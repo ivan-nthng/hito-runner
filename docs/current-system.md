@@ -9,7 +9,7 @@
   `npm run build` emits `.output/` locally
   `vercel build` emits `.vercel/output/` with Vercel functions
 - request middleware in `src/start.ts` now resolves either:
-  a temporary local single-user session from an httpOnly cookie when the local bypass env contract is enabled
+  a temporary local account session from an httpOnly cookie when the local bypass env contract is enabled
   or a Supabase session through `supabase.auth.getUser()` when auth env exists
   and otherwise falls back to signed-out preview context instead of crashing preview routes
 
@@ -22,12 +22,12 @@
   authenticated persisted weekly plan
 - `src/routes/login.tsx`
   renders either:
-  a minimal `Hito.` auth-first entry screen with the temporary local single-user credentials form when the local bypass env contract is enabled
-  or the email magic-link entry flow with loading, sent, callback-error, and retry states
+  a minimal `Hito.` auth-first entry screen with visible temporary local username/password login as the primary path and Magic Link as a secondary option
+  or the email magic-link entry flow when local credentials are not configured
 - `src/routes/api.auth.confirm.tsx`
   exchanges the Supabase auth code into a cookie-backed session
 - `src/routes/api.auth.local-login.tsx`
-  validates the temporary local single-user credentials contract and sets the local auth cookie
+  validates the temporary local account credentials contract and sets the local auth cookie
 - `src/routes/api.auth.logout.tsx`
   clears the temporary local auth cookie and signs out Supabase sessions when present
 - `src/routes/workout.$date.tsx`
@@ -55,7 +55,7 @@
 - `src/lib/imported-plan.ts`
   owns the observed JSON onboarding schema and the mapping from imported week data into the canonical saved workout shape
 - `src/lib/local-auth.ts`
-  owns the temporary local single-user credential contract and cookie session helpers
+  owns the temporary local account credential contract, account discovery, and cookie session helpers
 - `src/lib/local-auth-store.ts`
   owns the temporary local persisted state used only when the local bypass session is active
 - `supabase/migrations/20260506025058_phase_2_phase_3_backend_foundation.sql`
@@ -65,7 +65,7 @@
 
 - signed-out users now hit a login-first entry surface on `/` and do not create trusted history
 - signed-out preview routes can still render on direct route access when real Supabase env values are absent, but they are no longer the primary entry experience
-- temporary local-bypass users enter saved mode without magic-link email flow and write only to the local bypass state store
+- temporary local-bypass users enter saved mode through visible credentials login or Magic Link and write only to the local bypass state store
 - authenticated users without `runner_profile` are routed into setup on `/`
 - onboarding now imports one JSON plan shape, creates or updates one `runner_profile`, and creates one active `plan_cycle`
 - the imported JSON week creates the saved `planned_workouts` directly instead of shifting the preview template onto today
@@ -77,7 +77,7 @@
 ## Trusted-Output Contract
 
 - authenticated profile, plan, workout logs, and week status are trusted product output
-- temporary local-bypass profile, plan, workout logs, and week status are trusted only for the local single-user unblock path and remain a removal target
+- temporary local-bypass profile, plan, workout logs, and week status are trusted only for the local account-backed unblock path and remain a removal target
 - signed-out preview mode remains untrusted and clearly labeled as preview
 - `/progress`, `/body`, and `/integrations` still preserve shell breadth without claiming provider, AI, OCR, weather, or readiness truth
 
@@ -90,7 +90,8 @@
 - legacy `VITE_APP_NAME`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` remain supported as compatibility aliases
 - `APP_BASE_URL` is an optional server-only override for auth redirects; when it is unset, the magic-link request and callback derive origin from the incoming runtime request
 - `SUPABASE_SERVICE_ROLE_KEY` remains server-only and is not required by the currently implemented Vercel runtime path
-- temporary local-only auth env is `LOCAL_AUTH_BYPASS_ENABLED`, `LOCAL_AUTH_BYPASS_IDENTIFIER`, `LOCAL_AUTH_BYPASS_PASSWORD`, optional `LOCAL_AUTH_BYPASS_EMAIL`, optional `LOCAL_AUTH_BYPASS_USER_ID`, and optional `LOCAL_AUTH_BYPASS_STATE_PATH`
+- temporary local-only auth env now prefers `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE` for an untracked local account list
+- legacy single-account fallback env remains supported through `LOCAL_AUTH_BYPASS_IDENTIFIER`, `LOCAL_AUTH_BYPASS_PASSWORD`, optional `LOCAL_AUTH_BYPASS_EMAIL`, optional `LOCAL_AUTH_BYPASS_USER_ID`, and optional `LOCAL_AUTH_BYPASS_STATE_PATH`
 - required Vercel env for the live Supabase-backed auth path is `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - temporary local-only auth env must stay unset on Vercel because the bypass store is a local unblock mechanism, not a production deployment contract
 - server-side writes and persisted reads flow through one backend seam rather than direct client DB access

@@ -76,6 +76,7 @@ export const serverEnv = {
   localAuthBypassEnabled:
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED")?.toLowerCase() === "true" ||
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED") === "1",
+  localAuthBypassAccountsFile: optionalEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE"),
   localAuthBypassIdentifier: optionalEnv("LOCAL_AUTH_BYPASS_IDENTIFIER"),
   localAuthBypassPassword: optionalEnv("LOCAL_AUTH_BYPASS_PASSWORD"),
   localAuthBypassEmail: optionalEnv("LOCAL_AUTH_BYPASS_EMAIL"),
@@ -93,6 +94,6 @@ export const hasSupabaseServerEnv = Boolean(
 
 export const hasLocalAuthBypassEnv = Boolean(
   serverEnv.localAuthBypassEnabled &&
-  serverEnv.localAuthBypassIdentifier &&
-  serverEnv.localAuthBypassPassword,
+  (serverEnv.localAuthBypassAccountsFile ||
+    (serverEnv.localAuthBypassIdentifier && serverEnv.localAuthBypassPassword)),
 );

@@ -12,7 +12,7 @@ import {
   weekdayLong,
 } from "@/lib/training";
 import { buildImportedPlanSeed, type ImportedPlan } from "@/lib/imported-plan";
-import type { LocalAuthConfig } from "@/lib/local-auth";
+import type { LocalAuthAccountConfig } from "@/lib/local-auth";
 
 interface LocalProfileRecord {
   goalType: RunnerProfileSummary["goalType"];
@@ -85,7 +85,9 @@ const goalLabels = {
   distance_build: "Build distance",
 } as const;
 
-export async function getLocalAuthSnapshot(config: LocalAuthConfig): Promise<TrainingSnapshot> {
+export async function getLocalAuthSnapshot(
+  config: LocalAuthAccountConfig,
+): Promise<TrainingSnapshot> {
   const state = await readState(config);
 
   if (!state.profile) {
@@ -156,7 +158,10 @@ export async function getLocalAuthSnapshot(config: LocalAuthConfig): Promise<Tra
   };
 }
 
-export async function completeLocalAuthOnboarding(config: LocalAuthConfig, input: ImportedPlan) {
+export async function completeLocalAuthOnboarding(
+  config: LocalAuthAccountConfig,
+  input: ImportedPlan,
+) {
   const state = await readState(config);
   const now = new Date().toISOString();
   const importedSeed = buildImportedPlanSeed(input);
@@ -209,7 +214,7 @@ export async function completeLocalAuthOnboarding(config: LocalAuthConfig, input
 }
 
 export async function saveLocalAuthWorkoutLog(
-  config: LocalAuthConfig,
+  config: LocalAuthAccountConfig,
   input: {
     plannedWorkoutId: string;
     outcome: WorkoutOutcome;
@@ -269,7 +274,7 @@ export async function saveLocalAuthWorkoutLog(
   };
 }
 
-async function ensureLocalPlan(state: LocalAuthState, config: LocalAuthConfig) {
+async function ensureLocalPlan(state: LocalAuthState, config: LocalAuthAccountConfig) {
   if (!state.profile) {
     return state;
   }
@@ -321,7 +326,7 @@ async function ensureLocalPlan(state: LocalAuthState, config: LocalAuthConfig) {
   return nextState;
 }
 
-async function readState(config: LocalAuthConfig): Promise<LocalAuthState> {
+async function readState(config: LocalAuthAccountConfig): Promise<LocalAuthState> {
   const filePath = await resolveStatePath(config);
   const defaultState = buildDefaultState(config);
   const { readFile } = await import("node:fs/promises");
@@ -350,7 +355,7 @@ async function readState(config: LocalAuthConfig): Promise<LocalAuthState> {
   }
 }
 
-async function writeState(config: LocalAuthConfig, state: LocalAuthState) {
+async function writeState(config: LocalAuthAccountConfig, state: LocalAuthState) {
   const filePath = await resolveStatePath(config);
   const { mkdir, writeFile } = await import("node:fs/promises");
   const path = await import("node:path");

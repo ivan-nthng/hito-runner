@@ -29,7 +29,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { snapshot, localBypassEnabled } = Route.useLoaderData();
+  const { snapshot, localBypassEnabled, localAccounts, magicLinkEnabled } = Route.useLoaderData();
   const search = Route.useSearch();
   const nextLabel =
     search.next === "/"
@@ -87,6 +87,8 @@ function LoginPage() {
   return (
     <AuthEntryScreen
       localBypassEnabled={localBypassEnabled}
+      localAccounts={localAccounts}
+      magicLinkEnabled={magicLinkEnabled}
       next={search.next}
       status={search.status}
     />

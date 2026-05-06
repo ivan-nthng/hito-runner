@@ -26,11 +26,18 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { snapshot, localBypassEnabled } = Route.useLoaderData();
+  const { snapshot, localBypassEnabled, localAccounts, magicLinkEnabled } = Route.useLoaderData();
   const hasPlannedWorkouts = snapshot.workouts.some((workout) => workout.type !== "rest");
 
   if (snapshot.mode === "preview") {
-    return <AuthEntryScreen localBypassEnabled={localBypassEnabled} next="/" />;
+    return (
+      <AuthEntryScreen
+        localBypassEnabled={localBypassEnabled}
+        localAccounts={localAccounts}
+        magicLinkEnabled={magicLinkEnabled}
+        next="/"
+      />
+    );
   }
 
   return (

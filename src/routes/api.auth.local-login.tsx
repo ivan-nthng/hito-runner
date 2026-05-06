@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/auth/local-login")({
           });
         }
 
-        await appendLocalAuthSessionCookie(responseHeaders, request, authResult.config);
+        await appendLocalAuthSessionCookie(responseHeaders, request, authResult.account);
         responseHeaders.set("location", new URL(next, appBaseUrl).toString());
 
         return new Response(null, {

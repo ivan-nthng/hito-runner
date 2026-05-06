@@ -8,7 +8,11 @@ import {
   getLocalAuthSnapshot,
   saveLocalAuthWorkoutLog,
 } from "@/lib/local-auth-store";
-import { getLocalAuthConfig, isLocalAuthBypassEnabled } from "@/lib/local-auth";
+import {
+  findLocalAuthAccountByUserId,
+  getLocalAuthAccountSummaries,
+  isLocalAuthBypassEnabled,
+} from "@/lib/local-auth";
 import {
   addDaysIso,
   diffDaysIso,
@@ -69,7 +73,9 @@ const workoutLogInputSchema = z
 export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async () => {
   return {
     snapshot: await getSnapshotForRequest(),
-    localBypassEnabled: isLocalAuthBypassEnabled(),
+    localBypassEnabled: await isLocalAuthBypassEnabled(),
+    localAccounts: await getLocalAuthAccountSummaries(),
+    magicLinkEnabled: hasSupabaseBrowserEnv,
   };
 });
 
@@ -82,7 +88,9 @@ export const getShellRouteData = createServerFn({ method: "GET" }).handler(async
 export const getLoginRouteData = createServerFn({ method: "GET" }).handler(async () => {
   return {
     snapshot: await getSnapshotForRequest(),
-    localBypassEnabled: isLocalAuthBypassEnabled(),
+    localBypassEnabled: await isLocalAuthBypassEnabled(),
+    localAccounts: await getLocalAuthAccountSummaries(),
+    magicLinkEnabled: hasSupabaseBrowserEnv,
   };
 });
 
@@ -168,7 +176,7 @@ export const completeOnboarding = createServerFn({ method: "POST" })
     const importedSeed = buildImportedPlanSeed(data.importedPlan);
 
     if (auth.provider === "local") {
-      const localConfig = getRequiredLocalAuthConfig();
+      const localConfig = await getRequiredLocalAuthConfig(auth.userId);
 
       await completeLocalAuthOnboarding(localConfig, data.importedPlan);
 
@@ -224,7 +232,7 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
     const auth = requireAuthenticatedUser();
 
     if (auth.provider === "local") {
-      const localConfig = getRequiredLocalAuthConfig();
+      const localConfig = await getRequiredLocalAuthConfig(auth.userId);
       const result = await saveLocalAuthWorkoutLog(localConfig, {
         plannedWorkoutId: data.plannedWorkoutId,
         outcome: data.outcome,
@@ -331,7 +339,7 @@ async function getSnapshotForRequest() {
   }
 
   if (auth.provider === "local") {
-    return getLocalAuthSnapshot(getRequiredLocalAuthConfig());
+    return getLocalAuthSnapshot(await getRequiredLocalAuthConfig(auth.userId));
   }
 
   return getPersistedSnapshot(auth.userId);
@@ -612,8 +620,12 @@ function getRuntimeAppBaseUrl(request?: Request) {
   return appBaseUrl;
 }
 
-function getRequiredLocalAuthConfig() {
-  const config = getLocalAuthConfig();
+async function getRequiredLocalAuthConfig(userId: string | null) {
+  if (!userId) {
+    throw new Error("Temporary local auth bypass could not resolve the current account.");
+  }
+
+  const config = await findLocalAuthAccountByUserId(userId);
 
   if (!config) {
     throw new Error("Temporary local auth bypass is not configured in this environment.");

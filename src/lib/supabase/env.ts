@@ -1,5 +1,20 @@
 function readEnv(name: string): string | null {
-  const value = import.meta.env[name];
+  const viteValue = import.meta.env[name];
+
+  if (typeof viteValue === "string" && viteValue.trim()) {
+    return viteValue.trim();
+  }
+
+  const processEnv =
+    typeof globalThis !== "undefined" &&
+    "process" in globalThis &&
+    typeof globalThis.process === "object" &&
+    globalThis.process &&
+    "env" in globalThis.process &&
+    typeof globalThis.process.env === "object"
+      ? globalThis.process.env
+      : undefined;
+  const value = processEnv?.[name];
 
   if (typeof value !== "string" || !value.trim()) {
     return null;
@@ -56,8 +71,16 @@ export const publicEnv = {
 };
 
 export const serverEnv = {
-  appBaseUrl: envOrFallback("APP_BASE_URL", "http://localhost:3000"),
+  appBaseUrl: optionalEnv("APP_BASE_URL"),
   supabaseServiceRoleKey: optionalEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  localAuthBypassEnabled:
+    optionalEnv("LOCAL_AUTH_BYPASS_ENABLED")?.toLowerCase() === "true" ||
+    optionalEnv("LOCAL_AUTH_BYPASS_ENABLED") === "1",
+  localAuthBypassIdentifier: optionalEnv("LOCAL_AUTH_BYPASS_IDENTIFIER"),
+  localAuthBypassPassword: optionalEnv("LOCAL_AUTH_BYPASS_PASSWORD"),
+  localAuthBypassEmail: optionalEnv("LOCAL_AUTH_BYPASS_EMAIL"),
+  localAuthBypassUserId: optionalEnv("LOCAL_AUTH_BYPASS_USER_ID"),
+  localAuthBypassStatePath: optionalEnv("LOCAL_AUTH_BYPASS_STATE_PATH"),
 };
 
 export const hasSupabaseBrowserEnv = Boolean(
@@ -66,4 +89,10 @@ export const hasSupabaseBrowserEnv = Boolean(
 
 export const hasSupabaseServerEnv = Boolean(
   hasSupabaseBrowserEnv && serverEnv.supabaseServiceRoleKey,
+);
+
+export const hasLocalAuthBypassEnv = Boolean(
+  serverEnv.localAuthBypassEnabled &&
+  serverEnv.localAuthBypassIdentifier &&
+  serverEnv.localAuthBypassPassword,
 );

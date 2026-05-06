@@ -15,6 +15,8 @@ import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api.auth.logout'
+import { Route as ApiAuthLocalLoginRouteImport } from './routes/api.auth.local-login'
 import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
 
 const ProgressRoute = ProgressRouteImport.update({
@@ -47,6 +49,16 @@ const WorkoutDateRoute = WorkoutDateRouteImport.update({
   path: '/workout/$date',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthLocalLoginRoute = ApiAuthLocalLoginRouteImport.update({
+  id: '/api/auth/local-login',
+  path: '/api/auth/local-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthConfirmRoute = ApiAuthConfirmRouteImport.update({
   id: '/api/auth/confirm',
   path: '/api/auth/confirm',
@@ -61,6 +73,8 @@ export interface FileRoutesByFullPath {
   '/progress': typeof ProgressRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
+  '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +84,8 @@ export interface FileRoutesByTo {
   '/progress': typeof ProgressRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
+  '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +96,8 @@ export interface FileRoutesById {
   '/progress': typeof ProgressRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
+  '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
+  '/api/auth/logout': typeof ApiAuthLogoutRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +109,8 @@ export interface FileRouteTypes {
     | '/progress'
     | '/workout/$date'
     | '/api/auth/confirm'
+    | '/api/auth/local-login'
+    | '/api/auth/logout'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +120,8 @@ export interface FileRouteTypes {
     | '/progress'
     | '/workout/$date'
     | '/api/auth/confirm'
+    | '/api/auth/local-login'
+    | '/api/auth/logout'
   id:
     | '__root__'
     | '/'
@@ -109,6 +131,8 @@ export interface FileRouteTypes {
     | '/progress'
     | '/workout/$date'
     | '/api/auth/confirm'
+    | '/api/auth/local-login'
+    | '/api/auth/logout'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +143,8 @@ export interface RootRouteChildren {
   ProgressRoute: typeof ProgressRoute
   WorkoutDateRoute: typeof WorkoutDateRoute
   ApiAuthConfirmRoute: typeof ApiAuthConfirmRoute
+  ApiAuthLocalLoginRoute: typeof ApiAuthLocalLoginRoute
+  ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -165,6 +191,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkoutDateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/local-login': {
+      id: '/api/auth/local-login'
+      path: '/api/auth/local-login'
+      fullPath: '/api/auth/local-login'
+      preLoaderRoute: typeof ApiAuthLocalLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/confirm': {
       id: '/api/auth/confirm'
       path: '/api/auth/confirm'
@@ -183,6 +223,8 @@ const rootRouteChildren: RootRouteChildren = {
   ProgressRoute: ProgressRoute,
   WorkoutDateRoute: WorkoutDateRoute,
   ApiAuthConfirmRoute: ApiAuthConfirmRoute,
+  ApiAuthLocalLoginRoute: ApiAuthLocalLoginRoute,
+  ApiAuthLogoutRoute: ApiAuthLogoutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

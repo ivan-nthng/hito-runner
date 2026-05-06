@@ -20,6 +20,10 @@ Architect Agent
   visible branding is now `Hito Running`, misleading AI/sync/OCR/weather claims were neutralized, and `/progress`, `/body`, `/integrations` remain as honest preview surfaces.
 - Phase 2 auth and env setup are complete:
   Supabase wiring now exists, `.env.example` matches the required contract, `/login` is live, and auth callback handling is implemented through a cookie-backed magic-link flow.
+- Phase 2 auth runtime verification fixes are complete:
+  callback redirects now use the live runtime origin unless `APP_BASE_URL` explicitly overrides it, and preview-mode login CTAs preserve the original safe `next` destination on `/login`.
+- Temporary local saved-mode unblock is complete:
+  `/login` now supports one env-backed local credentials flow with an httpOnly cookie and temporary server-side state so the saved-mode seam can be exercised while Magic Link is intentionally paused.
 - Phase 3 mock replacement is complete:
   one canonical data seam now serves signed-out preview mode and authenticated persisted mode without route churn.
 - Phase 4 completion persistence and week status are complete:
@@ -553,7 +557,8 @@ Recommended surface corrections:
   completed: keep preview mode separate from trusted saved mode
 - Invariants:
   auth exists to support persistence, not to redefine the product
-  magic link is the only required first auth path
+  Supabase magic link remains the intended long-term auth path
+  any local credentials bypass must stay single-user, env-backed, and temporary
   no client-side secret exposure
 - Failure modes:
   auth gating too early and blocking baseline review

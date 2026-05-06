@@ -1,6 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { DEFAULT_AUTH_REDIRECT, sanitizeRedirectPath } from "@/lib/auth-redirect";
+import {
+  completeLocalAuthOnboarding,
+  getLocalAuthSnapshot,
+  saveLocalAuthWorkoutLog,
+} from "@/lib/local-auth-store";
+import { getLocalAuthConfig, isLocalAuthBypassEnabled } from "@/lib/local-auth";
 import {
   addDaysIso,
   diffDaysIso,
@@ -73,11 +80,17 @@ export const getShellRouteData = createServerFn({ method: "GET" }).handler(async
   };
 });
 
+export const getLoginRouteData = createServerFn({ method: "GET" }).handler(async () => {
+  return {
+    snapshot: await getSnapshotForRequest(),
+    localBypassEnabled: isLocalAuthBypassEnabled(),
+  };
+});
+
 export const getWorkoutRouteData = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => z.object({ date: z.string() }).parse(value))
   .handler(async ({ data }) => {
-    const auth = getRequestAuthContext();
-    const snapshot = auth.userId ? await getPersistedSnapshot(auth.userId) : getPreviewSnapshot();
+    const snapshot = await getSnapshotForRequest();
 
     if (snapshot.mode === "onboarding") {
       return {
@@ -129,8 +142,8 @@ export const requestMagicLink = createServerFn({ method: "POST" })
         },
       },
     );
-    const redirectTo = new URL("/api/auth/confirm", serverEnv.appBaseUrl);
-    const next = sanitizeRedirect(data.next ?? null);
+    const redirectTo = new URL("/api/auth/confirm", getRuntimeAppBaseUrl());
+    const next = sanitizeRedirectPath(data.next);
     redirectTo.searchParams.set("next", next);
 
     const { error } = await supabase.auth.signInWithOtp({
@@ -152,7 +165,24 @@ export const requestMagicLink = createServerFn({ method: "POST" })
 export const completeOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => onboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
-    const { userId } = requireAuthenticatedUser();
+    const auth = requireAuthenticatedUser();
+
+    if (auth.provider === "local") {
+      const localConfig = getRequiredLocalAuthConfig();
+
+      await completeLocalAuthOnboarding(localConfig, {
+        goalType: data.goalType,
+        baselineSessionsPerWeek: data.baselineSessionsPerWeek,
+        baselineLongRunKm: data.baselineLongRunKm,
+        baselineNotes: data.baselineNotes ?? null,
+      });
+
+      return {
+        ok: true,
+      };
+    }
+
+    const { userId } = auth;
     const supabase = createAdminSupabaseClient();
     const goalLabel = goalLabels[data.goalType];
 
@@ -197,7 +227,27 @@ export const completeOnboarding = createServerFn({ method: "POST" })
 export const saveWorkoutLog = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
-    const { userId } = requireAuthenticatedUser();
+    const auth = requireAuthenticatedUser();
+
+    if (auth.provider === "local") {
+      const localConfig = getRequiredLocalAuthConfig();
+      const result = await saveLocalAuthWorkoutLog(localConfig, {
+        plannedWorkoutId: data.plannedWorkoutId,
+        outcome: data.outcome,
+        actualDistanceKm: data.actualDistanceKm,
+        actualDurationMin: data.actualDurationMin,
+        rpe: data.rpe,
+        notes: data.notes,
+        intervalsCompleted: data.intervalsCompleted,
+      });
+
+      return {
+        ok: true,
+        id: result.id,
+      };
+    }
+
+    const { userId } = auth;
     const supabase = createAdminSupabaseClient();
 
     const plannedWorkout = await supabase
@@ -247,26 +297,36 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
 export async function exchangeCodeForSession(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = sanitizeRedirect(url.searchParams.get("next"));
+  const appBaseUrl = getRuntimeAppBaseUrl(request);
+  const next = sanitizeRedirectPath(url.searchParams.get("next"));
   const responseHeaders = new Headers();
 
   if (!hasSupabaseBrowserEnv) {
-    return redirectResponse(buildLoginRedirect("error", next).toString(), responseHeaders);
+    return redirectResponse(
+      buildLoginRedirect("error", next, appBaseUrl).toString(),
+      responseHeaders,
+    );
   }
 
   const supabase = createRequestSupabaseClient(request, responseHeaders);
 
   if (!code) {
-    return redirectResponse(buildLoginRedirect("error", next).toString(), responseHeaders);
+    return redirectResponse(
+      buildLoginRedirect("error", next, appBaseUrl).toString(),
+      responseHeaders,
+    );
   }
 
   const exchangeResult = await supabase.auth.exchangeCodeForSession(code);
 
   if (exchangeResult.error) {
-    return redirectResponse(buildLoginRedirect("error", next).toString(), responseHeaders);
+    return redirectResponse(
+      buildLoginRedirect("error", next, appBaseUrl).toString(),
+      responseHeaders,
+    );
   }
 
-  return redirectResponse(new URL(next, serverEnv.appBaseUrl).toString(), responseHeaders);
+  return redirectResponse(new URL(next, appBaseUrl).toString(), responseHeaders);
 }
 
 async function getSnapshotForRequest() {
@@ -274,6 +334,10 @@ async function getSnapshotForRequest() {
 
   if (!auth.userId) {
     return getPreviewSnapshot();
+  }
+
+  if (auth.provider === "local") {
+    return getLocalAuthSnapshot(getRequiredLocalAuthConfig());
   }
 
   return getPersistedSnapshot(auth.userId);
@@ -295,6 +359,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
     return {
       mode: "onboarding",
       source: "persisted",
+      backend: "supabase",
       currentDate: todayIso(),
       planMeta: null,
       profile: null,
@@ -334,6 +399,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
   return {
     mode: "authenticated",
     source: "persisted",
+    backend: "supabase",
     currentDate,
     planMeta: {
       title: planCycle.title,
@@ -485,19 +551,41 @@ function redirectResponse(url: string, headers: Headers) {
   });
 }
 
-function sanitizeRedirect(next: string | null) {
-  if (!next || !next.startsWith("/")) {
-    return "/";
+function getRuntimeAppBaseUrl(request?: Request) {
+  if (serverEnv.appBaseUrl) {
+    return new URL(serverEnv.appBaseUrl).origin;
   }
 
-  return next;
+  if (request) {
+    return new URL(request.url).origin;
+  }
+
+  const { appBaseUrl } = getRequestAuthContext();
+
+  if (!appBaseUrl) {
+    throw new Error(
+      "Could not resolve the app base URL for this request. Set APP_BASE_URL or retry through the app runtime.",
+    );
+  }
+
+  return appBaseUrl;
 }
 
-function buildLoginRedirect(status: "error", next: string) {
-  const url = new URL("/login", serverEnv.appBaseUrl);
+function getRequiredLocalAuthConfig() {
+  const config = getLocalAuthConfig();
+
+  if (!config) {
+    throw new Error("Temporary local auth bypass is not configured in this environment.");
+  }
+
+  return config;
+}
+
+function buildLoginRedirect(status: "error", next: string, appBaseUrl: string) {
+  const url = new URL("/login", appBaseUrl);
   url.searchParams.set("status", status);
 
-  if (next !== "/") {
+  if (next !== DEFAULT_AUTH_REDIRECT) {
     url.searchParams.set("next", next);
   }
 

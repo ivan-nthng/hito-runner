@@ -1,14 +1,34 @@
 import { createMiddleware, createStart } from "@tanstack/react-start";
+import { resolveLocalAuthSession } from "@/lib/local-auth";
+import { serverEnv } from "@/lib/supabase/env";
 import { createRequestSupabaseClient, mergeResponseHeaders } from "@/lib/supabase/server";
 import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
 
 const authMiddleware = createMiddleware().server(async ({ next, request }) => {
+  const appBaseUrl = serverEnv.appBaseUrl ?? new URL(request.url).origin;
+  const localSession = await resolveLocalAuthSession(request);
+
+  if (localSession) {
+    return next({
+      context: {
+        auth: {
+          userId: localSession.userId,
+          email: localSession.email,
+          appBaseUrl,
+          provider: "local",
+        },
+      },
+    });
+  }
+
   if (!hasSupabaseBrowserEnv) {
     return next({
       context: {
         auth: {
           userId: null,
           email: null,
+          appBaseUrl,
+          provider: "preview",
         },
       },
     });
@@ -35,6 +55,8 @@ const authMiddleware = createMiddleware().server(async ({ next, request }) => {
       auth: {
         userId,
         email,
+        appBaseUrl,
+        provider: userId ? "supabase" : "preview",
       },
     },
   });

@@ -19,13 +19,14 @@ Active
 - Phase 3 mock-seam replacement is implemented through one canonical backend contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
+- The unauthenticated root flow is now login-first, and first-time onboarding is now JSON-first against the observed week-template structure.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
 - The Cloudflare-oriented build shape has been replaced with a Vercel-compatible Nitro deployment path.
 - The repo now contains one TanStack Start runtime with preserved imported route structure, stable preview mode, authenticated saved mode backed by Supabase when full env/project setup is available, and a temporary local single-user bypass path for immediate local use.
 
 ## Current Active Stream
 
-Vercel deployment validation on top of the implemented TanStack Start + Supabase runtime, with temporary local bypass still restricted to local use only.
+Vercel deployment validation on top of the implemented TanStack Start + Supabase runtime, with login-first entry and JSON-first onboarding now layered onto the temporary local bypass for local use.
 
 ## Next Recommended Steps
 

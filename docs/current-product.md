@@ -4,7 +4,7 @@
 
 The implemented product is now a hybrid running-plan experience for Hito Running:
 
-- signed-out users can inspect the preserved baseline as an honest preview
+- signed-out users now enter through a login-first screen instead of landing in the calendar as the primary experience
 - signed-in users can create a real profile, receive a persisted plan, log workouts, and see backend-derived weekly status
 - the current local unblock path uses a temporary single-user credentials login instead of depending on the Supabase magic-link email flow
 
@@ -14,7 +14,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 
 - home `/`
   shows either:
-  preview weekly plan
+  login-first unauthenticated entry
   setup gate for authenticated users without a profile
   persisted weekly plan for authenticated users with setup complete
 - workout detail `/workout/$date`
@@ -26,7 +26,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - integrations `/integrations`
   keeps the integrations information architecture as a not-connected preview
 - login `/login`
-  provides the current temporary local single-user credentials entry path and retains the Supabase magic-link path as the intended long-term auth architecture
+  provides the current `Hito.` login-first surface, the temporary local single-user credentials entry path, and the retained Supabase magic-link path as the intended long-term auth architecture
 
 ## Interaction Contracts
 
@@ -34,6 +34,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - calendar hover and navigation behaviors remain preserved
 - workout-detail tabs remain interactive
 - workout-detail tab selection now follows the route search so direct `?tab=complete` entry and reload stay aligned with the visible logging surface
+- the unauthenticated root experience is now login-first instead of preview-first
 - completion logging controls stay available in both modes:
   preview mode remains local-only
   saved mode persists through the backend seam
@@ -41,14 +42,15 @@ The product still avoids claims of live coaching, connected integrations, weathe
 
 ## Workflow And Status Behavior
 
-- signed-out users open into a preserved sample weekly plan
-- authenticated users without setup complete are gated into goal and baseline capture on `/`
+- signed-out users open into a minimal auth-first entry surface with `Hito.` branding
+- authenticated users without setup complete are gated into JSON-first import on `/`
 - the temporary local login path behaves as signed-in saved mode for one configured local user without requiring email delivery
-- onboarding now runs as a compact two-step setup flow with completion feedback before returning to the saved weekly plan
-- setup writes one profile and seeds one active plan from the imported template
+- onboarding now imports one JSON plan week, validates the expected shape, and returns into the saved weekly plan after import
+- setup writes one profile and creates one active plan from the imported JSON data
 - today&apos;s workout can be opened from home or calendar cells
 - saved workout logging now distinguishes preview-only drafts from persisted saves, supports truthful overwrite between `completed`, `partial`, and `skipped`, and surfaces pending, success, and failure feedback without hiding backend failures
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
+- signed-in surfaces now state honestly that JSON export is a later capability, not implemented in this slice yet
 
 ## Known Allowed Fix Areas
 

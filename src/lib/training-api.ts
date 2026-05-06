@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { DEFAULT_AUTH_REDIRECT, sanitizeRedirectPath } from "@/lib/auth-redirect";
+import { buildImportedPlanSeed, importedPlanSchema } from "@/lib/imported-plan";
 import {
   completeLocalAuthOnboarding,
   getLocalAuthSnapshot,
@@ -38,10 +39,7 @@ const loginInputSchema = z.object({
 });
 
 const onboardingInputSchema = z.object({
-  goalType: z.enum(["build_consistency", "first_race", "distance_build"]),
-  baselineSessionsPerWeek: z.number().int().min(0).max(7),
-  baselineLongRunKm: z.number().min(0).max(80),
-  baselineNotes: z.string().trim().max(500).nullable().optional(),
+  importedPlan: importedPlanSchema,
 });
 
 const workoutLogInputSchema = z
@@ -71,6 +69,7 @@ const workoutLogInputSchema = z
 export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async () => {
   return {
     snapshot: await getSnapshotForRequest(),
+    localBypassEnabled: isLocalAuthBypassEnabled(),
   };
 });
 
@@ -166,16 +165,12 @@ export const completeOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => onboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
     const auth = requireAuthenticatedUser();
+    const importedSeed = buildImportedPlanSeed(data.importedPlan);
 
     if (auth.provider === "local") {
       const localConfig = getRequiredLocalAuthConfig();
 
-      await completeLocalAuthOnboarding(localConfig, {
-        goalType: data.goalType,
-        baselineSessionsPerWeek: data.baselineSessionsPerWeek,
-        baselineLongRunKm: data.baselineLongRunKm,
-        baselineNotes: data.baselineNotes ?? null,
-      });
+      await completeLocalAuthOnboarding(localConfig, data.importedPlan);
 
       return {
         ok: true,
@@ -184,17 +179,16 @@ export const completeOnboarding = createServerFn({ method: "POST" })
 
     const { userId } = auth;
     const supabase = createAdminSupabaseClient();
-    const goalLabel = goalLabels[data.goalType];
 
     const profileUpsert = await supabase
       .from("runner_profiles")
       .upsert({
         user_id: userId,
-        goal_type: data.goalType,
-        goal_label: goalLabel,
-        baseline_sessions_per_week: data.baselineSessionsPerWeek,
-        baseline_long_run_km: data.baselineLongRunKm,
-        baseline_notes: data.baselineNotes ?? null,
+        goal_type: importedSeed.profile.goalType,
+        goal_label: importedSeed.profile.goalLabel,
+        baseline_sessions_per_week: importedSeed.profile.baselineSessionsPerWeek,
+        baseline_long_run_km: importedSeed.profile.baselineLongRunKm,
+        baseline_notes: importedSeed.profile.baselineNotes ?? null,
         setup_state: "completed",
       })
       .select("*")
@@ -216,7 +210,7 @@ export const completeOnboarding = createServerFn({ method: "POST" })
     }
 
     if (!existingPlan.data) {
-      await createAssignedPlan(userId, profileRowToSummary(profileUpsert.data));
+      await createAssignedPlanFromImportedInput(userId, data.importedPlan);
     }
 
     return {
@@ -485,6 +479,53 @@ async function createAssignedPlan(userId: string, profile: RunnerProfileSummary)
       display_order: index,
     };
   });
+
+  const workoutInsert = await supabase.from("planned_workouts").insert(workouts);
+
+  if (workoutInsert.error) {
+    throw new Error(workoutInsert.error.message);
+  }
+
+  return planInsert.data;
+}
+
+async function createAssignedPlanFromImportedInput(
+  userId: string,
+  importedPlan: z.infer<typeof importedPlanSchema>,
+) {
+  const supabase = createAdminSupabaseClient();
+  const importedSeed = buildImportedPlanSeed(importedPlan);
+  const planInsert = await supabase
+    .from("plan_cycles")
+    .insert({
+      user_id: userId,
+      status: "active",
+      title: importedSeed.title,
+      goal_summary: importedSeed.goalSummary,
+      source_template: importedSeed.sourceTemplate,
+      start_date: importedSeed.startDate,
+      end_date: importedSeed.endDate,
+    })
+    .select("*")
+    .single();
+
+  if (planInsert.error) {
+    throw new Error(planInsert.error.message);
+  }
+
+  const workouts = importedSeed.workouts.map((workout) => ({
+    plan_cycle_id: planInsert.data.id,
+    user_id: userId,
+    workout_date: workout.workoutDate,
+    weekday: workout.weekday,
+    week_number: workout.weekNumber,
+    phase: workout.phase,
+    workout_type: workout.workoutType,
+    title: workout.title,
+    notes: workout.notes,
+    steps: workout.steps as Json,
+    display_order: workout.displayOrder,
+  }));
 
   const workoutInsert = await supabase.from("planned_workouts").insert(workouts);
 

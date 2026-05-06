@@ -11,6 +11,7 @@ import {
   type WorkoutOutcome,
   weekdayLong,
 } from "@/lib/training";
+import { buildImportedPlanSeed, type ImportedPlan } from "@/lib/imported-plan";
 import type { LocalAuthConfig } from "@/lib/local-auth";
 
 interface LocalProfileRecord {
@@ -155,36 +156,56 @@ export async function getLocalAuthSnapshot(config: LocalAuthConfig): Promise<Tra
   };
 }
 
-export async function completeLocalAuthOnboarding(
-  config: LocalAuthConfig,
-  input: {
-    goalType: RunnerProfileSummary["goalType"];
-    baselineSessionsPerWeek: number;
-    baselineLongRunKm: number;
-    baselineNotes: string | null;
-  },
-) {
+export async function completeLocalAuthOnboarding(config: LocalAuthConfig, input: ImportedPlan) {
   const state = await readState(config);
   const now = new Date().toISOString();
+  const importedSeed = buildImportedPlanSeed(input);
   const profile: LocalProfileRecord = {
-    goalType: input.goalType,
-    goalLabel: goalLabels[input.goalType],
-    baselineSessionsPerWeek: input.baselineSessionsPerWeek,
-    baselineLongRunKm: input.baselineLongRunKm,
-    baselineNotes: input.baselineNotes,
+    goalType: importedSeed.profile.goalType,
+    goalLabel: importedSeed.profile.goalLabel,
+    baselineSessionsPerWeek: importedSeed.profile.baselineSessionsPerWeek,
+    baselineLongRunKm: importedSeed.profile.baselineLongRunKm,
+    baselineNotes: importedSeed.profile.baselineNotes,
     setupState: "completed",
     setupCompletedAt: state.profile?.setupCompletedAt ?? now,
     createdAt: state.profile?.createdAt ?? now,
     updatedAt: now,
   };
+  const planCycle: LocalPlanCycleRecord = {
+    id: crypto.randomUUID(),
+    userId: config.userId,
+    status: "active",
+    title: importedSeed.title,
+    goalSummary: importedSeed.goalSummary,
+    sourceTemplate: importedSeed.sourceTemplate,
+    startDate: importedSeed.startDate,
+    endDate: importedSeed.endDate,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const plannedWorkouts: LocalPlannedWorkoutRecord[] = importedSeed.workouts.map((workout) => ({
+    id: crypto.randomUUID(),
+    planCycleId: planCycle.id,
+    userId: config.userId,
+    workoutDate: workout.workoutDate,
+    weekday: workout.weekday,
+    weekNumber: workout.weekNumber,
+    phase: workout.phase,
+    workoutType: workout.workoutType,
+    title: workout.title,
+    notes: workout.notes,
+    steps: workout.steps,
+    displayOrder: workout.displayOrder,
+    createdAt: now,
+  }));
 
-  const nextState: LocalAuthState = {
+  await writeState(config, {
     ...state,
     profile,
-  };
-
-  const withPlan = nextState.planCycle ? nextState : await ensureLocalPlan(nextState, config);
-  await writeState(config, withPlan);
+    planCycle,
+    plannedWorkouts,
+    workoutLogs: [],
+  });
 }
 
 export async function saveLocalAuthWorkoutLog(

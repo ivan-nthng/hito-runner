@@ -17,12 +17,12 @@
 
 - `src/routes/index.tsx`
   renders one of three states behind the same route:
-  preview weekly plan
+  login-first unauthenticated entry
   authenticated onboarding gate
   authenticated persisted weekly plan
 - `src/routes/login.tsx`
   renders either:
-  a temporary local single-user credentials form when the local bypass env contract is enabled
+  a minimal `Hito.` auth-first entry screen with the temporary local single-user credentials form when the local bypass env contract is enabled
   or the email magic-link entry flow with loading, sent, callback-error, and retry states
 - `src/routes/api.auth.confirm.tsx`
   exchanges the Supabase auth code into a cookie-backed session
@@ -51,7 +51,9 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, onboarding, and workout logging
+  owns server-backed loading and mutation entry points for home, workout detail, progress, login, JSON-first onboarding, and workout logging
+- `src/lib/imported-plan.ts`
+  owns the observed JSON onboarding schema and the mapping from imported week data into the canonical saved workout shape
 - `src/lib/local-auth.ts`
   owns the temporary local single-user credential contract and cookie session helpers
 - `src/lib/local-auth-store.ts`
@@ -61,12 +63,12 @@
 
 ## State And Lifecycle Rules
 
-- signed-out users stay in preview mode and do not create trusted history
-- signed-out preview routes still render even when real Supabase env values are absent
+- signed-out users now hit a login-first entry surface on `/` and do not create trusted history
+- signed-out preview routes can still render on direct route access when real Supabase env values are absent, but they are no longer the primary entry experience
 - temporary local-bypass users enter saved mode without magic-link email flow and write only to the local bypass state store
 - authenticated users without `runner_profile` are routed into setup on `/`
-- onboarding creates or updates one `runner_profile` and seeds one active `plan_cycle`
-- the active plan seeds `planned_workouts` from the imported template shifted onto the current start date
+- onboarding now imports one JSON plan shape, creates or updates one `runner_profile`, and creates one active `plan_cycle`
+- the imported JSON week creates the saved `planned_workouts` directly instead of shifting the preview template onto today
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - saved workout logs can be overwritten from `completed` to `partial` or `skipped`, and skipped truth persists with null actual metrics instead of backfilled planned defaults
 - past-due planned workouts without a saved log are treated as `skipped` until the user overwrites them with a real result

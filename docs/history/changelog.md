@@ -12,10 +12,13 @@ Completed implementation history only.
 - Fixed `/login?next=...` shell CTA behavior so `Save with login` preserves the original safe destination instead of nesting `/login` into `next`.
 - Polished `/login` into an intentional magic-link surface with clearer send, success, callback-error, and retry states while preserving the imported shell and motion language.
 - Upgraded authenticated onboarding into a compact two-step setup flow with clearer submission and completion feedback before returning to the weekly plan.
+- Replaced the preview-first unauthenticated root with a login-first `Hito.` entry surface, added a password visibility toggle to the temporary local login form, and kept the existing local single-user auth path intact.
+- Replaced the old goal/baseline onboarding wizard with a JSON-first onboarding flow that validates the observed uploaded template shape and creates the saved calendar directly from the imported week.
 - Tightened `/`, `/workout/$date`, and `/progress` edge-state messaging with explicit pending, error, empty, setup-required, and no-plan states.
 - Improved workout logging feedback so preview-only drafts, persisted saves, overwrite edits, and save failures are clearly distinguished inside the preserved completion panel.
 - Fixed the saved-mode workout logging flow so `partial` and `skipped` outcomes persist truthfully, completed results can be overwritten to either state, skipped reloads no longer backfill planned metrics as actuals, and route-level week status follows the saved truth after reload.
 - Made preview routes boot without real Supabase env values by falling back to signed-out preview auth context, while keeping live auth and persisted verification dependent on real Supabase configuration.
+- Added honest signed-in copy that JSON export is a later capability, not a live feature in the current slice.
 
 ## 2026-05-05
 

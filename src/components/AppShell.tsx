@@ -135,8 +135,8 @@ export function AppShell({
             <p className="mt-2 text-xs leading-relaxed text-foreground/80">
               {shellSnapshot.source === "persisted"
                 ? shellSnapshot.backend === "temporary_local"
-                  ? "This shell now reads one temporary local saved-mode contract for a single-user bypass while preserving the imported layout and interaction structure."
-                  : "This shell now reads one canonical persisted profile, plan, and workout-log contract while preserving the imported layout and interaction structure."
+                  ? "This shell now reads one temporary local saved-mode contract for a single-user bypass while preserving the imported layout and interaction structure. JSON export comes later."
+                  : "This shell now reads one canonical persisted profile, plan, and workout-log contract while preserving the imported layout and interaction structure. JSON export comes later."
                 : "This imported shell stays available as a read-only preview while real profile setup and saved workout logging live behind auth."}
             </p>
             <div className="mt-3 text-[11px] tracking-wider uppercase text-signal">

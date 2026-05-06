@@ -3,45 +3,45 @@ import { createRequestSupabaseClient, mergeResponseHeaders } from "@/lib/supabas
 import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
 
 const authMiddleware = createMiddleware().server(async ({ next, request }) => {
-	if (!hasSupabaseBrowserEnv) {
-		return next({
-			context: {
-				auth: {
-					userId: null,
-					email: null,
-				},
-			},
-		});
-	}
+  if (!hasSupabaseBrowserEnv) {
+    return next({
+      context: {
+        auth: {
+          userId: null,
+          email: null,
+        },
+      },
+    });
+  }
 
-	const responseHeaders = new Headers();
-	const supabase = createRequestSupabaseClient(request, responseHeaders);
+  const responseHeaders = new Headers();
+  const supabase = createRequestSupabaseClient(request, responseHeaders);
 
-	let userId: string | null = null;
-	let email: string | null = null;
+  let userId: string | null = null;
+  let email: string | null = null;
 
-	const claimsResult = await supabase.auth.getClaims();
+  const userResult = await supabase.auth.getUser();
 
-	if (claimsResult.error) {
-		await supabase.auth.signOut();
-	} else {
-		const claims = claimsResult.data?.claims;
-		userId = typeof claims?.sub === "string" ? claims.sub : null;
-		email = typeof claims?.email === "string" ? claims.email : null;
-	}
+  if (userResult.error) {
+    await supabase.auth.signOut();
+  } else {
+    const user = userResult.data.user;
+    userId = user?.id ?? null;
+    email = user?.email ?? null;
+  }
 
-	const result = await next({
-		context: {
-			auth: {
-				userId,
-				email,
-			},
-		},
-	});
+  const result = await next({
+    context: {
+      auth: {
+        userId,
+        email,
+      },
+    },
+  });
 
-	return mergeResponseHeaders(result.response, responseHeaders);
+  return mergeResponseHeaders(result.response, responseHeaders);
 });
 
 export const startInstance = createStart(() => ({
-	requestMiddleware: [authMiddleware],
+  requestMiddleware: [authMiddleware],
 }));

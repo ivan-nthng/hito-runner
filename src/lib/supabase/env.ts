@@ -1,46 +1,69 @@
-function requireEnv(name: string): string {
-	const value = import.meta.env[name];
+function readEnv(name: string): string | null {
+  const value = import.meta.env[name];
 
-	if (typeof value !== "string" || !value.trim()) {
-		throw new Error(`Missing required environment variable: ${name}`);
-	}
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
 
-	return value.trim();
+  return value.trim();
 }
 
-function envOrFallback(name: string, fallback: string): string {
-	const value = import.meta.env[name];
+function requireEnv(...names: string[]): string {
+  for (const name of names) {
+    const value = readEnv(name);
 
-	if (typeof value !== "string" || !value.trim()) {
-		return fallback;
-	}
+    if (value) {
+      return value;
+    }
+  }
 
-	return value.trim();
+  throw new Error(`Missing required environment variable: ${names.join(" or ")}`);
 }
 
-function optionalEnv(name: string): string | null {
-	const value = import.meta.env[name];
+function envOrFallback(names: string | string[], fallback: string): string {
+  const envNames = Array.isArray(names) ? names : [names];
 
-	if (typeof value !== "string" || !value.trim()) {
-		return null;
-	}
+  for (const name of envNames) {
+    const value = readEnv(name);
 
-	return value.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return fallback;
+}
+
+function optionalEnv(...names: string[]): string | null {
+  for (const name of names) {
+    const value = readEnv(name);
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 export const publicEnv = {
-	appName: envOrFallback("VITE_APP_NAME", "Hito Running"),
-	supabaseUrl: optionalEnv("VITE_SUPABASE_URL"),
-	supabaseAnonKey: optionalEnv("VITE_SUPABASE_ANON_KEY"),
+  appName: envOrFallback(["NEXT_PUBLIC_APP_NAME", "VITE_APP_NAME"], "Hito Running"),
+  supabaseUrl: optionalEnv("NEXT_PUBLIC_SUPABASE_URL", "VITE_SUPABASE_URL"),
+  supabasePublishableKey: optionalEnv(
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    "VITE_SUPABASE_ANON_KEY",
+  ),
 };
 
 export const serverEnv = {
-	appBaseUrl: envOrFallback("APP_BASE_URL", "http://localhost:3000"),
-	supabaseServiceRoleKey: optionalEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  appBaseUrl: envOrFallback("APP_BASE_URL", "http://localhost:3000"),
+  supabaseServiceRoleKey: optionalEnv("SUPABASE_SERVICE_ROLE_KEY"),
 };
 
-export const hasSupabaseBrowserEnv = Boolean(publicEnv.supabaseUrl && publicEnv.supabaseAnonKey);
+export const hasSupabaseBrowserEnv = Boolean(
+  publicEnv.supabaseUrl && publicEnv.supabasePublishableKey,
+);
 
 export const hasSupabaseServerEnv = Boolean(
-	hasSupabaseBrowserEnv && serverEnv.supabaseServiceRoleKey,
+  hasSupabaseBrowserEnv && serverEnv.supabaseServiceRoleKey,
 );

@@ -6,16 +6,16 @@ import type { Database } from "@/lib/supabase/database";
 let browserClient: SupabaseClient<Database> | null = null;
 
 export function getBrowserSupabaseClient() {
-	if (!browserClient) {
-		if (!hasSupabaseBrowserEnv) {
-			throw new Error("Supabase auth is not configured in this environment.");
-		}
+  if (!browserClient) {
+    if (!hasSupabaseBrowserEnv) {
+      throw new Error("Supabase auth is not configured in this environment.");
+    }
 
-		browserClient = createBrowserClient<Database>(
-			publicEnv.supabaseUrl!,
-			publicEnv.supabaseAnonKey!,
-		);
-	}
+    browserClient = createBrowserClient<Database>(
+      publicEnv.supabaseUrl!,
+      publicEnv.supabasePublishableKey!,
+    );
+  }
 
-	return browserClient;
+  return browserClient;
 }

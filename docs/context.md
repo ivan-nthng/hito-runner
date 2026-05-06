@@ -47,7 +47,7 @@ Signed-out preview mode remains intentionally outside the trusted product bounda
 - seam:
   one canonical data seam in `src/lib/training.ts` with backend loading through `src/lib/training-api.ts`
 - env:
-  `.env.example` now defines the Phase 2 contract for public Supabase config and server-only base URL and service-role access
+  `.env.example` now defines the Phase 2 contract for public Supabase config and server-only base URL and service-role access, with `NEXT_PUBLIC_*` as the preferred public naming and legacy `VITE_*` aliases still supported
 
 ## Important Constraints
 
@@ -55,6 +55,7 @@ Signed-out preview mode remains intentionally outside the trusted product bounda
 - keep one canonical backend truth path for profile, plan, workout logs, and week status
 - keep preview mode visibly separate from authenticated saved mode
 - keep secrets server-only and do not expose service-role access to the client
+- keep session refresh server-validated in request middleware so cookie-backed auth stays current across SSR requests
 
 ## Key Routes And Surfaces
 

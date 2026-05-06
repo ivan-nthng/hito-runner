@@ -5,7 +5,7 @@
 - one TanStack Start application lives at the repo root
 - the imported baseline structure remains preserved in `src/`, including generated route tree, shell, components, UI primitives, and styles
 - build and dev commands come from `package.json`
-- request middleware in `src/start.ts` now resolves Supabase session state when auth env exists and otherwise falls back to signed-out preview context instead of crashing preview routes
+- request middleware in `src/start.ts` now refreshes and resolves Supabase session state through `supabase.auth.getUser()` when auth env exists and otherwise falls back to signed-out preview context instead of crashing preview routes
 
 ## Implemented Route Contract
 
@@ -64,7 +64,8 @@
 
 - Supabase auth is the session source of truth
 - `VITE_APP_NAME` falls back to `Hito Running` when unset so preview routes can still boot locally
-- public env usage is limited to `VITE_APP_NAME`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`
+- preferred public env usage is `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- legacy `VITE_APP_NAME`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` remain supported as compatibility aliases
 - `APP_BASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` remain server-only
 - server-side writes and persisted reads flow through one backend seam rather than direct client DB access
 

@@ -324,7 +324,8 @@ Public variables:
 
 - `VITE_APP_NAME`
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
 Server-only variables:
 
@@ -346,8 +347,8 @@ Recommended minimum phase contract:
 - Phase 0 and Phase 1:
   `VITE_APP_NAME`
 - Phase 2:
-  `VITE_SUPABASE_URL`
-  `VITE_SUPABASE_ANON_KEY`
+  `NEXT_PUBLIC_SUPABASE_URL`
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
   `APP_BASE_URL`
   `SUPABASE_SERVICE_ROLE_KEY`
 - Phase 5 only if enabled:

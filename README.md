@@ -15,9 +15,11 @@ Hito Running currently contains an imported TanStack Start frontend baseline plu
 
 ## Current Product State
 
-- weekly plan home and workout detail are implemented as honest preview surfaces
+- weekly plan home and workout detail support preview mode plus authenticated saved mode through one backend seam
 - `/progress`, `/body`, and `/integrations` are preserved as non-connected preview shells
-- auth, persistence, Supabase, OpenAI, weather, and device integrations are not wired
+- Supabase-backed auth/session wiring is implemented
+- a temporary local-only single-user bypass also exists for local unblock and should remain disabled on Vercel deploys
+- OpenAI, weather, and device integrations are still not wired
 
 ## Commands
 
@@ -25,6 +27,19 @@ Hito Running currently contains an imported TanStack Start frontend baseline plu
 - `npm run dev`
 - `npm run lint`
 - `npm run build`
+- `npm run start`
+
+## Deployment
+
+- the canonical deployment target is now Vercel via Nitro
+- `npm run build` produces `.output/` locally and `vercel build` produces `.vercel/output/`
+- required Vercel env for the current live auth path:
+  `NEXT_PUBLIC_SUPABASE_URL`
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- optional:
+  `NEXT_PUBLIC_APP_NAME`
+  `APP_BASE_URL`
+- local bypass env such as `LOCAL_AUTH_BYPASS_ENABLED` should stay unset on Vercel
 
 ## Canonical References
 

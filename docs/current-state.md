@@ -20,15 +20,16 @@ Active
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
+- The Cloudflare-oriented build shape has been replaced with a Vercel-compatible Nitro deployment path.
 - The repo now contains one TanStack Start runtime with preserved imported route structure, stable preview mode, authenticated saved mode backed by Supabase when full env/project setup is available, and a temporary local single-user bypass path for immediate local use.
 
 ## Current Active Stream
 
-QA rerun of the saved-mode path through the temporary local single-user bypass, with focus on truthful overwrite and route-status consistency for workout outcomes while Supabase email auth remains intentionally paused for local unblock.
+Vercel deployment validation on top of the implemented TanStack Start + Supabase runtime, with temporary local bypass still restricted to local use only.
 
 ## Next Recommended Steps
 
-1. QA + validate the auth callback, onboarding creation, workout-log overwrite flow, and week-status transitions against a real Supabase project.
+1. QA + validate the deployed Vercel preview against the live Supabase auth callback, onboarding creation, workout-log overwrite flow, and week-status transitions.
 2. BACKEND + remove the temporary local bypass after Supabase email auth is restored and fully verified end to end.
 
 ## Canonical References

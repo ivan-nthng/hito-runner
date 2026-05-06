@@ -5,6 +5,9 @@
 - one TanStack Start application lives at the repo root
 - the imported baseline structure remains preserved in `src/`, including generated route tree, shell, components, UI primitives, and styles
 - build and dev commands come from `package.json`
+- the canonical deployment runtime is now Nitro for Vercel:
+  `npm run build` emits `.output/` locally
+  `vercel build` emits `.vercel/output/` with Vercel functions
 - request middleware in `src/start.ts` now resolves either:
   a temporary local single-user session from an httpOnly cookie when the local bypass env contract is enabled
   or a Supabase session through `supabase.auth.getUser()` when auth env exists
@@ -84,14 +87,17 @@
 - preferred public env usage is `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - legacy `VITE_APP_NAME`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY` remain supported as compatibility aliases
 - `APP_BASE_URL` is an optional server-only override for auth redirects; when it is unset, the magic-link request and callback derive origin from the incoming runtime request
-- `SUPABASE_SERVICE_ROLE_KEY` remains server-only
+- `SUPABASE_SERVICE_ROLE_KEY` remains server-only and is not required by the currently implemented Vercel runtime path
 - temporary local-only auth env is `LOCAL_AUTH_BYPASS_ENABLED`, `LOCAL_AUTH_BYPASS_IDENTIFIER`, `LOCAL_AUTH_BYPASS_PASSWORD`, optional `LOCAL_AUTH_BYPASS_EMAIL`, optional `LOCAL_AUTH_BYPASS_USER_ID`, and optional `LOCAL_AUTH_BYPASS_STATE_PATH`
+- required Vercel env for the live Supabase-backed auth path is `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- temporary local-only auth env must stay unset on Vercel because the bypass store is a local unblock mechanism, not a production deployment contract
 - server-side writes and persisted reads flow through one backend seam rather than direct client DB access
 
 ## Runtime Invariants
 
 - one app runtime only
 - one canonical data seam only
+- one canonical deployment path only: Vercel via Nitro
 - one temporary local bypass path only while Supabase email auth is intentionally paused
 - no framework migration from TanStack Start
 - preview shells remain honest about not being wired to future capabilities

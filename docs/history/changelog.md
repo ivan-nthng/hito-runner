@@ -4,6 +4,8 @@ Completed implementation history only.
 
 ## 2026-05-06
 
+- Replaced the old Cloudflare-oriented build shape with a Nitro-backed Vercel deployment path so the app now builds into `.output/` locally and `.vercel/output/` under `vercel build`.
+- Removed the canonical Worker/Wrangler deploy shape from the repo and documented the Vercel env contract, including that the temporary local auth bypass must stay disabled on Vercel.
 - Added a temporary local-only single-user auth bypass behind env-backed credentials and an httpOnly cookie so one local runner can enter saved mode without Magic Link delivery.
 - Added a temporary local saved-mode store used only by the bypass path so onboarding, plan assignment, workout logging, and backend-derived week status can still be exercised without widening client-side mock truth.
 - Fixed the auth runtime contract so magic-link callbacks and login redirects resolve against the live app origin instead of silently falling back to `localhost:3000`, with `APP_BASE_URL` kept as an optional server-only override.

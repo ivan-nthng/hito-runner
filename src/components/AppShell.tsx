@@ -1,7 +1,29 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { ReactNode } from "react";
-import { CalendarDays, LineChart, Activity, Plug, NotebookPen, HeartPulse } from "lucide-react";
+import {
+  CalendarDays,
+  LineChart,
+  Activity,
+  Plug,
+  NotebookPen,
+  HeartPulse,
+  ChevronUp,
+  Settings2,
+  SlidersHorizontal,
+  UserRound,
+  LogOut,
+} from "lucide-react";
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
 import {
@@ -44,10 +66,31 @@ export function AppShell({
       : shellSnapshot.backend === "temporary_local"
         ? "Temporary local"
         : "Preview only";
+  const profileName =
+    shellSnapshot.mode === "authenticated"
+      ? shellSnapshot.backend === "temporary_local"
+        ? "Local runner"
+        : "Runner profile"
+      : shellSnapshot.mode === "onboarding"
+        ? "Setup in progress"
+        : "Preview runner";
+  const profileDetail = snapshot?.profile?.goalLabel
+    ? snapshot.profile.goalLabel
+    : shellSnapshot.mode === "authenticated"
+      ? "Saved progress enabled"
+      : shellSnapshot.mode === "onboarding"
+        ? "Finish setup on home"
+        : "Sign in to save progress";
+  const profileInitials =
+    shellSnapshot.mode === "authenticated"
+      ? "LR"
+      : shellSnapshot.mode === "onboarding"
+        ? "SU"
+        : "PR";
 
   return (
     <div className="min-h-screen flex bg-background text-foreground canvas-grain">
-      <aside className="hidden md:flex w-[240px] shrink-0 flex-col border-r border-hairline bg-sidebar/60 backdrop-blur">
+      <aside className="hidden md:sticky md:top-0 md:flex md:h-screen w-[240px] shrink-0 self-start flex-col border-r border-hairline bg-sidebar/60 backdrop-blur">
         <div className="px-6 pt-7 pb-10">
           <Link to="/" className="flex items-baseline gap-2">
             <span className="font-display text-2xl tracking-tight">{APP_NAME.toLowerCase()}</span>
@@ -83,7 +126,7 @@ export function AppShell({
           })}
         </nav>
 
-        <div className="mt-auto p-4">
+        <div className="mt-auto flex flex-col gap-4 p-4">
           <div className="rounded-lg border border-hairline bg-surface/50 p-4">
             <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
               <NotebookPen className="h-3 w-3 text-signal" />
@@ -101,26 +144,66 @@ export function AppShell({
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3 px-1">
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-signal to-quality grid place-items-center text-[11px] font-medium text-signal-foreground">
-              HR
-            </div>
-            <div className="leading-tight">
-              <div className="text-sm">{APP_NAME}</div>
-              <div className="text-[11px] text-muted-foreground">
-                {shellSnapshot.mode === "authenticated"
-                  ? "Saved progress enabled"
-                  : shellSnapshot.mode === "onboarding"
-                    ? "Finish setup on home"
-                    : "Sign in to save progress"}
-              </div>
-            </div>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="group flex w-full items-center gap-3 rounded-lg border border-hairline bg-background/45 px-3 py-3 text-left transition-colors hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-foreground/20"
+              >
+                <Avatar className="h-9 w-9 border border-hairline/80 bg-background/70">
+                  <AvatarFallback className="bg-gradient-to-br from-signal to-quality text-[11px] font-medium text-signal-foreground">
+                    {profileInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-sm text-foreground">{profileName}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">{profileDetail}</div>
+                </div>
+                <ChevronUp className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="top"
+              align="start"
+              className="w-[208px] border-hairline bg-background/95 backdrop-blur-xl"
+            >
+              <DropdownMenuLabel className="pb-1">
+                <div className="text-sm font-medium text-foreground">{profileName}</div>
+                <div className="mt-1 text-[11px] font-normal uppercase tracking-[0.16em] text-muted-foreground">
+                  {backendLabel} · {modeLabel}
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled>
+                <Settings2 className="h-4 w-4" />
+                Settings
+                <DropdownMenuShortcut>Later</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <UserRound className="h-4 w-4" />
+                Account
+                <DropdownMenuShortcut>Later</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <SlidersHorizontal className="h-4 w-4" />
+                Preferences
+                <DropdownMenuShortcut>Later</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <a href="/api/auth/logout?next=%2F">
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {shellSnapshot.mode !== "authenticated" && loc.pathname !== "/login" && (
             <Link
               to="/login"
               search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
-              className="mt-4 inline-flex rounded-md border border-hairline px-3 py-2 text-xs tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="inline-flex rounded-md border border-hairline px-3 py-2 text-xs tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               Open login
             </Link>

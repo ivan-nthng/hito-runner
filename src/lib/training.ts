@@ -155,14 +155,8 @@ export const WEEK_STATUS_META: Record<WeekStatus, { label: string; helper: strin
   },
 };
 
-let previewSnapshotCache: TrainingSnapshot | null = null;
-
 export function getPreviewSnapshot(): TrainingSnapshot {
-  if (previewSnapshotCache) {
-    return previewSnapshotCache;
-  }
-
-  const currentDate = previewPlan.meta.start_date;
+  const currentDate = todayIso();
   const workouts = previewPlan.schedule.map((workout) => ({
     id: workout.id,
     date: workout.date,
@@ -177,7 +171,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
     status: inferWorkoutStatus(workout.type, workout.date, currentDate, null),
   }));
 
-  previewSnapshotCache = {
+  return {
     mode: "preview",
     source: "preview",
     backend: "preview",
@@ -195,8 +189,6 @@ export function getPreviewSnapshot(): TrainingSnapshot {
     workouts,
     weekStatus: deriveWeekStatus(workouts, currentDate),
   };
-
-  return previewSnapshotCache;
 }
 
 export function getShellSnapshot(snapshot?: TrainingSnapshot | null): ShellSnapshot {
@@ -393,6 +385,15 @@ export function startOfWeekIso(iso: string) {
   const weekday = (date.getDay() + 6) % 7;
   date.setDate(date.getDate() - weekday);
   return toIsoDate(date);
+}
+
+export function todayIso() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function dateFromIso(iso: string) {

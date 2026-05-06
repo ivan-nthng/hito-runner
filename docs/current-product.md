@@ -47,7 +47,9 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - the temporary local login path behaves as signed-in saved mode for the configured local admin account and can now expand to a few local test accounts later without changing routes
 - onboarding now imports one JSON plan week, validates the expected shape, and returns into the saved weekly plan after import
 - setup writes one profile and creates one active plan from the imported JSON data
-- today&apos;s workout can be opened from home or calendar cells
+- home and calendar now default to the real current day instead of a frozen demo start date
+- today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
+- when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero
 - saved workout logging now distinguishes preview-only drafts from persisted saves, supports truthful overwrite between `completed`, `partial`, and `skipped`, and surfaces pending, success, and failure feedback without hiding backend failures
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
 - signed-in surfaces now state honestly that JSON export is a later capability, not implemented in this slice yet

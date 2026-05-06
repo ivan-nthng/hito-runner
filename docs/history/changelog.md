@@ -18,6 +18,7 @@ Completed implementation history only.
 - Tightened `/`, `/workout/$date`, and `/progress` edge-state messaging with explicit pending, error, empty, setup-required, and no-plan states.
 - Improved workout logging feedback so preview-only drafts, persisted saves, overwrite edits, and save failures are clearly distinguished inside the preserved completion panel.
 - Fixed the saved-mode workout logging flow so `partial` and `skipped` outcomes persist truthfully, completed results can be overwritten to either state, skipped reloads no longer backfill planned metrics as actuals, and route-level week status follows the saved truth after reload.
+- Replaced the remaining frozen home/calendar date assumption with the real runtime local date, removed stale preview-date caching, and added an explicit home state for days outside the current plan window.
 - Made preview routes boot without real Supabase env values by falling back to signed-out preview auth context, while keeping live auth and persisted verification dependent on real Supabase configuration.
 - Added honest signed-in copy that JSON export is a later capability, not a live feature in the current slice.
 

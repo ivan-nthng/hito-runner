@@ -20,6 +20,7 @@ import {
   findWorkout,
   getPreviewSnapshot,
   inferWorkoutStatus,
+  todayIso,
   type RunnerProfileSummary,
   type Step,
   type TrainingSnapshot,
@@ -643,8 +644,4 @@ function buildLoginRedirect(status: "error", next: string, appBaseUrl: string) {
   }
 
   return url;
-}
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
 }

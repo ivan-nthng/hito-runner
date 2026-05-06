@@ -46,6 +46,7 @@
 - `src/lib/training.ts`
   is now the canonical normalized seam for:
   preview snapshot creation
+  real current-date resolution for preview and saved-mode calendar behavior
   persisted snapshot shape
   workout lookup
   status derivation
@@ -69,6 +70,8 @@
 - authenticated users without `runner_profile` are routed into setup on `/`
 - onboarding now imports one JSON plan shape, creates or updates one `runner_profile`, and creates one active `plan_cycle`
 - the imported JSON week creates the saved `planned_workouts` directly instead of shifting the preview template onto today
+- home and calendar now anchor `today` to the real runtime local date instead of a frozen template start date
+- the preview snapshot no longer caches a stale `currentDate`, so reloads can reflect the actual current day
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - saved workout logs can be overwritten from `completed` to `partial` or `skipped`, and skipped truth persists with null actual metrics instead of backfilled planned defaults
 - past-due planned workouts without a saved log are treated as `skipped` until the user overwrites them with a real result

@@ -4,6 +4,7 @@ import {
   deriveWeekStatus,
   getPreviewSnapshot,
   inferWorkoutStatus,
+  todayIso,
   type RunnerProfileSummary,
   type Step,
   type TrainingSnapshot,
@@ -406,8 +407,4 @@ function mapLocalLog(log: LocalWorkoutLogRecord): WorkoutLog {
     intervalsCompleted: log.intervalsCompleted,
     loggedAt: log.loggedAt,
   };
-}
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
 }

@@ -21,6 +21,7 @@ Active
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
 - The unauthenticated root flow is now login-first, and first-time onboarding is now JSON-first against the observed week-template structure.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
+- Home/calendar now resolve `today` from the real runtime local date and default the planning surface to that day instead of a frozen demo date.
 - The Cloudflare-oriented build shape has been replaced with a Vercel-compatible Nitro deployment path.
 - The repo now contains one TanStack Start runtime with preserved imported route structure, stable preview mode, authenticated saved mode backed by Supabase when full env/project setup is available, and a temporary local account-backed bypass path for immediate local use.
 

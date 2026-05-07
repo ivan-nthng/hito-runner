@@ -28,6 +28,8 @@ Active
 - The unauthenticated root flow is now login-first, and first-time onboarding is now JSON-first against the observed week-template structure.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
 - Home/calendar now resolve `today` from the real runtime local date and default the planning surface to that day instead of a frozen demo date.
+- The saved-mode home/calendar page now keeps the main `Today` card intact, uses one grouped support card on the right, removes the lower metadata strip, and marks completed calendar days more clearly.
+- Saved-mode shell navigation back to `/` now uses a fresh home request, and the `Tomorrow` summary no longer falls through to broken `nullkm · 0′` placeholders for interval-style workouts.
 - The profile/sidebar area now shows the runner name plus active plan title, removes duplicate top-level sign-out, and owns a lightweight saved-mode `Upload JSON` entry path.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.
 - Saved-mode `Upload JSON` replacement now has a continuity guard:

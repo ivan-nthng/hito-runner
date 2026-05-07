@@ -16,7 +16,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
   shows either:
   login-first unauthenticated entry
   setup gate for authenticated users without a profile
-  persisted weekly plan for authenticated users with setup complete
+  persisted weekly plan for authenticated users with setup complete, keeping the large `Today` card, one compact right-side support card, and the calendar below
 - workout detail `/workout/$date`
   shows workout structure, logging controls, and week-status context using preview or persisted truth through one shared contract, with calmer rest-day presentation and a tighter grouped right-side panel
 - progress `/progress`
@@ -50,6 +50,9 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - home and calendar now default to the real current day instead of a frozen demo start date
 - today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
 - when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero
+- the home support column is now one grouped card for `Planning Note`, `Week Status`, and `Tomorrow`, and the old lower metadata strip has been removed
+- saved-mode shell links that return to home now intentionally reopen `/` through a fresh request so the calendar page stays reliable even from long-lived tabs
+- completed calendar days now read more clearly at a glance through a green confirmation treatment without overriding the primary today highlight
 - saved workout logging now distinguishes preview-only drafts from persisted saves, supports truthful overwrite between `completed`, `partial`, and `skipped`, and surfaces pending, success, and failure feedback without hiding backend failures
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
 - signed-in surfaces now state honestly that JSON export is a later capability, not implemented in this slice yet

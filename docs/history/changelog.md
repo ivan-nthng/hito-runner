@@ -2,6 +2,11 @@
 
 Completed implementation history only.
 
+## 2026-05-07
+
+- Hardened saved-mode home return navigation so shell links reopen `/` through a fresh request, and fixed the grouped `Tomorrow` summary so interval-style workouts no longer render broken `nullkm · 0′` text.
+- Refined the saved-mode Calendar page so the main `Today` workout card stays intact, the right-side support content is now one grouped card with dividers, the lower hero metadata strip is removed, and completed days are easier to spot in the calendar grid.
+
 ## 2026-05-06
 
 - Repaired the live saved-mode `Upload JSON` continuity seam so already-orphaned workout logs from older broken replacements are recovered onto the active matching plan before same-template preserve or mismatch-block checks run.

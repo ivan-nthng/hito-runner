@@ -20,7 +20,7 @@
   renders one of three states behind the same route:
   login-first unauthenticated entry
   authenticated onboarding gate
-  authenticated persisted weekly plan
+  authenticated persisted weekly plan, where the saved-mode hero keeps one preserved main workout card, one grouped support card, and the calendar below
 - `src/routes/login.tsx`
   renders either:
   a minimal `Hito.` auth-first entry screen with simple `Log in` and `Sign up` tabs, where username-or-email plus password remains the primary path and Magic Link lives under the `Sign up` tab
@@ -75,6 +75,9 @@
 - the imported JSON week creates the saved `planned_workouts` directly instead of shifting the preview template onto today
 - home and calendar now anchor `today` to the real runtime local date instead of a frozen template start date
 - the preview snapshot no longer caches a stale `currentDate`, so reloads can reflect the actual current day
+- the saved-mode home hero now uses one grouped support module for `Planning Note`, `Week Status`, and `Tomorrow`, and the lower metadata strip has been removed
+- saved-mode home-return affordances in the shell now reopen `/` through a fresh document request so already-open tabs can recover the authoritative home route even when a stale client fetch path fails
+- calendar day cells now mark completed workouts with a clearer green confirmation state while keeping today and rest states readable
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode `Upload JSON` entry point plus sign-out action
 - the saved-mode `Upload JSON` dialog reuses the canonical onboarding mutation instead of creating a second plan-import path

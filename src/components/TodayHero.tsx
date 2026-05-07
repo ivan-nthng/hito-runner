@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, NotebookPen, Flag } from "lucide-react";
+import { ArrowUpRight, Flag, NotebookPen } from "lucide-react";
 import {
   formatDate,
   findWorkout,
@@ -21,6 +21,13 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   const duration = workoutDuration(workout);
   const target = workout.steps[0]?.target;
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
+  const primaryTarget =
+    typeof target?.hr_bpm === "string"
+      ? target.hr_bpm
+      : typeof target?.pace === "string"
+        ? target.pace
+        : "—";
+  const paceHint = typeof target?.pace === "string" ? target.pace : "Keep the effort relaxed";
 
   const tomorrowDate = new Date(`${snapshot.currentDate}T00:00:00`);
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -52,20 +59,16 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
 
           <p className="mt-4 max-w-md text-sm text-muted-foreground leading-relaxed">
             {isRestDay
-              ? "Keep the day open unless a light assignment is actually planned."
-              : "Your current day stays front and center so the plan is easy to open and follow."}
+              ? "Keep the day light unless a small recovery assignment is actually planned."
+              : (workout.notes ?? "Keep the effort smooth and let the session carry the day.")}
           </p>
 
           {!isRestDay ? (
             <div className="mt-8 flex flex-wrap gap-8">
               <Metric label="Distance" value={km ? `${km}` : "—"} unit="km" />
               <Metric label="Duration" value={duration ? `${duration}` : "—"} unit="min" />
-              <Metric
-                label="Target HR"
-                value={(target?.hr_bpm as string)?.split("-")[0] ?? "—"}
-                unit={`–${(target?.hr_bpm as string)?.split("-")[1] ?? ""} bpm`}
-              />
-              <Metric label="Pace hint" value="6:40" unit="–7:40 /km" />
+              <Metric label="Target" value={primaryTarget} />
+              <Metric label="Pace Hint" value={paceHint} />
             </div>
           ) : (
             <div className="mt-8 max-w-md rounded-xl bg-background/35 p-4">
@@ -74,10 +77,10 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
                   <span className="h-4 w-4 rounded-full border border-hairline bg-surface/70" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-foreground/85">No distance or load planned today.</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Use the day for recovery, mobility, or nothing at all.
+                  <p className="text-sm text-foreground/85">
+                    No workout metrics are planned today.
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Leave room for recovery.</p>
                 </div>
               </div>
             </div>
@@ -105,59 +108,48 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="rounded-lg border border-hairline bg-background/40 p-4">
+        <div className="rounded-xl border border-hairline bg-background/40 p-4 lg:p-5">
+          <section>
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
               <NotebookPen className="h-3 w-3 text-signal" />
-              Planning note · {snapshot.source === "persisted" ? "saved" : "preview"}
+              Planning Note
             </div>
-            <p className="mt-2 text-sm leading-relaxed">
-              {snapshot.source === "persisted"
-                ? "This surface keeps the imported structure while plan and workout status now read from saved truth."
-                : "This surface keeps the imported structure while preview data stays read-only."}
+            <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+              Previous-run insight will appear here once recent completed workouts include notes or
+              uploaded results.
             </p>
-            <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
-              <span>Data source</span>
-              <div className="flex-1 h-1 rounded-full bg-hairline overflow-hidden">
-                <div className="h-full bg-signal" style={{ width: "100%" }} />
-              </div>
-              <span className="font-mono-num text-foreground/80">
-                {snapshot.source === "persisted" ? "saved" : "mock"}
-              </span>
-            </div>
-          </div>
+          </section>
 
-          <div className="rounded-lg border border-hairline bg-background/40 p-4">
+          <div className="my-4 border-t border-hairline" />
+
+          <section>
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
               <Flag className="h-3 w-3" />
-              Week status · {snapshot.source === "persisted" ? "backend" : "preview"}
+              Week Status
             </div>
             <div className="mt-2">
               <span className="font-display text-3xl">{weekStatus.label}</span>
               <p className="mt-2 text-xs text-muted-foreground">{weekStatus.helper}</p>
             </div>
-          </div>
+          </section>
 
-          {tomorrow && tomorrow.type !== "rest" && (
-            <div className="rounded-lg border border-hairline bg-background/40 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Tomorrow
-              </div>
-              <div className="mt-1 text-sm">{tomorrow.title}</div>
-              <div className="mt-2 text-[11px] font-mono-num text-muted-foreground">
-                {workoutDistanceKm(tomorrow)}km · {workoutDuration(tomorrow)}′
-              </div>
-            </div>
+          {tomorrow && (
+            <>
+              <div className="my-4 border-t border-hairline" />
+              <section>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Tomorrow
+                </div>
+                <div className="mt-1 text-sm text-foreground/90">
+                  {tomorrow.type === "rest" ? "Rest day" : tomorrow.title}
+                </div>
+                <div className="mt-2 text-[11px] font-mono-num text-muted-foreground">
+                  {summarizeUpcomingWorkout(tomorrow)}
+                </div>
+              </section>
+            </>
           )}
         </div>
-      </div>
-
-      <div className="mt-10 pt-6 border-t border-hairline flex flex-wrap items-center gap-x-8 gap-y-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-        <span>Surface · {snapshot.source === "persisted" ? "weekly plan" : "preview plan"}</span>
-        <span className="opacity-50">·</span>
-        <span>Source · {snapshot.source === "persisted" ? "saved state" : "mock data"}</span>
-        <span className="opacity-50">·</span>
-        <span>JSON export comes later</span>
       </div>
     </section>
   );
@@ -198,7 +190,7 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
             month: "short",
             day: "numeric",
           })}.`
-        : "The calendar is still anchored to the real current day, and you can open any other workout manually.";
+        : "Open another day from the calendar whenever you want to review the plan.";
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
@@ -224,12 +216,7 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
             {heading}
           </h2>
 
-          <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
-            {body}{" "}
-            {snapshot.source === "persisted"
-              ? "Saved plan data stays intact."
-              : "Preview data stays intact."}
-          </p>
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">{body}</p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             {closestWorkout && (
@@ -251,23 +238,25 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="rounded-lg border border-hairline bg-background/40 p-4">
+        <div className="rounded-xl border border-hairline bg-background/40 p-4 lg:p-5">
+          <section>
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
               <NotebookPen className="h-3 w-3 text-signal" />
-              Plan window
+              Plan Window
             </div>
-            <p className="mt-2 text-sm leading-relaxed">
+            <p className="mt-2 text-sm leading-relaxed text-foreground/85">
               {planStart && planEnd
                 ? `${formatDate(planStart, { month: "short", day: "numeric" })} to ${formatDate(planEnd, { month: "short", day: "numeric" })}`
                 : "No imported workouts are available yet."}
             </p>
-          </div>
+          </section>
 
-          <div className="rounded-lg border border-hairline bg-background/40 p-4">
+          <div className="my-4 border-t border-hairline" />
+
+          <section>
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
               <Flag className="h-3 w-3" />
-              Current week
+              Week Status
             </div>
             <div className="mt-2">
               <span className="font-display text-3xl">
@@ -277,45 +266,76 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
                 {WEEK_STATUS_META[snapshot.weekStatus].helper}
               </p>
             </div>
-          </div>
+          </section>
 
           {closestWorkout && (
-            <div className="rounded-lg border border-hairline bg-background/40 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Next useful stop
-              </div>
-              <div className="mt-1 text-sm">{closestWorkout.title}</div>
-              <div className="mt-2 text-[11px] font-mono-num text-muted-foreground">
-                {formatDate(closestWorkout.date, {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </div>
-            </div>
+            <>
+              <div className="my-4 border-t border-hairline" />
+              <section>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Nearest Workout
+                </div>
+                <div className="mt-1 text-sm text-foreground/90">{closestWorkout.title}</div>
+                <div className="mt-2 text-[11px] font-mono-num text-muted-foreground">
+                  {formatDate(closestWorkout.date, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </div>
+              </section>
+            </>
           )}
         </div>
-      </div>
-
-      <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-hairline pt-6 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-        <span>Surface · Weekly plan</span>
-        <span className="opacity-50">·</span>
-        <span>Anchor · Real current date</span>
-        <span className="opacity-50">·</span>
-        <span>Selection · Manual day picking stays available</span>
       </div>
     </section>
   );
 }
 
-function Metric({ label, value, unit }: { label: string; value: string; unit: string }) {
+function Metric({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
       <div className="mt-1 flex items-baseline gap-1">
         <span className="font-display text-3xl leading-none">{value}</span>
-        <span className="text-xs text-muted-foreground">{unit}</span>
+        {unit ? <span className="text-xs text-muted-foreground">{unit}</span> : null}
       </div>
     </div>
   );
+}
+
+function summarizeUpcomingWorkout(
+  workout: Parameters<typeof workoutDistanceKm>[0] & { title: string },
+) {
+  const km = workoutDistanceKm(workout);
+  const duration = workoutDuration(workout);
+
+  if (workout.type === "rest") {
+    return "Keep it light.";
+  }
+
+  if (km && duration > 0) {
+    return `${km}km · ${duration}′`;
+  }
+
+  if (km) {
+    return `${km}km`;
+  }
+
+  if (duration > 0) {
+    return `${duration}′`;
+  }
+
+  const intervalStep = workout.steps.find((step) => step.repeats && step.work);
+
+  if (intervalStep?.repeats && intervalStep.work?.distance_km) {
+    const meters = Math.round(intervalStep.work.distance_km * 1000);
+    return `${intervalStep.repeats} × ${meters}m`;
+  }
+
+  if (intervalStep?.repeats && intervalStep.work?.duration_min) {
+    return `${intervalStep.repeats} × ${intervalStep.work.duration_min}′`;
+  }
+
+  return TYPE_META[workout.type].label;
 }

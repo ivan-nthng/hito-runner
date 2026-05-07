@@ -98,12 +98,13 @@ export function AppShell({
       : shellSnapshot.mode === "onboarding"
         ? "setup"
         : "preview";
+  const useFreshHomeRequest = shellSnapshot.mode !== "preview";
 
   return (
     <div className="min-h-screen flex bg-background text-foreground canvas-grain">
       <aside className="hidden md:sticky md:top-0 md:flex md:h-screen w-[240px] shrink-0 self-start flex-col border-r border-hairline bg-sidebar/60 backdrop-blur">
         <div className="px-6 pt-7 pb-10">
-          <Link to="/" className="flex items-baseline gap-2">
+          <Link to="/" reloadDocument={useFreshHomeRequest} className="flex items-baseline gap-2">
             <span className="font-display text-2xl tracking-tight">{APP_NAME.toLowerCase()}</span>
             <span className="h-1.5 w-1.5 rounded-full bg-signal" />
           </Link>
@@ -122,6 +123,7 @@ export function AppShell({
               <Link
                 key={navItem.to}
                 to={navItem.to}
+                reloadDocument={navItem.to === "/" && useFreshHomeRequest}
                 className={cn(
                   "group flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                   active
@@ -255,6 +257,7 @@ export function AppShell({
               <StatusPill label="Backend" value={backendLabel} />
               <Link
                 to={shellSnapshot.mode === "preview" ? "/login" : "/"}
+                reloadDocument={shellSnapshot.mode !== "preview"}
                 search={
                   shellSnapshot.mode === "preview" && nextPath !== DEFAULT_AUTH_REDIRECT
                     ? { next: nextPath }
@@ -286,6 +289,7 @@ export function AppShell({
               <Link
                 key={navItem.to}
                 to={navItem.to}
+                reloadDocument={navItem.to === "/" && useFreshHomeRequest}
                 className={cn(
                   "flex flex-col items-center gap-1 py-3 text-[10px] tracking-wide uppercase",
                   active ? "text-signal" : "text-muted-foreground",

@@ -30,6 +30,9 @@ Architect Agent
   workout logs persist through one backend mutation and visible week status is derived from backend truth instead of deterministic mock logic.
 - Phase 5 frontend polish is complete:
   login, onboarding, saved logging feedback, and route edge-state messaging now match the persisted seam more clearly without changing the preserved baseline structure.
+- Canonical plan storage cutover is implemented in code:
+  local bypass sessions now map into Supabase-backed plan ownership when a server-side key is present, and a narrow current-plan import script exists for the live JSON source.
+- The current local admin plan has been imported into the linked Supabase project and is now reading back through the saved-mode runtime on `/progress` and `/workout/$date`.
 - Validation is complete for install, lint, build, route generation, and Supabase migration file creation.
 
 ## Context

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, MinusCircle, XCircle } from "lucide-react";
@@ -34,23 +34,45 @@ export function CompletionPanel({
   const plannedMin = workoutDuration(workout);
   const plannedRepeats = workout.steps.find((step) => step.repeats)?.repeats ?? 0;
   const hasSavedLog = snapshot.source === "persisted" && Boolean(workout.log);
-  const workoutSyncKey = [
-    workout.id,
-    workout.log?.id ?? "",
-    workout.log?.outcome ?? "",
-    workout.log?.actualDistanceKm ?? "",
-    workout.log?.actualDurationMin ?? "",
-    workout.log?.rpe ?? "",
-    workout.log?.notes ?? "",
-    workout.log?.intervalsCompleted ?? "",
-    plannedKm,
-    plannedMin,
-    plannedRepeats,
-  ].join("|");
+  const savedLogOutcome = workout.log?.outcome ?? null;
+  const savedLogDistanceKm = workout.log?.actualDistanceKm ?? null;
+  const savedLogDurationMin = workout.log?.actualDurationMin ?? null;
+  const savedLogRpe = workout.log?.rpe ?? null;
+  const savedLogNotes = workout.log?.notes ?? null;
+  const savedLogIntervalsCompleted = workout.log?.intervalsCompleted ?? null;
+  const savedPayloadFromWorkout = useMemo(
+    () =>
+      buildSavedPayload(workout.id, {
+        outcome: savedLogOutcome,
+        actualDistanceKm: savedLogDistanceKm,
+        actualDurationMin: savedLogDurationMin,
+        rpe: savedLogRpe,
+        notes: savedLogNotes,
+        intervalsCompleted: savedLogIntervalsCompleted,
+      }),
+    [
+      workout.id,
+      savedLogOutcome,
+      savedLogDistanceKm,
+      savedLogDurationMin,
+      savedLogRpe,
+      savedLogNotes,
+      savedLogIntervalsCompleted,
+    ],
+  );
+  const savedPayloadKey = useMemo(
+    () => serializePayload(savedPayloadFromWorkout),
+    [savedPayloadFromWorkout],
+  );
+  const syncedFormState = useMemo(
+    () => buildInitialFormState(savedPayloadFromWorkout, plannedKm, plannedMin, plannedRepeats),
+    [plannedKm, plannedMin, plannedRepeats, savedPayloadFromWorkout],
+  );
   const [form, setForm] = useState<CompletionFormState>(() =>
-    buildInitialFormState(workout.log, plannedKm, plannedMin, plannedRepeats),
+    buildInitialFormState(savedPayloadFromWorkout, plannedKm, plannedMin, plannedRepeats),
   );
   const formRef = useRef<CompletionFormState>(form);
+  const [savedBaselineKey, setSavedBaselineKey] = useState(savedPayloadKey);
 
   function updateForm(
     updater: CompletionFormState | ((current: CompletionFormState) => CompletionFormState),
@@ -61,19 +83,19 @@ export function CompletionPanel({
   }
 
   useEffect(() => {
-    const nextState = buildInitialFormState(workout.log, plannedKm, plannedMin, plannedRepeats);
-    formRef.current = nextState;
-    setForm(nextState);
-  }, [plannedKm, plannedMin, plannedRepeats, workout.log, workoutSyncKey]);
+    formRef.current = syncedFormState;
+    setForm(syncedFormState);
+    setSavedBaselineKey(savedPayloadKey);
+  }, [savedPayloadKey, syncedFormState]);
 
   useEffect(() => {
     setMessage(null);
     setError(null);
   }, [form.actualKm, form.actualMin, form.intervalsCompleted, form.notes, form.outcome, form.rpe]);
 
-  const savedPayload = buildSavedPayload(workout.id, workout.log);
   const currentPayload = buildSavePayload(workout, form);
-  const isDirty = JSON.stringify(currentPayload) !== JSON.stringify(savedPayload);
+  const currentPayloadKey = useMemo(() => serializePayload(currentPayload), [currentPayload]);
+  const isDirty = currentPayloadKey !== savedBaselineKey;
   const outcome = form.outcome;
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const isSkipped = outcome === "skipped";
@@ -340,42 +362,57 @@ export function CompletionPanel({
 }
 
 function buildInitialFormState(
-  log: Workout["log"],
+  savedPayload: ReturnType<typeof buildSavedPayload>,
   plannedKm: number,
   plannedMin: number,
   plannedRepeats: number,
 ): CompletionFormState {
-  const outcome = log?.outcome ?? "completed";
+  const outcome = savedPayload.outcome;
 
   return {
     outcome,
     actualKm:
-      log?.actualDistanceKm != null
-        ? log.actualDistanceKm.toString()
+      savedPayload.actualDistanceKm != null
+        ? savedPayload.actualDistanceKm.toString()
         : outcome === "skipped"
           ? ""
           : plannedKm.toString(),
     actualMin:
-      log?.actualDurationMin != null
-        ? log.actualDurationMin.toString()
+      savedPayload.actualDurationMin != null
+        ? savedPayload.actualDurationMin.toString()
         : outcome === "skipped"
           ? ""
           : plannedMin.toString(),
-    rpe: log?.rpe ?? 6,
-    notes: log?.notes ?? "",
-    intervalsCompleted: log?.intervalsCompleted ?? (outcome === "skipped" ? 0 : plannedRepeats),
+    rpe: savedPayload.rpe ?? 6,
+    notes: savedPayload.notes ?? "",
+    intervalsCompleted:
+      savedPayload.intervalsCompleted ?? (outcome === "skipped" ? 0 : plannedRepeats),
   };
 }
 
-function buildSavedPayload(workoutId: string, log: Workout["log"]) {
+function buildSavedPayload(
+  workoutId: string,
+  log: {
+    outcome: Workout["log"] extends infer T
+      ? T extends { outcome: infer O | null | undefined }
+        ? O | null
+        : null
+      : null;
+    actualDistanceKm: number | null;
+    actualDurationMin: number | null;
+    rpe: number | null;
+    notes: string | null;
+    intervalsCompleted: number | null;
+  },
+) {
   return {
     plannedWorkoutId: workoutId,
-    outcome: log?.outcome ?? "completed",
-    actualDistanceKm: log?.actualDistanceKm ?? null,
-    actualDurationMin: log?.actualDurationMin ?? null,
-    rpe: log?.rpe ?? null,
-    notes: log?.notes ?? null,
-    intervalsCompleted: log?.intervalsCompleted ?? null,
+    outcome: log.outcome ?? "completed",
+    actualDistanceKm: log.actualDistanceKm,
+    actualDurationMin: log.actualDurationMin,
+    rpe: log.rpe,
+    notes: log.notes,
+    intervalsCompleted: log.intervalsCompleted,
   };
 }
 
@@ -392,6 +429,10 @@ function buildSavePayload(workout: Workout, form: CompletionFormState) {
         ? null
         : form.intervalsCompleted,
   };
+}
+
+function serializePayload(payload: ReturnType<typeof buildSavePayload>) {
+  return JSON.stringify(payload);
 }
 
 function parseNumberInput(value: string) {

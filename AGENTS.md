@@ -8,11 +8,11 @@ Customize the pipeline terms below for the new project before real execution beg
 
 - Protect pipeline integrity.
 - Define one canonical pipeline and keep it explicit, for example:
-    - `raw intake -> normalization -> canonical entities -> enrichment -> moderation -> trusted dataset`
+  - `raw intake -> normalization -> canonical entities -> enrichment -> moderation -> trusted dataset`
 - Never bypass normalization, moderation, review, or publication safeguards once those concepts are defined for the project.
 - Keep the product boundary clear:
-    - what this repo owns
-    - what downstream delivery/consumption owns
+  - what this repo owns
+  - what downstream delivery/consumption owns
 
 ## 2) Execution Style (Act Vs Ask)
 
@@ -20,8 +20,8 @@ Customize the pipeline terms below for the new project before real execution beg
 - Prefer extraction and targeted fixes over broad rewrites.
 - Reuse existing project patterns before introducing new abstractions.
 - Avoid over-engineering:
-    - no new subsystem/framework/queue unless a concrete bottleneck is proven
-    - no speculative improvements outside the requested scope
+  - no new subsystem/framework/queue unless a concrete bottleneck is proven
+  - no speculative improvements outside the requested scope
 - Keep reporting compact and execution-focused.
 
 Required default output shape for implementation work:
@@ -52,9 +52,9 @@ Read in this order for non-trivial work:
 1. `docs/context.md`
 2. `docs/glossary.md`
 3. task-specific current doc:
-    - `docs/current-system.md`
-    - `docs/current-product.md`
-    - `docs/current-state.md`
+   - `docs/current-system.md`
+   - `docs/current-product.md`
+   - `docs/current-state.md`
 4. related execution plan in `docs/plans/active/`
 5. `docs/README.md`
 
@@ -77,9 +77,9 @@ Execution discipline:
 
 - Keep plan status aligned with real progress.
 - For failures/bugs, investigate in order:
-    1. logs
-    2. exact failing entity or route
-    3. fix from observed evidence
+  1. logs
+  2. exact failing entity or route
+  3. fix from observed evidence
 
 Completion gate:
 
@@ -105,6 +105,12 @@ Completion gate:
 - Preserve auditability for important user or system actions.
 - Avoid making hot paths heavier without evidence.
 - Prevent mixed render states in async UI updates.
+
+## 6.5) QA Browser Policy
+
+- QA browser verification must use Computer Use in Safari.
+- Chrome must not be used for QA browser testing except as a last-resort fallback when Safari is genuinely blocked.
+- Any Chrome fallback must be stated explicitly in the QA report with the reason Safari could not be used.
 
 ## 7) Handoff Footer (Conditional)
 

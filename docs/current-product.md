@@ -6,7 +6,7 @@ The implemented product is now a hybrid running-plan experience for Hito Running
 
 - signed-out users now enter through a login-first screen instead of landing in the calendar as the primary experience
 - signed-in users can create a real profile, receive a persisted plan, log workouts, and see backend-derived weekly status
-- the current local unblock path uses a temporary local account login with visible username/password fields instead of depending on the Supabase magic-link email flow
+- the current local unblock path uses a temporary local account login with visible username/password fields instead of depending on the Supabase magic-link email flow, but the canonical plan store now prefers Supabase when a server-side key is available
 
 The product still avoids claims of live coaching, connected integrations, weather-aware adaptation, or biometric authority.
 
@@ -26,7 +26,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - integrations `/integrations`
   keeps the integrations information architecture as a not-connected preview
 - login `/login`
-  provides the current `Hito.` login-first surface, visible temporary local username/password login as the main path, and Magic Link as a secondary alternative
+  provides the current `Hito.` login-first surface with simple `Log in` and `Sign up` tabs, keeping username-or-email plus password as the main path and Magic Link under `Sign up`
 
 ## Interaction Contracts
 
@@ -44,7 +44,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 
 - signed-out users open into a minimal auth-first entry surface with `Hito.` branding
 - authenticated users without setup complete are gated into JSON-first import on `/`
-- the temporary local login path behaves as signed-in saved mode for the configured local admin account and can now expand to a few local test accounts later without changing routes
+- the temporary local login path behaves as signed-in saved mode for the configured local admin account, can now expand to a few local test accounts later without changing routes, and uses Supabase as the canonical plan store whenever server-side admin access is configured
 - onboarding now imports one JSON plan week, validates the expected shape, and returns into the saved weekly plan after import
 - setup writes one profile and creates one active plan from the imported JSON data
 - home and calendar now default to the real current day instead of a frozen demo start date

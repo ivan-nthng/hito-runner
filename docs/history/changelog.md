@@ -4,8 +4,13 @@ Completed implementation history only.
 
 ## 2026-05-06
 
+- Applied the base persisted Supabase migration to the linked `dltfjwexyctmihclcjqj` project, imported `/Users/ivan/Desktop/corrected_half_marathon_start_2026-05-05.json` as the active canonical plan for the current local admin path, and verified saved-mode SSR now resolves `/progress` and `/workout/2026-05-08` from Supabase.
+- Simplified the local-auth-to-Supabase cutover path to resolve the temporary local account into `auth.users` by email and import directly into the existing canonical tables, removing the extra mapping/snapshot schema dependency from the live cutover flow.
+- Added a canonical Supabase plan-import path for the JSON-first onboarding flow, including local-account-to-Supabase-user mapping, raw imported JSON snapshots, and a narrow current-plan import script for `/Users/ivan/Desktop/corrected_half_marathon_start_2026-05-05.json`.
+- Switched the temporary local bypass to prefer Supabase-backed plan reads and workout-log writes whenever a server-side Supabase key is configured, while keeping the local state file only as a fallback when that key is absent.
 - Replaced the old Cloudflare-oriented build shape with a Nitro-backed Vercel deployment path so the app now builds into `.output/` locally and `.vercel/output/` under `vercel build`.
 - Removed the canonical Worker/Wrangler deploy shape from the repo and documented the Vercel env contract, including that the temporary local auth bypass must stay disabled on Vercel.
+- Fixed a local auth regression where `npm run start` did not load `.env.local`, causing the built server path to miss the temporary admin credentials even though `vite dev` still worked.
 - Added a temporary local-only single-user auth bypass behind env-backed credentials and an httpOnly cookie so one local runner can enter saved mode without Magic Link delivery.
 - Refined the temporary local auth path into a small local account model, made username/password login the clearly visible primary path, moved the real admin credential source into an untracked local accounts file, and kept Magic Link available as a secondary option.
 - Added a temporary local saved-mode store used only by the bypass path so onboarding, plan assignment, workout logging, and backend-derived week status can still be exercised without widening client-side mock truth.
@@ -21,6 +26,7 @@ Completed implementation history only.
 - Replaced the remaining frozen home/calendar date assumption with the real runtime local date, removed stale preview-date caching, and added an explicit home state for days outside the current plan window.
 - Made preview routes boot without real Supabase env values by falling back to signed-out preview auth context, while keeping live auth and persisted verification dependent on real Supabase configuration.
 - Added honest signed-in copy that JSON export is a later capability, not a live feature in the current slice.
+- Fixed the Supabase-backed saved workout overwrite path so a reloaded saved result becomes dirty again on outcome, notes, and actual-metric edits, and overwrite now targets the existing `workout_logs` row through `planned_workout_id` instead of leaving the CTA stuck in a false saved state.
 
 ## 2026-05-05
 

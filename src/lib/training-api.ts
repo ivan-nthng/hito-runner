@@ -13,6 +13,7 @@ import {
   getLocalAuthAccountSummaries,
   isLocalAuthBypassEnabled,
 } from "@/lib/local-auth";
+import { ensureLocalAuthSupabaseUserId } from "@/lib/local-auth-supabase";
 import {
   addDaysIso,
   diffDaysIso,
@@ -179,6 +180,16 @@ export const completeOnboarding = createServerFn({ method: "POST" })
     if (auth.provider === "local") {
       const localConfig = await getRequiredLocalAuthConfig(auth.userId);
 
+      if (canUseSupabasePlanStorage()) {
+        const linkedUserId = await ensureLocalAuthSupabaseUserId(localConfig);
+        await upsertRunnerProfile(linkedUserId, importedSeed.profile);
+        await replaceActivePlanWithImportedInput(linkedUserId, data.importedPlan);
+
+        return {
+          ok: true,
+        };
+      }
+
       await completeLocalAuthOnboarding(localConfig, data.importedPlan);
 
       return {
@@ -187,40 +198,8 @@ export const completeOnboarding = createServerFn({ method: "POST" })
     }
 
     const { userId } = auth;
-    const supabase = createAdminSupabaseClient();
-
-    const profileUpsert = await supabase
-      .from("runner_profiles")
-      .upsert({
-        user_id: userId,
-        goal_type: importedSeed.profile.goalType,
-        goal_label: importedSeed.profile.goalLabel,
-        baseline_sessions_per_week: importedSeed.profile.baselineSessionsPerWeek,
-        baseline_long_run_km: importedSeed.profile.baselineLongRunKm,
-        baseline_notes: importedSeed.profile.baselineNotes ?? null,
-        setup_state: "completed",
-      })
-      .select("*")
-      .single();
-
-    if (profileUpsert.error) {
-      throw new Error(profileUpsert.error.message);
-    }
-
-    const existingPlan = await supabase
-      .from("plan_cycles")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .maybeSingle();
-
-    if (existingPlan.error) {
-      throw new Error(existingPlan.error.message);
-    }
-
-    if (!existingPlan.data) {
-      await createAssignedPlanFromImportedInput(userId, data.importedPlan);
-    }
+    await upsertRunnerProfile(userId, importedSeed.profile);
+    await replaceActivePlanWithImportedInput(userId, data.importedPlan);
 
     return {
       ok: true,
@@ -234,6 +213,11 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
 
     if (auth.provider === "local") {
       const localConfig = await getRequiredLocalAuthConfig(auth.userId);
+
+      if (canUseSupabasePlanStorage()) {
+        return savePersistedWorkoutLog(await ensureLocalAuthSupabaseUserId(localConfig), data);
+      }
+
       const result = await saveLocalAuthWorkoutLog(localConfig, {
         plannedWorkoutId: data.plannedWorkoutId,
         outcome: data.outcome,
@@ -250,31 +234,37 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
       };
     }
 
-    const { userId } = auth;
-    const supabase = createAdminSupabaseClient();
+    return savePersistedWorkoutLog(auth.userId, data);
+  });
 
-    const plannedWorkout = await supabase
-      .from("planned_workouts")
-      .select("id, user_id, workout_type")
-      .eq("id", data.plannedWorkoutId)
-      .eq("user_id", userId)
-      .maybeSingle();
+async function savePersistedWorkoutLog(
+  userId: string,
+  data: z.output<typeof workoutLogInputSchema>,
+) {
+  const supabase = createAdminSupabaseClient();
+  const plannedWorkout = await supabase
+    .from("planned_workouts")
+    .select("id, user_id, workout_type")
+    .eq("id", data.plannedWorkoutId)
+    .eq("user_id", userId)
+    .maybeSingle();
 
-    if (plannedWorkout.error) {
-      throw new Error(plannedWorkout.error.message);
-    }
+  if (plannedWorkout.error) {
+    throw new Error(plannedWorkout.error.message);
+  }
 
-    if (!plannedWorkout.data) {
-      throw new Error("Planned workout not found.");
-    }
+  if (!plannedWorkout.data) {
+    throw new Error("Planned workout not found.");
+  }
 
-    if (plannedWorkout.data.workout_type === "rest") {
-      throw new Error("Rest days cannot be logged as completed workouts.");
-    }
+  if (plannedWorkout.data.workout_type === "rest") {
+    throw new Error("Rest days cannot be logged as completed workouts.");
+  }
 
-    const upsertResult = await supabase
-      .from("workout_logs")
-      .upsert({
+  const upsertResult = await supabase
+    .from("workout_logs")
+    .upsert(
+      {
         planned_workout_id: data.plannedWorkoutId,
         user_id: userId,
         outcome: data.outcome,
@@ -283,19 +273,21 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
         rpe: data.rpe,
         notes: data.notes,
         intervals_completed: data.intervalsCompleted,
-      })
-      .select("id")
-      .single();
+      },
+      { onConflict: "planned_workout_id" },
+    )
+    .select("id")
+    .single();
 
-    if (upsertResult.error) {
-      throw new Error(upsertResult.error.message);
-    }
+  if (upsertResult.error) {
+    throw new Error(upsertResult.error.message);
+  }
 
-    return {
-      ok: true,
-      id: upsertResult.data.id,
-    };
-  });
+  return {
+    ok: true,
+    id: upsertResult.data.id,
+  };
+}
 
 export async function exchangeCodeForSession(request: Request) {
   const url = new URL(request.url);
@@ -340,7 +332,13 @@ async function getSnapshotForRequest() {
   }
 
   if (auth.provider === "local") {
-    return getLocalAuthSnapshot(await getRequiredLocalAuthConfig(auth.userId));
+    const localConfig = await getRequiredLocalAuthConfig(auth.userId);
+
+    if (canUseSupabasePlanStorage()) {
+      return getPersistedSnapshot(await ensureLocalAuthSupabaseUserId(localConfig));
+    }
+
+    return getLocalAuthSnapshot(localConfig);
   }
 
   return getPersistedSnapshot(auth.userId);
@@ -545,6 +543,45 @@ async function createAssignedPlanFromImportedInput(
   return planInsert.data;
 }
 
+async function replaceActivePlanWithImportedInput(
+  userId: string,
+  importedPlan: z.infer<typeof importedPlanSchema>,
+) {
+  const supabase = createAdminSupabaseClient();
+  const archiveExisting = await supabase
+    .from("plan_cycles")
+    .update({ status: "archived" })
+    .eq("user_id", userId)
+    .eq("status", "active");
+
+  if (archiveExisting.error) {
+    throw new Error(archiveExisting.error.message);
+  }
+
+  return createAssignedPlanFromImportedInput(userId, importedPlan);
+}
+
+async function upsertRunnerProfile(userId: string, profile: RunnerProfileSummary) {
+  const supabase = createAdminSupabaseClient();
+  const profileUpsert = await supabase
+    .from("runner_profiles")
+    .upsert({
+      user_id: userId,
+      goal_type: profile.goalType,
+      goal_label: profile.goalLabel,
+      baseline_sessions_per_week: profile.baselineSessionsPerWeek,
+      baseline_long_run_km: profile.baselineLongRunKm,
+      baseline_notes: profile.baselineNotes ?? null,
+      setup_state: "completed",
+    })
+    .select("user_id")
+    .single();
+
+  if (profileUpsert.error) {
+    throw new Error(profileUpsert.error.message);
+  }
+}
+
 function dbWorkoutToView(
   workout: Database["public"]["Tables"]["planned_workouts"]["Row"],
   log: Database["public"]["Tables"]["workout_logs"]["Row"] | null,
@@ -644,4 +681,8 @@ function buildLoginRedirect(status: "error", next: string, appBaseUrl: string) {
   }
 
   return url;
+}
+
+function canUseSupabasePlanStorage() {
+  return hasSupabaseBrowserEnv && Boolean(serverEnv.supabaseServiceRoleKey);
 }

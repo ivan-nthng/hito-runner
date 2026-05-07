@@ -16,6 +16,10 @@ Active
   auth callback redirects now resolve against the live runtime origin unless `APP_BASE_URL` explicitly overrides it, and `/login` preserves the original safe `next` intent instead of nesting login into itself.
 - A temporary local account-backed auth bypass is implemented:
   `/login` now shows visible username/password login for configured local accounts, keeps Magic Link as a secondary option, and still uses an httpOnly cookie without depending on Magic Link delivery for the main local flow.
+- Canonical plan storage wiring is now implemented for the current JSON-first flow:
+  when a server-side Supabase key is configured, local bypass users map into a Supabase auth user, import their current plan into Supabase, and read saved mode back from the canonical Supabase tables instead of the local state file.
+- The current local admin plan has now been cut over into Supabase:
+  the linked project contains the base persisted schema, the current JSON week is imported as the active canonical plan, and saved-mode SSR now resolves `/progress` and `/workout/$date` from Supabase.
 - Phase 3 mock-seam replacement is implemented through one canonical backend contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
@@ -27,12 +31,12 @@ Active
 
 ## Current Active Stream
 
-Local auth-path refinement on top of the implemented TanStack Start + Supabase runtime, with credentials-first login, JSON-first onboarding, and Magic Link retained as a secondary option.
+QA validation of the imported Supabase-backed current plan, with local auth still available as the temporary entry path.
 
 ## Next Recommended Steps
 
-1. QA + validate the deployed Vercel preview against the live Supabase auth callback, onboarding creation, workout-log overwrite flow, and week-status transitions.
-2. BACKEND + remove the temporary local bypass after Supabase email auth is restored and fully verified end to end.
+1. QA + validate the loaded Supabase-backed plan, onboarding replacement behavior, workout-log overwrite flow, and week-status transitions.
+2. BACKEND + remove the temporary local fallback store after the Supabase-backed path is considered stable enough to be the only saved-mode source for local testing.
 
 ## Canonical References
 

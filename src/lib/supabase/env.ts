@@ -72,7 +72,7 @@ export const publicEnv = {
 
 export const serverEnv = {
   appBaseUrl: optionalEnv("APP_BASE_URL"),
-  supabaseServiceRoleKey: optionalEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  supabaseServiceRoleKey: optionalEnv("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"),
   localAuthBypassEnabled:
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED")?.toLowerCase() === "true" ||
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED") === "1",

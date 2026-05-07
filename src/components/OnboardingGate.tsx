@@ -2,7 +2,11 @@ import { useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { FileJson2, Upload, CheckCircle2 } from "lucide-react";
-import { importedPlanSchema, type ImportedPlan } from "@/lib/imported-plan";
+import {
+  summarizeImportedPlan,
+  type ImportedPlan,
+  validateImportedPlanJson,
+} from "@/lib/imported-plan";
 import { completeOnboarding } from "@/lib/training-api";
 
 const REQUIRED_ROOT_KEYS = [
@@ -198,10 +202,10 @@ export function OnboardingGate() {
               JSON ready
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-foreground/85">
-              <p>Plan: {importedPlan.plan_name}</p>
-              <p>For: {importedPlan.generated_for}</p>
+              <p>Plan: {summarizeImportedPlan(importedPlan).planName}</p>
+              <p>For: {summarizeImportedPlan(importedPlan).generatedFor}</p>
               <p>Start date: {importedPlan.start_date}</p>
-              <p>Week items: {importedPlan.week_1_preview.length}</p>
+              <p>Week items: {summarizeImportedPlan(importedPlan).days}</p>
             </div>
           </div>
         )}
@@ -290,23 +294,23 @@ function validateJsonDraftFactory({
     setFieldErrors([]);
     setImportedPlan(null);
 
-    try {
-      const parsedJson = JSON.parse(raw) as unknown;
-      const validation = importedPlanSchema.safeParse(parsedJson);
+    const validation = validateImportedPlanJson(raw);
 
-      if (!validation.success) {
-        setFieldErrors(
-          validation.error.issues.map((issue) => formatIssue(issue.path, issue.message)),
-        );
-        setStatus("idle");
-        return;
-      }
-
-      setImportedPlan(validation.data);
-      setStatus("idle");
-    } catch {
+    if (!validation) {
       setStatus("idle");
       setError("The JSON content could not be parsed.");
+      return;
     }
+
+    if (!validation.success) {
+      setFieldErrors(
+        validation.error.issues.map((issue) => formatIssue(issue.path, issue.message)),
+      );
+      setStatus("idle");
+      return;
+    }
+
+    setImportedPlan(validation.data);
+    setStatus("idle");
   };
 }

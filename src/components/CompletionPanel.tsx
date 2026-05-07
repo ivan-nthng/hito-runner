@@ -110,6 +110,20 @@ export function CompletionPanel({
             ? "Save changes"
             : "Save result";
 
+  if (workout.type === "rest") {
+    return (
+      <div className="rounded-xl border border-hairline bg-background/35 p-5">
+        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          Rest day
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+          Rest days do not need a workout result. If a real mobility or strength assignment is added
+          later, this surface can stay available for it.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div

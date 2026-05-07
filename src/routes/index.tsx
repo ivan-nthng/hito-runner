@@ -26,7 +26,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { snapshot, localBypassEnabled, localAccounts, magicLinkEnabled } = Route.useLoaderData();
+  const { snapshot, viewer, localBypassEnabled, localAccounts, magicLinkEnabled } =
+    Route.useLoaderData();
   const hasPlannedWorkouts = snapshot.workouts.some((workout) => workout.type !== "rest");
 
   if (snapshot.mode === "preview") {
@@ -41,7 +42,7 @@ function Index() {
   }
 
   return (
-    <AppShell snapshot={snapshot}>
+    <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="px-6 lg:px-10 py-8 lg:py-10 space-y-12">
         {snapshot.mode === "onboarding" ? (
           <OnboardingGate />

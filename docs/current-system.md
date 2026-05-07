@@ -32,7 +32,7 @@
 - `src/routes/api.auth.logout.tsx`
   clears the temporary local auth cookie and signs out Supabase sessions when present
 - `src/routes/workout.$date.tsx`
-  renders workout detail for preview or persisted data, treats the route search as the source of truth for the active tab, preserves `tab=complete`, and logs results through the canonical backend mutation when saved mode is active
+  renders workout detail for preview or persisted data, treats the route search as the source of truth for the active tab, preserves `tab=complete`, logs results through the canonical backend mutation when saved mode is active, and now keeps rest-day detail sparse with one grouped right-side context panel
 - `src/routes/progress.tsx`
   renders the preserved analytics shell using preview or persisted aggregates from the same data seam
 - `src/routes/body.tsx`
@@ -55,7 +55,7 @@
 - `src/lib/training-api.ts`
   owns server-backed loading and mutation entry points for home, workout detail, progress, login, JSON-first onboarding, and workout logging
 - `src/lib/imported-plan.ts`
-  owns the observed JSON onboarding schema and the mapping from imported week data into the canonical saved workout shape
+  owns the observed JSON onboarding schema, JSON validation helpers, and the mapping from imported week data into the canonical saved workout shape
 - `src/lib/local-auth.ts`
   owns the temporary local account credential contract, account discovery, and cookie session helpers
 - `src/lib/local-auth-supabase.ts`
@@ -76,9 +76,14 @@
 - home and calendar now anchor `today` to the real runtime local date instead of a frozen template start date
 - the preview snapshot no longer caches a stale `currentDate`, so reloads can reflect the actual current day
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
+- the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode `Upload JSON` entry point plus sign-out action
+- the saved-mode `Upload JSON` dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
+- active-plan replacement now carries saved workout logs forward only for exact deterministic matches on logged days by date, workout type, title, notes, and steps; otherwise the apply step is rejected and the current active plan remains unchanged
+- if older broken replacements already stranded logs on archived plan cycles from the same user and plan window, the persisted seam repairs those orphaned same-date logs back onto the current active plan before evaluating visible state or replacement safety
 - saved workout logs can be overwritten from `completed` to `partial` or `skipped`, and skipped truth persists with null actual metrics instead of backfilled planned defaults
 - past-due planned workouts without a saved log are treated as `skipped` until the user overwrites them with a real result
 - `week_status` is derived on the backend-facing seam from persisted workout state, not from client-only heuristics
+- rest days no longer render distance, duration, load, or empty target and note sections by default; only genuine assigned rest-day content is surfaced
 
 ## Trusted-Output Contract
 
@@ -104,6 +109,8 @@
 - temporary local-only auth env must stay unset on Vercel because the bypass store is a local unblock mechanism, not a production deployment contract
 - server-side writes and persisted reads flow through one backend seam rather than direct client DB access
 - `npm run import:current-plan` now exists as the narrow script for importing `/Users/ivan/Desktop/corrected_half_marathon_start_2026-05-05.json` into the canonical Supabase plan tables for the current local bypass user
+- `npm run test-user -- ...` is now the canonical Backend lifecycle tool for tester-account create, reset, optional plan seeding, and delete against the real Supabase auth/data model
+- `.tanstack/hito-running-local-accounts.json` is now the preferred ignored local credentials file for repeatable tester login on the temporary local bypass path
 
 ## Runtime Invariants
 

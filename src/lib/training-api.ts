@@ -4,6 +4,10 @@ import { z } from "zod";
 import { DEFAULT_AUTH_REDIRECT, sanitizeRedirectPath } from "@/lib/auth-redirect";
 import { buildImportedPlanSeed, importedPlanSchema } from "@/lib/imported-plan";
 import {
+  buildImportedLogCarryForwardPlan,
+  buildPersistedWorkoutInsertRows,
+} from "@/lib/persisted-plan-replacement";
+import {
   completeLocalAuthOnboarding,
   getLocalAuthSnapshot,
   saveLocalAuthWorkoutLog,
@@ -38,6 +42,15 @@ const goalLabels = {
   first_race: "Finish a first race",
   distance_build: "Build distance",
 } as const;
+
+export interface ViewerSummary {
+  name: string | null;
+  email: string | null;
+}
+
+type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
+type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
+type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 
 const loginInputSchema = z.object({
   email: z.string().trim().email(),
@@ -75,6 +88,7 @@ const workoutLogInputSchema = z
 export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async () => {
   return {
     snapshot: await getSnapshotForRequest(),
+    viewer: await getViewerForRequest(),
     localBypassEnabled: await isLocalAuthBypassEnabled(),
     localAccounts: await getLocalAuthAccountSummaries(),
     magicLinkEnabled: hasSupabaseBrowserEnv,
@@ -84,12 +98,14 @@ export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async 
 export const getShellRouteData = createServerFn({ method: "GET" }).handler(async () => {
   return {
     snapshot: await getSnapshotForRequest(),
+    viewer: await getViewerForRequest(),
   };
 });
 
 export const getLoginRouteData = createServerFn({ method: "GET" }).handler(async () => {
   return {
     snapshot: await getSnapshotForRequest(),
+    viewer: await getViewerForRequest(),
     localBypassEnabled: await isLocalAuthBypassEnabled(),
     localAccounts: await getLocalAuthAccountSummaries(),
     magicLinkEnabled: hasSupabaseBrowserEnv,
@@ -117,6 +133,7 @@ export const getWorkoutRouteData = createServerFn({ method: "POST" })
 
     return {
       snapshot,
+      viewer: await getViewerForRequest(),
       workout,
       prev: workoutIndex > 0 ? snapshot.workouts[workoutIndex - 1] : null,
       next:
@@ -129,6 +146,7 @@ export const getWorkoutRouteData = createServerFn({ method: "POST" })
 export const getProgressRouteData = createServerFn({ method: "GET" }).handler(async () => {
   return {
     snapshot: await getSnapshotForRequest(),
+    viewer: await getViewerForRequest(),
   };
 });
 
@@ -344,6 +362,27 @@ async function getSnapshotForRequest() {
   return getPersistedSnapshot(auth.userId);
 }
 
+async function getViewerForRequest(): Promise<ViewerSummary | null> {
+  const auth = getRequestAuthContext();
+
+  if (!auth.userId) {
+    return null;
+  }
+
+  if (auth.provider === "local") {
+    const account = await findLocalAuthAccountByUserId(auth.userId);
+    return {
+      name: account?.displayName ?? inferViewerName(auth.email),
+      email: account?.email ?? auth.email,
+    };
+  }
+
+  return {
+    name: inferViewerName(auth.email),
+    email: auth.email,
+  };
+}
+
 async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
   const supabase = createAdminSupabaseClient();
   const profileResult = await supabase
@@ -371,29 +410,12 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
 
   const profile = profileRowToSummary(profileResult.data);
   const planCycle = await ensureActivePlan(userId, profile);
-  const plannedWorkoutsResult = await supabase
-    .from("planned_workouts")
-    .select("*")
-    .eq("plan_cycle_id", planCycle.id)
-    .order("workout_date", { ascending: true })
-    .order("display_order", { ascending: true });
-
-  if (plannedWorkoutsResult.error) {
-    throw new Error(plannedWorkoutsResult.error.message);
-  }
-
-  const workoutIds = plannedWorkoutsResult.data.map((workout) => workout.id);
-  const logsResult = workoutIds.length
-    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", workoutIds)
-    : { data: [], error: null };
-
-  if (logsResult.error) {
-    throw new Error(logsResult.error.message);
-  }
-
-  const logsByWorkoutId = new Map(logsResult.data.map((log) => [log.planned_workout_id, log]));
+  const { workouts: persistedWorkouts, logsByWorkoutId } = await getResolvedPlanWorkoutsWithLogs(
+    userId,
+    planCycle,
+  );
   const currentDate = todayIso();
-  const workouts = plannedWorkoutsResult.data.map((workout) =>
+  const workouts = persistedWorkouts.map((workout) =>
     dbWorkoutToView(workout, logsByWorkoutId.get(workout.id) ?? null, currentDate),
   );
 
@@ -499,6 +521,7 @@ async function createAssignedPlan(userId: string, profile: RunnerProfileSummary)
 async function createAssignedPlanFromImportedInput(
   userId: string,
   importedPlan: z.infer<typeof importedPlanSchema>,
+  status: PersistedPlanCycleRow["status"] = "active",
 ) {
   const supabase = createAdminSupabaseClient();
   const importedSeed = buildImportedPlanSeed(importedPlan);
@@ -506,7 +529,7 @@ async function createAssignedPlanFromImportedInput(
     .from("plan_cycles")
     .insert({
       user_id: userId,
-      status: "active",
+      status,
       title: importedSeed.title,
       goal_summary: importedSeed.goalSummary,
       source_template: importedSeed.sourceTemplate,
@@ -520,27 +543,19 @@ async function createAssignedPlanFromImportedInput(
     throw new Error(planInsert.error.message);
   }
 
-  const workouts = importedSeed.workouts.map((workout) => ({
-    plan_cycle_id: planInsert.data.id,
-    user_id: userId,
-    workout_date: workout.workoutDate,
-    weekday: workout.weekday,
-    week_number: workout.weekNumber,
-    phase: workout.phase,
-    workout_type: workout.workoutType,
-    title: workout.title,
-    notes: workout.notes,
-    steps: workout.steps as Json,
-    display_order: workout.displayOrder,
-  }));
-
-  const workoutInsert = await supabase.from("planned_workouts").insert(workouts);
+  const workoutInsert = await supabase
+    .from("planned_workouts")
+    .insert(buildPersistedWorkoutInsertRows(planInsert.data.id, userId, importedSeed.workouts))
+    .select("*");
 
   if (workoutInsert.error) {
     throw new Error(workoutInsert.error.message);
   }
 
-  return planInsert.data;
+  return {
+    planCycle: planInsert.data,
+    workouts: workoutInsert.data,
+  };
 }
 
 async function replaceActivePlanWithImportedInput(
@@ -548,17 +563,115 @@ async function replaceActivePlanWithImportedInput(
   importedPlan: z.infer<typeof importedPlanSchema>,
 ) {
   const supabase = createAdminSupabaseClient();
+  const importedSeed = buildImportedPlanSeed(importedPlan);
+  const activePlanResult = await supabase
+    .from("plan_cycles")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activePlanResult.error) {
+    throw new Error(activePlanResult.error.message);
+  }
+
+  const activePlan = activePlanResult.data;
+
+  const existingWorkouts = activePlan
+    ? await getResolvedPlanWorkoutsWithLogs(userId, activePlan)
+    : {
+        workouts: [] as PersistedPlannedWorkoutRow[],
+        logsByWorkoutId: new Map<string, PersistedWorkoutLogRow>(),
+      };
+  const preservationPlan = buildImportedLogCarryForwardPlan(
+    existingWorkouts.workouts,
+    existingWorkouts.logsByWorkoutId,
+    importedSeed.workouts,
+  );
+
+  if (!preservationPlan.ok) {
+    throw new Error(preservationPlan.message);
+  }
+
+  const insertedPlan = await createAssignedPlanFromImportedInput(
+    userId,
+    importedPlan,
+    activePlan ? "archived" : "active",
+  );
+  const insertedWorkoutsByDate = new Map(
+    insertedPlan.workouts.map((workout) => [workout.workout_date, workout]),
+  );
+
+  if (preservationPlan.logs.length > 0) {
+    const copiedLogs = preservationPlan.logs.map(({ log, workoutDate }) => {
+      const nextWorkout = insertedWorkoutsByDate.get(workoutDate);
+
+      if (!nextWorkout) {
+        throw new Error(
+          `Imported plan replacement lost the inserted workout for ${workoutDate}. Current plan is unchanged.`,
+        );
+      }
+
+      return {
+        planned_workout_id: nextWorkout.id,
+        user_id: userId,
+        outcome: log.outcome,
+        actual_distance_km: log.actual_distance_km,
+        actual_duration_min: log.actual_duration_min,
+        rpe: log.rpe,
+        notes: log.notes,
+        intervals_completed: log.intervals_completed,
+        logged_at: log.logged_at,
+        updated_at: log.updated_at,
+      };
+    });
+
+    const logInsert = await supabase.from("workout_logs").insert(copiedLogs);
+
+    if (logInsert.error) {
+      await rollbackInsertedPlan(insertedPlan.planCycle.id);
+      throw new Error(logInsert.error.message);
+    }
+  }
+
+  if (!activePlan) {
+    return insertedPlan.planCycle;
+  }
+
   const archiveExisting = await supabase
     .from("plan_cycles")
     .update({ status: "archived" })
-    .eq("user_id", userId)
+    .eq("id", activePlan.id)
     .eq("status", "active");
 
   if (archiveExisting.error) {
+    await rollbackInsertedPlan(insertedPlan.planCycle.id);
     throw new Error(archiveExisting.error.message);
   }
 
-  return createAssignedPlanFromImportedInput(userId, importedPlan);
+  const activateInserted = await supabase
+    .from("plan_cycles")
+    .update({ status: "active" })
+    .eq("id", insertedPlan.planCycle.id)
+    .eq("status", "archived")
+    .select("*")
+    .single();
+
+  if (activateInserted.error) {
+    await supabase.from("plan_cycles").update({ status: "active" }).eq("id", activePlan.id);
+    await rollbackInsertedPlan(insertedPlan.planCycle.id);
+    throw new Error(activateInserted.error.message);
+  }
+
+  const deletePreviousPlan = await supabase.from("plan_cycles").delete().eq("id", activePlan.id);
+
+  if (deletePreviousPlan.error) {
+    throw new Error(deletePreviousPlan.error.message);
+  }
+
+  return activateInserted.data;
 }
 
 async function upsertRunnerProfile(userId: string, profile: RunnerProfileSummary) {
@@ -638,6 +751,24 @@ function redirectResponse(url: string, headers: Headers) {
   });
 }
 
+function inferViewerName(email: string | null) {
+  if (!email) {
+    return null;
+  }
+
+  const localPart = email.split("@")[0] ?? "";
+
+  if (!localPart) {
+    return null;
+  }
+
+  return localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
 function getRuntimeAppBaseUrl(request?: Request) {
   if (serverEnv.appBaseUrl) {
     return new URL(serverEnv.appBaseUrl).origin;
@@ -685,4 +816,181 @@ function buildLoginRedirect(status: "error", next: string, appBaseUrl: string) {
 
 function canUseSupabasePlanStorage() {
   return hasSupabaseBrowserEnv && Boolean(serverEnv.supabaseServiceRoleKey);
+}
+
+async function getPlanWorkoutsWithLogs(planCycleId: string) {
+  const supabase = createAdminSupabaseClient();
+  const workoutsResult = await supabase
+    .from("planned_workouts")
+    .select("*")
+    .eq("plan_cycle_id", planCycleId)
+    .order("workout_date", { ascending: true })
+    .order("display_order", { ascending: true });
+
+  if (workoutsResult.error) {
+    throw new Error(workoutsResult.error.message);
+  }
+
+  const workoutIds = workoutsResult.data.map((workout) => workout.id);
+  const logsResult = workoutIds.length
+    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", workoutIds)
+    : { data: [], error: null };
+
+  if (logsResult.error) {
+    throw new Error(logsResult.error.message);
+  }
+
+  return {
+    workouts: workoutsResult.data,
+    logsByWorkoutId: new Map(logsResult.data.map((log) => [log.planned_workout_id, log])),
+  };
+}
+
+async function getResolvedPlanWorkoutsWithLogs(userId: string, planCycle: PersistedPlanCycleRow) {
+  const direct = await getPlanWorkoutsWithLogs(planCycle.id);
+  const recovered = await recoverArchivedLogsOntoActivePlan(userId, planCycle, direct);
+
+  if (!recovered) {
+    return direct;
+  }
+
+  return getPlanWorkoutsWithLogs(planCycle.id);
+}
+
+async function recoverArchivedLogsOntoActivePlan(
+  userId: string,
+  activePlan: PersistedPlanCycleRow,
+  direct: {
+    workouts: PersistedPlannedWorkoutRow[];
+    logsByWorkoutId: Map<string, PersistedWorkoutLogRow>;
+  },
+) {
+  const unresolvedDates = direct.workouts
+    .filter((workout) => workout.workout_type !== "rest" && !direct.logsByWorkoutId.has(workout.id))
+    .map((workout) => workout.workout_date);
+
+  if (unresolvedDates.length === 0) {
+    return false;
+  }
+
+  const supabase = createAdminSupabaseClient();
+  const archivedPlansResult = await supabase
+    .from("plan_cycles")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "archived")
+    .eq("title", activePlan.title)
+    .eq("start_date", activePlan.start_date)
+    .eq("end_date", activePlan.end_date)
+    .eq("source_template", activePlan.source_template)
+    .order("created_at", { ascending: false });
+
+  if (archivedPlansResult.error) {
+    throw new Error(archivedPlansResult.error.message);
+  }
+
+  if (archivedPlansResult.data.length === 0) {
+    return false;
+  }
+
+  const planOrder = new Map(archivedPlansResult.data.map((plan, index) => [plan.id, index]));
+  const archivedPlanIds = archivedPlansResult.data.map((plan) => plan.id);
+  const archivedWorkoutsResult = await supabase
+    .from("planned_workouts")
+    .select("*")
+    .in("plan_cycle_id", archivedPlanIds)
+    .in("workout_date", unresolvedDates)
+    .order("workout_date", { ascending: true })
+    .order("display_order", { ascending: true });
+
+  if (archivedWorkoutsResult.error) {
+    throw new Error(archivedWorkoutsResult.error.message);
+  }
+
+  const archivedWorkoutIds = archivedWorkoutsResult.data.map((workout) => workout.id);
+  const archivedLogsResult = archivedWorkoutIds.length
+    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", archivedWorkoutIds)
+    : { data: [], error: null };
+
+  if (archivedLogsResult.error) {
+    throw new Error(archivedLogsResult.error.message);
+  }
+
+  const archivedLogsByWorkoutId = new Map(
+    archivedLogsResult.data.map((log) => [log.planned_workout_id, log]),
+  );
+  const archivedCandidatesByDate = new Map<
+    string,
+    Array<{
+      planOrder: number;
+      workout: PersistedPlannedWorkoutRow;
+      log: PersistedWorkoutLogRow;
+    }>
+  >();
+
+  for (const workout of archivedWorkoutsResult.data) {
+    const log = archivedLogsByWorkoutId.get(workout.id);
+
+    if (!log) {
+      continue;
+    }
+
+    const entries = archivedCandidatesByDate.get(workout.workout_date) ?? [];
+    entries.push({
+      planOrder: planOrder.get(workout.plan_cycle_id) ?? Number.MAX_SAFE_INTEGER,
+      workout,
+      log,
+    });
+    archivedCandidatesByDate.set(workout.workout_date, entries);
+  }
+
+  const recoveredLogs = direct.workouts.flatMap((activeWorkout) => {
+    if (activeWorkout.workout_type === "rest" || direct.logsByWorkoutId.has(activeWorkout.id)) {
+      return [];
+    }
+
+    const candidates = archivedCandidatesByDate.get(activeWorkout.workout_date) ?? [];
+    const matched = candidates
+      .slice()
+      .sort((left, right) => left.planOrder - right.planOrder)
+      .find((candidate) => candidate.workout.workout_date === activeWorkout.workout_date);
+
+    if (!matched) {
+      return [];
+    }
+
+    return [
+      {
+        planned_workout_id: activeWorkout.id,
+        user_id: userId,
+        outcome: matched.log.outcome,
+        actual_distance_km: matched.log.actual_distance_km,
+        actual_duration_min: matched.log.actual_duration_min,
+        rpe: matched.log.rpe,
+        notes: matched.log.notes,
+        intervals_completed: matched.log.intervals_completed,
+        logged_at: matched.log.logged_at,
+        updated_at: matched.log.updated_at,
+      },
+    ];
+  });
+
+  if (recoveredLogs.length === 0) {
+    return false;
+  }
+
+  const recoveredInsert = await supabase.from("workout_logs").upsert(recoveredLogs, {
+    onConflict: "planned_workout_id",
+  });
+
+  if (recoveredInsert.error) {
+    throw new Error(recoveredInsert.error.message);
+  }
+
+  return true;
+}
+
+async function rollbackInsertedPlan(planCycleId: string) {
+  const supabase = createAdminSupabaseClient();
+  await supabase.from("plan_cycles").delete().eq("id", planCycleId);
 }

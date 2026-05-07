@@ -16,6 +16,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
     return <TodayFallback snapshot={snapshot} />;
   }
   const meta = TYPE_META[workout.type];
+  const isRestDay = workout.type === "rest";
   const km = workoutDistanceKm(workout);
   const duration = workoutDuration(workout);
   const target = workout.steps[0]?.target;
@@ -46,28 +47,41 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
           </div>
 
           <h2 className="font-display text-4xl lg:text-6xl mt-4 leading-[1.05] text-balance">
-            {workout.title}
+            {isRestDay ? "Rest day" : workout.title}
           </h2>
 
           <p className="mt-4 max-w-md text-sm text-muted-foreground leading-relaxed">
-            Today&apos;s workout stays front and center so the preserved baseline still answers the
-            main question quickly: what should I do next?
-            {workout.status === "today" &&
-              (snapshot.source === "persisted"
-                ? " This now reads from the persisted plan and workout log contract."
-                : " This preview is still powered by the imported sample plan.")}
+            {isRestDay
+              ? "Keep the day open unless a light assignment is actually planned."
+              : "Your current day stays front and center so the plan is easy to open and follow."}
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-8">
-            <Metric label="Distance" value={km ? `${km}` : "—"} unit="km" />
-            <Metric label="Duration" value={duration ? `${duration}` : "—"} unit="min" />
-            <Metric
-              label="Target HR"
-              value={(target?.hr_bpm as string)?.split("-")[0] ?? "—"}
-              unit={`–${(target?.hr_bpm as string)?.split("-")[1] ?? ""} bpm`}
-            />
-            <Metric label="Pace hint" value="6:40" unit="–7:40 /km" />
-          </div>
+          {!isRestDay ? (
+            <div className="mt-8 flex flex-wrap gap-8">
+              <Metric label="Distance" value={km ? `${km}` : "—"} unit="km" />
+              <Metric label="Duration" value={duration ? `${duration}` : "—"} unit="min" />
+              <Metric
+                label="Target HR"
+                value={(target?.hr_bpm as string)?.split("-")[0] ?? "—"}
+                unit={`–${(target?.hr_bpm as string)?.split("-")[1] ?? ""} bpm`}
+              />
+              <Metric label="Pace hint" value="6:40" unit="–7:40 /km" />
+            </div>
+          ) : (
+            <div className="mt-8 max-w-md rounded-xl bg-background/35 p-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-background/70">
+                  <span className="h-4 w-4 rounded-full border border-hairline bg-surface/70" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-foreground/85">No distance or load planned today.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Use the day for recovery, mobility, or nothing at all.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
@@ -75,17 +89,19 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
               params={{ date: snapshot.currentDate }}
               className="inline-flex items-center gap-2 rounded-md bg-signal text-signal-foreground px-5 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity"
             >
-              Open workout
+              {isRestDay ? "Open day" : "Open workout"}
               <ArrowUpRight className="h-4 w-4" />
             </Link>
-            <Link
-              to="/workout/$date"
-              params={{ date: snapshot.currentDate }}
-              search={{ tab: "complete" } as never}
-              className="inline-flex items-center gap-2 rounded-md border border-hairline px-5 py-2.5 text-sm hover:bg-accent transition-colors"
-            >
-              Mark complete
-            </Link>
+            {!isRestDay && (
+              <Link
+                to="/workout/$date"
+                params={{ date: snapshot.currentDate }}
+                search={{ tab: "complete" } as never}
+                className="inline-flex items-center gap-2 rounded-md border border-hairline px-5 py-2.5 text-sm hover:bg-accent transition-colors"
+              >
+                Mark complete
+              </Link>
+            )}
           </div>
         </div>
 
@@ -97,8 +113,8 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
             </div>
             <p className="mt-2 text-sm leading-relaxed">
               {snapshot.source === "persisted"
-                ? "This hero keeps the imported visual structure intact while the plan, profile, and workout logging now come from one persisted backend contract."
-                : "This imported hero keeps the current visual structure intact, but real plan generation, persistence, and adaptation are not wired in yet."}
+                ? "This surface keeps the imported structure while plan and workout status now read from saved truth."
+                : "This surface keeps the imported structure while preview data stays read-only."}
             </p>
             <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
               <span>Data source</span>
@@ -137,16 +153,9 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
       </div>
 
       <div className="mt-10 pt-6 border-t border-hairline flex flex-wrap items-center gap-x-8 gap-y-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-        <span>
-          Surface · {snapshot.source === "persisted" ? "weekly plan" : "weekly plan preview"}
-        </span>
+        <span>Surface · {snapshot.source === "persisted" ? "weekly plan" : "preview plan"}</span>
         <span className="opacity-50">·</span>
-        <span>
-          Source ·{" "}
-          {snapshot.source === "persisted"
-            ? "persisted runner state"
-            : "imported baseline mock data"}
-        </span>
+        <span>Source · {snapshot.source === "persisted" ? "saved state" : "mock data"}</span>
         <span className="opacity-50">·</span>
         <span>JSON export comes later</span>
       </div>

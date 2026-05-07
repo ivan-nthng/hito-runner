@@ -4,6 +4,11 @@ Completed implementation history only.
 
 ## 2026-05-06
 
+- Repaired the live saved-mode `Upload JSON` continuity seam so already-orphaned workout logs from older broken replacements are recovered onto the active matching plan before same-template preserve or mismatch-block checks run.
+- Fixed the saved-mode `Upload JSON` replace contract so logged workout history now carries forward only for exact deterministic workout matches on logged dates; unsafe replacements are rejected before apply instead of silently resetting visible progress.
+- Added `npm run test-user -- ...` as the canonical tester-account lifecycle path, including create, reset, optional plan seeding, and delete against the real Supabase auth/data model, and documented the exact contract in `docs/process/test-user-lifecycle.md`.
+- Tightened the saved-mode shell and workout detail UI: the sidebar profile trigger now shows runner name plus active plan, owns `Upload JSON` and sign-out, and rest-day detail now stays sparse with a grouped right-side context panel and calmer fueling surface.
+- Switched local multi-tester credentials toward one ignored accounts file path so newly created tester accounts can use the visible username/password login without dashboard-only setup.
 - Applied the base persisted Supabase migration to the linked `dltfjwexyctmihclcjqj` project, imported `/Users/ivan/Desktop/corrected_half_marathon_start_2026-05-05.json` as the active canonical plan for the current local admin path, and verified saved-mode SSR now resolves `/progress` and `/workout/2026-05-08` from Supabase.
 - Simplified the local-auth-to-Supabase cutover path to resolve the temporary local account into `auth.users` by email and import directly into the existing canonical tables, removing the extra mapping/snapshot schema dependency from the live cutover flow.
 - Added a canonical Supabase plan-import path for the JSON-first onboarding flow, including local-account-to-Supabase-user mapping, raw imported JSON snapshots, and a narrow current-plan import script for `/Users/ivan/Desktop/corrected_half_marathon_start_2026-05-05.json`.

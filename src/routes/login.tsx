@@ -29,7 +29,8 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { snapshot, localBypassEnabled, localAccounts, magicLinkEnabled } = Route.useLoaderData();
+  const { snapshot, viewer, localBypassEnabled, localAccounts, magicLinkEnabled } =
+    Route.useLoaderData();
   const search = Route.useSearch();
   const nextLabel =
     search.next === "/"
@@ -42,7 +43,7 @@ function LoginPage() {
 
   if (snapshot.source === "persisted") {
     return (
-      <AppShell snapshot={snapshot}>
+      <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="px-6 py-10 lg:px-10">
           <section className="max-w-3xl rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">

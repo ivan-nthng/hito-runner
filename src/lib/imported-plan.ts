@@ -40,6 +40,31 @@ export interface ImportedPlanSeed {
   workouts: ImportedWorkoutSeed[];
 }
 
+export interface ImportedPlanSummary {
+  planName: string;
+  generatedFor: string;
+  days: number;
+  workouts: number;
+}
+
+export function validateImportedPlanJson(raw: string) {
+  try {
+    const parsedJson = JSON.parse(raw) as unknown;
+    return importedPlanSchema.safeParse(parsedJson);
+  } catch {
+    return null;
+  }
+}
+
+export function summarizeImportedPlan(plan: ImportedPlan): ImportedPlanSummary {
+  return {
+    planName: plan.plan_name,
+    generatedFor: plan.generated_for,
+    days: plan.week_1_preview.length,
+    workouts: plan.week_1_preview.filter((item) => !/rest|recovery$/i.test(item.workout)).length,
+  };
+}
+
 export function buildImportedPlanSeed(plan: ImportedPlan): ImportedPlanSeed {
   const workouts = plan.week_1_preview
     .slice()

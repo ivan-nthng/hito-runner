@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import {
   CalendarDays,
   LineChart,
@@ -12,8 +12,10 @@ import {
   SlidersHorizontal,
   UserRound,
   LogOut,
+  FileJson2,
 } from "lucide-react";
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
+import { UploadJsonDialog } from "@/components/UploadJsonDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -32,6 +34,7 @@ import {
   getShellSnapshot,
   type TrainingSnapshot,
 } from "@/lib/training";
+import type { ViewerSummary } from "@/lib/training-api";
 
 const NAV = [
   { to: "/", label: "Calendar", icon: CalendarDays },
@@ -43,10 +46,13 @@ const NAV = [
 export function AppShell({
   children,
   snapshot,
+  viewer,
 }: {
   children: ReactNode;
   snapshot?: TrainingSnapshot | null;
+  viewer?: ViewerSummary | null;
 }) {
+  const [uploadOpen, setUploadOpen] = useState(false);
   const loc = useLocation();
   const nextPath = getLoginIntentPath(
     loc.pathname,
@@ -66,27 +72,32 @@ export function AppShell({
       : shellSnapshot.backend === "temporary_local"
         ? "Temporary local"
         : "Preview only";
-  const profileName =
-    shellSnapshot.mode === "authenticated"
+  const profileName = viewer?.name
+    ? viewer.name
+    : shellSnapshot.mode === "authenticated"
       ? shellSnapshot.backend === "temporary_local"
         ? "Local runner"
         : "Runner profile"
       : shellSnapshot.mode === "onboarding"
         ? "Setup in progress"
         : "Preview runner";
-  const profileDetail = snapshot?.profile?.goalLabel
-    ? snapshot.profile.goalLabel
-    : shellSnapshot.mode === "authenticated"
-      ? "Saved progress enabled"
-      : shellSnapshot.mode === "onboarding"
-        ? "Finish setup on home"
-        : "Sign in to save progress";
-  const profileInitials =
+  const profileDetail = snapshot?.planMeta?.title
+    ? snapshot.planMeta.title
+    : snapshot?.profile?.goalLabel
+      ? snapshot.profile.goalLabel
+      : shellSnapshot.mode === "authenticated"
+        ? "Saved plan active"
+        : shellSnapshot.mode === "onboarding"
+          ? "Import JSON on home"
+          : "Sign in to save progress";
+  const profileInitials = buildInitials(profileName);
+  const showUploadAction = shellSnapshot.mode !== "preview";
+  const modeTag =
     shellSnapshot.mode === "authenticated"
-      ? "LR"
+      ? "saved"
       : shellSnapshot.mode === "onboarding"
-        ? "SU"
-        : "PR";
+        ? "setup"
+        : "preview";
 
   return (
     <div className="min-h-screen flex bg-background text-foreground canvas-grain">
@@ -127,17 +138,15 @@ export function AppShell({
         </nav>
 
         <div className="mt-auto flex flex-col gap-4 p-4">
-          <div className="rounded-lg border border-hairline bg-surface/50 p-4">
+          <div className="rounded-lg border border-hairline bg-surface/45 p-4">
             <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
               <NotebookPen className="h-3 w-3 text-signal" />
               Plan note
             </div>
             <p className="mt-2 text-xs leading-relaxed text-foreground/80">
               {shellSnapshot.source === "persisted"
-                ? shellSnapshot.backend === "temporary_local"
-                  ? "This shell now reads one temporary local account-backed saved-mode contract while preserving the imported layout and interaction structure. JSON export comes later."
-                  : "This shell now reads one canonical persisted profile, plan, and workout-log contract while preserving the imported layout and interaction structure. JSON export comes later."
-                : "This imported shell stays available as a read-only preview while real profile setup and saved workout logging live behind auth."}
+                ? "Saved plan and workout status are live here. JSON export comes later."
+                : "This shell stays available as a preview until you sign in and save a real plan."}
             </p>
             <div className="mt-3 text-[11px] tracking-wider uppercase text-signal">
               {weekStatus.label}
@@ -169,11 +178,25 @@ export function AppShell({
             >
               <DropdownMenuLabel className="pb-1">
                 <div className="text-sm font-medium text-foreground">{profileName}</div>
-                <div className="mt-1 text-[11px] font-normal uppercase tracking-[0.16em] text-muted-foreground">
-                  {backendLabel} · {modeLabel}
+                <div className="mt-1 truncate text-[11px] font-normal text-muted-foreground">
+                  {profileDetail}
+                </div>
+                <div className="mt-2 text-[11px] font-normal uppercase tracking-[0.16em] text-muted-foreground">
+                  {backendLabel} · {modeTag}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {showUploadAction && (
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setUploadOpen(true);
+                  }}
+                >
+                  <FileJson2 className="h-4 w-4" />
+                  Upload JSON
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem disabled>
                 <Settings2 className="h-4 w-4" />
                 Settings
@@ -246,14 +269,6 @@ export function AppShell({
                     ? "Finish setup"
                     : "Open plan"}
               </Link>
-              {shellSnapshot.mode !== "preview" && (
-                <a
-                  href="/api/auth/logout?next=%2F"
-                  className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  Sign out
-                </a>
-              )}
               <button className="md:hidden h-8 w-8 rounded-full bg-gradient-to-br from-signal to-quality grid place-items-center text-[10px] text-signal-foreground">
                 HR
               </button>
@@ -283,6 +298,7 @@ export function AppShell({
           })}
         </nav>
       </main>
+      <UploadJsonDialog open={uploadOpen} onOpenChange={setUploadOpen} />
     </div>
   );
 }
@@ -300,4 +316,20 @@ function StatusPill({ label, value }: { label: string; value: string }) {
       <span className="text-[10px] uppercase tracking-wider opacity-60">{value}</span>
     </div>
   );
+}
+
+function buildInitials(name: string) {
+  const parts = name
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!parts.length) {
+    return "HR";
+  }
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
 }

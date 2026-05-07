@@ -41,14 +41,14 @@ export const Route = createFileRoute("/workout/$date")({
 });
 
 function WorkoutPage() {
-  const { workout, snapshot, prev, next } = Route.useLoaderData();
+  const { workout, snapshot, viewer, prev, next } = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const tab = search.tab;
 
   if (!workout) {
     return (
-      <AppShell snapshot={snapshot}>
+      <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="px-6 lg:px-10 py-20 max-w-2xl">
           {snapshot.mode === "onboarding" ? (
             <>
@@ -90,11 +90,13 @@ function WorkoutPage() {
   const km = workoutDistanceKm(workout);
   const duration = workoutDuration(workout);
   const status = workout.status;
+  const isRestDay = workout.type === "rest";
+  const restAssignment = restAssignmentFor(workout);
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const phase = `${workout.phase} · week ${workout.week}`;
 
   return (
-    <AppShell snapshot={snapshot}>
+    <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="px-6 lg:px-10 py-8 max-w-6xl">
         <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
           <Link to="/" className="inline-flex items-center gap-1 hover:text-foreground">
@@ -122,18 +124,22 @@ function WorkoutPage() {
               )}
             </div>
             <h1 className="mt-3 font-display text-4xl lg:text-5xl leading-[1.05] text-balance max-w-2xl">
-              {workout.title}
+              {isRestDay ? "Rest day" : workout.title}
             </h1>
-            <p className="mt-4 text-sm text-muted-foreground max-w-xl leading-relaxed">
-              {objectiveFor(workout.type)}
-            </p>
+            {objectiveFor(workout.type) && (
+              <p className="mt-4 text-sm text-muted-foreground max-w-xl leading-relaxed">
+                {objectiveFor(workout.type)}
+              </p>
+            )}
           </div>
 
-          <div className="flex gap-6">
-            <Stat label="Distance" value={km ? km.toString() : "—"} unit="km" />
-            <Stat label="Duration" value={duration ? duration.toString() : "—"} unit="min" />
-            <Stat label="Load" value={loadFor(workout)} unit="" />
-          </div>
+          {!isRestDay && (
+            <div className="flex gap-6">
+              <Stat label="Distance" value={km ? km.toString() : "—"} unit="km" />
+              <Stat label="Duration" value={duration ? duration.toString() : "—"} unit="min" />
+              <Stat label="Load" value={loadFor(workout)} unit="" />
+            </div>
+          )}
         </div>
 
         <div className="mt-10 border-b border-hairline flex gap-6">
@@ -177,84 +183,83 @@ function WorkoutPage() {
             {tab === "preview" && <PreviewPanel />}
           </div>
 
-          <aside className="space-y-4">
-            <SidebarCard title="Targets" tone="signal">
-              {workout.steps[0]?.target &&
-                Object.entries(workout.steps[0].target).map(([key, value]) => (
+          <aside>
+            <SidebarPanel>
+              {!isRestDay && workout.steps[0]?.target && (
+                <SidebarSection title="Targets" tone="signal">
+                  {Object.entries(workout.steps[0].target).map(([key, value]) => (
+                    <div key={key} className="flex justify-between gap-3 py-1 last:border-0">
+                      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        {key.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-xs text-right text-foreground/85">{String(value)}</span>
+                    </div>
+                  ))}
+                </SidebarSection>
+              )}
+
+              {(!isRestDay || restAssignment) && (
+                <SidebarSection title={isRestDay ? "Assignment" : "Workout note"} muted>
+                  <p className="text-xs leading-relaxed text-foreground/80">
+                    {isRestDay ? restAssignment : coachNoteFor(workout.type)}
+                  </p>
+                </SidebarSection>
+              )}
+
+              <SidebarSection title="Week status">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    {snapshot.source === "persisted" ? "Current backend truth" : "Current preview"}
+                  </span>
+                  <span className="font-mono-num">{weekStatus.label}</span>
+                </div>
+                <div className="mt-2 h-1 rounded-full overflow-hidden bg-hairline">
                   <div
-                    key={key}
-                    className="flex justify-between gap-3 py-1 border-b border-hairline last:border-0"
-                  >
-                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      {key.replace(/_/g, " ")}
-                    </span>
-                    <span className="text-xs text-foreground/85 text-right">{String(value)}</span>
-                  </div>
-                ))}
-            </SidebarCard>
-
-            <SidebarCard title="Workout note" muted>
-              <p className="text-xs leading-relaxed text-foreground/80">
-                {coachNoteFor(workout.type)}
-              </p>
-              <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Manual note · no adaptive engine connected
-              </p>
-            </SidebarCard>
-
-            <SidebarCard title="Week status">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">
-                  {snapshot.source === "persisted" ? "Current backend truth" : "Current preview"}
-                </span>
-                <span className="font-mono-num">{weekStatus.label}</span>
-              </div>
-              <div className="mt-2 h-1 rounded-full bg-hairline overflow-hidden">
-                <div
-                  className={cn(
-                    "h-full",
-                    weekStatus.label === "On track"
-                      ? "bg-success"
-                      : weekStatus.label === "Partially off track"
-                        ? "bg-warn"
-                        : "bg-destructive",
-                  )}
-                  style={{
-                    width:
+                    className={cn(
+                      "h-full",
                       weekStatus.label === "On track"
-                        ? "100%"
+                        ? "bg-success"
                         : weekStatus.label === "Partially off track"
-                          ? "60%"
-                          : "35%",
-                  }}
-                />
-              </div>
-              <p className="mt-3 text-[11px] text-muted-foreground">{weekStatus.helper}</p>
-            </SidebarCard>
+                          ? "bg-warn"
+                          : "bg-destructive",
+                    )}
+                    style={{
+                      width:
+                        weekStatus.label === "On track"
+                          ? "100%"
+                          : weekStatus.label === "Partially off track"
+                            ? "60%"
+                            : "35%",
+                    }}
+                  />
+                </div>
+                <p className="mt-3 text-[11px] text-muted-foreground">{weekStatus.helper}</p>
+              </SidebarSection>
 
-            <SidebarCard title="Preview boundary" tone="signal">
-              <div className="flex items-start gap-2">
-                <CalendarClock className="h-3.5 w-3.5 text-signal mt-0.5" />
-                <p className="text-xs leading-relaxed text-foreground/80">
-                  {snapshot.source === "persisted"
-                    ? `${APP_NAME} keeps this imported workout shell while logging and week status now come from one persisted backend contract.`
-                    : `${APP_NAME} keeps this imported workout shell, but real logging, reset actions, and provider-driven updates are not wired yet.`}
-                </p>
-              </div>
-            </SidebarCard>
-
-            {status === "skipped" && (
-              <SidebarCard title="Skipped">
+              <SidebarSection title="Preview boundary" tone="signal">
                 <div className="flex items-start gap-2">
-                  <ShieldAlert className="h-3.5 w-3.5 text-destructive mt-0.5" />
-                  <p className="text-xs text-foreground/80">
+                  <CalendarClock className="mt-0.5 h-3.5 w-3.5 text-signal" />
+                  <p className="text-xs leading-relaxed text-foreground/80">
                     {snapshot.source === "persisted"
-                      ? "Past-due workouts without a saved log are treated as skipped until you overwrite them with a real result."
-                      : "This sample status is derived from imported preview logic. No automatic rebalancing has happened behind the scenes."}
+                      ? `${APP_NAME} keeps this shell while plan, logs, and week status now come from saved truth.`
+                      : `${APP_NAME} keeps this shell in preview mode only. Real logging and plan updates are not wired here yet.`}
                   </p>
                 </div>
-              </SidebarCard>
-            )}
+              </SidebarSection>
+
+              {status === "skipped" && (
+                <SidebarSection title="Skipped">
+                  <div className="flex items-start gap-2">
+                    <ShieldAlert className="mt-0.5 h-3.5 w-3.5 text-destructive" />
+                    <p className="text-xs text-foreground/80">
+                      {snapshot.source === "persisted"
+                        ? "Past-due workouts without a saved log are treated as skipped until you overwrite them with a real result."
+                        : "This sample status comes from preview logic only."}
+                    </p>
+                  </div>
+                </SidebarSection>
+              )}
+            </SidebarPanel>
           </aside>
         </div>
 
@@ -340,8 +345,45 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
 }
 
 function Overview({ workout }: { workout: Workout }) {
+  const restAssignment = restAssignmentFor(workout);
+
+  if (workout.type === "rest") {
+    return (
+      <div className="space-y-6">
+        <section className="overflow-hidden rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Recovery day
+              </p>
+              <h3 className="mt-2 font-display text-3xl">Keep it light.</h3>
+            </div>
+            <div className="flex items-end gap-2 opacity-70">
+              <div className="h-8 w-8 rounded-full border border-hairline bg-background/60" />
+              <div className="h-12 w-12 rounded-full border border-hairline bg-background/50" />
+              <div className="h-6 w-6 rounded-full border border-hairline bg-background/70" />
+            </div>
+          </div>
+          <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground">
+            No distance, duration, or load is scheduled here. Let the day stay open unless a real
+            recovery assignment is present.
+          </p>
+        </section>
+
+        {restAssignment && (
+          <section className="rounded-xl border border-hairline bg-background/35 p-4">
+            <h3 className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Assignment
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-foreground/85">{restAssignment}</p>
+          </section>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <IntervalsViz workout={workout} />
 
       <div>
@@ -372,7 +414,7 @@ function Overview({ workout }: { workout: Workout }) {
         <h3 className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
           Fueling & recovery
         </h3>
-        <div className="mt-4 grid sm:grid-cols-3 gap-3">
+        <div className="mt-4 grid gap-2 rounded-xl bg-[linear-gradient(135deg,rgba(20,25,31,0.92),rgba(28,36,46,0.72))] p-4 sm:grid-cols-3">
           {[
             { t: "Pre", v: "Light carb 60 min prior" },
             {
@@ -381,11 +423,12 @@ function Overview({ workout }: { workout: Workout }) {
             },
             { t: "After", v: "Protein + carb within 45 min" },
           ].map((item) => (
-            <div key={item.t} className="rounded-lg border border-hairline p-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                {item.t}
-              </div>
-              <div className="mt-1 text-sm">{item.v}</div>
+            <div
+              key={item.t}
+              className="rounded-lg bg-white/5 px-3 py-3 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            >
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/55">{item.t}</div>
+              <div className="mt-1 text-sm text-white/92">{item.v}</div>
             </div>
           ))}
         </div>
@@ -423,7 +466,15 @@ function Stat({ label, value, unit }: { label: string; value: string; unit: stri
   );
 }
 
-function SidebarCard({
+function SidebarPanel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-hairline bg-surface/28">
+      {children}
+    </div>
+  );
+}
+
+function SidebarSection({
   title,
   children,
   tone,
@@ -435,18 +486,18 @@ function SidebarCard({
   muted?: boolean;
 }) {
   return (
-    <div
+    <section
       className={cn(
-        "rounded-lg border p-4",
-        tone === "signal" ? "border-signal/20 bg-signal/[0.03]" : "border-hairline",
+        "border-t border-hairline px-4 py-4 first:border-t-0",
+        tone === "signal" && "bg-signal/[0.03]",
         muted && "bg-surface/30",
       )}
     >
-      <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground mb-3">
+      <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
         {title}
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -464,7 +515,7 @@ function NavCard({
       to="/workout/$date"
       params={{ date }}
       className={cn(
-        "group rounded-lg border border-hairline p-4 hover:bg-accent/40 transition-colors",
+        "group rounded-lg border border-hairline px-4 py-3 hover:bg-accent/40 transition-colors",
         direction === "next" ? "text-right" : "",
       )}
     >
@@ -491,13 +542,13 @@ function objectiveFor(type: string) {
   switch (type) {
     case "easy":
     case "steady_or_easy":
-      return "Aerobic base. Build mitochondrial density and capillarisation. Strictly conversational — if you can't speak in full sentences, slow down.";
+      return "Easy aerobic work. Keep it conversational and steady.";
     case "long_run":
-      return "Time-on-feet. Trains glycogen utilisation, mental endurance, and the slow-twitch fibres that carry race day. Pacing should feel almost too easy at the start.";
+      return "Long aerobic work. Start easy and let the run settle.";
     case "quality":
-      return "Stress the threshold. Sharp efforts at controlled intensity to lift lactate clearance and running economy. Form before pace.";
+      return "Controlled quality work. Keep form ahead of pace.";
     case "rest":
-      return "Active recovery. Sleep, hydrate, walk. The plan only works if you absorb it.";
+      return "";
     default:
       return "";
   }
@@ -521,4 +572,18 @@ function loadFor(workout: Workout) {
     rest: 0,
   };
   return Math.min(95, Math.round(duration * (multiplier[workout.type] ?? 1) * 0.6)).toString();
+}
+
+function restAssignmentFor(workout: Workout) {
+  if (workout.type !== "rest") {
+    return null;
+  }
+
+  const note = workout.notes?.trim() ?? "";
+
+  if (!note || /^(recovery|rest|rest day)$/i.test(note)) {
+    return null;
+  }
+
+  return note;
 }

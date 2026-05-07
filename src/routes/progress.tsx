@@ -26,12 +26,12 @@ export const Route = createFileRoute("/progress")({
 });
 
 function Progress() {
-  const { snapshot } = Route.useLoaderData();
+  const { snapshot, viewer } = Route.useLoaderData();
   const hasPlannedWorkouts = snapshot.workouts.some((workout) => workout.type !== "rest");
 
   if (snapshot.mode === "onboarding") {
     return (
-      <AppShell snapshot={snapshot}>
+      <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="px-6 lg:px-10 py-20 max-w-3xl">
           <section className="rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -60,7 +60,7 @@ function Progress() {
 
   if (!hasPlannedWorkouts) {
     return (
-      <AppShell snapshot={snapshot}>
+      <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="px-6 lg:px-10 py-20 max-w-3xl">
           <section className="rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
             <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -95,7 +95,7 @@ function Progress() {
     .slice(-12);
 
   return (
-    <AppShell snapshot={snapshot}>
+    <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="px-6 lg:px-10 py-10 max-w-6xl space-y-14">
         <header>
           <p className="text-[11px] tracking-[0.18em] uppercase text-muted-foreground">

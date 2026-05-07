@@ -1,16 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, NotebookPen, ShieldAlert, ChevronRight, CalendarClock } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarClock,
+  Check,
+  ChevronRight,
+  Minus,
+  NotebookPen,
+  ShieldAlert,
+  X,
+} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { IntervalsViz } from "@/components/IntervalsViz";
 import { CompletionPanel } from "@/components/CompletionPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TYPE_META,
-  workoutDistanceKm,
-  workoutDuration,
   formatDate,
   WEEK_STATUS_META,
   type Workout,
+  weekOf,
+  workoutDistanceKm,
+  workoutDuration,
 } from "@/lib/training";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
@@ -93,11 +103,14 @@ function WorkoutPage() {
   const isRestDay = workout.type === "rest";
   const restAssignment = restAssignmentFor(workout);
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
+  const resultMeta = resultMetaForStatus(status);
+  const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
   const phase = `${workout.phase} · week ${workout.week}`;
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="px-6 lg:px-10 py-8 max-w-6xl">
+      <div className="relative max-w-6xl px-6 py-8 lg:px-10">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(circle_at_top_left,rgba(209,161,69,0.14),transparent_48%),radial-gradient(circle_at_top_right,rgba(122,162,247,0.12),transparent_44%),radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_62%)]" />
         <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
           <Link to="/" className="inline-flex items-center gap-1 hover:text-foreground">
             <ArrowLeft className="h-3 w-3" /> Calendar
@@ -106,41 +119,49 @@ function WorkoutPage() {
           <span>{phase}</span>
         </div>
 
-        <div className="mt-6 grid lg:grid-cols-[1fr_auto] gap-8 items-end">
-          <div>
-            <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em]">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
-              <span style={{ color: meta.color }}>{meta.label}</span>
-              <span className="opacity-50">·</span>
-              <span className="text-muted-foreground">
-                {formatDate(workout.date, {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </span>
-              {workout.date === snapshot.currentDate && (
-                <span className="text-signal">· Today</span>
+        <section className="relative mt-6 overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(145deg,rgba(18,24,31,0.94),rgba(27,34,43,0.78))] px-6 py-6 shadow-[0_18px_50px_rgba(0,0,0,0.22)] lg:px-8 lg:py-8">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+          <div className="absolute -right-16 top-0 h-32 w-32 rounded-full bg-signal/10 blur-3xl" />
+          <div className="grid items-end gap-8 lg:grid-cols-[1fr_auto]">
+            <div>
+              <div className="flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.18em]">
+                {resultMeta ? (
+                  <ResultBadge meta={resultMeta} mode="identity" />
+                ) : (
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
+                )}
+                <span style={{ color: meta.color }}>{meta.label}</span>
+                <span className="opacity-50">·</span>
+                <span className="text-muted-foreground">
+                  {formatDate(workout.date, {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </span>
+                {workout.date === snapshot.currentDate && (
+                  <span className="text-signal">· Today</span>
+                )}
+              </div>
+              <h1 className="mt-3 max-w-2xl text-balance font-display text-4xl leading-[1.05] lg:text-5xl">
+                {isRestDay ? "Rest day" : workout.title}
+              </h1>
+              {objectiveFor(workout.type) && (
+                <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  {objectiveFor(workout.type)}
+                </p>
               )}
             </div>
-            <h1 className="mt-3 font-display text-4xl lg:text-5xl leading-[1.05] text-balance max-w-2xl">
-              {isRestDay ? "Rest day" : workout.title}
-            </h1>
-            {objectiveFor(workout.type) && (
-              <p className="mt-4 text-sm text-muted-foreground max-w-xl leading-relaxed">
-                {objectiveFor(workout.type)}
-              </p>
+
+            {!isRestDay && (
+              <div className="grid grid-cols-3 gap-3 sm:flex sm:gap-6">
+                <Stat label="Distance" value={km ? km.toString() : "—"} unit="km" />
+                <Stat label="Duration" value={duration ? duration.toString() : "—"} unit="min" />
+                <Stat label="Load" value={loadFor(workout)} unit="" />
+              </div>
             )}
           </div>
-
-          {!isRestDay && (
-            <div className="flex gap-6">
-              <Stat label="Distance" value={km ? km.toString() : "—"} unit="km" />
-              <Stat label="Duration" value={duration ? duration.toString() : "—"} unit="min" />
-              <Stat label="Load" value={loadFor(workout)} unit="" />
-            </div>
-          )}
-        </div>
+        </section>
 
         <div className="mt-10 border-b border-hairline flex gap-6">
           {(
@@ -177,7 +198,8 @@ function WorkoutPage() {
         </div>
 
         <div className="mt-8 grid lg:grid-cols-[1fr_320px] gap-10">
-          <div>
+          <div className="relative overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(150deg,rgba(16,22,28,0.86),rgba(29,36,46,0.7))] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.18)]">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             {tab === "overview" && <Overview workout={workout} />}
             {tab === "complete" && <CompletionPanel workout={workout} snapshot={snapshot} />}
             {tab === "preview" && <PreviewPanel />}
@@ -185,6 +207,17 @@ function WorkoutPage() {
 
           <aside>
             <SidebarPanel>
+              {resultMeta && (
+                <SidebarSection title="Result state">
+                  <div className="flex items-center justify-between gap-3">
+                    <ResultBadge meta={resultMeta} mode="sidebar" />
+                    <span className="text-xs text-muted-foreground">
+                      {snapshot.source === "persisted" ? "Saved truth" : "Preview state"}
+                    </span>
+                  </div>
+                </SidebarSection>
+              )}
+
               {!isRestDay && workout.steps[0]?.target && (
                 <SidebarSection title="Targets" tone="signal">
                   {Object.entries(workout.steps[0].target).map(([key, value]) => (
@@ -206,32 +239,24 @@ function WorkoutPage() {
                 </SidebarSection>
               )}
 
-              <SidebarSection title="Week status">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">
-                    {snapshot.source === "persisted" ? "Current backend truth" : "Current preview"}
+              <SidebarSection title="Week Status">
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="text-foreground/85">
+                    {weekProgress.completed} of {weekProgress.total} workouts completed
                   </span>
-                  <span className="font-mono-num">{weekStatus.label}</span>
+                  <span className="font-mono-num text-muted-foreground">
+                    {weekProgress.percent}%
+                  </span>
                 </div>
-                <div className="mt-2 h-1 rounded-full overflow-hidden bg-hairline">
+                <div className="mt-3 h-2 rounded-full overflow-hidden bg-hairline/80">
                   <div
-                    className={cn(
-                      "h-full",
-                      weekStatus.label === "On track"
-                        ? "bg-success"
-                        : weekStatus.label === "Partially off track"
-                          ? "bg-warn"
-                          : "bg-destructive",
-                    )}
-                    style={{
-                      width:
-                        weekStatus.label === "On track"
-                          ? "100%"
-                          : weekStatus.label === "Partially off track"
-                            ? "60%"
-                            : "35%",
-                    }}
+                    className="h-full rounded-full bg-[linear-gradient(90deg,rgba(122,162,247,0.95),rgba(209,161,69,0.92))]"
+                    style={{ width: `${weekProgress.percent}%` }}
                   />
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                  <span>{weekStatus.label}</span>
+                  <span>{weekProgress.remaining} left</span>
                 </div>
                 <p className="mt-3 text-[11px] text-muted-foreground">{weekStatus.helper}</p>
               </SidebarSection>
@@ -414,7 +439,8 @@ function Overview({ workout }: { workout: Workout }) {
         <h3 className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
           Fueling & recovery
         </h3>
-        <div className="mt-4 grid gap-2 rounded-xl bg-[linear-gradient(135deg,rgba(20,25,31,0.92),rgba(28,36,46,0.72))] p-4 sm:grid-cols-3">
+        <div className="relative mt-4 overflow-hidden rounded-2xl bg-[linear-gradient(145deg,rgba(15,19,24,0.92),rgba(21,26,32,0.82))] shadow-[0_14px_35px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid sm:grid-cols-3">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           {[
             { t: "Pre", v: "Light carb 60 min prior" },
             {
@@ -425,9 +451,9 @@ function Overview({ workout }: { workout: Workout }) {
           ].map((item) => (
             <div
               key={item.t}
-              className="rounded-lg bg-white/5 px-3 py-3 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+              className="border-t border-white/8 px-4 py-4 text-foreground first:border-t-0 sm:border-t-0 sm:border-l sm:border-white/8 sm:first:border-l-0"
             >
-              <div className="text-[10px] uppercase tracking-[0.18em] text-white/55">{item.t}</div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">{item.t}</div>
               <div className="mt-1 text-sm text-white/92">{item.v}</div>
             </div>
           ))}
@@ -468,7 +494,7 @@ function Stat({ label, value, unit }: { label: string; value: string; unit: stri
 
 function SidebarPanel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-hairline bg-surface/28">
+    <div className="overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(160deg,rgba(16,21,28,0.92),rgba(28,34,42,0.72))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
       {children}
     </div>
   );
@@ -488,7 +514,7 @@ function SidebarSection({
   return (
     <section
       className={cn(
-        "border-t border-hairline px-4 py-4 first:border-t-0",
+        "border-t border-white/8 px-4 py-4 first:border-t-0",
         tone === "signal" && "bg-signal/[0.03]",
         muted && "bg-surface/30",
       )}
@@ -515,7 +541,7 @@ function NavCard({
       to="/workout/$date"
       params={{ date }}
       className={cn(
-        "group rounded-lg border border-hairline px-4 py-3 hover:bg-accent/40 transition-colors",
+        "group rounded-xl bg-[linear-gradient(150deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_12px_28px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-colors hover:bg-[linear-gradient(150deg,rgba(255,255,255,0.18),rgba(255,255,255,0.1))]",
         direction === "next" ? "text-right" : "",
       )}
     >
@@ -586,4 +612,71 @@ function restAssignmentFor(workout: Workout) {
   }
 
   return note;
+}
+
+function weekProgressFor(workouts: Workout[], currentDate: string) {
+  const currentWeek = weekOf(workouts, currentDate).filter((workout) => workout.type !== "rest");
+  const total = currentWeek.length;
+  const completed = currentWeek.filter((workout) => workout.status === "completed").length;
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+
+  return {
+    total,
+    completed,
+    remaining: Math.max(total - completed, 0),
+    percent,
+  };
+}
+
+function resultMetaForStatus(status: Workout["status"]) {
+  if (status === "completed") {
+    return {
+      label: "Completed well",
+      icon: Check,
+      tone: "success" as const,
+    };
+  }
+
+  if (status === "partial") {
+    return {
+      label: "Partial",
+      icon: Minus,
+      tone: "warn" as const,
+    };
+  }
+
+  if (status === "skipped") {
+    return {
+      label: "Skipped",
+      icon: X,
+      tone: "destructive" as const,
+    };
+  }
+
+  return null;
+}
+
+function ResultBadge({
+  meta,
+  mode,
+}: {
+  meta: NonNullable<ReturnType<typeof resultMetaForStatus>>;
+  mode: "identity" | "sidebar";
+}) {
+  const Icon = meta.icon;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]",
+        meta.tone === "success" && "border-success/30 bg-success/12 text-success",
+        meta.tone === "warn" && "border-warn/30 bg-warn/12 text-warn",
+        meta.tone === "destructive" && "border-destructive/30 bg-destructive/12 text-destructive",
+        mode === "sidebar" && "text-[11px]",
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" strokeWidth={2.2} />
+      {meta.label}
+    </span>
+  );
 }

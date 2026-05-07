@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertCircle, CheckCircle2, FileJson2, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, FileJson2, Upload } from "lucide-react";
 import {
+  FUTURE_TEMPLATE_DOWNLOAD_PATH,
+  FUTURE_TEMPLATE_VERSION,
+  LEGACY_IMPORT_ROOT_KEYS,
   summarizeImportedPlan,
   type ImportedPlan,
   validateImportedPlanJson,
@@ -62,9 +65,9 @@ export function UploadJsonDialog({
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
           <DialogTitle className="font-display text-3xl">Upload JSON</DialogTitle>
           <DialogDescription className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-            Use one JSON file to replace the current saved plan. You can work with your agent to
-            generate or fill it with goals, weight, height, recent results, and recent training
-            context.
+            Use one JSON file to replace the current saved plan. The current import still expects
+            the supported week-preview shape, while the downloadable template previews a richer
+            structured format for later plan preparation.
           </DialogDescription>
         </DialogHeader>
 
@@ -114,12 +117,44 @@ export function UploadJsonDialog({
                 <Upload className="h-4 w-4" />
                 {selectedFileName ? "Choose another JSON" : "Upload JSON"}
               </button>
+              <a
+                href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
+                download
+                className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-accent"
+              >
+                <Download className="h-4 w-4 text-signal" />
+                Download template
+              </a>
               <span className="text-sm text-muted-foreground">
                 {selectedFileName ?? "No file selected yet"}
               </span>
             </div>
             <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Expected keys: plan_name, generated_for, start_date, week_1_preview[]
+              Works now: {LEGACY_IMPORT_ROOT_KEYS.join(", ")}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-hairline bg-background/30 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Future detailed template
+                </div>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/85">
+                  <span className="font-medium">{FUTURE_TEMPLATE_VERSION}</span> is the planned
+                  structured authoring format for later imports. It introduces a preparation
+                  horizon, richer workout segments, and a clearer planned structure for future
+                  comparison work.
+                </p>
+              </div>
+              <span className="rounded-full border border-hairline px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-signal">
+                Later
+              </span>
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+              The template is available now for structured preparation, but this modal still applies
+              only the currently supported `week_1_preview[]` import shape. Detailed segment import
+              and planned-vs-actual comparison are not live yet.
             </p>
           </div>
 
@@ -158,7 +193,8 @@ export function UploadJsonDialog({
               Validate JSON
             </button>
             <span className="text-[11px] text-muted-foreground">
-              Export comes later. This flow only parses and applies a new plan.
+              Current flow parses and applies the supported JSON shape only. Detailed template
+              import comes later.
             </span>
           </div>
 

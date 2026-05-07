@@ -1,6 +1,18 @@
 import { z } from "zod";
 import type { RunnerProfileSummary, Step, WorkoutType } from "@/lib/training";
 
+export const LEGACY_IMPORT_ROOT_KEYS = [
+  "plan_name",
+  "generated_for",
+  "start_date",
+  "week_1_preview[]",
+] as const;
+
+export const LEGACY_IMPORT_ITEM_KEYS = ["date", "weekday", "workout", "details", "target"] as const;
+
+export const FUTURE_TEMPLATE_VERSION = "training-plan-v2";
+export const FUTURE_TEMPLATE_DOWNLOAD_PATH = "/templates/hito-training-plan-v2-template.json";
+
 export const importedPlanWorkoutSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   weekday: z.string().trim().min(1),

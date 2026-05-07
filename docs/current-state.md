@@ -32,6 +32,10 @@ Active
 - Saved-mode shell navigation back to `/` now uses a fresh home request, and the `Tomorrow` summary no longer falls through to broken `nullkm · 0′` placeholders for interval-style workouts.
 - The profile/sidebar area now shows the runner name plus active plan title, removes duplicate top-level sign-out, and owns a lightweight saved-mode `Upload JSON` entry path.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.
+- The first workout-page refinement pass is now implemented:
+  the three-block page structure remains intact, saved result states now surface as check, dash, or cross markers near workout identity and in the right-side context, `Week Status` is progress-driven, and the log-result notes area now reserves an honest `Upload result` placeholder seam.
+- The remaining upload-flow/template UI slice is now implemented:
+  the saved-mode `Upload JSON` flow includes a real `Download template` affordance for the future structured `training-plan-v2` direction, while the currently supported applied import remains the legacy `week_1_preview[]` shape.
 - Saved-mode `Upload JSON` replacement now has a continuity guard:
   logged workout history is carried forward only for exact deterministic matches on logged dates, and unsafe replacements are rejected instead of silently resetting visible progress.
   Older broken replacements that already stranded logs on archived copies of the same plan window are now repaired back onto the active plan before saved-mode reads and replacement checks run.

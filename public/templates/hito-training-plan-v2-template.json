@@ -1,0 +1,131 @@
+{
+  "schema_version": "training-plan-v2",
+  "plan_name": "Half Marathon Plan",
+  "generated_for": "Runner Name",
+  "start_date": "2026-05-05",
+  "preparation_horizon_months": 4,
+  "planned_workouts": [
+    {
+      "date": "2026-05-05",
+      "weekday": "Tuesday",
+      "week_number": 1,
+      "phase": "Base",
+      "workout_type": "easy",
+      "title": "Easy Run",
+      "summary": "50 min easy with calm aerobic control",
+      "segments": [
+        {
+          "segment_type": "warmup",
+          "duration_min": 10,
+          "target": {
+            "intensity": "easy",
+            "hint": "Settle in gradually"
+          }
+        },
+        {
+          "segment_type": "main",
+          "duration_min": 35,
+          "target": {
+            "hr_bpm": "135-145",
+            "intensity": "easy"
+          }
+        },
+        {
+          "segment_type": "cooldown",
+          "duration_min": 5,
+          "target": {
+            "hint": "Relax the finish"
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-05-06",
+      "weekday": "Wednesday",
+      "week_number": 1,
+      "phase": "Base",
+      "workout_type": "rest",
+      "title": "Rest Day",
+      "summary": "Recovery and mobility",
+      "segments": [
+        {
+          "segment_type": "rest",
+          "target": {
+            "hint": "Optional mobility or light walk"
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-05-08",
+      "weekday": "Friday",
+      "week_number": 1,
+      "phase": "Base",
+      "workout_type": "quality",
+      "title": "Intervals",
+      "summary": "6 x 400m with controlled fast running",
+      "segments": [
+        {
+          "segment_type": "warmup",
+          "duration_min": 12,
+          "target": {
+            "intensity": "easy",
+            "hint": "Open the stride gradually"
+          }
+        },
+        {
+          "segment_type": "interval_block",
+          "repeat_count": 6,
+          "work_distance_km": 0.4,
+          "recovery_duration_min": 2,
+          "target": {
+            "intensity": "5k effort",
+            "hint": "Stay smooth and tall"
+          }
+        },
+        {
+          "segment_type": "cooldown",
+          "duration_min": 10,
+          "target": {
+            "intensity": "easy",
+            "hint": "Jog down, then walk if needed"
+          }
+        }
+      ]
+    },
+    {
+      "date": "2026-05-10",
+      "weekday": "Sunday",
+      "week_number": 1,
+      "phase": "Base",
+      "workout_type": "long_run",
+      "title": "Long Run",
+      "summary": "60 min easy aerobic build",
+      "segments": [
+        {
+          "segment_type": "warmup",
+          "duration_min": 10,
+          "target": {
+            "intensity": "easy",
+            "hint": "Let heart rate rise slowly"
+          }
+        },
+        {
+          "segment_type": "main",
+          "duration_min": 45,
+          "target": {
+            "intensity": "easy",
+            "hr_bpm": "135-145"
+          }
+        },
+        {
+          "segment_type": "cooldown",
+          "duration_min": 5,
+          "target": {
+            "hint": "Relax shoulders and cadence"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,20 +3,14 @@ import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { FileJson2, Upload, CheckCircle2 } from "lucide-react";
 import {
+  FUTURE_TEMPLATE_VERSION,
+  LEGACY_IMPORT_ITEM_KEYS,
+  LEGACY_IMPORT_ROOT_KEYS,
   summarizeImportedPlan,
   type ImportedPlan,
   validateImportedPlanJson,
 } from "@/lib/imported-plan";
 import { completeOnboarding } from "@/lib/training-api";
-
-const REQUIRED_ROOT_KEYS = [
-  "plan_name",
-  "generated_for",
-  "start_date",
-  "week_1_preview[]",
-] as const;
-
-const REQUIRED_ITEM_KEYS = ["date", "weekday", "workout", "details", "target"] as const;
 
 export function OnboardingGate() {
   const router = useRouter();
@@ -60,20 +54,22 @@ export function OnboardingGate() {
       <div className="mt-8 grid gap-3 md:grid-cols-2">
         <div className="rounded-xl border border-hairline bg-background/35 p-4">
           <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Template shape
+            Current supported import
           </div>
           <div className="mt-3 space-y-2 text-sm text-foreground/85">
-            <p>Root keys: {REQUIRED_ROOT_KEYS.join(" · ")}</p>
-            <p>Each workout item: {REQUIRED_ITEM_KEYS.join(" · ")}</p>
+            <p>Root keys: {LEGACY_IMPORT_ROOT_KEYS.join(" · ")}</p>
+            <p>Each workout item: {LEGACY_IMPORT_ITEM_KEYS.join(" · ")}</p>
           </div>
         </div>
         <div className="rounded-xl border border-hairline bg-background/35 p-4">
           <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            How to use it
+            Future template direction
           </div>
           <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
-            Start from the provided JSON template shape, edit it later with your own values, and
-            import it again for a fresh setup. JSON export of your saved trainings comes later.
+            The later <span className="font-medium">{FUTURE_TEMPLATE_VERSION}</span> template will
+            support preparation horizon metadata and more detailed workout segments. This first
+            setup flow still imports the simpler week-preview shape today. JSON export of your saved
+            trainings comes later.
           </p>
         </div>
       </div>

@@ -32,7 +32,7 @@
 - `src/routes/api.auth.logout.tsx`
   clears the temporary local auth cookie and signs out Supabase sessions when present
 - `src/routes/workout.$date.tsx`
-  renders workout detail for preview or persisted data, treats the route search as the source of truth for the active tab, preserves `tab=complete`, logs results through the canonical backend mutation when saved mode is active, and now keeps rest-day detail sparse with one grouped right-side context panel
+  renders workout detail for preview or persisted data, treats the route search as the source of truth for the active tab, preserves `tab=complete`, logs results through the canonical backend mutation when saved mode is active, now keeps rest-day detail sparse with one grouped right-side context panel, and preserves the three-block page structure with richer surface treatment, result-state badges, and progress-driven week status
 - `src/routes/progress.tsx`
   renders the preserved analytics shell using preview or persisted aggregates from the same data seam
 - `src/routes/body.tsx`
@@ -55,7 +55,7 @@
 - `src/lib/training-api.ts`
   owns server-backed loading and mutation entry points for home, workout detail, progress, login, JSON-first onboarding, and workout logging
 - `src/lib/imported-plan.ts`
-  owns the observed JSON onboarding schema, JSON validation helpers, and the mapping from imported week data into the canonical saved workout shape
+  owns the observed JSON onboarding schema, JSON validation helpers, the current legacy import-key constants, the future template metadata constants, and the mapping from imported week data into the canonical saved workout shape
 - `src/lib/local-auth.ts`
   owns the temporary local account credential contract, account discovery, and cookie session helpers
 - `src/lib/local-auth-supabase.ts`
@@ -81,12 +81,21 @@
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode `Upload JSON` entry point plus sign-out action
 - the saved-mode `Upload JSON` dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
+- the saved-mode `Upload JSON` dialog now exposes one static `Download template` affordance for the future `training-plan-v2` authoring direction while keeping the current applied import path on the legacy `week_1_preview[]` shape
 - active-plan replacement now carries saved workout logs forward only for exact deterministic matches on logged days by date, workout type, title, notes, and steps; otherwise the apply step is rejected and the current active plan remains unchanged
 - if older broken replacements already stranded logs on archived plan cycles from the same user and plan window, the persisted seam repairs those orphaned same-date logs back onto the current active plan before evaluating visible state or replacement safety
 - saved workout logs can be overwritten from `completed` to `partial` or `skipped`, and skipped truth persists with null actual metrics instead of backfilled planned defaults
 - past-due planned workouts without a saved log are treated as `skipped` until the user overwrites them with a real result
 - `week_status` is derived on the backend-facing seam from persisted workout state, not from client-only heuristics
 - rest days no longer render distance, duration, load, or empty target and note sections by default; only genuine assigned rest-day content is surfaced
+- workout detail now shows saved result semantics directly in the route chrome:
+  check for `completed`
+  dash for `partial`
+  cross for `skipped`
+- the workout-detail `Week Status` block now answers one deterministic question through a progress bar:
+  completed non-rest workouts in the current week
+- `src/components/CompletionPanel.tsx`
+  now reserves one honest `Upload result` placeholder seam in the notes area without claiming Garmin, Strava, OCR, or extraction capability
 
 ## Trusted-Output Contract
 

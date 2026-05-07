@@ -18,7 +18,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
   setup gate for authenticated users without a profile
   persisted weekly plan for authenticated users with setup complete, keeping the large `Today` card, one compact right-side support card, and the calendar below
 - workout detail `/workout/$date`
-  shows workout structure, logging controls, and week-status context using preview or persisted truth through one shared contract, with calmer rest-day presentation and a tighter grouped right-side panel
+  shows workout structure, logging controls, and week-status context using preview or persisted truth through one shared contract, with calmer rest-day presentation, a tighter grouped right-side panel, richer workout surfaces, and visible result-state markers for completed, partial, and skipped truth
 - progress `/progress`
   keeps the analytics-style layout and can now read persisted completion and volume aggregates when saved mode is active
 - body `/body`
@@ -54,10 +54,13 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - saved-mode shell links that return to home now intentionally reopen `/` through a fresh request so the calendar page stays reliable even from long-lived tabs
 - completed calendar days now read more clearly at a glance through a green confirmation treatment without overriding the primary today highlight
 - saved workout logging now distinguishes preview-only drafts from persisted saves, supports truthful overwrite between `completed`, `partial`, and `skipped`, and surfaces pending, success, and failure feedback without hiding backend failures
+- the workout-detail `Week Status` surface is now progress-based and reports completed non-rest workouts in the current week
+- the workout-detail notes area now includes an honest `Upload result` placeholder seam for future evidence import, without claiming connected extraction
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
 - signed-in surfaces now state honestly that JSON export is a later capability, not implemented in this slice yet
 - the runner profile area now shows the current runner name and active plan title, keeps sign-out inside the dropdown, and offers a lightweight `Upload JSON` plan-replacement flow
 - that `Upload JSON` replacement flow now preserves saved workout progress only when logged workouts still match the replacement JSON exactly on the logged dates; otherwise the replace action is blocked instead of silently clearing visible progress
+- the same `Upload JSON` flow now includes a lightweight `Download template` affordance for the future structured `training-plan-v2` format, while stating clearly that the currently supported applied import still uses the simpler `week_1_preview[]` shape
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
 
 ## Known Allowed Fix Areas

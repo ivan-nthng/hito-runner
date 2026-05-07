@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, MinusCircle, XCircle } from "lucide-react";
+import { CheckCircle2, MinusCircle, Upload, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { saveWorkoutLog } from "@/lib/training-api";
 import type { TrainingSnapshot, Workout } from "@/lib/training";
@@ -326,6 +326,26 @@ export function CompletionPanel({
           placeholder="Felt strong on the climb, slight tightness in right calf at km 6…"
           className="mt-3 w-full rounded-lg border border-hairline bg-background/50 p-3 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground/30 resize-none"
         />
+        <div className="mt-4 rounded-xl border border-dashed border-hairline bg-background/25 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled
+              className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/80 disabled:opacity-100"
+            >
+              <Upload className="h-4 w-4 text-signal" />
+              Upload result
+              <span className="text-[10px] uppercase tracking-[0.18em] text-signal">Later</span>
+            </button>
+            <span className="text-[11px] text-muted-foreground">
+              Add screenshot or evidence here later.
+            </span>
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+            Post-run insight will appear here once uploaded result evidence is supported. Garmin,
+            Strava, and extraction are not connected in this slice.
+          </p>
+        </div>
         <p className="mt-3 text-[11px] text-muted-foreground">
           {snapshot.source === "persisted"
             ? "Saving here upserts the canonical workout log and recomputes the visible week status from backend truth."

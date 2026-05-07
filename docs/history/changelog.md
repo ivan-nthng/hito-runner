@@ -4,6 +4,8 @@ Completed implementation history only.
 
 ## 2026-05-07
 
+- Finished the remaining upload-flow/template UI slice by adding a real `Download template` affordance in `Upload JSON`, shipping a static future `training-plan-v2` template artifact, and clarifying that current applied imports still use the legacy `week_1_preview[]` shape.
+- Implemented the first workout-page refinement pass: preserved the three-block workout-detail layout, added richer surface treatment, surfaced check/dash/cross saved-result markers, changed `Week Status` into a progress-driven completed-workouts bar, and added an honest placeholder-only `Upload result` seam in the log-result notes area.
 - Hardened saved-mode home return navigation so shell links reopen `/` through a fresh request, and fixed the grouped `Tomorrow` summary so interval-style workouts no longer render broken `nullkm · 0′` text.
 - Refined the saved-mode Calendar page so the main `Today` workout card stays intact, the right-side support content is now one grouped card with dividers, the lower hero metadata strip is removed, and completed days are easier to spot in the calendar grid.
 

@@ -10,6 +10,17 @@ Architect Agent
 
 2026-05-07
 
+## Checklist
+
+- [x] Extend the import seam so it validates both legacy `week_1_preview[]` and `training-plan-v2`.
+- [x] Normalize both accepted import shapes into the same canonical `plan_cycles` plus `planned_workouts` storage model.
+- [x] Persist richer structured segment detail into `planned_workouts.steps jsonb`.
+- [x] Tighten stored `steps jsonb` toward the canonical segment DSL with segment metadata, prescription structure, and bounded target keys while preserving current route compatibility.
+- [x] Keep saved-mode `/` and `/workout/$date` rendering on the existing `TrainingSnapshot` seam.
+- [x] Exclude runtime-only v2 fields such as `status`, `completion_state`, and placeholder booleans from canonical plan truth.
+- [ ] Add import-batch provenance or editability-specific schema expansion.
+- [ ] Persist richer plan-level metadata beyond what the current routes already use.
+
 ## Context
 
 The current service already has one working saved-mode path:
@@ -22,12 +33,12 @@ The current service already has one working saved-mode path:
 - one normalized `TrainingSnapshot` seam in `src/lib/training.ts`
 - server-owned loading and mutation in `src/lib/training-api.ts`
 
-The current import path is still legacy-only:
+The current import path now supports both accepted shapes:
 
-- `src/lib/imported-plan.ts` validates `week_1_preview[]`
-- `completeOnboarding` in `src/lib/training-api.ts` accepts only the legacy import shape
-- `replaceActivePlanWithImportedInput()` creates a new normalized plan from that legacy shape
-- `dbWorkoutToView()` maps persisted rows into the shared route rendering contract
+- `src/lib/imported-plan.ts` validates both `week_1_preview[]` and `training-plan-v2`
+- `completeOnboarding` in `src/lib/training-api.ts` accepts either validated import shape and normalizes it through the same persisted seam
+- `replaceActivePlanWithImportedInput()` creates one normalized plan shape regardless of source format
+- `dbWorkoutToView()` maps persisted rows into the shared route rendering contract without a separate runtime path for v2
 
 The current richer draft at `/Users/ivan/Downloads/ivan_complete_half_marathon_plan.json` proves the next need clearly:
 
@@ -60,9 +71,9 @@ Out of scope:
 Smallest viable first implementation slice:
 
 - accept `training-plan-v2`
-- normalize it into the current `plan_cycles` plus `planned_workouts` model with minimal schema expansion
+- normalize it into the current `plan_cycles` plus `planned_workouts` model without creating split runtime truth
 - render the imported richer workouts through the existing `TrainingSnapshot` seam
-- keep editing and advanced plan preferences as storage-prepared but non-UI features
+- keep editing, provenance expansion, and advanced plan preferences as later non-UI follow-up work
 
 ## Current Contract
 
@@ -655,7 +666,7 @@ Recommended enum decision:
 - one approved `training-plan-v2` contract exists
 - validator support is specified for both legacy and v2
 - one canonical mapping into current Supabase entities is defined
-- required schema expansions are explicit and additive
+- the first implementation slice either uses the existing schema cleanly or documents any deferred schema expansion explicitly
 - rendering integration path is defined for home, calendar, and workout-detail
 - runtime state and placeholder fields from the richer draft are explicitly excluded from template truth
 - editability-preparation semantics are defined without building a full editor subsystem
@@ -668,7 +679,7 @@ BACKEND
 ## Suggested Next Step
 
 Implement the smallest viable slice:
-add `training-plan-v2` validation plus additive schema expansion for `plan_cycles`, `planned_workouts`, and `plan_import_batches`, then normalize one real v2 import into canonical Supabase rows and verify that the existing saved-mode calendar and workout-detail routes can render from those rows through the unchanged `TrainingSnapshot` seam.
+done for the first viable backend slice: `training-plan-v2` validation now ships alongside legacy validation, both normalize into the existing canonical rows, and the saved-mode home plus workout-detail routes render from persisted v2-backed data through the unchanged `TrainingSnapshot` seam. Next backend follow-up is additive provenance or editability-oriented schema work only if later slices truly need it.
 
 ## 🔁 HANDOFF BLOCK (MANDATORY)
 

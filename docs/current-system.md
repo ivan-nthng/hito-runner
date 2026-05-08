@@ -53,9 +53,13 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, JSON-first onboarding, and workout logging
+  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text-first onboarding, advanced JSON onboarding, the first structured-authoring onboarding seam, and workout logging
 - `src/lib/imported-plan.ts`
-  owns the observed JSON onboarding schema, JSON validation helpers, the current legacy import-key constants, the future template metadata constants, and the mapping from imported week data into the canonical saved workout shape
+  owns the observed JSON onboarding schema, JSON validation helpers, the supported legacy and `training-plan-v2` import-key constants, the runtime-noise exclusions for v2, the bounded canonical target and prescription normalization rules, and the mapping from both accepted import shapes into the canonical saved workout shape
+- `src/lib/structured-plan-authoring.ts`
+  owns the first server-side structured authoring contract, its normalization rules, and the deterministic generator that emits canonical `training-plan-v2` plan truth before persistence
+- `src/lib/openai-plan-authoring.ts`
+  owns the first server-side OpenAI text-to-plan seam, prompts the model for bounded structured authoring input, validates that model output, and converts the validated authoring input into canonical `training-plan-v2` truth before persistence
 - `src/lib/local-auth.ts`
   owns the temporary local account credential contract, account discovery, and cookie session helpers
 - `src/lib/local-auth-supabase.ts`
@@ -71,7 +75,14 @@
 - signed-out preview routes can still render on direct route access when real Supabase env values are absent, but they are no longer the primary entry experience
 - temporary local-bypass users enter saved mode through visible credentials login or Magic Link and now write to Supabase when a server-side key is configured, with the local state file kept only as a fallback and no longer treated as the canonical store for the imported current plan
 - authenticated users without `runner_profile` are routed into setup on `/`
-- onboarding now imports one JSON plan shape, creates or updates one `runner_profile`, and creates one active `plan_cycle`
+- visible onboarding on `/` is now text-first:
+  authenticated users without setup describe their goal and current context in one compact request, the backend turns that request into bounded structured authoring input through OpenAI, validates it deterministically, and only then generates canonical `training-plan-v2` plan data before persistence
+- the backend now also has one first-pass free-text authoring seam:
+  authenticated saved mode can accept one free-text request server-side, ask OpenAI for bounded structured authoring input, validate that output deterministically, and only then generate canonical `training-plan-v2` plan truth for persistence
+- advanced JSON import remains available inside onboarding as a secondary fallback path for existing plan artifacts, migration, and testing
+- both JSON import and structured authoring now create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
+- OpenAI-generated authoring output never persists directly:
+  the app validates the model response, converts it into canonical plan data, and persists through the same `plan_cycles` plus `planned_workouts` seam already used by JSON import and structured authoring
 - the imported JSON week creates the saved `planned_workouts` directly instead of shifting the preview template onto today
 - home and calendar now anchor `today` to the real runtime local date instead of a frozen template start date
 - the preview snapshot no longer caches a stale `currentDate`, so reloads can reflect the actual current day
@@ -81,7 +92,11 @@
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode `Upload JSON` entry point plus sign-out action
 - the saved-mode `Upload JSON` dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
-- the saved-mode `Upload JSON` dialog now exposes one static `Download template` affordance for the future `training-plan-v2` authoring direction while keeping the current applied import path on the legacy `week_1_preview[]` shape
+- the saved-mode `Upload JSON` dialog now accepts both the legacy `week_1_preview[]` shape and the richer `training-plan-v2` shape, normalizes both into the same persisted `plan_cycles` plus `planned_workouts` seam, and ignores runtime-only v2 fields such as `status`, `completion_state`, and sync or feedback placeholders
+- the first structured authoring generator now emits the same canonical `training-plan-v2` family used by JSON import, persists it through `plan_cycles` plus `planned_workouts`, and reuses `steps jsonb` as the only structured workout payload
+- normalized `planned_workouts.steps jsonb` now preserves explicit segment-level `segment_id`, `segment_type`, `sequence`, `prescription`, canonical target keys such as `hr_bpm_range` and `pace_min_per_km_range`, and one bounded interval DSL that supports both distance-based and time-based repeat units while keeping route-compatible aliases in the same stored object
+- saved-mode rendering now keeps distance-first interval reps visible as distance-first in workout structure UI, resolves tempo-backed quality workouts to a tempo-specific visible identity, and formats visible distance totals through one shared rounding seam
+- the same dialog still exposes one static `Download template` affordance for the structured `training-plan-v2` authoring direction, but the saved-mode apply path is no longer legacy-only
 - active-plan replacement now carries saved workout logs forward only for exact deterministic matches on logged days by date, workout type, title, notes, and steps; otherwise the apply step is rejected and the current active plan remains unchanged
 - if older broken replacements already stranded logs on archived plan cycles from the same user and plan window, the persisted seam repairs those orphaned same-date logs back onto the current active plan before evaluating visible state or replacement safety
 - saved workout logs can be overwritten from `completed` to `partial` or `skipped`, and skipped truth persists with null actual metrics instead of backfilled planned defaults
@@ -122,6 +137,8 @@
 - server-side writes and persisted reads flow through one backend seam rather than direct client DB access
 - `npm run import:current-plan` now exists as the narrow script for importing `/Users/ivan/Desktop/corrected_half_marathon_start_2026-05-05.json` into the canonical Supabase plan tables for the current local bypass user
 - `npm run test-user -- ...` is now the canonical Backend lifecycle tool for tester-account create, reset, optional plan seeding, and delete against the real Supabase auth/data model
+- `npm run author-structured-plan -- --email <tester-email> --input-file <absolute-json-path>` is now the canonical ops path for validating bounded structured authoring input and persisting the generated canonical plan into Supabase without a frontend wizard
+- `npm run author-plan-from-text -- --email <tester-email> --prompt "<free text>"` is now the narrow ops path for exercising the first OpenAI-backed text-to-plan seam against the same canonical Supabase persistence path
 - `.tanstack/hito-running-local-accounts.json` is now the preferred ignored local credentials file for repeatable tester login on the temporary local bypass path
 
 ## Runtime Invariants

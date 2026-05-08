@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertCircle, CheckCircle2, Download, FileJson2, Upload } from "lucide-react";
+import { AlertCircle, Download, Upload } from "lucide-react";
 import {
   FUTURE_TEMPLATE_DOWNLOAD_PATH,
-  FUTURE_TEMPLATE_VERSION,
-  LEGACY_IMPORT_ROOT_KEYS,
   summarizeImportedPlan,
   type ImportedPlan,
   validateImportedPlanJson,
@@ -61,17 +59,15 @@ export function UploadJsonDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl border-hairline bg-background/95 p-0 backdrop-blur-xl">
+      <DialogContent className="max-w-xl border-hairline bg-background/95 p-0 backdrop-blur-xl">
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
           <DialogTitle className="font-display text-3xl">Upload JSON</DialogTitle>
-          <DialogDescription className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-            Use one JSON file to replace the current saved plan. The current import still expects
-            the supported week-preview shape, while the downloadable template previews a richer
-            structured format for later plan preparation.
+          <DialogDescription className="text-sm text-muted-foreground">
+            Replace the current saved plan with one JSON file.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-5 px-6 py-5">
+        <div className="grid gap-4 px-6 py-5">
           <input
             ref={fileInputRef}
             type="file"
@@ -106,56 +102,27 @@ export function UploadJsonDialog({
             }}
           />
 
-          <div className="rounded-xl border border-dashed border-hairline bg-background/35 p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-              >
-                <Upload className="h-4 w-4" />
-                {selectedFileName ? "Choose another JSON" : "Upload JSON"}
-              </button>
-              <a
-                href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
-                download
-                className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-accent"
-              >
-                <Download className="h-4 w-4 text-signal" />
-                Download template
-              </a>
-              <span className="text-sm text-muted-foreground">
-                {selectedFileName ?? "No file selected yet"}
-              </span>
-            </div>
-            <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Works now: {LEGACY_IMPORT_ROOT_KEYS.join(", ")}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-hairline bg-background/30 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Future detailed template
-                </div>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-foreground/85">
-                  <span className="font-medium">{FUTURE_TEMPLATE_VERSION}</span> is the planned
-                  structured authoring format for later imports. It introduces a preparation
-                  horizon, richer workout segments, and a clearer planned structure for future
-                  comparison work.
-                </p>
-              </div>
-              <span className="rounded-full border border-hairline px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-signal">
-                Later
-              </span>
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              The template is available now for structured preparation, but this modal still applies
-              only the currently supported `week_1_preview[]` import shape. Detailed segment import
-              and planned-vs-actual comparison are not live yet.
-            </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+            >
+              <Upload className="h-4 w-4" />
+              {selectedFileName ? "Choose another JSON" : "Upload JSON"}
+            </button>
+            <a
+              href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
+              download
+              className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-accent"
+            >
+              <Download className="h-4 w-4 text-signal" />
+              Download template
+            </a>
+            {selectedFileName && (
+              <span className="text-sm text-muted-foreground">{selectedFileName}</span>
+            )}
           </div>
 
           <label className="grid gap-2">
@@ -171,7 +138,7 @@ export function UploadJsonDialog({
                 setFieldErrors([]);
                 setError(null);
               }}
-              placeholder='{"plan_name":"...","generated_for":"...","start_date":"...","week_1_preview":[...]}'
+              placeholder='{"plan_name":"...","generated_for":"...","start_date":"...","week_1_preview":[...]} or {"schema_version":"training-plan-v2",...}'
               className="rounded-lg border border-hairline bg-background/50 px-4 py-3 font-mono text-xs leading-relaxed placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
             />
           </label>
@@ -193,74 +160,45 @@ export function UploadJsonDialog({
               Validate JSON
             </button>
             <span className="text-[11px] text-muted-foreground">
-              Current flow parses and applies the supported JSON shape only. Detailed template
-              import comes later.
+              Keep this as the advanced fallback path.
             </span>
           </div>
 
           {summary && (
-            <div
+            <p
               className={
                 isBlockedReplace
-                  ? "rounded-xl border border-warn/30 bg-warn/10 p-4"
-                  : "rounded-xl border border-success/20 bg-success/10 p-4"
+                  ? "text-sm leading-relaxed text-warn"
+                  : "text-sm leading-relaxed text-foreground/85"
               }
             >
-              <div
-                className={
-                  isBlockedReplace
-                    ? "flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-warn"
-                    : "flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-success"
-                }
-              >
-                {isBlockedReplace ? (
-                  <AlertCircle className="h-3.5 w-3.5" />
-                ) : (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                )}
-                {isBlockedReplace ? "Replace blocked" : "Ready to apply"}
-              </div>
-              <div className="mt-3 grid gap-3 text-sm text-foreground/85 sm:grid-cols-3">
-                <p>Plan: {summary.planName}</p>
-                <p>Days: {summary.days}</p>
-                <p>Workouts: {summary.workouts}</p>
-              </div>
-              {isBlockedReplace && (
-                <p className="mt-3 text-sm leading-relaxed text-foreground/85">
-                  This JSON parsed correctly, but it cannot replace the current saved plan without
-                  detaching logged workout history.
-                </p>
+              {isBlockedReplace ? (
+                <>
+                  <span className="inline-flex items-center gap-2">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Replace blocked.
+                  </span>{" "}
+                  This JSON parsed correctly, but applying it here would detach saved workout
+                  history.
+                </>
+              ) : (
+                <>
+                  Ready to apply: {summary.days} days, {summary.workouts} workouts.
+                </>
               )}
-            </div>
+            </p>
           )}
 
           {fieldErrors.length > 0 && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-destructive">
-                JSON shape mismatch
-              </div>
-              <div className="mt-3 space-y-2 text-sm text-foreground/85">
-                {fieldErrors.slice(0, 5).map((issue) => (
-                  <p key={issue}>{issue}</p>
-                ))}
-              </div>
+            <div className="space-y-2 text-sm text-destructive">
+              <p className="text-[11px] uppercase tracking-[0.18em]">JSON shape mismatch</p>
+              {fieldErrors.slice(0, 5).map((issue) => (
+                <p key={issue}>{issue}</p>
+              ))}
             </div>
           )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
-
-          <div className="rounded-xl bg-gradient-to-br from-surface-elevated to-surface p-4">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              <FileJson2 className="h-3.5 w-3.5 text-signal" />
-              Apply behavior
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-foreground/85">
-              Confirming here replaces the current active plan and opens the updated calendar view.
-              Saved workout history carries forward only when logged days still match exactly by
-              date and workout content. Otherwise the apply step is blocked and the current saved
-              plan stays unchanged.
-            </p>
-          </div>
         </div>
 
         <DialogFooter className="border-t border-hairline px-6 py-4">

@@ -14,11 +14,13 @@ import { IntervalsViz } from "@/components/IntervalsViz";
 import { CompletionPanel } from "@/components/CompletionPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  TYPE_META,
+  formatDistanceKm,
   formatDate,
+  primaryWorkoutTarget,
   WEEK_STATUS_META,
   type Workout,
   weekOf,
+  workoutTypeMeta,
   workoutDistanceKm,
   workoutDuration,
 } from "@/lib/training";
@@ -96,7 +98,7 @@ function WorkoutPage() {
     );
   }
 
-  const meta = TYPE_META[workout.type];
+  const meta = workoutTypeMeta(workout);
   const km = workoutDistanceKm(workout);
   const duration = workoutDuration(workout);
   const status = workout.status;
@@ -105,6 +107,7 @@ function WorkoutPage() {
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const resultMeta = resultMetaForStatus(status);
   const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
+  const primaryTarget = primaryWorkoutTarget(workout);
   const phase = `${workout.phase} · week ${workout.week}`;
 
   return (
@@ -155,7 +158,7 @@ function WorkoutPage() {
 
             {!isRestDay && (
               <div className="grid grid-cols-3 gap-3 sm:flex sm:gap-6">
-                <Stat label="Distance" value={km ? km.toString() : "—"} unit="km" />
+                <Stat label="Distance" value={km != null ? formatDistanceKm(km) : "—"} unit="km" />
                 <Stat label="Duration" value={duration ? duration.toString() : "—"} unit="min" />
                 <Stat label="Load" value={loadFor(workout)} unit="" />
               </div>
@@ -218,9 +221,9 @@ function WorkoutPage() {
                 </SidebarSection>
               )}
 
-              {!isRestDay && workout.steps[0]?.target && (
+              {!isRestDay && primaryTarget && (
                 <SidebarSection title="Targets" tone="signal">
-                  {Object.entries(workout.steps[0].target).map(([key, value]) => (
+                  {Object.entries(primaryTarget).map(([key, value]) => (
                     <div key={key} className="flex justify-between gap-3 py-1 last:border-0">
                       <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
                         {key.replace(/_/g, " ")}

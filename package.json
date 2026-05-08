@@ -13,6 +13,8 @@
     "preview": "vite preview",
     "start": "node --env-file=.env.local .output/server/index.mjs",
     "import:current-plan": "node --env-file=.env.local ./scripts/import-current-plan.mjs /Users/ivan/Desktop/corrected_half_marathon_start_2026-05-05.json",
+    "author-structured-plan": "node --env-file=.env.local ./scripts/author-structured-plan.mjs",
+    "author-plan-from-text": "node --env-file=.env.local ./scripts/author-plan-from-text.mjs",
     "test-user": "node --env-file=.env.local ./scripts/test-user.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."

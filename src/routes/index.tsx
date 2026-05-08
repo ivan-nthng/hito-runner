@@ -15,7 +15,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Sign in first, then open your imported weekly running plan and saved workout status.",
+          "Sign in first, describe your running goal, and open the saved weekly plan once the first plan is built.",
       },
     ],
   }),

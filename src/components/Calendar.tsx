@@ -3,10 +3,13 @@ import { Link } from "@tanstack/react-router";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  formatDistanceKm,
   TYPE_META,
   WEEK_STATUS_META,
   workoutDuration,
   workoutDistanceKm,
+  workoutTypeMeta,
+  primaryWorkoutTarget,
   findWorkout,
   weekdayShort,
   formatDate,
@@ -196,7 +199,7 @@ function DayCell({
   const status = workout?.status ?? "rest";
   const day = parseInt(iso.split("-")[2], 10);
   const isHover = hovered === iso;
-  const meta = workout ? TYPE_META[workout.type] : null;
+  const meta = workout ? workoutTypeMeta(workout) : null;
   const km = workout ? workoutDistanceKm(workout) : null;
   const duration = workout ? workoutDuration(workout) : 0;
   const isCompleted = status === "completed";
@@ -257,13 +260,13 @@ function DayCell({
               )}
               style={{ color: meta?.color }}
             >
-              {TYPE_META[workout.type].short}
+              {meta.short}
             </div>
             <div className="mt-1 text-xs leading-tight text-foreground/85 line-clamp-2">
               {workout.title.replace(/^(Аэробный |Лёгкий )/, "")}
             </div>
             <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground font-mono-num">
-              {km && <span>{km}km</span>}
+              {km != null && <span>{formatDistanceKm(km)}km</span>}
               {duration > 0 && <span>{duration}′</span>}
               <StatusDot status={status} />
             </div>
@@ -320,9 +323,9 @@ function StatusDot({ status }: { status: Status }) {
 function Tooltip({ workout }: { workout: Workout }) {
   const km = workoutDistanceKm(workout);
   const duration = workoutDuration(workout);
-  const meta = TYPE_META[workout.type];
+  const meta = workoutTypeMeta(workout);
   const status = workout.status;
-  const target = workout.steps[0]?.target;
+  const target = primaryWorkoutTarget(workout);
 
   return (
     <div className="rounded-lg border border-hairline bg-popover/95 backdrop-blur-xl shadow-2xl p-4 text-left">
@@ -336,7 +339,7 @@ function Tooltip({ workout }: { workout: Workout }) {
       </div>
       <div className="mt-2 font-display text-lg leading-tight">{workout.title}</div>
       <div className="mt-3 grid grid-cols-3 gap-3 text-[11px]">
-        <Stat label="Distance" value={km ? `${km}km` : "—"} />
+        <Stat label="Distance" value={km != null ? `${formatDistanceKm(km)}km` : "—"} />
         <Stat label="Duration" value={duration ? `${duration}′` : "—"} />
         <Stat label="Status" value={status} />
       </div>
@@ -373,7 +376,7 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
       {dates.map((iso) => {
         const workout = findWorkout(snapshot.workouts, iso);
         const isToday = iso === snapshot.currentDate;
-        const meta = workout ? TYPE_META[workout.type] : null;
+        const meta = workout ? workoutTypeMeta(workout) : null;
         const status = workout?.status ?? "rest";
         const km = workout ? workoutDistanceKm(workout) : null;
         const duration = workout ? workoutDuration(workout) : 0;
@@ -417,7 +420,7 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
                 </div>
                 <div className="mt-1 text-sm leading-snug">{workout.title}</div>
                 <div className="mt-auto pt-3 flex items-center gap-3 text-[11px] font-mono-num text-muted-foreground">
-                  {km && <span>{km}km</span>}
+                  {km != null && <span>{formatDistanceKm(km)}km</span>}
                   {duration > 0 && <span>{duration}′</span>}
                   <span className="ml-auto capitalize text-foreground/70">{status}</span>
                 </div>

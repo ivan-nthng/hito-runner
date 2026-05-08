@@ -1,11 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Flag, NotebookPen } from "lucide-react";
 import {
+  formatDistanceKm,
   formatDate,
   findWorkout,
+  primaryWorkoutTarget,
   WEEK_STATUS_META,
-  TYPE_META,
   type TrainingSnapshot,
+  workoutTypeMeta,
   workoutDistanceKm,
   workoutDuration,
 } from "@/lib/training";
@@ -15,19 +17,40 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   if (!workout) {
     return <TodayFallback snapshot={snapshot} />;
   }
-  const meta = TYPE_META[workout.type];
+  const meta = workoutTypeMeta(workout);
   const isRestDay = workout.type === "rest";
   const km = workoutDistanceKm(workout);
   const duration = workoutDuration(workout);
-  const target = workout.steps[0]?.target;
+  const target = primaryWorkoutTarget(workout);
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const primaryTarget =
-    typeof target?.hr_bpm === "string"
-      ? target.hr_bpm
-      : typeof target?.pace === "string"
-        ? target.pace
-        : "—";
-  const paceHint = typeof target?.pace === "string" ? target.pace : "Keep the effort relaxed";
+    typeof target?.hr_bpm_range === "string"
+      ? target.hr_bpm_range
+      : typeof target?.hr_bpm === "string"
+        ? target.hr_bpm
+        : typeof target?.pace_min_per_km_range === "string"
+          ? target.pace_min_per_km_range
+          : typeof target?.pace_range_min_km === "string"
+            ? target.pace_range_min_km
+            : typeof target?.pace === "string"
+              ? target.pace
+              : typeof target?.intensity === "string"
+                ? target.intensity
+                : typeof target?.cue === "string"
+                  ? target.cue
+                  : typeof target?.hint === "string"
+                    ? target.hint
+                    : "—";
+  const paceHint =
+    typeof target?.pace_min_per_km_range === "string"
+      ? target.pace_min_per_km_range
+      : typeof target?.pace_range_min_km === "string"
+        ? target.pace_range_min_km
+        : typeof target?.pace === "string"
+          ? target.pace
+          : typeof target?.hint === "string"
+            ? target.hint
+            : "Keep the effort relaxed";
 
   const tomorrowDate = new Date(`${snapshot.currentDate}T00:00:00`);
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -65,7 +88,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
 
           {!isRestDay ? (
             <div className="mt-8 flex flex-wrap gap-8">
-              <Metric label="Distance" value={km ? `${km}` : "—"} unit="km" />
+              <Metric label="Distance" value={km != null ? formatDistanceKm(km) : "—"} unit="km" />
               <Metric label="Duration" value={duration ? `${duration}` : "—"} unit="min" />
               <Metric label="Target" value={primaryTarget} />
               <Metric label="Pace Hint" value={paceHint} />
@@ -315,11 +338,11 @@ function summarizeUpcomingWorkout(
   }
 
   if (km && duration > 0) {
-    return `${km}km · ${duration}′`;
+    return `${formatDistanceKm(km)}km · ${duration}′`;
   }
 
   if (km) {
-    return `${km}km`;
+    return `${formatDistanceKm(km)}km`;
   }
 
   if (duration > 0) {
@@ -337,5 +360,5 @@ function summarizeUpcomingWorkout(
     return `${intervalStep.repeats} × ${intervalStep.work.duration_min}′`;
   }
 
-  return TYPE_META[workout.type].label;
+  return workoutTypeMeta(workout).label;
 }

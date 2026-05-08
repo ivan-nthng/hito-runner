@@ -66,12 +66,6 @@ export function AppShell({
       : shellSnapshot.mode === "onboarding"
         ? "Setup required"
         : "Preview mode";
-  const backendLabel =
-    shellSnapshot.backend === "supabase"
-      ? "Supabase"
-      : shellSnapshot.backend === "temporary_local"
-        ? "Temporary local"
-        : "Preview only";
   const profileName = viewer?.name
     ? viewer.name
     : shellSnapshot.mode === "authenticated"
@@ -109,7 +103,7 @@ export function AppShell({
             <span className="h-1.5 w-1.5 rounded-full bg-signal" />
           </Link>
           <p className="mt-1 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
-            {modeLabel} · backend {backendLabel}
+            {modeLabel}
           </p>
         </div>
 
@@ -184,7 +178,7 @@ export function AppShell({
                   {profileDetail}
                 </div>
                 <div className="mt-2 text-[11px] font-normal uppercase tracking-[0.16em] text-muted-foreground">
-                  {backendLabel} · {modeTag}
+                  {modeTag}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -254,7 +248,6 @@ export function AppShell({
             </div>
             <div className="ml-auto flex items-center gap-3">
               <StatusPill label="Week" value={weekStatus.label} />
-              <StatusPill label="Backend" value={backendLabel} />
               <Link
                 to={shellSnapshot.mode === "preview" ? "/login" : "/"}
                 reloadDocument={shellSnapshot.mode !== "preview"}
@@ -269,7 +262,7 @@ export function AppShell({
                 {shellSnapshot.mode === "preview"
                   ? "Save with login"
                   : shellSnapshot.mode === "onboarding"
-                    ? "Finish setup"
+                    ? "Create a Plan"
                     : "Open plan"}
               </Link>
               <button className="md:hidden h-8 w-8 rounded-full bg-gradient-to-br from-signal to-quality grid place-items-center text-[10px] text-signal-foreground">

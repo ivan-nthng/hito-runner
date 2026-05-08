@@ -1,266 +1,321 @@
 import { useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { FileJson2, Upload, CheckCircle2 } from "lucide-react";
+import { ChevronDown, Download, Upload } from "lucide-react";
 import {
-  FUTURE_TEMPLATE_VERSION,
-  LEGACY_IMPORT_ITEM_KEYS,
-  LEGACY_IMPORT_ROOT_KEYS,
+  FUTURE_TEMPLATE_DOWNLOAD_PATH,
   summarizeImportedPlan,
   type ImportedPlan,
   validateImportedPlanJson,
 } from "@/lib/imported-plan";
-import { completeOnboarding } from "@/lib/training-api";
+import { completeOnboarding, completeTextOnboarding } from "@/lib/training-api";
+import { cn } from "@/lib/utils";
+
+type TextStatus = "idle" | "saving" | "finishing";
+type JsonStatus = "idle" | "parsing" | "saving" | "finishing";
 
 export function OnboardingGate() {
   const router = useRouter();
+  const completeTextOnboardingFn = useServerFn(completeTextOnboarding);
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [authoringText, setAuthoringText] = useState("");
+  const [textStatus, setTextStatus] = useState<TextStatus>("idle");
+  const [textError, setTextError] = useState<string | null>(null);
+
+  const [showJsonImport, setShowJsonImport] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [jsonDraft, setJsonDraft] = useState("");
   const [importedPlan, setImportedPlan] = useState<ImportedPlan | null>(null);
-  const [status, setStatus] = useState<"idle" | "parsing" | "saving" | "finishing">("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [jsonStatus, setJsonStatus] = useState<JsonStatus>("idle");
+  const [jsonError, setJsonError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
 
-  const isBusy = status !== "idle";
+  const isBusy = textStatus !== "idle" || jsonStatus !== "idle";
+  const importedSummary = importedPlan ? summarizeImportedPlan(importedPlan) : null;
+
   const validateJsonDraft = validateJsonDraftFactory({
-    setError,
+    setJsonError,
     setFieldErrors,
     setImportedPlan,
-    setStatus,
+    setJsonStatus,
   });
 
   return (
-    <section className="mx-auto max-w-3xl rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
+    <section className="mx-auto max-w-4xl rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
       <div className="max-w-2xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            JSON onboarding
-          </p>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            First import
-          </p>
-        </div>
-        <h1 className="mt-3 font-display text-4xl lg:text-5xl leading-[1.05]">
-          Import your first training week
+        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">First plan</p>
+        <h1 className="mt-3 font-display text-4xl leading-[1.05] lg:text-5xl">
+          Describe what you&apos;re training for.
         </h1>
-        <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-          Upload one JSON file with your plan structure. We will validate the shape, create your
-          saved calendar from that data, and keep the existing weekly-plan baseline intact.
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          Tell us your goal and current context in your own words. We use that description to build
+          the first saved plan, then open the same calendar and workout flow you&apos;ll use
+          afterward.
         </p>
       </div>
 
-      <div className="mt-8 grid gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-hairline bg-background/35 p-4">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Current supported import
-          </div>
-          <div className="mt-3 space-y-2 text-sm text-foreground/85">
-            <p>Root keys: {LEGACY_IMPORT_ROOT_KEYS.join(" · ")}</p>
-            <p>Each workout item: {LEGACY_IMPORT_ITEM_KEYS.join(" · ")}</p>
-          </div>
-        </div>
-        <div className="rounded-xl border border-hairline bg-background/35 p-4">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Future template direction
-          </div>
-          <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
-            The later <span className="font-medium">{FUTURE_TEMPLATE_VERSION}</span> template will
-            support preparation horizon metadata and more detailed workout segments. This first
-            setup flow still imports the simpler week-preview shape today. JSON export of your saved
-            trainings comes later.
-          </p>
-        </div>
-      </div>
-
       <form
-        className="mt-10 grid gap-6"
+        className="mt-8 grid gap-6"
         onSubmit={async (event) => {
           event.preventDefault();
-          setError(null);
+          const trimmed = authoringText.trim();
 
-          if (!importedPlan) {
-            setError("Upload a valid JSON file before creating your calendar.");
+          setTextError(null);
+
+          if (trimmed.length < 20) {
+            setTextError("Add a little more detail before building the first plan.");
             return;
           }
 
-          setStatus("saving");
+          setTextStatus("saving");
 
           try {
-            await completeOnboardingFn({
+            await completeTextOnboardingFn({
               data: {
-                importedPlan,
+                authoringText: trimmed,
               },
             });
-            setStatus("finishing");
+            setTextStatus("finishing");
             await router.invalidate();
+            await router.navigate({ to: "/" });
           } catch (submitError) {
-            setStatus("idle");
-            setError(
+            setTextStatus("idle");
+            setTextError(
               submitError instanceof Error
                 ? submitError.message
-                : "Could not create your calendar.",
+                : "Could not build the first plan from this description.",
             );
           }
         }}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            setImportedPlan(null);
-            setFieldErrors([]);
-            setError(null);
+        <div className="grid gap-4">
+          <p className="max-w-2xl text-sm leading-relaxed text-foreground/85">
+            Mention the goal, time horizon, current level, recent results, and any constraints that
+            matter.
+          </p>
 
-            if (!file) {
-              setSelectedFileName(null);
-              return;
-            }
+          <label className="grid gap-2">
+            <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Your request
+            </span>
+            <textarea
+              rows={10}
+              value={authoringText}
+              onChange={(event) => {
+                setAuthoringText(event.target.value);
+                setTextError(null);
+              }}
+              placeholder={
+                "Goal: half marathon later this year.\nTarget horizon: around 16 weeks.\nCurrent level: running 3 times per week, long run 8 km.\nRecent results: 10K in 59:30 two months ago.\nContext: 34 years old, back from a light injury break.\nConstraints: no Tuesdays, prefer 4 runs per week, keep one full rest day."
+              }
+              className="resize-y rounded-lg border border-hairline bg-background/50 px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
+            />
+          </label>
 
-            setSelectedFileName(file.name);
+          {textError && <p className="text-sm text-destructive">{textError}</p>}
 
-            try {
-              const raw = await file.text();
-              setJsonDraft(raw);
-              validateJsonDraft(raw);
-            } catch (parseError) {
-              setFieldErrors([]);
-              setStatus("idle");
-              setError(
-                parseError instanceof Error
-                  ? "The file could not be read as valid JSON."
-                  : "The file could not be read as valid JSON.",
-              );
-            }
-          }}
-        />
-
-        <div className="rounded-xl border border-dashed border-hairline bg-background/30 p-5">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 pt-1">
             <button
-              type="button"
-              disabled={isBusy}
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              type="submit"
+              disabled={isBusy || authoringText.trim().length < 20}
+              className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
             >
-              <Upload className="h-4 w-4" />
-              {selectedFileName ? "Choose another JSON" : "Upload JSON"}
+              {textStatus === "saving"
+                ? "Building your plan..."
+                : textStatus === "finishing"
+                  ? "Opening your plan..."
+                  : "Build my first plan"}
             </button>
-            <span className="text-sm text-muted-foreground">
-              {selectedFileName ?? "No file selected yet"}
+            <span className="text-[11px] text-muted-foreground">
+              One compact request is enough for the first plan.
             </span>
           </div>
-          <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            We validate the uploaded shape before creating the saved plan.
-          </p>
+
+          {textStatus === "finishing" && (
+            <p className="text-sm text-foreground/80">
+              Your plan was created. Loading the saved calendar now…
+            </p>
+          )}
         </div>
-
-        <label className="grid gap-2">
-          <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            JSON content
-          </span>
-          <textarea
-            rows={12}
-            value={jsonDraft}
-            onChange={(event) => {
-              setJsonDraft(event.target.value);
-              setImportedPlan(null);
-              setFieldErrors([]);
-              setError(null);
-            }}
-            placeholder='Paste or edit your JSON here. Example root keys: {"plan_name": "...", "generated_for": "...", "start_date": "...", "week_1_preview": [...]}'
-            className="rounded-lg border border-hairline bg-background/50 px-4 py-3 font-mono text-xs leading-relaxed placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground/30 resize-y"
-          />
-        </label>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled={isBusy || !jsonDraft.trim()}
-            onClick={() => validateJsonDraft(jsonDraft)}
-            className="rounded-md border border-hairline px-5 py-2.5 text-sm transition-colors hover:bg-accent disabled:opacity-60"
-          >
-            Validate JSON
-          </button>
-          <span className="text-[11px] text-muted-foreground">
-            File upload fills this editor, and you can also paste or adjust the template manually.
-          </span>
-        </div>
-
-        {importedPlan && (
-          <div className="rounded-xl border border-success/20 bg-success/10 p-4">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-success">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              JSON ready
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 text-sm text-foreground/85">
-              <p>Plan: {summarizeImportedPlan(importedPlan).planName}</p>
-              <p>For: {summarizeImportedPlan(importedPlan).generatedFor}</p>
-              <p>Start date: {importedPlan.start_date}</p>
-              <p>Week items: {summarizeImportedPlan(importedPlan).days}</p>
-            </div>
-          </div>
-        )}
-
-        {fieldErrors.length > 0 && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-destructive">
-              JSON shape mismatch
-            </div>
-            <div className="mt-3 space-y-2 text-sm text-foreground/85">
-              {fieldErrors.slice(0, 5).map((issue) => (
-                <p key={issue}>{issue}</p>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-foreground/85">
-            {error}
-          </div>
-        )}
-
-        <div className="rounded-xl border border-hairline bg-background/35 p-4">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            <FileJson2 className="h-3.5 w-3.5 text-signal" />
-            What happens next
-          </div>
-          <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
-            After a valid import we create one saved plan cycle and open the existing calendar and
-            workout routes with your imported week as the visible source of truth.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-6">
-          <button
-            type="submit"
-            disabled={isBusy || !importedPlan}
-            className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-          >
-            {status === "parsing"
-              ? "Checking JSON..."
-              : status === "saving"
-                ? "Creating calendar..."
-                : status === "finishing"
-                  ? "Opening your plan..."
-                  : "Create my calendar"}
-          </button>
-          <span className="text-[11px] text-muted-foreground">
-            Import first. JSON export arrives later as a separate saved-mode capability.
-          </span>
-        </div>
-
-        {status === "finishing" && (
-          <p className="text-sm text-foreground/80">
-            Your JSON was accepted. Loading the saved weekly plan now…
-          </p>
-        )}
       </form>
+
+      <div className="mt-8 border-t border-hairline pt-6">
+        <button
+          type="button"
+          onClick={() => setShowJsonImport((current) => !current)}
+          className="flex w-full items-center justify-between gap-4 text-left"
+        >
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Advanced path
+            </div>
+            <div className="mt-1 text-sm text-foreground/90">Upload JSON instead</div>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Keep this for existing plan artifacts, migration, or testing.
+            </p>
+          </div>
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+              showJsonImport && "rotate-180",
+            )}
+          />
+        </button>
+
+        {showJsonImport && (
+          <div className="mt-5 border-t border-hairline pt-5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                setImportedPlan(null);
+                setFieldErrors([]);
+                setJsonError(null);
+
+                if (!file) {
+                  setSelectedFileName(null);
+                  return;
+                }
+
+                setSelectedFileName(file.name);
+
+                try {
+                  const raw = await file.text();
+                  setJsonDraft(raw);
+                  validateJsonDraft(raw);
+                } catch {
+                  setFieldErrors([]);
+                  setJsonStatus("idle");
+                  setJsonError("The file could not be read as valid JSON.");
+                }
+              }}
+            />
+
+            <div className="grid gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  <Upload className="h-4 w-4" />
+                  {selectedFileName ? "Choose another JSON" : "Upload JSON"}
+                </button>
+                <a
+                  href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
+                  download
+                  className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-accent"
+                >
+                  <Download className="h-4 w-4 text-signal" />
+                  Download template
+                </a>
+                {selectedFileName && (
+                  <span className="text-sm text-muted-foreground">{selectedFileName}</span>
+                )}
+              </div>
+
+              <label className="grid gap-2">
+                <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  JSON content
+                </span>
+                <textarea
+                  rows={10}
+                  value={jsonDraft}
+                  onChange={(event) => {
+                    setJsonDraft(event.target.value);
+                    setImportedPlan(null);
+                    setFieldErrors([]);
+                    setJsonError(null);
+                  }}
+                  placeholder='{"plan_name":"...","generated_for":"...","start_date":"...","week_1_preview":[...]} or {"schema_version":"training-plan-v2",...}'
+                  className="rounded-lg border border-hairline bg-background/50 px-4 py-3 font-mono text-xs leading-relaxed placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
+                />
+              </label>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={isBusy || !jsonDraft.trim()}
+                  onClick={() => validateJsonDraft(jsonDraft)}
+                  className="rounded-md border border-hairline px-4 py-2 text-sm transition-colors hover:bg-accent disabled:opacity-60"
+                >
+                  Validate JSON
+                </button>
+                <span className="text-[11px] text-muted-foreground">
+                  Keep this as the fallback path.
+                </span>
+              </div>
+
+              {importedSummary && (
+                <p className="text-sm leading-relaxed text-foreground/85">
+                  Ready to import: {importedSummary.days} days, {importedSummary.workouts} workouts.
+                </p>
+              )}
+
+              {fieldErrors.length > 0 && (
+                <div className="space-y-2 text-sm text-destructive">
+                  <p className="text-[11px] uppercase tracking-[0.18em]">JSON shape mismatch</p>
+                  {fieldErrors.slice(0, 5).map((issue) => (
+                    <p key={issue}>{issue}</p>
+                  ))}
+                </div>
+              )}
+
+              {jsonError && <p className="text-sm text-destructive">{jsonError}</p>}
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  disabled={isBusy || !importedPlan}
+                  onClick={async () => {
+                    if (!importedPlan) {
+                      setJsonError("Upload a valid JSON file before creating the saved plan.");
+                      return;
+                    }
+
+                    setJsonStatus("saving");
+                    setJsonError(null);
+
+                    try {
+                      await completeOnboardingFn({
+                        data: {
+                          importedPlan,
+                        },
+                      });
+                      setJsonStatus("finishing");
+                      await router.invalidate();
+                      await router.navigate({ to: "/" });
+                    } catch (submitError) {
+                      setJsonStatus("idle");
+                      setJsonError(
+                        submitError instanceof Error
+                          ? submitError.message
+                          : "Could not import the JSON plan.",
+                      );
+                    }
+                  }}
+                  className="rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                >
+                  {jsonStatus === "parsing"
+                    ? "Checking JSON..."
+                    : jsonStatus === "saving"
+                      ? "Importing plan..."
+                      : jsonStatus === "finishing"
+                        ? "Opening your plan..."
+                        : "Import JSON instead"}
+                </button>
+                <span className="text-[11px] text-muted-foreground">Advanced fallback only.</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -274,27 +329,27 @@ function formatIssue(path: (string | number)[], message: string) {
 }
 
 function validateJsonDraftFactory({
-  setError,
+  setJsonError,
   setFieldErrors,
   setImportedPlan,
-  setStatus,
+  setJsonStatus,
 }: {
-  setError: (value: string | null) => void;
+  setJsonError: (value: string | null) => void;
   setFieldErrors: (value: string[]) => void;
   setImportedPlan: (value: ImportedPlan | null) => void;
-  setStatus: (value: "idle" | "parsing" | "saving" | "finishing") => void;
+  setJsonStatus: (value: JsonStatus) => void;
 }) {
   return function validateJsonDraft(raw: string) {
-    setStatus("parsing");
-    setError(null);
+    setJsonStatus("parsing");
+    setJsonError(null);
     setFieldErrors([]);
     setImportedPlan(null);
 
     const validation = validateImportedPlanJson(raw);
 
     if (!validation) {
-      setStatus("idle");
-      setError("The JSON content could not be parsed.");
+      setJsonStatus("idle");
+      setJsonError("The JSON content could not be parsed.");
       return;
     }
 
@@ -302,11 +357,11 @@ function validateJsonDraftFactory({
       setFieldErrors(
         validation.error.issues.map((issue) => formatIssue(issue.path, issue.message)),
       );
-      setStatus("idle");
+      setJsonStatus("idle");
       return;
     }
 
     setImportedPlan(validation.data);
-    setStatus("idle");
+    setJsonStatus("idle");
   };
 }

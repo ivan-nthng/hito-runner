@@ -6,14 +6,49 @@ export type WeekStatus = "on_track" | "partially_off_track" | "needs_reset";
 export type TrainingMode = "preview" | "onboarding" | "authenticated";
 export type WorkoutOutcome = Extract<Status, "completed" | "partial" | "skipped">;
 
+export interface StepTarget {
+  intensity?: string;
+  hr_bpm_range?: string;
+  hr_bpm?: string;
+  pace_min_per_km_range?: string;
+  pace_range_min_km?: string;
+  pace?: string;
+  rpe?: string | number;
+  cadence_spm_range?: string;
+  cue?: string;
+  hint?: string;
+  extra?: Record<string, string | number>;
+}
+
+export interface StepUnitPrescription {
+  mode: "time" | "distance" | "none";
+  duration_min?: number;
+  distance_km?: number;
+}
+
+export interface StepPrescription {
+  mode: "time" | "distance" | "repeats" | "none";
+  duration_min?: number;
+  distance_km?: number;
+  repeat_count?: number;
+  repeat_unit?: StepUnitPrescription;
+  recovery_unit?: StepUnitPrescription;
+}
+
 export interface Step {
   type: string;
+  segment_id?: string;
+  segment_type?: string;
+  label?: string | null;
+  sequence?: number;
+  prescription?: StepPrescription;
+  guidance?: string | null;
   duration_min?: number;
   distance_km?: number;
   repeats?: number;
   work?: Step;
   recovery?: Step;
-  target?: Record<string, string | number>;
+  target?: StepTarget;
 }
 
 export interface WorkoutLog {
@@ -140,6 +175,38 @@ export const TYPE_META: Record<
   },
 };
 
+export function workoutTypeMeta(workout: Pick<Workout, "type" | "title" | "steps">): {
+  label: string;
+  short: string;
+  color: string;
+  ring: string;
+} {
+  const base = TYPE_META[workout.type];
+
+  if (workout.type !== "quality") {
+    return base;
+  }
+
+  const hasTempoIdentity =
+    /tempo/i.test(workout.title) ||
+    workout.steps.some(
+      (step) =>
+        step.type === "tempo" ||
+        step.segment_type === "tempo_block" ||
+        /tempo/i.test(step.label ?? ""),
+    );
+
+  if (!hasTempoIdentity) {
+    return base;
+  }
+
+  return {
+    ...base,
+    label: "Tempo",
+    short: "Tempo",
+  };
+}
+
 export const WEEK_STATUS_META: Record<WeekStatus, { label: string; helper: string }> = {
   on_track: {
     label: "On track",
@@ -250,14 +317,11 @@ export function deriveWeekStatus(workouts: Workout[], currentDate: string): Week
   return "on_track";
 }
 
-export function workoutDuration(workout: Pick<Workout, "steps">): number {
+export function workoutDuration(workout: Pick<Workout, "steps" | "type">): number {
   let total = 0;
 
   for (const step of workout.steps) {
-    if (step.duration_min) total += step.duration_min;
-    if (step.repeats && step.work && step.recovery) {
-      total += step.repeats * ((step.work.duration_min || 0) + (step.recovery.duration_min || 0));
-    }
+    total += stepPlannedDurationMin(step, workout.type);
   }
 
   return total;
@@ -268,13 +332,15 @@ export function workoutDistanceKm(workout: Pick<Workout, "steps" | "type">): num
   let anyDistance = false;
 
   for (const step of workout.steps) {
-    if (step.distance_km) {
-      km += step.distance_km;
+    const stepKm = stepPlannedDistanceKm(step);
+
+    if (stepKm > 0) {
+      km += stepKm;
       anyDistance = true;
     }
   }
 
-  if (anyDistance) return km;
+  if (anyDistance) return roundDistanceKm(km);
 
   const duration = workoutDuration(workout);
   if (!duration) return null;
@@ -290,7 +356,99 @@ export function workoutDistanceKm(workout: Pick<Workout, "steps" | "type">): num
 
   if (!pace) return null;
 
-  return +(duration / pace).toFixed(1);
+  return roundDistanceKm(duration / pace);
+}
+
+export function formatDistanceKm(distanceKm: number | null | undefined): string {
+  if (distanceKm == null || !Number.isFinite(distanceKm)) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(roundDistanceKm(distanceKm));
+}
+
+export function primaryWorkoutTarget(workout: Pick<Workout, "steps">): StepTarget | undefined {
+  const preferredTypes = new Set(["run", "tempo", "intervals", "work"]);
+
+  for (const step of workout.steps) {
+    if (step.repeats && step.work?.target) {
+      return step.work.target;
+    }
+
+    if (step.target && preferredTypes.has(step.type)) {
+      return step.target;
+    }
+  }
+
+  for (const step of workout.steps) {
+    if (step.target) {
+      return step.target;
+    }
+
+    if (step.work?.target) {
+      return step.work.target;
+    }
+  }
+
+  return undefined;
+}
+
+export function stepPlannedDistanceKm(step: Step) {
+  let total = step.distance_km ?? 0;
+
+  if (step.repeats && step.work?.distance_km) {
+    total += step.repeats * step.work.distance_km;
+  }
+
+  if (step.repeats && step.recovery?.distance_km) {
+    total += step.repeats * step.recovery.distance_km;
+  }
+
+  return total;
+}
+
+export function stepPlannedDurationMin(step: Step, workoutType: WorkoutType) {
+  let total = step.duration_min ?? 0;
+
+  if (step.repeats && step.work) {
+    const workDuration =
+      step.work.duration_min ??
+      estimateDurationFromDistanceKm(step.work.distance_km ?? 0, workoutType);
+    const recoveryDuration =
+      step.recovery?.duration_min ??
+      estimateDurationFromDistanceKm(step.recovery?.distance_km ?? 0, "easy");
+    total += step.repeats * (workDuration + recoveryDuration);
+  }
+
+  return total;
+}
+
+function estimateDurationFromDistanceKm(distanceKm: number, workoutType: WorkoutType) {
+  if (!distanceKm) {
+    return 0;
+  }
+
+  const paceMap: Record<WorkoutType, number> = {
+    easy: 7.0,
+    steady_or_easy: 6.6,
+    long_run: 6.8,
+    quality: 5.8,
+    rest: 0,
+  };
+  const pace = paceMap[workoutType];
+
+  if (!pace) {
+    return 0;
+  }
+
+  return Math.round(distanceKm * pace);
+}
+
+function roundDistanceKm(distanceKm: number) {
+  return Number(distanceKm.toFixed(2));
 }
 
 export function weeklyMileage(snapshot: TrainingSnapshot) {

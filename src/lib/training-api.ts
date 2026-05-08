@@ -3,6 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { DEFAULT_AUTH_REDIRECT, sanitizeRedirectPath } from "@/lib/auth-redirect";
 import { buildImportedPlanSeed, importedPlanSchema } from "@/lib/imported-plan";
+import { generateCanonicalPlanFromText } from "@/lib/openai-plan-authoring";
+import {
+  buildStructuredAuthoringPlan,
+  structuredPlanAuthoringInputSchema,
+} from "@/lib/structured-plan-authoring";
 import {
   buildImportedLogCarryForwardPlan,
   buildPersistedWorkoutInsertRows,
@@ -59,6 +64,14 @@ const loginInputSchema = z.object({
 
 const onboardingInputSchema = z.object({
   importedPlan: importedPlanSchema,
+});
+
+const structuredOnboardingInputSchema = z.object({
+  authoringInput: structuredPlanAuthoringInputSchema,
+});
+
+const textAuthoringInputSchema = z.object({
+  authoringText: z.string().trim().min(20).max(4000),
 });
 
 const workoutLogInputSchema = z
@@ -192,35 +205,39 @@ export const requestMagicLink = createServerFn({ method: "POST" })
 export const completeOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => onboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
-    const auth = requireAuthenticatedUser();
-    const importedSeed = buildImportedPlanSeed(data.importedPlan);
+    await persistImportedPlanForCurrentRequest(data.importedPlan);
+    return {
+      ok: true,
+    };
+  });
 
-    if (auth.provider === "local") {
-      const localConfig = await getRequiredLocalAuthConfig(auth.userId);
-
-      if (canUseSupabasePlanStorage()) {
-        const linkedUserId = await ensureLocalAuthSupabaseUserId(localConfig);
-        await upsertRunnerProfile(linkedUserId, importedSeed.profile);
-        await replaceActivePlanWithImportedInput(linkedUserId, data.importedPlan);
-
-        return {
-          ok: true,
-        };
-      }
-
-      await completeLocalAuthOnboarding(localConfig, data.importedPlan);
-
-      return {
-        ok: true,
-      };
-    }
-
-    const { userId } = auth;
-    await upsertRunnerProfile(userId, importedSeed.profile);
-    await replaceActivePlanWithImportedInput(userId, data.importedPlan);
+export const completeStructuredOnboarding = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => structuredOnboardingInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    const generatedPlan = buildStructuredAuthoringPlan(data.authoringInput);
+    await persistImportedPlanForCurrentRequest(generatedPlan);
 
     return {
       ok: true,
+      schemaVersion: generatedPlan.schema_version,
+      sourceKind: generatedPlan.source_kind,
+      workoutCount: generatedPlan.planned_workouts.length,
+    };
+  });
+
+export const completeTextOnboarding = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => textAuthoringInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    const generatedPlan = await generateCanonicalPlanFromText(data.authoringText);
+    await persistImportedPlanForCurrentRequest(generatedPlan.canonicalPlan);
+
+    return {
+      ok: true,
+      schemaVersion: generatedPlan.canonicalPlan.schema_version,
+      sourceKind: generatedPlan.canonicalPlan.source_kind,
+      workoutCount: generatedPlan.canonicalPlan.planned_workouts.length,
+      model: generatedPlan.model,
+      responseId: generatedPlan.responseId,
     };
   });
 
@@ -305,6 +322,30 @@ async function savePersistedWorkoutLog(
     ok: true,
     id: upsertResult.data.id,
   };
+}
+
+async function persistImportedPlanForCurrentRequest(
+  importedPlan: z.infer<typeof importedPlanSchema>,
+) {
+  const auth = requireAuthenticatedUser();
+  const importedSeed = buildImportedPlanSeed(importedPlan);
+
+  if (auth.provider === "local") {
+    const localConfig = await getRequiredLocalAuthConfig(auth.userId);
+
+    if (canUseSupabasePlanStorage()) {
+      const linkedUserId = await ensureLocalAuthSupabaseUserId(localConfig);
+      await upsertRunnerProfile(linkedUserId, importedSeed.profile);
+      await replaceActivePlanWithImportedInput(linkedUserId, importedPlan);
+      return;
+    }
+
+    await completeLocalAuthOnboarding(localConfig, importedPlan);
+    return;
+  }
+
+  await upsertRunnerProfile(auth.userId, importedSeed.profile);
+  await replaceActivePlanWithImportedInput(auth.userId, importedPlan);
 }
 
 export async function exchangeCodeForSession(request: Request) {

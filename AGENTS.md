@@ -108,7 +108,12 @@ Completion gate:
 
 ## 6.5) QA Browser Policy
 
+- Prefer the built-in app/browser testing environment for browser verification whenever it can cover the task.
 - QA browser verification must use Computer Use in Safari.
+- When Safari is required, reuse the existing Safari session when practical.
+- Do not open many Safari windows for QA. Prefer navigating the current tab or opening a small number of new tabs.
+- Do not use private/incognito windows for routine QA unless the test specifically requires a clean unauthenticated session.
+- Preserve useful logged-in Safari sessions when possible so repeat QA passes do not require unnecessary username/password entry.
 - Chrome must not be used for QA browser testing except as a last-resort fallback when Safari is genuinely blocked.
 - Any Chrome fallback must be stated explicitly in the QA report with the reason Safari could not be used.
 

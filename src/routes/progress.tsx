@@ -70,8 +70,8 @@ function Progress() {
               There isn&apos;t a visible plan to summarize yet.
             </h1>
             <p className="mt-4 max-w-xl text-sm text-muted-foreground leading-relaxed">
-              Once the saved plan is assigned, this preserved surface will reuse the same backend
-              truth for volume, completion, and week status context.
+              Once you create or import a saved plan, this preserved surface will reuse the same
+              backend truth for volume, completion, and week status context.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
@@ -260,12 +260,7 @@ function Progress() {
                   },
                   {
                     k: "Backend",
-                    v:
-                      snapshot.source === "persisted"
-                        ? snapshot.backend === "temporary_local"
-                          ? "Local"
-                          : "Supabase"
-                        : "Off",
+                    v: snapshot.source === "persisted" ? "Supabase" : "Off",
                   },
                 ].map((metric) => (
                   <div

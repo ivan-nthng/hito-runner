@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  displayTargetEntries,
   formatDistanceKm,
   TYPE_META,
   WEEK_STATUS_META,
@@ -345,14 +346,12 @@ function Tooltip({ workout }: { workout: Workout }) {
       </div>
       {target && (
         <div className="mt-3 pt-3 border-t border-hairline text-[11px] text-muted-foreground space-y-0.5">
-          {Object.entries(target)
+          {displayTargetEntries(target)
             .slice(0, 2)
-            .map(([key, value]) => (
-              <div key={key} className="flex justify-between gap-3">
-                <span className="uppercase tracking-wider text-[10px]">
-                  {key.replace(/_/g, " ")}
-                </span>
-                <span className="text-foreground/80 truncate">{String(value)}</span>
+            .map((entry) => (
+              <div key={entry.key} className="flex justify-between gap-3">
+                <span className="uppercase tracking-wider text-[10px]">{entry.label}</span>
+                <span className="text-foreground/80 truncate">{entry.value}</span>
               </div>
             ))}
         </div>

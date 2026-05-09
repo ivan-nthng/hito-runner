@@ -1,13 +1,10 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { buildImportedPlanSeed } from "./lib/imported-plan-seed.mjs";
 
 const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
-const DEFAULT_LEGACY_EMAIL = "ivan@local.test";
-const DEFAULT_LEGACY_USER_ID = "11111111-1111-4111-8111-111111111111";
-const DEFAULT_LEGACY_STATE_PATH = ".tanstack/hito-running-local-auth.json";
 
 const command = process.argv[2];
 const options = parseArgs(process.argv.slice(3));
@@ -71,7 +68,6 @@ async function handleCreate() {
     email,
     role: "tester",
     displayName,
-    statePath: `.tanstack/hito-running-local-auth-${slugify(username)}.json`,
   });
 
   await saveLocalAccounts(nextAccounts);
@@ -118,10 +114,6 @@ async function handleReset() {
   const beforeCounts = await getUserDataCounts(authUser.id);
   await resetPersistedUserData(authUser.id);
 
-  if (localAccount) {
-    await removeLocalStateFile(localAccount.statePath);
-  }
-
   let importedPlan = null;
 
   if (options.plan) {
@@ -164,10 +156,6 @@ async function handleDelete() {
     throw new Error(`No local or Supabase user found for ${email}.`);
   }
 
-  if (localAccount) {
-    await removeLocalStateFile(localAccount.statePath);
-  }
-
   const nextAccounts = accounts.filter((account) => account.email !== email);
   await saveLocalAccounts(nextAccounts);
 
@@ -197,13 +185,10 @@ async function handleDelete() {
 
 function buildConfig() {
   const supabaseUrl = requireOption(
-    readEnv("NEXT_PUBLIC_SUPABASE_URL") ?? readEnv("VITE_SUPABASE_URL"),
+    readEnv("NEXT_PUBLIC_SUPABASE_URL"),
     "NEXT_PUBLIC_SUPABASE_URL",
   );
-  const supabaseServerKey = requireOption(
-    readEnv("SUPABASE_SECRET_KEY") ?? readEnv("SUPABASE_SERVICE_ROLE_KEY"),
-    "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY",
-  );
+  const supabaseServerKey = requireOption(readEnv("SUPABASE_SECRET_KEY"), "SUPABASE_SECRET_KEY");
 
   return {
     supabaseUrl,
@@ -212,61 +197,27 @@ function buildConfig() {
       process.cwd(),
       readEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE") ?? DEFAULT_ACCOUNTS_FILE,
     ),
-    protectedPrimaryEmail: normalizeEmail(
-      readEnv("LOCAL_AUTH_BYPASS_EMAIL") ?? DEFAULT_LEGACY_EMAIL,
-    ),
-    protectedPrimaryUsername: normalizeUsername(readEnv("LOCAL_AUTH_BYPASS_IDENTIFIER") ?? "ivan"),
   };
 }
 
 async function loadLocalAccounts() {
-  const fallbackAccounts = [];
-  const legacyAdmin = readLegacyAdminAccount();
-
-  if (legacyAdmin) {
-    fallbackAccounts.push(legacyAdmin);
-  }
-
   try {
     const raw = await readFile(config.accountsFilePath, "utf8");
     const parsed = JSON.parse(raw);
     const rawAccounts = Array.isArray(parsed) ? parsed : (parsed.accounts ?? []);
-    return dedupeAccounts(rawAccounts.map(normalizeAccount), fallbackAccounts);
+    return rawAccounts.map(normalizeAccount);
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code !== "ENOENT") {
       throw error;
     }
 
-    if (fallbackAccounts.length > 0) {
-      await saveLocalAccounts(fallbackAccounts);
-    }
-
-    return fallbackAccounts;
+    return [];
   }
 }
 
 async function saveLocalAccounts(accounts) {
   await mkdir(path.dirname(config.accountsFilePath), { recursive: true });
   await writeFile(config.accountsFilePath, `${JSON.stringify({ accounts }, null, 2)}\n`, "utf8");
-}
-
-function readLegacyAdminAccount() {
-  const username = readEnv("LOCAL_AUTH_BYPASS_IDENTIFIER");
-  const password = readEnv("LOCAL_AUTH_BYPASS_PASSWORD");
-
-  if (!username || !password) {
-    return null;
-  }
-
-  return normalizeAccount({
-    username,
-    password,
-    email: readEnv("LOCAL_AUTH_BYPASS_EMAIL") ?? DEFAULT_LEGACY_EMAIL,
-    userId: readEnv("LOCAL_AUTH_BYPASS_USER_ID") ?? DEFAULT_LEGACY_USER_ID,
-    role: "admin",
-    displayName: humanizeUsername(normalizeUsername(username)),
-    statePath: readEnv("LOCAL_AUTH_BYPASS_STATE_PATH") ?? DEFAULT_LEGACY_STATE_PATH,
-  });
 }
 
 function normalizeAccount(account) {
@@ -280,22 +231,7 @@ function normalizeAccount(account) {
     userId: account.userId ?? deriveUserId(username),
     role: account.role === "admin" ? "admin" : "tester",
     displayName: account.displayName?.trim() || humanizeUsername(username),
-    statePath:
-      account.statePath?.trim() || `.tanstack/hito-running-local-auth-${slugify(username)}.json`,
   };
-}
-
-function dedupeAccounts(accounts, fallbackAccounts) {
-  const merged = [...fallbackAccounts, ...accounts];
-  const byEmail = new Map();
-
-  for (const account of merged) {
-    byEmail.set(account.email, account);
-  }
-
-  return Array.from(byEmail.values()).sort((left, right) =>
-    left.username.localeCompare(right.username),
-  );
 }
 
 function upsertLocalAccount(accounts, nextAccount) {
@@ -451,8 +387,13 @@ async function importPlanForUser(userId, email, planPath) {
       title: importedSeed.title,
       goal_summary: importedSeed.goalSummary,
       source_template: importedSeed.sourceTemplate,
+      schema_version: importedSeed.schemaVersion,
+      source_kind: importedSeed.sourceKind,
       start_date: importedSeed.startDate,
       end_date: importedSeed.endDate,
+      target_date: importedSeed.targetDate,
+      goal_metadata: importedSeed.goalMetadata,
+      plan_preferences: importedSeed.planPreferences,
     })
     .select("id, title, start_date, end_date")
     .single();
@@ -469,8 +410,13 @@ async function importPlanForUser(userId, email, planPath) {
     week_number: workout.weekNumber,
     phase: workout.phase,
     workout_type: workout.workoutType,
+    source_workout_id: workout.sourceWorkoutId,
+    source_workout_type: workout.sourceWorkoutType,
     title: workout.title,
     notes: workout.notes,
+    planned_rpe: workout.plannedRpe,
+    estimated_fatigue: workout.estimatedFatigue,
+    recovery_priority: workout.recoveryPriority,
     steps: workout.steps,
     display_order: workout.displayOrder,
   }));
@@ -500,24 +446,9 @@ async function importPlanForUser(userId, email, planPath) {
 }
 
 function assertNotProtectedAccount(email, localAccount, action) {
-  if (email === config.protectedPrimaryEmail) {
-    throw new Error(`Refusing to ${action} the protected primary account ${email}.`);
-  }
-
-  if (
-    localAccount?.role === "admin" ||
-    localAccount?.username === config.protectedPrimaryUsername
-  ) {
+  if (localAccount?.role === "admin") {
     throw new Error(`Refusing to ${action} admin account ${localAccount.email}.`);
   }
-}
-
-async function removeLocalStateFile(statePath) {
-  if (!statePath) {
-    return;
-  }
-
-  await rm(path.resolve(process.cwd(), statePath), { force: true });
 }
 
 function parseArgs(argv) {

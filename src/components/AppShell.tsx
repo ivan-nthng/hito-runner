@@ -69,9 +69,7 @@ export function AppShell({
   const profileName = viewer?.name
     ? viewer.name
     : shellSnapshot.mode === "authenticated"
-      ? shellSnapshot.backend === "temporary_local"
-        ? "Local runner"
-        : "Runner profile"
+      ? "Runner profile"
       : shellSnapshot.mode === "onboarding"
         ? "Setup in progress"
         : "Preview runner";
@@ -82,7 +80,7 @@ export function AppShell({
       : shellSnapshot.mode === "authenticated"
         ? "Saved plan active"
         : shellSnapshot.mode === "onboarding"
-          ? "Import JSON on home"
+          ? "Create a plan on home"
           : "Sign in to save progress";
   const profileInitials = buildInitials(profileName);
   const showUploadAction = shellSnapshot.mode !== "preview";
@@ -190,7 +188,7 @@ export function AppShell({
                   }}
                 >
                   <FileJson2 className="h-4 w-4" />
-                  Upload JSON
+                  Advanced import
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem disabled>
@@ -218,7 +216,7 @@ export function AppShell({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {shellSnapshot.mode !== "authenticated" && loc.pathname !== "/login" && (
+          {shellSnapshot.mode === "preview" && loc.pathname !== "/login" && (
             <Link
               to="/login"
               search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}

@@ -1,12 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { sanitizeRedirectPath } from "@/lib/auth-redirect";
 import { appendLocalAuthSessionCookie, verifyLocalAuthCredentials } from "@/lib/local-auth";
+import { isDevOnlyLocalAuthRuntime } from "@/lib/supabase/env";
 
 export const Route = createFileRoute("/api/auth/local-login")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const url = new URL(request.url);
+
+        if (!isDevOnlyLocalAuthRuntime(request.url)) {
+          return new Response("Not found", {
+            status: 404,
+          });
+        }
+
         const formData = await request.formData();
         const appBaseUrl = url.origin;
         const next = sanitizeRedirectPath(
@@ -20,7 +28,7 @@ export const Route = createFileRoute("/api/auth/local-login")({
             : "";
         const password =
           typeof formData.get("password") === "string" ? (formData.get("password") as string) : "";
-        const authResult = await verifyLocalAuthCredentials(identifier, password);
+        const authResult = await verifyLocalAuthCredentials(identifier, password, request.url);
         const responseHeaders = new Headers();
 
         if (!authResult.ok) {

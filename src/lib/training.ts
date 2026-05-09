@@ -20,6 +20,17 @@ export interface StepTarget {
   extra?: Record<string, string | number>;
 }
 
+export type SegmentTone = "warmup" | "prep" | "work" | "recovery" | "cooldown" | "easy";
+
+export interface SegmentColorMeta {
+  tone: SegmentTone;
+  label: string;
+  color: string;
+  background: string;
+  border: string;
+  glow: string;
+}
+
 export interface StepUnitPrescription {
   mode: "time" | "distance" | "none";
   duration_min?: number;
@@ -69,6 +80,7 @@ export interface Workout {
   week: number;
   phase: string;
   type: WorkoutType;
+  sourceWorkoutType?: string | null;
   title: string;
   notes: string | null;
   steps: Step[];
@@ -97,7 +109,7 @@ export interface RunnerProfileSummary {
 export interface TrainingSnapshot {
   mode: TrainingMode;
   source: "preview" | "persisted";
-  backend: "preview" | "supabase" | "temporary_local";
+  backend: "preview" | "supabase";
   currentDate: string;
   weekStatus: WeekStatus;
   planMeta: PlanMeta | null;
@@ -110,7 +122,7 @@ export interface ShellSnapshot {
   weekStatus: WeekStatus;
   mode: TrainingMode;
   source: "preview" | "persisted";
-  backend: "preview" | "supabase" | "temporary_local";
+  backend: "preview" | "supabase";
 }
 
 interface TemplateWorkout {
@@ -175,16 +187,59 @@ export const TYPE_META: Record<
   },
 };
 
-export function workoutTypeMeta(workout: Pick<Workout, "type" | "title" | "steps">): {
+export function workoutTypeMeta(
+  workout: Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType">,
+): {
   label: string;
   short: string;
   color: string;
   ring: string;
 } {
   const base = TYPE_META[workout.type];
+  const sourceType = workout.sourceWorkoutType?.trim().toLowerCase() ?? null;
 
   if (workout.type !== "quality") {
+    if (workout.type === "easy" && sourceType === "recovery") {
+      return {
+        ...base,
+        label: "Recovery",
+        short: "Recovery",
+      };
+    }
+
     return base;
+  }
+
+  if (sourceType === "intervals") {
+    return {
+      ...base,
+      label: "Intervals",
+      short: "Intervals",
+    };
+  }
+
+  if (sourceType === "progression") {
+    return {
+      ...base,
+      label: "Progression",
+      short: "Progression",
+    };
+  }
+
+  if (sourceType === "race") {
+    return {
+      ...base,
+      label: "Race pace",
+      short: "Race",
+    };
+  }
+
+  if (sourceType === "tempo") {
+    return {
+      ...base,
+      label: "Tempo",
+      short: "Tempo",
+    };
   }
 
   const hasTempoIdentity =
@@ -370,6 +425,28 @@ export function formatDistanceKm(distanceKm: number | null | undefined): string 
   }).format(roundDistanceKm(distanceKm));
 }
 
+export function formatDurationMin(
+  durationMin: number | null | undefined,
+  unit: "min" | "prime" = "min",
+): string {
+  if (durationMin == null || !Number.isFinite(durationMin)) {
+    return "—";
+  }
+
+  const rounded = Math.round(durationMin * 10) / 10;
+  const value = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(rounded);
+
+  return unit === "prime" ? `${value}′` : `${value} min`;
+}
+
+export function segmentColorMeta(kind: string, target?: StepTarget): SegmentColorMeta {
+  const tone = segmentToneForKind(kind, target);
+  return SEGMENT_COLOR_META[tone];
+}
+
 export function primaryWorkoutTarget(workout: Pick<Workout, "steps">): StepTarget | undefined {
   const preferredTypes = new Set(["run", "tempo", "intervals", "work"]);
 
@@ -394,6 +471,50 @@ export function primaryWorkoutTarget(workout: Pick<Workout, "steps">): StepTarge
   }
 
   return undefined;
+}
+
+export function displayTargetEntries(target: StepTarget | undefined) {
+  if (!target) {
+    return [];
+  }
+
+  const entries: Array<{ key: string; label: string; value: string }> = [];
+  const seen = new Set<string>();
+  const pushEntry = (key: string, value: string | number | undefined) => {
+    if (value == null) {
+      return;
+    }
+
+    const stringValue = typeof value === "number" ? String(value) : value.trim();
+
+    if (!stringValue || seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    entries.push({
+      key,
+      label: humanizeTargetLabel(key),
+      value: stringValue,
+    });
+  };
+
+  pushEntry("intensity", target.intensity);
+  pushEntry("hr_bpm_range", target.hr_bpm_range ?? target.hr_bpm);
+  pushEntry("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
+  pushEntry("pace", target.pace);
+  pushEntry("rpe", target.rpe);
+  pushEntry("cadence_spm_range", target.cadence_spm_range);
+  pushEntry("cue", target.cue);
+  pushEntry("hint", target.hint);
+
+  for (const [key, value] of Object.entries(target.extra ?? {})) {
+    if (typeof value === "string" || typeof value === "number") {
+      pushEntry(key, value);
+    }
+  }
+
+  return entries;
 }
 
 export function stepPlannedDistanceKm(step: Step) {
@@ -449,6 +570,106 @@ function estimateDurationFromDistanceKm(distanceKm: number, workoutType: Workout
 
 function roundDistanceKm(distanceKm: number) {
   return Number(distanceKm.toFixed(2));
+}
+
+function humanizeTargetLabel(key: string) {
+  switch (key) {
+    case "hr_bpm_range":
+      return "HR";
+    case "pace_min_per_km_range":
+      return "Pace";
+    case "cadence_spm_range":
+      return "Cadence";
+    case "rpe":
+      return "RPE";
+    default:
+      return key.replace(/_/g, " ");
+  }
+}
+
+const SEGMENT_COLOR_META: Record<SegmentTone, SegmentColorMeta> = {
+  warmup: {
+    tone: "warmup",
+    label: "Warm-up",
+    color: "rgb(122 162 247)",
+    background: "color-mix(in oklch, rgb(122 162 247) 64%, transparent)",
+    border: "color-mix(in oklch, rgb(122 162 247) 72%, white 8%)",
+    glow: "0 0 22px rgb(122 162 247 / 0.28)",
+  },
+  prep: {
+    tone: "prep",
+    label: "Prep",
+    color: "rgb(135 196 190)",
+    background: "color-mix(in oklch, rgb(135 196 190) 62%, transparent)",
+    border: "color-mix(in oklch, rgb(135 196 190) 74%, white 8%)",
+    glow: "0 0 20px rgb(135 196 190 / 0.24)",
+  },
+  work: {
+    tone: "work",
+    label: "Work",
+    color: "rgb(239 112 101)",
+    background: "color-mix(in oklch, rgb(239 112 101) 82%, transparent)",
+    border: "color-mix(in oklch, rgb(239 112 101) 80%, white 10%)",
+    glow: "0 0 24px rgb(239 112 101 / 0.32)",
+  },
+  recovery: {
+    tone: "recovery",
+    label: "Recovery",
+    color: "rgb(148 163 184)",
+    background: "color-mix(in oklch, rgb(148 163 184) 38%, transparent)",
+    border: "color-mix(in oklch, rgb(148 163 184) 54%, white 6%)",
+    glow: "0 0 16px rgb(148 163 184 / 0.16)",
+  },
+  cooldown: {
+    tone: "cooldown",
+    label: "Cool-down",
+    color: "rgb(128 149 176)",
+    background: "color-mix(in oklch, rgb(128 149 176) 46%, transparent)",
+    border: "color-mix(in oklch, rgb(128 149 176) 58%, white 6%)",
+    glow: "0 0 18px rgb(128 149 176 / 0.18)",
+  },
+  easy: {
+    tone: "easy",
+    label: "Easy",
+    color: "rgb(112 171 201)",
+    background: "color-mix(in oklch, rgb(112 171 201) 54%, transparent)",
+    border: "color-mix(in oklch, rgb(112 171 201) 64%, white 8%)",
+    glow: "0 0 20px rgb(112 171 201 / 0.2)",
+  },
+};
+
+function segmentToneForKind(kind: string, target?: StepTarget): SegmentTone {
+  const normalizedKind = kind.trim().toLowerCase().replace(/_/g, " ");
+  const intensity = target?.intensity?.trim().toLowerCase() ?? "";
+  const cue = `${target?.cue ?? ""} ${target?.hint ?? ""}`.toLowerCase();
+
+  if (/cool|down/.test(normalizedKind)) {
+    return "cooldown";
+  }
+
+  if (/recover|rest|walk|float/.test(normalizedKind)) {
+    return "recovery";
+  }
+
+  if (
+    /mobil|drill|activation|prep|stride|dynamic/.test(normalizedKind) ||
+    /drill|activation/.test(cue)
+  ) {
+    return "prep";
+  }
+
+  if (/warm/.test(normalizedKind)) {
+    return "warmup";
+  }
+
+  if (
+    /work|tempo|interval|repeat|threshold|race|hill|quality/.test(normalizedKind) ||
+    /fast|hard|tempo|threshold|race|5k|10k|controlled/.test(intensity)
+  ) {
+    return "work";
+  }
+
+  return "easy";
 }
 
 export function weeklyMileage(snapshot: TrainingSnapshot) {

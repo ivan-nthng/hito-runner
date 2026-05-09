@@ -61,9 +61,10 @@ export function UploadJsonDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl border-hairline bg-background/95 p-0 backdrop-blur-xl">
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
-          <DialogTitle className="font-display text-3xl">Upload JSON</DialogTitle>
+          <DialogTitle className="font-display text-3xl">Advanced import</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Replace the current saved plan with one JSON file.
+            Replace the current saved plan only when you already have a `training-plan-v2` Hito JSON
+            file.
           </DialogDescription>
         </DialogHeader>
 
@@ -110,7 +111,7 @@ export function UploadJsonDialog({
               className="inline-flex items-center gap-2 rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
             >
               <Upload className="h-4 w-4" />
-              {selectedFileName ? "Choose another JSON" : "Upload JSON"}
+              {selectedFileName ? "Choose another file" : "Upload JSON"}
             </button>
             <a
               href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
@@ -118,7 +119,7 @@ export function UploadJsonDialog({
               className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-accent"
             >
               <Download className="h-4 w-4 text-signal" />
-              Download template
+              Download JSON template
             </a>
             {selectedFileName && (
               <span className="text-sm text-muted-foreground">{selectedFileName}</span>
@@ -138,7 +139,7 @@ export function UploadJsonDialog({
                 setFieldErrors([]);
                 setError(null);
               }}
-              placeholder='{"plan_name":"...","generated_for":"...","start_date":"...","week_1_preview":[...]} or {"schema_version":"training-plan-v2",...}'
+              placeholder='{"schema_version":"training-plan-v2","plan_name":"...","generated_for":"...","start_date":"...","planned_workouts":[...]}'
               className="rounded-lg border border-hairline bg-background/50 px-4 py-3 font-mono text-xs leading-relaxed placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
             />
           </label>
@@ -160,33 +161,36 @@ export function UploadJsonDialog({
               Validate JSON
             </button>
             <span className="text-[11px] text-muted-foreground">
-              Keep this as the advanced fallback path.
+              Advanced import requires the canonical `training-plan-v2` contract.
             </span>
           </div>
 
           {summary && (
-            <p
-              className={
-                isBlockedReplace
-                  ? "text-sm leading-relaxed text-warn"
-                  : "text-sm leading-relaxed text-foreground/85"
-              }
-            >
-              {isBlockedReplace ? (
-                <>
-                  <span className="inline-flex items-center gap-2">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    Replace blocked.
-                  </span>{" "}
-                  This JSON parsed correctly, but applying it here would detach saved workout
-                  history.
-                </>
-              ) : (
-                <>
-                  Ready to apply: {summary.days} days, {summary.workouts} workouts.
-                </>
-              )}
-            </p>
+            <div className="space-y-1">
+              <p
+                className={
+                  isBlockedReplace
+                    ? "text-sm leading-relaxed text-warn"
+                    : "text-sm leading-relaxed text-foreground/85"
+                }
+              >
+                {isBlockedReplace ? (
+                  <>
+                    <span className="inline-flex items-center gap-2">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      Replace blocked.
+                    </span>{" "}
+                    This JSON parsed correctly, but applying it here would detach saved workout
+                    history.
+                  </>
+                ) : (
+                  <>
+                    Ready to apply: {summary.days} days, {summary.workouts} workouts from{" "}
+                    {summary.contractLabel}.
+                  </>
+                )}
+              </p>
+            </div>
           )}
 
           {fieldErrors.length > 0 && (

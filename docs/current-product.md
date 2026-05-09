@@ -6,7 +6,7 @@ The implemented product is now a hybrid running-plan experience for Hito Running
 
 - signed-out users now enter through a login-first screen instead of landing in the calendar as the primary experience
 - signed-in users can create a real profile, receive a persisted plan, log workouts, and see backend-derived weekly status
-- the current local unblock path uses a temporary local account login with visible username/password fields instead of depending on the Supabase magic-link email flow, but the canonical plan store now prefers Supabase when a server-side key is available
+- the current local unblock path keeps a temporary local account login only for loopback development, while deploy-visible auth now exposes only the real email path and authenticated plan truth resolves through Supabase
 
 The product still avoids claims of live coaching, connected integrations, weather-aware adaptation, or biometric authority.
 
@@ -26,7 +26,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - integrations `/integrations`
   keeps the integrations information architecture as a not-connected preview
 - login `/login`
-  provides the current `Hito.` login-first surface with simple `Log in` and `Sign up` tabs, keeping username-or-email plus password as the main path and Magic Link under `Sign up`
+  provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, but deploy-visible environments show only the real email sign-in path
 
 ## Interaction Contracts
 
@@ -45,18 +45,18 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - signed-out users open into a minimal auth-first entry surface with `Hito.` branding
 - authenticated users without setup complete are gated into a compact text-first onboarding request on `/`
 - the primary onboarding surface now asks for one free-text description of the goal and current running context, then builds the first saved plan through the backend authoring seam
+- if a signed-in user has no active saved plan yet, the app now stays honestly in that setup state instead of silently assigning a preview-derived plan
 - setup-required accounts now see `Create a Plan` in the home header where saved-mode accounts see `Open plan`
 - the backend now also supports one first-pass free-text authoring seam:
   one user message is turned into validated canonical plan data server-side through OpenAI before the saved weekly plan opens
 - advanced JSON upload remains available as a secondary fallback path for existing plan artifacts, migration, and testing
-- the temporary local login path behaves as signed-in saved mode for the configured local admin account, can now expand to a few local test accounts later without changing routes, and uses Supabase as the canonical plan store whenever server-side admin access is configured
-- onboarding now leads with one compact text request, and still keeps advanced JSON import behind a secondary expandable path
-- the first structured authoring slice is backend-only for now:
+- the temporary local login path behaves as signed-in saved mode for the configured local admin account only on loopback local runtimes, can still expand to a few local test accounts later without changing routes, and uses Supabase as the only authenticated plan store
+- onboarding now leads with one compact text request, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
 - the first structured authoring slice is backend-only for now:
   it validates goal, schedule, runner basics, recent result context, available days, constraints, and preferences, then generates one canonical `training-plan-v2` plan into the same persisted saved-mode seam without changing routes
 - the first OpenAI-backed text authoring slice is also backend-only for now:
   it treats the user message as intent only, asks OpenAI for bounded structured authoring input, validates that output, and persists only the resulting canonical plan through the same saved-mode seam
-- setup writes one profile and creates one active plan from the imported JSON data
+- setup writes one profile and creates one active plan from the text-first authoring result, with JSON import retained only as an advanced fallback
 - home and calendar now default to the real current day instead of a frozen demo start date
 - today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
 - when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero
@@ -69,13 +69,17 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - the workout-detail notes area now includes an honest `Upload result` placeholder seam for future evidence import, without claiming connected extraction
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
 - signed-in surfaces now state honestly that JSON export is a later capability, not implemented in this slice yet
-- the runner profile area now shows the current runner name and active plan title, keeps sign-out inside the dropdown, and offers a lightweight `Upload JSON` plan-replacement flow
-- that `Upload JSON` replacement flow now preserves saved workout progress only when logged workouts still match the replacement JSON exactly on the logged dates; otherwise the replace action is blocked instead of silently clearing visible progress
-- the same `Upload JSON` flow now supports both the simpler legacy `week_1_preview[]` shape and the structured `training-plan-v2` shape, normalizes both into the same saved-mode plan seam, and ignores runtime-only v2 fields that do not belong in canonical plan truth
+- the runner profile area now shows the current runner name and active plan title, keeps sign-out inside the dropdown, and offers a lightweight advanced JSON plan-replacement flow
+- that advanced import replacement flow now preserves saved workout progress only when logged workouts still match the replacement JSON exactly on the logged dates; otherwise the replace action is blocked instead of silently clearing visible progress
+- the same advanced import flow now accepts only the canonical `training-plan-v2` file contract, while still ignoring runtime-only v2 fields that do not belong in canonical plan truth
 - structured imports now persist one clearer segment DSL in saved mode:
   interval-by-distance and interval-by-time both normalize into the same repeat prescription shape, and the existing home plus workout-detail routes keep rendering from that one stored contract
+- saved-mode plan truth now also preserves higher-value richer semantics across import, structured authoring, and text authoring without adding a second runtime model:
+  target date, goal metadata, plan preferences, source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority all persist into the same canonical Supabase plan rows
 - home, calendar, and workout detail now render tempo workouts with a tempo-specific visible identity instead of flattening every quality workout into the same generic label, and distance-first interval reps keep visible distance-first cues in the workout structure UI
-- the flow still includes a lightweight `Download template` affordance for structured `training-plan-v2` authoring
+- richer imported workout detail now renders scalar target truth only, so structured metadata no longer leaks into visible `[object Object]` text
+- richer imported interval workouts now keep an honest visible interval identity instead of being mislabeled as easy runs
+- the advanced import flow still includes a lightweight `Download JSON template` affordance for users who already need file-based plan handoff
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
 
 ## Known Allowed Fix Areas

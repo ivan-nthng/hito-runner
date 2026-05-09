@@ -26,15 +26,13 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { snapshot, viewer, localBypassEnabled, localAccounts, magicLinkEnabled } =
-    Route.useLoaderData();
+  const { snapshot, viewer, localBypassEnabled, magicLinkEnabled } = Route.useLoaderData();
   const hasPlannedWorkouts = snapshot.workouts.some((workout) => workout.type !== "rest");
 
   if (snapshot.mode === "preview") {
     return (
       <AuthEntryScreen
         localBypassEnabled={localBypassEnabled}
-        localAccounts={localAccounts}
         magicLinkEnabled={magicLinkEnabled}
         next="/"
       />
@@ -70,7 +68,7 @@ function PlanUnavailableState() {
       </h1>
       <p className="mt-4 max-w-xl text-sm text-muted-foreground leading-relaxed">
         We could open your saved mode, but no planned workouts are available to render on the
-        calendar yet. Return to setup or refresh once the plan has been assigned.
+        calendar yet. Return to setup and describe the plan you need before reopening the calendar.
       </p>
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <button

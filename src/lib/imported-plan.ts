@@ -8,18 +8,12 @@ import type {
   StepUnitPrescription,
   WorkoutType,
 } from "@/lib/training";
-
-export const LEGACY_IMPORT_ROOT_KEYS = [
-  "plan_name",
-  "generated_for",
-  "start_date",
-  "week_1_preview[]",
-] as const;
-
-export const LEGACY_IMPORT_ITEM_KEYS = ["date", "weekday", "workout", "details", "target"] as const;
+import type { Json } from "@/lib/supabase/database";
 
 export const FUTURE_TEMPLATE_VERSION = "training-plan-v2";
 export const FUTURE_TEMPLATE_DOWNLOAD_PATH = "/templates/hito-training-plan-v2-template.json";
+export const REMOVED_LEGACY_IMPORT_NOTICE =
+  "Legacy week_1_preview[] JSON is no longer supported. Convert this file to training-plan-v2 before importing.";
 
 export const V2_IMPORT_ROOT_KEYS = [
   "schema_version",
@@ -42,6 +36,11 @@ export const V2_IGNORED_WORKOUT_KEYS = [
   "status",
   "completion_state",
   "ai_adjustable",
+  "ai_adjustment_candidate",
+  "ai_notes",
+  "ai_recovery_recommendation",
+  "ai_risk_flags",
+  "completed_result",
   "garmin_sync_placeholder",
   "strava_sync_placeholder",
   "user_feedback_placeholder",
@@ -49,6 +48,7 @@ export const V2_IGNORED_WORKOUT_KEYS = [
 ] as const;
 
 const targetValueSchema = z.union([z.string(), z.number()]);
+const placeholderEnvelopeSchema = z.union([z.boolean(), z.record(z.string(), z.unknown())]);
 
 const v2TargetSchema = z
   .object({
@@ -66,21 +66,6 @@ const v2TargetSchema = z
   })
   .catchall(targetValueSchema);
 
-export const importedPlanWorkoutSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  weekday: z.string().trim().min(1),
-  workout: z.string().trim().min(1),
-  details: z.string().trim().min(1),
-  target: z.string().trim().nullable(),
-});
-
-export const legacyImportedPlanSchema = z.object({
-  plan_name: z.string().trim().min(1),
-  generated_for: z.string().trim().min(1),
-  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  week_1_preview: z.array(importedPlanWorkoutSchema).min(1),
-});
-
 const v2RunnerProfileSchema = z
   .object({
     experience_level: z.string().trim().min(1).optional(),
@@ -90,6 +75,10 @@ const v2RunnerProfileSchema = z
     age: z.number().int().min(1).max(120).optional(),
     height_cm: z.number().min(1).max(300).optional(),
     weight_kg: z.number().min(1).max(500).optional(),
+    primary_goal: z.string().trim().min(1).optional(),
+    secondary_goal: z.string().trim().min(1).optional(),
+    current_easy_aerobic_hr_bpm: z.string().trim().min(1).optional(),
+    risk_policy: z.string().trim().min(1).optional(),
     recent_injury_recovery_context: z.string().trim().min(1).optional(),
     preferred_effort_language: z.string().trim().min(1).optional(),
     recent_result_summary: z.string().trim().min(1).optional(),
@@ -109,6 +98,16 @@ const v2RunnerProfileSchema = z
           .strict(),
       )
       .optional(),
+  })
+  .strict();
+
+const v2TrainingConstraintsSchema = z
+  .object({
+    running_days_per_week: z.number().int().min(1).max(7).optional(),
+    full_rest_days: z.array(z.string().trim().min(1)).optional(),
+    long_run_day: z.string().trim().min(1).optional(),
+    intensity_distribution: z.string().trim().min(1).optional(),
+    progression_policy: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -157,7 +156,7 @@ const v2PlanPreferencesSchema = z
 const v2UnitPrescriptionSchema = z
   .object({
     mode: z.enum(["time", "distance", "none"]),
-    duration_min: z.number().int().positive().optional(),
+    duration_min: z.number().positive().optional(),
     distance_km: z.number().positive().optional(),
   })
   .strict()
@@ -182,7 +181,7 @@ const v2UnitPrescriptionSchema = z
 const v2SegmentPrescriptionSchema = z
   .object({
     mode: z.enum(["time", "distance", "repeats", "none"]),
-    duration_min: z.number().int().positive().optional(),
+    duration_min: z.number().positive().optional(),
     distance_km: z.number().positive().optional(),
     repeat_count: z.number().int().positive().optional(),
     repeat_unit: v2UnitPrescriptionSchema.optional(),
@@ -235,7 +234,13 @@ const v2SegmentSchema = z
       "recovery",
       "rest",
       "mobility",
+      "mobility_optional",
       "strength",
+      "activation",
+      "drills",
+      "strides",
+      "recovery_jog",
+      "fueling",
       "tempo_block",
       "interval_block",
     ]),
@@ -243,58 +248,107 @@ const v2SegmentSchema = z
     sequence: z.number().int().min(1).optional(),
     guidance: z.string().trim().min(1).optional(),
     prescription: v2SegmentPrescriptionSchema.optional(),
-    duration_min: z.number().int().positive().optional(),
+    duration_min: z.number().positive().optional(),
     distance_km: z.number().positive().optional(),
     target: v2TargetSchema.optional(),
     repeat_count: z.number().int().positive().optional(),
     work_distance_km: z.number().positive().optional(),
-    recovery_duration_min: z.number().int().positive().optional(),
+    work_duration_min: z.number().positive().optional(),
+    work_duration_sec: z.number().positive().optional(),
+    recovery_duration_min: z.number().positive().optional(),
+    recovery_duration_sec: z.number().positive().optional(),
     recovery_distance_km: z.number().positive().optional(),
     recovery_target: v2TargetSchema.optional(),
   })
   .strict()
   .superRefine((segment, context) => {
     if (segment.prescription) {
-      if (segment.segment_type === "interval_block" && segment.prescription.mode !== "repeats") {
+      if (
+        (segment.segment_type === "interval_block" || segment.segment_type === "strides") &&
+        segment.prescription.mode !== "repeats"
+      ) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["prescription", "mode"],
-          message: "interval_block segments require prescription.mode = repeats.",
+          message: `${segment.segment_type} segments require prescription.mode = repeats.`,
         });
       }
 
-      if (segment.segment_type === "rest" && segment.prescription.mode !== "none") {
+      if (
+        (segment.segment_type === "rest" || segment.segment_type === "fueling") &&
+        segment.prescription.mode !== "none"
+      ) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["prescription", "mode"],
-          message: "rest segments require prescription.mode = none.",
+          message: `${segment.segment_type} segments require prescription.mode = none.`,
         });
       }
 
       return;
     }
 
-    if (segment.segment_type === "interval_block") {
+    if (segment.segment_type === "interval_block" || segment.segment_type === "strides") {
       if (!segment.repeat_count) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["repeat_count"],
-          message: "repeat_count is required for interval_block segments.",
+          message: `repeat_count is required for ${segment.segment_type} segments.`,
         });
       }
 
-      if (!segment.work_distance_km && !segment.duration_min) {
+      if (
+        !segment.work_distance_km &&
+        !segment.work_duration_min &&
+        !segment.work_duration_sec &&
+        !segment.duration_min
+      ) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["work_distance_km"],
-          message: "interval_block segments need work_distance_km or duration_min.",
+          message: `${segment.segment_type} segments need work_distance_km, work_duration_min, work_duration_sec, or duration_min.`,
         });
       }
 
       return;
     }
 
-    if (segment.segment_type === "rest") {
+    if (segment.segment_type === "rest" || segment.segment_type === "fueling") {
+      return;
+    }
+
+    if (
+      segment.segment_type === "tempo_block" &&
+      (segment.repeat_count ||
+        segment.work_distance_km ||
+        segment.work_duration_min ||
+        segment.work_duration_sec ||
+        segment.recovery_duration_min ||
+        segment.recovery_duration_sec ||
+        segment.recovery_distance_km)
+    ) {
+      if (!segment.repeat_count) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["repeat_count"],
+          message: "repeat_count is required for repeated tempo_block segments.",
+        });
+      }
+
+      if (
+        !segment.work_distance_km &&
+        !segment.work_duration_min &&
+        !segment.work_duration_sec &&
+        !segment.duration_min
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["work_distance_km"],
+          message:
+            "repeated tempo_block segments need work_distance_km, work_duration_min, work_duration_sec, or duration_min.",
+        });
+      }
+
       return;
     }
 
@@ -314,13 +368,18 @@ const v2WorkoutSchema = z
     weekday: z.string().trim().min(1),
     week_number: z.number().int().min(1),
     phase: z.string().trim().min(1),
-    status: z.string().trim().min(1).optional(),
-    completion_state: z.string().trim().min(1).optional(),
-    ai_adjustable: z.boolean().optional(),
-    garmin_sync_placeholder: z.boolean().optional(),
-    strava_sync_placeholder: z.boolean().optional(),
-    user_feedback_placeholder: z.boolean().optional(),
-    pain_tracking_placeholder: z.boolean().optional(),
+    status: z.unknown().optional(),
+    completion_state: z.unknown().optional(),
+    ai_adjustable: z.unknown().optional(),
+    ai_adjustment_candidate: z.unknown().optional(),
+    ai_notes: z.unknown().optional(),
+    ai_recovery_recommendation: z.unknown().optional(),
+    ai_risk_flags: z.unknown().optional(),
+    completed_result: z.unknown().optional(),
+    garmin_sync_placeholder: placeholderEnvelopeSchema.optional(),
+    strava_sync_placeholder: placeholderEnvelopeSchema.optional(),
+    user_feedback_placeholder: placeholderEnvelopeSchema.optional(),
+    pain_tracking_placeholder: placeholderEnvelopeSchema.optional(),
     segments: z.array(v2SegmentSchema).min(1),
     workout_type: z.enum([
       "easy",
@@ -329,6 +388,9 @@ const v2WorkoutSchema = z
       "long_run",
       "quality",
       "tempo",
+      "intervals",
+      "progression",
+      "race",
       "recovery",
     ]),
     title: z.string().trim().min(1),
@@ -357,15 +419,15 @@ export const trainingPlanV2Schema = z
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .optional(),
     plan_preferences: v2PlanPreferencesSchema.optional(),
+    training_constraints: v2TrainingConstraintsSchema.optional(),
     planned_workouts: z.array(v2WorkoutSchema).min(1),
   })
   .strict();
 
-export const importedPlanSchema = z.union([legacyImportedPlanSchema, trainingPlanV2Schema]);
+export const importedPlanSchema = trainingPlanV2Schema;
 
-export type LegacyImportedPlan = z.infer<typeof legacyImportedPlanSchema>;
 export type TrainingPlanV2 = z.infer<typeof trainingPlanV2Schema>;
-export type ImportedPlan = z.infer<typeof importedPlanSchema>;
+export type ImportedPlan = TrainingPlanV2;
 
 export interface ImportedWorkoutSeed {
   workoutDate: string;
@@ -373,8 +435,13 @@ export interface ImportedWorkoutSeed {
   weekNumber: number;
   phase: string;
   workoutType: WorkoutType;
+  sourceWorkoutId: string;
+  sourceWorkoutType: string;
   title: string;
   notes: string | null;
+  plannedRpe: number | null;
+  estimatedFatigue: string | null;
+  recoveryPriority: string | null;
   steps: Step[];
   displayOrder: number;
 }
@@ -384,8 +451,13 @@ export interface ImportedPlanSeed {
   title: string;
   goalSummary: string;
   sourceTemplate: string;
+  schemaVersion: string;
+  sourceKind: string | null;
   startDate: string;
   endDate: string;
+  targetDate: string | null;
+  goalMetadata: Json | null;
+  planPreferences: Json | null;
   workouts: ImportedWorkoutSeed[];
 }
 
@@ -394,86 +466,46 @@ export interface ImportedPlanSummary {
   generatedFor: string;
   days: number;
   workouts: number;
-  format: "legacy" | "training-plan-v2";
+  format: "training-plan-v2";
+  contractLabel: string;
 }
 
 export function validateImportedPlanJson(raw: string) {
   try {
     const parsedJson = JSON.parse(raw) as unknown;
 
-    if (isV2ImportCandidate(parsedJson)) {
-      return trainingPlanV2Schema.safeParse(parsedJson);
+    if (looksLikeRemovedLegacyImport(parsedJson)) {
+      return {
+        success: false as const,
+        error: new z.ZodError([
+          {
+            code: z.ZodIssueCode.custom,
+            path: ["week_1_preview"],
+            message: REMOVED_LEGACY_IMPORT_NOTICE,
+          },
+        ]),
+      };
     }
 
-    return legacyImportedPlanSchema.safeParse(parsedJson);
+    return trainingPlanV2Schema.safeParse(parsedJson);
   } catch {
     return null;
   }
 }
 
 export function summarizeImportedPlan(plan: ImportedPlan): ImportedPlanSummary {
-  if (isTrainingPlanV2(plan)) {
-    return {
-      planName: plan.plan_name,
-      generatedFor: plan.generated_for,
-      days: plan.planned_workouts.length,
-      workouts: plan.planned_workouts.filter((item) => item.workout_type !== "rest").length,
-      format: "training-plan-v2",
-    };
-  }
-
   return {
     planName: plan.plan_name,
     generatedFor: plan.generated_for,
-    days: plan.week_1_preview.length,
-    workouts: plan.week_1_preview.filter((item) => !/rest|recovery$/i.test(item.workout)).length,
-    format: "legacy",
+    days: plan.planned_workouts.length,
+    workouts: plan.planned_workouts.filter((item) => item.workout_type !== "rest").length,
+    format: "training-plan-v2",
+    contractLabel: "training-plan-v2",
   };
 }
 
 export function buildImportedPlanSeed(plan: ImportedPlan): ImportedPlanSeed {
-  if (isTrainingPlanV2(plan)) {
-    return buildTrainingPlanV2Seed(plan);
-  }
-
-  return buildLegacyImportedPlanSeed(plan);
-}
-
-function buildLegacyImportedPlanSeed(plan: LegacyImportedPlan): ImportedPlanSeed {
-  const workouts = plan.week_1_preview
-    .slice()
-    .sort((left, right) => left.date.localeCompare(right.date))
-    .map((entry, index) => {
-      const workoutType = inferLegacyWorkoutType(entry.workout);
-      const title =
-        entry.details.toLowerCase() === "recovery"
-          ? entry.workout
-          : `${entry.workout} · ${entry.details}`;
-
-      return {
-        workoutDate: entry.date,
-        weekday: entry.weekday,
-        weekNumber: 1,
-        phase: "Imported week",
-        workoutType,
-        title,
-        notes: buildLegacyNotes(entry.details, entry.target),
-        steps: buildLegacySteps(workoutType, entry.details, entry.target),
-        displayOrder: index,
-      };
-    });
-
-  const profile = buildImportedProfile(plan.plan_name, plan.generated_for, workouts);
-
-  return {
-    profile,
-    title: plan.plan_name,
-    goalSummary: `Imported JSON week for ${plan.generated_for}.`,
-    sourceTemplate: "json-import-v1",
-    startDate: plan.start_date,
-    endDate: workouts.at(-1)?.workoutDate ?? plan.start_date,
-    workouts,
-  };
+  return buildTrainingPlanV2Seed(plan);
 }
 
 function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
@@ -491,9 +523,14 @@ function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
       weekNumber: entry.week_number,
       phase: entry.phase,
       workoutType: normalizeV2WorkoutType(entry.workout_type),
+      sourceWorkoutId: entry.workout_id,
+      sourceWorkoutType: entry.workout_type,
       title: entry.title,
       notes: buildV2Notes(entry),
-      steps: normalizeV2Segments(entry.segments, normalizeV2WorkoutType(entry.workout_type)),
+      plannedRpe: entry.planned_rpe ?? null,
+      estimatedFatigue: entry.estimated_fatigue ?? null,
+      recoveryPriority: entry.recovery_priority ?? null,
+      steps: normalizeV2Segments(entry.segments),
       displayOrder: index,
     }));
 
@@ -504,8 +541,13 @@ function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
     title: plan.plan_name,
     goalSummary: buildV2GoalSummary(plan),
     sourceTemplate: FUTURE_TEMPLATE_VERSION,
+    schemaVersion: plan.schema_version,
+    sourceKind: plan.source_kind?.trim() || "training_plan_v2_import",
     startDate: plan.start_date,
     endDate: workouts.at(-1)?.workoutDate ?? plan.start_date,
+    targetDate: deriveTargetDate(plan),
+    goalMetadata: buildGoalMetadata(plan),
+    planPreferences: buildPersistedPlanPreferences(plan),
     workouts,
   };
 }
@@ -523,7 +565,10 @@ function buildImportedProfile(
 
   return {
     goalType: deriveRunnerGoalType(planName, trainingPlan),
-    goalLabel: trainingPlan?.goal?.goal_label?.trim() || planName,
+    goalLabel:
+      trainingPlan?.goal?.goal_label?.trim() ||
+      trainingPlan?.runner_profile?.primary_goal?.trim() ||
+      planName,
     baselineSessionsPerWeek,
     baselineLongRunKm,
     baselineNotes: buildImportedProfileNotes(generatedFor, trainingPlan),
@@ -535,6 +580,12 @@ function buildV2GoalSummary(plan: TrainingPlanV2) {
 
   if (goalLabel) {
     return goalLabel;
+  }
+
+  const primaryGoal = plan.runner_profile?.primary_goal?.trim();
+
+  if (primaryGoal) {
+    return primaryGoal;
   }
 
   return `Imported ${FUTURE_TEMPLATE_VERSION} plan for ${plan.generated_for}.`;
@@ -614,6 +665,11 @@ function buildImportedProfileNotes(generatedFor: string, trainingPlan?: Training
     trainingPlan?.runner_profile?.recent_result_summary,
     trainingPlan?.runner_profile?.current_training_load_summary,
     trainingPlan?.runner_profile?.recent_injury_recovery_context,
+    trainingPlan?.runner_profile?.current_easy_aerobic_hr_bpm
+      ? `Current easy aerobic HR ${trainingPlan.runner_profile.current_easy_aerobic_hr_bpm}`
+      : null,
+    trainingPlan?.runner_profile?.risk_policy,
+    trainingPlan?.runner_profile?.secondary_goal,
   ]
     .filter((value): value is string => Boolean(value?.trim()))
     .join(" · ");
@@ -625,24 +681,108 @@ function buildImportedProfileNotes(generatedFor: string, trainingPlan?: Training
   return `Imported from JSON for ${generatedFor}.`;
 }
 
-function inferLegacyWorkoutType(workout: string): WorkoutType {
-  if (/rest|recovery$/i.test(workout)) {
-    return "rest";
-  }
+function deriveTargetDate(plan: TrainingPlanV2) {
+  return (
+    plan.target_date ?? plan.goal?.target_event?.event_date ?? plan.goal?.target_event?.date ?? null
+  );
+}
 
-  if (/interval|tempo|speed|quality/i.test(workout)) {
-    return "quality";
-  }
+function buildGoalMetadata(plan: TrainingPlanV2): Json | null {
+  const targetDate = deriveTargetDate(plan);
+  const goalType = plan.goal?.goal_type?.trim() || null;
+  const goalLabel =
+    plan.goal?.goal_label?.trim() || plan.runner_profile?.primary_goal?.trim() || null;
+  const targetEvent = plan.goal?.target_event;
+  const primaryGoal = plan.runner_profile?.primary_goal?.trim() || null;
+  const secondaryGoal = plan.runner_profile?.secondary_goal?.trim() || null;
 
-  if (/long/i.test(workout)) {
-    return "long_run";
-  }
+  const metadata = {
+    ...(goalType ? { goal_type: goalType } : {}),
+    ...(goalLabel ? { goal_label: goalLabel } : {}),
+    ...(targetDate ? { target_date: targetDate } : {}),
+    ...(targetEvent
+      ? {
+          target_event: {
+            ...(targetEvent.label ? { label: targetEvent.label } : {}),
+            ...(targetEvent.event_name ? { event_name: targetEvent.event_name } : {}),
+            ...(targetDate ? { date: targetDate } : {}),
+          },
+        }
+      : {}),
+    ...(primaryGoal ? { primary_goal: primaryGoal } : {}),
+    ...(secondaryGoal ? { secondary_goal: secondaryGoal } : {}),
+  } satisfies Record<string, Json>;
 
-  if (/steady/i.test(workout)) {
-    return "steady_or_easy";
-  }
+  return Object.keys(metadata).length > 0 ? metadata : null;
+}
 
-  return "easy";
+function buildPersistedPlanPreferences(plan: TrainingPlanV2): Json | null {
+  const notes = [
+    plan.plan_preferences?.notes?.trim() || null,
+    plan.training_constraints?.intensity_distribution?.trim() || null,
+    plan.training_constraints?.progression_policy?.trim() || null,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" · ");
+
+  const preferences = {
+    ...(plan.plan_preferences?.preferred_run_days
+      ? { preferred_run_days: plan.plan_preferences.preferred_run_days }
+      : {}),
+    ...(plan.plan_preferences?.preferred_running_days
+      ? { preferred_run_days: plan.plan_preferences.preferred_running_days }
+      : {}),
+    ...(plan.plan_preferences?.blocked_days
+      ? { blocked_days: plan.plan_preferences.blocked_days }
+      : {}),
+    ...(plan.plan_preferences?.unavailable_days
+      ? { blocked_days: plan.plan_preferences.unavailable_days }
+      : {}),
+    ...(plan.plan_preferences?.max_running_days_per_week
+      ? { max_running_days_per_week: plan.plan_preferences.max_running_days_per_week }
+      : {}),
+    ...(plan.plan_preferences?.max_weekly_sessions
+      ? { max_running_days_per_week: plan.plan_preferences.max_weekly_sessions }
+      : {}),
+    ...(typeof plan.plan_preferences?.allow_back_to_back_days === "boolean"
+      ? { allow_back_to_back_days: plan.plan_preferences.allow_back_to_back_days }
+      : {}),
+    ...(typeof plan.plan_preferences?.no_double_days === "boolean"
+      ? { allow_back_to_back_days: !plan.plan_preferences.no_double_days }
+      : {}),
+    ...(plan.plan_preferences?.preferred_long_run_day
+      ? { preferred_long_run_day: plan.plan_preferences.preferred_long_run_day }
+      : {}),
+    ...(plan.plan_preferences?.injury_constraints
+      ? { injury_constraints: plan.plan_preferences.injury_constraints }
+      : {}),
+    ...(plan.plan_preferences?.hard_constraints
+      ? { hard_constraints: plan.plan_preferences.hard_constraints }
+      : {}),
+    ...(plan.plan_preferences?.preferred_workout_mix
+      ? { preferred_workout_mix: plan.plan_preferences.preferred_workout_mix }
+      : {}),
+    ...(plan.plan_preferences?.strength_or_mobility_interest
+      ? {
+          strength_or_mobility_interest: plan.plan_preferences.strength_or_mobility_interest,
+        }
+      : {}),
+    ...(typeof plan.plan_preferences?.indoor_treadmill_ok === "boolean"
+      ? { indoor_treadmill_ok: plan.plan_preferences.indoor_treadmill_ok }
+      : {}),
+    ...(plan.training_constraints?.running_days_per_week
+      ? { max_running_days_per_week: plan.training_constraints.running_days_per_week }
+      : {}),
+    ...(plan.training_constraints?.full_rest_days
+      ? { blocked_days: plan.training_constraints.full_rest_days }
+      : {}),
+    ...(plan.training_constraints?.long_run_day
+      ? { preferred_long_run_day: plan.training_constraints.long_run_day }
+      : {}),
+    ...(notes ? { notes } : {}),
+  } satisfies Record<string, Json>;
+
+  return Object.keys(preferences).length > 0 ? preferences : null;
 }
 
 function normalizeV2WorkoutType(
@@ -655,6 +795,9 @@ function normalizeV2WorkoutType(
       return "long_run";
     case "quality":
     case "tempo":
+    case "intervals":
+    case "progression":
+    case "race":
       return "quality";
     case "steady_or_easy":
       return "steady_or_easy";
@@ -663,14 +806,6 @@ function normalizeV2WorkoutType(
     default:
       return "easy";
   }
-}
-
-function buildLegacyNotes(details: string, target: string | null) {
-  if (!target) {
-    return details;
-  }
-
-  return `${details} · Target: ${target}`;
 }
 
 function buildV2Notes(workout: TrainingPlanV2["planned_workouts"][number]) {
@@ -682,96 +817,9 @@ function buildV2Notes(workout: TrainingPlanV2["planned_workouts"][number]) {
   return workout.summary;
 }
 
-function buildLegacySteps(
-  workoutType: WorkoutType,
-  details: string,
-  target: string | null,
-): Step[] {
-  if (workoutType === "rest") {
-    return [];
-  }
-
-  const targetPayload = parseLegacyTarget(target);
-  const intervalMatch = details.match(/(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*(m|km)/i);
-
-  if (intervalMatch) {
-    const repeats = Number(intervalMatch[1]);
-    const workDistanceKm = normalizeDistance(Number(intervalMatch[2]), intervalMatch[3]);
-    const targetPayload = parseLegacyTarget(target);
-    const prescription: StepPrescription = {
-      mode: "repeats",
-      repeat_count: repeats,
-      repeat_unit: {
-        mode: "distance",
-        distance_km: workDistanceKm,
-      },
-      recovery_unit: {
-        mode: "none",
-      },
-    };
-
-    return [
-      {
-        segment_id: "legacy-segment-1",
-        segment_type: "interval_block",
-        sequence: 1,
-        label: details,
-        prescription,
-        type: "intervals",
-        repeats,
-        work: {
-          type: "work",
-          distance_km: workDistanceKm,
-          prescription: prescription.repeat_unit,
-          ...(targetPayload ? { target: targetPayload } : {}),
-        },
-        recovery: {
-          type: "recovery",
-          prescription: prescription.recovery_unit,
-        },
-      },
-    ];
-  }
-
-  const distanceMatch = details.match(/(\d+(?:\.\d+)?)\s*km/i);
-  const durationMatch = details.match(/(\d+(?:\.\d+)?)\s*min/i);
-  const stepType = workoutType === "quality" ? "run" : "run";
-  const segmentType = workoutType === "quality" ? "main" : "main";
-  const prescription = durationMatch
-    ? ({
-        mode: "time",
-        duration_min: Number(durationMatch[1]),
-      } satisfies StepPrescription)
-    : distanceMatch
-      ? ({
-          mode: "distance",
-          distance_km: Number(distanceMatch[1]),
-        } satisfies StepPrescription)
-      : undefined;
-
-  return [
-    {
-      segment_id: "legacy-segment-1",
-      segment_type: segmentType,
-      sequence: 1,
-      label: details,
-      ...(prescription ? { prescription } : {}),
-      type: stepType,
-      ...(distanceMatch ? { distance_km: Number(distanceMatch[1]) } : {}),
-      ...(durationMatch ? { duration_min: Number(durationMatch[1]) } : {}),
-      ...(targetPayload ? { target: targetPayload } : {}),
-    },
-  ];
-}
-
 function normalizeV2Segments(
   segments: TrainingPlanV2["planned_workouts"][number]["segments"],
-  workoutType: WorkoutType,
 ): Step[] {
-  if (workoutType === "rest") {
-    return [];
-  }
-
   return segments.flatMap((segment, index) => {
     if (segment.segment_type === "rest") {
       return [];
@@ -791,7 +839,14 @@ function normalizeV2Segment(
   const label = segment.label ?? buildDefaultSegmentLabel(segment.segment_type, sequence);
   const prescription = buildSegmentPrescription(segment);
 
-  if (segment.segment_type === "interval_block") {
+  if (
+    segment.segment_type === "interval_block" ||
+    segment.segment_type === "strides" ||
+    (segment.segment_type === "tempo_block" && prescription.mode === "repeats")
+  ) {
+    const recoveryTarget = normalizeSegmentTarget(segment.recovery_target);
+    const repeatedType = segment.segment_type === "tempo_block" ? "tempo" : "intervals";
+
     return {
       segment_id: segmentId,
       segment_type: segment.segment_type,
@@ -799,7 +854,7 @@ function normalizeV2Segment(
       label,
       guidance,
       prescription,
-      type: "intervals",
+      type: repeatedType,
       repeats: prescription.repeat_count,
       work: {
         type: "work",
@@ -820,9 +875,7 @@ function normalizeV2Segment(
         ...(prescription.recovery_unit?.duration_min
           ? { duration_min: prescription.recovery_unit.duration_min }
           : {}),
-        ...(normalizeSegmentTarget(segment.recovery_target)
-          ? { target: normalizeSegmentTarget(segment.recovery_target) }
-          : {}),
+        ...(recoveryTarget ? { target: recoveryTarget } : {}),
         ...(prescription.recovery_unit ? { prescription: prescription.recovery_unit } : {}),
       },
     };
@@ -866,7 +919,23 @@ function buildSegmentPrescription(
     };
   }
 
-  if (segment.segment_type === "interval_block") {
+  if (
+    segment.segment_type === "interval_block" ||
+    segment.segment_type === "strides" ||
+    (segment.segment_type === "tempo_block" && segment.repeat_count)
+  ) {
+    const workDurationMin =
+      segment.work_duration_min ??
+      (segment.work_duration_sec
+        ? Number((segment.work_duration_sec / 60).toFixed(2))
+        : undefined) ??
+      segment.duration_min;
+    const recoveryDurationMin =
+      segment.recovery_duration_min ??
+      (segment.recovery_duration_sec
+        ? Number((segment.recovery_duration_sec / 60).toFixed(2))
+        : undefined);
+
     return {
       mode: "repeats",
       repeat_count: segment.repeat_count,
@@ -877,10 +946,10 @@ function buildSegmentPrescription(
           }
         : {
             mode: "time",
-            duration_min: segment.duration_min,
+            duration_min: workDurationMin,
           },
       recovery_unit:
-        segment.recovery_duration_min || segment.recovery_distance_km
+        recoveryDurationMin || segment.recovery_distance_km
           ? segment.recovery_distance_km
             ? {
                 mode: "distance",
@@ -888,7 +957,7 @@ function buildSegmentPrescription(
               }
             : {
                 mode: "time",
-                duration_min: segment.recovery_duration_min,
+                duration_min: recoveryDurationMin,
               }
           : {
               mode: "none",
@@ -896,7 +965,7 @@ function buildSegmentPrescription(
     };
   }
 
-  if (segment.segment_type === "rest") {
+  if (segment.segment_type === "rest" || segment.segment_type === "fueling") {
     return {
       mode: "none",
     };
@@ -938,9 +1007,20 @@ function normalizeSegmentTarget(
     return undefined;
   }
 
-  const extra: Record<string, string | number> = {
-    ...(target.extra ?? {}),
-  };
+  const extra: Record<string, string | number> = {};
+
+  for (const [key, value] of Object.entries(target.extra ?? {})) {
+    if (
+      key === "hr_bpm" ||
+      key === "hr_bpm_range" ||
+      key === "pace_range_min_km" ||
+      key === "pace_min_per_km_range"
+    ) {
+      continue;
+    }
+
+    extra[key] = value;
+  }
 
   for (const [key, value] of Object.entries(target)) {
     if (
@@ -977,13 +1057,8 @@ function normalizeSegmentTarget(
 
   return {
     ...(typeof target.intensity === "string" ? { intensity: target.intensity } : {}),
-    ...(hrRange ? { hr_bpm_range: hrRange, hr_bpm: hrRange } : {}),
-    ...(paceRange
-      ? {
-          pace_min_per_km_range: paceRange,
-          pace_range_min_km: paceRange,
-        }
-      : {}),
+    ...(hrRange ? { hr_bpm_range: hrRange } : {}),
+    ...(paceRange ? { pace_min_per_km_range: paceRange } : {}),
     ...(typeof target.pace === "string" ? { pace: target.pace } : {}),
     ...(typeof target.rpe === "string" || typeof target.rpe === "number"
       ? { rpe: target.rpe }
@@ -1023,6 +1098,12 @@ function mapSegmentTypeToStepType(segmentType: string) {
       return "tempo";
     case "main":
       return "run";
+    case "activation":
+    case "drills":
+    case "mobility_optional":
+      return "mobility";
+    case "recovery_jog":
+      return "recovery";
     default:
       return segmentType;
   }
@@ -1042,8 +1123,20 @@ function buildDefaultSegmentLabel(segmentType: string, sequence: number) {
       return "Rest";
     case "mobility":
       return "Mobility";
+    case "mobility_optional":
+      return "Optional mobility";
     case "strength":
       return "Strength";
+    case "activation":
+      return "Activation";
+    case "drills":
+      return "Drills";
+    case "strides":
+      return "Strides";
+    case "recovery_jog":
+      return "Recovery jog";
+    case "fueling":
+      return "Fueling";
     case "tempo_block":
       return "Tempo";
     case "interval_block":
@@ -1051,25 +1144,6 @@ function buildDefaultSegmentLabel(segmentType: string, sequence: number) {
     default:
       return `Segment ${sequence}`;
   }
-}
-
-function parseLegacyTarget(target: string | null) {
-  if (!target) {
-    return undefined;
-  }
-
-  const hrMatch = target.match(/HR\s*(\d{2,3})\s*-\s*(\d{2,3})/i);
-
-  if (hrMatch) {
-    return {
-      hr_bpm_range: `${hrMatch[1]}-${hrMatch[2]}`,
-      hr_bpm: `${hrMatch[1]}-${hrMatch[2]}`,
-    };
-  }
-
-  return {
-    cue: target,
-  };
 }
 
 function estimateDistanceKm(steps: Step[], workoutType: WorkoutType) {
@@ -1128,11 +1202,7 @@ function paceMinutesPerKm(workoutType: WorkoutType) {
   return paceMap[workoutType];
 }
 
-function normalizeDistance(distance: number, unit: string) {
-  return unit.toLowerCase() === "km" ? distance : Number((distance / 1000).toFixed(3));
-}
-
-function isV2ImportCandidate(value: unknown): value is { schema_version: string } {
+function isTrainingPlanV2ImportCandidate(value: unknown): value is { schema_version: string } {
   return Boolean(
     value &&
     typeof value === "object" &&
@@ -1141,6 +1211,19 @@ function isV2ImportCandidate(value: unknown): value is { schema_version: string 
   );
 }
 
-export function isTrainingPlanV2(plan: ImportedPlan): plan is TrainingPlanV2 {
-  return "schema_version" in plan && plan.schema_version === FUTURE_TEMPLATE_VERSION;
+function looksLikeRemovedLegacyImport(value: unknown): value is {
+  plan_name?: unknown;
+  generated_for?: unknown;
+  start_date?: unknown;
+  week_1_preview?: unknown;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  return (
+    "week_1_preview" in value ||
+    (!isTrainingPlanV2ImportCandidate(value) &&
+      ("plan_name" in value || "generated_for" in value || "start_date" in value))
+  );
 }

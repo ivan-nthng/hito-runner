@@ -1,20 +1,16 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { buildImportedPlanSeed } from "./lib/imported-plan-seed.mjs";
 
-const PLAN_PATH =
-  process.argv[2] ?? "/Users/ivan/Desktop/corrected_half_marathon_start_2026-05-05.json";
+const PLAN_PATH = process.argv[2] ?? "/Users/ivan/Downloads/ivan_complete_half_marathon_plan.json";
+const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 
 const supabaseUrl = readEnv("NEXT_PUBLIC_SUPABASE_URL");
-const supabaseServerKey = readEnv("SUPABASE_SECRET_KEY") ?? readEnv("SUPABASE_SERVICE_ROLE_KEY");
-const localUserId = readEnv("LOCAL_AUTH_BYPASS_USER_ID") ?? "11111111-1111-4111-8111-111111111111";
-const localUsername = readEnv("LOCAL_AUTH_BYPASS_IDENTIFIER") ?? "ivan";
-const localEmail = readEnv("LOCAL_AUTH_BYPASS_EMAIL") ?? "ivan@local.test";
+const supabaseServerKey = readEnv("SUPABASE_SECRET_KEY");
 
 if (!supabaseUrl || !supabaseServerKey) {
-  throw new Error(
-    "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY/SUPABASE_SERVICE_ROLE_KEY for the plan import.",
-  );
+  throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY for the plan import.");
 }
 
 const supabase = createClient(supabaseUrl, supabaseServerKey, {
@@ -26,12 +22,13 @@ const supabase = createClient(supabaseUrl, supabaseServerKey, {
 
 const plan = JSON.parse(await readFile(PLAN_PATH, "utf8"));
 const importedSeed = buildImportedPlanSeed(plan);
+const localAccount = await loadCanonicalLocalBypassAccount();
 const supabaseUserId = await ensureLocalBypassSupabaseUser({
-  email: localEmail,
-  displayName: humanizeUsername(localUsername),
-  role: localUsername === "ivan" ? "admin" : "tester",
-  userId: localUserId,
-  username: localUsername,
+  email: localAccount.email,
+  displayName: localAccount.displayName,
+  role: localAccount.role,
+  userId: localAccount.userId,
+  username: localAccount.username,
 });
 
 const profileUpsert = await supabase
@@ -70,8 +67,13 @@ const planInsert = await supabase
     title: importedSeed.title,
     goal_summary: importedSeed.goalSummary,
     source_template: importedSeed.sourceTemplate,
+    schema_version: importedSeed.schemaVersion,
+    source_kind: importedSeed.sourceKind,
     start_date: importedSeed.startDate,
     end_date: importedSeed.endDate,
+    target_date: importedSeed.targetDate,
+    goal_metadata: importedSeed.goalMetadata,
+    plan_preferences: importedSeed.planPreferences,
   })
   .select("id, title, start_date, end_date")
   .single();
@@ -88,8 +90,13 @@ const workouts = importedSeed.workouts.map((workout) => ({
   week_number: workout.weekNumber,
   phase: workout.phase,
   workout_type: workout.workoutType,
+  source_workout_id: workout.sourceWorkoutId,
+  source_workout_type: workout.sourceWorkoutType,
   title: workout.title,
   notes: workout.notes,
+  planned_rpe: workout.plannedRpe,
+  estimated_fatigue: workout.estimatedFatigue,
+  recovery_priority: workout.recoveryPriority,
   steps: workout.steps,
   display_order: workout.displayOrder,
 }));
@@ -114,7 +121,7 @@ console.log(
     {
       ok: true,
       planPath: PLAN_PATH,
-      localUserId,
+      localUserId: localAccount.userId,
       supabaseUserId,
       activePlanId: planInsert.data.id,
       workoutCount: verifyPlan.count ?? 0,
@@ -126,6 +133,22 @@ console.log(
     2,
   ),
 );
+
+async function loadCanonicalLocalBypassAccount() {
+  const accountsFilePath = readEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE") ?? DEFAULT_ACCOUNTS_FILE;
+  const fileContents = await readFile(accountsFilePath, "utf8");
+  const parsed = JSON.parse(fileContents);
+  const rawAccounts = Array.isArray(parsed) ? parsed : (parsed.accounts ?? []);
+
+  if (!Array.isArray(rawAccounts) || rawAccounts.length === 0) {
+    throw new Error(
+      `No local bypass accounts found in ${accountsFilePath}. Create one with npm run test-user or update LOCAL_AUTH_BYPASS_ACCOUNTS_FILE.`,
+    );
+  }
+
+  const normalizedAccounts = rawAccounts.map(normalizeLocalAccount);
+  return normalizedAccounts.find((account) => account.role === "admin") ?? normalizedAccounts[0];
+}
 
 async function ensureLocalBypassSupabaseUser(config) {
   const existingUser = await findAuthUserByEmail(config.email);
@@ -188,6 +211,34 @@ async function findAuthUserByEmail(email) {
 function readEnv(name) {
   const value = process.env[name];
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeLocalAccount(account) {
+  const username = String(account.username ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!username) {
+    throw new Error("Local bypass accounts file must include username for each account.");
+  }
+
+  return {
+    username,
+    email: String(account.email ?? `${username}@local.test`)
+      .trim()
+      .toLowerCase(),
+    userId: String(account.userId ?? deriveUserId(username)).trim(),
+    role: account.role === "admin" ? "admin" : "tester",
+    displayName: String(account.displayName ?? humanizeUsername(username)).trim(),
+  };
+}
+
+function deriveUserId(username) {
+  const hash = createHash("sha256").update(username).digest("hex");
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(
+    17,
+    20,
+  )}-${hash.slice(20, 32)}`;
 }
 
 function humanizeUsername(username) {

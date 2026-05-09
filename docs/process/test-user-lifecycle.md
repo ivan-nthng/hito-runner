@@ -116,7 +116,6 @@ What reset removes:
 - all `public.planned_workouts` rows through cascade
 - all `public.workout_logs` rows through cascade
 - the user&apos;s `public.runner_profiles` row
-- the user&apos;s local fallback state file when one exists
 
 What reset preserves:
 
@@ -128,7 +127,6 @@ What reset preserves:
 Meaning in this repo:
 
 - remove the local credentials account entry
-- remove the local fallback state file
 - hard-delete the Supabase auth user
 - rely on `auth.users -> public.*` cascade cleanup for persisted plan and log data
 
@@ -148,7 +146,6 @@ What delete removes:
 - `public.planned_workouts` through cascade
 - `public.workout_logs` through cascade
 - the local credentials account entry
-- the local fallback state file when one exists
 
 What delete preserves:
 
@@ -165,7 +162,6 @@ Backend must verify all of the following before running delete:
 
 The script itself refuses to reset or delete:
 
-- the protected primary email from local auth env
 - local accounts marked as `admin`
 
 ## Local Credentials Path

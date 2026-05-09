@@ -23,18 +23,6 @@ function readEnv(name: string): string | null {
   return value.trim();
 }
 
-function requireEnv(...names: string[]): string {
-  for (const name of names) {
-    const value = readEnv(name);
-
-    if (value) {
-      return value;
-    }
-  }
-
-  throw new Error(`Missing required environment variable: ${names.join(" or ")}`);
-}
-
 function envOrFallback(names: string | string[], fallback: string): string {
   const envNames = Array.isArray(names) ? names : [names];
 
@@ -61,29 +49,23 @@ function optionalEnv(...names: string[]): string | null {
   return null;
 }
 
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
 export const publicEnv = {
-  appName: envOrFallback(["NEXT_PUBLIC_APP_NAME", "VITE_APP_NAME"], "Hito Running"),
-  supabaseUrl: optionalEnv("NEXT_PUBLIC_SUPABASE_URL", "VITE_SUPABASE_URL"),
-  supabasePublishableKey: optionalEnv(
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-    "VITE_SUPABASE_ANON_KEY",
-  ),
+  appName: envOrFallback("NEXT_PUBLIC_APP_NAME", "Hito Running"),
+  supabaseUrl: optionalEnv("NEXT_PUBLIC_SUPABASE_URL"),
+  supabasePublishableKey: optionalEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
 };
 
 export const serverEnv = {
   appBaseUrl: optionalEnv("APP_BASE_URL"),
-  supabaseServiceRoleKey: optionalEnv("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"),
+  supabaseServiceRoleKey: optionalEnv("SUPABASE_SECRET_KEY"),
   openAiApiKey: optionalEnv("OPENAI_API_KEY"),
   openAiPlanModel: optionalEnv("OPENAI_PLAN_MODEL"),
   localAuthBypassEnabled:
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED")?.toLowerCase() === "true" ||
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED") === "1",
   localAuthBypassAccountsFile: optionalEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE"),
-  localAuthBypassIdentifier: optionalEnv("LOCAL_AUTH_BYPASS_IDENTIFIER"),
-  localAuthBypassPassword: optionalEnv("LOCAL_AUTH_BYPASS_PASSWORD"),
-  localAuthBypassEmail: optionalEnv("LOCAL_AUTH_BYPASS_EMAIL"),
-  localAuthBypassUserId: optionalEnv("LOCAL_AUTH_BYPASS_USER_ID"),
-  localAuthBypassStatePath: optionalEnv("LOCAL_AUTH_BYPASS_STATE_PATH"),
 };
 
 export const hasSupabaseBrowserEnv = Boolean(
@@ -95,7 +77,22 @@ export const hasSupabaseServerEnv = Boolean(
 );
 
 export const hasLocalAuthBypassEnv = Boolean(
-  serverEnv.localAuthBypassEnabled &&
-  (serverEnv.localAuthBypassAccountsFile ||
-    (serverEnv.localAuthBypassIdentifier && serverEnv.localAuthBypassPassword)),
+  serverEnv.localAuthBypassEnabled && serverEnv.localAuthBypassAccountsFile,
 );
+
+export function isLoopbackRuntimeUrl(url: string | URL | null | undefined) {
+  if (!url) {
+    return false;
+  }
+
+  try {
+    const parsed = url instanceof URL ? url : new URL(url);
+    return LOOPBACK_HOSTNAMES.has(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+export function isDevOnlyLocalAuthRuntime(url: string | URL | null | undefined) {
+  return hasLocalAuthBypassEnv && isLoopbackRuntimeUrl(url);
+}

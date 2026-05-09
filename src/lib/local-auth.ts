@@ -1,11 +1,8 @@
 import { parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
 import { z } from "zod";
-import { serverEnv } from "@/lib/supabase/env";
+import { isDevOnlyLocalAuthRuntime, serverEnv } from "@/lib/supabase/env";
 
 const LOCAL_AUTH_COOKIE = "hito_local_auth_session";
-const DEFAULT_LEGACY_EMAIL = "ivan@local.test";
-const DEFAULT_LEGACY_USER_ID = "11111111-1111-4111-8111-111111111111";
-const DEFAULT_LEGACY_STATE_PATH = ".tanstack/hito-running-local-auth.json";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 const localAuthAccountSchema = z.object({
@@ -15,7 +12,6 @@ const localAuthAccountSchema = z.object({
   userId: z.string().uuid().optional(),
   role: z.enum(["admin", "tester"]).optional(),
   displayName: z.string().trim().min(1).optional(),
-  statePath: z.string().trim().min(1).optional(),
 });
 
 const localAuthAccountsSchema = z.union([
@@ -32,7 +28,6 @@ export interface LocalAuthAccountConfig {
   userId: string;
   role: "admin" | "tester";
   displayName: string;
-  statePath: string;
 }
 
 export interface LocalAuthSession {
@@ -40,39 +35,16 @@ export interface LocalAuthSession {
   email: string;
 }
 
-export interface LocalAuthAccountSummary {
-  username: string;
-  email: string;
-  role: "admin" | "tester";
-  displayName: string;
-}
-
 export async function getLocalAuthAccounts(): Promise<LocalAuthAccountConfig[]> {
-  if (!serverEnv.localAuthBypassEnabled) {
+  if (!serverEnv.localAuthBypassEnabled || !serverEnv.localAuthBypassAccountsFile) {
     return [];
   }
 
-  if (serverEnv.localAuthBypassAccountsFile) {
-    try {
-      return await readAccountsFile(serverEnv.localAuthBypassAccountsFile);
-    } catch {
-      return [];
-    }
+  try {
+    return await readAccountsFile(serverEnv.localAuthBypassAccountsFile);
+  } catch {
+    return [];
   }
-
-  const legacyAccount = await buildLegacyAccount();
-  return legacyAccount ? [legacyAccount] : [];
-}
-
-export async function getLocalAuthAccountSummaries(): Promise<LocalAuthAccountSummary[]> {
-  const accounts = await getLocalAuthAccounts();
-
-  return accounts.map((account) => ({
-    username: account.username,
-    email: account.email,
-    role: account.role,
-    displayName: account.displayName,
-  }));
 }
 
 export async function isLocalAuthBypassEnabled() {
@@ -86,6 +58,10 @@ export async function findLocalAuthAccountByUserId(userId: string) {
 }
 
 export async function resolveLocalAuthSession(request: Request): Promise<LocalAuthSession | null> {
+  if (!isDevOnlyLocalAuthRuntime(request.url)) {
+    return null;
+  }
+
   const accounts = await getLocalAuthAccounts();
 
   if (accounts.length === 0) {
@@ -113,7 +89,15 @@ export async function resolveLocalAuthSession(request: Request): Promise<LocalAu
   return null;
 }
 
-export async function verifyLocalAuthCredentials(identifier: string, password: string) {
+export async function verifyLocalAuthCredentials(
+  identifier: string,
+  password: string,
+  requestUrl: string | URL,
+) {
+  if (!isDevOnlyLocalAuthRuntime(requestUrl)) {
+    return { ok: false as const, reason: "unavailable" as const };
+  }
+
   const accounts = await getLocalAuthAccounts();
 
   if (accounts.length === 0) {
@@ -172,38 +156,17 @@ export function clearLocalAuthSessionCookie(headers: Headers, request: Request) 
   );
 }
 
-async function buildLegacyAccount(): Promise<LocalAuthAccountConfig | null> {
-  if (!serverEnv.localAuthBypassIdentifier || !serverEnv.localAuthBypassPassword) {
-    return null;
-  }
-
-  const username = normalizeUsername(serverEnv.localAuthBypassIdentifier);
-
-  return {
-    username,
-    password: serverEnv.localAuthBypassPassword,
-    email: serverEnv.localAuthBypassEmail ?? DEFAULT_LEGACY_EMAIL,
-    userId: serverEnv.localAuthBypassUserId ?? DEFAULT_LEGACY_USER_ID,
-    role: "admin",
-    displayName: humanizeUsername(username),
-    statePath: serverEnv.localAuthBypassStatePath ?? DEFAULT_LEGACY_STATE_PATH,
-  };
-}
-
 async function readAccountsFile(filePath: string) {
   const { readFile } = await import("node:fs/promises");
   const fileContents = await readFile(filePath, "utf8");
   const parsed = localAuthAccountsSchema.parse(JSON.parse(fileContents));
   const rawAccounts = Array.isArray(parsed) ? parsed : parsed.accounts;
 
-  return await Promise.all(
-    rawAccounts.map(async (account) => normalizeAccount(account, { source: "file" })),
-  );
+  return await Promise.all(rawAccounts.map(async (account) => normalizeAccount(account)));
 }
 
 async function normalizeAccount(
   account: z.infer<typeof localAuthAccountSchema>,
-  options: { source: "file" | "legacy" },
 ): Promise<LocalAuthAccountConfig> {
   const username = normalizeUsername(account.username);
   const email = account.email?.trim().toLowerCase() ?? `${username}@local.test`;
@@ -215,11 +178,6 @@ async function normalizeAccount(
     userId: account.userId ?? (await deriveUserId(username)),
     role: account.role ?? (username === "ivan" ? "admin" : "tester"),
     displayName: account.displayName?.trim() ?? humanizeUsername(username),
-    statePath:
-      account.statePath?.trim() ??
-      (options.source === "legacy"
-        ? DEFAULT_LEGACY_STATE_PATH
-        : `.tanstack/hito-running-local-auth-${slugify(username)}.json`),
   };
 }
 
@@ -243,10 +201,6 @@ async function deriveUserId(username: string) {
 
 function normalizeUsername(value: string) {
   return value.trim().toLowerCase();
-}
-
-function slugify(value: string) {
-  return value.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "user";
 }
 
 function humanizeUsername(username: string) {

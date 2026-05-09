@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-07
+2026-05-09
 
 ## Where We Are Now
 
@@ -22,49 +22,65 @@ Active
   the linked project contains the base persisted schema, the current JSON week is imported as the active canonical plan, and saved-mode SSR now resolves `/progress` and `/workout/$date` from Supabase.
 - A practical tester-account lifecycle tool is now implemented:
   Backend can create a tester, reset that tester back to onboarding, optionally reseed plan data, and delete the tester through one canonical CLI path documented in `docs/process/test-user-lifecycle.md`.
-- Phase 3 mock-seam replacement is implemented through one canonical backend contract.
+- Phase 3 architecture cleanup is now implemented through one canonical persisted richer-plan contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
-- The unauthenticated root flow is now login-first, and first-time onboarding is now text-first against the live OpenAI authoring seam, with JSON import kept as a secondary advanced path.
+- The production-facing local auth legacy cleanup slice is now implemented:
+  deploy-visible login now exposes only the real email auth path, while the temporary local credentials bypass remains available only on loopback local runtimes for development.
+- The final Phase 5 legacy-removal slice is now implemented:
+  deprecated `week_1_preview[]` import support has been removed from the active runtime, CLI tooling, and visible import contract, so `training-plan-v2` is now the only remaining supported plan-import format.
+- The first actual deletion slice from the final Phase 5 plan is now implemented:
+  `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` have been removed from the active runtime and CLI env contract, so public Supabase browser config now resolves only from `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- The second actual deletion slice from the final Phase 5 plan is now implemented:
+  `SUPABASE_SERVICE_ROLE_KEY` has been removed from the active runtime and CLI env contract, so server-side Supabase admin/write access now resolves only from `SUPABASE_SECRET_KEY`.
+- The third actual deletion slice from the final Phase 5 plan is now implemented:
+  deprecated single-account local auth env support has been removed from the active runtime and local tooling, so loopback local bypass now resolves only through `LOCAL_AUTH_BYPASS_ENABLED=true` plus `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE=...`.
+- The unauthenticated root flow is now login-first, and first-time onboarding is now text-first against the live OpenAI authoring seam, with JSON import visibly demoted to an advanced file-based fallback.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
 - Home/calendar now resolve `today` from the real runtime local date and default the planning surface to that day instead of a frozen demo date.
 - The saved-mode home/calendar page now keeps the main `Today` card intact, uses one grouped support card on the right, removes the lower metadata strip, and marks completed calendar days more clearly.
 - Saved-mode shell navigation back to `/` now uses a fresh home request, and the `Tomorrow` summary no longer falls through to broken `nullkm · 0′` placeholders for interval-style workouts.
-- The profile/sidebar area now shows the runner name plus active plan title, removes duplicate top-level sign-out, and owns a lightweight saved-mode `Upload JSON` entry path.
+- The profile/sidebar area now shows the runner name plus active plan title, removes duplicate top-level sign-out, and owns a lightweight saved-mode advanced import entry path.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.
 - The first workout-page refinement pass is now implemented:
   the three-block page structure remains intact, saved result states now surface as check, dash, or cross markers near workout identity and in the right-side context, `Week Status` is progress-driven, and the log-result notes area now reserves an honest `Upload result` placeholder seam.
 - The remaining upload-flow/template UI slice is now implemented:
-  the saved-mode `Upload JSON` flow now accepts both the legacy `week_1_preview[]` import and the first supported `training-plan-v2` import, normalizes both into the same canonical persisted plan seam, and ignores runtime-only v2 fields that do not belong in plan truth.
-  The same flow still includes a real `Download template` affordance for structured `training-plan-v2` authoring.
-- The current first `training-plan-v2` slice keeps `plan_cycles` plus `planned_workouts` as the core storage model, writes richer segment structure into `planned_workouts.steps jsonb`, and deliberately defers import-batch provenance plus editability-oriented schema expansion to a later phase.
-- The next contract-alignment slice is now implemented:
-  persisted `steps jsonb` keeps canonical segment metadata and bounded prescription structure, including stable `segment_id`, canonical target keys, and one repeat-unit DSL that covers both interval-by-distance and interval-by-time without creating a second runtime path.
+  the saved-mode advanced import flow now accepts only canonical `training-plan-v2` JSON while still normalizing that contract into the same canonical persisted plan seam and ignoring runtime-only v2 fields that do not belong in plan truth.
+  The same flow still includes a real `Download JSON template` affordance for file-based plan handoff.
+- The current `training-plan-v2` runtime still keeps `plan_cycles` plus `planned_workouts` as the only canonical storage model, writes richer segment structure into `planned_workouts.steps jsonb`, and still deliberately defers import-batch provenance plus editability-oriented schema expansion to a later phase.
+- The current Phase 3 cleanup slice is now implemented:
+  persisted plan truth now preserves `schema_version`, `source_kind`, `target_date`, goal metadata, plan preferences, source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority through the same canonical Supabase rows used by JSON import, structured authoring, and OpenAI text authoring.
+  New writes now persist canonical target keys only, while legacy target aliases remain read-compatible for older rows instead of being written again.
+- The first post-Phase-3 correction pass is now implemented:
+  richer `training-plan-v2` normalization now accepts the live fuller segment DSL used by the richer reference files, workout-detail target shaping no longer leaks opaque structured metadata into `[object Object]`, and richer imported interval workouts no longer collapse into misleading visible easy-run identity.
 - The first structured plan-authoring backend slice is now implemented:
   the service accepts one bounded structured input contract, normalizes it server-side, generates canonical `training-plan-v2` plan data, and persists that plan through the same Supabase `plan_cycles` plus `planned_workouts` seam already used by JSON import.
   That bounded contract remains a backend and ops asset behind the visible text-first onboarding UI, and Backend plus ops can still validate and persist generated structured plans through `npm run author-structured-plan -- --email <tester-email> --input-file <absolute-json-path>`.
 - The first OpenAI-backed text-to-plan backend slice is now implemented:
   the service accepts one bounded free-text request, asks OpenAI for structured authoring input, validates that model output deterministically, and persists only the resulting canonical `training-plan-v2` plan through the same Supabase seam already used by JSON import and structured authoring.
   The visible onboarding UI is now wired to this path, and local live validation is green with a working `OPENAI_API_KEY`.
+- The Phase 4 frontend cleanup slice is now implemented:
+  visible no-plan and shell surfaces present text-first plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
 - The remaining first-pass v2 rendering-truth gaps are now fixed:
   distance-based interval reps no longer invent minute-based per-rep UI,
   tempo workouts now render with a tempo-specific visible identity on home and workout detail,
   and visible distance totals now round consistently instead of leaking floating precision.
-- Saved-mode `Upload JSON` replacement now has a continuity guard:
+- Saved-mode advanced import replacement now has a continuity guard:
   logged workout history is carried forward only for exact deterministic matches on logged dates, and unsafe replacements are rejected instead of silently resetting visible progress.
   Older broken replacements that already stranded logs on archived copies of the same plan window are now repaired back onto the active plan before saved-mode reads and replacement checks run.
 - The Cloudflare-oriented build shape has been replaced with a Vercel-compatible Nitro deployment path.
-- The repo now contains one TanStack Start runtime with preserved imported route structure, stable preview mode, authenticated saved mode backed by Supabase when full env/project setup is available, and a temporary local account-backed bypass path for immediate local use.
+- The repo now contains one TanStack Start runtime with preserved imported route structure, stable preview mode, authenticated saved mode backed by Supabase, and a temporary local account-backed bypass path for immediate local use.
 
 ## Current Active Stream
 
-QA handoff for validating the new visible text-first onboarding surface on top of the now-validated OpenAI-backed authoring seam, while local auth remains the temporary entry path.
+Phase 3 cleanup follow-up after the first architecture refactor slices:
+authenticated saved mode no longer uses either the temporary local persisted store or preview-derived saved-plan bootstrap, and richer canonical plan semantics now persist explicitly through the same Supabase runtime model without reintroducing split truth.
 
 ## Next Recommended Steps
 
-1. QA + validate the visible free-text authoring flow end to end alongside the existing structured-input and JSON fallback paths.
-2. BACKEND + remove the temporary local fallback store after the Supabase-backed path is considered stable enough to be the only saved-mode source for local testing.
-3. FRONTEND + continue small text-authoring polish only if QA finds clarity gaps, without expanding into a wizard.
+1. QA + validate the visible free-text authoring flow end to end alongside the demoted advanced JSON fallback, with emphasis on richer-plan route rendering and replacement continuity.
+2. QA + verify that no-plan accounts read as one text-first product path in Safari and that advanced import remains discoverable without competing with onboarding.
+3. QA + run one final Safari canonical-only advanced-import pass, then archive the completed Phase 5 legacy-removal track and plan any later full local-bypass deletion separately.
 
 ## Canonical References
 

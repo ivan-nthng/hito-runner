@@ -93,7 +93,7 @@ export function OnboardingGate() {
         <div className="grid gap-4">
           <p className="max-w-2xl text-sm leading-relaxed text-foreground/85">
             Mention the goal, time horizon, current level, recent results, and any constraints that
-            matter.
+            should shape the plan.
           </p>
 
           <label className="grid gap-2">
@@ -129,7 +129,7 @@ export function OnboardingGate() {
                   : "Build my first plan"}
             </button>
             <span className="text-[11px] text-muted-foreground">
-              One compact request is enough for the first plan.
+              One compact request is enough to start.
             </span>
           </div>
 
@@ -149,11 +149,12 @@ export function OnboardingGate() {
         >
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Advanced path
+              Advanced import
             </div>
-            <div className="mt-1 text-sm text-foreground/90">Upload JSON instead</div>
+            <div className="mt-1 text-sm text-foreground/90">Use a JSON plan file</div>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Keep this for existing plan artifacts, migration, or testing.
+              For existing `training-plan-v2` Hito plan files, migration, or testing. Most runners
+              should describe the plan above.
             </p>
           </div>
           <ChevronDown
@@ -205,7 +206,7 @@ export function OnboardingGate() {
                   className="inline-flex items-center gap-2 rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   <Upload className="h-4 w-4" />
-                  {selectedFileName ? "Choose another JSON" : "Upload JSON"}
+                  {selectedFileName ? "Choose another file" : "Upload JSON"}
                 </button>
                 <a
                   href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
@@ -213,7 +214,7 @@ export function OnboardingGate() {
                   className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-accent"
                 >
                   <Download className="h-4 w-4 text-signal" />
-                  Download template
+                  Download JSON template
                 </a>
                 {selectedFileName && (
                   <span className="text-sm text-muted-foreground">{selectedFileName}</span>
@@ -233,7 +234,7 @@ export function OnboardingGate() {
                     setFieldErrors([]);
                     setJsonError(null);
                   }}
-                  placeholder='{"plan_name":"...","generated_for":"...","start_date":"...","week_1_preview":[...]} or {"schema_version":"training-plan-v2",...}'
+                  placeholder='{"schema_version":"training-plan-v2","plan_name":"...","generated_for":"...","start_date":"...","planned_workouts":[...]}'
                   className="rounded-lg border border-hairline bg-background/50 px-4 py-3 font-mono text-xs leading-relaxed placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
                 />
               </label>
@@ -248,14 +249,17 @@ export function OnboardingGate() {
                   Validate JSON
                 </button>
                 <span className="text-[11px] text-muted-foreground">
-                  Keep this as the fallback path.
+                  Advanced import requires the canonical `training-plan-v2` contract.
                 </span>
               </div>
 
               {importedSummary && (
-                <p className="text-sm leading-relaxed text-foreground/85">
-                  Ready to import: {importedSummary.days} days, {importedSummary.workouts} workouts.
-                </p>
+                <div className="space-y-1">
+                  <p className="text-sm leading-relaxed text-foreground/85">
+                    Ready to import: {importedSummary.days} days, {importedSummary.workouts}{" "}
+                    workouts from {importedSummary.contractLabel}.
+                  </p>
+                </div>
               )}
 
               {fieldErrors.length > 0 && (
@@ -308,9 +312,11 @@ export function OnboardingGate() {
                       ? "Importing plan..."
                       : jsonStatus === "finishing"
                         ? "Opening your plan..."
-                        : "Import JSON instead"}
+                        : "Apply JSON plan"}
                 </button>
-                <span className="text-[11px] text-muted-foreground">Advanced fallback only.</span>
+                <span className="text-[11px] text-muted-foreground">
+                  This does not replace the text-first setup path.
+                </span>
               </div>
             </div>
           </div>

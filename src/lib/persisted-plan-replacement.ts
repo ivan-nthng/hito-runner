@@ -18,8 +18,13 @@ export function buildPersistedWorkoutInsertRows(
     week_number: workout.weekNumber,
     phase: workout.phase,
     workout_type: workout.workoutType,
+    source_workout_id: workout.sourceWorkoutId,
+    source_workout_type: workout.sourceWorkoutType,
     title: workout.title,
     notes: workout.notes,
+    planned_rpe: workout.plannedRpe,
+    estimated_fatigue: workout.estimatedFatigue,
+    recovery_priority: workout.recoveryPriority,
     steps: workout.steps as Json,
     display_order: workout.displayOrder,
   }));

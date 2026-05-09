@@ -7,14 +7,8 @@ const options = parseArgs(process.argv.slice(2));
 const email = normalizeEmail(requireOption(options.email, "--email"));
 const authoringText = await readAuthoringText(options);
 
-const supabaseUrl = requireOption(
-  readEnv("NEXT_PUBLIC_SUPABASE_URL") ?? readEnv("VITE_SUPABASE_URL"),
-  "NEXT_PUBLIC_SUPABASE_URL",
-);
-const supabaseServerKey = requireOption(
-  readEnv("SUPABASE_SECRET_KEY") ?? readEnv("SUPABASE_SERVICE_ROLE_KEY"),
-  "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY",
-);
+const supabaseUrl = requireOption(readEnv("NEXT_PUBLIC_SUPABASE_URL"), "NEXT_PUBLIC_SUPABASE_URL");
+const supabaseServerKey = requireOption(readEnv("SUPABASE_SECRET_KEY"), "SUPABASE_SECRET_KEY");
 
 const supabase = createClient(supabaseUrl, supabaseServerKey, {
   auth: {
@@ -67,8 +61,13 @@ const planInsert = await supabase
     title: importedSeed.title,
     goal_summary: importedSeed.goalSummary,
     source_template: importedSeed.sourceTemplate,
+    schema_version: importedSeed.schemaVersion,
+    source_kind: importedSeed.sourceKind,
     start_date: importedSeed.startDate,
     end_date: importedSeed.endDate,
+    target_date: importedSeed.targetDate,
+    goal_metadata: importedSeed.goalMetadata,
+    plan_preferences: importedSeed.planPreferences,
   })
   .select("id, title, start_date, end_date, source_template")
   .single();
@@ -85,8 +84,13 @@ const workouts = importedSeed.workouts.map((workout) => ({
   week_number: workout.weekNumber,
   phase: workout.phase,
   workout_type: workout.workoutType,
+  source_workout_id: workout.sourceWorkoutId,
+  source_workout_type: workout.sourceWorkoutType,
   title: workout.title,
   notes: workout.notes,
+  planned_rpe: workout.plannedRpe,
+  estimated_fatigue: workout.estimatedFatigue,
+  recovery_priority: workout.recoveryPriority,
   steps: workout.steps,
   display_order: workout.displayOrder,
 }));

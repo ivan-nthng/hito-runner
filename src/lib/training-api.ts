@@ -12,20 +12,9 @@ import {
   buildImportedLogCarryForwardPlan,
   buildPersistedWorkoutInsertRows,
 } from "@/lib/persisted-plan-replacement";
-import {
-  completeLocalAuthOnboarding,
-  getLocalAuthSnapshot,
-  saveLocalAuthWorkoutLog,
-} from "@/lib/local-auth-store";
-import {
-  findLocalAuthAccountByUserId,
-  getLocalAuthAccountSummaries,
-  isLocalAuthBypassEnabled,
-} from "@/lib/local-auth";
+import { findLocalAuthAccountByUserId, isLocalAuthBypassEnabled } from "@/lib/local-auth";
 import { ensureLocalAuthSupabaseUserId } from "@/lib/local-auth-supabase";
 import {
-  addDaysIso,
-  diffDaysIso,
   deriveWeekStatus,
   findWorkout,
   getPreviewSnapshot,
@@ -37,16 +26,15 @@ import {
   type Workout,
   type WorkoutLog,
 } from "@/lib/training";
-import type { Database, Json } from "@/lib/supabase/database";
+import type { Database } from "@/lib/supabase/database";
 import { getRequestAuthContext, requireAuthenticatedUser } from "@/lib/backend/auth";
 import { createAdminSupabaseClient, createRequestSupabaseClient } from "@/lib/supabase/server";
-import { hasSupabaseBrowserEnv, publicEnv, serverEnv } from "@/lib/supabase/env";
-
-const goalLabels = {
-  build_consistency: "Build consistency",
-  first_race: "Finish a first race",
-  distance_build: "Build distance",
-} as const;
+import {
+  hasSupabaseBrowserEnv,
+  isDevOnlyLocalAuthRuntime,
+  publicEnv,
+  serverEnv,
+} from "@/lib/supabase/env";
 
 export interface ViewerSummary {
   name: string | null;
@@ -99,11 +87,12 @@ const workoutLogInputSchema = z
   });
 
 export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async () => {
+  const auth = getRequestAuthContext();
+
   return {
     snapshot: await getSnapshotForRequest(),
     viewer: await getViewerForRequest(),
-    localBypassEnabled: await isLocalAuthBypassEnabled(),
-    localAccounts: await getLocalAuthAccountSummaries(),
+    localBypassEnabled: await isLocalAuthBypassEnabledForCurrentRequest(auth.appBaseUrl),
     magicLinkEnabled: hasSupabaseBrowserEnv,
   };
 });
@@ -116,11 +105,12 @@ export const getShellRouteData = createServerFn({ method: "GET" }).handler(async
 });
 
 export const getLoginRouteData = createServerFn({ method: "GET" }).handler(async () => {
+  const auth = getRequestAuthContext();
+
   return {
     snapshot: await getSnapshotForRequest(),
     viewer: await getViewerForRequest(),
-    localBypassEnabled: await isLocalAuthBypassEnabled(),
-    localAccounts: await getLocalAuthAccountSummaries(),
+    localBypassEnabled: await isLocalAuthBypassEnabledForCurrentRequest(auth.appBaseUrl),
     magicLinkEnabled: hasSupabaseBrowserEnv,
   };
 });
@@ -245,31 +235,7 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
     const auth = requireAuthenticatedUser();
-
-    if (auth.provider === "local") {
-      const localConfig = await getRequiredLocalAuthConfig(auth.userId);
-
-      if (canUseSupabasePlanStorage()) {
-        return savePersistedWorkoutLog(await ensureLocalAuthSupabaseUserId(localConfig), data);
-      }
-
-      const result = await saveLocalAuthWorkoutLog(localConfig, {
-        plannedWorkoutId: data.plannedWorkoutId,
-        outcome: data.outcome,
-        actualDistanceKm: data.actualDistanceKm,
-        actualDurationMin: data.actualDurationMin,
-        rpe: data.rpe,
-        notes: data.notes,
-        intervalsCompleted: data.intervalsCompleted,
-      });
-
-      return {
-        ok: true,
-        id: result.id,
-      };
-    }
-
-    return savePersistedWorkoutLog(auth.userId, data);
+    return savePersistedWorkoutLog(await getPersistedUserIdForAuth(auth), data);
   });
 
 async function savePersistedWorkoutLog(
@@ -329,23 +295,9 @@ async function persistImportedPlanForCurrentRequest(
 ) {
   const auth = requireAuthenticatedUser();
   const importedSeed = buildImportedPlanSeed(importedPlan);
-
-  if (auth.provider === "local") {
-    const localConfig = await getRequiredLocalAuthConfig(auth.userId);
-
-    if (canUseSupabasePlanStorage()) {
-      const linkedUserId = await ensureLocalAuthSupabaseUserId(localConfig);
-      await upsertRunnerProfile(linkedUserId, importedSeed.profile);
-      await replaceActivePlanWithImportedInput(linkedUserId, importedPlan);
-      return;
-    }
-
-    await completeLocalAuthOnboarding(localConfig, importedPlan);
-    return;
-  }
-
-  await upsertRunnerProfile(auth.userId, importedSeed.profile);
-  await replaceActivePlanWithImportedInput(auth.userId, importedPlan);
+  const persistedUserId = await getPersistedUserIdForAuth(auth);
+  await upsertRunnerProfile(persistedUserId, importedSeed.profile);
+  await replaceActivePlanWithImportedInput(persistedUserId, importedPlan);
 }
 
 export async function exchangeCodeForSession(request: Request) {
@@ -390,17 +342,7 @@ async function getSnapshotForRequest() {
     return getPreviewSnapshot();
   }
 
-  if (auth.provider === "local") {
-    const localConfig = await getRequiredLocalAuthConfig(auth.userId);
-
-    if (canUseSupabasePlanStorage()) {
-      return getPersistedSnapshot(await ensureLocalAuthSupabaseUserId(localConfig));
-    }
-
-    return getLocalAuthSnapshot(localConfig);
-  }
-
-  return getPersistedSnapshot(auth.userId);
+  return getPersistedSnapshot(await getPersistedUserIdForAuth(auth));
 }
 
 async function getViewerForRequest(): Promise<ViewerSummary | null> {
@@ -450,7 +392,21 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
   }
 
   const profile = profileRowToSummary(profileResult.data);
-  const planCycle = await ensureActivePlan(userId, profile);
+  const planCycle = await getActivePlan(userId);
+
+  if (!planCycle) {
+    return {
+      mode: "onboarding",
+      source: "persisted",
+      backend: "supabase",
+      currentDate: todayIso(),
+      planMeta: null,
+      profile,
+      workouts: [],
+      weekStatus: "on_track",
+    };
+  }
+
   const { workouts: persistedWorkouts, logsByWorkoutId } = await getResolvedPlanWorkoutsWithLogs(
     userId,
     planCycle,
@@ -470,7 +426,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
       createdFor: "You",
       createdAt: planCycle.created_at,
       startDate: planCycle.start_date,
-      raceDate: planCycle.end_date,
+      raceDate: planCycle.target_date ?? planCycle.end_date,
       goal: planCycle.goal_summary,
       source: "persisted",
     },
@@ -480,7 +436,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
   };
 }
 
-async function ensureActivePlan(userId: string, profile: RunnerProfileSummary) {
+async function getActivePlan(userId: string) {
   const supabase = createAdminSupabaseClient();
   const existing = await supabase
     .from("plan_cycles")
@@ -495,68 +451,7 @@ async function ensureActivePlan(userId: string, profile: RunnerProfileSummary) {
     throw new Error(existing.error.message);
   }
 
-  if (existing.data) {
-    return existing.data;
-  }
-
-  return createAssignedPlan(userId, profile);
-}
-
-async function createAssignedPlan(userId: string, profile: RunnerProfileSummary) {
-  const supabase = createAdminSupabaseClient();
-  const preview = getPreviewSnapshot();
-  const startDate = todayIso();
-  const templateStart = preview.planMeta?.startDate ?? startDate;
-  const endDate = addDaysIso(
-    startDate,
-    diffDaysIso(preview.workouts.at(-1)?.date ?? startDate, templateStart),
-  );
-  const title = `${goalLabels[profile.goalType]} plan`;
-  const planInsert = await supabase
-    .from("plan_cycles")
-    .insert({
-      user_id: userId,
-      status: "active",
-      title,
-      goal_summary: `${goalLabels[profile.goalType]} with ${profile.baselineSessionsPerWeek} running day${profile.baselineSessionsPerWeek === 1 ? "" : "s"} per week.`,
-      source_template: "baseline-import-v1",
-      start_date: startDate,
-      end_date: endDate,
-    })
-    .select("*")
-    .single();
-
-  if (planInsert.error) {
-    throw new Error(planInsert.error.message);
-  }
-
-  const workouts = preview.workouts.map((workout, index) => {
-    const shiftedDate = addDaysIso(startDate, diffDaysIso(workout.date, templateStart));
-
-    return {
-      plan_cycle_id: planInsert.data.id,
-      user_id: userId,
-      workout_date: shiftedDate,
-      weekday: new Date(`${shiftedDate}T00:00:00`).toLocaleDateString("en-US", {
-        weekday: "long",
-      }),
-      week_number: workout.week,
-      phase: workout.phase,
-      workout_type: workout.type,
-      title: workout.title,
-      notes: workout.notes,
-      steps: workout.steps as Json,
-      display_order: index,
-    };
-  });
-
-  const workoutInsert = await supabase.from("planned_workouts").insert(workouts);
-
-  if (workoutInsert.error) {
-    throw new Error(workoutInsert.error.message);
-  }
-
-  return planInsert.data;
+  return existing.data;
 }
 
 async function createAssignedPlanFromImportedInput(
@@ -574,8 +469,13 @@ async function createAssignedPlanFromImportedInput(
       title: importedSeed.title,
       goal_summary: importedSeed.goalSummary,
       source_template: importedSeed.sourceTemplate,
+      schema_version: importedSeed.schemaVersion,
+      source_kind: importedSeed.sourceKind,
       start_date: importedSeed.startDate,
       end_date: importedSeed.endDate,
+      target_date: importedSeed.targetDate,
+      goal_metadata: importedSeed.goalMetadata,
+      plan_preferences: importedSeed.planPreferences,
     })
     .select("*")
     .single();
@@ -750,6 +650,7 @@ function dbWorkoutToView(
     week: workout.week_number,
     phase: workout.phase,
     type: workout.workout_type,
+    sourceWorkoutType: workout.source_workout_type,
     title: workout.title,
     notes: workout.notes,
     steps: (workout.steps as Step[]) ?? [],
@@ -844,6 +745,23 @@ async function getRequiredLocalAuthConfig(userId: string | null) {
   return config;
 }
 
+async function isLocalAuthBypassEnabledForCurrentRequest(appBaseUrl: string | null) {
+  if (!isDevOnlyLocalAuthRuntime(appBaseUrl)) {
+    return false;
+  }
+
+  return isLocalAuthBypassEnabled();
+}
+
+async function getPersistedUserIdForAuth(auth: ReturnType<typeof requireAuthenticatedUser>) {
+  if (auth.provider !== "local") {
+    return auth.userId;
+  }
+
+  const localConfig = await getRequiredLocalAuthConfig(auth.userId);
+  return ensureLocalAuthSupabaseUserId(localConfig);
+}
+
 function buildLoginRedirect(status: "error", next: string, appBaseUrl: string) {
   const url = new URL("/login", appBaseUrl);
   url.searchParams.set("status", status);
@@ -853,10 +771,6 @@ function buildLoginRedirect(status: "error", next: string, appBaseUrl: string) {
   }
 
   return url;
-}
-
-function canUseSupabasePlanStorage() {
-  return hasSupabaseBrowserEnv && Boolean(serverEnv.supabaseServiceRoleKey);
 }
 
 async function getPlanWorkoutsWithLogs(planCycleId: string) {

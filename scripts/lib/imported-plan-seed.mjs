@@ -1,46 +1,13 @@
 const FUTURE_TEMPLATE_VERSION = "training-plan-v2";
+const REMOVED_LEGACY_IMPORT_NOTICE =
+  "Legacy week_1_preview[] JSON is no longer supported. Convert this file to training-plan-v2 before importing.";
 
 export function buildImportedPlanSeed(plan) {
-  if (isTrainingPlanV2(plan)) {
-    return buildTrainingPlanV2Seed(plan);
+  if (!isTrainingPlanV2(plan)) {
+    throw new Error(REMOVED_LEGACY_IMPORT_NOTICE);
   }
 
-  return buildLegacyImportedPlanSeed(plan);
-}
-
-function buildLegacyImportedPlanSeed(plan) {
-  const workouts = plan.week_1_preview
-    .slice()
-    .sort((left, right) => left.date.localeCompare(right.date))
-    .map((entry, index) => {
-      const workoutType = inferLegacyWorkoutType(entry.workout);
-      const title =
-        entry.details.toLowerCase() === "recovery"
-          ? entry.workout
-          : `${entry.workout} · ${entry.details}`;
-
-      return {
-        workoutDate: entry.date,
-        weekday: entry.weekday,
-        weekNumber: 1,
-        phase: "Imported week",
-        workoutType,
-        title,
-        notes: buildLegacyNotes(entry.details, entry.target),
-        steps: buildLegacySteps(workoutType, entry.details, entry.target),
-        displayOrder: index,
-      };
-    });
-
-  return {
-    profile: buildImportedProfile(plan.plan_name, plan.generated_for, workouts),
-    title: plan.plan_name,
-    goalSummary: `Imported JSON week for ${plan.generated_for}.`,
-    sourceTemplate: "json-import-v1",
-    startDate: plan.start_date,
-    endDate: workouts.at(-1)?.workoutDate ?? plan.start_date,
-    workouts,
-  };
+  return buildTrainingPlanV2Seed(plan);
 }
 
 function buildTrainingPlanV2Seed(plan) {
@@ -58,9 +25,14 @@ function buildTrainingPlanV2Seed(plan) {
       weekNumber: entry.week_number,
       phase: entry.phase,
       workoutType: normalizeV2WorkoutType(entry.workout_type),
+      sourceWorkoutId: entry.workout_id,
+      sourceWorkoutType: entry.workout_type,
       title: entry.title,
       notes: buildV2Notes(entry),
-      steps: normalizeV2Segments(entry.segments, normalizeV2WorkoutType(entry.workout_type)),
+      plannedRpe: entry.planned_rpe ?? null,
+      estimatedFatigue: entry.estimated_fatigue ?? null,
+      recoveryPriority: entry.recovery_priority ?? null,
+      steps: normalizeV2Segments(entry.segments),
       displayOrder: index,
     }));
 
@@ -69,8 +41,13 @@ function buildTrainingPlanV2Seed(plan) {
     title: plan.plan_name,
     goalSummary: buildV2GoalSummary(plan),
     sourceTemplate: FUTURE_TEMPLATE_VERSION,
+    schemaVersion: plan.schema_version,
+    sourceKind: plan.source_kind?.trim() || "training_plan_v2_import",
     startDate: plan.start_date,
     endDate: workouts.at(-1)?.workoutDate ?? plan.start_date,
+    targetDate: deriveTargetDate(plan),
+    goalMetadata: buildGoalMetadata(plan),
+    planPreferences: buildPersistedPlanPreferences(plan),
     workouts,
   };
 }
@@ -83,7 +60,10 @@ function buildImportedProfile(planName, generatedFor, workouts, trainingPlan = n
 
   return {
     goalType: deriveRunnerGoalType(planName, trainingPlan),
-    goalLabel: trainingPlan?.goal?.goal_label?.trim() || planName,
+    goalLabel:
+      trainingPlan?.goal?.goal_label?.trim() ||
+      trainingPlan?.runner_profile?.primary_goal?.trim() ||
+      planName,
     baselineSessionsPerWeek,
     baselineLongRunKm,
     baselineNotes: buildImportedProfileNotes(generatedFor, trainingPlan),
@@ -92,7 +72,14 @@ function buildImportedProfile(planName, generatedFor, workouts, trainingPlan = n
 
 function buildV2GoalSummary(plan) {
   const goalLabel = plan.goal?.goal_label?.trim();
-  return goalLabel || `Imported ${FUTURE_TEMPLATE_VERSION} plan for ${plan.generated_for}.`;
+
+  if (goalLabel) {
+    return goalLabel;
+  }
+
+  const primaryGoal = plan.runner_profile?.primary_goal?.trim();
+
+  return primaryGoal || `Imported ${FUTURE_TEMPLATE_VERSION} plan for ${plan.generated_for}.`;
 }
 
 function deriveBaselineSessionsPerWeek(workouts) {
@@ -158,6 +145,11 @@ function buildImportedProfileNotes(generatedFor, trainingPlan = null) {
     trainingPlan?.runner_profile?.recent_result_summary,
     trainingPlan?.runner_profile?.current_training_load_summary,
     trainingPlan?.runner_profile?.recent_injury_recovery_context,
+    trainingPlan?.runner_profile?.current_easy_aerobic_hr_bpm
+      ? `Current easy aerobic HR ${trainingPlan.runner_profile.current_easy_aerobic_hr_bpm}`
+      : null,
+    trainingPlan?.runner_profile?.risk_policy,
+    trainingPlan?.runner_profile?.secondary_goal,
   ]
     .filter((value) => Boolean(value?.trim()))
     .join(" · ");
@@ -165,12 +157,106 @@ function buildImportedProfileNotes(generatedFor, trainingPlan = null) {
   return notes || `Imported from JSON for ${generatedFor}.`;
 }
 
-function inferLegacyWorkoutType(workout) {
-  if (/rest|recovery$/i.test(workout)) return "rest";
-  if (/interval|tempo|speed|quality/i.test(workout)) return "quality";
-  if (/long/i.test(workout)) return "long_run";
-  if (/steady/i.test(workout)) return "steady_or_easy";
-  return "easy";
+function deriveTargetDate(plan) {
+  return (
+    plan.target_date ?? plan.goal?.target_event?.event_date ?? plan.goal?.target_event?.date ?? null
+  );
+}
+
+function buildGoalMetadata(plan) {
+  const targetDate = deriveTargetDate(plan);
+  const goalType = plan.goal?.goal_type?.trim() || null;
+  const goalLabel =
+    plan.goal?.goal_label?.trim() || plan.runner_profile?.primary_goal?.trim() || null;
+  const targetEvent = plan.goal?.target_event;
+  const primaryGoal = plan.runner_profile?.primary_goal?.trim() || null;
+  const secondaryGoal = plan.runner_profile?.secondary_goal?.trim() || null;
+
+  const metadata = {
+    ...(goalType ? { goal_type: goalType } : {}),
+    ...(goalLabel ? { goal_label: goalLabel } : {}),
+    ...(targetDate ? { target_date: targetDate } : {}),
+    ...(targetEvent
+      ? {
+          target_event: {
+            ...(targetEvent.label ? { label: targetEvent.label } : {}),
+            ...(targetEvent.event_name ? { event_name: targetEvent.event_name } : {}),
+            ...(targetDate ? { date: targetDate } : {}),
+          },
+        }
+      : {}),
+    ...(primaryGoal ? { primary_goal: primaryGoal } : {}),
+    ...(secondaryGoal ? { secondary_goal: secondaryGoal } : {}),
+  };
+
+  return Object.keys(metadata).length > 0 ? metadata : null;
+}
+
+function buildPersistedPlanPreferences(plan) {
+  const notes = [
+    plan.plan_preferences?.notes?.trim() || null,
+    plan.training_constraints?.intensity_distribution?.trim() || null,
+    plan.training_constraints?.progression_policy?.trim() || null,
+  ]
+    .filter((value) => Boolean(value))
+    .join(" · ");
+
+  const preferences = {
+    ...(plan.plan_preferences?.preferred_run_days
+      ? { preferred_run_days: plan.plan_preferences.preferred_run_days }
+      : {}),
+    ...(plan.plan_preferences?.preferred_running_days
+      ? { preferred_run_days: plan.plan_preferences.preferred_running_days }
+      : {}),
+    ...(plan.plan_preferences?.blocked_days
+      ? { blocked_days: plan.plan_preferences.blocked_days }
+      : {}),
+    ...(plan.plan_preferences?.unavailable_days
+      ? { blocked_days: plan.plan_preferences.unavailable_days }
+      : {}),
+    ...(plan.plan_preferences?.max_running_days_per_week
+      ? { max_running_days_per_week: plan.plan_preferences.max_running_days_per_week }
+      : {}),
+    ...(plan.plan_preferences?.max_weekly_sessions
+      ? { max_running_days_per_week: plan.plan_preferences.max_weekly_sessions }
+      : {}),
+    ...(typeof plan.plan_preferences?.allow_back_to_back_days === "boolean"
+      ? { allow_back_to_back_days: plan.plan_preferences.allow_back_to_back_days }
+      : {}),
+    ...(typeof plan.plan_preferences?.no_double_days === "boolean"
+      ? { allow_back_to_back_days: !plan.plan_preferences.no_double_days }
+      : {}),
+    ...(plan.plan_preferences?.preferred_long_run_day
+      ? { preferred_long_run_day: plan.plan_preferences.preferred_long_run_day }
+      : {}),
+    ...(plan.plan_preferences?.injury_constraints
+      ? { injury_constraints: plan.plan_preferences.injury_constraints }
+      : {}),
+    ...(plan.plan_preferences?.hard_constraints
+      ? { hard_constraints: plan.plan_preferences.hard_constraints }
+      : {}),
+    ...(plan.plan_preferences?.preferred_workout_mix
+      ? { preferred_workout_mix: plan.plan_preferences.preferred_workout_mix }
+      : {}),
+    ...(plan.plan_preferences?.strength_or_mobility_interest
+      ? { strength_or_mobility_interest: plan.plan_preferences.strength_or_mobility_interest }
+      : {}),
+    ...(typeof plan.plan_preferences?.indoor_treadmill_ok === "boolean"
+      ? { indoor_treadmill_ok: plan.plan_preferences.indoor_treadmill_ok }
+      : {}),
+    ...(plan.training_constraints?.running_days_per_week
+      ? { max_running_days_per_week: plan.training_constraints.running_days_per_week }
+      : {}),
+    ...(plan.training_constraints?.full_rest_days
+      ? { blocked_days: plan.training_constraints.full_rest_days }
+      : {}),
+    ...(plan.training_constraints?.long_run_day
+      ? { preferred_long_run_day: plan.training_constraints.long_run_day }
+      : {}),
+    ...(notes ? { notes } : {}),
+  };
+
+  return Object.keys(preferences).length > 0 ? preferences : null;
 }
 
 function normalizeV2WorkoutType(workoutType) {
@@ -181,6 +267,9 @@ function normalizeV2WorkoutType(workoutType) {
       return "long_run";
     case "quality":
     case "tempo":
+    case "intervals":
+    case "progression":
+    case "race":
       return "quality";
     case "steady_or_easy":
       return "steady_or_easy";
@@ -189,10 +278,6 @@ function normalizeV2WorkoutType(workoutType) {
     default:
       return "easy";
   }
-}
-
-function buildLegacyNotes(details, target) {
-  return target ? `${details} · Target: ${target}` : details;
 }
 
 function buildV2Notes(workout) {
@@ -204,86 +289,7 @@ function buildV2Notes(workout) {
   return workout.summary;
 }
 
-function buildLegacySteps(workoutType, details, target) {
-  if (workoutType === "rest") {
-    return [];
-  }
-
-  const targetPayload = parseLegacyTarget(target);
-  const intervalMatch = details.match(/(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*(m|km)/i);
-
-  if (intervalMatch) {
-    const repeats = Number(intervalMatch[1]);
-    const workDistanceKm = normalizeDistance(Number(intervalMatch[2]), intervalMatch[3]);
-    const prescription = {
-      mode: "repeats",
-      repeat_count: repeats,
-      repeat_unit: {
-        mode: "distance",
-        distance_km: workDistanceKm,
-      },
-      recovery_unit: {
-        mode: "none",
-      },
-    };
-
-    return [
-      {
-        segment_id: "legacy-segment-1",
-        segment_type: "interval_block",
-        sequence: 1,
-        label: details,
-        prescription,
-        type: "intervals",
-        repeats,
-        work: {
-          type: "work",
-          distance_km: workDistanceKm,
-          prescription: prescription.repeat_unit,
-          ...(targetPayload ? { target: targetPayload } : {}),
-        },
-        recovery: {
-          type: "recovery",
-          prescription: prescription.recovery_unit,
-        },
-      },
-    ];
-  }
-
-  const distanceMatch = details.match(/(\d+(?:\.\d+)?)\s*km/i);
-  const durationMatch = details.match(/(\d+(?:\.\d+)?)\s*min/i);
-  const prescription = durationMatch
-    ? {
-        mode: "time",
-        duration_min: Number(durationMatch[1]),
-      }
-    : distanceMatch
-      ? {
-          mode: "distance",
-          distance_km: Number(distanceMatch[1]),
-        }
-      : undefined;
-
-  return [
-    {
-      segment_id: "legacy-segment-1",
-      segment_type: "main",
-      sequence: 1,
-      label: details,
-      ...(prescription ? { prescription } : {}),
-      type: "run",
-      ...(distanceMatch ? { distance_km: Number(distanceMatch[1]) } : {}),
-      ...(durationMatch ? { duration_min: Number(durationMatch[1]) } : {}),
-      ...(targetPayload ? { target: targetPayload } : {}),
-    },
-  ];
-}
-
-function normalizeV2Segments(segments, workoutType) {
-  if (workoutType === "rest") {
-    return [];
-  }
-
+function normalizeV2Segments(segments) {
   return segments.flatMap((segment, index) => {
     if (segment.segment_type === "rest") {
       return [];
@@ -291,25 +297,6 @@ function normalizeV2Segments(segments, workoutType) {
 
     return [normalizeV2Segment(segment, index + 1)];
   });
-}
-
-function parseLegacyTarget(target) {
-  if (!target) {
-    return undefined;
-  }
-
-  const hrMatch = target.match(/HR\s*(\d{2,3})\s*-\s*(\d{2,3})/i);
-
-  if (hrMatch) {
-    return {
-      hr_bpm_range: `${hrMatch[1]}-${hrMatch[2]}`,
-      hr_bpm: `${hrMatch[1]}-${hrMatch[2]}`,
-    };
-  }
-
-  return {
-    cue: target,
-  };
 }
 
 function estimateDistanceKm(steps, workoutType) {
@@ -350,7 +337,13 @@ function normalizeV2Segment(segment, sequence) {
   const label = segment.label ?? buildDefaultSegmentLabel(segment.segment_type, sequence);
   const prescription = buildSegmentPrescription(segment);
 
-  if (segment.segment_type === "interval_block") {
+  if (
+    segment.segment_type === "interval_block" ||
+    segment.segment_type === "strides" ||
+    (segment.segment_type === "tempo_block" && prescription.mode === "repeats")
+  ) {
+    const repeatedType = segment.segment_type === "tempo_block" ? "tempo" : "intervals";
+
     return {
       segment_id: segmentId,
       segment_type: segment.segment_type,
@@ -358,7 +351,7 @@ function normalizeV2Segment(segment, sequence) {
       label,
       guidance,
       prescription,
-      type: "intervals",
+      type: repeatedType,
       repeats: prescription.repeat_count,
       work: {
         type: "work",
@@ -421,7 +414,23 @@ function buildSegmentPrescription(segment) {
     };
   }
 
-  if (segment.segment_type === "interval_block") {
+  if (
+    segment.segment_type === "interval_block" ||
+    segment.segment_type === "strides" ||
+    (segment.segment_type === "tempo_block" && segment.repeat_count)
+  ) {
+    const workDurationMin =
+      segment.work_duration_min ??
+      (segment.work_duration_sec
+        ? Number((segment.work_duration_sec / 60).toFixed(2))
+        : undefined) ??
+      segment.duration_min;
+    const recoveryDurationMin =
+      segment.recovery_duration_min ??
+      (segment.recovery_duration_sec
+        ? Number((segment.recovery_duration_sec / 60).toFixed(2))
+        : undefined);
+
     return {
       mode: "repeats",
       repeat_count: segment.repeat_count,
@@ -432,10 +441,10 @@ function buildSegmentPrescription(segment) {
           }
         : {
             mode: "time",
-            duration_min: segment.duration_min,
+            duration_min: workDurationMin,
           },
       recovery_unit:
-        segment.recovery_duration_min || segment.recovery_distance_km
+        recoveryDurationMin || segment.recovery_distance_km
           ? segment.recovery_distance_km
             ? {
                 mode: "distance",
@@ -443,7 +452,7 @@ function buildSegmentPrescription(segment) {
               }
             : {
                 mode: "time",
-                duration_min: segment.recovery_duration_min,
+                duration_min: recoveryDurationMin,
               }
           : {
               mode: "none",
@@ -451,7 +460,7 @@ function buildSegmentPrescription(segment) {
     };
   }
 
-  if (segment.segment_type === "rest") {
+  if (segment.segment_type === "rest" || segment.segment_type === "fueling") {
     return {
       mode: "none",
     };
@@ -487,9 +496,20 @@ function normalizeSegmentTarget(target) {
     return undefined;
   }
 
-  const extra = {
-    ...(target.extra ?? {}),
-  };
+  const extra = {};
+
+  for (const [key, value] of Object.entries(target.extra ?? {})) {
+    if (
+      key === "hr_bpm" ||
+      key === "hr_bpm_range" ||
+      key === "pace_range_min_km" ||
+      key === "pace_min_per_km_range"
+    ) {
+      continue;
+    }
+
+    extra[key] = value;
+  }
 
   for (const [key, value] of Object.entries(target)) {
     if (
@@ -519,13 +539,8 @@ function normalizeSegmentTarget(target) {
 
   return {
     ...(typeof target.intensity === "string" ? { intensity: target.intensity } : {}),
-    ...(hrRange ? { hr_bpm_range: hrRange, hr_bpm: hrRange } : {}),
-    ...(paceRange
-      ? {
-          pace_min_per_km_range: paceRange,
-          pace_range_min_km: paceRange,
-        }
-      : {}),
+    ...(hrRange ? { hr_bpm_range: hrRange } : {}),
+    ...(paceRange ? { pace_min_per_km_range: paceRange } : {}),
     ...(typeof target.pace === "string" ? { pace: target.pace } : {}),
     ...(typeof target.rpe === "string" || typeof target.rpe === "number"
       ? { rpe: target.rpe }
@@ -557,6 +572,12 @@ function mapSegmentTypeToStepType(segmentType) {
       return "tempo";
     case "main":
       return "run";
+    case "activation":
+    case "drills":
+    case "mobility_optional":
+      return "mobility";
+    case "recovery_jog":
+      return "recovery";
     default:
       return segmentType;
   }
@@ -576,8 +597,20 @@ function buildDefaultSegmentLabel(segmentType, sequence) {
       return "Rest";
     case "mobility":
       return "Mobility";
+    case "mobility_optional":
+      return "Optional mobility";
     case "strength":
       return "Strength";
+    case "activation":
+      return "Activation";
+    case "drills":
+      return "Drills";
+    case "strides":
+      return "Strides";
+    case "recovery_jog":
+      return "Recovery jog";
+    case "fueling":
+      return "Fueling";
     case "tempo_block":
       return "Tempo";
     case "interval_block":
@@ -636,10 +669,6 @@ function paceMinutesPerKm(workoutType) {
   };
 
   return paceMap[workoutType];
-}
-
-function normalizeDistance(distance, unit) {
-  return unit.toLowerCase() === "km" ? distance : Number((distance / 1000).toFixed(3));
 }
 
 function isTrainingPlanV2(plan) {

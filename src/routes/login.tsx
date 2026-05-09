@@ -20,7 +20,7 @@ export const Route = createFileRoute("/login")({
       { title: `Login — ${APP_NAME}` },
       {
         name: "description",
-        content: "Sign in first, then import JSON to create your saved Hito plan.",
+        content: "Sign in first, then describe your running goal to create your saved Hito plan.",
       },
     ],
   }),
@@ -29,8 +29,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { snapshot, viewer, localBypassEnabled, localAccounts, magicLinkEnabled } =
-    Route.useLoaderData();
+  const { snapshot, viewer, localBypassEnabled, magicLinkEnabled } = Route.useLoaderData();
   const search = Route.useSearch();
   const nextLabel =
     search.next === "/"
@@ -52,12 +51,12 @@ function LoginPage() {
             <h1 className="mt-3 font-display text-4xl leading-[1.05] lg:text-5xl">
               {snapshot.mode === "authenticated"
                 ? "You’re already signed in."
-                : "You’re signed in. Import JSON next."}
+                : "You’re signed in. Create your plan next."}
             </h1>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
               {snapshot.mode === "authenticated"
-                ? "Your profile, imported plan, and workout logging are already using persisted saved-mode truth."
-                : "Your authenticated account is ready. Finish JSON import on home to create the saved calendar and workout surface."}
+                ? "Your profile, plan, and workout logging are already using persisted saved-mode truth."
+                : "Your authenticated account is ready. Describe your goal on home to create the saved calendar and workout surface."}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
@@ -88,7 +87,6 @@ function LoginPage() {
   return (
     <AuthEntryScreen
       localBypassEnabled={localBypassEnabled}
-      localAccounts={localAccounts}
       magicLinkEnabled={magicLinkEnabled}
       next={search.next}
       status={search.status}

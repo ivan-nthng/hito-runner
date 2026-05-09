@@ -6,22 +6,13 @@ import { requestMagicLink } from "@/lib/training-api";
 
 type AuthEntryStatus = "error" | "invalid_credentials" | "local_unavailable" | undefined;
 
-interface LocalAccountSummary {
-  username: string;
-  email: string;
-  role: "admin" | "tester";
-  displayName: string;
-}
-
 export function AuthEntryScreen({
   localBypassEnabled,
-  localAccounts,
   magicLinkEnabled,
   next,
   status,
 }: {
   localBypassEnabled: boolean;
-  localAccounts: LocalAccountSummary[];
   magicLinkEnabled: boolean;
   next: string;
   status?: AuthEntryStatus;
@@ -31,7 +22,9 @@ export function AuthEntryScreen({
   const [phase, setPhase] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const [activeTab, setActiveTab] = useState<"login" | "signup">(
+    localBypassEnabled ? "login" : "signup",
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground canvas-grain">
@@ -55,34 +48,36 @@ export function AuthEntryScreen({
           </div>
 
           <div className="rounded-2xl border border-hairline bg-background/30 p-5 lg:p-6">
-            <div className="inline-flex rounded-lg border border-hairline bg-background/35 p-1">
-              {(
-                [
-                  { key: "login", label: "Log in" },
-                  { key: "signup", label: "Sign up" },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(tab.key);
-                    setPhase("idle");
-                    setError(null);
-                  }}
-                  className={cn(
-                    "rounded-md px-4 py-2 text-sm transition-colors",
-                    activeTab === tab.key
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {localBypassEnabled ? (
+              <div className="inline-flex rounded-lg border border-hairline bg-background/35 p-1">
+                {(
+                  [
+                    { key: "login", label: "Log in" },
+                    { key: "signup", label: "Sign up" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.key);
+                      setPhase("idle");
+                      setError(null);
+                    }}
+                    className={cn(
+                      "rounded-md px-4 py-2 text-sm transition-colors",
+                      activeTab === tab.key
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
 
-            {activeTab === "login" ? (
+            {localBypassEnabled && activeTab === "login" ? (
               <div className="mt-6">
                 <form method="post" action="/api/auth/local-login" className="grid gap-5">
                   <input type="hidden" name="next" value={next} />
@@ -136,7 +131,7 @@ export function AuthEntryScreen({
                   )}
                   {status === "local_unavailable" && (
                     <p className="text-sm text-destructive">
-                      Credentials login is not configured on this server yet.
+                      Local development login is not available on this runtime.
                     </p>
                   )}
                 </form>
@@ -147,7 +142,11 @@ export function AuthEntryScreen({
                   <Mail className="h-3.5 w-3.5 text-signal" />
                   <span>Continue with email</span>
                 </div>
-                <p className="mt-3 text-sm text-muted-foreground">Use an email link to continue.</p>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {localBypassEnabled
+                    ? "Use an email link to continue."
+                    : "Use the real email sign-in path for this environment."}
+                </p>
 
                 {status === "error" && (
                   <p className="mt-4 text-sm text-destructive">

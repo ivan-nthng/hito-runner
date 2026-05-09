@@ -2,7 +2,28 @@
 
 Completed implementation history only.
 
+## 2026-05-09
+
+- Completed the final Phase 5 legacy-removal slice by deleting deprecated `week_1_preview[]` compatibility from the active runtime, CLI tooling, and visible advanced-import contract, so `training-plan-v2` is now the only supported import format.
+- Continued the final Phase 5 deletion window by removing deprecated single-account local auth env support from the active runtime and local tooling, cleaning `.env.example`, and making the accounts-file path the only remaining local bypass input contract.
+- Continued the final Phase 5 deletion window by removing `SUPABASE_SERVICE_ROLE_KEY` from the active runtime and CLI env contract, cleaning `.env.example`, and making `SUPABASE_SECRET_KEY` the only documented server-side Supabase admin/write key.
+- Started the final Phase 5 deletion window by removing `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the active runtime and CLI env contract, cleaning `.env.example`, and making `NEXT_PUBLIC_SUPABASE_URL` plus `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` the only documented public Supabase browser env names.
+- Continued Phase 5 by quarantining the remaining legacy compatibility: the deprecated `week_1_preview[]` parser and seed mapping now live in dedicated compatibility helpers instead of staying mixed into the canonical `training-plan-v2` import path, and the tester lifecycle tool no longer merges deprecated single-account admin env into the normal accounts-file path when that file already exists.
+
+## 2026-05-08
+
+- Started Phase 5 carefully instead of deleting compatibility outright: `training-plan-v2` is now the explicit canonical file contract in the advanced import surface, legacy `week_1_preview[]` now surfaces as deprecated compatibility, `VITE_APP_NAME` is no longer part of the active runtime env contract, and the tester lifecycle script no longer materializes deprecated single-account local auth env into the canonical accounts file automatically.
+- Demoted remaining visible non-primary authoring paths for the Phase 4 cleanup slice: no-plan setup and shell copy now present text-first plan creation as the primary product path, while JSON stays available only as an advanced import/fallback for existing Hito plan files, migration, and testing.
+- Removed the production-facing local credentials path from deploy-visible auth: loopback local runtimes may still use the temporary bypass for development, but deploy-like requests now expose only the real email auth surface and `/api/auth/local-login` no longer behaves like a product login path there.
+- Fixed the first richer-plan truth leaks after Phase 3: the live `training-plan-v2` validator and normalizer now accept the fuller segment DSL used by the richer reference files, route-facing target rendering suppresses opaque structured metadata instead of leaking `[object Object]`, and richer imported `intervals` workouts keep an honest visible interval identity instead of collapsing to easy-run labeling.
+- Tightened canonical persisted richer-plan truth without adding a second runtime model: `plan_cycles` now preserves `schema_version`, `source_kind`, `target_date`, `goal_metadata`, and `plan_preferences`, while `planned_workouts` now preserves source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority across JSON import, structured authoring, and OpenAI text authoring.
+- Removed fresh-write target alias duplication from richer plan normalization so new persisted `steps jsonb` rows keep only canonical target keys such as `hr_bpm_range` and `pace_min_per_km_range`, while older rows remain read-compatible.
+- Removed preview-derived active-plan bootstrap from the authenticated saved-mode seam so accounts without an active plan now stay honestly in setup until text authoring, structured authoring, or advanced JSON import creates canonical persisted plan truth.
+
 ## 2026-05-07
+
+- Removed `src/lib/local-auth-store.ts` from the authenticated saved-mode path so local auth now acts only as a temporary identity bridge, while all authenticated saved-mode reads, plan writes, and workout-log writes resolve through the canonical Supabase seam.
+- Removed the now-dead `temporary_local` saved-mode backend branch and the obsolete local fallback state-file contract from the active runtime and tester lifecycle tooling.
 
 - Simplified the text-first onboarding and `Upload JSON` surfaces by removing nested card chrome, flattening the advanced import layout, swapping the no-plan header CTA to `Create a Plan`, and removing the visible backend label from the home shell status area.
 - Replaced the visible JSON-first onboarding entry on `/` with a compact text-first request surface wired into the live OpenAI-backed `completeTextOnboarding` seam, while keeping `Upload JSON` available as a secondary advanced fallback path.

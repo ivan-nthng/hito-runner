@@ -14,10 +14,12 @@ import { IntervalsViz } from "@/components/IntervalsViz";
 import { CompletionPanel } from "@/components/CompletionPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  displayTargetEntries,
   formatDistanceKm,
   formatDate,
   primaryWorkoutTarget,
   WEEK_STATUS_META,
+  type TrainingSnapshot,
   type Workout,
   weekOf,
   workoutTypeMeta,
@@ -106,6 +108,7 @@ function WorkoutPage() {
   const restAssignment = restAssignmentFor(workout);
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const resultMeta = resultMetaForStatus(status);
+  const skippedCopy = skippedExplanationFor(workout, snapshot.source);
   const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
   const primaryTarget = primaryWorkoutTarget(workout);
   const phase = `${workout.phase} · week ${workout.week}`;
@@ -223,12 +226,12 @@ function WorkoutPage() {
 
               {!isRestDay && primaryTarget && (
                 <SidebarSection title="Targets" tone="signal">
-                  {Object.entries(primaryTarget).map(([key, value]) => (
-                    <div key={key} className="flex justify-between gap-3 py-1 last:border-0">
+                  {displayTargetEntries(primaryTarget).map((entry) => (
+                    <div key={entry.key} className="flex justify-between gap-3 py-1 last:border-0">
                       <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                        {key.replace(/_/g, " ")}
+                        {entry.label}
                       </span>
-                      <span className="text-xs text-right text-foreground/85">{String(value)}</span>
+                      <span className="text-xs text-right text-foreground/85">{entry.value}</span>
                     </div>
                   ))}
                 </SidebarSection>
@@ -281,7 +284,7 @@ function WorkoutPage() {
                     <ShieldAlert className="mt-0.5 h-3.5 w-3.5 text-destructive" />
                     <p className="text-xs text-foreground/80">
                       {snapshot.source === "persisted"
-                        ? "Past-due workouts without a saved log are treated as skipped until you overwrite them with a real result."
+                        ? skippedCopy
                         : "This sample status comes from preview logic only."}
                     </p>
                   </div>
@@ -657,6 +660,18 @@ function resultMetaForStatus(status: Workout["status"]) {
   }
 
   return null;
+}
+
+function skippedExplanationFor(workout: Workout, source: TrainingSnapshot["source"]) {
+  if (source !== "persisted") {
+    return "This sample status comes from preview logic only.";
+  }
+
+  if (workout.log?.outcome === "skipped") {
+    return "This skipped result was saved manually and is reflected in the current workout log.";
+  }
+
+  return "Past-due workouts without a saved log are treated as skipped until you overwrite them with a real result.";
 }
 
 function ResultBadge({

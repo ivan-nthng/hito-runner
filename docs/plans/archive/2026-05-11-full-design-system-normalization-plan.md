@@ -1,6 +1,8 @@
-Status: Active
+Status: Archived
 Owner: Designer Agent
 Last Updated: 2026-05-11
+
+Archive Note: Final Safari QA in the visible runner-facing scope found no obvious stray custom UI drift. The normalization track is considered effectively complete from the visible product perspective, with `/hitoDS` retained as the reference baseline and documented visualization geometry exceptions left intentionally outside shared Hito component families.
 
 # 2026-05-11 Full Design System Normalization Plan
 

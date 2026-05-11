@@ -28,7 +28,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - login `/login`
   provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, but deploy-visible environments show only the real email sign-in path
 - internal design-system reference `/hitoDS`
-  uses a dedicated design-system sidebar and component playground to document the implemented low-card Hito primitives; it is an internal implementation/reference surface, not a runner-facing capability
+  uses a dedicated design-system sidebar and component playground to document the implemented low-card Hito primitives; it is the internal reference baseline for future UI inspection and primitive extension, not a runner-facing capability
 
 ## Interaction Contracts
 
@@ -88,6 +88,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
 - auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress analytics stats and legends, body severity micro-UI, preserved integration utility rows, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share the first Hito component primitives for low-card surfaces, tiered controls, helper/error text, grouped rows, metric rows, compact analytics stats, compact legends, compact tooltips, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, labels, captions, tabs, and dividers, keeping text-first onboarding primary and advanced JSON import secondary
 - remaining chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are treated as product visualization geometry, not runner-facing component chrome
+- from the visible product perspective, the interface is now treated as normalized into Hito DS ownership, and future UI work should reuse shared Hito primitives or documented geometry exceptions instead of adding new custom route-local chrome
 
 ## Known Allowed Fix Areas
 

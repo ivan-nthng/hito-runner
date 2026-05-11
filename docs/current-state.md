@@ -71,6 +71,8 @@ Active
   visible no-plan and shell surfaces present text-first plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
 - The first Hito design-system implementation slices are now implemented:
   shared low-card CSS primitives exist for core surfaces, tiered buttons, tiered inputs, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact analytics stats, compact chart legends, compact tooltip shells, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell navigation rows, shell profile triggers, shell dropdown rows, and setup/empty/error state surfaces; auth, text-first onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, route-level state surfaces, progress analytics surfaces, body severity micro-UI, preserved integration utility rows, calendar and workout-structure tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now use those primitives; `/hitoDS` provides an internal component playground with dedicated design-system navigation instead of runner-facing shell chrome; and chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional visualization geometry exceptions.
+- The full Hito design-system normalization track is now effectively complete from the visible product perspective:
+  final Safari QA found no obvious stray custom UI drift in the tested runner-facing scope, `/hitoDS` is the accepted internal reference baseline, and only documented visualization geometry exceptions remain outside the shared Hito component families.
 - The remaining first-pass v2 rendering-truth gaps are now fixed:
   distance-based interval reps no longer invent minute-based per-rep UI,
   tempo workouts now render with a tempo-specific visible identity on home and workout detail,
@@ -83,14 +85,14 @@ Active
 
 ## Current Active Stream
 
-Phase 3 cleanup follow-up after the first architecture refactor slices:
-authenticated saved mode no longer uses either the temporary local persisted store or preview-derived saved-plan bootstrap, and richer canonical plan semantics now persist explicitly through the same Supabase runtime model without reintroducing split truth.
+Post-normalization stabilization:
+the visible interface is now treated as owned by shared Hito DS primitives and documented shell families, while remaining non-DS geometry stays intentionally constrained to charts, interval widths, SVG silhouettes, and marker coordinates.
 
 ## Next Recommended Steps
 
 1. QA + validate the visible free-text authoring flow end to end alongside the demoted advanced JSON fallback, with emphasis on richer-plan route rendering and replacement continuity.
 2. QA + verify that no-plan accounts read as one text-first product path in Safari and that advanced import remains discoverable without competing with onboarding.
-3. QA + run one final Safari canonical-only advanced-import pass, then archive the completed Phase 5 legacy-removal track and plan any later full local-bypass deletion separately.
+3. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use `/hitoDS` as the inspection surface before shipping new visual patterns.
 
 ## Canonical References
 

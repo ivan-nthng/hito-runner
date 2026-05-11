@@ -28,7 +28,7 @@
   or the real email auth path only when the request is deploy-like
   or the email magic-link entry flow when local credentials are not configured
 - `src/routes/hitoDS.tsx`
-  renders the internal Hito design-system playground with its own design-system sidebar and no runner-facing shell chrome, documenting and demonstrating the implemented low-card surface, typography, button, input, row, shell navigation, card, and dropdown primitives without adding a runner-facing product capability
+  renders the internal Hito design-system playground with its own design-system sidebar and no runner-facing shell chrome, documenting and demonstrating the implemented low-card surface, typography, button, input, row, shell navigation, card, and dropdown primitives without adding a runner-facing product capability, and now serves as the reference baseline for ongoing Hito UI inspection
 - `src/routes/api.auth.confirm.tsx`
   exchanges the Supabase auth code into a cookie-backed session
 - `src/routes/api.auth.local-login.tsx`
@@ -130,6 +130,7 @@
   now reserves one honest `Upload result` placeholder seam in the notes area without claiming Garmin, Strava, OCR, or extraction capability
 - the first Hito design-system implementation slices now exist in shared CSS primitives for low-card surfaces, tiered buttons, tiered fields, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact status pills, compact status markers, setup/empty/error state surfaces, progress analytics stats, chart legends, tooltip shells, body severity scales, body severity summaries, shell navigation rows, shell profile triggers, and shell dropdown rows; those primitives are applied to auth, onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, deeper workout-structure and completion micro-surfaces, route-level state surfaces, progress analytics surfaces, body severity micro-UI, preserved integration utility rows, and the internal `/hitoDS` reference page
 - remaining visualization-specific chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional geometry exceptions rather than generalized Hito component families
+- final Safari QA on the visible runner-facing scope found no obvious stray custom UI drift, so future UI work should extend shared Hito primitives or documented shell families instead of introducing new route-local visual treatments
 
 ## Trusted-Output Contract
 

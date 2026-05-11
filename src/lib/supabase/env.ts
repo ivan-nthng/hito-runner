@@ -51,6 +51,18 @@ function optionalEnv(...names: string[]): string | null {
 
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
+function safeOrigin(url: string | URL | null | undefined) {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
 export const publicEnv = {
   appName: envOrFallback("NEXT_PUBLIC_APP_NAME", "Hito Running"),
   supabaseUrl: optionalEnv("NEXT_PUBLIC_SUPABASE_URL"),
@@ -95,4 +107,31 @@ export function isLoopbackRuntimeUrl(url: string | URL | null | undefined) {
 
 export function isDevOnlyLocalAuthRuntime(url: string | URL | null | undefined) {
   return hasLocalAuthBypassEnv && isLoopbackRuntimeUrl(url);
+}
+
+export function resolveRuntimeAppBaseUrl(options?: {
+  requestUrl?: string | URL | null;
+  contextAppBaseUrl?: string | null;
+}) {
+  const requestOrigin = safeOrigin(options?.requestUrl);
+  const configuredOrigin = safeOrigin(serverEnv.appBaseUrl);
+  const contextOrigin = safeOrigin(options?.contextAppBaseUrl);
+
+  if (requestOrigin && isLoopbackRuntimeUrl(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  if (configuredOrigin && !isLoopbackRuntimeUrl(configuredOrigin)) {
+    return configuredOrigin;
+  }
+
+  if (requestOrigin) {
+    return requestOrigin;
+  }
+
+  if (contextOrigin) {
+    return contextOrigin;
+  }
+
+  return configuredOrigin;
 }

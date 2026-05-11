@@ -64,37 +64,35 @@ function WorkoutPage() {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="px-6 lg:px-10 py-20 max-w-2xl">
-          {snapshot.mode === "onboarding" ? (
-            <>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Setup required
-              </p>
-              <h1 className="mt-3 font-display text-4xl">Finish setup before opening workouts.</h1>
-              <p className="mt-4 text-sm text-muted-foreground">
-                The saved workout detail route exists only after a persisted runner profile and
-                active plan cycle are created.
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                No workout
-              </p>
-              <h1 className="mt-3 font-display text-4xl">Nothing is scheduled for this day.</h1>
-              <p className="mt-4 text-sm text-muted-foreground">
-                This date does not have a workout in the current {snapshot.source} plan view. Go
-                back to the weekly plan and choose another day.
-              </p>
-            </>
-          )}
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link
-              to="/"
-              className="inline-flex text-sm text-signal underline-offset-4 hover:underline"
-            >
-              Back to weekly plan
-            </Link>
-          </div>
+          <section
+            className="hito-state-surface"
+            data-tone={snapshot.mode === "onboarding" ? "signal" : undefined}
+          >
+            {snapshot.mode === "onboarding" ? (
+              <>
+                <p className="hito-label">Setup required</p>
+                <h1 className="hito-page-title">Finish setup before opening workouts.</h1>
+                <p className="hito-page-copy">
+                  The saved workout detail route exists only after a persisted runner profile and
+                  active plan cycle are created.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="hito-label">No workout</p>
+                <h1 className="hito-page-title">Nothing is scheduled for this day.</h1>
+                <p className="hito-page-copy">
+                  This date does not have a workout in the current {snapshot.source} plan view. Go
+                  back to the weekly plan and choose another day.
+                </p>
+              </>
+            )}
+            <div className="hito-state-actions">
+              <Link to="/" className="hito-button hito-button-primary hito-button-lg">
+                Back to weekly plan
+              </Link>
+            </div>
+          </section>
         </div>
       </AppShell>
     );
@@ -112,12 +110,21 @@ function WorkoutPage() {
   const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
   const primaryTarget = primaryWorkoutTarget(workout);
   const phase = `${workout.phase} · week ${workout.week}`;
+  const heroMetrics = isRestDay
+    ? []
+    : [
+        km != null ? { label: "Distance", value: formatDistanceKm(km), unit: "km" } : null,
+        duration > 0 ? { label: "Duration", value: duration.toString(), unit: "min" } : null,
+        duration > 0 ? { label: "Load", value: loadFor(workout) } : null,
+      ].filter((metric): metric is { label: string; value: string; unit?: string } =>
+        Boolean(metric),
+      );
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="relative max-w-6xl px-6 py-8 lg:px-10">
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(circle_at_top_left,rgba(209,161,69,0.14),transparent_48%),radial-gradient(circle_at_top_right,rgba(122,162,247,0.12),transparent_44%),radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_62%)]" />
-        <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="flex items-center gap-3 hito-section-subtitle">
           <Link to="/" className="inline-flex items-center gap-1 hover:text-foreground">
             <ArrowLeft className="h-3 w-3" /> Calendar
           </Link>
@@ -125,12 +132,10 @@ function WorkoutPage() {
           <span>{phase}</span>
         </div>
 
-        <section className="relative mt-6 overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(145deg,rgba(18,24,31,0.94),rgba(27,34,43,0.78))] px-6 py-6 shadow-[0_18px_50px_rgba(0,0,0,0.22)] lg:px-8 lg:py-8">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-          <div className="absolute -right-16 top-0 h-32 w-32 rounded-full bg-signal/10 blur-3xl" />
-          <div className="grid items-end gap-8 lg:grid-cols-[1fr_auto]">
+        <section className="relative mt-5 overflow-hidden border-t border-hairline/80 px-1 pb-3 pt-6 lg:pt-7">
+          <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
             <div>
-              <div className="flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.18em]">
+              <div className="flex flex-wrap items-center gap-3 hito-section-subtitle">
                 {resultMeta ? (
                   <ResultBadge meta={resultMeta} mode="identity" />
                 ) : (
@@ -153,59 +158,70 @@ function WorkoutPage() {
                 {isRestDay ? "Rest day" : workout.title}
               </h1>
               {objectiveFor(workout.type) && (
-                <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                  {objectiveFor(workout.type)}
-                </p>
+                <p className="hito-support-copy mt-4 max-w-xl">{objectiveFor(workout.type)}</p>
               )}
             </div>
 
-            {!isRestDay && (
-              <div className="grid grid-cols-3 gap-3 sm:flex sm:gap-6">
-                <Stat label="Distance" value={km != null ? formatDistanceKm(km) : "—"} unit="km" />
-                <Stat label="Duration" value={duration ? duration.toString() : "—"} unit="min" />
-                <Stat label="Load" value={loadFor(workout)} unit="" />
+            {heroMetrics.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-6 sm:justify-end sm:gap-8">
+                {heroMetrics.map((metric) => (
+                  <Stat
+                    key={metric.label}
+                    label={metric.label}
+                    value={metric.value}
+                    unit={metric.unit}
+                  />
+                ))}
               </div>
             )}
           </div>
         </section>
 
-        <div className="mt-10 border-b border-hairline flex gap-6">
-          {(
-            [
-              { v: "overview", l: "Overview" },
-              { v: "complete", l: "Log result" },
-              { v: "preview", l: "Preview state" },
-            ] as const
-          ).map((tabOption) => (
-            <button
-              key={tabOption.v}
-              onClick={() =>
-                navigate({
-                  search: (current) => ({
-                    ...current,
-                    tab: tabOption.v,
-                  }),
-                  replace: true,
-                })
-              }
-              className={cn(
-                "py-3 text-sm border-b-2 transition-colors -mb-px",
-                tab === tabOption.v
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {tabOption.l}
-              {tabOption.v === "preview" && (
-                <span className="ml-2 text-[10px] uppercase tracking-wider text-signal">later</span>
-              )}
-            </button>
-          ))}
+        <div className="mt-10 flex gap-6 border-b border-hairline/80 pb-3">
+          <div className="hito-tab-list hito-tab-list-open">
+            {(
+              [
+                { v: "overview", l: "Overview" },
+                { v: "complete", l: "Log result" },
+                { v: "preview", l: "Preview state" },
+              ] as const
+            ).map((tabOption) => (
+              <button
+                key={tabOption.v}
+                onClick={() =>
+                  navigate({
+                    search: (current) => ({
+                      ...current,
+                      tab: tabOption.v,
+                    }),
+                    replace: true,
+                  })
+                }
+                data-active={tab === tabOption.v}
+                className="hito-tab"
+              >
+                {tabOption.l}
+                {tabOption.v === "preview" && (
+                  <span className="ml-2 text-[10px] uppercase tracking-wider text-signal">
+                    later
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="mt-8 grid lg:grid-cols-[1fr_320px] gap-10">
-          <div className="relative overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(150deg,rgba(16,22,28,0.86),rgba(29,36,46,0.7))] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.18)]">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          <div
+            className={cn(
+              "relative",
+              tab !== "overview" &&
+                "overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(150deg,rgba(16,22,28,0.86),rgba(29,36,46,0.7))] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.18)]",
+            )}
+          >
+            {tab !== "overview" && (
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            )}
             {tab === "overview" && <Overview workout={workout} />}
             {tab === "complete" && <CompletionPanel workout={workout} snapshot={snapshot} />}
             {tab === "preview" && <PreviewPanel />}
@@ -228,9 +244,7 @@ function WorkoutPage() {
                 <SidebarSection title="Targets" tone="signal">
                   {displayTargetEntries(primaryTarget).map((entry) => (
                     <div key={entry.key} className="flex justify-between gap-3 py-1 last:border-0">
-                      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                        {entry.label}
-                      </span>
+                      <span className="hito-section-subtitle">{entry.label}</span>
                       <span className="text-xs text-right text-foreground/85">{entry.value}</span>
                     </div>
                   ))}
@@ -260,11 +274,11 @@ function WorkoutPage() {
                     style={{ width: `${weekProgress.percent}%` }}
                   />
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+                <div className="mt-3 flex items-center justify-between gap-3 hito-caption">
                   <span>{weekStatus.label}</span>
                   <span>{weekProgress.remaining} left</span>
                 </div>
-                <p className="mt-3 text-[11px] text-muted-foreground">{weekStatus.helper}</p>
+                <p className="hito-caption mt-3">{weekStatus.helper}</p>
               </SidebarSection>
 
               <SidebarSection title="Preview boundary" tone="signal">
@@ -307,7 +321,7 @@ function WorkoutPendingState() {
   return (
     <AppShell>
       <div className="px-6 lg:px-10 py-8 max-w-6xl space-y-8">
-        <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="flex items-center gap-3 hito-section-subtitle">
           <Skeleton className="h-3 w-32 bg-background/30" />
         </div>
         <div className="grid lg:grid-cols-[1fr_auto] gap-8 items-end">
@@ -340,25 +354,21 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
   return (
     <AppShell>
       <div className="px-6 lg:px-10 py-20 max-w-2xl">
-        <section className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 lg:p-10">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-destructive">
-            Workout unavailable
-          </p>
-          <h1 className="mt-3 font-display text-4xl leading-[1.05]">
-            We couldn&apos;t load this workout.
-          </h1>
-          <p className="mt-4 text-sm text-foreground/85 leading-relaxed">
+        <section className="hito-state-surface" data-tone="destructive">
+          <p className="hito-label text-destructive">Workout unavailable</p>
+          <h1 className="hito-page-title">We couldn&apos;t load this workout.</h1>
+          <p className="hito-page-copy text-foreground/85">
             Try again to reopen the latest workout detail from preview or saved mode. If the plan is
             still being set up, return home first.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="hito-state-actions">
             <button
               type="button"
               onClick={() => {
                 reset();
                 window.location.reload();
               }}
-              className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90"
+              className="hito-button hito-button-primary hito-button-lg"
             >
               Try again
             </button>
@@ -380,36 +390,32 @@ function Overview({ workout }: { workout: Workout }) {
 
   if (workout.type === "rest") {
     return (
-      <div className="space-y-6">
-        <section className="overflow-hidden rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Recovery day
-              </p>
-              <h3 className="mt-2 font-display text-3xl">Keep it light.</h3>
-            </div>
-            <div className="flex items-end gap-2 opacity-70">
-              <div className="h-8 w-8 rounded-full border border-hairline bg-background/60" />
-              <div className="h-12 w-12 rounded-full border border-hairline bg-background/50" />
-              <div className="h-6 w-6 rounded-full border border-hairline bg-background/70" />
-            </div>
+      <section className="flex min-h-[220px] flex-col border-t border-white/8 pt-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="hito-label">Recovery day</p>
+            <h3 className="mt-2 font-display text-3xl">Keep it light.</h3>
+            <p className="hito-support-copy mt-4 max-w-lg">
+              No distance, duration, or load is scheduled here. Let the day stay open unless a real
+              recovery assignment is present.
+            </p>
           </div>
-          <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground">
-            No distance, duration, or load is scheduled here. Let the day stay open unless a real
-            recovery assignment is present.
-          </p>
-        </section>
+          <div className="hidden items-end gap-2 opacity-50 sm:flex">
+            <div className="h-8 w-8 rounded-full border border-white/8 bg-background/25" />
+            <div className="h-12 w-12 rounded-full border border-white/8 bg-background/20" />
+            <div className="h-6 w-6 rounded-full border border-white/8 bg-background/25" />
+          </div>
+        </div>
 
         {restAssignment && (
-          <section className="rounded-xl border border-hairline bg-background/35 p-4">
-            <h3 className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Assignment
-            </h3>
-            <p className="mt-3 text-sm leading-relaxed text-foreground/85">{restAssignment}</p>
-          </section>
+          <div className="mt-auto border-t border-white/8 pt-5">
+            <div>
+              <p className="hito-label">Assignment</p>
+              <p className="mt-3 text-sm leading-relaxed text-foreground/85">{restAssignment}</p>
+            </div>
+          </div>
         )}
-      </div>
+      </section>
     );
   }
 
@@ -418,9 +424,7 @@ function Overview({ workout }: { workout: Workout }) {
       <IntervalsViz workout={workout} />
 
       <div>
-        <h3 className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Execution cues
-        </h3>
+        <h3 className="hito-label">Execution cues</h3>
         <ul className="mt-4 space-y-2 text-sm text-foreground/85">
           <li className="flex gap-3">
             <span className="text-muted-foreground">·</span> Start the first 10 minutes deliberately
@@ -442,9 +446,7 @@ function Overview({ workout }: { workout: Workout }) {
       </div>
 
       <div>
-        <h3 className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Fueling & recovery
-        </h3>
+        <h3 className="hito-label">Fueling & recovery</h3>
         <div className="relative mt-4 overflow-hidden rounded-2xl bg-[linear-gradient(145deg,rgba(15,19,24,0.92),rgba(21,26,32,0.82))] shadow-[0_14px_35px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid sm:grid-cols-3">
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           {[
@@ -459,7 +461,7 @@ function Overview({ workout }: { workout: Workout }) {
               key={item.t}
               className="border-t border-white/8 px-4 py-4 text-foreground first:border-t-0 sm:border-t-0 sm:border-l sm:border-white/8 sm:first:border-l-0"
             >
-              <div className="text-[10px] uppercase tracking-[0.18em] text-white/50">{item.t}</div>
+              <div className="hito-section-subtitle text-[10px] text-white/50">{item.t}</div>
               <div className="mt-1 text-sm text-white/92">{item.v}</div>
             </div>
           ))}
@@ -471,39 +473,36 @@ function Overview({ workout }: { workout: Workout }) {
 
 function PreviewPanel() {
   return (
-    <div className="rounded-xl border border-dashed border-hairline p-10 text-center">
+    <div className="hito-surface-flat border-dashed p-8 text-center">
       <NotebookPen className="h-6 w-6 mx-auto text-signal" strokeWidth={1.4} />
       <h3 className="mt-4 font-display text-2xl">This panel stays as a preview shell</h3>
-      <p className="mt-3 text-sm text-muted-foreground max-w-md mx-auto">
+      <p className="hito-support-copy mx-auto mt-3 max-w-md">
         It preserves the imported tab structure without pretending that analysis, external data
         ingest, or plan rewriting are already live.
       </p>
-      <div className="mt-6 inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-        <span className="h-1 w-1 rounded-full bg-signal" />
-        Later surface · not connected yet
+      <div className="mt-6">
+        <span className="hito-status-pill" data-tone="signal">
+          Later surface · not connected yet
+        </span>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, unit }: { label: string; value: string; unit: string }) {
+function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
-    <div className="text-right">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
-      <div className="mt-1 flex items-baseline gap-1 justify-end">
-        <span className="font-display text-3xl leading-none">{value}</span>
-        <span className="text-xs text-muted-foreground">{unit}</span>
+    <div className="hito-metric min-w-16">
+      <div className="flex items-baseline justify-center gap-1">
+        <span className="hito-metric-value text-2xl">{value}</span>
+        {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
       </div>
+      <div className="hito-metric-label">{label}</div>
     </div>
   );
 }
 
 function SidebarPanel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(160deg,rgba(16,21,28,0.92),rgba(28,34,42,0.72))] shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
-      {children}
-    </div>
-  );
+  return <div className="hito-row-group">{children}</div>;
 }
 
 function SidebarSection({
@@ -520,15 +519,15 @@ function SidebarSection({
   return (
     <section
       className={cn(
-        "border-t border-white/8 px-4 py-4 first:border-t-0",
+        "hito-list-row items-start",
         tone === "signal" && "bg-signal/[0.03]",
         muted && "bg-surface/30",
       )}
     >
-      <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-        {title}
+      <div className="w-full min-w-0">
+        <div className="hito-label mb-3">{title}</div>
+        {children}
       </div>
-      {children}
     </section>
   );
 }
@@ -542,30 +541,35 @@ function NavCard({
   date: string;
   title: string;
 }) {
+  const formattedDate = formatDate(date, { weekday: "short", month: "short", day: "numeric" });
+
   return (
     <Link
       to="/workout/$date"
       params={{ date }}
-      className={cn(
-        "group rounded-xl bg-[linear-gradient(150deg,rgba(255,255,255,0.16),rgba(255,255,255,0.08))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_12px_28px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-colors hover:bg-[linear-gradient(150deg,rgba(255,255,255,0.18),rgba(255,255,255,0.1))]",
-        direction === "next" ? "text-right" : "",
-      )}
+      data-direction={direction === "next" ? "next" : "previous"}
+      className="hito-nav-card"
     >
-      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-1.5 justify-between">
+      <div className="hito-nav-card-top">
         {direction === "prev" ? (
           <>
-            <ArrowLeft className="h-3 w-3" /> Previous
+            <span className="hito-nav-card-arrow">
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </span>
+            <span className="hito-nav-card-label">Previous</span>
+            <span className="hito-nav-card-date">{formattedDate}</span>
           </>
         ) : (
           <>
-            Next <ChevronRight className="h-3 w-3" />
+            <span className="hito-nav-card-date">{formattedDate}</span>
+            <span className="hito-nav-card-label">Next</span>
+            <span className="hito-nav-card-arrow">
+              <ChevronRight className="h-3.5 w-3.5" />
+            </span>
           </>
         )}
-        <span className="font-mono-num">
-          {formatDate(date, { weekday: "short", month: "short", day: "numeric" })}
-        </span>
       </div>
-      <div className="mt-2 text-sm">{title}</div>
+      <div className="hito-nav-card-title">{title}</div>
     </Link>
   );
 }
@@ -685,15 +689,17 @@ function ResultBadge({
 
   return (
     <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]",
-        meta.tone === "success" && "border-success/30 bg-success/12 text-success",
-        meta.tone === "warn" && "border-warn/30 bg-warn/12 text-warn",
-        meta.tone === "destructive" && "border-destructive/30 bg-destructive/12 text-destructive",
-        mode === "sidebar" && "text-[11px]",
-      )}
+      className={cn("hito-status-pill", mode === "sidebar" && "text-[11px]")}
+      data-icon="false"
+      data-tone={meta.tone === "warn" ? "warning" : meta.tone}
     >
-      <Icon className="h-3.5 w-3.5" strokeWidth={2.2} />
+      <span
+        className="hito-status-marker"
+        data-size="xs"
+        data-tone={meta.tone === "warn" ? "warning" : meta.tone}
+      >
+        <Icon className="h-3.5 w-3.5" strokeWidth={2.2} />
+      </span>
       {meta.label}
     </span>
   );

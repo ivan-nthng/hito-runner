@@ -23,10 +23,8 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Workout structure
-        </span>
-        <span className="text-[11px] font-mono-num text-muted-foreground">
+        <span className="hito-label">Workout structure</span>
+        <span className="hito-caption font-mono-num">
           {formatDurationMin(total)} · {blocks.length} blocks
         </span>
       </div>
@@ -83,7 +81,7 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
         )}
       </div>
 
-      <ol className="mt-5 space-y-2.5">
+      <ol className="hito-row-group mt-5">
         {blocks.map((b, i) => {
           const colors = segmentColorMeta(b.semanticKind, b.target);
           const isActive = activeIndex === i;
@@ -92,11 +90,11 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
             <li
               key={i}
               className={cn(
-                "flex items-center gap-4 rounded-lg border border-transparent px-2 py-1.5 text-sm transition-colors",
-                isActive && "border-white/10 bg-white/[0.085]",
+                "hito-list-row justify-start gap-4 transition-colors",
+                isActive && "bg-white/[0.085]",
               )}
             >
-              <span className="font-mono-num text-[11px] text-muted-foreground w-6 text-right">
+              <span className="hito-caption w-6 text-right font-mono-num">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <span
@@ -108,11 +106,11 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
-                  <span className="capitalize">{b.kind.replace("_", " ")}</span>
-                  <span className="text-[11px] text-muted-foreground">{b.label}</span>
+                  <span className="hito-list-row-title capitalize">{b.kind.replace("_", " ")}</span>
+                  <span className="hito-caption">{b.label}</span>
                 </div>
                 {b.target && (
-                  <div className="mt-0.5 text-[11px] text-muted-foreground space-x-3">
+                  <div className="hito-caption mt-0.5 space-x-3">
                     {displayTargetEntries(b.target).map((entry) => (
                       <span key={entry.key}>
                         <span className="opacity-60">{entry.label}:</span>{" "}
@@ -122,7 +120,7 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
                   </div>
                 )}
               </div>
-              <span className="font-mono-num text-xs text-muted-foreground">{b.metric}</span>
+              <span className="hito-caption font-mono-num">{b.metric}</span>
             </li>
           );
         })}
@@ -211,7 +209,7 @@ function SegmentTooltip({
   return (
     <span
       className={cn(
-        "pointer-events-none absolute top-[calc(100%+10px)] z-30 block w-max max-w-[240px] rounded-xl border border-white/14 bg-[#11161d] px-3 py-2 text-left text-[11px] leading-relaxed text-white opacity-100 shadow-[0_18px_40px_rgba(0,0,0,0.44)]",
+        "hito-tooltip absolute top-[calc(100%+10px)] z-30 opacity-100",
         align === "left" && "translate-x-0",
         align === "center" && "left-1/2 -translate-x-1/2",
         align === "right" && "-translate-x-full",
@@ -221,15 +219,15 @@ function SegmentTooltip({
       }}
     >
       <span className="flex items-center gap-2 font-medium">
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
-        <span>{block.title}</span>
+        <span className="hito-tooltip-dot" style={{ background: color }} />
+        <span className="hito-tooltip-title">{block.title}</span>
       </span>
-      <span className="mt-1 block font-mono-num text-white/68">{block.metric}</span>
+      <span className="hito-tooltip-meta mt-1 block font-mono-num">{block.metric}</span>
       {priorityEntries.length > 0 && (
-        <span className="mt-1.5 block space-y-0.5 text-white/68">
+        <span className="hito-tooltip-meta mt-1.5 block space-y-0.5">
           {priorityEntries.map((entry) => (
             <span key={entry.key} className="block">
-              <span className="text-white/42">{entry.label}:</span> <span>{entry.value}</span>
+              <span className="opacity-65">{entry.label}:</span> <span>{entry.value}</span>
             </span>
           ))}
         </span>

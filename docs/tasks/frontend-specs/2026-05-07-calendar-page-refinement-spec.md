@@ -213,6 +213,11 @@ Until those inputs exist, the block should stay honest and quiet.
 
 Calendar cells should show completed days more clearly, but without making the grid noisy or collapsing the distinction between `today`, `selected/current`, `future`, and `rest`.
 
+This calendar also needs room for one secondary future signal:
+
+- the workout was completed
+- and richer feedback evidence was attached later
+
 ### Required Visual Signal
 
 Completed days should use a clearer success treatment, combining:

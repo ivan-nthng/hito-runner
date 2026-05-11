@@ -112,10 +112,8 @@ export function CompletionPanel({
 
   if (workout.type === "rest") {
     return (
-      <div className="rounded-xl border border-hairline bg-background/35 p-5">
-        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Rest day
-        </div>
+      <div className="hito-surface-flat p-5">
+        <div className="hito-label">Rest day</div>
         <p className="mt-2 text-sm leading-relaxed text-foreground/85">
           Rest days do not need a workout result. If a real mobility or strength assignment is added
           later, this surface can stay available for it.
@@ -128,17 +126,17 @@ export function CompletionPanel({
     <div className="space-y-8">
       <div
         className={cn(
-          "rounded-xl border p-4",
+          "hito-surface-flat p-4",
           error
             ? "border-destructive/30 bg-destructive/10"
             : message
               ? "border-success/30 bg-success/10"
               : hasSavedLog
                 ? "border-success/20 bg-background/35"
-                : "border-hairline bg-background/35",
+                : "",
         )}
       >
-        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="hito-label">
           {isSaving
             ? "Saving result"
             : error
@@ -172,7 +170,7 @@ export function CompletionPanel({
                       : "Saving here writes the canonical workout log and updates the visible week status from backend truth."
                     : "You can try the flow here, but preview mode does not persist workout history."}
         </p>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+        <div className="hito-caption mt-3 flex flex-wrap items-center gap-3">
           <span>
             Week status <span className="text-foreground/80">{weekStatus.label}</span>
           </span>
@@ -222,10 +220,8 @@ export function CompletionPanel({
                   }))
                 }
                 className={cn(
-                  "flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-all",
-                  active
-                    ? "border-foreground/30 bg-accent/40"
-                    : "border-hairline hover:bg-accent/30",
+                  "hito-surface-flat flex flex-col items-start gap-2 p-4 text-left transition-all",
+                  active ? "border-foreground/30 bg-accent/40" : "hover:bg-accent/30",
                 )}
               >
                 <Icon
@@ -241,10 +237,8 @@ export function CompletionPanel({
       </div>
 
       {isSkipped ? (
-        <div className="rounded-xl border border-hairline bg-background/35 p-4">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Skipped result
-          </div>
+        <div className="hito-surface-flat p-4">
+          <div className="hito-label">Skipped result</div>
           <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
             Skipped saves without actual distance, duration, reps, or RPE. You can keep notes for
             context, and the visible route status will reflect the skipped truth after save.
@@ -272,10 +266,8 @@ export function CompletionPanel({
             </div>
 
             {plannedRepeats > 0 && (
-              <div className="mt-4 rounded-lg border border-hairline p-3">
-                <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Intervals completed
-                </div>
+              <div className="hito-surface-flat mt-4 p-3">
+                <div className="hito-label mb-2">Intervals completed</div>
                 <div className="flex gap-1.5">
                   {Array.from({ length: plannedRepeats }).map((_, index) => (
                     <button
@@ -298,9 +290,7 @@ export function CompletionPanel({
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Tap to mark how many reps were completed.
-                </p>
+                <p className="hito-field-helper mt-2">Tap to mark how many reps were completed.</p>
               </div>
             )}
           </div>
@@ -324,29 +314,27 @@ export function CompletionPanel({
           value={form.notes}
           onChange={(event) => updateForm((current) => ({ ...current, notes: event.target.value }))}
           placeholder="Felt strong on the climb, slight tightness in right calf at km 6…"
-          className="mt-3 w-full rounded-lg border border-hairline bg-background/50 p-3 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground/30 resize-none"
+          className="hito-field hito-textarea-md mt-3 min-h-28 resize-none"
         />
-        <div className="mt-4 rounded-xl border border-dashed border-hairline bg-background/25 p-4">
+        <div className="hito-surface-flat mt-4 border-dashed p-4">
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               disabled
-              className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/80 disabled:opacity-100"
+              className="hito-button hito-button-secondary hito-button-md disabled:opacity-100"
             >
               <Upload className="h-4 w-4 text-signal" />
               Upload result
-              <span className="text-[10px] uppercase tracking-[0.18em] text-signal">Later</span>
+              <span className="hito-label hito-label-signal text-[10px]">Later</span>
             </button>
-            <span className="text-[11px] text-muted-foreground">
-              Add screenshot or evidence here later.
-            </span>
+            <span className="hito-caption">Add screenshot or evidence here later.</span>
           </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="hito-caption mt-3">
             Post-run insight will appear here once uploaded result evidence is supported. Garmin,
             Strava, and extraction are not connected in this slice.
           </p>
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">
+        <p className="hito-caption mt-3">
           {snapshot.source === "persisted"
             ? "Saving here upserts the canonical workout log and recomputes the visible week status from backend truth."
             : "Preview only. This form keeps the imported interaction pattern, but saved results are not persisted or synced yet."}
@@ -380,12 +368,12 @@ export function CompletionPanel({
               setIsSaving(false);
             }
           }}
-          className="rounded-md bg-signal text-signal-foreground px-5 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-60"
+          className="hito-button hito-button-primary hito-button-lg"
           disabled={isSaving || (hasSavedLog && !isDirty)}
         >
           {saveButtonLabel}
         </button>
-        <span className="ml-auto text-[11px] text-muted-foreground">
+        <span className="hito-caption ml-auto">
           {snapshot.source === "persisted"
             ? "Current phase keeps one canonical persisted backend contract."
             : "Current phase keeps one local preview form and one preview seam."}
@@ -481,9 +469,7 @@ function parseNumberInput(value: string) {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{children}</div>
-  );
+  return <div className="hito-label">{children}</div>;
 }
 
 function NumField({
@@ -500,10 +486,10 @@ function NumField({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="rounded-lg border border-hairline p-3">
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-        <span>{label}</span>
-        <span>plan {planned}</span>
+    <div className="hito-surface-flat p-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="hito-label">{label}</span>
+        <span className="hito-caption font-mono-num">plan {planned}</span>
       </div>
       <div className="mt-1 flex items-baseline gap-2">
         <input
@@ -532,7 +518,7 @@ function Slider({
 }) {
   return (
     <div>
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="hito-label flex items-center justify-between">
         <span>{label}</span>
         <span className="text-foreground/80">{hint}</span>
       </div>

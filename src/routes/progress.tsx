@@ -33,22 +33,15 @@ function Progress() {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="px-6 lg:px-10 py-20 max-w-3xl">
-          <section className="rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Setup required
-            </p>
-            <h1 className="mt-3 font-display text-4xl lg:text-5xl leading-[1.05]">
-              Finish setup before reviewing progress.
-            </h1>
-            <p className="mt-4 max-w-xl text-sm text-muted-foreground leading-relaxed">
+          <section className="hito-state-surface" data-tone="signal">
+            <p className="hito-label">Setup required</p>
+            <h1 className="hito-page-title">Finish setup before reviewing progress.</h1>
+            <p className="hito-page-copy">
               Progress becomes meaningful only after your saved runner profile and first plan are
               created on home.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                to="/"
-                className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90"
-              >
+            <div className="hito-state-actions">
+              <Link to="/" className="hito-button hito-button-primary hito-button-lg">
                 Finish setup
               </Link>
             </div>
@@ -62,22 +55,15 @@ function Progress() {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="px-6 lg:px-10 py-20 max-w-3xl">
-          <section className="rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Progress unavailable
-            </p>
-            <h1 className="mt-3 font-display text-4xl lg:text-5xl leading-[1.05]">
-              There isn&apos;t a visible plan to summarize yet.
-            </h1>
-            <p className="mt-4 max-w-xl text-sm text-muted-foreground leading-relaxed">
+          <section className="hito-state-surface">
+            <p className="hito-label">Progress unavailable</p>
+            <h1 className="hito-page-title">There isn&apos;t a visible plan to summarize yet.</h1>
+            <p className="hito-page-copy">
               Once you create or import a saved plan, this preserved surface will reuse the same
               backend truth for volume, completion, and week status context.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                to="/"
-                className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90"
-              >
+            <div className="hito-state-actions">
+              <Link to="/" className="hito-button hito-button-primary hito-button-lg">
                 Back to weekly plan
               </Link>
             </div>
@@ -96,20 +82,20 @@ function Progress() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="px-6 lg:px-10 py-10 max-w-6xl space-y-14">
-        <header>
-          <p className="text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
+      <div className="hito-route-stack px-6 py-10 lg:px-10 max-w-6xl">
+        <header className="hito-page-header">
+          <p className="hito-label">
             {snapshot.source === "persisted" ? "Saved mode shell" : "Preview surface"}
           </p>
-          <h1 className="font-display text-5xl mt-2 leading-none">Progress, kept honest.</h1>
-          <p className="mt-4 text-sm text-muted-foreground max-w-xl">
+          <h1 className="hito-page-title">Progress, kept honest.</h1>
+          <p className="hito-page-copy">
             {snapshot.source === "persisted"
               ? "This route stays preserved to keep the imported navigation and layout intact while the aggregates now read from persisted plan and workout-log state."
               : "This route is preserved to keep the imported navigation and layout intact. The charts below still read from deterministic sample data rather than saved runner history."}
           </p>
         </header>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="hito-analytics-grid">
           <BigStat
             icon={Activity}
             label="Completed sessions"
@@ -138,16 +124,15 @@ function Progress() {
             icon={Flag}
             label="Surface state"
             value={snapshot.source === "persisted" ? "Saved" : "Preview"}
-            hint={
-              snapshot.source === "persisted" ? "backend truth is live" : "no backend truth yet"
-            }
+            hint={snapshot.source === "persisted" ? "saved logs are live" : "preview only"}
+            statusTone={snapshot.source === "persisted" ? "success" : undefined}
             tone="warn"
           />
         </div>
 
         <section>
           <SectionHeader title="Weekly mileage" subtitle="Planned vs actual" />
-          <div className="rounded-xl border border-hairline p-6 bg-surface/40">
+          <div className="hito-surface-flat p-5">
             <div className="flex items-end gap-1.5 h-48">
               {weeks.map((week) => {
                 const isPast = week.weekStart <= snapshot.currentDate;
@@ -156,7 +141,7 @@ function Progress() {
                     key={week.weekStart}
                     className="group flex-1 flex flex-col justify-end items-center gap-1 relative"
                   >
-                    <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-mono-num text-muted-foreground">
+                    <div className="hito-caption absolute -top-7 font-mono-num opacity-0 transition-opacity group-hover:opacity-100">
                       {week.km.toFixed(0)}km
                     </div>
                     <div className="w-full flex items-end gap-px h-full">
@@ -180,31 +165,27 @@ function Progress() {
                 );
               })}
             </div>
-            <div className="mt-3 flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              <span>Wk 1</span>
-              <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-sm bg-signal/80" /> Actual
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-sm bg-foreground/15" /> Planned
-                </span>
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <span className="hito-caption font-mono-num">Wk 1</span>
+              <div className="hito-legend justify-center">
+                <LegendItem tone="actual" label="Actual" />
+                <LegendItem tone="planned" label="Planned" />
               </div>
-              <span>Wk {weeks.length}</span>
+              <span className="hito-caption font-mono-num">Wk {weeks.length}</span>
             </div>
           </div>
         </section>
 
         <section>
           <SectionHeader title="Activity trend" subtitle="14-day sample pattern" />
-          <div className="rounded-xl border border-hairline p-6 bg-surface/40">
+          <div className="hito-surface-flat p-5">
             <FatigueChart />
           </div>
         </section>
 
         <section>
           <SectionHeader title="Consistency" subtitle="Last 12 quality sessions" />
-          <div className="rounded-xl border border-hairline p-6 bg-surface/40">
+          <div className="hito-surface-flat p-5">
             <div className="flex gap-1.5">
               {recentTypes.map((workout) => {
                 const meta = TYPE_META[workout.type];
@@ -224,31 +205,34 @@ function Progress() {
                         opacity: workout.status === "skipped" ? 0.5 : 1,
                       }}
                     />
-                    <div className="mt-2 text-[9px] font-mono-num text-muted-foreground text-center">
+                    <div className="hito-caption mt-2 text-center font-mono-num">
                       {workout.date.slice(5)}
                     </div>
                   </div>
                 );
               })}
             </div>
+            <div className="hito-legend mt-5">
+              <LegendItem tone="completed" label="Completed" />
+              <LegendItem tone="partial" label="Partial" />
+              <LegendItem tone="skipped" label="Skipped" />
+            </div>
           </div>
         </section>
 
         <section>
           <SectionHeader title="Why this page stays" subtitle="Preserved shell" />
-          <div className="rounded-xl border border-hairline p-8 bg-gradient-to-br from-surface-elevated to-surface">
-            <div className="grid lg:grid-cols-[1fr_auto] gap-8 items-end">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Preview contract
-                </p>
+          <div className="hito-row-group">
+            <div className="hito-list-row items-end">
+              <div className="max-w-xl">
+                <p className="hito-label">Preview contract</p>
                 <div className="mt-3 font-display text-5xl leading-none">Later, not live.</div>
-                <p className="mt-3 text-sm text-muted-foreground">
+                <p className="hito-support-copy mt-3">
                   This is where richer trend interpretation can live later, once workout logs, week
                   status, and any derived summaries are backed by real persisted data.
                 </p>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="grid min-w-[220px] gap-3">
                 {[
                   {
                     k: "Status",
@@ -259,17 +243,12 @@ function Progress() {
                     v: snapshot.source === "persisted" ? "Persisted" : "Local only",
                   },
                   {
-                    k: "Backend",
-                    v: snapshot.source === "persisted" ? "Supabase" : "Off",
+                    k: "Truth",
+                    v: snapshot.source === "persisted" ? "Saved logs" : "Preview",
                   },
                 ].map((metric) => (
-                  <div
-                    key={metric.k}
-                    className="rounded-md border border-hairline px-3 py-2 min-w-[140px] flex justify-between items-baseline"
-                  >
-                    <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                      {metric.k}
-                    </span>
+                  <div key={metric.k} className="flex items-baseline justify-between gap-4">
+                    <span className="hito-label">{metric.k}</span>
                     <span className="font-mono-num text-sm">{metric.v}</span>
                   </div>
                 ))}
@@ -307,24 +286,20 @@ function ProgressErrorState({ reset }: { error: Error; reset: () => void }) {
   return (
     <AppShell>
       <div className="px-6 lg:px-10 py-20 max-w-3xl">
-        <section className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 lg:p-10">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-destructive">
-            Progress unavailable
-          </p>
-          <h1 className="mt-3 font-display text-4xl leading-[1.05]">
-            We couldn&apos;t load this progress view.
-          </h1>
-          <p className="mt-4 text-sm text-foreground/85 leading-relaxed">
+        <section className="hito-state-surface" data-tone="destructive">
+          <p className="hito-label text-destructive">Progress unavailable</p>
+          <h1 className="hito-page-title">We couldn&apos;t load this progress view.</h1>
+          <p className="hito-page-copy text-foreground/85">
             Try again to reopen the latest preview or saved aggregate state.
           </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="hito-state-actions">
             <button
               type="button"
               onClick={() => {
                 reset();
                 window.location.reload();
               }}
-              className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90"
+              className="hito-button hito-button-primary hito-button-lg"
             >
               Try again
             </button>
@@ -343,11 +318,9 @@ function ProgressErrorState({ reset }: { error: Error; reset: () => void }) {
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="flex items-baseline justify-between mb-4">
-      <h2 className="font-display text-2xl">{title}</h2>
-      <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-        {subtitle}
-      </span>
+    <div className="hito-section-header">
+      <h2 className="hito-section-title">{title}</h2>
+      <span className="hito-section-subtitle">{subtitle}</span>
     </div>
   );
 }
@@ -358,6 +331,7 @@ function BigStat({
   value,
   unit,
   hint,
+  statusTone,
   tone,
 }: {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -365,20 +339,46 @@ function BigStat({
   value: string;
   unit?: string;
   hint?: string;
+  statusTone?: "success" | "warning" | "destructive" | "signal";
   tone?: "warn";
 }) {
   return (
-    <div className="rounded-xl border border-hairline bg-surface/40 p-5">
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-        <span>{label}</span>
-        <Icon className={cn("h-3.5 w-3.5", tone === "warn" && "text-warn")} strokeWidth={1.5} />
+    <div className="hito-analytics-stat">
+      <div className="hito-analytics-stat-head">
+        <span className="hito-label">{label}</span>
+        <span className="hito-analytics-stat-icon" data-tone={tone}>
+          <Icon className="h-3.5 w-3.5" strokeWidth={1.5} />
+        </span>
       </div>
-      <div className="mt-3 flex items-baseline gap-1">
-        <span className="font-display text-4xl leading-none">{value}</span>
-        {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
+      <div className="hito-analytics-stat-body">
+        {statusTone ? (
+          <span className="hito-status-pill" data-tone={statusTone}>
+            {value}
+          </span>
+        ) : (
+          <div className="flex items-baseline justify-center gap-1.5">
+            <span className="hito-analytics-value">{value}</span>
+            {unit && <span className="hito-analytics-unit">{unit}</span>}
+          </div>
+        )}
+        {hint && <div className="hito-caption">{hint}</div>}
       </div>
-      {hint && <div className="mt-2 text-[11px] text-muted-foreground">{hint}</div>}
     </div>
+  );
+}
+
+function LegendItem({
+  tone,
+  label,
+}: {
+  tone: "actual" | "planned" | "completed" | "partial" | "skipped";
+  label: string;
+}) {
+  return (
+    <span className="hito-legend-item">
+      <span className="hito-legend-swatch" data-tone={tone} />
+      {label}
+    </span>
   );
 }
 
@@ -420,7 +420,7 @@ function FatigueChart() {
         <path d={area} fill="url(#g)" />
         <path d={path} fill="none" stroke="var(--signal)" strokeWidth="2.2" />
       </svg>
-      <div className="mt-3 text-[11px] text-muted-foreground">
+      <div className="hito-caption mt-3">
         Static placeholder chart. No readiness model, OCR import, or adaptive coaching logic is
         inferred from this line.
       </div>

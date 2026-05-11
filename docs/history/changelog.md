@@ -2,8 +2,37 @@
 
 Completed implementation history only.
 
+## 2026-05-11
+
+- Completed a near-final no-stray Hito DS cleanup: calendar and workout-structure tooltip chrome now uses one shared `hito-tooltip` primitive, calendar workout-type legend rows use the shared `hito-legend` family, `/hitoDS` documents the tooltip shell plus final visualization geometry exceptions, and chart bars, plotted lines, interval widths, SVG silhouettes, and marker coordinates remain intentionally route-owned geometry.
+- Normalized shell navigation ownership: desktop and mobile AppShell navigation rows, the profile trigger, and profile dropdown menu rows now use explicit Hito shell primitives; `/integrations` data-flow utility rows now use shared grouped rows; and `/hitoDS` demonstrates the live shell navigation pattern.
+- Normalized the body severity design-system slice: `/body` severity selectors now use a shared `hito-scale-control` and `hito-scale-button` pattern, active-log summaries use shared `hito-severity-bars`, and `/hitoDS` documents the live severity scale pattern while preserving the body-map SVG as visualization-specific geometry.
+- Normalized the next Hito design-system progress analytics slice: `/progress` large summary stats now use a shared `hito-analytics-stat` primitive, chart legends use a shared `hito-legend` family, and `/hitoDS` demonstrates the implemented analytics primitives without changing progress data semantics.
+- Added the next full design-system normalization slice: shared `hito-status-marker` and `hito-state-surface` primitives now own compact check/dash/cross status expression and setup/empty/error route surfaces across calendar, workout, progress, and home error states, with `/hitoDS` updated to demonstrate the live marker and state-surface families.
+- Normalized deeper Hito design-system micro-primitives in workout support components: `IntervalsViz` now uses shared labels, captions, tooltip tone, and grouped rows, while `CompletionPanel` now uses shared flat surfaces, labels, fields, helper text, buttons, and captions for save feedback, actual metrics, interval count support, notes, and the upload-result placeholder.
+- Restored `localhost:3000` as the trusted local QA runtime by replacing the stale long-lived Nitro server with the current built `.output`, adding an explicit `npm run serve:local` command for the production-like local server, and verifying current hashed assets load on port 3000.
+- Reworked `/hitoDS` into a dedicated internal component playground with its own design-system sidebar, no runner-facing Today/Week/Open Plan chrome, and live primitive examples for buttons, inputs, surfaces, list items, and dropdown-style rows.
+- Normalized the next Hito design-system typography and spacing slice: runner-facing page headers, section headers, support copy, captions, and route rhythm now use shared primitives across home/calendar, workout detail, progress, body, integrations, and `/hitoDS`.
+- Softened the workout-detail tab chrome by adding an open Hito tab-list treatment for the route tabs, removing the tight boxed border and giving the tab row more breathing room above the section divider.
+- Added the mirrored Hito workout navigation card pattern for workout-detail previous/next links, with darker low-chrome surfaces, mirrored arrow/date/label/title alignment, and a living `/hitoDS` reference example.
+
+## 2026-05-10
+
+- Applied the next Hito design-system rollout slice to preserved secondary surfaces: `/progress`, `/body`, and `/integrations` now use shared low-card surfaces, grouped rows, buttons, fields, and compact status treatment where they fit, while workout-detail preview support uses the same status/surface primitives.
+- Simplified the home surface divider rhythm: pace guidance now sits inline with the workout subtitle, right-side Planning Note and Week Status no longer have extra top divider lines, calendar controls are no longer boxed by a top grid divider, and one shared divider now separates the hero from the calendar section.
+- Fixed the remaining Safari-visible home/calendar DS regressions: prose pace guidance no longer renders as a large hero metric value, and week cards no longer duplicate status markers in the narrow footer area.
+- Corrected the latest home design-system rollout by removing the reintroduced large card treatment from the Today hero and calendar frame, softening the right-side support area into divided rows, making today read through outline treatment, and replacing weekly per-day status pills with compact check/dash/cross markers.
+- Applied the Hito component primitives to core runner-facing surfaces: home support panels now use grouped rows and status pills, calendar controls use shared tabs/buttons/status treatment, and workout detail uses shared metric, tab, grouped-row, and status-pill primitives for hero stats, right-side support, and result state.
+- Implemented the first Hito component-system slice by adding shared tiered button variants, tiered field and textarea sizing, helper/error/success text styles, grouped row primitives, metric rows, and compact status pills; applying them to auth, onboarding, advanced import, shell chrome, and refreshing `/hitoDS` to demonstrate the real primitives.
+- Implemented the first Hito design-system rollout slice by adding shared low-card surface, field, button, tab, label, and divider primitives; applying them to auth, onboarding, advanced import, and shell chrome; and adding `/hitoDS` as an internal living reference page with the existing left navigation.
+- Fixed advanced `training-plan-v2` apply reliability so a successful saved-mode import no longer falls through into a generic client-side `Load failed`; the flow now exits through a fresh home reload and keeps apply-time failures specific.
+- Strengthened the canonical JSON template by adding a reserved `_ml_agent_template` instruction block, and updated the import seam to accept that block as ignored template metadata instead of runtime truth.
+- Fixed the text-first onboarding post-submit transition so successful plan creation automatically opens the saved-mode home route through a fresh document request instead of leaving the current setup screen stuck in its pending state.
+
 ## 2026-05-09
 
+- Restored the visible text-first plan creation path for authenticated no-plan/no-workout states by reusing the primary onboarding surface and making the plan text area visually unmistakable while keeping advanced import secondary.
+- Fixed auth redirect-origin resolution so deploy-like Magic Link and callback flows no longer trust a loopback `APP_BASE_URL` override and no longer send users back to `localhost:3000`.
 - Completed the final Phase 5 legacy-removal slice by deleting deprecated `week_1_preview[]` compatibility from the active runtime, CLI tooling, and visible advanced-import contract, so `training-plan-v2` is now the only supported import format.
 - Continued the final Phase 5 deletion window by removing deprecated single-account local auth env support from the active runtime and local tooling, cleaning `.env.example`, and making the accounts-file path the only remaining local bypass input contract.
 - Continued the final Phase 5 deletion window by removing `SUPABASE_SERVICE_ROLE_KEY` from the active runtime and CLI env contract, cleaning `.env.example`, and making `SUPABASE_SECRET_KEY` the only documented server-side Supabase admin/write key.

@@ -12,6 +12,7 @@ import type { Json } from "@/lib/supabase/database";
 
 export const FUTURE_TEMPLATE_VERSION = "training-plan-v2";
 export const FUTURE_TEMPLATE_DOWNLOAD_PATH = "/templates/hito-training-plan-v2-template.json";
+export const ML_AGENT_TEMPLATE_META_KEY = "_ml_agent_template";
 export const REMOVED_LEGACY_IMPORT_NOTICE =
   "Legacy week_1_preview[] JSON is no longer supported. Convert this file to training-plan-v2 before importing.";
 
@@ -20,6 +21,7 @@ export const V2_IMPORT_ROOT_KEYS = [
   "plan_id",
   "plan_name",
   "source_kind",
+  "_ml_agent_template",
   "created_at",
   "generated_for",
   "goal",
@@ -407,6 +409,7 @@ export const trainingPlanV2Schema = z
     schema_version: z.literal(FUTURE_TEMPLATE_VERSION),
     plan_name: z.string().trim().min(1),
     source_kind: z.string().trim().min(1).optional(),
+    [ML_AGENT_TEMPLATE_META_KEY]: z.unknown().optional(),
     created_at: z.string().datetime().optional(),
     generated_for: z.string().trim().min(1),
     goal: v2GoalSchema.optional(),

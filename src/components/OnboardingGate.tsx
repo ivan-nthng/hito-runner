@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, Download, Upload } from "lucide-react";
 import {
@@ -15,7 +14,6 @@ type TextStatus = "idle" | "saving" | "finishing";
 type JsonStatus = "idle" | "parsing" | "saving" | "finishing";
 
 export function OnboardingGate() {
-  const router = useRouter();
   const completeTextOnboardingFn = useServerFn(completeTextOnboarding);
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -43,9 +41,9 @@ export function OnboardingGate() {
   });
 
   return (
-    <section className="mx-auto max-w-4xl rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
+    <section className="hito-surface mx-auto max-w-4xl p-6 lg:p-10">
       <div className="max-w-2xl">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">First plan</p>
+        <p className="text-[11px] uppercase tracking-[0.18em] text-signal">Create a plan</p>
         <h1 className="mt-3 font-display text-4xl leading-[1.05] lg:text-5xl">
           Describe what you&apos;re training for.
         </h1>
@@ -78,8 +76,7 @@ export function OnboardingGate() {
               },
             });
             setTextStatus("finishing");
-            await router.invalidate();
-            await router.navigate({ to: "/" });
+            openSavedHome();
           } catch (submitError) {
             setTextStatus("idle");
             setTextError(
@@ -97,11 +94,10 @@ export function OnboardingGate() {
           </p>
 
           <label className="grid gap-2">
-            <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Your request
-            </span>
+            <span className="hito-label hito-label-signal">Write your plan request here</span>
             <textarea
-              rows={10}
+              autoFocus
+              rows={9}
               value={authoringText}
               onChange={(event) => {
                 setAuthoringText(event.target.value);
@@ -110,17 +106,17 @@ export function OnboardingGate() {
               placeholder={
                 "Goal: half marathon later this year.\nTarget horizon: around 16 weeks.\nCurrent level: running 3 times per week, long run 8 km.\nRecent results: 10K in 59:30 two months ago.\nContext: 34 years old, back from a light injury break.\nConstraints: no Tuesdays, prefer 4 runs per week, keep one full rest day."
               }
-              className="resize-y rounded-lg border border-hairline bg-background/50 px-4 py-3 text-sm leading-relaxed placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
+              className="hito-field hito-textarea-lg resize-y"
             />
           </label>
 
-          {textError && <p className="text-sm text-destructive">{textError}</p>}
+          {textError && <p className="hito-field-error">{textError}</p>}
 
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <button
               type="submit"
               disabled={isBusy || authoringText.trim().length < 20}
-              className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="hito-button hito-button-primary hito-button-lg"
             >
               {textStatus === "saving"
                 ? "Building your plan..."
@@ -128,20 +124,18 @@ export function OnboardingGate() {
                   ? "Opening your plan..."
                   : "Build my first plan"}
             </button>
-            <span className="text-[11px] text-muted-foreground">
-              One compact request is enough to start.
-            </span>
+            <span className="hito-field-helper">One compact request is enough to start.</span>
           </div>
 
           {textStatus === "finishing" && (
-            <p className="text-sm text-foreground/80">
+            <p className="hito-field-success">
               Your plan was created. Loading the saved calendar now…
             </p>
           )}
         </div>
       </form>
 
-      <div className="mt-8 border-t border-hairline pt-6">
+      <div className="hito-section-divider mt-8 pt-6">
         <button
           type="button"
           onClick={() => setShowJsonImport((current) => !current)}
@@ -166,7 +160,7 @@ export function OnboardingGate() {
         </button>
 
         {showJsonImport && (
-          <div className="mt-5 border-t border-hairline pt-5">
+          <div className="hito-section-divider mt-5 pt-5">
             <input
               ref={fileInputRef}
               type="file"
@@ -203,7 +197,7 @@ export function OnboardingGate() {
                   type="button"
                   disabled={isBusy}
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                  className="hito-button hito-button-primary hito-button-md"
                 >
                   <Upload className="h-4 w-4" />
                   {selectedFileName ? "Choose another file" : "Upload JSON"}
@@ -211,7 +205,7 @@ export function OnboardingGate() {
                 <a
                   href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
                   download
-                  className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-accent"
+                  className="hito-button hito-button-secondary hito-button-md"
                 >
                   <Download className="h-4 w-4 text-signal" />
                   Download JSON template
@@ -222,9 +216,7 @@ export function OnboardingGate() {
               </div>
 
               <label className="grid gap-2">
-                <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  JSON content
-                </span>
+                <span className="hito-label">JSON content</span>
                 <textarea
                   rows={10}
                   value={jsonDraft}
@@ -235,7 +227,7 @@ export function OnboardingGate() {
                     setJsonError(null);
                   }}
                   placeholder='{"schema_version":"training-plan-v2","plan_name":"...","generated_for":"...","start_date":"...","planned_workouts":[...]}'
-                  className="rounded-lg border border-hairline bg-background/50 px-4 py-3 font-mono text-xs leading-relaxed placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
+                  className="hito-field hito-textarea-md font-mono text-xs"
                 />
               </label>
 
@@ -244,34 +236,50 @@ export function OnboardingGate() {
                   type="button"
                   disabled={isBusy || !jsonDraft.trim()}
                   onClick={() => validateJsonDraft(jsonDraft)}
-                  className="rounded-md border border-hairline px-4 py-2 text-sm transition-colors hover:bg-accent disabled:opacity-60"
+                  className="hito-button hito-button-secondary hito-button-md"
                 >
                   Validate JSON
                 </button>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="hito-field-helper">
                   Advanced import requires the canonical `training-plan-v2` contract.
                 </span>
               </div>
 
               {importedSummary && (
-                <div className="space-y-1">
-                  <p className="text-sm leading-relaxed text-foreground/85">
-                    Ready to import: {importedSummary.days} days, {importedSummary.workouts}{" "}
-                    workouts from {importedSummary.contractLabel}.
-                  </p>
+                <div className="hito-row-group">
+                  <div className="hito-list-row">
+                    <div>
+                      <p className="hito-list-row-title">Ready to import</p>
+                      <p className="hito-list-row-copy">
+                        {importedSummary.days} days, {importedSummary.workouts} workouts from{" "}
+                        {importedSummary.contractLabel}.
+                      </p>
+                    </div>
+                    <span className="hito-status-pill" data-tone="success">
+                      Valid
+                    </span>
+                  </div>
                 </div>
               )}
 
               {fieldErrors.length > 0 && (
-                <div className="space-y-2 text-sm text-destructive">
-                  <p className="text-[11px] uppercase tracking-[0.18em]">JSON shape mismatch</p>
-                  {fieldErrors.slice(0, 5).map((issue) => (
-                    <p key={issue}>{issue}</p>
-                  ))}
+                <div className="hito-row-group">
+                  <div className="hito-list-row items-start">
+                    <div>
+                      <p className="hito-label text-destructive">JSON shape mismatch</p>
+                      <div className="mt-2 space-y-1">
+                        {fieldErrors.slice(0, 5).map((issue) => (
+                          <p key={issue} className="hito-field-error">
+                            {issue}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {jsonError && <p className="text-sm text-destructive">{jsonError}</p>}
+              {jsonError && <p className="hito-field-error">{jsonError}</p>}
 
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <button
@@ -293,8 +301,7 @@ export function OnboardingGate() {
                         },
                       });
                       setJsonStatus("finishing");
-                      await router.invalidate();
-                      await router.navigate({ to: "/" });
+                      openSavedHome();
                     } catch (submitError) {
                       setJsonStatus("idle");
                       setJsonError(
@@ -304,7 +311,7 @@ export function OnboardingGate() {
                       );
                     }
                   }}
-                  className="rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                  className="hito-button hito-button-primary hito-button-md"
                 >
                   {jsonStatus === "parsing"
                     ? "Checking JSON..."
@@ -314,7 +321,7 @@ export function OnboardingGate() {
                         ? "Opening your plan..."
                         : "Apply JSON plan"}
                 </button>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="hito-field-helper">
                   This does not replace the text-first setup path.
                 </span>
               </div>
@@ -370,4 +377,8 @@ function validateJsonDraftFactory({
     setImportedPlan(validation.data);
     setJsonStatus("idle");
   };
+}
+
+function openSavedHome() {
+  window.location.assign("/");
 }

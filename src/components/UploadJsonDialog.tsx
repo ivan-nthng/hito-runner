@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AlertCircle, Download, Upload } from "lucide-react";
 import {
@@ -25,7 +24,6 @@ export function UploadJsonDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const router = useRouter();
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -43,6 +41,21 @@ export function UploadJsonDialog({
     /would detach saved workout history|apply step is blocked|current saved plan stays unchanged/i.test(
       error,
     );
+  const describeApplyError = (submitError: unknown) => {
+    if (!(submitError instanceof Error)) {
+      return "Could not apply the imported plan.";
+    }
+
+    if (/load failed|failed to fetch|networkerror/i.test(submitError.message)) {
+      return "The import request did not complete, so the current saved plan was left unchanged. Retry the apply step.";
+    }
+
+    if (/not authenticated|signed in|session/i.test(submitError.message)) {
+      return "Your sign-in session expired before the plan could be applied. Sign in again and retry.";
+    }
+
+    return submitError.message;
+  };
 
   useEffect(() => {
     if (open) {
@@ -108,7 +121,7 @@ export function UploadJsonDialog({
               type="button"
               disabled={isBusy}
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+              className="hito-button hito-button-primary hito-button-md"
             >
               <Upload className="h-4 w-4" />
               {selectedFileName ? "Choose another file" : "Upload JSON"}
@@ -116,7 +129,7 @@ export function UploadJsonDialog({
             <a
               href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
               download
-              className="inline-flex items-center gap-2 rounded-md border border-hairline bg-background/45 px-4 py-2 text-sm text-foreground/85 transition-colors hover:bg-accent"
+              className="hito-button hito-button-secondary hito-button-md"
             >
               <Download className="h-4 w-4 text-signal" />
               Download JSON template
@@ -127,9 +140,7 @@ export function UploadJsonDialog({
           </div>
 
           <label className="grid gap-2">
-            <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              JSON content
-            </span>
+            <span className="hito-label">JSON content</span>
             <textarea
               rows={10}
               value={jsonDraft}
@@ -140,7 +151,7 @@ export function UploadJsonDialog({
                 setError(null);
               }}
               placeholder='{"schema_version":"training-plan-v2","plan_name":"...","generated_for":"...","start_date":"...","planned_workouts":[...]}'
-              className="rounded-lg border border-hairline bg-background/50 px-4 py-3 font-mono text-xs leading-relaxed placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
+              className="hito-field hito-textarea-md font-mono text-xs"
             />
           </label>
 
@@ -156,60 +167,74 @@ export function UploadJsonDialog({
                   setStatus,
                 })
               }
-              className="rounded-md border border-hairline px-4 py-2 text-sm transition-colors hover:bg-accent disabled:opacity-60"
+              className="hito-button hito-button-secondary hito-button-md"
             >
               Validate JSON
             </button>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="hito-field-helper">
               Advanced import requires the canonical `training-plan-v2` contract.
             </span>
           </div>
 
           {summary && (
-            <div className="space-y-1">
-              <p
-                className={
-                  isBlockedReplace
-                    ? "text-sm leading-relaxed text-warn"
-                    : "text-sm leading-relaxed text-foreground/85"
-                }
-              >
-                {isBlockedReplace ? (
-                  <>
-                    <span className="inline-flex items-center gap-2">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      Replace blocked.
-                    </span>{" "}
-                    This JSON parsed correctly, but applying it here would detach saved workout
-                    history.
-                  </>
-                ) : (
-                  <>
-                    Ready to apply: {summary.days} days, {summary.workouts} workouts from{" "}
-                    {summary.contractLabel}.
-                  </>
-                )}
-              </p>
+            <div className="hito-row-group">
+              <div className="hito-list-row items-start">
+                <div>
+                  <p
+                    className={
+                      isBlockedReplace ? "hito-list-row-title text-warn" : "hito-list-row-title"
+                    }
+                  >
+                    {isBlockedReplace ? (
+                      <span className="inline-flex items-center gap-2">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        Replace blocked.
+                      </span>
+                    ) : (
+                      "Ready to apply"
+                    )}
+                  </p>
+                  <p className="hito-list-row-copy">
+                    {isBlockedReplace
+                      ? "This JSON parsed correctly, but applying it here would detach saved workout history."
+                      : `${summary.days} days, ${summary.workouts} workouts from ${summary.contractLabel}.`}
+                  </p>
+                </div>
+                <span
+                  className="hito-status-pill"
+                  data-tone={isBlockedReplace ? "warning" : "success"}
+                >
+                  {isBlockedReplace ? "Blocked" : "Valid"}
+                </span>
+              </div>
             </div>
           )}
 
           {fieldErrors.length > 0 && (
-            <div className="space-y-2 text-sm text-destructive">
-              <p className="text-[11px] uppercase tracking-[0.18em]">JSON shape mismatch</p>
-              {fieldErrors.slice(0, 5).map((issue) => (
-                <p key={issue}>{issue}</p>
-              ))}
+            <div className="hito-row-group">
+              <div className="hito-list-row items-start">
+                <div>
+                  <p className="hito-label text-destructive">JSON shape mismatch</p>
+                  <div className="mt-2 space-y-1">
+                    {fieldErrors.slice(0, 5).map((issue) => (
+                      <p key={issue} className="hito-field-error">
+                        {issue}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="hito-field-error">{error}</p>}
         </div>
 
-        <DialogFooter className="border-t border-hairline px-6 py-4">
+        <DialogFooter className="hito-section-divider px-6 py-4">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="rounded-md border border-hairline px-4 py-2 text-sm transition-colors hover:bg-accent"
+            className="hito-button hito-button-secondary hito-button-md"
           >
             Cancel
           </button>
@@ -231,19 +256,18 @@ export function UploadJsonDialog({
                     importedPlan,
                   },
                 });
-                await router.invalidate();
                 onOpenChange(false);
-                await router.navigate({ to: "/" });
+
+                if (typeof window !== "undefined") {
+                  window.location.assign("/");
+                  return;
+                }
               } catch (submitError) {
                 setStatus("idle");
-                setError(
-                  submitError instanceof Error
-                    ? submitError.message
-                    : "Could not apply the imported plan.",
-                );
+                setError(describeApplyError(submitError));
               }
             }}
-            className="rounded-md bg-signal px-4 py-2 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+            className="hito-button hito-button-primary hito-button-md"
           >
             {status === "parsing"
               ? "Checking JSON..."

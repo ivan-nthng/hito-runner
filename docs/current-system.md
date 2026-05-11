@@ -6,6 +6,7 @@
 - the imported baseline structure remains preserved in `src/`, including generated route tree, shell, components, UI primitives, and styles
 - build and dev commands come from `package.json`
 - local production-like `npm run start` now explicitly loads `.env.local` so the temporary env-backed admin login reaches the built server path
+- local QA on `localhost:3000` should use the current built output through `npm run serve:local` after `npm run build`; long-lived server processes must be restarted after rebuilds so HTML and hashed assets come from the same `.output`
 - the canonical deployment runtime is now Nitro for Vercel:
   `npm run build` emits `.output/` locally
   `vercel build` emits `.vercel/output/` with Vercel functions
@@ -20,12 +21,14 @@
   renders one of three states behind the same route:
   login-first unauthenticated entry
   authenticated onboarding gate
-  authenticated persisted weekly plan, where the saved-mode hero keeps one preserved main workout card, one grouped support card, and the calendar below
+  authenticated persisted weekly plan, where the saved-mode hero keeps the preserved workout hierarchy as an open low-chrome header, a light right-side support module, and the calendar below
 - `src/routes/login.tsx`
   renders either:
   a minimal `Hito.` auth-first entry screen where loopback local runtimes may still show the temporary credentials tab for development
   or the real email auth path only when the request is deploy-like
   or the email magic-link entry flow when local credentials are not configured
+- `src/routes/hitoDS.tsx`
+  renders the internal Hito design-system playground with its own design-system sidebar and no runner-facing shell chrome, documenting and demonstrating the implemented low-card surface, typography, button, input, row, shell navigation, card, and dropdown primitives without adding a runner-facing product capability
 - `src/routes/api.auth.confirm.tsx`
   exchanges the Supabase auth code into a cookie-backed session
 - `src/routes/api.auth.local-login.tsx`
@@ -35,9 +38,9 @@
 - `src/routes/workout.$date.tsx`
   renders workout detail for preview or persisted data, treats the route search as the source of truth for the active tab, preserves `tab=complete`, logs results through the canonical backend mutation when saved mode is active, now keeps rest-day detail sparse with one grouped right-side context panel, and preserves the three-block page structure with richer surface treatment, result-state badges, and progress-driven week status
 - `src/routes/progress.tsx`
-  renders the preserved analytics shell using preview or persisted aggregates from the same data seam
+  renders the preserved analytics shell using preview or persisted aggregates from the same data seam, with large summary stats and chart legends now mapped to shared Hito analytics primitives
 - `src/routes/body.tsx`
-  renders a preserved body-note preview shell
+  renders a preserved body-note preview shell, with severity scale controls and active-log severity summaries mapped to shared Hito severity primitives while the body-map SVG remains visualization-specific
 - `src/routes/integrations.tsx`
   renders a preserved integration preview shell
 
@@ -56,7 +59,7 @@
 - `src/lib/training-api.ts`
   owns server-backed loading and mutation entry points for home, workout detail, progress, login, text-first onboarding, advanced JSON import, internal structured authoring, and workout logging
 - `src/lib/imported-plan.ts`
-  owns the canonical `training-plan-v2` import contract, JSON validation helpers, the runtime-noise exclusions for v2, the bounded canonical target and prescription normalization rules, and the mapping from accepted import shapes into the canonical saved workout shape
+  owns the canonical `training-plan-v2` import contract, JSON validation helpers, the runtime-noise exclusions for v2, the bounded canonical target and prescription normalization rules, the accepted-but-ignored `_ml_agent_template` instruction block, and the mapping from accepted import shapes into the canonical saved workout shape
 - `src/lib/structured-plan-authoring.ts`
   owns the first server-side structured authoring contract, its normalization rules, and the deterministic generator that emits canonical `training-plan-v2` plan truth before persistence
 - `src/lib/openai-plan-authoring.ts`
@@ -95,12 +98,13 @@
 - the imported JSON week creates the saved `planned_workouts` directly instead of shifting the preview template onto today
 - home and calendar now anchor `today` to the real runtime local date instead of a frozen template start date
 - the preview snapshot no longer caches a stale `currentDate`, so reloads can reflect the actual current day
-- the saved-mode home hero now uses one grouped support module for `Planning Note`, `Week Status`, and `Tomorrow`, and the lower metadata strip has been removed
+- the saved-mode home hero now uses one light divided support module for `Planning Note`, `Week Status`, and `Tomorrow`, and the lower metadata strip has been removed
 - saved-mode home-return affordances in the shell now reopen `/` through a fresh document request so already-open tabs can recover the authoritative home route even when a stale client fetch path fails
 - calendar day cells now mark completed workouts with a clearer green confirmation state while keeping today and rest states readable
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode advanced import entry point plus sign-out action
 - the saved-mode advanced import dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
+- after a successful saved-mode advanced import apply, the client now leaves the current page through a fresh document request to `/` instead of relying on an immediate in-place router refresh on the replaced plan state
 - the saved-mode advanced import dialog now accepts only canonical `training-plan-v2` files, and runtime-only v2 fields such as `status`, `completion_state`, and sync or feedback placeholders remain non-canonical
 - the first structured authoring generator now emits the same canonical `training-plan-v2` family used by JSON import, persists it through `plan_cycles` plus `planned_workouts`, and reuses `steps jsonb` as the only structured workout payload
 - normalized `planned_workouts.steps jsonb` now preserves explicit segment-level `segment_id`, `segment_type`, `sequence`, `prescription`, and canonical target keys such as `hr_bpm_range` and `pace_min_per_km_range`
@@ -124,6 +128,8 @@
   completed non-rest workouts in the current week
 - `src/components/CompletionPanel.tsx`
   now reserves one honest `Upload result` placeholder seam in the notes area without claiming Garmin, Strava, OCR, or extraction capability
+- the first Hito design-system implementation slices now exist in shared CSS primitives for low-card surfaces, tiered buttons, tiered fields, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact status pills, compact status markers, setup/empty/error state surfaces, progress analytics stats, chart legends, tooltip shells, body severity scales, body severity summaries, shell navigation rows, shell profile triggers, and shell dropdown rows; those primitives are applied to auth, onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, deeper workout-structure and completion micro-surfaces, route-level state surfaces, progress analytics surfaces, body severity micro-UI, preserved integration utility rows, and the internal `/hitoDS` reference page
+- remaining visualization-specific chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional geometry exceptions rather than generalized Hito component families
 
 ## Trusted-Output Contract
 
@@ -140,7 +146,7 @@
 - preferred public env usage is `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - app name now falls back directly to `Hito Running` when `NEXT_PUBLIC_APP_NAME` is unset
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are now the only supported public Supabase browser env names
-- `APP_BASE_URL` is an optional server-only override for auth redirects; when it is unset, the magic-link request and callback derive origin from the incoming runtime request
+- `APP_BASE_URL` is an optional server-only non-loopback override for auth redirects; deploy-like requests now prefer the real runtime origin over any loopback override, and local loopback development should usually leave `APP_BASE_URL` unset so magic-link and callback URLs stay on the local origin
 - `SUPABASE_SECRET_KEY` is now the only supported server-only key for canonical Supabase writes, local-bypass plan imports, and admin-backed persisted saved mode
 - temporary local-only auth env now uses only `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE` for an untracked local account list
 - required Vercel env for the live Supabase-backed auth path is `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`

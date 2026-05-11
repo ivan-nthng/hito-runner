@@ -1,11 +1,91 @@
 {
   "schema_version": "training-plan-v2",
+  "_ml_agent_template": {
+    "purpose": "Reserved instructions for ML agents generating canonical Hito training-plan-v2 JSON.",
+    "import_behavior": "Accepted but ignored by Hito import. Do not treat this block as runtime truth.",
+    "canonical_required_top_level_fields": [
+      "schema_version",
+      "plan_name",
+      "generated_for",
+      "start_date",
+      "planned_workouts"
+    ],
+    "runtime_truth_rules": [
+      "Only plan truth belongs here: plan metadata, workout metadata, and segment prescriptions.",
+      "Do not invent app-state, UI state, sync state, database ids, session data, user auth state, or client-side flags.",
+      "Use one workout per calendar date.",
+      "Use ISO dates in YYYY-MM-DD format.",
+      "Use canonical training-plan-v2 field names whenever a canonical form exists."
+    ],
+    "segment_rules": [
+      "Every workout must have a non-empty segments array.",
+      "Use segment_type values already supported by Hito: warmup, main, cooldown, recovery, rest, mobility, mobility_optional, strength, activation, drills, strides, recovery_jog, fueling, tempo_block, interval_block.",
+      "For simple time or distance segments, set duration_min or distance_km directly.",
+      "For interval_block or strides, use repeat_count plus either work_distance_km, work_duration_min, work_duration_sec, or duration_min for the work unit.",
+      "For repeated tempo_block segments, use repeat_count plus work_distance_km, work_duration_min, work_duration_sec, or duration_min.",
+      "Use recovery_duration_min, recovery_duration_sec, or recovery_distance_km for explicit recovery inside repeated segments.",
+      "You may alternatively use prescription.mode = repeats with repeat_unit and recovery_unit, but do not mix conflicting representations."
+    ],
+    "target_rules": [
+      "Target is for user-facing training cues only.",
+      "Prefer canonical keys like hr_bpm_range and pace_min_per_km_range.",
+      "You may include intensity, rpe, cadence_spm_range, cue, and hint.",
+      "If extra structured target metadata is helpful, put it under target.extra as scalar key/value pairs only.",
+      "Do not place nested objects or arrays inside target.extra."
+    ],
+    "accepted_but_non_canonical_fields": [
+      "status",
+      "completion_state",
+      "ai_adjustable",
+      "ai_adjustment_candidate",
+      "ai_notes",
+      "ai_recovery_recommendation",
+      "ai_risk_flags",
+      "completed_result",
+      "garmin_sync_placeholder",
+      "strava_sync_placeholder",
+      "user_feedback_placeholder",
+      "pain_tracking_placeholder"
+    ],
+    "non_canonical_field_rule": "These fields may be present for compatibility, but Hito does not treat them as canonical persisted runtime truth. Do not rely on them for import success.",
+    "do_not_invent": [
+      "Legacy week_1_preview arrays",
+      "Unsupported workout_type values",
+      "Unsupported segment_type values",
+      "Nested runtime objects outside the accepted compatibility placeholders",
+      "Database ids for persisted rows",
+      "Fields not defined by the canonical contract unless they are clearly ignored compatibility placeholders"
+    ]
+  },
   "plan_name": "Half Marathon Plan",
   "generated_for": "Runner Name",
   "start_date": "2026-05-05",
-  "preparation_horizon_months": 4,
+  "source_kind": "ml_generated_template_v1",
+  "goal": {
+    "goal_type": "race",
+    "goal_label": "Finish a half marathon feeling controlled",
+    "target_event": {
+      "label": "Target half marathon",
+      "date": "2026-08-30"
+    }
+  },
+  "runner_profile": {
+    "experience_level": "returning beginner",
+    "baseline_sessions_per_week": 4,
+    "baseline_long_run_km": 8,
+    "primary_goal": "Finish a half marathon feeling controlled",
+    "secondary_goal": "Rebuild running durability without rushing intensity"
+  },
+  "training_constraints": {
+    "running_days_per_week": 4,
+    "full_rest_days": ["Wednesday", "Saturday"],
+    "long_run_day": "Sunday",
+    "intensity_distribution": "Mostly easy running with one quality touch",
+    "progression_policy": "Increase gradually and protect recovery weeks"
+  },
   "planned_workouts": [
     {
+      "workout_id": "template-2026-05-05-easy",
       "date": "2026-05-05",
       "weekday": "Tuesday",
       "week_number": 1,
@@ -13,6 +93,9 @@
       "workout_type": "easy",
       "title": "Easy Run",
       "summary": "50 min easy with calm aerobic control",
+      "planned_rpe": 4,
+      "estimated_fatigue": "low",
+      "recovery_priority": "medium",
       "segments": [
         {
           "segment_type": "warmup",
@@ -26,7 +109,8 @@
           "segment_type": "main",
           "duration_min": 35,
           "target": {
-            "hr_bpm": "135-145",
+            "hr_bpm_range": "135-145",
+            "pace_min_per_km_range": "6:50-7:30",
             "intensity": "easy"
           }
         },
@@ -40,13 +124,14 @@
       ]
     },
     {
+      "workout_id": "template-2026-05-06-rest",
       "date": "2026-05-06",
       "weekday": "Wednesday",
       "week_number": 1,
       "phase": "Base",
       "workout_type": "rest",
       "title": "Rest Day",
-      "summary": "Recovery and mobility",
+      "summary": "Recovery and optional mobility",
       "segments": [
         {
           "segment_type": "rest",
@@ -57,13 +142,17 @@
       ]
     },
     {
+      "workout_id": "template-2026-05-08-intervals",
       "date": "2026-05-08",
       "weekday": "Friday",
       "week_number": 1,
       "phase": "Base",
-      "workout_type": "quality",
+      "workout_type": "intervals",
       "title": "Intervals",
       "summary": "6 x 400m with controlled fast running",
+      "planned_rpe": 7,
+      "estimated_fatigue": "medium_high",
+      "recovery_priority": "high",
       "segments": [
         {
           "segment_type": "warmup",
@@ -94,6 +183,7 @@
       ]
     },
     {
+      "workout_id": "template-2026-05-10-long-run",
       "date": "2026-05-10",
       "weekday": "Sunday",
       "week_number": 1,
@@ -101,6 +191,9 @@
       "workout_type": "long_run",
       "title": "Long Run",
       "summary": "60 min easy aerobic build",
+      "planned_rpe": 5,
+      "estimated_fatigue": "moderate",
+      "recovery_priority": "high",
       "segments": [
         {
           "segment_type": "warmup",
@@ -115,7 +208,7 @@
           "duration_min": 45,
           "target": {
             "intensity": "easy",
-            "hr_bpm": "135-145"
+            "hr_bpm_range": "135-145"
           }
         },
         {

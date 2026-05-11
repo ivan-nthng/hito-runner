@@ -36,33 +36,38 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
               ? target.pace
               : typeof target?.intensity === "string"
                 ? target.intensity
-                : typeof target?.cue === "string"
-                  ? target.cue
-                  : typeof target?.hint === "string"
-                    ? target.hint
-                    : "—";
-  const paceHint =
+                : null;
+  const paceValue =
     typeof target?.pace_min_per_km_range === "string"
       ? target.pace_min_per_km_range
       : typeof target?.pace_range_min_km === "string"
         ? target.pace_range_min_km
         : typeof target?.pace === "string"
           ? target.pace
-          : typeof target?.hint === "string"
-            ? target.hint
-            : "Keep the effort relaxed";
+          : null;
+  const paceHint =
+    typeof target?.hint === "string"
+      ? target.hint
+      : typeof target?.cue === "string"
+        ? target.cue
+        : paceValue
+          ? null
+          : "Keep the effort relaxed";
+  const workoutSupportText = isRestDay
+    ? "Keep the day light unless a small recovery assignment is actually planned."
+    : [workout.notes ?? "Keep the effort smooth and let the session carry the day.", paceHint]
+        .filter(Boolean)
+        .join(" · ");
 
   const tomorrowDate = new Date(`${snapshot.currentDate}T00:00:00`);
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
   const tomorrow = findWorkout(snapshot.workouts, tomorrowDate.toISOString().slice(0, 10));
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-signal/40 to-transparent" />
-
-      <div className="grid lg:grid-cols-[1.4fr_1fr] gap-10">
+    <section className="border-t border-hairline pt-6 lg:pt-8">
+      <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:gap-10">
         <div>
-          <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="flex items-center gap-3 hito-section-subtitle">
             <span className="h-1.5 w-1.5 rounded-full bg-signal animate-pulse" />
             <span className="text-signal">
               Today ·{" "}
@@ -80,22 +85,20 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
             {isRestDay ? "Rest day" : workout.title}
           </h2>
 
-          <p className="mt-4 max-w-md text-sm text-muted-foreground leading-relaxed">
-            {isRestDay
-              ? "Keep the day light unless a small recovery assignment is actually planned."
-              : (workout.notes ?? "Keep the effort smooth and let the session carry the day.")}
-          </p>
+          <p className="hito-support-copy mt-4 max-w-md">{workoutSupportText}</p>
 
           {!isRestDay ? (
-            <div className="mt-8 flex flex-wrap gap-8">
-              <Metric label="Distance" value={km != null ? formatDistanceKm(km) : "—"} unit="km" />
-              <Metric label="Duration" value={duration ? `${duration}` : "—"} unit="min" />
-              <Metric label="Target" value={primaryTarget} />
-              <Metric label="Pace Hint" value={paceHint} />
-            </div>
+            <>
+              <div className="hito-metric-row mt-8 max-w-3xl">
+                {km != null && <Metric label="Distance" value={formatDistanceKm(km)} unit="km" />}
+                {duration > 0 && <Metric label="Duration" value={`${duration}`} unit="min" />}
+                {primaryTarget && <Metric label="Target" value={primaryTarget} />}
+                {paceValue && <Metric label="Pace" value={paceValue} />}
+              </div>
+            </>
           ) : (
-            <div className="mt-8 max-w-md rounded-xl bg-background/35 p-4">
-              <div className="flex items-center gap-3">
+            <div className="mt-8 max-w-md border-y border-hairline py-4">
+              <div className="flex items-center gap-4">
                 <div className="grid h-10 w-10 place-items-center rounded-full bg-background/70">
                   <span className="h-4 w-4 rounded-full border border-hairline bg-surface/70" />
                 </div>
@@ -113,7 +116,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
             <Link
               to="/workout/$date"
               params={{ date: snapshot.currentDate }}
-              className="inline-flex items-center gap-2 rounded-md bg-signal text-signal-foreground px-5 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity"
+              className="hito-button hito-button-primary hito-button-lg"
             >
               {isRestDay ? "Open day" : "Open workout"}
               <ArrowUpRight className="h-4 w-4" />
@@ -123,7 +126,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
                 to="/workout/$date"
                 params={{ date: snapshot.currentDate }}
                 search={{ tab: "complete" } as never}
-                className="inline-flex items-center gap-2 rounded-md border border-hairline px-5 py-2.5 text-sm hover:bg-accent transition-colors"
+                className="hito-button hito-button-secondary hito-button-lg"
               >
                 Mark complete
               </Link>
@@ -131,49 +134,49 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-hairline bg-background/40 p-4 lg:p-5">
-          <section>
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              <NotebookPen className="h-3 w-3 text-signal" />
-              Planning Note
+        <div>
+          <section className="pb-4">
+            <div>
+              <div className="flex items-center gap-2 hito-section-subtitle">
+                <NotebookPen className="h-3 w-3 text-signal" />
+                Planning Note
+              </div>
+              <p className="hito-list-row-copy">
+                Previous-run insight will appear here once recent completed workouts include notes
+                or uploaded results.
+              </p>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-foreground/85">
-              Previous-run insight will appear here once recent completed workouts include notes or
-              uploaded results.
-            </p>
           </section>
 
-          <div className="my-4 border-t border-hairline" />
-
-          <section>
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              <Flag className="h-3 w-3" />
-              Week Status
+          <section className="flex items-start justify-between gap-4 py-4">
+            <div>
+              <div className="flex items-center gap-2 hito-section-subtitle">
+                <Flag className="h-3 w-3" />
+                Week Status
+              </div>
+              <p className="hito-list-row-copy">{weekStatus.helper}</p>
             </div>
-            <div className="mt-2">
-              <span className="font-display text-3xl">{weekStatus.label}</span>
-              <p className="mt-2 text-xs text-muted-foreground">{weekStatus.helper}</p>
-            </div>
+            <span className="hito-status-pill" data-tone={weekStatusTone(weekStatus.label)}>
+              {weekStatus.label}
+            </span>
           </section>
 
           {tomorrow && (
-            <>
-              <div className="my-4 border-t border-hairline" />
-              <section>
-                <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Tomorrow
-                </div>
+            <section className="border-t border-hairline py-4">
+              <div>
+                <div className="hito-section-subtitle">Tomorrow</div>
                 <div className="mt-1 text-sm text-foreground/90">
                   {tomorrow.type === "rest" ? "Rest day" : tomorrow.title}
                 </div>
-                <div className="mt-2 text-[11px] font-mono-num text-muted-foreground">
+                <div className="hito-caption mt-2 font-mono-num">
                   {summarizeUpcomingWorkout(tomorrow)}
                 </div>
-              </section>
-            </>
+              </div>
+            </section>
           )}
         </div>
       </div>
+      <div className="mt-8 border-b border-hairline" />
     </section>
   );
 }
@@ -216,12 +219,10 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
         : "Open another day from the calendar whenever you want to review the plan.";
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-signal/40 to-transparent" />
-
+    <section className="border-t border-hairline pt-6 lg:pt-8">
       <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
         <div>
-          <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="flex items-center gap-3 hito-section-subtitle">
             <span className="h-1.5 w-1.5 rounded-full bg-signal animate-pulse" />
             <span className="text-signal">
               Today ·{" "}
@@ -239,92 +240,96 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
             {heading}
           </h2>
 
-          <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">{body}</p>
+          <p className="hito-support-copy mt-4 max-w-md">{body}</p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             {closestWorkout && (
               <Link
                 to="/workout/$date"
                 params={{ date: closestWorkout.date }}
-                className="inline-flex items-center gap-2 rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90"
+                className="hito-button hito-button-primary hito-button-lg"
               >
                 Open nearest workout
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
             )}
-            <Link
-              to="/progress"
-              className="inline-flex items-center gap-2 rounded-md border border-hairline px-5 py-2.5 text-sm transition-colors hover:bg-accent"
-            >
+            <Link to="/progress" className="hito-button hito-button-secondary hito-button-lg">
               Open progress
             </Link>
           </div>
         </div>
 
-        <div className="rounded-xl border border-hairline bg-background/40 p-4 lg:p-5">
-          <section>
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              <NotebookPen className="h-3 w-3 text-signal" />
-              Plan Window
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-foreground/85">
-              {planStart && planEnd
-                ? `${formatDate(planStart, { month: "short", day: "numeric" })} to ${formatDate(planEnd, { month: "short", day: "numeric" })}`
-                : "No imported workouts are available yet."}
-            </p>
-          </section>
-
-          <div className="my-4 border-t border-hairline" />
-
-          <section>
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              <Flag className="h-3 w-3" />
-              Week Status
-            </div>
-            <div className="mt-2">
-              <span className="font-display text-3xl">
-                {WEEK_STATUS_META[snapshot.weekStatus].label}
-              </span>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {WEEK_STATUS_META[snapshot.weekStatus].helper}
+        <div>
+          <section className="pb-4">
+            <div>
+              <div className="flex items-center gap-2 hito-section-subtitle">
+                <NotebookPen className="h-3 w-3 text-signal" />
+                Plan Window
+              </div>
+              <p className="hito-list-row-copy">
+                {planStart && planEnd
+                  ? `${formatDate(planStart, { month: "short", day: "numeric" })} to ${formatDate(planEnd, { month: "short", day: "numeric" })}`
+                  : "No imported workouts are available yet."}
               </p>
             </div>
           </section>
 
+          <section className="flex items-start justify-between gap-4 py-4">
+            <div>
+              <div className="flex items-center gap-2 hito-section-subtitle">
+                <Flag className="h-3 w-3" />
+                Week Status
+              </div>
+              <p className="hito-list-row-copy">{WEEK_STATUS_META[snapshot.weekStatus].helper}</p>
+            </div>
+            <span
+              className="hito-status-pill"
+              data-tone={weekStatusTone(WEEK_STATUS_META[snapshot.weekStatus].label)}
+            >
+              {WEEK_STATUS_META[snapshot.weekStatus].label}
+            </span>
+          </section>
+
           {closestWorkout && (
-            <>
-              <div className="my-4 border-t border-hairline" />
-              <section>
-                <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Nearest Workout
-                </div>
+            <section className="border-t border-hairline py-4">
+              <div>
+                <div className="hito-section-subtitle">Nearest Workout</div>
                 <div className="mt-1 text-sm text-foreground/90">{closestWorkout.title}</div>
-                <div className="mt-2 text-[11px] font-mono-num text-muted-foreground">
+                <div className="hito-caption mt-2 font-mono-num">
                   {formatDate(closestWorkout.date, {
                     weekday: "short",
                     month: "short",
                     day: "numeric",
                   })}
                 </div>
-              </section>
-            </>
+              </div>
+            </section>
           )}
         </div>
       </div>
+      <div className="mt-8 border-b border-hairline" />
     </section>
   );
 }
 
 function Metric({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
-    <div>
-      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <span className="font-display text-3xl leading-none">{value}</span>
+    <div className="hito-metric">
+      <div className="flex items-baseline justify-center gap-1">
+        <span className="hito-metric-value text-xl">{value}</span>
         {unit ? <span className="text-xs text-muted-foreground">{unit}</span> : null}
       </div>
+      <div className="hito-metric-label">{label}</div>
     </div>
   );
+}
+
+function weekStatusTone(label: string) {
+  if (/reset|missed|off/i.test(label)) {
+    return "warning";
+  }
+
+  return "success";
 }
 
 function summarizeUpcomingWorkout(

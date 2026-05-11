@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
-import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { APP_NAME } from "@/lib/app-config";
 import { getShellRouteData } from "@/lib/training-api";
@@ -61,13 +60,13 @@ function Body() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="px-6 lg:px-10 py-10 max-w-6xl">
-        <header className="mb-10">
-          <p className="text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
+      <div className="px-6 py-10 lg:px-10 max-w-6xl">
+        <header className="hito-page-header">
+          <p className="hito-label">
             {snapshot.source === "persisted" ? "Saved mode shell" : "Preview surface"}
           </p>
-          <h1 className="font-display text-5xl mt-2 leading-none">Manual body notes.</h1>
-          <p className="mt-4 text-sm text-muted-foreground max-w-xl">
+          <h1 className="hito-page-title">Manual body notes.</h1>
+          <p className="hito-page-copy">
             {snapshot.source === "persisted"
               ? "This route stays visible inside saved mode, but body notes remain a preserved local-only shell. They do not adapt the plan, rewrite workouts, or sync to a device yet."
               : "This route stays visible as a preserved shell. Interactions are local-only and do not adapt the plan, rewrite workouts, or sync to a device yet."}
@@ -76,23 +75,21 @@ function Body() {
 
         <div className="grid lg:grid-cols-[1fr_360px] gap-10">
           {/* Body map */}
-          <div className="rounded-xl border border-hairline bg-surface/40 p-8">
+          <div className="hito-surface-flat p-6 lg:p-8">
             <div className="flex items-center justify-between mb-6">
-              <div className="flex rounded-md border border-hairline p-0.5 text-xs">
+              <div className="hito-tab-list">
                 {(["front", "back"] as const).map((v) => (
                   <button
                     key={v}
                     onClick={() => setView(v)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-sm capitalize tracking-wide",
-                      view === v ? "bg-accent text-foreground" : "text-muted-foreground",
-                    )}
+                    data-active={view === v}
+                    className="hito-tab capitalize"
                   >
                     {v}
                   </button>
                 ))}
               </div>
-              <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="hito-section-subtitle">
                 {Object.keys(log).length} active marker
                 {Object.keys(log).length === 1 ? "" : "s"}
               </span>
@@ -159,116 +156,105 @@ function Body() {
               </svg>
             </div>
 
-            <p className="text-center text-[11px] uppercase tracking-[0.18em] text-muted-foreground mt-4">
+            <p className="hito-section-subtitle mt-4 text-center">
               {active ? REGIONS.find((r) => r.id === active)?.label : "Tap a region"}
             </p>
           </div>
 
           {/* Right panel */}
-          <aside className="space-y-4">
+          <aside className="hito-row-group self-start">
             {active && (
-              <div className="rounded-xl border border-hairline p-5 bg-surface/40">
-                <div className="flex items-baseline justify-between">
-                  <h3 className="font-display text-xl">
-                    {REGIONS.find((r) => r.id === active)?.label}
-                  </h3>
-                  <button
-                    onClick={() => setLevel(active, 0)}
-                    className="text-[11px] text-muted-foreground hover:text-foreground"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className="mt-4 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Severity
-                </div>
-                <div className="mt-2 grid grid-cols-5 gap-1">
-                  {[1, 2, 3, 4, 5].map((n) => (
+              <section className="hito-list-row items-start">
+                <div className="w-full">
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="font-display text-xl">
+                      {REGIONS.find((r) => r.id === active)?.label}
+                    </h3>
                     <button
-                      key={n}
-                      onClick={() => setLevel(active, n)}
-                      className={cn(
-                        "h-9 rounded-md border text-xs font-mono-num transition-colors",
-                        (log[active] ?? 0) >= n
-                          ? "bg-destructive/30 border-destructive/50 text-foreground"
-                          : "border-hairline text-muted-foreground hover:bg-accent/40",
-                      )}
+                      onClick={() => setLevel(active, 0)}
+                      className="hito-button hito-button-ghost hito-button-xs"
                     >
-                      {n}
+                      Clear
                     </button>
-                  ))}
+                  </div>
+                  <div className="hito-label mt-4">Severity</div>
+                  <div className="hito-scale-control mt-2">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setLevel(active, n)}
+                        data-active={(log[active] ?? 0) >= n}
+                        data-level={n}
+                        className="hito-scale-button"
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="hito-label mt-4">Sensation</div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {["Sore", "Tight", "Sharp", "Dull", "Swollen", "Stiff"].map((s) => (
+                      <button key={s} className="hito-button hito-button-outlined hito-button-xs">
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    placeholder="When does it appear? After tempo runs, downhill, etc."
+                    rows={3}
+                    className="hito-field hito-textarea-md mt-4 min-h-24 resize-none"
+                  />
                 </div>
-                <div className="mt-4 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Sensation
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {["Sore", "Tight", "Sharp", "Dull", "Swollen", "Stiff"].map((s) => (
-                    <button
-                      key={s}
-                      className="rounded-full border border-hairline px-3 py-1 text-[11px] hover:bg-accent"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  placeholder="When does it appear? After tempo runs, downhill, etc."
-                  rows={3}
-                  className="mt-4 w-full rounded-md border border-hairline bg-background/50 p-3 text-xs placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground/30 resize-none"
-                />
-              </div>
+              </section>
             )}
 
-            <div className="rounded-xl border border-hairline p-5 bg-surface/40">
-              <h3 className="font-display text-xl">Active log</h3>
-              <div className="mt-4 space-y-2">
-                {Object.entries(log).length === 0 && (
-                  <p className="text-[11px] text-muted-foreground">
-                    No markers. Body feels good today.
-                  </p>
-                )}
-                {Object.entries(log).map(([id, level]) => {
-                  const r = REGIONS.find((x) => x.id === id);
-                  return (
-                    <div
-                      key={id}
-                      className="flex items-center justify-between text-sm py-2 border-b border-hairline last:border-0"
-                    >
-                      <span>{r?.label}</span>
-                      <div className="flex items-center gap-3">
-                        <div className="flex gap-0.5">
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <span
-                              key={n}
-                              className={cn(
-                                "h-1 w-2 rounded-full",
-                                n <= level ? "bg-destructive" : "bg-hairline",
-                              )}
-                            />
-                          ))}
+            <section className="hito-list-row items-start">
+              <div className="w-full">
+                <h3 className="font-display text-xl">Active log</h3>
+                <div className="mt-4">
+                  {Object.entries(log).length === 0 && (
+                    <p className="hito-caption">No markers. Body feels good today.</p>
+                  )}
+                  {Object.entries(log).map(([id, level]) => {
+                    const r = REGIONS.find((x) => x.id === id);
+                    return (
+                      <div
+                        key={id}
+                        className="flex items-center justify-between gap-4 border-t border-hairline py-3 first:border-t-0"
+                      >
+                        <span className="hito-list-row-title">{r?.label}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="hito-severity-bars" aria-label={`Severity ${level} of 5`}>
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <span
+                                key={n}
+                                className="hito-severity-bar"
+                                data-active={n <= level}
+                                data-level={n}
+                              />
+                            ))}
+                          </div>
+                          <span className="hito-caption w-4 text-right font-mono-num">{level}</span>
                         </div>
-                        <span className="font-mono-num text-xs text-muted-foreground w-4">
-                          {level}
-                        </span>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-xl border border-signal/20 bg-signal/[0.03] p-5">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Preview note
+            <section className="hito-list-row items-start bg-signal/[0.03]">
+              <div>
+                <div className="hito-label">Preview note</div>
+                <p className="hito-support-copy mt-2 text-foreground/85">
+                  Later phases may use this area for trusted body-state guidance. In the current
+                  repo it is only a preserved preview block, not a decision engine.
+                </p>
+                <button className="hito-button hito-button-ghost hito-button-xs mt-3 text-signal">
+                  <Plus className="h-3 w-3" /> Keep surface
+                </button>
               </div>
-              <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
-                Later phases may use this area for trusted body-state guidance. In the current repo
-                it is only a preserved preview block, not a decision engine.
-              </p>
-              <button className="mt-3 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-signal hover:underline">
-                <Plus className="h-3 w-3" /> Keep surface
-              </button>
-            </div>
+            </section>
           </aside>
         </div>
       </div>

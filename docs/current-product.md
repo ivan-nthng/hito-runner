@@ -16,17 +16,19 @@ The product still avoids claims of live coaching, connected integrations, weathe
   shows either:
   login-first unauthenticated entry
   setup gate for authenticated users without a profile
-  persisted weekly plan for authenticated users with setup complete, keeping the large `Today` card, one compact right-side support card, and the calendar below
+  persisted weekly plan for authenticated users with setup complete, keeping the large `Today` hierarchy as a lighter open header, one compact right-side support module, and the calendar below
 - workout detail `/workout/$date`
   shows workout structure, logging controls, and week-status context using preview or persisted truth through one shared contract, with calmer rest-day presentation, a tighter grouped right-side panel, richer workout surfaces, and visible result-state markers for completed, partial, and skipped truth
 - progress `/progress`
-  keeps the analytics-style layout and can now read persisted completion and volume aggregates when saved mode is active
+  keeps the analytics-style layout, can read persisted completion and volume aggregates when saved mode is active, and now uses shared Hito large-stat and legend treatment instead of route-local dashboard chrome
 - body `/body`
-  keeps the body-map layout as a manual-note preview
+  keeps the body-map layout as a manual-note preview, with severity controls and active-log summaries now using shared Hito severity primitives instead of route-local micro-UI
 - integrations `/integrations`
   keeps the integrations information architecture as a not-connected preview
 - login `/login`
   provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, but deploy-visible environments show only the real email sign-in path
+- internal design-system reference `/hitoDS`
+  uses a dedicated design-system sidebar and component playground to document the implemented low-card Hito primitives; it is an internal implementation/reference surface, not a runner-facing capability
 
 ## Interaction Contracts
 
@@ -52,6 +54,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - advanced JSON upload remains available as a secondary fallback path for existing plan artifacts, migration, and testing
 - the temporary local login path behaves as signed-in saved mode for the configured local admin account only on loopback local runtimes, can still expand to a few local test accounts later without changing routes, and uses Supabase as the only authenticated plan store
 - onboarding now leads with one compact text request, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
+- authenticated no-plan or no-workout states now render the same visible text-first plan creation surface instead of stranding users on a retry-only empty state
 - the first structured authoring slice is backend-only for now:
   it validates goal, schedule, runner basics, recent result context, available days, constraints, and preferences, then generates one canonical `training-plan-v2` plan into the same persisted saved-mode seam without changing routes
 - the first OpenAI-backed text authoring slice is also backend-only for now:
@@ -60,7 +63,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - home and calendar now default to the real current day instead of a frozen demo start date
 - today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
 - when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero
-- the home support column is now one grouped card for `Planning Note`, `Week Status`, and `Tomorrow`, and the old lower metadata strip has been removed
+- the home support column is now one light divided support module for `Planning Note`, `Week Status`, and `Tomorrow`, and the old lower metadata strip has been removed
 - the visible home shell chrome now keeps `Week` status but no longer shows a technical backend label
 - saved-mode shell links that return to home now intentionally reopen `/` through a fresh request so the calendar page stays reliable even from long-lived tabs
 - completed calendar days now read more clearly at a glance through a green confirmation treatment without overriding the primary today highlight
@@ -72,6 +75,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - the runner profile area now shows the current runner name and active plan title, keeps sign-out inside the dropdown, and offers a lightweight advanced JSON plan-replacement flow
 - that advanced import replacement flow now preserves saved workout progress only when logged workouts still match the replacement JSON exactly on the logged dates; otherwise the replace action is blocked instead of silently clearing visible progress
 - the same advanced import flow now accepts only the canonical `training-plan-v2` file contract, while still ignoring runtime-only v2 fields that do not belong in canonical plan truth
+- when that advanced import apply succeeds, the product now returns to saved home through a fresh page load instead of leaving users in a stale in-place route refresh state
 - structured imports now persist one clearer segment DSL in saved mode:
   interval-by-distance and interval-by-time both normalize into the same repeat prescription shape, and the existing home plus workout-detail routes keep rendering from that one stored contract
 - saved-mode plan truth now also preserves higher-value richer semantics across import, structured authoring, and text authoring without adding a second runtime model:
@@ -80,7 +84,10 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - richer imported workout detail now renders scalar target truth only, so structured metadata no longer leaks into visible `[object Object]` text
 - richer imported interval workouts now keep an honest visible interval identity instead of being mislabeled as easy runs
 - the advanced import flow still includes a lightweight `Download JSON template` affordance for users who already need file-based plan handoff
+- that downloadable template now includes one reserved `_ml_agent_template` instruction block so ML-generated files can target the canonical `training-plan-v2` contract more explicitly without turning template-only guidance into runtime truth
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
+- auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress analytics stats and legends, body severity micro-UI, preserved integration utility rows, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share the first Hito component primitives for low-card surfaces, tiered controls, helper/error text, grouped rows, metric rows, compact analytics stats, compact legends, compact tooltips, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, labels, captions, tabs, and dividers, keeping text-first onboarding primary and advanced JSON import secondary
+- remaining chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are treated as product visualization geometry, not runner-facing component chrome
 
 ## Known Allowed Fix Areas
 

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Eye, EyeOff, Mail } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { cn } from "@/lib/utils";
 import { requestMagicLink } from "@/lib/training-api";
 
 type AuthEntryStatus = "error" | "invalid_credentials" | "local_unavailable" | undefined;
@@ -32,7 +31,7 @@ export function AuthEntryScreen({
         <section className="grid w-full gap-12 lg:grid-cols-[0.9fr_0.85fr]">
           <div className="flex flex-col justify-center gap-8">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-hairline bg-surface-elevated/50">
+              <div className="hito-surface-flat flex h-12 w-12 items-center justify-center">
                 <div className="h-3.5 w-3.5 rounded-full bg-signal shadow-[0_0_20px_rgba(243,167,74,0.35)]" />
               </div>
               <div className="font-display text-5xl leading-none tracking-tight lg:text-7xl">
@@ -47,9 +46,9 @@ export function AuthEntryScreen({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-hairline bg-background/30 p-5 lg:p-6">
+          <div className="hito-surface-flat p-5 lg:p-6">
             {localBypassEnabled ? (
-              <div className="inline-flex rounded-lg border border-hairline bg-background/35 p-1">
+              <div className="hito-tab-list">
                 {(
                   [
                     { key: "login", label: "Log in" },
@@ -64,12 +63,8 @@ export function AuthEntryScreen({
                       setPhase("idle");
                       setError(null);
                     }}
-                    className={cn(
-                      "rounded-md px-4 py-2 text-sm transition-colors",
-                      activeTab === tab.key
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
+                    data-active={activeTab === tab.key}
+                    className="hito-tab"
                   >
                     {tab.label}
                   </button>
@@ -82,32 +77,28 @@ export function AuthEntryScreen({
                 <form method="post" action="/api/auth/local-login" className="grid gap-5">
                   <input type="hidden" name="next" value={next} />
                   <label className="grid gap-2">
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Username or email
-                    </span>
+                    <span className="hito-label">Username or email</span>
                     <input
                       type="text"
                       name="identifier"
                       required
                       placeholder="username or email"
-                      className="rounded-lg border border-hairline bg-background/50 px-4 py-3 text-sm placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
+                      className="hito-field hito-field-lg"
                     />
                   </label>
                   <label className="grid gap-2">
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Password
-                    </span>
+                    <span className="hito-label">Password</span>
                     <div className="relative">
                       <input
                         type={passwordVisible ? "text" : "password"}
                         name="password"
                         required
-                        className="w-full rounded-lg border border-hairline bg-background/50 px-4 py-3 pr-12 text-sm placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
+                        className="hito-field hito-field-lg pr-12"
                       />
                       <button
                         type="button"
                         onClick={() => setPasswordVisible((current) => !current)}
-                        className="absolute inset-y-0 right-0 inline-flex w-12 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                        className="hito-button hito-button-ghost absolute inset-y-0 right-0 min-h-0 w-12 rounded-l-none p-0 text-muted-foreground hover:translate-y-0"
                         aria-label={passwordVisible ? "Hide password" : "Show password"}
                       >
                         {passwordVisible ? (
@@ -118,19 +109,16 @@ export function AuthEntryScreen({
                       </button>
                     </div>
                   </label>
-                  <button
-                    type="submit"
-                    className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90"
-                  >
+                  <button type="submit" className="hito-button hito-button-primary hito-button-lg">
                     Log in
                   </button>
                   {status === "invalid_credentials" && (
-                    <p className="text-sm text-destructive">
+                    <p className="hito-field-error">
                       The username or password was not accepted. Try again.
                     </p>
                   )}
                   {status === "local_unavailable" && (
-                    <p className="text-sm text-destructive">
+                    <p className="hito-field-error">
                       Local development login is not available on this runtime.
                     </p>
                   )}
@@ -149,19 +137,19 @@ export function AuthEntryScreen({
                 </p>
 
                 {status === "error" && (
-                  <p className="mt-4 text-sm text-destructive">
+                  <p className="hito-field-error mt-4">
                     The last Magic Link could not finish sign-in. Request a fresh link and try
                     again.
                   </p>
                 )}
 
                 {phase === "sent" && (
-                  <p className="mt-4 text-sm text-success">
+                  <p className="hito-field-success mt-4">
                     Check {email} and open the new sign-in link on this device.
                   </p>
                 )}
 
-                {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+                {error && <p className="hito-field-error mt-4">{error}</p>}
 
                 {magicLinkEnabled ? (
                   <form
@@ -190,9 +178,7 @@ export function AuthEntryScreen({
                     }}
                   >
                     <label className="grid gap-2">
-                      <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                        Email
-                      </span>
+                      <span className="hito-label">Email</span>
                       <input
                         type="email"
                         name="email"
@@ -200,13 +186,13 @@ export function AuthEntryScreen({
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         placeholder="name@example.com"
-                        className="rounded-lg border border-hairline bg-background/50 px-4 py-3 text-sm placeholder:text-muted-foreground/60 focus:border-foreground/30 focus:outline-none"
+                        className="hito-field hito-field-lg"
                       />
                     </label>
                     <button
                       type="submit"
                       disabled={phase === "sending"}
-                      className="rounded-md border border-hairline px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+                      className="hito-button hito-button-secondary hito-button-lg"
                     >
                       {phase === "sending" ? "Sending Magic Link..." : "Send Magic Link"}
                     </button>

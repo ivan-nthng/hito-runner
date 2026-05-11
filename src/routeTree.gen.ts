@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
+import { Route as HitoDSRouteImport } from './routes/hitoDS'
 import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
@@ -32,6 +33,11 @@ const LoginRoute = LoginRouteImport.update({
 const IntegrationsRoute = IntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HitoDSRoute = HitoDSRouteImport.update({
+  id: '/hitoDS',
+  path: '/hitoDS',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BodyRoute = BodyRouteImport.update({
@@ -68,6 +74,7 @@ const ApiAuthConfirmRoute = ApiAuthConfirmRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/body': typeof BodyRoute
+  '/hitoDS': typeof HitoDSRoute
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/body': typeof BodyRoute
+  '/hitoDS': typeof HitoDSRoute
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/body': typeof BodyRoute
+  '/hitoDS': typeof HitoDSRoute
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/body'
+    | '/hitoDS'
     | '/integrations'
     | '/login'
     | '/progress'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/body'
+    | '/hitoDS'
     | '/integrations'
     | '/login'
     | '/progress'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/body'
+    | '/hitoDS'
     | '/integrations'
     | '/login'
     | '/progress'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BodyRoute: typeof BodyRoute
+  HitoDSRoute: typeof HitoDSRoute
   IntegrationsRoute: typeof IntegrationsRoute
   LoginRoute: typeof LoginRoute
   ProgressRoute: typeof ProgressRoute
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/integrations'
       preLoaderRoute: typeof IntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hitoDS': {
+      id: '/hitoDS'
+      path: '/hitoDS'
+      fullPath: '/hitoDS'
+      preLoaderRoute: typeof HitoDSRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/body': {
@@ -218,6 +238,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BodyRoute: BodyRoute,
+  HitoDSRoute: HitoDSRoute,
   IntegrationsRoute: IntegrationsRoute,
   LoginRoute: LoginRoute,
   ProgressRoute: ProgressRoute,

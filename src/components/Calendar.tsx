@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   displayTargetEntries,
@@ -52,33 +52,33 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+      <div className="hito-section-header mb-8">
         <div>
-          <p className="text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
-            Training plan
-          </p>
-          <h1 className="font-display text-4xl lg:text-5xl mt-1 leading-none">{monthLabel}</h1>
-          <p className="text-sm text-muted-foreground mt-3 max-w-xl">
+          <p className="hito-label">Training plan</p>
+          <h1 className="hito-section-title mt-2 text-4xl lg:text-5xl">{monthLabel}</h1>
+          <p className="hito-support-copy mt-3 max-w-xl">
             Open any day to review the plan or update the workout result.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex rounded-md border border-hairline p-0.5 text-xs">
+          <div className="hito-tab-list">
             <button
               onClick={() => setView("month")}
+              data-active={view === "month"}
               className={cn(
-                "px-3 py-1.5 rounded-sm tracking-wide",
-                view === "month" ? "bg-accent text-foreground" : "text-muted-foreground",
+                "hito-tab px-3 py-1.5 text-xs tracking-wide",
+                view !== "month" && "text-muted-foreground",
               )}
             >
               Month
             </button>
             <button
               onClick={() => setView("week")}
+              data-active={view === "week"}
               className={cn(
-                "px-3 py-1.5 rounded-sm tracking-wide",
-                view === "week" ? "bg-accent text-foreground" : "text-muted-foreground",
+                "hito-tab px-3 py-1.5 text-xs tracking-wide",
+                view !== "week" && "text-muted-foreground",
               )}
             >
               Week
@@ -86,30 +86,30 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
           </div>
           <button
             onClick={() => shift(-1)}
-            className="h-8 w-8 grid place-items-center rounded-md border border-hairline hover:bg-accent"
+            className="hito-button hito-button-secondary hito-button-sm aspect-square p-0"
           >
             <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
           </button>
           <button
             onClick={() => setCursor(new Date(`${snapshot.currentDate}T00:00:00`))}
-            className="px-3 h-8 rounded-md border border-hairline text-xs tracking-wide hover:bg-accent"
+            className="hito-button hito-button-secondary hito-button-sm tracking-wide"
           >
             Today
           </button>
           <button
             onClick={() => shift(1)}
-            className="h-8 w-8 grid place-items-center rounded-md border border-hairline hover:bg-accent"
+            className="hito-button hito-button-secondary hito-button-sm aspect-square p-0"
           >
             <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="hito-legend mb-5">
         {(["easy", "long_run", "quality", "rest"] as const).map((type) => (
-          <div key={type} className="flex items-center gap-1.5">
+          <div key={type} className="hito-legend-item">
             <span
-              className="h-2 w-2 rounded-full"
+              className="hito-legend-swatch rounded-full"
               style={{
                 background: `var(--${type === "long_run" ? "long" : type === "quality" ? "quality" : type === "rest" ? "rest" : "easy"})`,
               }}
@@ -117,20 +117,19 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
             <span>{TYPE_META[type].short}</span>
           </div>
         ))}
-        <div className="ml-auto hidden md:flex items-center gap-1.5">
+        <div className="ml-auto hidden items-center gap-1.5 md:flex">
           <span className="text-muted-foreground">Week status</span>
-          <span className="font-mono-num text-foreground">{weekStatus.label}</span>
+          <span className="hito-status-pill" data-tone={weekStatusTone(weekStatus.label)}>
+            {weekStatus.label}
+          </span>
         </div>
       </div>
 
       {view === "month" ? (
-        <div className="rounded-xl border border-hairline overflow-hidden bg-surface/40">
+        <div className="border-b border-hairline">
           <div className="grid grid-cols-7 border-b border-hairline">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-              <div
-                key={day}
-                className="px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground"
-              >
+              <div key={day} className="px-3 py-2 hito-section-subtitle text-[10px]">
                 {day}
               </div>
             ))}
@@ -217,7 +216,7 @@ function DayCell({
         className={cn(
           "block aspect-[5/4] border-r border-b border-hairline p-3 transition-colors group",
           !inMonth && "opacity-30",
-          isToday && "bg-accent/40",
+          isToday && "relative z-10 outline outline-1 outline-offset-[-1px] outline-signal/60",
           isCompleted && !isToday && "bg-success/[0.04]",
           "hover:bg-accent/40",
         )}
@@ -239,11 +238,7 @@ function DayCell({
             >
               {String(day).padStart(2, "0")}
             </div>
-            {isCompleted && (
-              <span className="grid h-4 w-4 place-items-center rounded-full bg-success/15 text-success">
-                <Check className="h-3 w-3" strokeWidth={2.5} />
-              </span>
-            )}
+            <StatusMark status={status} />
           </div>
           {workout && workout.type !== "rest" && meta && (
             <span style={{ color: meta.color }}>
@@ -269,7 +264,6 @@ function DayCell({
             <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground font-mono-num">
               {km != null && <span>{formatDistanceKm(km)}km</span>}
               {duration > 0 && <span>{duration}′</span>}
-              <StatusDot status={status} />
             </div>
           </div>
         )}
@@ -300,7 +294,7 @@ function DayCell({
       </Link>
 
       {isHover && workout && workout.type !== "rest" && (
-        <div className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 w-72 pointer-events-none">
+        <div className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 pointer-events-none">
           <Tooltip workout={workout} />
         </div>
       )}
@@ -308,17 +302,40 @@ function DayCell({
   );
 }
 
-function StatusDot({ status }: { status: Status }) {
-  const map: Record<Status, string> = {
-    completed: "bg-success",
-    partial: "bg-warn",
-    skipped: "bg-destructive/70",
-    today: "bg-signal animate-pulse",
-    upcoming: "bg-muted-foreground/30",
-    rest: "bg-transparent",
-  };
+function StatusMark({ status, compact = false }: { status: Status; compact?: boolean }) {
+  if (status === "completed") {
+    return (
+      <span
+        className={cn("hito-status-marker", compact && "ml-auto")}
+        data-size="xs"
+        data-tone="success"
+      >
+        <Check className="h-3.5 w-3.5" strokeWidth={2.4} />
+      </span>
+    );
+  }
 
-  return <span className={cn("ml-auto h-1.5 w-1.5 rounded-full", map[status])} />;
+  if (status === "skipped") {
+    return (
+      <span
+        className={cn("hito-status-marker", compact && "ml-auto")}
+        data-size="xs"
+        data-tone="destructive"
+      >
+        <X className="h-3.5 w-3.5" strokeWidth={2.3} />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn("hito-status-marker", compact && "ml-auto")}
+      data-size="xs"
+      data-tone="muted"
+    >
+      <Minus className="h-3.5 w-3.5" strokeWidth={2.2} />
+    </span>
+  );
 }
 
 function Tooltip({ workout }: { workout: Workout }) {
@@ -329,28 +346,28 @@ function Tooltip({ workout }: { workout: Workout }) {
   const target = primaryWorkoutTarget(workout);
 
   return (
-    <div className="rounded-lg border border-hairline bg-popover/95 backdrop-blur-xl shadow-2xl p-4 text-left">
+    <div className="hito-tooltip w-72 max-w-72">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: meta.color }}>
+        <span className="hito-label text-[10px]" style={{ color: meta.color }}>
           {meta.label}
         </span>
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="hito-tooltip-meta uppercase tracking-wider">
           {formatDate(workout.date, { month: "short", day: "numeric", weekday: "short" })}
         </span>
       </div>
-      <div className="mt-2 font-display text-lg leading-tight">{workout.title}</div>
-      <div className="mt-3 grid grid-cols-3 gap-3 text-[11px]">
+      <div className="hito-tooltip-title mt-2 font-display text-lg">{workout.title}</div>
+      <div className="hito-metric-row mt-3 grid-cols-3">
         <Stat label="Distance" value={km != null ? `${formatDistanceKm(km)}km` : "—"} />
         <Stat label="Duration" value={duration ? `${duration}′` : "—"} />
         <Stat label="Status" value={status} />
       </div>
       {target && (
-        <div className="mt-3 pt-3 border-t border-hairline text-[11px] text-muted-foreground space-y-0.5">
+        <div className="hito-caption mt-3 space-y-0.5 border-t border-hairline pt-3">
           {displayTargetEntries(target)
             .slice(0, 2)
             .map((entry) => (
               <div key={entry.key} className="flex justify-between gap-3">
-                <span className="uppercase tracking-wider text-[10px]">{entry.label}</span>
+                <span className="hito-label text-[10px]">{entry.label}</span>
                 <span className="text-foreground/80 truncate">{entry.value}</span>
               </div>
             ))}
@@ -362,16 +379,24 @@ function Tooltip({ workout }: { workout: Workout }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="text-[9px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
-      <div className="font-mono-num text-foreground mt-0.5 capitalize">{value}</div>
+    <div className="hito-metric">
+      <div className="hito-metric-value text-xs capitalize">{value}</div>
+      <div className="hito-metric-label text-[9px]">{label}</div>
     </div>
   );
 }
 
+function weekStatusTone(label: string) {
+  if (/reset|missed|off/i.test(label)) {
+    return "warning";
+  }
+
+  return "success";
+}
+
 function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSnapshot }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+    <div className="grid grid-cols-1 border-b border-hairline md:grid-cols-7">
       {dates.map((iso) => {
         const workout = findWorkout(snapshot.workouts, iso);
         const isToday = iso === snapshot.currentDate;
@@ -386,9 +411,9 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
             to="/workout/$date"
             params={{ date: iso }}
             className={cn(
-              "rounded-xl border border-hairline p-4 bg-surface/40 hover:bg-accent/40 transition-colors min-h-[180px] flex flex-col",
-              isToday && "border-signal/40",
-              isCompleted && !isToday && "border-success/30 bg-success/[0.04]",
+              "flex min-h-[170px] flex-col border-b border-hairline p-4 transition-colors hover:bg-accent/30 md:border-r md:border-b-0",
+              isToday && "relative z-10 outline outline-1 outline-offset-[-1px] outline-signal/60",
+              isCompleted && !isToday && "bg-success/[0.04]",
             )}
             style={
               isCompleted
@@ -398,14 +423,10 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
                 : undefined
             }
           >
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="flex items-center justify-between hito-section-subtitle text-[10px]">
               <span>{weekdayShort(iso)}</span>
               <div className="flex items-center gap-1.5">
-                {isCompleted && (
-                  <span className="grid h-4 w-4 place-items-center rounded-full bg-success/15 text-success">
-                    <Check className="h-3 w-3" strokeWidth={2.5} />
-                  </span>
-                )}
+                <StatusMark status={status} />
                 <span className="font-mono-num">{iso.slice(8)}</span>
               </div>
             </div>
@@ -418,10 +439,9 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
                   {meta.short}
                 </div>
                 <div className="mt-1 text-sm leading-snug">{workout.title}</div>
-                <div className="mt-auto pt-3 flex items-center gap-3 text-[11px] font-mono-num text-muted-foreground">
+                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-3 font-mono-num text-[11px] text-muted-foreground">
                   {km != null && <span>{formatDistanceKm(km)}km</span>}
                   {duration > 0 && <span>{duration}′</span>}
-                  <span className="ml-auto capitalize text-foreground/70">{status}</span>
                 </div>
               </>
             ) : (

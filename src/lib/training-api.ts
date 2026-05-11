@@ -33,6 +33,7 @@ import {
   hasSupabaseBrowserEnv,
   isDevOnlyLocalAuthRuntime,
   publicEnv,
+  resolveRuntimeAppBaseUrl,
   serverEnv,
 } from "@/lib/supabase/env";
 
@@ -712,23 +713,19 @@ function inferViewerName(email: string | null) {
 }
 
 function getRuntimeAppBaseUrl(request?: Request) {
-  if (serverEnv.appBaseUrl) {
-    return new URL(serverEnv.appBaseUrl).origin;
-  }
-
-  if (request) {
-    return new URL(request.url).origin;
-  }
-
   const { appBaseUrl } = getRequestAuthContext();
+  const resolved = resolveRuntimeAppBaseUrl({
+    requestUrl: request?.url,
+    contextAppBaseUrl: appBaseUrl,
+  });
 
-  if (!appBaseUrl) {
+  if (!resolved) {
     throw new Error(
-      "Could not resolve the app base URL for this request. Set APP_BASE_URL or retry through the app runtime.",
+      "Could not resolve the app base URL for this request. Use a real app origin or set APP_BASE_URL to a non-loopback public URL.",
     );
   }
 
-  return appBaseUrl;
+  return resolved;
 }
 
 async function getRequiredLocalAuthConfig(userId: string | null) {

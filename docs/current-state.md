@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-09
+2026-05-11
 
 ## Where We Are Now
 
@@ -27,6 +27,8 @@ Active
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
 - The production-facing local auth legacy cleanup slice is now implemented:
   deploy-visible login now exposes only the real email auth path, while the temporary local credentials bypass remains available only on loopback local runtimes for development.
+- The urgent auth redirect-origin fix is now implemented:
+  deploy-like Magic Link and callback flows no longer trust a loopback `APP_BASE_URL` override, so non-local auth redirects resolve back to the real app domain instead of falling through to `localhost`.
 - The final Phase 5 legacy-removal slice is now implemented:
   deprecated `week_1_preview[]` import support has been removed from the active runtime, CLI tooling, and visible import contract, so `training-plan-v2` is now the only remaining supported plan-import format.
 - The first actual deletion slice from the final Phase 5 plan is now implemented:
@@ -36,9 +38,13 @@ Active
 - The third actual deletion slice from the final Phase 5 plan is now implemented:
   deprecated single-account local auth env support has been removed from the active runtime and local tooling, so loopback local bypass now resolves only through `LOCAL_AUTH_BYPASS_ENABLED=true` plus `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE=...`.
 - The unauthenticated root flow is now login-first, and first-time onboarding is now text-first against the live OpenAI authoring seam, with JSON import visibly demoted to an advanced file-based fallback.
+- The product-path recovery fix is now implemented:
+  authenticated no-plan or no-workout states now show the same obvious text-entry plan creation surface, with advanced import kept secondary below it.
+- The text-first onboarding post-submit transition fix is now implemented:
+  successful plan creation now automatically opens a fresh saved-mode home request instead of leaving users stuck in the setup pending state.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
 - Home/calendar now resolve `today` from the real runtime local date and default the planning surface to that day instead of a frozen demo date.
-- The saved-mode home/calendar page now keeps the main `Today` card intact, uses one grouped support card on the right, removes the lower metadata strip, and marks completed calendar days more clearly.
+- The saved-mode home/calendar page now keeps the main `Today` hierarchy intact as a lighter open header, uses one divided support module on the right, removes the lower metadata strip, and marks day status with compact check/dash/cross symbols instead of bulky per-day pills.
 - Saved-mode shell navigation back to `/` now uses a fresh home request, and the `Tomorrow` summary no longer falls through to broken `nullkm · 0′` placeholders for interval-style workouts.
 - The profile/sidebar area now shows the runner name plus active plan title, removes duplicate top-level sign-out, and owns a lightweight saved-mode advanced import entry path.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.
@@ -47,6 +53,8 @@ Active
 - The remaining upload-flow/template UI slice is now implemented:
   the saved-mode advanced import flow now accepts only canonical `training-plan-v2` JSON while still normalizing that contract into the same canonical persisted plan seam and ignoring runtime-only v2 fields that do not belong in plan truth.
   The same flow still includes a real `Download JSON template` affordance for file-based plan handoff.
+- The advanced import reliability pass is now implemented:
+  successful `training-plan-v2` apply now exits through a fresh home reload instead of an immediate in-place router refresh, and the canonical template artifact now ships a reserved `_ml_agent_template` instruction block that is accepted but ignored at import time.
 - The current `training-plan-v2` runtime still keeps `plan_cycles` plus `planned_workouts` as the only canonical storage model, writes richer segment structure into `planned_workouts.steps jsonb`, and still deliberately defers import-batch provenance plus editability-oriented schema expansion to a later phase.
 - The current Phase 3 cleanup slice is now implemented:
   persisted plan truth now preserves `schema_version`, `source_kind`, `target_date`, goal metadata, plan preferences, source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority through the same canonical Supabase rows used by JSON import, structured authoring, and OpenAI text authoring.
@@ -61,6 +69,8 @@ Active
   The visible onboarding UI is now wired to this path, and local live validation is green with a working `OPENAI_API_KEY`.
 - The Phase 4 frontend cleanup slice is now implemented:
   visible no-plan and shell surfaces present text-first plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
+- The first Hito design-system implementation slices are now implemented:
+  shared low-card CSS primitives exist for core surfaces, tiered buttons, tiered inputs, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact analytics stats, compact chart legends, compact tooltip shells, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell navigation rows, shell profile triggers, shell dropdown rows, and setup/empty/error state surfaces; auth, text-first onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, route-level state surfaces, progress analytics surfaces, body severity micro-UI, preserved integration utility rows, calendar and workout-structure tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now use those primitives; `/hitoDS` provides an internal component playground with dedicated design-system navigation instead of runner-facing shell chrome; and chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional visualization geometry exceptions.
 - The remaining first-pass v2 rendering-truth gaps are now fixed:
   distance-based interval reps no longer invent minute-based per-rep UI,
   tempo workouts now render with a tempo-specific visible identity on home and workout detail,

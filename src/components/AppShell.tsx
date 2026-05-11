@@ -26,7 +26,6 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
 import {
   WEEK_STATUS_META,
@@ -105,7 +104,7 @@ export function AppShell({
           </p>
         </div>
 
-        <nav className="px-3 flex flex-col gap-0.5">
+        <nav className="hito-shell-nav px-3">
           {NAV.map((navItem) => {
             const active =
               loc.pathname === navItem.to ||
@@ -116,43 +115,43 @@ export function AppShell({
                 key={navItem.to}
                 to={navItem.to}
                 reloadDocument={navItem.to === "/" && useFreshHomeRequest}
-                className={cn(
-                  "group flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                  active
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-                )}
+                data-active={active ? "true" : undefined}
+                className="hito-shell-nav-row"
               >
-                <Icon className="h-4 w-4" strokeWidth={1.5} />
+                <Icon className="hito-shell-nav-icon" strokeWidth={1.5} />
                 <span>{navItem.label}</span>
-                {active && <span className="ml-auto h-1 w-1 rounded-full bg-signal" />}
+                {active && <span className="hito-shell-nav-dot" />}
               </Link>
             );
           })}
         </nav>
 
         <div className="mt-auto flex flex-col gap-4 p-4">
-          <div className="rounded-lg border border-hairline bg-surface/45 p-4">
-            <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
-              <NotebookPen className="h-3 w-3 text-signal" />
-              Plan note
+          <div className="hito-row-group">
+            <div className="hito-list-row items-start">
+              <div>
+                <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
+                  <NotebookPen className="h-3 w-3 text-signal" />
+                  Plan note
+                </div>
+                <p className="hito-list-row-copy">
+                  {shellSnapshot.source === "persisted"
+                    ? "Saved plan and workout status are live here. JSON export comes later."
+                    : "This shell stays available as a preview until you sign in and save a real plan."}
+                </p>
+              </div>
             </div>
-            <p className="mt-2 text-xs leading-relaxed text-foreground/80">
-              {shellSnapshot.source === "persisted"
-                ? "Saved plan and workout status are live here. JSON export comes later."
-                : "This shell stays available as a preview until you sign in and save a real plan."}
-            </p>
-            <div className="mt-3 text-[11px] tracking-wider uppercase text-signal">
-              {weekStatus.label}
+            <div className="hito-list-row py-3">
+              <span className="hito-label">Week</span>
+              <span className="hito-status-pill" data-tone={weekStatusTone(weekStatus.label)}>
+                {weekStatus.label}
+              </span>
             </div>
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="group flex w-full items-center gap-3 rounded-lg border border-hairline bg-background/45 px-3 py-3 text-left transition-colors hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-foreground/20"
-              >
+              <button type="button" className="hito-shell-profile-trigger group">
                 <Avatar className="h-9 w-9 border border-hairline/80 bg-background/70">
                   <AvatarFallback className="bg-gradient-to-br from-signal to-quality text-[11px] font-medium text-signal-foreground">
                     {profileInitials}
@@ -165,11 +164,7 @@ export function AppShell({
                 <ChevronUp className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              side="top"
-              align="start"
-              className="w-[208px] border-hairline bg-background/95 backdrop-blur-xl"
-            >
+            <DropdownMenuContent side="top" align="start" className="hito-shell-menu w-[208px]">
               <DropdownMenuLabel className="pb-1">
                 <div className="text-sm font-medium text-foreground">{profileName}</div>
                 <div className="mt-1 truncate text-[11px] font-normal text-muted-foreground">
@@ -179,9 +174,10 @@ export function AppShell({
                   {modeTag}
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="hito-shell-menu-separator" />
               {showUploadAction && (
                 <DropdownMenuItem
+                  className="hito-shell-menu-item"
                   onSelect={(event) => {
                     event.preventDefault();
                     setUploadOpen(true);
@@ -191,23 +187,23 @@ export function AppShell({
                   Advanced import
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem disabled>
+              <DropdownMenuItem className="hito-shell-menu-item" disabled>
                 <Settings2 className="h-4 w-4" />
                 Settings
                 <DropdownMenuShortcut>Later</DropdownMenuShortcut>
               </DropdownMenuItem>
-              <DropdownMenuItem disabled>
+              <DropdownMenuItem className="hito-shell-menu-item" disabled>
                 <UserRound className="h-4 w-4" />
                 Account
                 <DropdownMenuShortcut>Later</DropdownMenuShortcut>
               </DropdownMenuItem>
-              <DropdownMenuItem disabled>
+              <DropdownMenuItem className="hito-shell-menu-item" disabled>
                 <SlidersHorizontal className="h-4 w-4" />
                 Preferences
                 <DropdownMenuShortcut>Later</DropdownMenuShortcut>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
+              <DropdownMenuSeparator className="hito-shell-menu-separator" />
+              <DropdownMenuItem className="hito-shell-menu-item" asChild>
                 <a href="/api/auth/logout?next=%2F">
                   <LogOut className="h-4 w-4" />
                   Sign out
@@ -220,7 +216,7 @@ export function AppShell({
             <Link
               to="/login"
               search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
-              className="inline-flex rounded-md border border-hairline px-3 py-2 text-xs tracking-wide text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="hito-button hito-button-secondary hito-button-sm tracking-wide"
             >
               Open login
             </Link>
@@ -254,7 +250,7 @@ export function AppShell({
                     ? { next: nextPath }
                     : undefined
                 }
-                className="rounded-md border border-hairline px-3 py-1.5 text-xs tracking-wide hover:bg-accent transition-colors flex items-center gap-1.5"
+                className="hito-button hito-button-secondary hito-button-sm tracking-wide"
               >
                 <Activity className="h-3.5 w-3.5" strokeWidth={1.5} />
                 {shellSnapshot.mode === "preview"
@@ -272,7 +268,7 @@ export function AppShell({
 
         <div className="flex-1">{children}</div>
 
-        <nav className="md:hidden sticky bottom-0 z-30 border-t border-hairline bg-background/95 backdrop-blur grid grid-cols-4">
+        <nav className="hito-shell-mobile-nav md:hidden sticky bottom-0 z-30">
           {NAV.map((navItem) => {
             const active = loc.pathname === navItem.to;
             const Icon = navItem.icon;
@@ -281,12 +277,10 @@ export function AppShell({
                 key={navItem.to}
                 to={navItem.to}
                 reloadDocument={navItem.to === "/" && useFreshHomeRequest}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-3 text-[10px] tracking-wide uppercase",
-                  active ? "text-signal" : "text-muted-foreground",
-                )}
+                data-active={active ? "true" : undefined}
+                className="hito-shell-mobile-row"
               >
-                <Icon className="h-4 w-4" strokeWidth={1.5} />
+                <Icon className="hito-shell-nav-icon" strokeWidth={1.5} />
                 {navItem.label}
               </Link>
             );
@@ -300,17 +294,25 @@ export function AppShell({
 
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-muted-foreground">
-      <span
-        className={cn(
-          "h-1.5 w-1.5 rounded-full",
-          value === "Preview only" ? "bg-muted-foreground/40" : "bg-success",
-        )}
-      />
-      <span className="tracking-wide">{label}</span>
-      <span className="text-[10px] uppercase tracking-wider opacity-60">{value}</span>
+    <div className="hidden lg:flex items-center gap-2">
+      <span className="text-[11px] tracking-wide text-muted-foreground">{label}</span>
+      <span className="hito-status-pill" data-tone={weekStatusTone(value)}>
+        {value}
+      </span>
     </div>
   );
+}
+
+function weekStatusTone(value: string) {
+  if (/preview/i.test(value)) {
+    return "neutral";
+  }
+
+  if (/reset|missed|off/i.test(value)) {
+    return "warning";
+  }
+
+  return "success";
 }
 
 function buildInitials(name: string) {

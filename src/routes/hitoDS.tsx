@@ -59,6 +59,11 @@ const STATUS_MARKER_EXAMPLES = [
   { label: "Neutral", tone: "muted", icon: Minus },
 ] as const;
 
+const FEEDBACK_MARKER_EXAMPLES = [
+  { label: "Evidence", state: "evidence_attached" },
+  { label: "Feedback", state: "feedback_ready" },
+] as const;
+
 type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
 type ButtonSize = (typeof BUTTON_SIZES)[number];
 
@@ -413,6 +418,25 @@ function HitoDesignSystemPage() {
                     Short, scoped context only. No coaching wall.
                   </span>
                 </div>
+              </div>
+              <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <article className="hito-row-group">
+                  {FEEDBACK_MARKER_EXAMPLES.map(({ label, state }) => (
+                    <div key={state} className="hito-list-row py-3">
+                      <span className="hito-list-row-title">{label}</span>
+                      <span className="hito-feedback-marker" data-state={state}>
+                        <span className="hito-feedback-marker-dot" />
+                        <span>{label}</span>
+                      </span>
+                    </div>
+                  ))}
+                </article>
+                <article className="hito-surface-flat p-5">
+                  <p className="hito-label">Feedback markers</p>
+                  <p className="hito-support-copy mt-3">
+                    Secondary discovery only. Completion check, dash, and cross stay primary.
+                  </p>
+                </article>
               </div>
             </section>
 

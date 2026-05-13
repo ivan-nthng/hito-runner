@@ -2,15 +2,37 @@
 
 ## Status
 
-Draft
+In progress
 
 ## Owner
 
-Architect Agent
+Backend Agent
 
 ## Last Updated
 
 2026-05-11
+
+## Current Slice Note
+
+The current implementation is still intentionally narrower than the full plan:
+
+- upload is live only for Garmin `.fit` and Garmin `.zip` with exactly one FIT activity file
+- canonical backend truth now includes `workout_result_assets`, `workout_actual_metrics`, and `workout_comparisons`
+- deterministic comparison is now live only for already-trustworthy facts:
+  planned workout date vs actual local date
+  planned duration vs actual duration
+  explicit planned distance vs actual distance when the plan defines one
+  structured-step count only when the workout shape is simple enough to compare honestly
+- the deterministic comparison payload now also carries richer structured truth for readback:
+  explicit signal objects
+  honest `missing_actual` and `not_applicable` reasons
+  bounded delta/tolerance metadata when the metric supports it
+  session-summary facts plus a conservative step-summary block when ordered per-step duration comparison is trustworthy
+- workout detail now splits manual `Log result` from a dedicated `Feedback` tab that owns Garmin upload, parsed evidence summary, and deterministic comparison readback
+- the first bounded AI interpretation layer is now also live in `Feedback`:
+  one `workout_ai_insights` row is generated only from planned workout truth, normalized Garmin actual metrics, deterministic comparison payload, current week context, and next-workout summary
+  it stays additive to deterministic comparison instead of replacing it
+- screenshot OCR, provider sync, calendar evidence markers, and suggestion-only plan adjustment remain later phases
 
 ## Goal
 
@@ -704,21 +726,26 @@ Test these workout shapes:
 
 ## Checklist
 
-- [ ] confirm the narrow first release is `ZIP/FIT only`
-- [ ] add additive Supabase migration for result asset, actual metrics, comparison, and AI insight tables
-- [ ] implement archive extraction and primary file selection
-- [ ] implement deterministic Garmin FIT parser seam
-- [ ] implement normalization from parsed FIT into canonical actual metrics
-- [ ] implement deterministic planned-vs-actual comparison
-- [ ] define confidence and partial-match rules
-- [ ] split workout detail into `Log result` and `Feedback`
-- [ ] wire upload flow into workout detail `Feedback` surface in saved mode
-- [ ] show deterministic actual summary and comparison UI
+- [x] confirm the narrow first release is `ZIP/FIT only`
+- [x] add additive Supabase migration for result asset and actual metrics tables
+- [x] implement archive extraction and primary file selection
+- [x] implement deterministic Garmin FIT parser seam
+- [x] implement normalization from parsed FIT into canonical actual metrics
+- [x] wire the first saved-mode upload flow into the existing `Log result` surface with parsed-summary readback
+- [x] fix Safari file-picker compatibility by validating `.fit` and `.zip` after selection instead of relying on native MIME/UTI filtering
+- [x] align the visible upload surface so FIT/ZIP reads as live and screenshot remains clearly later-only
+- [x] implement deterministic planned-vs-actual comparison
+- [x] define confidence and partial-match rules
+- [x] enrich deterministic comparison payload/readback with structured signal truth before AI interpretation
+- [x] replace plain-text comparison readback with a factual signal-by-signal layout in the current `Log result` surface
+- [x] split workout detail into `Log result` and `Feedback`
+- [x] wire upload flow into workout detail `Feedback` surface in saved mode
+- [x] show deterministic actual summary and comparison UI inside the current `Log result` surface
 - [ ] expose `hasResultAsset` to calendar and render a secondary evidence marker
-- [ ] define and implement OpenAI input/output contract for analysis and recommendation
-- [ ] show AI analysis, next workout recommendation, and plan-adjustment suggestion separately from deterministic facts
+- [x] define and implement OpenAI input/output contract for bounded workout analysis and recommendation
+- [x] show AI analysis and next workout recommendation separately from deterministic facts
 - [ ] verify no path auto-edits the plan
-- [ ] validate the provided sample archive end to end
+- [x] validate the provided sample archive end to end
 
 ## Exit Criteria
 
@@ -728,6 +755,7 @@ Test these workout shapes:
 - The backend deterministically parses and normalizes the workout result.
 - The system stores a deterministic planned-vs-actual comparison for that workout.
 - The UI shows the deterministic comparison clearly before any AI interpretation.
+- The system stores one bounded AI interpretation linked to the deterministic comparison and reads it back separately inside `Feedback`.
 - The calendar can distinguish completed workouts that include richer feedback evidence from completed workouts that do not.
 - OpenAI generates workout analysis and next-workout guidance from structured comparison context, not raw binary upload.
 - Any plan-adjustment output is suggestion-only and never silently mutates the active plan.

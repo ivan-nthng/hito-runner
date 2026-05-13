@@ -14,8 +14,7 @@ export const Route = createFileRoute("/progress")({
       { title: `Progress — ${APP_NAME}` },
       {
         name: "description",
-        content:
-          "Progress surfaces backed by the preview seam or the persisted plan and workout log.",
+        content: "Review your progress.",
       },
     ],
   }),
@@ -59,8 +58,8 @@ function Progress() {
             <p className="hito-label">Progress unavailable</p>
             <h1 className="hito-page-title">There isn&apos;t a visible plan to summarize yet.</h1>
             <p className="hito-page-copy">
-              Once you create or import a saved plan, this preserved surface will reuse the same
-              backend truth for volume, completion, and week status context.
+              Once you create or import a plan, this page will summarize your volume, completion,
+              and week status.
             </p>
             <div className="hito-state-actions">
               <Link to="/" className="hito-button hito-button-primary hito-button-lg">
@@ -85,13 +84,13 @@ function Progress() {
       <div className="hito-route-stack px-6 py-10 lg:px-10 max-w-6xl">
         <header className="hito-page-header">
           <p className="hito-label">
-            {snapshot.source === "persisted" ? "Saved mode shell" : "Preview surface"}
+            {snapshot.source === "persisted" ? "Saved progress" : "Preview"}
           </p>
-          <h1 className="hito-page-title">Progress, kept honest.</h1>
+          <h1 className="hito-page-title">Progress</h1>
           <p className="hito-page-copy">
             {snapshot.source === "persisted"
-              ? "This route stays preserved to keep the imported navigation and layout intact while the aggregates now read from persisted plan and workout-log state."
-              : "This route is preserved to keep the imported navigation and layout intact. The charts below still read from deterministic sample data rather than saved runner history."}
+              ? "This page summarizes the plan and workout results you have saved so far."
+              : "You're viewing the preview, so the charts below still use sample data."}
           </p>
         </header>
 
@@ -100,7 +99,7 @@ function Progress() {
             icon={Activity}
             label="Completed sessions"
             value={`${totals.completed}`}
-            hint={`${totals.total} planned in the visible block`}
+            hint={`${totals.total} planned in this block`}
           />
           <BigStat
             icon={TrendingUp}
@@ -109,8 +108,8 @@ function Progress() {
             unit="km"
             hint={
               snapshot.source === "persisted"
-                ? "derived from saved workout outcomes"
-                : "derived from preview statuses"
+                ? "from saved workout results"
+                : "from preview statuses"
             }
           />
           <BigStat
@@ -118,13 +117,13 @@ function Progress() {
             label="Longest run"
             value={`${totals.longestKm}`}
             unit="km"
-            hint="current block view"
+            hint="in this block"
           />
           <BigStat
             icon={Flag}
-            label="Surface state"
+            label="View"
             value={snapshot.source === "persisted" ? "Saved" : "Preview"}
-            hint={snapshot.source === "persisted" ? "saved logs are live" : "preview only"}
+            hint={snapshot.source === "persisted" ? "saved workouts" : "preview only"}
             statusTone={snapshot.source === "persisted" ? "success" : undefined}
             tone="warn"
           />
@@ -221,15 +220,15 @@ function Progress() {
         </section>
 
         <section>
-          <SectionHeader title="Why this page stays" subtitle="Preserved shell" />
+          <SectionHeader title="About this page" subtitle="Current state" />
           <div className="hito-row-group">
             <div className="hito-list-row items-end">
               <div className="max-w-xl">
-                <p className="hito-label">Preview contract</p>
-                <div className="mt-3 font-display text-5xl leading-none">Later, not live.</div>
+                <p className="hito-label">What you're seeing</p>
+                <div className="mt-3 font-display text-5xl leading-none">Still growing.</div>
                 <p className="hito-support-copy mt-3">
-                  This is where richer trend interpretation can live later, once workout logs, week
-                  status, and any derived summaries are backed by real persisted data.
+                  This page will get deeper trend reading over time. For now, it focuses on the
+                  basics: completion, volume, and recent consistency.
                 </p>
               </div>
               <div className="grid min-w-[220px] gap-3">

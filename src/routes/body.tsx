@@ -11,7 +11,7 @@ export const Route = createFileRoute("/body")({
       { title: `Body — ${APP_NAME}` },
       {
         name: "description",
-        content: "Preview body-note surface preserved from the imported baseline.",
+        content: "Quick body notes.",
       },
     ],
   }),
@@ -63,13 +63,13 @@ function Body() {
       <div className="px-6 py-10 lg:px-10 max-w-6xl">
         <header className="hito-page-header">
           <p className="hito-label">
-            {snapshot.source === "persisted" ? "Saved mode shell" : "Preview surface"}
+            {snapshot.source === "persisted" ? "Saved notes" : "Preview"}
           </p>
-          <h1 className="hito-page-title">Manual body notes.</h1>
+          <h1 className="hito-page-title">Body notes</h1>
           <p className="hito-page-copy">
             {snapshot.source === "persisted"
-              ? "This route stays visible inside saved mode, but body notes remain a preserved local-only shell. They do not adapt the plan, rewrite workouts, or sync to a device yet."
-              : "This route stays visible as a preserved shell. Interactions are local-only and do not adapt the plan, rewrite workouts, or sync to a device yet."}
+              ? "This page is for quick manual notes right now. It does not change your plan or sync anywhere yet."
+              : "This page is just a local preview for quick body notes. It does not change your plan or sync anywhere yet."}
           </p>
         </header>
 
@@ -90,8 +90,7 @@ function Body() {
                 ))}
               </div>
               <span className="hito-section-subtitle">
-                {Object.keys(log).length} active marker
-                {Object.keys(log).length === 1 ? "" : "s"}
+                {Object.keys(log).length} area{Object.keys(log).length === 1 ? "" : "s"} marked
               </span>
             </div>
 
@@ -157,7 +156,7 @@ function Body() {
             </div>
 
             <p className="hito-section-subtitle mt-4 text-center">
-              {active ? REGIONS.find((r) => r.id === active)?.label : "Tap a region"}
+              {active ? REGIONS.find((r) => r.id === active)?.label : "Select an area"}
             </p>
           </div>
 
@@ -213,7 +212,7 @@ function Body() {
                 <h3 className="font-display text-xl">Active log</h3>
                 <div className="mt-4">
                   {Object.entries(log).length === 0 && (
-                    <p className="hito-caption">No markers. Body feels good today.</p>
+                    <p className="hito-caption">No markers today.</p>
                   )}
                   {Object.entries(log).map(([id, level]) => {
                     const r = REGIONS.find((x) => x.id === id);
@@ -245,13 +244,13 @@ function Body() {
 
             <section className="hito-list-row items-start bg-signal/[0.03]">
               <div>
-                <div className="hito-label">Preview note</div>
+                <div className="hito-label">For now</div>
                 <p className="hito-support-copy mt-2 text-foreground/85">
-                  Later phases may use this area for trusted body-state guidance. In the current
-                  repo it is only a preserved preview block, not a decision engine.
+                  This is just a private note area for now. It does not change your plan or suggest
+                  decisions yet.
                 </p>
                 <button className="hito-button hito-button-ghost hito-button-xs mt-3 text-signal">
-                  <Plus className="h-3 w-3" /> Keep surface
+                  <Plus className="h-3 w-3" /> Keep notes here
                 </button>
               </div>
             </section>

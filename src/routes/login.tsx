@@ -55,8 +55,8 @@ function LoginPage() {
             </h1>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
               {snapshot.mode === "authenticated"
-                ? "Your profile, plan, and workout logging are already using persisted saved-mode truth."
-                : "Your authenticated account is ready. Describe your goal on home to create the saved calendar and workout surface."}
+                ? "Your profile, plan, and workout results are already saved."
+                : "Your account is ready. Go home and describe your goal to create your plan."}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link

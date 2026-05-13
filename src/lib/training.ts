@@ -1,4 +1,5 @@
 import planJson from "@/data/training-plan.json";
+import type { WorkoutFeedbackMarkerSummary } from "@/lib/workout-result-import/types";
 
 export type WorkoutType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
 export type Status = "completed" | "partial" | "skipped" | "today" | "upcoming" | "rest";
@@ -84,6 +85,7 @@ export interface Workout {
   title: string;
   notes: string | null;
   steps: Step[];
+  feedbackMarker: WorkoutFeedbackMarkerSummary | null;
   status: Status;
   log: WorkoutLog | null;
 }
@@ -277,6 +279,29 @@ export const WEEK_STATUS_META: Record<WeekStatus, { label: string; helper: strin
   },
 };
 
+export function feedbackMarkerMeta(marker: WorkoutFeedbackMarkerSummary | null) {
+  if (!marker) {
+    return null;
+  }
+
+  switch (marker.state) {
+    case "evidence_attached":
+      return {
+        state: marker.state,
+        label: "Evidence attached",
+        shortLabel: "Evidence",
+      };
+    case "feedback_ready":
+      return {
+        state: marker.state,
+        label: "Feedback ready",
+        shortLabel: "Feedback",
+      };
+    default:
+      return null;
+  }
+}
+
 export function getPreviewSnapshot(): TrainingSnapshot {
   const currentDate = todayIso();
   const workouts = previewPlan.schedule.map((workout) => ({
@@ -289,6 +314,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
     title: workout.title,
     notes: workout.notes ?? null,
     steps: workout.steps,
+    feedbackMarker: null,
     log: null,
     status: inferWorkoutStatus(workout.type, workout.date, currentDate, null),
   }));
@@ -495,7 +521,7 @@ export function displayTargetEntries(target: StepTarget | undefined) {
     entries.push({
       key,
       label: humanizeTargetLabel(key),
-      value: stringValue,
+      value: humanizeTargetValue(key, stringValue),
     });
   };
 
@@ -574,17 +600,53 @@ function roundDistanceKm(distanceKm: number) {
 
 function humanizeTargetLabel(key: string) {
   switch (key) {
+    case "intensity":
+      return "Effort";
     case "hr_bpm_range":
-      return "HR";
+      return "Heart rate";
     case "pace_min_per_km_range":
+    case "pace":
       return "Pace";
     case "cadence_spm_range":
       return "Cadence";
     case "rpe":
       return "RPE";
+    case "cue":
+      return "Focus";
+    case "hint":
+      return "Note";
+    case "coaching_hint":
+      return "Coach note";
     default:
       return key.replace(/_/g, " ");
   }
+}
+
+function humanizeTargetValue(key: string, value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (key === "pace" || key === "pace_min_per_km_range") {
+    if (normalized === "not_measured") {
+      return "By feel";
+    }
+  }
+
+  if (key === "intensity") {
+    switch (normalized) {
+      case "easy_aerobic":
+        return "Easy aerobic";
+      case "controlled_fast":
+        return "Controlled fast running";
+      case "controlled":
+        return "Controlled";
+      case "fast":
+        return "Fast";
+      default:
+        break;
+    }
+  }
+
+  return value.replace(/_/g, " ");
 }
 
 const SEGMENT_COLOR_META: Record<SegmentTone, SegmentColorMeta> = {

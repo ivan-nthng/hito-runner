@@ -41,7 +41,7 @@ export function AuthEntryScreen({
             <div className="space-y-4">
               <p className="max-w-sm text-lg text-foreground/92">Your running plan, kept simple.</p>
               <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Create a new program for your next event, or come back to your plan and progress.
+                Start a plan for your next event, or pick up where you left off.
               </p>
             </div>
           </div>
@@ -119,7 +119,7 @@ export function AuthEntryScreen({
                   )}
                   {status === "local_unavailable" && (
                     <p className="hito-field-error">
-                      Local development login is not available on this runtime.
+                      Local login is not available in this environment.
                     </p>
                   )}
                 </form>
@@ -132,21 +132,18 @@ export function AuthEntryScreen({
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
                   {localBypassEnabled
-                    ? "Use an email link to continue."
-                    : "Use the real email sign-in path for this environment."}
+                    ? "Use an email sign-in link."
+                    : "Use email to sign in on this device."}
                 </p>
 
                 {status === "error" && (
                   <p className="hito-field-error mt-4">
-                    The last Magic Link could not finish sign-in. Request a fresh link and try
-                    again.
+                    The last sign-in link did not work. Request a new one and try again.
                   </p>
                 )}
 
                 {phase === "sent" && (
-                  <p className="hito-field-success mt-4">
-                    Check {email} and open the new sign-in link on this device.
-                  </p>
+                  <p className="hito-field-success mt-4">Check {email} for your sign-in link.</p>
                 )}
 
                 {error && <p className="hito-field-error mt-4">{error}</p>}
@@ -172,7 +169,7 @@ export function AuthEntryScreen({
                         setError(
                           requestError instanceof Error
                             ? requestError.message
-                            : "Could not send the Magic Link.",
+                            : "Could not send the sign-in link.",
                         );
                       }
                     }}
@@ -194,12 +191,12 @@ export function AuthEntryScreen({
                       disabled={phase === "sending"}
                       className="hito-button hito-button-secondary hito-button-lg"
                     >
-                      {phase === "sending" ? "Sending Magic Link..." : "Send Magic Link"}
+                      {phase === "sending" ? "Sending link..." : "Send sign-in link"}
                     </button>
                   </form>
                 ) : (
                   <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                    Magic Link is not configured in this environment yet.
+                    Email sign-in is not set up in this environment yet.
                   </p>
                 )}
               </div>

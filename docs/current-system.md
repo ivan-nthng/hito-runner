@@ -42,7 +42,7 @@
 - `src/routes/body.tsx`
   renders a preserved body-note preview shell, with severity scale controls and active-log severity summaries mapped to shared Hito severity primitives while the body-map SVG remains visualization-specific
 - `src/routes/integrations.tsx`
-  renders a preserved integration preview shell
+  renders a preserved integration shell that now points honestly to the live workout-detail Garmin feedback path and keeps screenshot import plus broader plan adjustments clearly later
 
 ## Data Contract
 
@@ -88,6 +88,16 @@
   authenticated saved mode can accept one free-text request server-side, ask OpenAI for bounded structured authoring input, validate that output deterministically, and only then generate canonical `training-plan-v2` plan truth for persistence
 - advanced JSON import remains available inside onboarding as a demoted fallback path for existing Hito plan files, migration, and testing
 - text-first authoring, advanced JSON import, and internal structured authoring all create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
+- canonical apply-time start normalization now lives in [src/lib/plan-apply-policy.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-apply-policy.ts):
+  explicit future `start_date` is preserved, while past or non-future `start_date` normalizes to `today` before persistence
+- that same backend-owned apply seam now also handles first-day conflicts:
+  if a normalized plan would start today with a non-rest day while the current active plan already has a non-rest workout today, the default backend behavior is now the safe path:
+  preserve today’s existing workout, drop incoming day 1, and start the imported original day 2 tomorrow without blocking normal apply
+- continuity safety still evaluates the final transformed workout dates, not the raw imported dates:
+  the default preserved-today path still cannot detach logged history, and the only alternate path is explicit destructive `replace_first_day`, which keeps incoming day 1 on today and is blocked honestly when it would break exact saved-history carry-forward
+- the frontend now mirrors that simplified policy instead of the older symmetric chooser:
+  text-first apply and advanced JSON apply both use the safe backend default without a required preserve-vs-ignore modal step
+  and only one explicit destructive override remains in the UI: `Replace today`, now kept behind a quieter disclosure instead of being shown as an equal sibling of the safe action
 - OpenAI-generated authoring output never persists directly:
   the app validates the model response, converts it into canonical plan data, and persists through the same `plan_cycles` plus `planned_workouts` seam already used by JSON import and structured authoring
 - canonical richer-plan truth now survives more explicitly in that same seam across JSON import, structured authoring, and OpenAI text authoring:
@@ -98,12 +108,14 @@
 - the imported JSON week creates the saved `planned_workouts` directly instead of shifting the preview template onto today
 - home and calendar now anchor `today` to the real runtime local date instead of a frozen template start date
 - the preview snapshot no longer caches a stale `currentDate`, so reloads can reflect the actual current day
-- the saved-mode home hero now uses one light divided support module for `Planning Note`, `Week Status`, and `Tomorrow`, and the lower metadata strip has been removed
+- the saved-mode home hero now keeps week status in the top/header treatment, uses a dismissible right-side `Planning Note` or plan-window support note plus the next/nearest workout context, and no longer repeats week status inside that side support area
 - saved-mode home-return affordances in the shell now reopen `/` through a fresh document request so already-open tabs can recover the authoritative home route even when a stale client fetch path fails
 - calendar day cells now mark completed workouts with a clearer green confirmation state while keeping today and rest states readable
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode advanced import entry point plus sign-out action
+- the sidebar plan-note support block is locally dismissible and no longer repeats the same week status already shown in the top header
 - the saved-mode advanced import dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
+- that same saved-mode import dialog now keeps its own internal scroll and calmer copy so long apply/import content fits without turning into an oversized blocking wall
 - after a successful saved-mode advanced import apply, the client now leaves the current page through a fresh document request to `/` instead of relying on an immediate in-place router refresh on the replaced plan state
 - the saved-mode advanced import dialog now accepts only canonical `training-plan-v2` files, and runtime-only v2 fields such as `status`, `completion_state`, and sync or feedback placeholders remain non-canonical
 - the first structured authoring generator now emits the same canonical `training-plan-v2` family used by JSON import, persists it through `plan_cycles` plus `planned_workouts`, and reuses `steps jsonb` as the only structured workout payload
@@ -127,7 +139,52 @@
 - the workout-detail `Week Status` block now answers one deterministic question through a progress bar:
   completed non-rest workouts in the current week
 - `src/components/CompletionPanel.tsx`
-  now reserves one honest `Upload result` placeholder seam in the notes area without claiming Garmin, Strava, OCR, or extraction capability
+  now keeps `Log result` focused on manual completion truth, adds one lighter state-aware Garmin continuation row into `Feedback`, and keeps the dedicated workout-detail `Feedback` surface as the canonical owner of the live `FIT / ZIP file` control, parsed Garmin evidence summary, factual plan-vs-run comparison readback, and the bounded AI interpretation readback
+- the first Garmin ingest seam accepts only:
+  one `.fit` file
+  or one `.zip` archive that contains exactly one usable FIT activity file
+- the visible Garmin upload picker intentionally avoids Safari-native MIME/UTI filtering and validates the `.fit` or `.zip` extension after selection so Safari can pass the file to the backend route
+- uploaded Garmin result truth now persists through two additive canonical tables:
+  `workout_result_assets` for immutable upload metadata and parse state
+  `workout_actual_metrics` for normalized actual workout metrics and structured actual step payload
+- uploaded Garmin result truth now also persists one additive deterministic comparison table:
+  `workout_comparisons` stores the latest backend-owned planned-vs-actual comparison for each normalized Garmin result
+- uploaded Garmin feedback truth now also persists one additive interpretation table:
+  `workout_ai_insights` stores one backend-generated bounded interpretation and next-workout recommendation linked to a deterministic comparison row
+- the first slice stores the original asset in the private `workout-result-assets` Supabase bucket, extracts FIT deterministically, parses with a deterministic FIT parser, and normalizes summary metrics plus lap and step payload without invoking AI on raw binary data
+- the second Garmin slice now computes deterministic planned-vs-actual comparison immediately after normalized Garmin metrics are written, using only backend truth from:
+  planned workout date
+  the same canonical planned duration seam already shown on workout detail
+  explicit planned distance when the plan defines one
+  structured-step count only when the workout shape is simple enough to compare honestly
+- comparison truth is intentionally conservative:
+  `comparison_status` is one of `complete`, `partial`, or `insufficient_data`
+  `completion_state` is one of `matched`, `partially_matched`, or `unclear`
+  and the stored payload now keeps:
+  explicit signal objects for date, duration, distance, and structured-step-count truth
+  honest `missing_actual` and `not_applicable` reasons
+  bounded delta and tolerance metadata when the metric supports it
+  session-summary facts plus a step-summary block when ordered per-step duration comparison is trustworthy
+  instead of AI verdict prose
+- the next Garmin slice now adds one bounded AI layer on top of those persisted facts only:
+  `workout_ai_insights` is generated from planned workout truth, normalized actual metrics, deterministic comparison payload, week context, and next-workout summary
+  it never parses raw FIT binary and never replaces deterministic comparison
+- current workout-detail `Feedback` readback now exposes the latest Garmin asset, latest normalized actual metrics, latest deterministic comparison, and latest bounded AI interpretation in a dedicated evidence surface separate from manual completion logging
+- that `Feedback` surface now uses a flatter divided layout with plain-language section framing:
+  upload explains why it helps
+  attached Garmin evidence now shows the live file state and supports explicit removal through the same saved-mode seam
+  the near-upload summary now reports compact state-aware payoff such as attached, run summary ready, comparison ready, recommendation ready, or retry needed
+  factual `Plan vs run` stays primary
+  bounded recommendation stays secondary and now reads as one runner-facing next-step note with plainer caution context instead of a more technical AI appendix
+- when Garmin evidence is already attached, the loaded `Feedback` state now switches from upload-first framing into attached-first review ownership:
+  the top area shows an attached-file owner row with quiet file metadata
+  upload buttons stay hidden until that evidence is removed
+  `Plan vs run` now leads with a stronger verdict row, one compact `Evidence / Confidence / Checks` strip, calmer run-summary deltas, and one quieter `Comparison notes` disclosure for technical caveats
+- the saved-mode workout snapshot now also carries one bounded `feedbackMarker` summary per workout day, derived only from existing Garmin feedback truth:
+  `evidence_attached` when a Garmin result asset exists
+  `feedback_ready` when canonical actual metrics plus deterministic comparison exist for that day
+- saved-mode home and calendar now render that `feedbackMarker` as a bounded secondary evidence indicator that links directly into the existing workout-detail `Feedback` tab without replacing completion-state truth
+- screenshot OCR, Garmin sync, Strava sync, and any plan-adjustment automation are still later slices
 - the first Hito design-system implementation slices now exist in shared CSS primitives for low-card surfaces, tiered buttons, tiered fields, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact status pills, compact status markers, setup/empty/error state surfaces, progress analytics stats, chart legends, tooltip shells, body severity scales, body severity summaries, shell navigation rows, shell profile triggers, and shell dropdown rows; those primitives are applied to auth, onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, deeper workout-structure and completion micro-surfaces, route-level state surfaces, progress analytics surfaces, body severity micro-UI, preserved integration utility rows, and the internal `/hitoDS` reference page
 - remaining visualization-specific chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional geometry exceptions rather than generalized Hito component families
 - final Safari QA on the visible runner-facing scope found no obvious stray custom UI drift, so future UI work should extend shared Hito primitives or documented shell families instead of introducing new route-local visual treatments

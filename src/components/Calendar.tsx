@@ -4,6 +4,7 @@ import { Check, ChevronLeft, ChevronRight, Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   displayTargetEntries,
+  feedbackMarkerMeta,
   formatDistanceKm,
   TYPE_META,
   WEEK_STATUS_META,
@@ -200,6 +201,7 @@ function DayCell({
   const day = parseInt(iso.split("-")[2], 10);
   const isHover = hovered === iso;
   const meta = workout ? workoutTypeMeta(workout) : null;
+  const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
   const km = workout ? workoutDistanceKm(workout) : null;
   const duration = workout ? workoutDuration(workout) : 0;
   const isCompleted = status === "completed";
@@ -258,7 +260,12 @@ function DayCell({
             >
               {meta.short}
             </div>
-            <div className="mt-1 text-xs leading-tight text-foreground/85 line-clamp-2">
+            <div
+              className={cn(
+                "mt-1 text-xs leading-tight text-foreground/85 line-clamp-2",
+                feedbackMeta && "pr-12",
+              )}
+            >
               {workout.title.replace(/^(Аэробный |Лёгкий )/, "")}
             </div>
             <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground font-mono-num">
@@ -292,6 +299,19 @@ function DayCell({
           </div>
         )}
       </Link>
+
+      {workout && workout.type !== "rest" && feedbackMeta && (
+        <Link
+          to="/workout/$date"
+          params={{ date: iso }}
+          search={{ tab: "feedback" } as never}
+          className="absolute bottom-2.5 right-2.5 z-20 hito-feedback-marker"
+          data-state={feedbackMeta.state}
+          aria-label={`${feedbackMeta.label}. Open workout feedback.`}
+        >
+          <span className="hito-feedback-marker-dot" />
+        </Link>
+      )}
 
       {isHover && workout && workout.type !== "rest" && (
         <div className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 pointer-events-none">
@@ -401,55 +421,74 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
         const workout = findWorkout(snapshot.workouts, iso);
         const isToday = iso === snapshot.currentDate;
         const meta = workout ? workoutTypeMeta(workout) : null;
+        const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
         const status = workout?.status ?? "rest";
         const km = workout ? workoutDistanceKm(workout) : null;
         const duration = workout ? workoutDuration(workout) : 0;
         const isCompleted = status === "completed";
         return (
-          <Link
-            key={iso}
-            to="/workout/$date"
-            params={{ date: iso }}
-            className={cn(
-              "flex min-h-[170px] flex-col border-b border-hairline p-4 transition-colors hover:bg-accent/30 md:border-r md:border-b-0",
-              isToday && "relative z-10 outline outline-1 outline-offset-[-1px] outline-signal/60",
-              isCompleted && !isToday && "bg-success/[0.04]",
-            )}
-            style={
-              isCompleted
-                ? {
-                    boxShadow: "inset 0 -3px 0 0 var(--success)",
-                  }
-                : undefined
-            }
-          >
-            <div className="flex items-center justify-between hito-section-subtitle text-[10px]">
-              <span>{weekdayShort(iso)}</span>
-              <div className="flex items-center gap-1.5">
-                <StatusMark status={status} />
-                <span className="font-mono-num">{iso.slice(8)}</span>
-              </div>
-            </div>
-            {workout && workout.type !== "rest" && meta ? (
-              <>
-                <div
-                  className="mt-3 text-[11px] uppercase tracking-wider"
-                  style={{ color: meta.color }}
-                >
-                  {meta.short}
+          <div key={iso} className="relative">
+            <Link
+              to="/workout/$date"
+              params={{ date: iso }}
+              className={cn(
+                "flex min-h-[170px] flex-col border-b border-hairline p-4 transition-colors hover:bg-accent/30 md:border-r md:border-b-0",
+                isToday &&
+                  "relative z-10 outline outline-1 outline-offset-[-1px] outline-signal/60",
+                isCompleted && !isToday && "bg-success/[0.04]",
+              )}
+              style={
+                isCompleted
+                  ? {
+                      boxShadow: "inset 0 -3px 0 0 var(--success)",
+                    }
+                  : undefined
+              }
+            >
+              <div className="flex items-center justify-between hito-section-subtitle text-[10px]">
+                <span>{weekdayShort(iso)}</span>
+                <div className="flex items-center gap-1.5">
+                  <StatusMark status={status} />
+                  <span className="font-mono-num">{iso.slice(8)}</span>
                 </div>
-                <div className="mt-1 text-sm leading-snug">{workout.title}</div>
-                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-3 font-mono-num text-[11px] text-muted-foreground">
-                  {km != null && <span>{formatDistanceKm(km)}km</span>}
-                  {duration > 0 && <span>{duration}′</span>}
-                </div>
-              </>
-            ) : (
-              <div className="mt-auto text-xs uppercase tracking-wider text-muted-foreground">
-                Rest
               </div>
+              {workout && workout.type !== "rest" && meta ? (
+                <>
+                  <div
+                    className="mt-3 text-[11px] uppercase tracking-wider"
+                    style={{ color: meta.color }}
+                  >
+                    {meta.short}
+                  </div>
+                  <div className={cn("mt-1 text-sm leading-snug", feedbackMeta && "pr-16")}>
+                    {workout.title}
+                  </div>
+                  <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-3 font-mono-num text-[11px] text-muted-foreground">
+                    {km != null && <span>{formatDistanceKm(km)}km</span>}
+                    {duration > 0 && <span>{duration}′</span>}
+                  </div>
+                </>
+              ) : (
+                <div className="mt-auto text-xs uppercase tracking-wider text-muted-foreground">
+                  Rest
+                </div>
+              )}
+            </Link>
+
+            {workout && workout.type !== "rest" && feedbackMeta && (
+              <Link
+                to="/workout/$date"
+                params={{ date: iso }}
+                search={{ tab: "feedback" } as never}
+                className="absolute bottom-4 right-4 z-20 hito-feedback-marker"
+                data-state={feedbackMeta.state}
+                aria-label={`${feedbackMeta.label}. Open workout feedback.`}
+              >
+                <span className="hito-feedback-marker-dot" />
+                <span>{feedbackMeta.shortLabel}</span>
+              </Link>
             )}
-          </Link>
+          </div>
         );
       })}
     </div>

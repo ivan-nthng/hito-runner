@@ -16,6 +16,8 @@ import { Route as HitoDSRouteImport } from './routes/hitoDS'
 import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
+import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
+import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api.auth.logout'
 import { Route as ApiAuthLocalLoginRouteImport } from './routes/api.auth.local-login'
 import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
@@ -55,6 +57,16 @@ const WorkoutDateRoute = WorkoutDateRouteImport.update({
   path: '/workout/$date',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkoutResultUploadRoute = ApiWorkoutResultUploadRouteImport.update({
+  id: '/api/workout-result/upload',
+  path: '/api/workout-result/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkoutResultRemoveRoute = ApiWorkoutResultRemoveRouteImport.update({
+  id: '/api/workout-result/remove',
+  path: '/api/workout-result/remove',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
   id: '/api/auth/logout',
   path: '/api/auth/logout',
@@ -82,6 +94,8 @@ export interface FileRoutesByFullPath {
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
+  '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -94,6 +108,8 @@ export interface FileRoutesByTo {
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
+  '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -107,6 +123,8 @@ export interface FileRoutesById {
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
+  '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -121,6 +139,8 @@ export interface FileRouteTypes {
     | '/api/auth/confirm'
     | '/api/auth/local-login'
     | '/api/auth/logout'
+    | '/api/workout-result/remove'
+    | '/api/workout-result/upload'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -133,6 +153,8 @@ export interface FileRouteTypes {
     | '/api/auth/confirm'
     | '/api/auth/local-login'
     | '/api/auth/logout'
+    | '/api/workout-result/remove'
+    | '/api/workout-result/upload'
   id:
     | '__root__'
     | '/'
@@ -145,6 +167,8 @@ export interface FileRouteTypes {
     | '/api/auth/confirm'
     | '/api/auth/local-login'
     | '/api/auth/logout'
+    | '/api/workout-result/remove'
+    | '/api/workout-result/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -158,6 +182,8 @@ export interface RootRouteChildren {
   ApiAuthConfirmRoute: typeof ApiAuthConfirmRoute
   ApiAuthLocalLoginRoute: typeof ApiAuthLocalLoginRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
+  ApiWorkoutResultRemoveRoute: typeof ApiWorkoutResultRemoveRoute
+  ApiWorkoutResultUploadRoute: typeof ApiWorkoutResultUploadRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -211,6 +237,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkoutDateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/workout-result/upload': {
+      id: '/api/workout-result/upload'
+      path: '/api/workout-result/upload'
+      fullPath: '/api/workout-result/upload'
+      preLoaderRoute: typeof ApiWorkoutResultUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workout-result/remove': {
+      id: '/api/workout-result/remove'
+      path: '/api/workout-result/remove'
+      fullPath: '/api/workout-result/remove'
+      preLoaderRoute: typeof ApiWorkoutResultRemoveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/logout': {
       id: '/api/auth/logout'
       path: '/api/auth/logout'
@@ -246,6 +286,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthConfirmRoute: ApiAuthConfirmRoute,
   ApiAuthLocalLoginRoute: ApiAuthLocalLoginRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
+  ApiWorkoutResultRemoveRoute: ApiWorkoutResultRemoveRoute,
+  ApiWorkoutResultUploadRoute: ApiWorkoutResultUploadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

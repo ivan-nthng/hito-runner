@@ -367,6 +367,57 @@
     color: var(--color-success);
   }
 
+  .hito-disclosure {
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 0.875rem;
+  }
+
+  .hito-disclosure-summary {
+    display: flex;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-radius: var(--radius-md);
+    color: var(--color-muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .hito-disclosure-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .hito-disclosure-summary:hover {
+    color: var(--color-foreground);
+  }
+
+  .hito-disclosure-summary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
+  }
+
+  .hito-disclosure-chevron {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    transition: transform 160ms ease;
+  }
+
+  .hito-disclosure[open] .hito-disclosure-chevron {
+    transform: rotate(180deg);
+  }
+
+  .hito-disclosure-body {
+    display: grid;
+    gap: 0.875rem;
+    padding-top: 0.875rem;
+  }
+
   .hito-button {
     display: inline-flex;
     align-items: center;
@@ -1003,6 +1054,53 @@
 
   .hito-status-marker[data-tone="muted"] {
     color: color-mix(in oklch, var(--color-muted-foreground) 62%, transparent);
+  }
+
+  .hito-feedback-marker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: color-mix(in oklch, var(--color-muted-foreground) 88%, transparent);
+    transition:
+      color 160ms ease,
+      opacity 160ms ease;
+  }
+
+  .hito-feedback-marker:hover {
+    color: var(--color-foreground);
+  }
+
+  .hito-feedback-marker:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
+    border-radius: 999px;
+  }
+
+  .hito-feedback-marker-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklch, var(--color-muted-foreground) 50%, transparent);
+    background: transparent;
+  }
+
+  .hito-feedback-marker[data-state="evidence_attached"] .hito-feedback-marker-dot {
+    border-color: color-mix(in oklch, var(--color-muted-foreground) 64%, transparent);
+    background: color-mix(in oklch, var(--color-foreground) 4%, transparent);
+  }
+
+  .hito-feedback-marker[data-state="feedback_ready"] {
+    color: color-mix(in oklch, var(--color-signal) 72%, var(--color-muted-foreground));
+  }
+
+  .hito-feedback-marker[data-state="feedback_ready"] .hito-feedback-marker-dot {
+    border-color: color-mix(in oklch, var(--color-signal) 72%, transparent);
+    background: color-mix(in oklch, var(--color-signal) 86%, transparent);
   }
 
   .hito-state-surface {

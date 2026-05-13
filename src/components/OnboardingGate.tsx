@@ -7,6 +7,7 @@ import {
   type ImportedPlan,
   validateImportedPlanJson,
 } from "@/lib/imported-plan";
+import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import { completeOnboarding, completeTextOnboarding } from "@/lib/training-api";
 import { cn } from "@/lib/utils";
 
@@ -40,17 +41,80 @@ export function OnboardingGate() {
     setJsonStatus,
   });
 
+  const submitTextPlan = async (
+    authoringRequest: string,
+    firstDayResolution: FirstDayResolution | null,
+  ) => {
+    setTextStatus("saving");
+    setTextError(null);
+
+    try {
+      const result = await completeTextOnboardingFn({
+        data: {
+          authoringText: authoringRequest,
+          firstDayResolution,
+        },
+      });
+
+      if (!result.ok) {
+        setTextStatus("idle");
+        setTextError("Could not apply that plan yet. Refresh and try again.");
+        return;
+      }
+
+      setTextStatus("finishing");
+      openSavedHome();
+    } catch (submitError) {
+      setTextStatus("idle");
+      setTextError(
+        submitError instanceof Error ? submitError.message : "Could not create the plan.",
+      );
+    }
+  };
+
+  const submitImportedPlan = async (firstDayResolution: FirstDayResolution | null) => {
+    if (!importedPlan) {
+      setJsonError("Upload a valid JSON file before importing the plan.");
+      return;
+    }
+
+    setJsonStatus("saving");
+    setJsonError(null);
+
+    try {
+      const result = await completeOnboardingFn({
+        data: {
+          importedPlan,
+          firstDayResolution,
+        },
+      });
+
+      if (!result.ok) {
+        setJsonStatus("idle");
+        setJsonError("Could not apply that plan yet. Refresh and try again.");
+        return;
+      }
+
+      setJsonStatus("finishing");
+      openSavedHome();
+    } catch (submitError) {
+      setJsonStatus("idle");
+      setJsonError(
+        submitError instanceof Error ? submitError.message : "Could not import the JSON plan.",
+      );
+    }
+  };
+
   return (
     <section className="hito-surface mx-auto max-w-4xl p-6 lg:p-10">
       <div className="max-w-2xl">
         <p className="text-[11px] uppercase tracking-[0.18em] text-signal">Create a plan</p>
         <h1 className="mt-3 font-display text-4xl leading-[1.05] lg:text-5xl">
-          Describe what you&apos;re training for.
+          Describe your goal and current running.
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-          Tell us your goal and current context in your own words. We use that description to build
-          the first saved plan, then open the same calendar and workout flow you&apos;ll use
-          afterward.
+          Write a short description in your own words. We&apos;ll turn it into your first plan and
+          open the same calendar you&apos;ll use afterward.
         </p>
       </div>
 
@@ -63,38 +127,20 @@ export function OnboardingGate() {
           setTextError(null);
 
           if (trimmed.length < 20) {
-            setTextError("Add a little more detail before building the first plan.");
+            setTextError("Add a bit more detail so we can build the plan.");
             return;
           }
 
-          setTextStatus("saving");
-
-          try {
-            await completeTextOnboardingFn({
-              data: {
-                authoringText: trimmed,
-              },
-            });
-            setTextStatus("finishing");
-            openSavedHome();
-          } catch (submitError) {
-            setTextStatus("idle");
-            setTextError(
-              submitError instanceof Error
-                ? submitError.message
-                : "Could not build the first plan from this description.",
-            );
-          }
+          await submitTextPlan(trimmed, null);
         }}
       >
         <div className="grid gap-4">
           <p className="max-w-2xl text-sm leading-relaxed text-foreground/85">
-            Mention the goal, time horizon, current level, recent results, and any constraints that
-            should shape the plan.
+            Include your goal, timeline, current level, recent result, and any schedule limits.
           </p>
 
           <label className="grid gap-2">
-            <span className="hito-label hito-label-signal">Write your plan request here</span>
+            <span className="hito-label hito-label-signal">Plan request</span>
             <textarea
               autoFocus
               rows={9}
@@ -119,18 +165,52 @@ export function OnboardingGate() {
               className="hito-button hito-button-primary hito-button-lg"
             >
               {textStatus === "saving"
-                ? "Building your plan..."
+                ? "Creating your plan..."
                 : textStatus === "finishing"
                   ? "Opening your plan..."
-                  : "Build my first plan"}
+                  : "Create plan"}
             </button>
-            <span className="hito-field-helper">One compact request is enough to start.</span>
           </div>
 
+          <p className="hito-field-helper max-w-2xl">
+            If today already has a workout planned, Hito keeps it and starts the new plan tomorrow
+            by default.
+          </p>
+
+          <details className="hito-disclosure max-w-2xl">
+            <summary className="hito-disclosure-summary">
+              <span>Need the new plan to start today instead?</span>
+              <ChevronDown className="hito-disclosure-chevron" />
+            </summary>
+            <div className="hito-disclosure-body">
+              <p className="hito-field-helper">
+                Replace today only if the new first workout should overwrite today&apos;s planned
+                workout.
+              </p>
+              <div>
+                <button
+                  type="button"
+                  disabled={isBusy || authoringText.trim().length < 20}
+                  onClick={() => {
+                    const trimmed = authoringText.trim();
+
+                    if (trimmed.length < 20) {
+                      setTextError("Add a bit more detail so we can build the plan.");
+                      return;
+                    }
+
+                    void submitTextPlan(trimmed, "replace_first_day");
+                  }}
+                  className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  {textStatus === "saving" ? "Replacing today..." : "Replace today"}
+                </button>
+              </div>
+            </div>
+          </details>
+
           {textStatus === "finishing" && (
-            <p className="hito-field-success">
-              Your plan was created. Loading the saved calendar now…
-            </p>
+            <p className="hito-field-success">Your plan is ready. Opening it now…</p>
           )}
         </div>
       </form>
@@ -143,12 +223,11 @@ export function OnboardingGate() {
         >
           <div>
             <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Advanced import
+              Import from JSON
             </div>
-            <div className="mt-1 text-sm text-foreground/90">Use a JSON plan file</div>
+            <div className="mt-1 text-sm text-foreground/90">Use an existing Hito plan file</div>
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              For existing `training-plan-v2` Hito plan files, migration, or testing. Most runners
-              should describe the plan above.
+              Use this only if you already have a Hito plan file.
             </p>
           </div>
           <ChevronDown
@@ -197,53 +276,61 @@ export function OnboardingGate() {
                   type="button"
                   disabled={isBusy}
                   onClick={() => fileInputRef.current?.click()}
-                  className="hito-button hito-button-primary hito-button-md"
-                >
-                  <Upload className="h-4 w-4" />
-                  {selectedFileName ? "Choose another file" : "Upload JSON"}
-                </button>
-                <a
-                  href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
-                  download
                   className="hito-button hito-button-secondary hito-button-md"
                 >
-                  <Download className="h-4 w-4 text-signal" />
-                  Download JSON template
-                </a>
+                  <Upload className="h-4 w-4" />
+                  {selectedFileName ? "Choose another file" : "Upload file"}
+                </button>
                 {selectedFileName && (
                   <span className="text-sm text-muted-foreground">{selectedFileName}</span>
                 )}
               </div>
 
-              <label className="grid gap-2">
-                <span className="hito-label">JSON content</span>
-                <textarea
-                  rows={10}
-                  value={jsonDraft}
-                  onChange={(event) => {
-                    setJsonDraft(event.target.value);
-                    setImportedPlan(null);
-                    setFieldErrors([]);
-                    setJsonError(null);
-                  }}
-                  placeholder='{"schema_version":"training-plan-v2","plan_name":"...","generated_for":"...","start_date":"...","planned_workouts":[...]}'
-                  className="hito-field hito-textarea-md font-mono text-xs"
-                />
-              </label>
+              <details className="hito-disclosure">
+                <summary className="hito-disclosure-summary">
+                  <span>Paste JSON or download a template</span>
+                  <ChevronDown className="hito-disclosure-chevron" />
+                </summary>
+                <div className="hito-disclosure-body">
+                  <div>
+                    <a
+                      href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
+                      download
+                      className="hito-button hito-button-ghost hito-button-sm"
+                    >
+                      <Download className="h-4 w-4 text-signal" />
+                      Download JSON template
+                    </a>
+                  </div>
+                  <label className="grid gap-2">
+                    <span className="hito-label">Paste plan JSON</span>
+                    <textarea
+                      rows={10}
+                      value={jsonDraft}
+                      onChange={(event) => {
+                        setJsonDraft(event.target.value);
+                        setImportedPlan(null);
+                        setFieldErrors([]);
+                        setJsonError(null);
+                      }}
+                      placeholder='{"schema_version":"training-plan-v2","plan_name":"...","generated_for":"...","start_date":"...","planned_workouts":[...]}'
+                      className="hito-field hito-textarea-md font-mono text-xs"
+                    />
+                  </label>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={isBusy || !jsonDraft.trim()}
-                  onClick={() => validateJsonDraft(jsonDraft)}
-                  className="hito-button hito-button-secondary hito-button-md"
-                >
-                  Validate JSON
-                </button>
-                <span className="hito-field-helper">
-                  Advanced import requires the canonical `training-plan-v2` contract.
-                </span>
-              </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={isBusy || !jsonDraft.trim()}
+                      onClick={() => validateJsonDraft(jsonDraft)}
+                      className="hito-button hito-button-secondary hito-button-md"
+                    >
+                      Check JSON
+                    </button>
+                    <span className="hito-field-helper">Only Hito plan JSON works here.</span>
+                  </div>
+                </div>
+              </details>
 
               {importedSummary && (
                 <div className="hito-row-group">
@@ -266,7 +353,7 @@ export function OnboardingGate() {
                 <div className="hito-row-group">
                   <div className="hito-list-row items-start">
                     <div>
-                      <p className="hito-label text-destructive">JSON shape mismatch</p>
+                      <p className="hito-label text-destructive">JSON issues</p>
                       <div className="mt-2 space-y-1">
                         {fieldErrors.slice(0, 5).map((issue) => (
                           <p key={issue} className="hito-field-error">
@@ -285,31 +372,8 @@ export function OnboardingGate() {
                 <button
                   type="button"
                   disabled={isBusy || !importedPlan}
-                  onClick={async () => {
-                    if (!importedPlan) {
-                      setJsonError("Upload a valid JSON file before creating the saved plan.");
-                      return;
-                    }
-
-                    setJsonStatus("saving");
-                    setJsonError(null);
-
-                    try {
-                      await completeOnboardingFn({
-                        data: {
-                          importedPlan,
-                        },
-                      });
-                      setJsonStatus("finishing");
-                      openSavedHome();
-                    } catch (submitError) {
-                      setJsonStatus("idle");
-                      setJsonError(
-                        submitError instanceof Error
-                          ? submitError.message
-                          : "Could not import the JSON plan.",
-                      );
-                    }
+                  onClick={() => {
+                    void submitImportedPlan(null);
                   }}
                   className="hito-button hito-button-primary hito-button-md"
                 >
@@ -319,12 +383,38 @@ export function OnboardingGate() {
                       ? "Importing plan..."
                       : jsonStatus === "finishing"
                         ? "Opening your plan..."
-                        : "Apply JSON plan"}
+                        : "Import plan"}
                 </button>
-                <span className="hito-field-helper">
-                  This does not replace the text-first setup path.
-                </span>
               </div>
+
+              <p className="hito-field-helper max-w-2xl">
+                Import plan keeps today&apos;s workout and starts the new plan tomorrow.
+              </p>
+
+              <details className="hito-disclosure max-w-2xl">
+                <summary className="hito-disclosure-summary">
+                  <span>Need this file to replace today?</span>
+                  <ChevronDown className="hito-disclosure-chevron" />
+                </summary>
+                <div className="hito-disclosure-body">
+                  <p className="hito-field-helper">
+                    Replace today only if the file&apos;s first workout should overwrite
+                    today&apos;s planned workout.
+                  </p>
+                  <div>
+                    <button
+                      type="button"
+                      disabled={isBusy || !importedPlan}
+                      onClick={() => {
+                        void submitImportedPlan("replace_first_day");
+                      }}
+                      className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      {jsonStatus === "saving" ? "Replacing today..." : "Replace today"}
+                    </button>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         )}

@@ -1,11 +1,13 @@
+import { useState } from "react";
+import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Flag, NotebookPen } from "lucide-react";
+import { ArrowUpRight, NotebookPen, X } from "lucide-react";
 import {
+  feedbackMarkerMeta,
   formatDistanceKm,
   formatDate,
   findWorkout,
   primaryWorkoutTarget,
-  WEEK_STATUS_META,
   type TrainingSnapshot,
   workoutTypeMeta,
   workoutDistanceKm,
@@ -17,12 +19,12 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   if (!workout) {
     return <TodayFallback snapshot={snapshot} />;
   }
+  const feedbackMeta = feedbackMarkerMeta(workout.feedbackMarker);
   const meta = workoutTypeMeta(workout);
   const isRestDay = workout.type === "rest";
   const km = workoutDistanceKm(workout);
   const duration = workoutDuration(workout);
   const target = primaryWorkoutTarget(workout);
-  const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const primaryTarget =
     typeof target?.hr_bpm_range === "string"
       ? target.hr_bpm_range
@@ -132,37 +134,33 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
               </Link>
             )}
           </div>
+
+          {!isRestDay && feedbackMeta && (
+            <div className="mt-4">
+              <Link
+                to="/workout/$date"
+                params={{ date: snapshot.currentDate }}
+                search={{ tab: "feedback" } as never}
+                className="hito-feedback-marker"
+                data-state={feedbackMeta.state}
+              >
+                <span className="hito-feedback-marker-dot" />
+                <span>{feedbackMeta.label}</span>
+              </Link>
+            </div>
+          )}
         </div>
 
         <div>
-          <section className="pb-4">
-            <div>
-              <div className="flex items-center gap-2 hito-section-subtitle">
-                <NotebookPen className="h-3 w-3 text-signal" />
-                Planning Note
-              </div>
-              <p className="hito-list-row-copy">
-                Previous-run insight will appear here once recent completed workouts include notes
-                or uploaded results.
-              </p>
-            </div>
-          </section>
-
-          <section className="flex items-start justify-between gap-4 py-4">
-            <div>
-              <div className="flex items-center gap-2 hito-section-subtitle">
-                <Flag className="h-3 w-3" />
-                Week Status
-              </div>
-              <p className="hito-list-row-copy">{weekStatus.helper}</p>
-            </div>
-            <span className="hito-status-pill" data-tone={weekStatusTone(weekStatus.label)}>
-              {weekStatus.label}
-            </span>
-          </section>
+          <DismissibleSupportNote
+            title="Recent notes"
+            icon={<NotebookPen className="h-3 w-3 text-signal" />}
+          >
+            Recent workout notes and Garmin uploads will show up here once you have them.
+          </DismissibleSupportNote>
 
           {tomorrow && (
-            <section className="border-t border-hairline py-4">
+            <section className="py-4">
               <div>
                 <div className="hito-section-subtitle">Tomorrow</div>
                 <div className="mt-1 text-sm text-foreground/90">
@@ -212,7 +210,7 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
         ? `Today is ${formatDate(snapshot.currentDate, {
             month: "short",
             day: "numeric",
-          })}, but this imported plan currently ends on ${formatDate(planEnd, {
+          })}, but this plan ends on ${formatDate(planEnd, {
             month: "short",
             day: "numeric",
           })}.`
@@ -260,38 +258,17 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
         </div>
 
         <div>
-          <section className="pb-4">
-            <div>
-              <div className="flex items-center gap-2 hito-section-subtitle">
-                <NotebookPen className="h-3 w-3 text-signal" />
-                Plan Window
-              </div>
-              <p className="hito-list-row-copy">
-                {planStart && planEnd
-                  ? `${formatDate(planStart, { month: "short", day: "numeric" })} to ${formatDate(planEnd, { month: "short", day: "numeric" })}`
-                  : "No imported workouts are available yet."}
-              </p>
-            </div>
-          </section>
-
-          <section className="flex items-start justify-between gap-4 py-4">
-            <div>
-              <div className="flex items-center gap-2 hito-section-subtitle">
-                <Flag className="h-3 w-3" />
-                Week Status
-              </div>
-              <p className="hito-list-row-copy">{WEEK_STATUS_META[snapshot.weekStatus].helper}</p>
-            </div>
-            <span
-              className="hito-status-pill"
-              data-tone={weekStatusTone(WEEK_STATUS_META[snapshot.weekStatus].label)}
-            >
-              {WEEK_STATUS_META[snapshot.weekStatus].label}
-            </span>
-          </section>
+          <DismissibleSupportNote
+            title="Plan Window"
+            icon={<NotebookPen className="h-3 w-3 text-signal" />}
+          >
+            {planStart && planEnd
+              ? `${formatDate(planStart, { month: "short", day: "numeric" })} to ${formatDate(planEnd, { month: "short", day: "numeric" })}`
+              : "No imported workouts are available yet."}
+          </DismissibleSupportNote>
 
           {closestWorkout && (
-            <section className="border-t border-hairline py-4">
+            <section className="py-4">
               <div>
                 <div className="hito-section-subtitle">Nearest Workout</div>
                 <div className="mt-1 text-sm text-foreground/90">{closestWorkout.title}</div>
@@ -322,14 +299,6 @@ function Metric({ label, value, unit }: { label: string; value: string; unit?: s
       <div className="hito-metric-label">{label}</div>
     </div>
   );
-}
-
-function weekStatusTone(label: string) {
-  if (/reset|missed|off/i.test(label)) {
-    return "warning";
-  }
-
-  return "success";
 }
 
 function summarizeUpcomingWorkout(
@@ -366,4 +335,42 @@ function summarizeUpcomingWorkout(
   }
 
   return workoutTypeMeta(workout).label;
+}
+
+function DismissibleSupportNote({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  const [isVisible, setIsVisible] = useState(true);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  return (
+    <section className="pb-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 hito-section-subtitle">
+            {icon}
+            {title}
+          </div>
+          <p className="hito-list-row-copy">{children}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsVisible(false)}
+          className="hito-button hito-button-ghost hito-button-xs aspect-square shrink-0 p-0 text-muted-foreground hover:text-foreground"
+          aria-label={`Dismiss ${title}`}
+        >
+          <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+        </button>
+      </div>
+    </section>
+  );
 }

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { IntervalsViz } from "@/components/IntervalsViz";
-import { CompletionPanel } from "@/components/CompletionPanel";
+import { CompletionPanel, WorkoutFeedbackPanel } from "@/components/CompletionPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   displayTargetEntries,
@@ -33,7 +33,10 @@ import { getWorkoutRouteData } from "@/lib/training-api";
 export const Route = createFileRoute("/workout/$date")({
   validateSearch: (search: Record<string, unknown>) => ({
     tab:
-      search.tab === "complete" || search.tab === "preview" || search.tab === "overview"
+      search.tab === "complete" ||
+      search.tab === "feedback" ||
+      search.tab === "preview" ||
+      search.tab === "overview"
         ? search.tab
         : "overview",
   }),
@@ -42,7 +45,7 @@ export const Route = createFileRoute("/workout/$date")({
       { title: `Workout — ${APP_NAME}` },
       {
         name: "description",
-        content: "Review a preserved workout-detail shell and log real or preview workout results.",
+        content: "Review the workout and log the result.",
       },
     ],
   }),
@@ -55,7 +58,7 @@ export const Route = createFileRoute("/workout/$date")({
 });
 
 function WorkoutPage() {
-  const { workout, snapshot, viewer, prev, next } = Route.useLoaderData();
+  const { workout, snapshot, viewer, prev, next, feedback } = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const tab = search.tab;
@@ -73,8 +76,7 @@ function WorkoutPage() {
                 <p className="hito-label">Setup required</p>
                 <h1 className="hito-page-title">Finish setup before opening workouts.</h1>
                 <p className="hito-page-copy">
-                  The saved workout detail route exists only after a persisted runner profile and
-                  active plan cycle are created.
+                  Create your plan first, then your workouts will open here.
                 </p>
               </>
             ) : (
@@ -82,8 +84,8 @@ function WorkoutPage() {
                 <p className="hito-label">No workout</p>
                 <h1 className="hito-page-title">Nothing is scheduled for this day.</h1>
                 <p className="hito-page-copy">
-                  This date does not have a workout in the current {snapshot.source} plan view. Go
-                  back to the weekly plan and choose another day.
+                  There is no workout on this date in the current plan. Go back and choose another
+                  day.
                 </p>
               </>
             )}
@@ -109,6 +111,10 @@ function WorkoutPage() {
   const skippedCopy = skippedExplanationFor(workout, snapshot.source);
   const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
   const primaryTarget = primaryWorkoutTarget(workout);
+  const targetEntries = displayTargetEntries(primaryTarget);
+  const targetMetricKeys = new Set(["intensity", "hr_bpm_range", "pace_min_per_km_range", "pace"]);
+  const primaryTargetMetrics = targetEntries.filter((entry) => targetMetricKeys.has(entry.key));
+  const targetSupportEntries = targetEntries.filter((entry) => !targetMetricKeys.has(entry.key));
   const phase = `${workout.phase} · week ${workout.week}`;
   const heroMetrics = isRestDay
     ? []
@@ -183,6 +189,7 @@ function WorkoutPage() {
               [
                 { v: "overview", l: "Overview" },
                 { v: "complete", l: "Log result" },
+                { v: "feedback", l: "Feedback" },
                 { v: "preview", l: "Preview state" },
               ] as const
             ).map((tabOption) => (
@@ -215,39 +222,65 @@ function WorkoutPage() {
           <div
             className={cn(
               "relative",
-              tab !== "overview" &&
+              (tab === "complete" || tab === "preview") &&
                 "overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(150deg,rgba(16,22,28,0.86),rgba(29,36,46,0.7))] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.18)]",
+              tab === "feedback" && "p-1",
             )}
           >
-            {tab !== "overview" && (
+            {(tab === "complete" || tab === "preview") && (
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             )}
             {tab === "overview" && <Overview workout={workout} />}
-            {tab === "complete" && <CompletionPanel workout={workout} snapshot={snapshot} />}
+            {tab === "complete" && (
+              <CompletionPanel workout={workout} snapshot={snapshot} feedback={feedback} />
+            )}
+            {tab === "feedback" && (
+              <WorkoutFeedbackPanel workout={workout} snapshot={snapshot} feedback={feedback} />
+            )}
             {tab === "preview" && <PreviewPanel />}
           </div>
 
           <aside>
             <SidebarPanel>
               {resultMeta && (
-                <SidebarSection title="Result state">
+                <SidebarSection title="Saved result">
                   <div className="flex items-center justify-between gap-3">
                     <ResultBadge meta={resultMeta} mode="sidebar" />
                     <span className="text-xs text-muted-foreground">
-                      {snapshot.source === "persisted" ? "Saved truth" : "Preview state"}
+                      {snapshot.source === "persisted" ? "Saved" : "Preview"}
                     </span>
                   </div>
                 </SidebarSection>
               )}
 
               {!isRestDay && primaryTarget && (
-                <SidebarSection title="Targets" tone="signal">
-                  {displayTargetEntries(primaryTarget).map((entry) => (
-                    <div key={entry.key} className="flex justify-between gap-3 py-1 last:border-0">
-                      <span className="hito-section-subtitle">{entry.label}</span>
-                      <span className="text-xs text-right text-foreground/85">{entry.value}</span>
-                    </div>
-                  ))}
+                <SidebarSection title="Workout targets" tone="signal" titleVariant="strong">
+                  <div className="space-y-3">
+                    {primaryTargetMetrics.map((entry) => (
+                      <div
+                        key={entry.key}
+                        className="flex items-start justify-between gap-3 py-1 last:border-0"
+                      >
+                        <span className="hito-section-subtitle">{entry.label}</span>
+                        <span className="max-w-[11rem] text-xs text-right text-foreground/85">
+                          {entry.value}
+                        </span>
+                      </div>
+                    ))}
+
+                    {targetSupportEntries.length > 0 ? (
+                      <div className="border-t border-hairline pt-4 space-y-4">
+                        {targetSupportEntries.map((entry) => (
+                          <div key={entry.key}>
+                            <p className="hito-section-subtitle">{entry.label}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-foreground/82">
+                              {entry.value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </SidebarSection>
               )}
 
@@ -259,7 +292,7 @@ function WorkoutPage() {
                 </SidebarSection>
               )}
 
-              <SidebarSection title="Week Status">
+              <SidebarSection title="This week">
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="text-foreground/85">
                     {weekProgress.completed} of {weekProgress.total} workouts completed
@@ -281,13 +314,13 @@ function WorkoutPage() {
                 <p className="hito-caption mt-3">{weekStatus.helper}</p>
               </SidebarSection>
 
-              <SidebarSection title="Preview boundary" tone="signal">
+              <SidebarSection title="About this page" tone="signal">
                 <div className="flex items-start gap-2">
                   <CalendarClock className="mt-0.5 h-3.5 w-3.5 text-signal" />
                   <p className="text-xs leading-relaxed text-foreground/80">
                     {snapshot.source === "persisted"
-                      ? `${APP_NAME} keeps this shell while plan, logs, and week status now come from saved truth.`
-                      : `${APP_NAME} keeps this shell in preview mode only. Real logging and plan updates are not wired here yet.`}
+                      ? `${APP_NAME} keeps the same layout here while your plan, results, and week status come from saved data.`
+                      : `You're viewing the preview. Results and plan changes are not saved here yet.`}
                   </p>
                 </div>
               </SidebarSection>
@@ -358,8 +391,7 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
           <p className="hito-label text-destructive">Workout unavailable</p>
           <h1 className="hito-page-title">We couldn&apos;t load this workout.</h1>
           <p className="hito-page-copy text-foreground/85">
-            Try again to reopen the latest workout detail from preview or saved mode. If the plan is
-            still being set up, return home first.
+            Try again. If your plan is still being set up, go back home first.
           </p>
           <div className="hito-state-actions">
             <button
@@ -475,14 +507,13 @@ function PreviewPanel() {
   return (
     <div className="hito-surface-flat border-dashed p-8 text-center">
       <NotebookPen className="h-6 w-6 mx-auto text-signal" strokeWidth={1.4} />
-      <h3 className="mt-4 font-display text-2xl">This panel stays as a preview shell</h3>
+      <h3 className="mt-4 font-display text-2xl">This tab is not in use yet</h3>
       <p className="hito-support-copy mx-auto mt-3 max-w-md">
-        It preserves the imported tab structure without pretending that analysis, external data
-        ingest, or plan rewriting are already live.
+        It stays here to hold the tab layout until extra analysis or plan tools are ready.
       </p>
       <div className="mt-6">
         <span className="hito-status-pill" data-tone="signal">
-          Later surface · not connected yet
+          Later
         </span>
       </div>
     </div>
@@ -510,11 +541,13 @@ function SidebarSection({
   children,
   tone,
   muted,
+  titleVariant,
 }: {
   title: string;
   children: React.ReactNode;
   tone?: "signal";
   muted?: boolean;
+  titleVariant?: "default" | "strong";
 }) {
   return (
     <section
@@ -525,7 +558,16 @@ function SidebarSection({
       )}
     >
       <div className="w-full min-w-0">
-        <div className="hito-label mb-3">{title}</div>
+        <div
+          className={cn(
+            "mb-3",
+            titleVariant === "strong"
+              ? "text-sm font-medium tracking-[0.01em] text-foreground/92"
+              : "hito-label",
+          )}
+        >
+          {title}
+        </div>
         {children}
       </div>
     </section>

@@ -13,6 +13,7 @@ import {
   UserRound,
   LogOut,
   FileJson2,
+  X,
 } from "lucide-react";
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
 import { UploadJsonDialog } from "@/components/UploadJsonDialog";
@@ -52,6 +53,7 @@ export function AppShell({
   viewer?: ViewerSummary | null;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [showShellPlanNote, setShowShellPlanNote] = useState(true);
   const loc = useLocation();
   const nextPath = getLoginIntentPath(
     loc.pathname,
@@ -127,27 +129,31 @@ export function AppShell({
         </nav>
 
         <div className="mt-auto flex flex-col gap-4 p-4">
-          <div className="hito-row-group">
-            <div className="hito-list-row items-start">
-              <div>
-                <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
-                  <NotebookPen className="h-3 w-3 text-signal" />
-                  Plan note
+          {showShellPlanNote && (
+            <div className="hito-row-group">
+              <div className="hito-list-row items-start">
+                <div className="relative min-w-0 flex-1 pr-8">
+                  <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
+                    <NotebookPen className="h-3 w-3 text-signal" />
+                    Plan note
+                  </div>
+                  <p className="hito-list-row-copy">
+                    {shellSnapshot.source === "persisted"
+                      ? "Your saved plan and workout results show up here. JSON export comes later."
+                      : "You can browse the preview here until you sign in and save a plan."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowShellPlanNote(false)}
+                    className="hito-button hito-button-ghost hito-button-xs absolute right-0 top-0 aspect-square shrink-0 p-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Dismiss plan note"
+                  >
+                    <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  </button>
                 </div>
-                <p className="hito-list-row-copy">
-                  {shellSnapshot.source === "persisted"
-                    ? "Saved plan and workout status are live here. JSON export comes later."
-                    : "This shell stays available as a preview until you sign in and save a real plan."}
-                </p>
               </div>
             </div>
-            <div className="hito-list-row py-3">
-              <span className="hito-label">Week</span>
-              <span className="hito-status-pill" data-tone={weekStatusTone(weekStatus.label)}>
-                {weekStatus.label}
-              </span>
-            </div>
-          </div>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -184,7 +190,7 @@ export function AppShell({
                   }}
                 >
                   <FileJson2 className="h-4 w-4" />
-                  Advanced import
+                  Import plan
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem className="hito-shell-menu-item" disabled>
@@ -218,7 +224,7 @@ export function AppShell({
               search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
               className="hito-button hito-button-secondary hito-button-sm tracking-wide"
             >
-              Open login
+              Sign in
             </Link>
           )}
         </div>
@@ -254,9 +260,9 @@ export function AppShell({
               >
                 <Activity className="h-3.5 w-3.5" strokeWidth={1.5} />
                 {shellSnapshot.mode === "preview"
-                  ? "Save with login"
+                  ? "Sign in to save"
                   : shellSnapshot.mode === "onboarding"
-                    ? "Create a Plan"
+                    ? "Create plan"
                     : "Open plan"}
               </Link>
               <button className="md:hidden h-8 w-8 rounded-full bg-gradient-to-br from-signal to-quality grid place-items-center text-[10px] text-signal-foreground">

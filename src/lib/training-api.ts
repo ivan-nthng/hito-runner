@@ -2,18 +2,33 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { DEFAULT_AUTH_REDIRECT, sanitizeRedirectPath } from "@/lib/auth-redirect";
-import { buildImportedPlanSeed, importedPlanSchema } from "@/lib/imported-plan";
+import { importedPlanSchema } from "@/lib/imported-plan";
 import { generateCanonicalPlanFromText } from "@/lib/openai-plan-authoring";
+import {
+  prepareImportedPlanApplyPolicy,
+  type FirstDayResolution,
+  type PlanApplyResult,
+  type PlanApplySuccessResult,
+  type PreparedPlanApplySuccess,
+} from "@/lib/plan-apply-policy";
+import {
+  getPersistedUserIdForAuthContext,
+  requirePersistedUserIdForCurrentRequest,
+} from "@/lib/request-persisted-user";
 import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "@/lib/structured-plan-authoring";
 import {
+  getLatestWorkoutResultFeedback,
+  getWorkoutFeedbackMarkerMap,
+  type WorkoutResultFeedbackSummary,
+} from "@/lib/workout-result-import/ingest-garmin-result";
+import {
   buildImportedLogCarryForwardPlan,
   buildPersistedWorkoutInsertRows,
 } from "@/lib/persisted-plan-replacement";
 import { findLocalAuthAccountByUserId, isLocalAuthBypassEnabled } from "@/lib/local-auth";
-import { ensureLocalAuthSupabaseUserId } from "@/lib/local-auth-supabase";
 import {
   deriveWeekStatus,
   findWorkout,
@@ -45,22 +60,28 @@ export interface ViewerSummary {
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
+type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
 
 const loginInputSchema = z.object({
   email: z.string().trim().email(),
   next: z.string().trim().max(500).optional().nullable(),
 });
 
+const firstDayResolutionSchema = z.enum(["replace_first_day", "ignore_first_day"]);
+
 const onboardingInputSchema = z.object({
   importedPlan: importedPlanSchema,
+  firstDayResolution: firstDayResolutionSchema.optional().nullable(),
 });
 
 const structuredOnboardingInputSchema = z.object({
   authoringInput: structuredPlanAuthoringInputSchema,
+  firstDayResolution: firstDayResolutionSchema.optional().nullable(),
 });
 
 const textAuthoringInputSchema = z.object({
   authoringText: z.string().trim().min(20).max(4000),
+  firstDayResolution: firstDayResolutionSchema.optional().nullable(),
 });
 
 const workoutLogInputSchema = z
@@ -86,6 +107,18 @@ const workoutLogInputSchema = z
 
     return value;
   });
+
+type ExistingPlanContext = {
+  activePlan: PersistedPlanCycleRow | null;
+  existingWorkouts: {
+    workouts: PersistedPlannedWorkoutRow[];
+    logsByWorkoutId: Map<string, PersistedWorkoutLogRow>;
+  };
+};
+
+type PreparedImportedPlanApply = PreparedPlanApplySuccess & {
+  planContext: ExistingPlanContext;
+};
 
 export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async () => {
   const auth = getRequestAuthContext();
@@ -124,9 +157,11 @@ export const getWorkoutRouteData = createServerFn({ method: "POST" })
     if (snapshot.mode === "onboarding") {
       return {
         snapshot,
+        viewer: await getViewerForRequest(),
         workout: null as Workout | null,
         prev: null as Workout | null,
         next: null as Workout | null,
+        feedback: null as WorkoutResultFeedbackSummary | null,
       };
     }
 
@@ -134,6 +169,10 @@ export const getWorkoutRouteData = createServerFn({ method: "POST" })
     const workoutIndex = workout
       ? snapshot.workouts.findIndex((entry) => entry.id === workout.id)
       : -1;
+    const feedback =
+      snapshot.source === "persisted" && workout
+        ? await getLatestWorkoutResultFeedback(workout.id)
+        : null;
 
     return {
       snapshot,
@@ -144,6 +183,7 @@ export const getWorkoutRouteData = createServerFn({ method: "POST" })
         workoutIndex >= 0 && workoutIndex < snapshot.workouts.length - 1
           ? snapshot.workouts[workoutIndex + 1]
           : null,
+      feedback,
     };
   });
 
@@ -196,47 +236,66 @@ export const requestMagicLink = createServerFn({ method: "POST" })
 export const completeOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => onboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
-    await persistImportedPlanForCurrentRequest(data.importedPlan);
-    return {
-      ok: true,
-    };
+    return persistImportedPlanForCurrentRequest(data.importedPlan, data.firstDayResolution ?? null);
   });
 
 export const completeStructuredOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => structuredOnboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
     const generatedPlan = buildStructuredAuthoringPlan(data.authoringInput);
-    await persistImportedPlanForCurrentRequest(generatedPlan);
+    const applyResult = await persistImportedPlanForCurrentRequest(
+      generatedPlan,
+      data.firstDayResolution ?? null,
+    );
 
-    return {
-      ok: true,
-      schemaVersion: generatedPlan.schema_version,
-      sourceKind: generatedPlan.source_kind,
-      workoutCount: generatedPlan.planned_workouts.length,
-    };
+    return applyResult.ok
+      ? {
+          ...applyResult,
+          schemaVersion: generatedPlan.schema_version,
+          sourceKind: generatedPlan.source_kind,
+          workoutCount: generatedPlan.planned_workouts.length,
+        }
+      : {
+          ...applyResult,
+          schemaVersion: generatedPlan.schema_version,
+          sourceKind: generatedPlan.source_kind,
+          workoutCount: generatedPlan.planned_workouts.length,
+        };
   });
 
 export const completeTextOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => textAuthoringInputSchema.parse(value))
   .handler(async ({ data }) => {
     const generatedPlan = await generateCanonicalPlanFromText(data.authoringText);
-    await persistImportedPlanForCurrentRequest(generatedPlan.canonicalPlan);
+    const applyResult = await persistImportedPlanForCurrentRequest(
+      generatedPlan.canonicalPlan,
+      data.firstDayResolution ?? null,
+    );
 
-    return {
-      ok: true,
-      schemaVersion: generatedPlan.canonicalPlan.schema_version,
-      sourceKind: generatedPlan.canonicalPlan.source_kind,
-      workoutCount: generatedPlan.canonicalPlan.planned_workouts.length,
-      model: generatedPlan.model,
-      responseId: generatedPlan.responseId,
-    };
+    return applyResult.ok
+      ? {
+          ...applyResult,
+          schemaVersion: generatedPlan.canonicalPlan.schema_version,
+          sourceKind: generatedPlan.canonicalPlan.source_kind,
+          workoutCount: generatedPlan.canonicalPlan.planned_workouts.length,
+          model: generatedPlan.model,
+          responseId: generatedPlan.responseId,
+        }
+      : {
+          ...applyResult,
+          schemaVersion: generatedPlan.canonicalPlan.schema_version,
+          sourceKind: generatedPlan.canonicalPlan.source_kind,
+          workoutCount: generatedPlan.canonicalPlan.planned_workouts.length,
+          model: generatedPlan.model,
+          responseId: generatedPlan.responseId,
+          importedPlan: generatedPlan.canonicalPlan,
+        };
   });
 
 export const saveWorkoutLog = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
-    const auth = requireAuthenticatedUser();
-    return savePersistedWorkoutLog(await getPersistedUserIdForAuth(auth), data);
+    return savePersistedWorkoutLog(await requirePersistedUserIdForCurrentRequest(), data);
   });
 
 async function savePersistedWorkoutLog(
@@ -292,13 +351,34 @@ async function savePersistedWorkoutLog(
 }
 
 async function persistImportedPlanForCurrentRequest(
-  importedPlan: z.infer<typeof importedPlanSchema>,
-) {
+  importedPlan: ImportedPlanInput,
+  firstDayResolution: FirstDayResolution | null,
+): Promise<PlanApplyResult> {
   const auth = requireAuthenticatedUser();
-  const importedSeed = buildImportedPlanSeed(importedPlan);
-  const persistedUserId = await getPersistedUserIdForAuth(auth);
-  await upsertRunnerProfile(persistedUserId, importedSeed.profile);
-  await replaceActivePlanWithImportedInput(persistedUserId, importedPlan);
+  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+
+  if (!persistedUserId) {
+    throw new Error("Authentication is required for this action.");
+  }
+
+  return applyImportedPlanForUser(persistedUserId, importedPlan, firstDayResolution);
+}
+
+export async function applyImportedPlanForUser(
+  userId: string,
+  importedPlan: ImportedPlanInput,
+  firstDayResolution: FirstDayResolution | null,
+): Promise<PlanApplyResult> {
+  const preparedApply = await prepareImportedPlanApply(userId, importedPlan, firstDayResolution);
+
+  if ("ok" in preparedApply && !preparedApply.ok) {
+    return preparedApply;
+  }
+
+  await upsertRunnerProfile(userId, preparedApply.importedSeed.profile);
+  await replaceActivePlanWithImportedInput(userId, preparedApply, preparedApply.planContext);
+
+  return preparedApply.result;
 }
 
 export async function exchangeCodeForSession(request: Request) {
@@ -343,7 +423,7 @@ async function getSnapshotForRequest() {
     return getPreviewSnapshot();
   }
 
-  return getPersistedSnapshot(await getPersistedUserIdForAuth(auth));
+  return getPersistedSnapshot((await getPersistedUserIdForAuthContext(auth)) ?? auth.userId);
 }
 
 async function getViewerForRequest(): Promise<ViewerSummary | null> {
@@ -413,8 +493,16 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
     planCycle,
   );
   const currentDate = todayIso();
+  const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMap(
+    persistedWorkouts.map((workout) => workout.id),
+  );
   const workouts = persistedWorkouts.map((workout) =>
-    dbWorkoutToView(workout, logsByWorkoutId.get(workout.id) ?? null, currentDate),
+    dbWorkoutToView(
+      workout,
+      logsByWorkoutId.get(workout.id) ?? null,
+      currentDate,
+      feedbackMarkerByWorkoutId.get(workout.id) ?? null,
+    ),
   );
 
   return {
@@ -455,13 +543,12 @@ async function getActivePlan(userId: string) {
   return existing.data;
 }
 
-async function createAssignedPlanFromImportedInput(
+async function createAssignedPlanFromImportedSeed(
   userId: string,
-  importedPlan: z.infer<typeof importedPlanSchema>,
+  importedSeed: PreparedPlanApplySuccess["importedSeed"],
   status: PersistedPlanCycleRow["status"] = "active",
 ) {
   const supabase = createAdminSupabaseClient();
-  const importedSeed = buildImportedPlanSeed(importedPlan);
   const planInsert = await supabase
     .from("plan_cycles")
     .insert({
@@ -502,45 +589,15 @@ async function createAssignedPlanFromImportedInput(
 
 async function replaceActivePlanWithImportedInput(
   userId: string,
-  importedPlan: z.infer<typeof importedPlanSchema>,
+  preparedApply: PreparedPlanApplySuccess,
+  planContext: ExistingPlanContext,
 ) {
   const supabase = createAdminSupabaseClient();
-  const importedSeed = buildImportedPlanSeed(importedPlan);
-  const activePlanResult = await supabase
-    .from("plan_cycles")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (activePlanResult.error) {
-    throw new Error(activePlanResult.error.message);
-  }
-
-  const activePlan = activePlanResult.data;
-
-  const existingWorkouts = activePlan
-    ? await getResolvedPlanWorkoutsWithLogs(userId, activePlan)
-    : {
-        workouts: [] as PersistedPlannedWorkoutRow[],
-        logsByWorkoutId: new Map<string, PersistedWorkoutLogRow>(),
-      };
-  const preservationPlan = buildImportedLogCarryForwardPlan(
-    existingWorkouts.workouts,
-    existingWorkouts.logsByWorkoutId,
-    importedSeed.workouts,
-  );
-
-  if (!preservationPlan.ok) {
-    throw new Error(preservationPlan.message);
-  }
-
-  const insertedPlan = await createAssignedPlanFromImportedInput(
+  const { importedSeed, preservationPlan } = preparedApply;
+  const insertedPlan = await createAssignedPlanFromImportedSeed(
     userId,
-    importedPlan,
-    activePlan ? "archived" : "active",
+    importedSeed,
+    planContext.activePlan ? "archived" : "active",
   );
   const insertedWorkoutsByDate = new Map(
     insertedPlan.workouts.map((workout) => [workout.workout_date, workout]),
@@ -578,14 +635,14 @@ async function replaceActivePlanWithImportedInput(
     }
   }
 
-  if (!activePlan) {
+  if (!planContext.activePlan) {
     return insertedPlan.planCycle;
   }
 
   const archiveExisting = await supabase
     .from("plan_cycles")
     .update({ status: "archived" })
-    .eq("id", activePlan.id)
+    .eq("id", planContext.activePlan.id)
     .eq("status", "active");
 
   if (archiveExisting.error) {
@@ -602,18 +659,58 @@ async function replaceActivePlanWithImportedInput(
     .single();
 
   if (activateInserted.error) {
-    await supabase.from("plan_cycles").update({ status: "active" }).eq("id", activePlan.id);
+    await supabase
+      .from("plan_cycles")
+      .update({ status: "active" })
+      .eq("id", planContext.activePlan.id);
     await rollbackInsertedPlan(insertedPlan.planCycle.id);
     throw new Error(activateInserted.error.message);
   }
 
-  const deletePreviousPlan = await supabase.from("plan_cycles").delete().eq("id", activePlan.id);
+  const deletePreviousPlan = await supabase
+    .from("plan_cycles")
+    .delete()
+    .eq("id", planContext.activePlan.id);
 
   if (deletePreviousPlan.error) {
     throw new Error(deletePreviousPlan.error.message);
   }
 
   return activateInserted.data;
+}
+
+async function prepareImportedPlanApply(
+  userId: string,
+  importedPlan: ImportedPlanInput,
+  firstDayResolution: FirstDayResolution | null,
+): Promise<PreparedImportedPlanApply> {
+  const planContext = await getExistingPlanContext(userId);
+  const policyResult = prepareImportedPlanApplyPolicy(
+    importedPlan,
+    planContext.existingWorkouts,
+    firstDayResolution,
+  );
+
+  return {
+    result: policyResult.result,
+    importedSeed: policyResult.importedSeed,
+    planContext,
+    preservationPlan: policyResult.preservationPlan,
+  };
+}
+
+async function getExistingPlanContext(userId: string): Promise<ExistingPlanContext> {
+  const activePlan = await getActivePlan(userId);
+
+  return {
+    activePlan,
+    existingWorkouts: activePlan
+      ? await getResolvedPlanWorkoutsWithLogs(userId, activePlan)
+      : {
+          workouts: [] as PersistedPlannedWorkoutRow[],
+          logsByWorkoutId: new Map<string, PersistedWorkoutLogRow>(),
+        },
+  };
 }
 
 async function upsertRunnerProfile(userId: string, profile: RunnerProfileSummary) {
@@ -641,6 +738,7 @@ function dbWorkoutToView(
   workout: Database["public"]["Tables"]["planned_workouts"]["Row"],
   log: Database["public"]["Tables"]["workout_logs"]["Row"] | null,
   currentDate: string,
+  feedbackMarker: Workout["feedbackMarker"],
 ): Workout {
   const mappedLog = log ? logRowToView(log) : null;
 
@@ -655,6 +753,7 @@ function dbWorkoutToView(
     title: workout.title,
     notes: workout.notes,
     steps: (workout.steps as Step[]) ?? [],
+    feedbackMarker,
     log: mappedLog,
     status: inferWorkoutStatus(workout.workout_type, workout.workout_date, currentDate, mappedLog),
   };
@@ -728,35 +827,12 @@ function getRuntimeAppBaseUrl(request?: Request) {
   return resolved;
 }
 
-async function getRequiredLocalAuthConfig(userId: string | null) {
-  if (!userId) {
-    throw new Error("Temporary local auth bypass could not resolve the current account.");
-  }
-
-  const config = await findLocalAuthAccountByUserId(userId);
-
-  if (!config) {
-    throw new Error("Temporary local auth bypass is not configured in this environment.");
-  }
-
-  return config;
-}
-
 async function isLocalAuthBypassEnabledForCurrentRequest(appBaseUrl: string | null) {
   if (!isDevOnlyLocalAuthRuntime(appBaseUrl)) {
     return false;
   }
 
   return isLocalAuthBypassEnabled();
-}
-
-async function getPersistedUserIdForAuth(auth: ReturnType<typeof requireAuthenticatedUser>) {
-  if (auth.provider !== "local") {
-    return auth.userId;
-  }
-
-  const localConfig = await getRequiredLocalAuthConfig(auth.userId);
-  return ensureLocalAuthSupabaseUserId(localConfig);
 }
 
 function buildLoginRedirect(status: "error", next: string, appBaseUrl: string) {

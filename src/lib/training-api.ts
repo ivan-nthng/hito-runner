@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type EmailOtpType } from "@supabase/supabase-js";
 import { z } from "zod";
 import { DEFAULT_AUTH_REDIRECT, sanitizeRedirectPath } from "@/lib/auth-redirect";
 import { importedPlanSchema } from "@/lib/imported-plan";
@@ -78,6 +78,15 @@ const structuredOnboardingInputSchema = z.object({
   authoringInput: structuredPlanAuthoringInputSchema,
   firstDayResolution: firstDayResolutionSchema.optional().nullable(),
 });
+
+const emailOtpTypeSchema = z.enum([
+  "signup",
+  "invite",
+  "magiclink",
+  "recovery",
+  "email_change",
+  "email",
+]);
 
 const textAuthoringInputSchema = z.object({
   authoringText: z.string().trim().min(20).max(4000),
@@ -218,6 +227,7 @@ export const requestMagicLink = createServerFn({ method: "POST" })
       {
         auth: {
           autoRefreshToken: false,
+          flowType: "pkce",
           persistSession: false,
         },
       },
@@ -393,6 +403,8 @@ export async function applyImportedPlanForUser(
 export async function exchangeCodeForSession(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
+  const tokenHash = url.searchParams.get("token_hash");
+  const otpType = parseEmailOtpType(url.searchParams.get("type"));
   const appBaseUrl = getRuntimeAppBaseUrl(request);
   const next = sanitizeRedirectPath(url.searchParams.get("next"));
   const responseHeaders = new Headers();
@@ -406,16 +418,21 @@ export async function exchangeCodeForSession(request: Request) {
 
   const supabase = createRequestSupabaseClient(request, responseHeaders);
 
-  if (!code) {
+  if (!code && !(tokenHash && otpType)) {
     return redirectResponse(
       buildLoginRedirect("error", next, appBaseUrl).toString(),
       responseHeaders,
     );
   }
 
-  const exchangeResult = await supabase.auth.exchangeCodeForSession(code);
+  const authResult = code
+    ? await supabase.auth.exchangeCodeForSession(code)
+    : await supabase.auth.verifyOtp({
+        token_hash: tokenHash!,
+        type: otpType!,
+      });
 
-  if (exchangeResult.error) {
+  if (authResult.error) {
     return redirectResponse(
       buildLoginRedirect("error", next, appBaseUrl).toString(),
       responseHeaders,
@@ -863,6 +880,15 @@ function buildLoginRedirect(status: "error", next: string, appBaseUrl: string) {
   }
 
   return url;
+}
+
+function parseEmailOtpType(value: string | null): EmailOtpType | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = emailOtpTypeSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 async function getPlanWorkoutsWithLogs(planCycleId: string) {

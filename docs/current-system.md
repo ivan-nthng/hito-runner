@@ -30,7 +30,7 @@
 - `src/routes/hitoDS.tsx`
   renders the internal Hito design-system reference with its own design-system sidebar and no runner-facing shell chrome, documenting the simplified live product language around open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure treatment, shell navigation, controls, and documented visualization geometry exceptions without adding a runner-facing product capability
 - `src/routes/api.auth.confirm.tsx`
-  exchanges the Supabase auth code into a cookie-backed session
+  exchanges the Supabase auth code into a cookie-backed session and now also accepts token-hash email callbacks for SSR-compatible Supabase passwordless flows
 - `src/routes/api.auth.local-login.tsx`
   validates the temporary local account credentials contract and sets the local auth cookie only on loopback local runtimes; deploy-like requests receive no production-facing local login path
 - `src/routes/api.auth.logout.tsx`
@@ -57,7 +57,7 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text-first onboarding, advanced JSON import, internal structured authoring, and workout logging
+  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text-first onboarding, advanced JSON import, internal structured authoring, and workout logging; the email sign-in path now requests PKCE-oriented Supabase links and the callback accepts either an auth code or an email token hash before writing the cookie-backed session
 - `src/lib/imported-plan.ts`
   owns the canonical `training-plan-v2` import contract, JSON validation helpers, the runtime-noise exclusions for v2, the bounded canonical target and prescription normalization rules, the accepted-but-ignored `_ml_agent_template` instruction block, and the mapping from accepted import shapes into the canonical saved workout shape
 - `src/lib/structured-plan-authoring.ts`
@@ -208,6 +208,9 @@
 - app name now falls back directly to `Hito Running` when `NEXT_PUBLIC_APP_NAME` is unset
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are now the only supported public Supabase browser env names
 - `APP_BASE_URL` is an optional server-only non-loopback override for auth redirects; when it is set to a real public origin, magic-link emails and callbacks use it, and loopback local runtimes without that override now keep email sign-in links disabled instead of generating localhost redirects
+- Supabase dashboard URL configuration and email templates still remain part of the live auth contract:
+  hosted URL configuration must allow the real production callback URL
+  and passwordless email templates must use `{{ .RedirectTo }}` for the SSR callback path instead of forcing `{{ .SiteURL }}`
 - `SUPABASE_SECRET_KEY` is now the only supported server-only key for canonical Supabase writes, local-bypass plan imports, and admin-backed persisted saved mode
 - temporary local-only auth env now uses only `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE` for an untracked local account list
 - required Vercel env for the live Supabase-backed auth path is `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`

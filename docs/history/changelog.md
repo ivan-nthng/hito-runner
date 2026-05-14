@@ -4,6 +4,7 @@ Completed implementation history only.
 
 ## 2026-05-13
 
+- Aligned the Supabase email sign-in code with SSR-safe passwordless auth: magic-link requests now opt into PKCE flow, the `/api/auth/confirm` callback now accepts either an auth `code` or an email `token_hash`, and the live configuration contract now explicitly depends on Supabase URL allow-listing plus `{{ .RedirectTo }}` email-template usage instead of a mixed implicit-flow fallback to localhost.
 - Implemented the fifth app-wide simplification slice for `/hitoDS`: the internal reference now follows the simplified live product language with open route rhythm, divider-based grouping, compact summary truth, restrained markers, utility/disclosure actions, simplified shell navigation, and explicit visualization geometry exceptions instead of historical overbuilt dashboard/card examples.
 - Implemented the fourth app-wide simplification slice for `/body`: demoted Body from primary desktop/mobile nav, kept it reachable as a quiet utility, and flattened the body-notes route into an open body-map area with divider-based selected-area, today’s-notes, and current-scope sections instead of widgetized support panels.
 - Implemented the third app-wide simplification slice for `/progress`: collapsed four peer stat cards into one compact summary group, kept weekly planned-vs-actual volume and recent consistency, replaced zero-volume chart scaffolding with honest sparse copy, removed the static placeholder activity chart, and deleted the heavy “Still growing” support frame.

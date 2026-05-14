@@ -26,7 +26,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - integrations `/integrations`
   stays a preserved status/reference utility, but no longer appears as a primary runner navigation destination; it remains reachable through quieter shell access and uses honest live/later wording: the live Garmin-enabled workout feedback path points to workout-detail `Feedback`, while screenshot import and broader plan adjustments remain clearly later
 - login `/login`
-  provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, while email sign-in appears only when the runtime can resolve a real non-loopback app URL for auth callbacks
+  provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, while email sign-in appears only when the runtime can resolve a real non-loopback app URL for auth callbacks and the Supabase-hosted passwordless email path can return through the SSR callback route
 - internal design-system reference `/hitoDS`
   uses a dedicated design-system sidebar and compact reference surface to document the simplified live Hito product language: open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure patterns, controls, shell navigation, and documented visualization geometry exceptions; it is the internal reference baseline for future UI inspection and primitive extension, not a runner-facing capability
 

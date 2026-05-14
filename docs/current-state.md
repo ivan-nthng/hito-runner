@@ -10,6 +10,10 @@ Active
 
 ## Where We Are Now
 
+- The email-auth flow is now aligned with SSR-safe Supabase passwordless callbacks:
+  link requests now ask Supabase for PKCE-oriented handling,
+  `/api/auth/confirm` can now accept either an auth `code` or a `token_hash` callback,
+  and the remaining live dependency is correct Supabase dashboard URL/template configuration instead of a mixed implicit-vs-SSR code path.
 - Phase 0 and Phase 1 baseline import work are implemented.
 - Phase 2 auth and env setup are implemented.
 - Phase 2 auth runtime QA fixes are implemented:

@@ -132,8 +132,8 @@ export function AuthEntryScreen({
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">
                   {localBypassEnabled
-                    ? "Use an email sign-in link."
-                    : "Use email to sign in on this device."}
+                    ? "Use an email sign-in link from a public Hito app URL."
+                    : "Use email to sign in from a public Hito app URL."}
                 </p>
 
                 {status === "error" && (
@@ -196,7 +196,9 @@ export function AuthEntryScreen({
                   </form>
                 ) : (
                   <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                    Email sign-in is not set up in this environment yet.
+                    {localBypassEnabled
+                      ? "Email sign-in links are turned off on this local runtime. Use local login here, or open Hito from a public app URL if you need a sign-in link."
+                      : "Email sign-in links are not available from this local runtime. Open Hito from a public app URL to request a sign-in link."}
                   </p>
                 )}
               </div>

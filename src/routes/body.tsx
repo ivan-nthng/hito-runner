@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
-import { Plus } from "lucide-react";
 import { APP_NAME } from "@/lib/app-config";
 import { getShellRouteData } from "@/lib/training-api";
 
@@ -60,26 +59,25 @@ function Body() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="px-6 py-10 lg:px-10 max-w-6xl">
+      <div className="hito-route-stack max-w-5xl px-6 py-10 lg:px-10">
         <header className="hito-page-header">
-          <p className="hito-label">
-            {snapshot.source === "persisted" ? "Saved notes" : "Preview"}
-          </p>
+          <p className="hito-label">Utility</p>
           <h1 className="hito-page-title">Body notes</h1>
           <p className="hito-page-copy">
             {snapshot.source === "persisted"
-              ? "This page is for quick manual notes right now. It does not change your plan or sync anywhere yet."
-              : "This page is just a local preview for quick body notes. It does not change your plan or sync anywhere yet."}
+              ? "A quick place to mark how your body feels. These notes stay separate from the plan for now."
+              : "A preview-only body note tool. It does not change the sample plan or sync anywhere."}
           </p>
         </header>
 
-        <div className="grid lg:grid-cols-[1fr_360px] gap-10">
+        <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
           {/* Body map */}
-          <div className="hito-surface-flat p-6 lg:p-8">
-            <div className="flex items-center justify-between mb-6">
+          <section className="border-t border-hairline pt-5">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <div className="hito-tab-list">
                 {(["front", "back"] as const).map((v) => (
                   <button
+                    type="button"
                     key={v}
                     onClick={() => setView(v)}
                     data-active={view === v}
@@ -89,13 +87,13 @@ function Body() {
                   </button>
                 ))}
               </div>
-              <span className="hito-section-subtitle">
+              <span className="hito-caption">
                 {Object.keys(log).length} area{Object.keys(log).length === 1 ? "" : "s"} marked
               </span>
             </div>
 
             <div className="flex justify-center">
-              <svg viewBox="0 0 200 500" className="h-[520px] w-auto">
+              <svg viewBox="0 0 200 500" className="h-[460px] w-auto max-w-full lg:h-[500px]">
                 <Silhouette view={view} />
                 {REGIONS.filter(
                   (r) =>
@@ -155,104 +153,106 @@ function Body() {
               </svg>
             </div>
 
-            <p className="hito-section-subtitle mt-4 text-center">
-              {active ? REGIONS.find((r) => r.id === active)?.label : "Select an area"}
+            <p className="hito-support-copy mt-5 text-center">
+              {active
+                ? `${REGIONS.find((r) => r.id === active)?.label} selected`
+                : "Select an area to add or edit a note."}
             </p>
-          </div>
+          </section>
 
           {/* Right panel */}
-          <aside className="hito-row-group self-start">
+          <aside className="self-start space-y-6">
             {active && (
-              <section className="hito-list-row items-start">
-                <div className="w-full">
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="font-display text-xl">
+              <section className="border-t border-hairline pt-5">
+                <div className="flex items-baseline justify-between gap-4">
+                  <div>
+                    <p className="hito-caption">Selected area</p>
+                    <h2 className="hito-section-title mt-1">
                       {REGIONS.find((r) => r.id === active)?.label}
-                    </h3>
-                    <button
-                      onClick={() => setLevel(active, 0)}
-                      className="hito-button hito-button-ghost hito-button-xs"
-                    >
-                      Clear
-                    </button>
+                    </h2>
                   </div>
-                  <div className="hito-label mt-4">Severity</div>
-                  <div className="hito-scale-control mt-2">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <button
-                        key={n}
-                        onClick={() => setLevel(active, n)}
-                        data-active={(log[active] ?? 0) >= n}
-                        data-level={n}
-                        className="hito-scale-button"
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="hito-label mt-4">Sensation</div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {["Sore", "Tight", "Sharp", "Dull", "Swollen", "Stiff"].map((s) => (
-                      <button key={s} className="hito-button hito-button-outlined hito-button-xs">
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    placeholder="When does it appear? After tempo runs, downhill, etc."
-                    rows={3}
-                    className="hito-field hito-textarea-md mt-4 min-h-24 resize-none"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setLevel(active, 0)}
+                    className="hito-button hito-button-ghost hito-button-xs"
+                  >
+                    Clear
+                  </button>
                 </div>
+                <div className="hito-label mt-5">Severity</div>
+                <div className="hito-scale-control mt-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      type="button"
+                      key={n}
+                      onClick={() => setLevel(active, n)}
+                      data-active={(log[active] ?? 0) >= n}
+                      data-level={n}
+                      className="hito-scale-button"
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <div className="hito-label mt-5">Sensation</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {["Sore", "Tight", "Sharp", "Dull", "Swollen", "Stiff"].map((s) => (
+                    <button
+                      type="button"
+                      key={s}
+                      className="hito-button hito-button-outlined hito-button-xs"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  placeholder="When does it appear? After tempo runs, downhill, etc."
+                  rows={3}
+                  className="hito-field hito-textarea-md mt-4 min-h-24 resize-none"
+                />
               </section>
             )}
 
-            <section className="hito-list-row items-start">
-              <div className="w-full">
-                <h3 className="font-display text-xl">Active log</h3>
-                <div className="mt-4">
-                  {Object.entries(log).length === 0 && (
-                    <p className="hito-caption">No markers today.</p>
-                  )}
-                  {Object.entries(log).map(([id, level]) => {
-                    const r = REGIONS.find((x) => x.id === id);
-                    return (
-                      <div
-                        key={id}
-                        className="flex items-center justify-between gap-4 border-t border-hairline py-3 first:border-t-0"
-                      >
-                        <span className="hito-list-row-title">{r?.label}</span>
-                        <div className="flex items-center gap-3">
-                          <div className="hito-severity-bars" aria-label={`Severity ${level} of 5`}>
-                            {[1, 2, 3, 4, 5].map((n) => (
-                              <span
-                                key={n}
-                                className="hito-severity-bar"
-                                data-active={n <= level}
-                                data-level={n}
-                              />
-                            ))}
-                          </div>
-                          <span className="hito-caption w-4 text-right font-mono-num">{level}</span>
+            <section className="border-t border-hairline pt-5">
+              <h2 className="hito-section-title">Today&apos;s notes</h2>
+              <div className="mt-4">
+                {Object.entries(log).length === 0 && (
+                  <p className="hito-caption">No areas marked.</p>
+                )}
+                {Object.entries(log).map(([id, level]) => {
+                  const r = REGIONS.find((x) => x.id === id);
+                  return (
+                    <div
+                      key={id}
+                      className="flex items-center justify-between gap-4 border-t border-hairline py-3 first:border-t-0"
+                    >
+                      <span className="hito-list-row-title">{r?.label}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="hito-severity-bars" aria-label={`Severity ${level} of 5`}>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <span
+                              key={n}
+                              className="hito-severity-bar"
+                              data-active={n <= level}
+                              data-level={n}
+                            />
+                          ))}
                         </div>
+                        <span className="hito-caption w-4 text-right font-mono-num">{level}</span>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
 
-            <section className="hito-list-row items-start bg-signal/[0.03]">
-              <div>
-                <div className="hito-label">For now</div>
-                <p className="hito-support-copy mt-2 text-foreground/85">
-                  This is just a private note area for now. It does not change your plan or suggest
-                  decisions yet.
-                </p>
-                <button className="hito-button hito-button-ghost hito-button-xs mt-3 text-signal">
-                  <Plus className="h-3 w-3" /> Keep notes here
-                </button>
-              </div>
+            <section className="border-t border-hairline pt-5">
+              <p className="hito-caption">Current scope</p>
+              <p className="hito-support-copy mt-2">
+                These are manual notes only. They do not change your plan or create recovery advice
+                yet.
+              </p>
             </section>
           </aside>
         </div>

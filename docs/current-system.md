@@ -25,10 +25,10 @@
 - `src/routes/login.tsx`
   renders either:
   a minimal `Hito.` auth-first entry screen where loopback local runtimes may still show the temporary credentials tab for development
-  or the real email auth path only when the request is deploy-like
-  or the email magic-link entry flow when local credentials are not configured
+  or the real email auth path only when the request can resolve a non-loopback auth redirect origin
+  while loopback local runtimes without a public `APP_BASE_URL` now keep email sign-in honestly unavailable instead of offering broken localhost magic links
 - `src/routes/hitoDS.tsx`
-  renders the internal Hito design-system playground with its own design-system sidebar and no runner-facing shell chrome, documenting and demonstrating the implemented low-card surface, typography, button, input, row, shell navigation, card, and dropdown primitives without adding a runner-facing product capability, and now serves as the reference baseline for ongoing Hito UI inspection
+  renders the internal Hito design-system reference with its own design-system sidebar and no runner-facing shell chrome, documenting the simplified live product language around open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure treatment, shell navigation, controls, and documented visualization geometry exceptions without adding a runner-facing product capability
 - `src/routes/api.auth.confirm.tsx`
   exchanges the Supabase auth code into a cookie-backed session
 - `src/routes/api.auth.local-login.tsx`
@@ -38,9 +38,9 @@
 - `src/routes/workout.$date.tsx`
   renders workout detail for preview or persisted data, treats the route search as the source of truth for the active tab, preserves `tab=complete`, logs results through the canonical backend mutation when saved mode is active, now keeps rest-day detail sparse with one grouped right-side context panel, and preserves the three-block page structure with richer surface treatment, result-state badges, and progress-driven week status
 - `src/routes/progress.tsx`
-  renders the preserved analytics shell using preview or persisted aggregates from the same data seam, with large summary stats and chart legends now mapped to shared Hito analytics primitives
+  renders a compact progress summary using preview or persisted aggregates from the same data seam, with completion, volume, weekly planned-vs-actual mileage, and recent workout consistency kept intentionally small instead of presenting a full analytics dashboard; sparse zero-volume states show short honest copy instead of an empty chart frame
 - `src/routes/body.tsx`
-  renders a preserved body-note preview shell, with severity scale controls and active-log severity summaries mapped to shared Hito severity primitives while the body-map SVG remains visualization-specific
+  renders a quieter body-note utility surface, with the body-map SVG kept as visualization-specific geometry while surrounding severity controls, active-note summaries, and scope copy use open divider-based Hito rhythm instead of a separate widgetized product language
 - `src/routes/integrations.tsx`
   renders a preserved integration shell that now points honestly to the live workout-detail Garmin feedback path and keeps screenshot import plus broader plan adjustments clearly later
 
@@ -111,8 +111,11 @@
 - the saved-mode home hero now keeps week status in the top/header treatment, uses a dismissible right-side `Planning Note` or plan-window support note plus the next/nearest workout context, and no longer repeats week status inside that side support area
 - saved-mode home-return affordances in the shell now reopen `/` through a fresh document request so already-open tabs can recover the authoritative home route even when a stale client fetch path fails
 - calendar day cells now mark completed workouts with a clearer green confirmation state while keeping today and rest states readable
+- saved-mode home/calendar now follows the simplified P0 rhythm: cells prioritize date, workout identity, completion marker, and secondary feedback cue while detailed distance/duration context stays in hover or the larger week context
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode advanced import entry point plus sign-out action
+- `/integrations` remains routable as a quiet connections/status utility, but it is no longer part of the primary desktop or mobile runner navigation
+- `/body` remains routable as a quiet body-notes utility, but it is no longer part of the primary desktop or mobile runner navigation
 - the sidebar plan-note support block is locally dismissible and no longer repeats the same week status already shown in the top header
 - the saved-mode advanced import dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
 - that same saved-mode import dialog now keeps its own internal scroll and calmer copy so long apply/import content fits without turning into an oversized blocking wall
@@ -185,7 +188,7 @@
   `feedback_ready` when canonical actual metrics plus deterministic comparison exist for that day
 - saved-mode home and calendar now render that `feedbackMarker` as a bounded secondary evidence indicator that links directly into the existing workout-detail `Feedback` tab without replacing completion-state truth
 - screenshot OCR, Garmin sync, Strava sync, and any plan-adjustment automation are still later slices
-- the first Hito design-system implementation slices now exist in shared CSS primitives for low-card surfaces, tiered buttons, tiered fields, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact status pills, compact status markers, setup/empty/error state surfaces, progress analytics stats, chart legends, tooltip shells, body severity scales, body severity summaries, shell navigation rows, shell profile triggers, and shell dropdown rows; those primitives are applied to auth, onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, deeper workout-structure and completion micro-surfaces, route-level state surfaces, progress analytics surfaces, body severity micro-UI, preserved integration utility rows, and the internal `/hitoDS` reference page
+- the first Hito design-system implementation slices now exist in shared CSS primitives for low-card surfaces, tiered buttons, tiered fields, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact status pills, compact status markers, setup/empty/error state surfaces, compact summary metrics, chart legends, tooltip shells, body severity scales, body severity summaries, shell navigation rows, shell profile triggers, shell dropdown rows, and disclosure; those primitives are applied to auth, onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, deeper workout-structure and completion micro-surfaces, route-level state surfaces, progress summary surfaces, body severity micro-UI, preserved integration utility rows, and the internal `/hitoDS` reference page
 - remaining visualization-specific chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional geometry exceptions rather than generalized Hito component families
 - final Safari QA on the visible runner-facing scope found no obvious stray custom UI drift, so future UI work should extend shared Hito primitives or documented shell families instead of introducing new route-local visual treatments
 
@@ -204,7 +207,7 @@
 - preferred public env usage is `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - app name now falls back directly to `Hito Running` when `NEXT_PUBLIC_APP_NAME` is unset
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are now the only supported public Supabase browser env names
-- `APP_BASE_URL` is an optional server-only non-loopback override for auth redirects; deploy-like requests now prefer the real runtime origin over any loopback override, and local loopback development should usually leave `APP_BASE_URL` unset so magic-link and callback URLs stay on the local origin
+- `APP_BASE_URL` is an optional server-only non-loopback override for auth redirects; when it is set to a real public origin, magic-link emails and callbacks use it, and loopback local runtimes without that override now keep email sign-in links disabled instead of generating localhost redirects
 - `SUPABASE_SECRET_KEY` is now the only supported server-only key for canonical Supabase writes, local-bypass plan imports, and admin-backed persisted saved mode
 - temporary local-only auth env now uses only `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE` for an untracked local account list
 - required Vercel env for the live Supabase-backed auth path is `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`

@@ -135,3 +135,18 @@ export function resolveRuntimeAppBaseUrl(options?: {
 
   return configuredOrigin;
 }
+
+export function resolveMagicLinkAppBaseUrl(options?: { contextAppBaseUrl?: string | null }) {
+  const configuredOrigin = safeOrigin(serverEnv.appBaseUrl);
+  const contextOrigin = safeOrigin(options?.contextAppBaseUrl);
+
+  if (configuredOrigin && !isLoopbackRuntimeUrl(configuredOrigin)) {
+    return configuredOrigin;
+  }
+
+  if (contextOrigin && !isLoopbackRuntimeUrl(contextOrigin)) {
+    return contextOrigin;
+  }
+
+  return null;
+}

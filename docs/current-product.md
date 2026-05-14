@@ -20,15 +20,15 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - workout detail `/workout/$date`
   shows workout structure, logging controls, and week-status context using preview or persisted truth through one shared contract, with calmer rest-day presentation, a tighter grouped right-side panel, richer workout surfaces, and visible result-state markers for completed, partial, and skipped truth
 - progress `/progress`
-  keeps the analytics-style layout, can read persisted completion and volume aggregates when saved mode is active, and now uses shared Hito large-stat and legend treatment instead of route-local dashboard chrome
+  is now a smaller summary route, reading persisted completion and volume aggregates when saved mode is active while keeping weekly volume and recent consistency visible without implying a mature analytics dashboard
 - body `/body`
-  keeps the body-map layout as a manual-note preview, with severity controls and active-log summaries now using shared Hito severity primitives instead of route-local micro-UI
+  is now a quieter secondary body-notes utility rather than a primary navigation destination; it keeps the manual body map and severity notes, but frames them as plan-separated notes with calmer dividers and less widget chrome
 - integrations `/integrations`
-  stays a preserved shell, but now uses honest live/later wording: the live Garmin-enabled workout feedback path points to workout-detail `Feedback`, while screenshot import and broader plan adjustments remain clearly later
+  stays a preserved status/reference utility, but no longer appears as a primary runner navigation destination; it remains reachable through quieter shell access and uses honest live/later wording: the live Garmin-enabled workout feedback path points to workout-detail `Feedback`, while screenshot import and broader plan adjustments remain clearly later
 - login `/login`
-  provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, but deploy-visible environments show only the real email sign-in path
+  provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, while email sign-in appears only when the runtime can resolve a real non-loopback app URL for auth callbacks
 - internal design-system reference `/hitoDS`
-  uses a dedicated design-system sidebar and component playground to document the implemented low-card Hito primitives; it is the internal reference baseline for future UI inspection and primitive extension, not a runner-facing capability
+  uses a dedicated design-system sidebar and compact reference surface to document the simplified live Hito product language: open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure patterns, controls, shell navigation, and documented visualization geometry exceptions; it is the internal reference baseline for future UI inspection and primitive extension, not a runner-facing capability
 
 ## Interaction Contracts
 
@@ -52,7 +52,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - the backend now also supports one first-pass free-text authoring seam:
   one user message is turned into validated canonical plan data server-side through OpenAI before the saved weekly plan opens
 - advanced JSON upload remains available as a secondary fallback path for existing plan artifacts, migration, and testing
-- the temporary local login path behaves as signed-in saved mode for the configured local admin account only on loopback local runtimes, can still expand to a few local test accounts later without changing routes, and uses Supabase as the only authenticated plan store
+- the temporary local login path behaves as signed-in saved mode for the configured local admin account only on loopback local runtimes, can still expand to a few local test accounts later without changing routes, and uses Supabase as the only authenticated plan store; those same loopback local runtimes no longer offer email magic links unless a real public `APP_BASE_URL` is configured
 - onboarding now leads with one compact text request, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
 - authenticated no-plan or no-workout states now render the same visible text-first plan creation surface instead of stranding users on a retry-only empty state
 - the first structured authoring slice is backend-only for now:
@@ -78,6 +78,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - the sidebar plan note can be dismissed for the current UI session, and the sidebar no longer repeats the same week status pill already present in the header
 - saved-mode shell links that return to home now intentionally reopen `/` through a fresh request so the calendar page stays reliable even from long-lived tabs
 - completed calendar days now read more clearly at a glance through a green confirmation treatment without overriding the primary today highlight
+- home/calendar now uses a lighter scan rhythm: month cells carry date, workout identity, completion truth, and a secondary feedback cue without inline metric/dashboard clutter
 - saved workout logging now distinguishes preview-only drafts from persisted saves, supports truthful overwrite between `completed`, `partial`, and `skipped`, and surfaces pending, success, and failure feedback without hiding backend failures
 - the workout-detail `Week Status` surface is now progress-based and reports completed non-rest workouts in the current week
 - workout detail now separates manual `Log result` from `Feedback`: `Log result` stays focused on completion truth, notes, and manual actuals, while `Feedback` owns the live Garmin `.fit` / `.zip` upload path, parsed evidence summary, and deterministic planned-vs-actual comparison readback
@@ -142,7 +143,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - the advanced import flow still includes a lightweight `Download JSON template` affordance for users who already need file-based plan handoff
 - that downloadable template now includes one reserved `_ml_agent_template` instruction block so ML-generated files can target the canonical `training-plan-v2` contract more explicitly without turning template-only guidance into runtime truth
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
-- auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress analytics stats and legends, body severity micro-UI, preserved integration utility rows, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share the first Hito component primitives for low-card surfaces, tiered controls, helper/error text, grouped rows, metric rows, compact analytics stats, compact legends, compact tooltips, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, labels, captions, tabs, and dividers, keeping text-first onboarding primary and advanced JSON import secondary
+- auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress summary metrics and legends, body severity micro-UI, preserved integration utility rows, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share Hito component primitives for low-card surfaces, open/divider grouping, tiered controls, helper/error text, grouped rows, metric rows, compact legends, compact tooltips, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, disclosure, labels, captions, tabs, and dividers, keeping text-first onboarding primary and advanced JSON import secondary
 - remaining chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are treated as product visualization geometry, not runner-facing component chrome
 - from the visible product perspective, the interface is now treated as normalized into Hito DS ownership, and future UI work should reuse shared Hito primitives or documented geometry exceptions instead of adding new custom route-local chrome
 

@@ -7,7 +7,6 @@ import {
   feedbackMarkerMeta,
   formatDistanceKm,
   TYPE_META,
-  WEEK_STATUS_META,
   workoutDuration,
   workoutDistanceKm,
   workoutTypeMeta,
@@ -19,7 +18,6 @@ import {
   type TrainingSnapshot,
   type Workout,
 } from "@/lib/training";
-import { WorkoutGlyph } from "./WorkoutGlyph";
 
 type View = "month" | "week";
 
@@ -30,7 +28,6 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
 
   const cells = useMemo(() => buildMonth(cursor), [cursor]);
   const monthLabel = cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
 
   const weekCells = useMemo(() => {
     const date = new Date(cursor);
@@ -53,13 +50,9 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
 
   return (
     <div>
-      <div className="hito-section-header mb-8">
+      <div className="hito-section-header mb-6">
         <div>
-          <p className="hito-label">Training plan</p>
-          <h1 className="hito-section-title mt-2 text-4xl lg:text-5xl">{monthLabel}</h1>
-          <p className="hito-support-copy mt-3 max-w-xl">
-            Open any day to review the plan or update the workout result.
-          </p>
+          <h1 className="hito-section-title text-4xl lg:text-5xl">{monthLabel}</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -106,7 +99,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
         </div>
       </div>
 
-      <div className="hito-legend mb-5">
+      <div className="hito-legend mb-4">
         {(["easy", "long_run", "quality", "rest"] as const).map((type) => (
           <div key={type} className="hito-legend-item">
             <span
@@ -118,12 +111,6 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
             <span>{TYPE_META[type].short}</span>
           </div>
         ))}
-        <div className="ml-auto hidden items-center gap-1.5 md:flex">
-          <span className="text-muted-foreground">Week status</span>
-          <span className="hito-status-pill" data-tone={weekStatusTone(weekStatus.label)}>
-            {weekStatus.label}
-          </span>
-        </div>
       </div>
 
       {view === "month" ? (
@@ -202,11 +189,9 @@ function DayCell({
   const isHover = hovered === iso;
   const meta = workout ? workoutTypeMeta(workout) : null;
   const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
-  const km = workout ? workoutDistanceKm(workout) : null;
-  const duration = workout ? workoutDuration(workout) : 0;
+  const hasWorkout = workout && workout.type !== "rest";
   const isCompleted = status === "completed";
-  const isPartial = status === "partial";
-  const isSkipped = status === "skipped";
+  const isSkipped = hasWorkout && status === "skipped";
 
   return (
     <div className="relative">
@@ -222,13 +207,6 @@ function DayCell({
           isCompleted && !isToday && "bg-success/[0.04]",
           "hover:bg-accent/40",
         )}
-        style={
-          isCompleted
-            ? {
-                boxShadow: "inset 0 -3px 0 0 var(--success)",
-              }
-            : undefined
-        }
       >
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-1.5">
@@ -240,16 +218,11 @@ function DayCell({
             >
               {String(day).padStart(2, "0")}
             </div>
-            <StatusMark status={status} />
+            {hasWorkout && <StatusMark status={status} />}
           </div>
-          {workout && workout.type !== "rest" && meta && (
-            <span style={{ color: meta.color }}>
-              <WorkoutGlyph type={workout.type} />
-            </span>
-          )}
         </div>
 
-        {workout && workout.type !== "rest" && (
+        {hasWorkout && (
           <div className="mt-3">
             <div
               className={cn(
@@ -268,10 +241,6 @@ function DayCell({
             >
               {workout.title.replace(/^(Аэробный |Лёгкий )/, "")}
             </div>
-            <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground font-mono-num">
-              {km != null && <span>{formatDistanceKm(km)}km</span>}
-              {duration > 0 && <span>{duration}′</span>}
-            </div>
           </div>
         )}
         {workout && workout.type === "rest" && (
@@ -279,28 +248,9 @@ function DayCell({
             Rest
           </div>
         )}
-
-        {workout && workout.type !== "rest" && (
-          <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-hairline overflow-hidden">
-            <div
-              className="h-full"
-              style={{
-                width: isCompleted ? "100%" : isPartial ? "55%" : isSkipped ? "100%" : "0%",
-                background: isCompleted
-                  ? "var(--success)"
-                  : isPartial
-                    ? "var(--warn)"
-                    : isSkipped
-                      ? "var(--destructive)"
-                      : "transparent",
-                opacity: isSkipped ? 0.5 : 1,
-              }}
-            />
-          </div>
-        )}
       </Link>
 
-      {workout && workout.type !== "rest" && feedbackMeta && (
+      {hasWorkout && feedbackMeta && (
         <Link
           to="/workout/$date"
           params={{ date: iso }}
@@ -313,7 +263,7 @@ function DayCell({
         </Link>
       )}
 
-      {isHover && workout && workout.type !== "rest" && (
+      {isHover && hasWorkout && (
         <div className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 pointer-events-none">
           <Tooltip workout={workout} />
         </div>
@@ -406,14 +356,6 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function weekStatusTone(label: string) {
-  if (/reset|missed|off/i.test(label)) {
-    return "warning";
-  }
-
-  return "success";
-}
-
 function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSnapshot }) {
   return (
     <div className="grid grid-cols-1 border-b border-hairline md:grid-cols-7">
@@ -423,8 +365,7 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
         const meta = workout ? workoutTypeMeta(workout) : null;
         const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
         const status = workout?.status ?? "rest";
-        const km = workout ? workoutDistanceKm(workout) : null;
-        const duration = workout ? workoutDuration(workout) : 0;
+        const hasWorkout = workout && workout.type !== "rest";
         const isCompleted = status === "completed";
         return (
           <div key={iso} className="relative">
@@ -437,22 +378,15 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
                   "relative z-10 outline outline-1 outline-offset-[-1px] outline-signal/60",
                 isCompleted && !isToday && "bg-success/[0.04]",
               )}
-              style={
-                isCompleted
-                  ? {
-                      boxShadow: "inset 0 -3px 0 0 var(--success)",
-                    }
-                  : undefined
-              }
             >
               <div className="flex items-center justify-between hito-section-subtitle text-[10px]">
                 <span>{weekdayShort(iso)}</span>
                 <div className="flex items-center gap-1.5">
-                  <StatusMark status={status} />
+                  {hasWorkout && <StatusMark status={status} />}
                   <span className="font-mono-num">{iso.slice(8)}</span>
                 </div>
               </div>
-              {workout && workout.type !== "rest" && meta ? (
+              {hasWorkout && meta ? (
                 <>
                   <div
                     className="mt-3 text-[11px] uppercase tracking-wider"
@@ -463,9 +397,8 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
                   <div className={cn("mt-1 text-sm leading-snug", feedbackMeta && "pr-16")}>
                     {workout.title}
                   </div>
-                  <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-3 font-mono-num text-[11px] text-muted-foreground">
-                    {km != null && <span>{formatDistanceKm(km)}km</span>}
-                    {duration > 0 && <span>{duration}′</span>}
+                  <div className="mt-auto pt-3 font-mono-num text-[11px] text-muted-foreground">
+                    {compactWorkoutSummary(workout)}
                   </div>
                 </>
               ) : (
@@ -475,7 +408,7 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
               )}
             </Link>
 
-            {workout && workout.type !== "rest" && feedbackMeta && (
+            {hasWorkout && feedbackMeta && (
               <Link
                 to="/workout/$date"
                 params={{ date: iso }}
@@ -493,4 +426,23 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
       })}
     </div>
   );
+}
+
+function compactWorkoutSummary(workout: Workout) {
+  const km = workoutDistanceKm(workout);
+  const duration = workoutDuration(workout);
+
+  if (km != null && duration > 0) {
+    return `${formatDistanceKm(km)}km · ${duration}′`;
+  }
+
+  if (km != null) {
+    return `${formatDistanceKm(km)}km`;
+  }
+
+  if (duration > 0) {
+    return `${duration}′`;
+  }
+
+  return workoutTypeMeta(workout).label;
 }

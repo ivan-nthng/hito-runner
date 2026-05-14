@@ -66,7 +66,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   const tomorrow = findWorkout(snapshot.workouts, tomorrowDate.toISOString().slice(0, 10));
 
   return (
-    <section className="border-t border-hairline pt-6 lg:pt-8">
+    <section className="pt-2 lg:pt-4">
       <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:gap-10">
         <div>
           <div className="flex items-center gap-3 hito-section-subtitle">
@@ -151,16 +151,9 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
           )}
         </div>
 
-        <div>
-          <DismissibleSupportNote
-            title="Recent notes"
-            icon={<NotebookPen className="h-3 w-3 text-signal" />}
-          >
-            Recent workout notes and Garmin uploads will show up here once you have them.
-          </DismissibleSupportNote>
-
+        <div className="lg:pt-10">
           {tomorrow && (
-            <section className="py-4">
+            <section className="border-t border-hairline py-4">
               <div>
                 <div className="hito-section-subtitle">Tomorrow</div>
                 <div className="mt-1 text-sm text-foreground/90">
@@ -217,7 +210,7 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
         : "Open another day from the calendar whenever you want to review the plan.";
 
   return (
-    <section className="border-t border-hairline pt-6 lg:pt-8">
+    <section className="pt-2 lg:pt-4">
       <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
         <div>
           <div className="flex items-center gap-3 hito-section-subtitle">

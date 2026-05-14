@@ -48,8 +48,8 @@ import {
   hasSupabaseBrowserEnv,
   isDevOnlyLocalAuthRuntime,
   publicEnv,
+  resolveMagicLinkAppBaseUrl,
   resolveRuntimeAppBaseUrl,
-  serverEnv,
 } from "@/lib/supabase/env";
 
 export interface ViewerSummary {
@@ -127,7 +127,7 @@ export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async 
     snapshot: await getSnapshotForRequest(),
     viewer: await getViewerForRequest(),
     localBypassEnabled: await isLocalAuthBypassEnabledForCurrentRequest(auth.appBaseUrl),
-    magicLinkEnabled: hasSupabaseBrowserEnv,
+    magicLinkEnabled: canUseMagicLinkForCurrentRequest(auth.appBaseUrl),
   };
 });
 
@@ -145,7 +145,7 @@ export const getLoginRouteData = createServerFn({ method: "GET" }).handler(async
     snapshot: await getSnapshotForRequest(),
     viewer: await getViewerForRequest(),
     localBypassEnabled: await isLocalAuthBypassEnabledForCurrentRequest(auth.appBaseUrl),
-    magicLinkEnabled: hasSupabaseBrowserEnv,
+    magicLinkEnabled: canUseMagicLinkForCurrentRequest(auth.appBaseUrl),
   };
 });
 
@@ -197,9 +197,18 @@ export const getProgressRouteData = createServerFn({ method: "GET" }).handler(as
 export const requestMagicLink = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => loginInputSchema.parse(value))
   .handler(async ({ data }) => {
+    const auth = getRequestAuthContext();
+    const magicLinkAppBaseUrl = getMagicLinkAppBaseUrl(auth.appBaseUrl);
+
     if (!hasSupabaseBrowserEnv) {
       throw new Error(
         "Magic link sign-in is not configured in this environment yet. Add real Supabase env values to test login.",
+      );
+    }
+
+    if (!magicLinkAppBaseUrl) {
+      throw new Error(
+        "Email sign-in links are not available from this local runtime. Use local login here, or open Hito from a public app URL before requesting a sign-in link.",
       );
     }
 
@@ -213,7 +222,7 @@ export const requestMagicLink = createServerFn({ method: "POST" })
         },
       },
     );
-    const redirectTo = new URL("/api/auth/confirm", getRuntimeAppBaseUrl());
+    const redirectTo = new URL("/api/auth/confirm", magicLinkAppBaseUrl);
     const next = sanitizeRedirectPath(data.next);
     redirectTo.searchParams.set("next", next);
 
@@ -825,6 +834,16 @@ function getRuntimeAppBaseUrl(request?: Request) {
   }
 
   return resolved;
+}
+
+function getMagicLinkAppBaseUrl(appBaseUrl: string | null) {
+  return resolveMagicLinkAppBaseUrl({
+    contextAppBaseUrl: appBaseUrl,
+  });
+}
+
+function canUseMagicLinkForCurrentRequest(appBaseUrl: string | null) {
+  return hasSupabaseBrowserEnv && Boolean(getMagicLinkAppBaseUrl(appBaseUrl));
 }
 
 async function isLocalAuthBypassEnabledForCurrentRequest(appBaseUrl: string | null) {

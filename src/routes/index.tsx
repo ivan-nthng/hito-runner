@@ -41,14 +41,14 @@ function Index() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="px-6 lg:px-10 py-8 lg:py-10 space-y-12">
+      <div className="px-6 py-8 lg:px-10 lg:py-10">
         {snapshot.mode === "onboarding" || !hasPlannedWorkouts ? (
           <OnboardingGate />
         ) : (
-          <>
+          <div className="hito-route-stack">
             <TodayHero snapshot={snapshot} />
             <Calendar snapshot={snapshot} />
-          </>
+          </div>
         )}
       </div>
     </AppShell>

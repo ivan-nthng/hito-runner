@@ -15,7 +15,7 @@ Active
 - Phase 2 auth runtime QA fixes are implemented:
   auth callback redirects now resolve against the live runtime origin unless `APP_BASE_URL` explicitly overrides it, and `/login` preserves the original safe `next` intent instead of nesting login into itself.
 - A temporary local account-backed auth bypass is implemented:
-  `/login` now shows visible username/password login for configured local accounts, keeps Magic Link as a secondary option, and still uses an httpOnly cookie without depending on Magic Link delivery for the main local flow.
+  `/login` now shows visible username/password login for configured local accounts, keeps an httpOnly cookie without depending on Magic Link delivery for the main local flow, and no longer offers email sign-in links from loopback local runtimes unless a real public `APP_BASE_URL` is configured.
 - Canonical plan storage wiring is now implemented for the current saved-mode onboarding flow:
   when a server-side Supabase key is configured, local bypass users map into a Supabase auth user, persist their generated or imported plan into Supabase, and read saved mode back from the canonical Supabase tables instead of the local state file.
 - The current local admin plan has now been cut over into Supabase:
@@ -29,6 +29,8 @@ Active
   deploy-visible login now exposes only the real email auth path, while the temporary local credentials bypass remains available only on loopback local runtimes for development.
 - The urgent auth redirect-origin fix is now implemented:
   deploy-like Magic Link and callback flows no longer trust a loopback `APP_BASE_URL` override, so non-local auth redirects resolve back to the real app domain instead of falling through to `localhost`.
+- The local Magic Link guard is now implemented:
+  loopback local runtimes without a real public `APP_BASE_URL` no longer offer or send email sign-in links, so local auth no longer generates broken `localhost` magic-link emails that cannot be completed outside the running dev server.
 - The final Phase 5 legacy-removal slice is now implemented:
   deprecated `week_1_preview[]` import support has been removed from the active runtime, CLI tooling, and visible import contract, so `training-plan-v2` is now the only remaining supported plan-import format.
 - The first actual deletion slice from the final Phase 5 plan is now implemented:
@@ -93,6 +95,36 @@ Active
   `Replace today` is disclosed as a secondary destructive exception instead of an equal primary sibling,
   advanced JSON paste/template tooling is quieter inside expert disclosure,
   and the `Log result` Garmin path is a lighter continuation row into `Feedback` rather than a competing block.
+- The first app-wide simplification slice is now implemented:
+  `/integrations` is no longer a primary desktop or mobile nav item,
+  the route remains reachable as a quieter connections/status utility,
+  and stale disabled shell menu utilities have been removed from the primary profile menu.
+- The second app-wide simplification slice is now implemented:
+  saved-mode home/calendar has a calmer rhythm,
+  month cells no longer carry inline metric/dashboard clutter,
+  the duplicate calendar-level week-status treatment is removed,
+  and feedback markers remain as small secondary cues behind completion truth.
+- The third app-wide simplification slice is now implemented:
+  `/progress` is reduced to a compact summary route with one aggregate summary group,
+  smaller weekly planned-vs-actual volume,
+  honest sparse weekly-volume empty copy,
+  recent consistency,
+  and no static placeholder trend chart or heavy explanatory support frame.
+- The fourth app-wide simplification slice is now implemented:
+  `/body` is no longer a primary desktop or mobile nav destination,
+  remains reachable as a quieter body-notes utility,
+  and its route chrome is reduced to an open body-map geometry area plus divider-based selected-area,
+  daily-notes,
+  and current-scope sections.
+- The fifth app-wide simplification slice is now implemented:
+  `/hitoDS` now follows the simplified live product instead of preserving historical overbuilt examples,
+  with open route rhythm,
+  divider-based grouping,
+  compact summary truth,
+  secondary feedback/status markers,
+  utility/disclosure actions,
+  simplified shell navigation,
+  and explicit visualization geometry exceptions.
 - The current `training-plan-v2` runtime still keeps `plan_cycles` plus `planned_workouts` as the only canonical storage model, writes richer segment structure into `planned_workouts.steps jsonb`, and still deliberately defers import-batch provenance plus editability-oriented schema expansion to a later phase.
 - The current Phase 3 cleanup slice is now implemented:
   persisted plan truth now preserves `schema_version`, `source_kind`, `target_date`, goal metadata, plan preferences, source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority through the same canonical Supabase rows used by JSON import, structured authoring, and OpenAI text authoring.
@@ -108,7 +140,7 @@ Active
 - The Phase 4 frontend cleanup slice is now implemented:
   visible no-plan and shell surfaces present text-first plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
 - The first Hito design-system implementation slices are now implemented:
-  shared low-card CSS primitives exist for core surfaces, tiered buttons, tiered inputs, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact analytics stats, compact chart legends, compact tooltip shells, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell navigation rows, shell profile triggers, shell dropdown rows, and setup/empty/error state surfaces; auth, text-first onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, route-level state surfaces, progress analytics surfaces, body severity micro-UI, preserved integration utility rows, calendar and workout-structure tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now use those primitives; `/hitoDS` provides an internal component playground with dedicated design-system navigation instead of runner-facing shell chrome; and chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional visualization geometry exceptions.
+  shared low-card CSS primitives exist for core surfaces, tiered buttons, tiered inputs, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact summary metrics, compact chart legends, compact tooltip shells, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell navigation rows, shell profile triggers, shell dropdown rows, disclosure, and setup/empty/error state surfaces; auth, text-first onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, route-level state surfaces, progress summary surfaces, body severity micro-UI, preserved integration utility rows, calendar and workout-structure tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now use those primitives; `/hitoDS` provides an internal simplified product-language reference with dedicated design-system navigation instead of runner-facing shell chrome; and chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional visualization geometry exceptions.
 - The full Hito design-system normalization track is now effectively complete from the visible product perspective:
   final Safari QA found no obvious stray custom UI drift in the tested runner-facing scope, `/hitoDS` is the accepted internal reference baseline, and only documented visualization geometry exceptions remain outside the shared Hito component families.
 - The remaining first-pass v2 rendering-truth gaps are now fixed:

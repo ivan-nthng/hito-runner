@@ -8,9 +8,6 @@ import {
   NotebookPen,
   HeartPulse,
   ChevronUp,
-  Settings2,
-  SlidersHorizontal,
-  UserRound,
   LogOut,
   FileJson2,
   X,
@@ -39,8 +36,6 @@ import type { ViewerSummary } from "@/lib/training-api";
 const NAV = [
   { to: "/", label: "Calendar", icon: CalendarDays },
   { to: "/progress", label: "Progress", icon: LineChart },
-  { to: "/body", label: "Body", icon: HeartPulse },
-  { to: "/integrations", label: "Integrations", icon: Plug },
 ];
 
 export function AppShell({
@@ -193,20 +188,19 @@ export function AppShell({
                   Import plan
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem className="hito-shell-menu-item" disabled>
-                <Settings2 className="h-4 w-4" />
-                Settings
-                <DropdownMenuShortcut>Later</DropdownMenuShortcut>
+              <DropdownMenuItem className="hito-shell-menu-item" asChild>
+                <Link to="/body">
+                  <HeartPulse className="h-4 w-4" />
+                  Body notes
+                  <DropdownMenuShortcut>Utility</DropdownMenuShortcut>
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem className="hito-shell-menu-item" disabled>
-                <UserRound className="h-4 w-4" />
-                Account
-                <DropdownMenuShortcut>Later</DropdownMenuShortcut>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="hito-shell-menu-item" disabled>
-                <SlidersHorizontal className="h-4 w-4" />
-                Preferences
-                <DropdownMenuShortcut>Later</DropdownMenuShortcut>
+              <DropdownMenuItem className="hito-shell-menu-item" asChild>
+                <Link to="/integrations">
+                  <Plug className="h-4 w-4" />
+                  Connections status
+                  <DropdownMenuShortcut>Utility</DropdownMenuShortcut>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
               <DropdownMenuItem className="hito-shell-menu-item" asChild>
@@ -265,9 +259,20 @@ export function AppShell({
                     ? "Create plan"
                     : "Open plan"}
               </Link>
-              <button className="md:hidden h-8 w-8 rounded-full bg-gradient-to-br from-signal to-quality grid place-items-center text-[10px] text-signal-foreground">
-                HR
-              </button>
+              <Link
+                to="/integrations"
+                aria-label="Open connections status"
+                className="hito-button hito-button-ghost hito-button-sm aspect-square p-0 md:hidden"
+              >
+                <Plug className="h-4 w-4" strokeWidth={1.5} />
+              </Link>
+              <Link
+                to="/body"
+                aria-label="Open body notes"
+                className="hito-button hito-button-ghost hito-button-sm aspect-square p-0 md:hidden"
+              >
+                <HeartPulse className="h-4 w-4" strokeWidth={1.5} />
+              </Link>
             </div>
           </div>
         </header>

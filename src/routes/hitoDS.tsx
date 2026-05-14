@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  Activity,
   ArrowRight,
   CalendarDays,
   Check,
@@ -14,9 +13,6 @@ import {
   Minus,
   Plug,
   Search,
-  Settings2,
-  TrendingUp,
-  UserRound,
   X,
 } from "lucide-react";
 import { APP_NAME } from "@/lib/app-config";
@@ -28,8 +24,7 @@ export const Route = createFileRoute("/hitoDS")({
       { title: `Hito Design System — ${APP_NAME}` },
       {
         name: "description",
-        content:
-          "Internal Hito design-system playground for primitives, controls, surfaces, rows, and component variants.",
+        content: "Internal Hito design-system reference for the simplified Hito product language.",
       },
     ],
   }),
@@ -41,10 +36,10 @@ const SECTIONS = [
   { id: "typography", label: "Typography" },
   { id: "buttons", label: "Buttons" },
   { id: "inputs", label: "Inputs" },
-  { id: "surfaces", label: "Surfaces" },
+  { id: "surfaces", label: "Composition" },
   { id: "states", label: "States" },
-  { id: "analytics", label: "Analytics" },
-  { id: "rows", label: "List items" },
+  { id: "analytics", label: "Summary truth" },
+  { id: "rows", label: "Rows & disclosure" },
   { id: "shell", label: "Shell nav" },
   { id: "dropdowns", label: "Dropdowns" },
 ] as const;
@@ -98,7 +93,7 @@ function HitoDesignSystemPage() {
           <div className="mt-10 border-t border-hairline pt-5">
             <p className="hito-label hito-label-signal">Rule</p>
             <p className="hito-list-row-copy">
-              This page is internal: component variants, not runner navigation or product state.
+              This page follows the live product: open rhythm first, cards only when they earn it.
             </p>
           </div>
         </aside>
@@ -107,10 +102,11 @@ function HitoDesignSystemPage() {
           <div className="mx-auto max-w-6xl">
             <header id="overview" className="hito-page-header border-t border-hairline pt-8">
               <p className="hito-label hito-label-signal">Hito design system</p>
-              <h1 className="hito-page-title lg:text-7xl">Primitive playground.</h1>
+              <h1 className="hito-page-title lg:text-7xl">Simplified product language.</h1>
               <p className="hito-page-copy max-w-2xl">
-                A focused internal builder for Hito primitives: typography, controls, inputs,
-                surfaces, rows, and dropdown patterns. Product chrome stays out of the way.
+                A compact reference for the simplified Hito product language: open route rhythm,
+                divider-based grouping, restrained markers, quiet support copy, and explicit
+                utility/disclosure treatment for secondary paths.
               </p>
             </header>
 
@@ -218,36 +214,12 @@ function HitoDesignSystemPage() {
                 </div>
               </div>
 
-              <div className="mt-6 overflow-x-auto border-t border-hairline pt-6">
-                <table className="w-full min-w-[760px] border-collapse text-left">
-                  <thead>
-                    <tr className="hito-section-subtitle border-b border-hairline">
-                      <th className="py-3 pr-4">Variant</th>
-                      {BUTTON_SIZES.map((buttonSize) => (
-                        <th key={buttonSize} className="px-3 py-3 uppercase">
-                          {buttonSize}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {BUTTON_VARIANTS.map((buttonVariant) => (
-                      <tr key={buttonVariant} className="border-b border-hairline last:border-0">
-                        <td className="hito-label py-4 pr-4 capitalize">{buttonVariant}</td>
-                        {BUTTON_SIZES.map((buttonSize) => (
-                          <td key={buttonSize} className="px-3 py-4">
-                            <DemoButton
-                              variant={buttonVariant}
-                              size={buttonSize}
-                              leftIcon
-                              rightIcon={false}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="mt-6 border-t border-hairline pt-5">
+                <p className="hito-caption max-w-2xl">
+                  The interactive builder is the source of truth for button variants. Avoid
+                  repeating every size and variant as a permanent production reference unless a
+                  route needs that exact QA matrix.
+                </p>
               </div>
             </section>
 
@@ -284,27 +256,40 @@ function HitoDesignSystemPage() {
 
             <section id="surfaces" className="ds-section">
               <SectionIntro
-                label="Surfaces"
-                title="Low-card by default."
-                body="Use frames only when boundaries improve scanability. Dividers and rows should do most of the work."
+                label="Composition"
+                title="Open rhythm before containers."
+                body="Route sections should breathe with spacing, section titles, and hairline dividers. Framed surfaces are reserved for stateful interaction or payload ownership."
               />
-              <div className="grid gap-4 lg:grid-cols-3">
-                <TokenCard
-                  label="Surface"
-                  title="Grouped frame."
-                  body="For related content that benefits from one boundary."
-                />
-                <article className="hito-surface-flat p-5">
-                  <p className="hito-label">Flat surface</p>
-                  <h3 className="mt-3 hito-section-title text-3xl">Softer support.</h3>
-                  <p className="hito-support-copy mt-3">
-                    A quieter container for secondary context.
-                  </p>
-                </article>
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
                 <article className="border-t border-hairline pt-5">
-                  <p className="hito-label">Open section</p>
-                  <h3 className="mt-3 hito-section-title text-3xl">No box needed.</h3>
-                  <p className="hito-support-copy mt-3">Spacing and one hairline can be enough.</p>
+                  <div className="hito-section-header">
+                    <div>
+                      <h3 className="hito-section-title text-3xl">Section with no box.</h3>
+                      <p className="hito-support-copy mt-2">
+                        This is the default route cadence used by simplified home, progress, and
+                        body surfaces.
+                      </p>
+                    </div>
+                    <span className="hito-section-subtitle">Default</span>
+                  </div>
+                  <div className="mt-5 grid gap-0 border-t border-hairline">
+                    <div className="flex items-center justify-between gap-4 border-b border-hairline py-3">
+                      <span className="hito-list-row-title">Primary truth first</span>
+                      <span className="hito-caption">Visible</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 border-b border-hairline py-3">
+                      <span className="hito-list-row-title">Support after divider</span>
+                      <span className="hito-caption">Quiet</span>
+                    </div>
+                  </div>
+                </article>
+                <article className="hito-surface-flat p-5">
+                  <p className="hito-label">Use sparingly</p>
+                  <h3 className="mt-3 hito-section-title text-3xl">Owned payload.</h3>
+                  <p className="hito-support-copy mt-3">
+                    Keep a surface when it contains one active object, like an attached file, form,
+                    or route-level state. Avoid stacking subcards inside it.
+                  </p>
                 </article>
               </div>
             </section>
@@ -442,48 +427,32 @@ function HitoDesignSystemPage() {
 
             <section id="analytics" className="ds-section">
               <SectionIntro
-                label="Analytics"
-                title="Large stats and chart legends."
-                body="Progress summaries use shared value-first stat blocks and one compact legend family instead of route-local dashboard chrome."
+                label="Summary truth"
+                title="Small summaries, not dashboards."
+                body="Progress now leads with one compact saved-truth summary, then uses charts only when current data makes them useful."
               />
-              <div className="hito-analytics-grid">
-                <article className="hito-analytics-stat">
-                  <div className="hito-analytics-stat-head">
-                    <span className="hito-label">Completed sessions</span>
-                    <Activity className="hito-analytics-stat-icon h-3.5 w-3.5" strokeWidth={1.5} />
+              <div className="hito-row-group">
+                <div className="hito-list-row items-start lg:items-end">
+                  <div className="max-w-md">
+                    <h3 className="hito-section-title">Current summary</h3>
+                    <p className="hito-support-copy mt-2">
+                      One grouped row can carry the real aggregate truth without pretending to be a
+                      mature analytics dashboard.
+                    </p>
                   </div>
-                  <div className="hito-analytics-stat-body">
-                    <div className="flex items-baseline justify-center gap-1.5">
-                      <span className="hito-analytics-value">4</span>
-                    </div>
-                    <span className="hito-caption">6 planned in the visible block</span>
+                  <div className="hito-metric-row w-full lg:max-w-xl">
+                    <SummaryMetric label="Completed" value="4" unit="of 6" />
+                    <SummaryMetric label="Volume" value="28" unit="km" />
+                    <SummaryMetric label="Longest" value="8.4" unit="km" />
                   </div>
-                </article>
-                <article className="hito-analytics-stat">
-                  <div className="hito-analytics-stat-head">
-                    <span className="hito-label">Total volume</span>
-                    <TrendingUp
-                      className="hito-analytics-stat-icon h-3.5 w-3.5"
-                      strokeWidth={1.5}
-                    />
-                  </div>
-                  <div className="hito-analytics-stat-body">
-                    <div className="flex items-baseline justify-center gap-1.5">
-                      <span className="hito-analytics-value">28</span>
-                      <span className="hito-analytics-unit">km</span>
-                    </div>
-                    <span className="hito-caption">derived from saved outcomes</span>
-                  </div>
-                </article>
+                </div>
               </div>
-              <div className="hito-surface-flat mt-5 p-5">
-                <p className="hito-label">Legend</p>
+              <div className="mt-5 border-t border-hairline pt-5">
+                <p className="hito-label">Compact legend</p>
                 <div className="hito-legend mt-4">
                   <LegendDemoItem tone="actual" label="Actual" />
                   <LegendDemoItem tone="planned" label="Planned" />
-                  <LegendDemoItem tone="completed" label="Completed" />
-                  <LegendDemoItem tone="partial" label="Partial" />
-                  <LegendDemoItem tone="skipped" label="Skipped" />
+                  <LegendDemoItem tone="completed" label="Done" />
                 </div>
               </div>
               <div className="hito-row-group mt-5">
@@ -496,26 +465,24 @@ function HitoDesignSystemPage() {
                       rows, and tooltips use Hito primitives.
                     </p>
                   </div>
-                  <span className="hito-status-pill" data-icon="false">
-                    Exception
-                  </span>
+                  <span className="hito-caption">Exception</span>
                 </div>
               </div>
             </section>
 
             <section id="rows" className="ds-section">
               <SectionIntro
-                label="List items"
-                title="Rows before boxes."
-                body="Grouped rows are the default for dense support content, menus, settings, summaries, and metadata."
+                label="Rows & disclosure"
+                title="Rows before boxes, disclosure before loud secondary actions."
+                body="Rows carry support content and utilities. Expert or destructive paths should sit behind quieter disclosure unless they are the primary task."
               />
               <div className="hito-row-group">
                 {[
                   ["Support row", "One title, one concise helper, optional status.", "Live"],
                   [
-                    "Settings row",
-                    "Left label and support text, right-side value or action.",
-                    "Later",
+                    "Utility row",
+                    "Secondary routes and tools stay reachable without becoming primary nav.",
+                    "Utility",
                   ],
                   [
                     "Metric row",
@@ -529,14 +496,33 @@ function HitoDesignSystemPage() {
                       <p className="hito-list-row-copy">{body}</p>
                     </div>
                     <span
-                      className="hito-status-pill"
-                      data-tone={value === "Live" ? "success" : undefined}
+                      className={cn(
+                        "hito-caption",
+                        value === "8.4 km" && "font-mono-num text-foreground",
+                        value === "Live" && "text-success",
+                      )}
                     >
                       {value}
                     </span>
                   </div>
                 ))}
               </div>
+              <details className="hito-disclosure mt-5">
+                <summary className="hito-disclosure-summary">
+                  <span>
+                    <span className="block text-sm text-foreground">Destructive override</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Available, but not a permanent sibling to the safe action.
+                    </span>
+                  </span>
+                  <ChevronDown className="hito-disclosure-chevron h-4 w-4" />
+                </summary>
+                <div className="hito-disclosure-body">
+                  <button className="hito-button hito-button-outlined hito-button-sm">
+                    Replace today
+                  </button>
+                </div>
+              </details>
             </section>
 
             <section id="shell" className="ds-section">
@@ -551,8 +537,6 @@ function HitoDesignSystemPage() {
                     {[
                       { label: "Calendar", icon: CalendarDays, active: true },
                       { label: "Progress", icon: LineChart, active: false },
-                      { label: "Body", icon: HeartPulse, active: false },
-                      { label: "Integrations", icon: Plug, active: false },
                     ].map(({ label, icon: Icon, active }) => (
                       <div key={label} className="hito-shell-nav-row" data-active={active}>
                         <Icon className="hito-shell-nav-icon" strokeWidth={1.5} />
@@ -577,8 +561,8 @@ function HitoDesignSystemPage() {
                   </button>
                   <div className="hito-row-group">
                     <MenuRow icon={FileJson2} label="Advanced import" meta="Utility" />
-                    <MenuRow icon={Settings2} label="Settings" meta="Later" />
-                    <MenuRow icon={UserRound} label="Account" meta="Later" />
+                    <MenuRow icon={HeartPulse} label="Body notes" meta="Utility" />
+                    <MenuRow icon={Plug} label="Connections status" meta="Utility" />
                   </div>
                 </div>
               </div>
@@ -598,7 +582,8 @@ function HitoDesignSystemPage() {
                   </button>
                 </div>
                 <div className="hito-row-group">
-                  <MenuRow icon={Settings2} label="Settings" meta="Later" />
+                  <MenuRow icon={HeartPulse} label="Body notes" meta="Utility" />
+                  <MenuRow icon={Plug} label="Connections status" meta="Utility" />
                   <MenuRow icon={FileJson2} label="Advanced import" meta="Utility" />
                   <MenuRow icon={Download} label="Download template" meta="Secondary" />
                 </div>
@@ -630,6 +615,18 @@ function TokenCard({ label, title, body }: { label: string; title: string; body:
       <h3 className="mt-3 hito-section-title text-3xl">{title}</h3>
       <p className="hito-support-copy mt-3">{body}</p>
     </article>
+  );
+}
+
+function SummaryMetric({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <div className="hito-metric">
+      <div className="flex items-baseline justify-center gap-1.5">
+        <span className="hito-analytics-value">{value}</span>
+        {unit && <span className="hito-analytics-unit">{unit}</span>}
+      </div>
+      <div className="hito-metric-label">{label}</div>
+    </div>
   );
 }
 

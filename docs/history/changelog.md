@@ -4,6 +4,11 @@ Completed implementation history only.
 
 ## 2026-05-13
 
+- Implemented the fifth app-wide simplification slice for `/hitoDS`: the internal reference now follows the simplified live product language with open route rhythm, divider-based grouping, compact summary truth, restrained markers, utility/disclosure actions, simplified shell navigation, and explicit visualization geometry exceptions instead of historical overbuilt dashboard/card examples.
+- Implemented the fourth app-wide simplification slice for `/body`: demoted Body from primary desktop/mobile nav, kept it reachable as a quiet utility, and flattened the body-notes route into an open body-map area with divider-based selected-area, today’s-notes, and current-scope sections instead of widgetized support panels.
+- Implemented the third app-wide simplification slice for `/progress`: collapsed four peer stat cards into one compact summary group, kept weekly planned-vs-actual volume and recent consistency, replaced zero-volume chart scaffolding with honest sparse copy, removed the static placeholder activity chart, and deleted the heavy “Still growing” support frame.
+- Implemented the second app-wide simplification slice for home/calendar density: month cells now prioritize date, workout identity, completion marker, and secondary feedback cue without inline metric/dashboard clutter, the duplicate calendar-level week-status treatment was removed, and the home right support rail was reduced to the next-workout context.
+- Implemented the first app-wide simplification slice: `/integrations` is no longer a primary desktop or mobile nav item, remains reachable as a quieter connections/status utility, and stale disabled Settings/Account/Preferences shell menu rows were removed.
 - Applied the hierarchy/disclosure cleanup after the copy pass: `Replace today` now sits behind quieter destructive disclosures in text-first and JSON apply flows, JSON paste/template tools are demoted inside expert disclosure, and the `Log result` Garmin bridge is a lighter continuation row into `Feedback` instead of a bordered promo block.
 - Simplified the frontend plan-apply UX to match the rewritten backend policy: normal text-first and advanced JSON apply now use the safe default without a required preserve-vs-ignore chooser, `Replace today` remains as the only explicit destructive override, and the saved-mode import dialog now scrolls internally with calmer copy.
 - Simplified the first-day plan-apply policy so a today-conflict no longer blocks normal apply by default: the canonical backend path now preserves today’s existing workout, drops the incoming first workout, and starts original day 2 tomorrow, while `replace_first_day` remains the only explicit destructive override and still respects saved-history continuity safety.
@@ -62,6 +67,7 @@ Completed implementation history only.
 
 ## 2026-05-09
 
+- Disabled localhost-origin Magic Link delivery on loopback local runtimes unless a real public `APP_BASE_URL` is configured, so `/login` no longer offers or sends broken email sign-in links that point back to `localhost`.
 - Fixed the first-day conflict resolution submit crash so actionable `Replace first day` and `Ignore first day` choices now complete through the canonical backend apply seam instead of failing on a lost active-plan persistence context, while blocked history-detachment paths remain honestly blocked.
 - Restored the visible text-first plan creation path for authenticated no-plan/no-workout states by reusing the primary onboarding surface and making the plan text area visually unmistakable while keeping advanced import secondary.
 - Fixed auth redirect-origin resolution so deploy-like Magic Link and callback flows no longer trust a loopback `APP_BASE_URL` override and no longer send users back to `localhost:3000`.

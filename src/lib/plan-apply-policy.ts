@@ -79,17 +79,22 @@ export function prepareImportedPlanApplyPolicy(
   importedPlan: ImportedPlanInput,
   existingWorkouts: ExistingPlanWorkoutsContext,
   firstDayResolution: FirstDayResolution | null,
+  requestedStartDate: string | null = null,
   currentDate: string = todayIso(),
 ): PreparedPlanApplySuccess {
   const declaredSeed = buildImportedPlanSeed(importedPlan);
-  const effectiveStartDate = deriveEffectiveStartDate(declaredSeed.startDate, currentDate);
+  const effectiveStartDate = deriveEffectiveStartDate(
+    declaredSeed.startDate,
+    currentDate,
+    requestedStartDate,
+  );
   const normalizedFromStartDate =
     effectiveStartDate !== declaredSeed.startDate ? declaredSeed.startDate : null;
   const normalizedSeed = shiftImportedSeedToStartDate(declaredSeed, effectiveStartDate);
-  const hasFirstDayConflict = hasTodayWorkoutConflict(
+  const hasFirstDayConflict = hasStartDateWorkoutConflict(
     existingWorkouts,
     normalizedSeed,
-    currentDate,
+    effectiveStartDate,
   );
   assertReplaceFirstDayAllowed(
     existingWorkouts,
@@ -133,7 +138,19 @@ export function prepareImportedPlanApplyPolicy(
   };
 }
 
-export function deriveEffectiveStartDate(startDate: string, currentDate: string) {
+export function deriveEffectiveStartDate(
+  startDate: string,
+  currentDate: string,
+  requestedStartDate: string | null = null,
+) {
+  if (requestedStartDate) {
+    if (requestedStartDate < currentDate) {
+      throw new Error("Choose today or a future date before applying this plan.");
+    }
+
+    return requestedStartDate;
+  }
+
   return startDate > currentDate ? startDate : currentDate;
 }
 
@@ -206,24 +223,26 @@ function resolveImportedSeedForApply(
     return normalizedSeed;
   }
 
-  return preserveExistingTodayAndIgnoreIncomingFirstDay(existingWorkouts, normalizedSeed);
+  return preserveExistingStartDateAndIgnoreIncomingFirstDay(existingWorkouts, normalizedSeed);
 }
 
-function preserveExistingTodayAndIgnoreIncomingFirstDay(
+function preserveExistingStartDateAndIgnoreIncomingFirstDay(
   existingWorkouts: ExistingPlanWorkoutsContext,
   importedSeed: ImportedPlanSeed,
 ) {
   const droppedSeed = dropFirstDayFromImportedSeed(importedSeed);
-  const preservedTodayWorkout = existingWorkouts.workouts.find(
+  const preservedStartDateWorkout = existingWorkouts.workouts.find(
     (workout) => workout.workout_date === importedSeed.startDate,
   );
 
-  if (!preservedTodayWorkout) {
-    throw new Error("The current plan does not have today’s workout available to preserve.");
+  if (!preservedStartDateWorkout) {
+    throw new Error(
+      "The current plan does not have a workout on the chosen start date to preserve.",
+    );
   }
 
   const workouts = [
-    persistedWorkoutRowToImportedSeed(preservedTodayWorkout, 0),
+    persistedWorkoutRowToImportedSeed(preservedStartDateWorkout, 0),
     ...droppedSeed.workouts.map((workout, index) => ({
       ...workout,
       displayOrder: index + 1,
@@ -232,8 +251,8 @@ function preserveExistingTodayAndIgnoreIncomingFirstDay(
 
   return {
     ...droppedSeed,
-    startDate: preservedTodayWorkout.workout_date,
-    endDate: workouts.at(-1)?.workoutDate ?? preservedTodayWorkout.workout_date,
+    startDate: preservedStartDateWorkout.workout_date,
+    endDate: workouts.at(-1)?.workoutDate ?? preservedStartDateWorkout.workout_date,
     workouts,
   };
 }
@@ -262,17 +281,21 @@ function persistedWorkoutRowToImportedSeed(
   };
 }
 
-function hasTodayWorkoutConflict(
+function hasStartDateWorkoutConflict(
   existingWorkouts: ExistingPlanWorkoutsContext,
   normalizedSeed: ReturnType<typeof buildImportedPlanSeed>,
-  today: string,
+  startDate: string,
 ) {
-  const existingTodayWorkout = existingWorkouts.workouts.find(
-    (workout) => workout.workout_date === today && workout.workout_type !== "rest",
+  const existingStartDateWorkout = existingWorkouts.workouts.find(
+    (workout) => workout.workout_date === startDate && workout.workout_type !== "rest",
   );
   const incomingFirstDay = normalizedSeed.workouts[0] ?? null;
 
-  if (!existingTodayWorkout || !incomingFirstDay || incomingFirstDay.workoutDate !== today) {
+  if (
+    !existingStartDateWorkout ||
+    !incomingFirstDay ||
+    incomingFirstDay.workoutDate !== startDate
+  ) {
     return false;
   }
 
@@ -342,7 +365,7 @@ function assertReplaceFirstDayAllowed(
   if (replaceOption.status === "blocked") {
     throw new Error(
       replaceOption.blockedReason ??
-        "Replacing today with the new first workout would detach saved workout history.",
+        "Replacing the chosen start date with the new first workout would detach saved workout history.",
     );
   }
 }

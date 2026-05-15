@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
-import { removeWorkoutResultEvidence } from "@/lib/workout-result-import/ingest-garmin-result";
 import { WorkoutResultImportError } from "@/lib/workout-result-import/types";
 
 export const Route = createFileRoute("/api/workout-result/remove")({
@@ -20,6 +19,8 @@ export const Route = createFileRoute("/api/workout-result/remove")({
           }
 
           const userId = await requirePersistedUserIdForCurrentRequest();
+          const { removeWorkoutResultEvidence } =
+            await import("@/lib/workout-result-import/ingest-garmin-result");
           const feedback = await removeWorkoutResultEvidence({
             userId,
             plannedWorkoutId,

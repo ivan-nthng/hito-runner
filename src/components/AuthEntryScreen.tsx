@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, Mail } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
+import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
 import { requestMagicLink } from "@/lib/training-api";
 
 type AuthEntryStatus = "error" | "invalid_credentials" | "local_unavailable" | undefined;
@@ -26,8 +27,10 @@ export function AuthEntryScreen({
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground canvas-grain">
-      <div className="mx-auto flex min-h-screen max-w-5xl items-center px-6 py-12 lg:px-10">
+    <div className="auth-hero min-h-screen bg-background text-foreground">
+      <img src={loginDesertHorizon} alt="" aria-hidden="true" className="auth-hero-image" />
+      <div className="auth-hero-overlay" aria-hidden="true" />
+      <div className="auth-hero-content mx-auto flex min-h-screen max-w-5xl items-center px-6 py-12 lg:px-10">
         <section className="grid w-full gap-12 lg:grid-cols-[0.9fr_0.85fr]">
           <div className="flex flex-col justify-center gap-8">
             <div className="flex items-center gap-4">
@@ -46,7 +49,7 @@ export function AuthEntryScreen({
             </div>
           </div>
 
-          <div className="hito-surface-flat p-5 lg:p-6">
+          <div className="auth-hero-card hito-surface-flat p-5 lg:p-6">
             {localBypassEnabled ? (
               <div className="hito-tab-list">
                 {(

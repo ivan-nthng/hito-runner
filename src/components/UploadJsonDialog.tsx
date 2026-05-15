@@ -21,15 +21,19 @@ import {
 export function UploadJsonDialog({
   open,
   onOpenChange,
+  defaultStartDate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultStartDate?: string | null;
 }) {
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const resolvedDefaultStartDate = defaultStartDate ?? todayLocalIso();
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [jsonDraft, setJsonDraft] = useState("");
   const [importedPlan, setImportedPlan] = useState<ImportedPlan | null>(null);
+  const [requestedStartDate, setRequestedStartDate] = useState(resolvedDefaultStartDate);
   const [status, setStatus] = useState<"idle" | "parsing" | "applying">("idle");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
@@ -46,14 +50,20 @@ export function UploadJsonDialog({
     setSelectedFileName(null);
     setJsonDraft("");
     setImportedPlan(null);
+    setRequestedStartDate(resolvedDefaultStartDate);
     setStatus("idle");
     setError(null);
     setFieldErrors([]);
-  }, [open]);
+  }, [open, resolvedDefaultStartDate]);
 
   const submitPlan = async (firstDayResolution: FirstDayResolution | null) => {
     if (!importedPlan) {
       setError("Upload a valid JSON file before importing the plan.");
+      return;
+    }
+
+    if (!requestedStartDate) {
+      setError("Choose when this plan should start.");
       return;
     }
 
@@ -65,6 +75,7 @@ export function UploadJsonDialog({
         data: {
           importedPlan,
           firstDayResolution,
+          requestedStartDate,
         },
       });
 
@@ -232,6 +243,41 @@ export function UploadJsonDialog({
                     {replaceBlockedReason ? "Replace blocked" : "Valid"}
                   </span>
                 </div>
+                <div className="hito-list-row items-start">
+                  <label className="grid flex-1 gap-2">
+                    <span className="hito-label">Start training</span>
+                    <input
+                      type="date"
+                      min={resolvedDefaultStartDate}
+                      value={requestedStartDate}
+                      onChange={(event) => setRequestedStartDate(event.target.value)}
+                      className="hito-field hito-field-md"
+                    />
+                  </label>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      className="hito-button hito-button-ghost hito-button-xs"
+                      onClick={() => setRequestedStartDate(resolvedDefaultStartDate)}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      className="hito-button hito-button-ghost hito-button-xs"
+                      onClick={() => setRequestedStartDate(addDaysIso(resolvedDefaultStartDate, 1))}
+                    >
+                      Tomorrow
+                    </button>
+                    <button
+                      type="button"
+                      className="hito-button hito-button-ghost hito-button-xs"
+                      onClick={() => setRequestedStartDate(addDaysIso(resolvedDefaultStartDate, 7))}
+                    >
+                      Next week
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -267,7 +313,7 @@ export function UploadJsonDialog({
             </button>
             <button
               type="button"
-              disabled={isBusy || !importedPlan}
+              disabled={isBusy || !importedPlan || !requestedStartDate}
               onClick={() => {
                 void submitPlan(null);
               }}
@@ -287,9 +333,8 @@ export function UploadJsonDialog({
             </summary>
             <div className="hito-disclosure-body">
               <p className="hito-field-helper max-w-lg">
-                Safe import keeps today&apos;s workout and starts the new plan tomorrow. Replace
-                today only if the file&apos;s first workout should overwrite today&apos;s planned
-                workout.
+                Safe import keeps any existing workout on the chosen start day. Replace only if the
+                file&apos;s first workout should overwrite it.
               </p>
               {replaceBlockedReason ? (
                 <p className="hito-field-error">
@@ -299,13 +344,15 @@ export function UploadJsonDialog({
               <div>
                 <button
                   type="button"
-                  disabled={isBusy || !importedPlan || Boolean(replaceBlockedReason)}
+                  disabled={
+                    isBusy || !importedPlan || !requestedStartDate || Boolean(replaceBlockedReason)
+                  }
                   onClick={() => {
                     void submitPlan("replace_first_day");
                   }}
                   className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
-                  {status === "applying" ? "Replacing today..." : "Replace today"}
+                  {status === "applying" ? "Replacing..." : "Replace start day"}
                 </button>
               </div>
             </div>
@@ -381,4 +428,27 @@ function isReplaceBlockedError(message: string | null) {
       message,
     ),
   );
+}
+
+function todayLocalIso() {
+  const date = new Date();
+  return toLocalIso(date);
+}
+
+function addDaysIso(iso: string, days: number) {
+  const date = parseIsoDate(iso);
+  date.setDate(date.getDate() + days);
+  return toLocalIso(date);
+}
+
+function parseIsoDate(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function toLocalIso(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

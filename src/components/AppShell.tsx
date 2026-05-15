@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
 import { UploadJsonDialog } from "@/components/UploadJsonDialog";
+import { PlanManagementDialog } from "@/components/PlanManagementDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -48,6 +49,7 @@ export function AppShell({
   viewer?: ViewerSummary | null;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [planManagementOpen, setPlanManagementOpen] = useState(false);
   const [showShellPlanNote, setShowShellPlanNote] = useState(true);
   const loc = useLocation();
   const nextPath = getLoginIntentPath(
@@ -69,15 +71,7 @@ export function AppShell({
       : shellSnapshot.mode === "onboarding"
         ? "Setup in progress"
         : "Preview runner";
-  const profileDetail = snapshot?.planMeta?.title
-    ? snapshot.planMeta.title
-    : snapshot?.profile?.goalLabel
-      ? snapshot.profile.goalLabel
-      : shellSnapshot.mode === "authenticated"
-        ? "Saved plan active"
-        : shellSnapshot.mode === "onboarding"
-          ? "Create a plan on home"
-          : "Sign in to save progress";
+  const profileDetail = getProfileDetail(snapshot, shellSnapshot.mode);
   const profileInitials = buildInitials(profileName);
   const showUploadAction = shellSnapshot.mode !== "preview";
   const modeTag =
@@ -242,23 +236,30 @@ export function AppShell({
             </div>
             <div className="ml-auto flex items-center gap-3">
               <StatusPill label="Week" value={weekStatus.label} />
-              <Link
-                to={shellSnapshot.mode === "preview" ? "/login" : "/"}
-                reloadDocument={shellSnapshot.mode !== "preview"}
-                search={
-                  shellSnapshot.mode === "preview" && nextPath !== DEFAULT_AUTH_REDIRECT
-                    ? { next: nextPath }
-                    : undefined
-                }
-                className="hito-button hito-button-secondary hito-button-sm tracking-wide"
-              >
-                <Activity className="h-3.5 w-3.5" strokeWidth={1.5} />
-                {shellSnapshot.mode === "preview"
-                  ? "Sign in to save"
-                  : shellSnapshot.mode === "onboarding"
-                    ? "Create plan"
-                    : "Open plan"}
-              </Link>
+              {shellSnapshot.mode === "authenticated" ? (
+                <button
+                  type="button"
+                  onClick={() => setPlanManagementOpen(true)}
+                  className="hito-button hito-button-secondary hito-button-sm tracking-wide"
+                >
+                  <Activity className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  Open plan
+                </button>
+              ) : (
+                <Link
+                  to={shellSnapshot.mode === "preview" ? "/login" : "/"}
+                  reloadDocument={shellSnapshot.mode !== "preview"}
+                  search={
+                    shellSnapshot.mode === "preview" && nextPath !== DEFAULT_AUTH_REDIRECT
+                      ? { next: nextPath }
+                      : undefined
+                  }
+                  className="hito-button hito-button-secondary hito-button-sm tracking-wide"
+                >
+                  <Activity className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  {shellSnapshot.mode === "preview" ? "Sign in to save" : "Create plan"}
+                </Link>
+              )}
               <Link
                 to="/integrations"
                 aria-label="Open connections status"
@@ -298,7 +299,17 @@ export function AppShell({
           })}
         </nav>
       </main>
-      <UploadJsonDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      <UploadJsonDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        defaultStartDate={snapshot?.currentDate}
+      />
+      <PlanManagementDialog
+        open={planManagementOpen}
+        onOpenChange={setPlanManagementOpen}
+        snapshot={snapshot}
+        viewer={viewer}
+      />
     </div>
   );
 }
@@ -340,4 +351,23 @@ function buildInitials(name: string) {
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
+}
+
+function getProfileDetail(
+  snapshot: TrainingSnapshot | null | undefined,
+  mode: ReturnType<typeof getShellSnapshot>["mode"],
+) {
+  if (snapshot?.planMeta?.title) {
+    return snapshot.planMeta.title;
+  }
+
+  if (mode === "authenticated") {
+    return "Saved plan active";
+  }
+
+  if (mode === "onboarding") {
+    return snapshot?.profile ? "No active plan" : "Create a plan on home";
+  }
+
+  return "Sign in to save progress";
 }

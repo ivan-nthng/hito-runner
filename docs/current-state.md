@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-13
+2026-05-14
 
 ## Where We Are Now
 
@@ -77,6 +77,10 @@ Active
   the visible FIT/ZIP control no longer relies on Safari-native `accept` MIME filtering and instead validates `.fit` or `.zip` after selection before posting multipart data to the backend route.
 - Saved-mode shell navigation back to `/` now uses a fresh home request, and the `Tomorrow` summary no longer falls through to broken `nullkm · 0′` placeholders for interval-style workouts.
 - The profile/sidebar area now shows the runner name plus active plan title, removes duplicate top-level sign-out, and owns a lightweight saved-mode advanced import entry path.
+- The first saved-mode plan-management backend slice is now implemented:
+  a canonical delete-plan action archives the active `plan_cycle` without deleting planned workouts or logs, leaving the runner in authenticated no-plan/setup-ready state, and the JSON import apply seam can now accept a `requestedStartDate` that becomes the effective schedule authority for saved-mode import.
+- The first saved-mode plan-management frontend slice is now implemented:
+  `Open plan` opens a compact active-plan modal with plan summary, primary text-first replacement, secondary JSON import with chosen start day, and a destructive `Delete plan` action wired to the backend archival seam.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.
 - The first workout-page refinement pass is now implemented:
   the three-block page structure remains intact, saved result states now surface as check, dash, or cross markers near workout identity and in the right-side context, `Week Status` is progress-driven, `Log result` stays focused on manual completion truth, and the dedicated `Feedback` tab now owns the Garmin FIT/ZIP evidence seam with screenshot still clearly later-only.

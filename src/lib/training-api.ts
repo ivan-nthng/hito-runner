@@ -19,11 +19,7 @@ import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "@/lib/structured-plan-authoring";
-import {
-  getLatestWorkoutResultFeedback,
-  getWorkoutFeedbackMarkerMap,
-  type WorkoutResultFeedbackSummary,
-} from "@/lib/workout-result-import/ingest-garmin-result";
+import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 import {
   buildImportedLogCarryForwardPlan,
   buildPersistedWorkoutInsertRows,
@@ -68,10 +64,15 @@ const loginInputSchema = z.object({
 });
 
 const firstDayResolutionSchema = z.enum(["replace_first_day", "ignore_first_day"]);
+const requestedStartDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a start date in YYYY-MM-DD format.");
 
 const onboardingInputSchema = z.object({
   importedPlan: importedPlanSchema,
   firstDayResolution: firstDayResolutionSchema.optional().nullable(),
+  requestedStartDate: requestedStartDateSchema.optional().nullable(),
 });
 
 const structuredOnboardingInputSchema = z.object({
@@ -129,6 +130,13 @@ type PreparedImportedPlanApply = PreparedPlanApplySuccess & {
   planContext: ExistingPlanContext;
 };
 
+export interface DeleteActivePlanResult {
+  ok: true;
+  status: "archived";
+  archivedPlanId: string;
+  snapshot: TrainingSnapshot;
+}
+
 export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async () => {
   const auth = getRequestAuthContext();
 
@@ -180,7 +188,7 @@ export const getWorkoutRouteData = createServerFn({ method: "POST" })
       : -1;
     const feedback =
       snapshot.source === "persisted" && workout
-        ? await getLatestWorkoutResultFeedback(workout.id)
+        ? await getLatestWorkoutResultFeedbackForServer(workout.id)
         : null;
 
     return {
@@ -255,8 +263,23 @@ export const requestMagicLink = createServerFn({ method: "POST" })
 export const completeOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => onboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
-    return persistImportedPlanForCurrentRequest(data.importedPlan, data.firstDayResolution ?? null);
+    return persistImportedPlanForCurrentRequest(
+      data.importedPlan,
+      data.firstDayResolution ?? null,
+      data.requestedStartDate ?? null,
+    );
   });
+
+export const deleteActivePlan = createServerFn({ method: "POST" }).handler(async () => {
+  const auth = requireAuthenticatedUser();
+  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+
+  if (!persistedUserId) {
+    throw new Error("Authentication is required for this action.");
+  }
+
+  return archiveActivePlanForUser(persistedUserId);
+});
 
 export const completeStructuredOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => structuredOnboardingInputSchema.parse(value))
@@ -372,6 +395,7 @@ async function savePersistedWorkoutLog(
 async function persistImportedPlanForCurrentRequest(
   importedPlan: ImportedPlanInput,
   firstDayResolution: FirstDayResolution | null,
+  requestedStartDate: string | null = null,
 ): Promise<PlanApplyResult> {
   const auth = requireAuthenticatedUser();
   const persistedUserId = await getPersistedUserIdForAuthContext(auth);
@@ -380,15 +404,26 @@ async function persistImportedPlanForCurrentRequest(
     throw new Error("Authentication is required for this action.");
   }
 
-  return applyImportedPlanForUser(persistedUserId, importedPlan, firstDayResolution);
+  return applyImportedPlanForUser(
+    persistedUserId,
+    importedPlan,
+    firstDayResolution,
+    requestedStartDate,
+  );
 }
 
 export async function applyImportedPlanForUser(
   userId: string,
   importedPlan: ImportedPlanInput,
   firstDayResolution: FirstDayResolution | null,
+  requestedStartDate: string | null = null,
 ): Promise<PlanApplyResult> {
-  const preparedApply = await prepareImportedPlanApply(userId, importedPlan, firstDayResolution);
+  const preparedApply = await prepareImportedPlanApply(
+    userId,
+    importedPlan,
+    firstDayResolution,
+    requestedStartDate,
+  );
 
   if ("ok" in preparedApply && !preparedApply.ok) {
     return preparedApply;
@@ -398,6 +433,35 @@ export async function applyImportedPlanForUser(
   await replaceActivePlanWithImportedInput(userId, preparedApply, preparedApply.planContext);
 
   return preparedApply.result;
+}
+
+export async function archiveActivePlanForUser(userId: string): Promise<DeleteActivePlanResult> {
+  const supabase = createAdminSupabaseClient();
+  const activePlan = await getActivePlan(userId);
+
+  if (!activePlan) {
+    throw new Error("There is no active plan to delete.");
+  }
+
+  const archived = await supabase
+    .from("plan_cycles")
+    .update({ status: "archived" })
+    .eq("id", activePlan.id)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .select("id")
+    .single();
+
+  if (archived.error) {
+    throw new Error(archived.error.message);
+  }
+
+  return {
+    ok: true,
+    status: "archived",
+    archivedPlanId: archived.data.id,
+    snapshot: await getPersistedSnapshot(userId),
+  };
 }
 
 export async function exchangeCodeForSession(request: Request) {
@@ -519,7 +583,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
     planCycle,
   );
   const currentDate = todayIso();
-  const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMap(
+  const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMapForServer(
     persistedWorkouts.map((workout) => workout.id),
   );
   const workouts = persistedWorkouts.map((workout) =>
@@ -549,6 +613,20 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
     workouts,
     weekStatus: deriveWeekStatus(workouts, currentDate),
   };
+}
+
+async function getLatestWorkoutResultFeedbackForServer(plannedWorkoutId: string) {
+  const { getLatestWorkoutResultFeedback } =
+    await import("@/lib/workout-result-import/ingest-garmin-result");
+
+  return getLatestWorkoutResultFeedback(plannedWorkoutId);
+}
+
+async function getWorkoutFeedbackMarkerMapForServer(plannedWorkoutIds: string[]) {
+  const { getWorkoutFeedbackMarkerMap } =
+    await import("@/lib/workout-result-import/ingest-garmin-result");
+
+  return getWorkoutFeedbackMarkerMap(plannedWorkoutIds);
 }
 
 async function getActivePlan(userId: string) {
@@ -709,12 +787,14 @@ async function prepareImportedPlanApply(
   userId: string,
   importedPlan: ImportedPlanInput,
   firstDayResolution: FirstDayResolution | null,
+  requestedStartDate: string | null,
 ): Promise<PreparedImportedPlanApply> {
   const planContext = await getExistingPlanContext(userId);
   const policyResult = prepareImportedPlanApplyPolicy(
     importedPlan,
     planContext.existingWorkouts,
     firstDayResolution,
+    requestedStartDate,
   );
 
   return {

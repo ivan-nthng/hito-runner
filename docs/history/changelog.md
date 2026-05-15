@@ -2,6 +2,11 @@
 
 Completed implementation history only.
 
+## 2026-05-14
+
+- Implemented the first saved-mode plan-management UI slice: `Open plan` now opens a compact active-plan modal with plan summary, primary text-first replacement, secondary JSON import using a runner-chosen start day, and backend-wired `Delete plan` archival action; the existing saved-mode JSON import dialog also sends `requestedStartDate`.
+- Added the first saved-mode plan-management backend slice: the server now exposes a canonical delete-plan lifecycle action that archives the active `plan_cycle` while preserving planned workouts and workout logs, and the JSON import apply seam now accepts an optional `requestedStartDate` that becomes the effective schedule authority when the saved-mode modal sends a chosen start day.
+
 ## 2026-05-13
 
 - Aligned the Supabase email sign-in code with SSR-safe passwordless auth: magic-link requests now opt into PKCE flow, the `/api/auth/confirm` callback now accepts either an auth `code` or an email `token_hash`, and the live configuration contract now explicitly depends on Supabase URL allow-listing plus `{{ .RedirectTo }}` email-template usage instead of a mixed implicit-flow fallback to localhost.

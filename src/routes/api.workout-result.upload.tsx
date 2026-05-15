@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
-import { ingestGarminWorkoutResult } from "@/lib/workout-result-import/ingest-garmin-result";
 import { WorkoutResultImportError } from "@/lib/workout-result-import/types";
 
 export const Route = createFileRoute("/api/workout-result/upload")({
@@ -23,6 +22,8 @@ export const Route = createFileRoute("/api/workout-result/upload")({
           }
 
           const userId = await requirePersistedUserIdForCurrentRequest();
+          const { ingestGarminWorkoutResult } =
+            await import("@/lib/workout-result-import/ingest-garmin-result");
           const result = await ingestGarminWorkoutResult({
             userId,
             plannedWorkoutId,

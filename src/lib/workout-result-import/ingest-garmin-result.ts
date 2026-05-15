@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import path from "node:path";
+import "@tanstack/react-start/server-only";
 import type { Database } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -14,16 +13,12 @@ import {
 } from "@/lib/training";
 import { buildDeterministicWorkoutComparison } from "@/lib/workout-result-import/compare-workout-result";
 import {
-  extractPrimaryFitFromArchive,
-  classifyWorkoutResultUpload,
-} from "@/lib/workout-result-import/archive";
-import {
   clampWorkoutAiInsight,
   generateWorkoutAiInsight,
   type WorkoutAiPromptInput,
 } from "@/lib/workout-result-import/generate-workout-ai-insight";
-import { parseGarminFitActivity } from "@/lib/workout-result-import/parse-garmin-fit";
 import {
+  type ExtractedGarminFitFile,
   MAX_WORKOUT_RESULT_UPLOAD_BYTES,
   WorkoutAiInsightSummary,
   WORKOUT_RESULT_STORAGE_BUCKET,
@@ -92,7 +87,7 @@ export async function ingestGarminWorkoutResult(params: {
   const supabase = createAdminSupabaseClient();
   const plannedWorkout = await getOwnedPlannedWorkout(userId, plannedWorkoutId);
   const existingLog = await getExistingWorkoutLog(plannedWorkoutId);
-  const assetId = randomUUID();
+  const assetId = generateAssetId();
   const storagePath = buildStoragePath({
     userId,
     plannedWorkoutId,
@@ -144,7 +139,7 @@ export async function ingestGarminWorkoutResult(params: {
             primaryFileName: originalFileName,
             fileBuffer,
           }
-        : await extractPrimaryFitFromArchive(fileBuffer);
+        : await extractPrimaryFitFromArchiveForServer(fileBuffer);
 
     await supabase
       .from("workout_result_assets")
@@ -156,7 +151,7 @@ export async function ingestGarminWorkoutResult(params: {
       })
       .eq("id", assetId);
 
-    const parsedWorkout = await parseGarminFitActivity(primaryFile.fileBuffer);
+    const parsedWorkout = await parseGarminFitActivityForServer(primaryFile.fileBuffer);
 
     const metricsInsert = await supabase
       .from("workout_actual_metrics")
@@ -653,8 +648,214 @@ function buildStoragePath(args: {
   assetId: string;
   originalFileName: string;
 }) {
-  const ext = path.extname(args.originalFileName).toLowerCase() || ".bin";
+  const ext = fileExtension(args.originalFileName) || ".bin";
   return `${args.userId}/${args.plannedWorkoutId}/${args.assetId}/original${ext}`;
+}
+
+function classifyWorkoutResultUpload(fileName: string): WorkoutResultAssetKind {
+  const lowerName = fileName.trim().toLowerCase();
+
+  if (lowerName.endsWith(".fit")) {
+    return "garmin_fit";
+  }
+
+  if (lowerName.endsWith(".zip")) {
+    return "garmin_zip";
+  }
+
+  throw new WorkoutResultImportError(
+    "unsupported_file_type",
+    "Only Garmin .fit files or .zip archives that contain one FIT activity are supported in this release.",
+    415,
+  );
+}
+
+async function extractPrimaryFitFromArchiveForServer(
+  zipBuffer: Buffer,
+): Promise<ExtractedGarminFitFile> {
+  if (!import.meta.env.SSR) {
+    throw new WorkoutResultImportError(
+      "invalid_upload",
+      "Garmin ZIP parsing is available only on the server.",
+      500,
+    );
+  }
+
+  const [{ mkdtemp, mkdir, open, readFile, rm }, pathModule, osModule, yauzlModule] =
+    await Promise.all([
+      import("node:fs/promises"),
+      import("node:path"),
+      import("node:os"),
+      import("yauzl"),
+    ]);
+  const path = pathModule.default;
+  const yauzl = yauzlModule.default;
+  const workspace = await mkdtemp(path.join(osModule.tmpdir(), "hito-fit-upload-"));
+
+  try {
+    const entries = await new Promise<string[]>((resolve, reject) => {
+      yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (error, zipFile) => {
+        if (error || !zipFile) {
+          reject(
+            new WorkoutResultImportError(
+              "invalid_upload",
+              "The uploaded ZIP archive could not be read.",
+              422,
+            ),
+          );
+          return;
+        }
+
+        const names: string[] = [];
+
+        zipFile.on("entry", (entry) => {
+          if (!entry.fileName.endsWith("/")) {
+            names.push(entry.fileName);
+          }
+
+          zipFile.readEntry();
+        });
+
+        zipFile.once("end", () => {
+          zipFile.close();
+          resolve(names);
+        });
+        zipFile.once("error", reject);
+        zipFile.readEntry();
+      });
+    });
+    const fitEntries = entries.filter((entry) => entry.toLowerCase().endsWith(".fit"));
+
+    if (fitEntries.length === 0) {
+      throw new WorkoutResultImportError(
+        "zip_missing_fit",
+        "This ZIP does not contain a usable .fit activity file.",
+        422,
+      );
+    }
+
+    if (fitEntries.length > 1) {
+      throw new WorkoutResultImportError(
+        "zip_multiple_fit",
+        "This ZIP contains more than one .fit file. Upload a ZIP with one Garmin activity FIT file only.",
+        422,
+      );
+    }
+
+    const primaryFileName = fitEntries[0]!;
+    const extractedPath = path.join(workspace, path.basename(primaryFileName));
+    await mkdir(path.dirname(extractedPath), { recursive: true });
+    const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
+      yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (error, zipFile) => {
+        if (error || !zipFile) {
+          reject(
+            new WorkoutResultImportError(
+              "invalid_upload",
+              "The uploaded ZIP archive could not be read.",
+              422,
+            ),
+          );
+          return;
+        }
+
+        let resolved = false;
+
+        zipFile.on("entry", (entry) => {
+          if (entry.fileName !== primaryFileName) {
+            zipFile.readEntry();
+            return;
+          }
+
+          zipFile.openReadStream(entry, async (streamError, readStream) => {
+            if (streamError || !readStream) {
+              reject(
+                new WorkoutResultImportError(
+                  "invalid_upload",
+                  "The FIT file inside the ZIP archive could not be read.",
+                  422,
+                ),
+              );
+              return;
+            }
+
+            const chunks: Buffer[] = [];
+
+            readStream.on("data", (chunk) => {
+              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            });
+            readStream.once("error", reject);
+            readStream.once("end", async () => {
+              try {
+                const extractedBuffer = Buffer.concat(chunks);
+                const fileHandle = await open(extractedPath, "w");
+                await fileHandle.writeFile(extractedBuffer);
+                await fileHandle.close();
+                resolved = true;
+                zipFile.close();
+                resolve(await readFile(extractedPath));
+              } catch (writeError) {
+                reject(writeError);
+              }
+            });
+          });
+        });
+
+        zipFile.once("end", () => {
+          if (!resolved) {
+            reject(
+              new WorkoutResultImportError(
+                "zip_missing_fit",
+                "This ZIP does not contain a usable .fit activity file.",
+                422,
+              ),
+            );
+          }
+        });
+        zipFile.once("error", reject);
+        zipFile.readEntry();
+      });
+    });
+
+    return {
+      primaryFileKind: "fit",
+      primaryFileName,
+      fileBuffer,
+    };
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+}
+
+async function parseGarminFitActivityForServer(fileBuffer: Buffer) {
+  if (!import.meta.env.SSR) {
+    throw new WorkoutResultImportError(
+      "fit_parse_failed",
+      "Garmin FIT parsing is available only on the server.",
+      500,
+    );
+  }
+
+  const { parseGarminFitActivity } = await import("@/lib/workout-result-import/parse-garmin-fit");
+  return parseGarminFitActivity(fileBuffer);
+}
+
+function generateAssetId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `asset-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function fileExtension(fileName: string) {
+  const baseName = fileName.trim().split(/[\\/]/).pop() ?? "";
+  const dotIndex = baseName.lastIndexOf(".");
+
+  if (dotIndex <= 0 || dotIndex === baseName.length - 1) {
+    return "";
+  }
+
+  return baseName.slice(dotIndex).toLowerCase();
 }
 
 function normalizeMimeType(mimeType: string, assetKind: WorkoutResultAssetKind) {

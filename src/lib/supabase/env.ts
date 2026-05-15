@@ -1,5 +1,6 @@
 function readEnv(name: string): string | null {
-  const viteValue = import.meta.env[name];
+  const viteEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  const viteValue = viteEnv?.[name];
 
   if (typeof viteValue === "string" && viteValue.trim()) {
     return viteValue.trim();

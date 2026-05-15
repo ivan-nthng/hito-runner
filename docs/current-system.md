@@ -90,14 +90,17 @@
 - text-first authoring, advanced JSON import, and internal structured authoring all create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
 - canonical apply-time start normalization now lives in [src/lib/plan-apply-policy.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-apply-policy.ts):
   explicit future `start_date` is preserved, while past or non-future `start_date` normalizes to `today` before persistence
+- saved-mode JSON import now collects an explicit start day in the visible saved-mode import surfaces and passes it as backend-owned `requestedStartDate`; when present, that date becomes the effective apply authority, the imported JSON `start_date` remains source metadata, and the imported workout sequence is shifted as one block around the chosen date
 - that same backend-owned apply seam now also handles first-day conflicts:
-  if a normalized plan would start today with a non-rest day while the current active plan already has a non-rest workout today, the default backend behavior is now the safe path:
-  preserve today’s existing workout, drop incoming day 1, and start the imported original day 2 tomorrow without blocking normal apply
+  if an applied plan would start on a chosen date with a non-rest day while the current active plan already has a non-rest workout on that date, the default backend behavior is now the safe path:
+  preserve the existing workout on the chosen date, drop incoming day 1, and start the imported original day 2 on the following day without blocking normal apply
 - continuity safety still evaluates the final transformed workout dates, not the raw imported dates:
-  the default preserved-today path still cannot detach logged history, and the only alternate path is explicit destructive `replace_first_day`, which keeps incoming day 1 on today and is blocked honestly when it would break exact saved-history carry-forward
+  the default preserved-start-day path still cannot detach logged history, and the only alternate path is explicit destructive `replace_first_day`, which keeps incoming day 1 on the chosen start date and is blocked honestly when it would break exact saved-history carry-forward
+- saved mode now has a backend delete-plan lifecycle action:
+  deleting an active plan archives the active `plan_cycle`, keeps its planned workouts and workout logs attached as history, leaves no active plan, and returns the runner to the authenticated no-plan/setup-ready state
 - the frontend now mirrors that simplified policy instead of the older symmetric chooser:
   text-first apply and advanced JSON apply both use the safe backend default without a required preserve-vs-ignore modal step
-  and only one explicit destructive override remains in the UI: `Replace today`, now kept behind a quieter disclosure instead of being shown as an equal sibling of the safe action
+  and only one explicit destructive override remains in the UI, now kept behind a quieter disclosure instead of being shown as an equal sibling of the safe action
 - OpenAI-generated authoring output never persists directly:
   the app validates the model response, converts it into canonical plan data, and persists through the same `plan_cycles` plus `planned_workouts` seam already used by JSON import and structured authoring
 - canonical richer-plan truth now survives more explicitly in that same seam across JSON import, structured authoring, and OpenAI text authoring:
@@ -114,6 +117,7 @@
 - saved-mode home/calendar now follows the simplified P0 rhythm: cells prioritize date, workout identity, completion marker, and secondary feedback cue while detailed distance/duration context stays in hover or the larger week context
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode advanced import entry point plus sign-out action
+- the saved-mode header `Open plan` action now opens one compact plan-management modal around the active plan summary, text-first replacement, advanced JSON import, and backend-owned plan deletion
 - `/integrations` remains routable as a quiet connections/status utility, but it is no longer part of the primary desktop or mobile runner navigation
 - `/body` remains routable as a quiet body-notes utility, but it is no longer part of the primary desktop or mobile runner navigation
 - the sidebar plan-note support block is locally dismissible and no longer repeats the same week status already shown in the top header

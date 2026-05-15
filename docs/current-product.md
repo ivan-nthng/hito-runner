@@ -62,14 +62,21 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - setup writes one profile and creates one active plan from the text-first authoring result, with JSON import retained only as an advanced fallback
 - applying a generated or imported plan now uses one shared backend start-date policy:
   explicit future starts are preserved, past or non-future starts normalize to today, and the plan is persisted only after those effective dates are resolved
-- if that normalized plan would start today with a workout while today already has a saved planned workout, the default product behavior is now the safe one:
-  keep today’s existing workout, skip the incoming first day, and start the imported original day 2 tomorrow
-- replacing today is now the only explicit override:
-  `Replace first day` keeps incoming day 1 on today, but it remains destructive and cannot bypass saved-history continuity protection
+- saved-mode JSON import can now use one explicit chosen start day as the apply authority:
+  when the caller sends that date, day 1 of the uploaded plan is intended for the chosen day, the source file’s `start_date` becomes metadata, and the backend shifts the plan block plus target date consistently
+- saved-mode JSON import surfaces now ask for that chosen start day before apply, using one date input plus small Today / Tomorrow / Next week shortcuts while leaving all schedule mapping to the backend
+- if the applied plan would start on a chosen date with a workout while that date already has a saved planned workout, the default product behavior is now the safe one:
+  keep the existing workout on that date, skip the incoming first day, and start the imported original day 2 the following day
+- replacing the chosen start day is now the only explicit override:
+  `Replace first day` keeps incoming day 1 on the chosen start date, but it remains destructive and cannot bypass saved-history continuity protection
 - the visible apply UX now follows that same backend truth:
   normal text-first and JSON apply no longer stop on a preserve-vs-ignore chooser
-  safe apply simply keeps today and starts the rest tomorrow
-  and `Replace today` remains available only as an explicit destructive override behind a quieter disclosure
+  safe apply keeps any existing workout on the chosen start date and starts the rest the following day
+  and the replace action remains available only as an explicit destructive override behind a quieter disclosure
+- saved mode now has a backend-owned plan deletion meaning:
+  `Delete plan` archives the current active plan, preserves planned-workout/log history under that archived plan, removes the active schedule from saved-mode view, and returns the runner to the same no-plan creation state
+- saved mode now exposes that lifecycle through one compact `Open plan` modal:
+  it summarizes the active plan, offers text-first plan replacement as the primary path, keeps JSON import as an advanced path with a chosen start day, and keeps `Delete plan` in a quieter destructive section
 - home and calendar now default to the real current day instead of a frozen demo start date
 - today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
 - when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero

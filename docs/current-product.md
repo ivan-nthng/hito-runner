@@ -21,8 +21,6 @@ The product still avoids claims of live coaching, connected integrations, weathe
   shows workout structure, logging controls, and week-status context using preview or persisted truth through one shared contract, with calmer rest-day presentation, a tighter grouped right-side panel, richer workout surfaces, and visible result-state markers for completed, partial, and skipped truth
 - progress `/progress`
   is now a smaller summary route, reading persisted completion and volume aggregates when saved mode is active while keeping weekly volume and recent consistency visible without implying a mature analytics dashboard
-- body `/body`
-  is now a quieter secondary body-notes utility rather than a primary navigation destination; it keeps the manual body map and severity notes, but frames them as plan-separated notes with calmer dividers and less widget chrome
 - integrations `/integrations`
   stays a preserved status/reference utility, but no longer appears as a primary runner navigation destination; it remains reachable through quieter shell access and uses honest live/later wording: the live Garmin-enabled workout feedback path points to workout-detail `Feedback`, while screenshot import and broader plan adjustments remain clearly later
 - login `/login`
@@ -75,8 +73,16 @@ The product still avoids claims of live coaching, connected integrations, weathe
   and the replace action remains available only as an explicit destructive override behind a quieter disclosure
 - saved mode now has a backend-owned plan deletion meaning:
   `Delete plan` archives the current active plan, preserves planned-workout/log history under that archived plan, removes the active schedule from saved-mode view, and returns the runner to the same no-plan creation state
+- saved mode now also has a backend-owned `Clear upcoming schedule` meaning:
+  it is the one-action way to remove today and future planned schedule before starting a later new plan, while preserving past history and any logged truth, including logged truth from today, under archived plan history
+  the v1 model archives the active plan and returns to no-plan state rather than keeping a half-active truncated plan, because that is the smallest clean lifecycle state before create/import
 - saved mode now exposes that lifecycle through one compact `Open plan` modal:
-  it summarizes the active plan, offers text-first plan replacement as the primary path, keeps JSON import as an advanced path with a chosen start day, and keeps `Delete plan` in a quieter destructive section
+  it summarizes the active plan, offers text-first plan replacement as the primary path, keeps JSON import as an advanced path with a chosen start day, exposes `Clear upcoming schedule` as a confirmed secondary action for removing the active upcoming schedule while preserving history, and keeps `Delete plan` in a quieter destructive section
+- later-starting saved-mode JSON import can also opt into clearing the previous upcoming schedule before apply:
+  the UI calls the backend clear-upcoming lifecycle first, then applies the validated imported plan through the same requested-start-date seam, without per-day schedule editing
+- the backend now owns the first active-plan export model for the upcoming `Open plan` export action:
+  JSON export is shaped as canonical `training-plan-v2` truth using the active saved schedule dates, Markdown export is derived from the same payload for readable sharing, and both omit completion, Garmin, comparison, AI, and other runtime-only saved-mode state
+  visible export controls and PDF remain later slices
 - home and calendar now default to the real current day instead of a frozen demo start date
 - today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
 - when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero
@@ -85,8 +91,14 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - the sidebar plan note can be dismissed for the current UI session, and the sidebar no longer repeats the same week status pill already present in the header
 - saved-mode shell links that return to home now intentionally reopen `/` through a fresh request so the calendar page stays reliable even from long-lived tabs
 - completed calendar days now read more clearly at a glance through a green confirmation treatment without overriding the primary today highlight
-- home/calendar now uses a lighter scan rhythm: month cells carry date, workout identity, completion truth, and a secondary feedback cue without inline metric/dashboard clutter
+- home/calendar now uses a lighter scan rhythm:
+  month cells carry date, completion truth, one broad-family workout glyph, one short workout-type label, the compact workout title, and a secondary feedback/evidence cue without inline distance, duration, target data, or dashboard clutter
 - saved workout logging now distinguishes preview-only drafts from persisted saves, supports truthful overwrite between `completed`, `partial`, and `skipped`, and surfaces pending, success, and failure feedback without hiding backend failures
+- saved workout logging now also supports workout-linked body notes as part of the saved result:
+  body notes persist with the specific workout log, reload with that workout, open from a focused modal inside `Log result`, and stay out of plan-adjustment truth while optionally informing Garmin feedback only as bounded caution context
+- legacy `/body` links now redirect to `/`:
+  body notes no longer exist as a standalone product surface, so the most truthful recovery path is back into the runner's current plan and workout flow
+- saved-mode user settings now have bounded persisted profile fields for identity, avatar metadata, age, weight, and height, resolved through the same saved runner identity used by the calendar and workout routes
 - the workout-detail `Week Status` surface is now progress-based and reports completed non-rest workouts in the current week
 - workout detail now separates manual `Log result` from `Feedback`: `Log result` stays focused on completion truth, notes, and manual actuals, while `Feedback` owns the live Garmin `.fit` / `.zip` upload path, parsed evidence summary, and deterministic planned-vs-actual comparison readback
 - the workout-detail feedback surface now reads in plain language for normal runners:
@@ -112,7 +124,9 @@ The product still avoids claims of live coaching, connected integrations, weathe
   signal-by-signal date, duration, distance, and structured-step statuses
   explicit `not applicable` and `missing actual` reasons
   honest delta and tolerance context where the metric supports it
-  and a step-summary block when ordered per-step duration comparison is trustworthy
+  a deterministic support matrix that says which signals were compared, missing, not applicable, or unsupported
+  ordered step-summary and warm-up/main/cooldown-style segment-group summaries when the planned and actual steps can be aligned honestly
+  and explicit unsupported states for pace and heart-rate comparison until those metrics have one normalized comparable contract
 - the current Garmin `Feedback` surface now also shows one bounded AI interpretation layer after a successful Garmin-backed comparison:
   it explains the most important matched or mismatched facts, gives one conservative next-workout recommendation, and keeps deterministic comparison visibly primary instead of replacing it
   that recommendation block now leads with one runner-facing next-step note, keeps supporting explanation below it, and expresses caution in plainer language when the evidence is mixed
@@ -132,10 +146,13 @@ The product still avoids claims of live coaching, connected integrations, weathe
   `Feedback` when the detailed `Feedback` tab is ready
   and those cues route into the existing workout-detail `Feedback` tab without competing with completion-status semantics
 - that AI layer is intentionally constrained:
-  it uses only canonical backend truth from the planned workout, parsed Garmin actual metrics, deterministic comparison payload, current week context, and next planned workout summary
-  it does not parse raw FIT, does not overwrite `workout_logs`, does not silently edit the plan, and stays cautious when deterministic evidence is partial or unclear
+  it uses only canonical backend truth from the planned workout, parsed Garmin actual metrics, deterministic comparison payload, current week context, next planned workout summary, and optional workout-scoped body-note context
+  it does not parse raw FIT, does not overwrite `workout_logs`, does not silently edit the plan, does not diagnose or give medical advice from body notes, and stays cautious when deterministic evidence is partial or unclear
+  visibly broken generated phrases are not shown to the runner; the backend replaces malformed recommendation text with shorter stable fallback copy when needed
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
-- signed-in surfaces now state honestly that JSON export is a later capability, not implemented in this slice yet
+- signed-in surfaces now expose one quiet `Export` action inside `Open plan`
+  it downloads the active saved plan as canonical JSON or readable Markdown from the same backend-owned export truth
+  PDF remains deferred
 - the runner profile area now shows the current runner name and active plan title, keeps sign-out inside the dropdown, and offers a lightweight advanced JSON plan-replacement flow
 - that advanced import replacement flow now preserves saved workout progress only when logged workouts still match the replacement JSON exactly on the logged dates; otherwise the replace action is blocked instead of silently clearing visible progress
 - the same advanced import flow now accepts only the canonical `training-plan-v2` file contract, while still ignoring runtime-only v2 fields that do not belong in canonical plan truth

@@ -22,6 +22,23 @@ export type WorkoutComparisonSignalKey =
   | "distance"
   | "structured_step_count";
 export type WorkoutComparisonSignalUnit = "date" | "min" | "km" | "count";
+export type WorkoutComparisonSupportStatus =
+  | "compared"
+  | "missing_actual"
+  | "not_applicable"
+  | "unsupported";
+export type WorkoutComparisonSupportSignalKey =
+  | WorkoutComparisonSignalKey
+  | "step_duration"
+  | "segment_group_duration"
+  | "pace"
+  | "heart_rate";
+export type WorkoutComparisonSegmentGroupKey =
+  | "warmup"
+  | "main"
+  | "cooldown"
+  | "recovery"
+  | "other";
 
 export class WorkoutResultImportError extends Error {
   code:
@@ -204,6 +221,40 @@ export interface WorkoutComparisonStepSummary {
   steps: WorkoutComparisonStepDetail[];
 }
 
+export interface WorkoutComparisonSegmentGroup {
+  key: WorkoutComparisonSegmentGroupKey;
+  label: string;
+  status: WorkoutComparisonFactStatus;
+  reason: string | null;
+  plannedStepCount: number;
+  actualStepCount: number;
+  plannedDurationMin: number | null;
+  actualDurationMin: number | null;
+  durationDeltaMin: number | null;
+  durationDeltaPct: number | null;
+  plannedDistanceKm: number | null;
+  actualDistanceKm: number | null;
+  distanceDeltaKm: number | null;
+}
+
+export interface WorkoutComparisonSegmentSummary {
+  status: "available" | "not_applicable";
+  mode: "ordered_simple_groups" | "none";
+  reason: string | null;
+  groups: WorkoutComparisonSegmentGroup[];
+}
+
+export interface WorkoutComparisonSupportItem {
+  key: WorkoutComparisonSupportSignalKey;
+  label: string;
+  status: WorkoutComparisonSupportStatus;
+  reason: string | null;
+}
+
+export interface WorkoutComparisonSupportMatrix {
+  signals: WorkoutComparisonSupportItem[];
+}
+
 export interface WorkoutComparisonDifferencePayload {
   plannedWorkout: {
     plannedWorkoutId: string;
@@ -238,7 +289,9 @@ export interface WorkoutComparisonDifferencePayload {
     plannedStructuredStepCount: number | null;
     actualStructuredStepCount: number | null;
   };
+  supportMatrix: WorkoutComparisonSupportMatrix;
   stepSummary: WorkoutComparisonStepSummary;
+  segmentSummary: WorkoutComparisonSegmentSummary;
   summary: {
     comparedSignalCount: number;
     visibleSignalCount: number;

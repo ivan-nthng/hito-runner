@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import { Check, ChevronLeft, ChevronRight, Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,11 @@ import {
 } from "@/lib/training";
 
 type View = "month" | "week";
+type CalendarWorkoutIdentity = {
+  label: string;
+  color: string;
+  glyph: "easy" | "long" | "quality" | "rest";
+};
 
 export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
   const [view, setView] = useState<View>("month");
@@ -187,11 +193,11 @@ function DayCell({
   const status = workout?.status ?? "rest";
   const day = parseInt(iso.split("-")[2], 10);
   const isHover = hovered === iso;
-  const meta = workout ? workoutTypeMeta(workout) : null;
   const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
   const hasWorkout = workout && workout.type !== "rest";
   const isCompleted = status === "completed";
   const isSkipped = hasWorkout && status === "skipped";
+  const identity = workout ? calendarWorkoutIdentity(workout) : null;
 
   return (
     <div className="relative">
@@ -226,26 +232,49 @@ function DayCell({
           <div className="mt-3">
             <div
               className={cn(
-                "text-[11px] uppercase tracking-wider",
+                "inline-flex max-w-full items-center gap-1.5 text-[10px] uppercase tracking-[0.14em]",
                 status === "skipped" && "line-through opacity-50",
               )}
-              style={{ color: meta?.color }}
+              style={{ color: identity?.color }}
             >
-              {meta.short}
+              <span
+                className="hito-calendar-type-glyph"
+                data-family={identity?.glyph}
+                style={
+                  {
+                    "--hito-calendar-type-color": identity?.color,
+                  } as CSSProperties
+                }
+              />
+              <span className="truncate">{identity?.label}</span>
             </div>
             <div
               className={cn(
-                "mt-1 text-xs leading-tight text-foreground/85 line-clamp-2",
-                feedbackMeta && "pr-12",
+                "mt-1.5 text-xs leading-tight text-foreground/85 line-clamp-2",
+                feedbackMeta && "pr-7",
               )}
             >
               {workout.title.replace(/^(Аэробный |Лёгкий )/, "")}
             </div>
           </div>
         )}
-        {workout && workout.type === "rest" && (
-          <div className="mt-3 text-[11px] uppercase tracking-wider text-muted-foreground">
-            Rest
+        {workout && workout.type === "rest" && identity && (
+          <div className="mt-3">
+            <div
+              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+              style={{ color: identity.color }}
+            >
+              <span
+                className="hito-calendar-type-glyph"
+                data-family={identity.glyph}
+                style={
+                  {
+                    "--hito-calendar-type-color": identity.color,
+                  } as CSSProperties
+                }
+              />
+              <span>{identity.label}</span>
+            </div>
           </div>
         )}
       </Link>
@@ -255,7 +284,7 @@ function DayCell({
           to="/workout/$date"
           params={{ date: iso }}
           search={{ tab: "feedback" } as never}
-          className="absolute bottom-2.5 right-2.5 z-20 hito-feedback-marker"
+          className="hito-feedback-marker hito-calendar-feedback-marker absolute bottom-2.5 right-2.5 z-20"
           data-state={feedbackMeta.state}
           aria-label={`${feedbackMeta.label}. Open workout feedback.`}
         >
@@ -270,6 +299,41 @@ function DayCell({
       )}
     </div>
   );
+}
+
+function calendarWorkoutIdentity(workout: Workout): CalendarWorkoutIdentity {
+  const meta = workoutTypeMeta(workout);
+  const label = meta.short === "Steady" ? "Easy" : meta.short;
+
+  if (workout.type === "rest") {
+    return {
+      label: "Rest",
+      color: "var(--rest)",
+      glyph: "rest",
+    };
+  }
+
+  if (workout.type === "long_run") {
+    return {
+      label: "Long",
+      color: meta.color,
+      glyph: "long",
+    };
+  }
+
+  if (workout.type === "quality") {
+    return {
+      label,
+      color: meta.color,
+      glyph: "quality",
+    };
+  }
+
+  return {
+    label,
+    color: meta.color,
+    glyph: "easy",
+  };
 }
 
 function StatusMark({ status, compact = false }: { status: Status; compact?: boolean }) {

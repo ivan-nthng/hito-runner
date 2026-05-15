@@ -70,6 +70,6 @@ Signed-out preview mode remains intentionally outside the trusted product bounda
 - `/progress`
   preserved analytics shell now able to read persisted aggregates from the canonical seam
 - `/body`
-  preserved manual body-notes shell
+  legacy path that now redirects to `/` because body notes belong to workout logging, not a standalone surface
 - `/integrations`
   preserved integration-preview shell

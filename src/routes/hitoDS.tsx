@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -8,11 +9,11 @@ import {
   Circle,
   Download,
   FileJson2,
-  HeartPulse,
   LineChart,
   Minus,
   Plug,
   Search,
+  Settings2,
   X,
 } from "lucide-react";
 import { APP_NAME } from "@/lib/app-config";
@@ -57,6 +58,18 @@ const STATUS_MARKER_EXAMPLES = [
 const FEEDBACK_MARKER_EXAMPLES = [
   { label: "Evidence", state: "evidence_attached" },
   { label: "Feedback", state: "feedback_ready" },
+] as const;
+
+const CALENDAR_TYPE_EXAMPLES = [
+  { label: "Easy", family: "easy", color: "var(--easy)" },
+  { label: "Recovery", family: "easy", color: "var(--easy)" },
+  { label: "Long", family: "long", color: "var(--long)" },
+  { label: "Tempo", family: "quality", color: "var(--quality)" },
+  { label: "Intervals", family: "quality", color: "var(--quality)" },
+  { label: "Progression", family: "quality", color: "var(--quality)" },
+  { label: "Race", family: "quality", color: "var(--quality)" },
+  { label: "Quality", family: "quality", color: "var(--quality)" },
+  { label: "Rest", family: "rest", color: "var(--rest)" },
 ] as const;
 
 type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
@@ -423,6 +436,30 @@ function HitoDesignSystemPage() {
                   </p>
                 </article>
               </div>
+              <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <article className="hito-row-group">
+                  {CALENDAR_TYPE_EXAMPLES.map(({ label, family, color }) => (
+                    <div key={label} className="hito-list-row py-3">
+                      <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
+                        <span
+                          className="hito-calendar-type-glyph"
+                          data-family={family}
+                          style={{ "--hito-calendar-type-color": color } as CSSProperties}
+                        />
+                        <span style={{ color }}>{label}</span>
+                      </span>
+                      <span className="hito-caption">Month cell</span>
+                    </div>
+                  ))}
+                </article>
+                <article className="hito-surface-flat p-5">
+                  <p className="hito-label">Calendar type identity</p>
+                  <p className="hito-support-copy mt-3">
+                    Month cells use one broad-family glyph plus one short label. Distance, duration,
+                    and target details stay in hover or workout detail.
+                  </p>
+                </article>
+              </div>
             </section>
 
             <section id="analytics" className="ds-section">
@@ -561,7 +598,7 @@ function HitoDesignSystemPage() {
                   </button>
                   <div className="hito-row-group">
                     <MenuRow icon={FileJson2} label="Advanced import" meta="Utility" />
-                    <MenuRow icon={HeartPulse} label="Body notes" meta="Utility" />
+                    <MenuRow icon={Settings2} label="User settings" meta="Utility" />
                     <MenuRow icon={Plug} label="Connections status" meta="Utility" />
                   </div>
                 </div>
@@ -582,7 +619,7 @@ function HitoDesignSystemPage() {
                   </button>
                 </div>
                 <div className="hito-row-group">
-                  <MenuRow icon={HeartPulse} label="Body notes" meta="Utility" />
+                  <MenuRow icon={Settings2} label="User settings" meta="Utility" />
                   <MenuRow icon={Plug} label="Connections status" meta="Utility" />
                   <MenuRow icon={FileJson2} label="Advanced import" meta="Utility" />
                   <MenuRow icon={Download} label="Download template" meta="Secondary" />

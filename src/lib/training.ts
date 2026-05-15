@@ -1,4 +1,5 @@
 import planJson from "@/data/training-plan.json";
+import type { BodyNote } from "@/lib/body-notes";
 import type { WorkoutFeedbackMarkerSummary } from "@/lib/workout-result-import/types";
 
 export type WorkoutType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
@@ -71,6 +72,7 @@ export interface WorkoutLog {
   rpe: number | null;
   notes: string | null;
   intervalsCompleted: number | null;
+  bodyNotes: BodyNote[];
   loggedAt: string | null;
 }
 
@@ -106,6 +108,14 @@ export interface RunnerProfileSummary {
   baselineSessionsPerWeek: number;
   baselineLongRunKm: number;
   baselineNotes: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string | null;
+  avatarUrl: string | null;
+  avatarStoragePath: string | null;
+  age: number | null;
+  weightKg: number | null;
+  heightCm: number | null;
 }
 
 export interface TrainingSnapshot {
@@ -378,6 +388,7 @@ export function weekOf(workouts: Workout[], date: string): Workout[] {
       title: "Rest",
       notes: null,
       steps: [],
+      feedbackMarker: null,
       log: null,
       status: "rest",
     });

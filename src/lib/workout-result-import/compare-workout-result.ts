@@ -6,9 +6,14 @@ import type {
   WorkoutComparisonFactStatus,
   WorkoutComparisonSignal,
   WorkoutComparisonSignalKey,
+  WorkoutComparisonSupportItem,
   WorkoutComparisonStatus,
+  WorkoutComparisonSegmentGroup,
+  WorkoutComparisonSegmentGroupKey,
+  WorkoutComparisonSegmentSummary,
   WorkoutComparisonStepDetail,
   WorkoutComparisonStepSummary,
+  WorkoutComparisonSupportStatus,
 } from "@/lib/workout-result-import/types";
 
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -104,8 +109,14 @@ export function buildDeterministicWorkoutComparison(params: {
     params.actualMetrics.actual_interval_count,
   );
   const stepSummary = buildStepSummary(plannedSteps, actualSteps);
+  const segmentSummary = buildSegmentSummary(plannedSteps, actualSteps, stepSummary);
 
   const signals = [dateAlignment, duration, distance, structuredStepCount];
+  const supportMatrix = buildSupportMatrix({
+    signals,
+    stepSummary,
+    segmentSummary,
+  });
   const comparedSignals = signals.filter((signal) => isComparedSignal(signal.status));
   const comparedSignalStatuses = comparedSignals.map((signal) => signal.status);
   const matchedSignals = comparedSignalStatuses.filter((status) => status === "matched").length;
@@ -168,7 +179,9 @@ export function buildDeterministicWorkoutComparison(params: {
       plannedStructuredStepCount: numberOrNull(structuredStepCount.plannedValue),
       actualStructuredStepCount: numberOrNull(structuredStepCount.actualValue),
     },
+    supportMatrix,
     stepSummary,
+    segmentSummary,
     summary: {
       comparedSignalCount: comparedSignals.length,
       visibleSignalCount: signals.length,
@@ -428,6 +441,180 @@ function buildStepSummary(
   };
 }
 
+function buildSegmentSummary(
+  plannedSteps: PlannedComparisonStep[],
+  actualSteps: ActualComparisonStep[],
+  stepSummary: WorkoutComparisonStepSummary,
+): WorkoutComparisonSegmentSummary {
+  if (stepSummary.status !== "available") {
+    return {
+      status: "not_applicable",
+      mode: "none",
+      reason:
+        stepSummary.reason ??
+        "Segment grouping requires ordered per-step comparison to be available first.",
+      groups: [],
+    };
+  }
+
+  const groups = orderedSegmentGroups(plannedSteps, actualSteps);
+
+  if (groups.length === 0) {
+    return {
+      status: "not_applicable",
+      mode: "none",
+      reason: "No deterministic segment groups were found for this planned workout.",
+      groups: [],
+    };
+  }
+
+  return {
+    status: "available",
+    mode: "ordered_simple_groups",
+    reason:
+      plannedSteps.length === actualSteps.length
+        ? null
+        : "Segment groups use only the ordered actual steps that overlap with the planned steps.",
+    groups,
+  };
+}
+
+function orderedSegmentGroups(
+  plannedSteps: PlannedComparisonStep[],
+  actualSteps: ActualComparisonStep[],
+): WorkoutComparisonSegmentGroup[] {
+  const grouped = new Map<WorkoutComparisonSegmentGroupKey, MutableSegmentGroup>();
+  const comparedStepCount = Math.min(plannedSteps.length, actualSteps.length);
+
+  for (let index = 0; index < plannedSteps.length; index += 1) {
+    const planned = plannedSteps[index];
+    const actual = index < comparedStepCount ? actualSteps[index] : null;
+    const key = segmentGroupForStep(planned);
+    const current = grouped.get(key) ?? emptyMutableSegmentGroup(key);
+
+    current.plannedStepCount += 1;
+    current.actualStepCount += actual ? 1 : 0;
+    current.plannedDurationMin = addNullable(current.plannedDurationMin, planned.durationMin);
+    current.actualDurationMin = addNullable(current.actualDurationMin, actual?.durationMin ?? null);
+    current.plannedDistanceKm = addNullable(current.plannedDistanceKm, planned.distanceKm);
+    current.actualDistanceKm = addNullable(current.actualDistanceKm, actual?.distanceKm ?? null);
+    grouped.set(key, current);
+  }
+
+  return [...grouped.values()].map((group) => finalizeSegmentGroup(group));
+}
+
+interface MutableSegmentGroup {
+  key: WorkoutComparisonSegmentGroupKey;
+  plannedStepCount: number;
+  actualStepCount: number;
+  plannedDurationMin: number | null;
+  actualDurationMin: number | null;
+  plannedDistanceKm: number | null;
+  actualDistanceKm: number | null;
+}
+
+function emptyMutableSegmentGroup(key: WorkoutComparisonSegmentGroupKey): MutableSegmentGroup {
+  return {
+    key,
+    plannedStepCount: 0,
+    actualStepCount: 0,
+    plannedDurationMin: null,
+    actualDurationMin: null,
+    plannedDistanceKm: null,
+    actualDistanceKm: null,
+  };
+}
+
+function finalizeSegmentGroup(group: MutableSegmentGroup): WorkoutComparisonSegmentGroup {
+  const durationSignal = compareStepDuration(group.plannedDurationMin, group.actualDurationMin);
+  const plannedDistanceKm = group.plannedDistanceKm
+    ? roundNumber(group.plannedDistanceKm, 2)
+    : null;
+  const actualDistanceKm = group.actualDistanceKm ? roundNumber(group.actualDistanceKm, 2) : null;
+
+  return {
+    key: group.key,
+    label: labelForSegmentGroup(group.key),
+    status: durationSignal.status,
+    reason:
+      durationSignal.status === "matched" || durationSignal.status === "partial"
+        ? null
+        : (durationSignal.reason ?? null),
+    plannedStepCount: group.plannedStepCount,
+    actualStepCount: group.actualStepCount,
+    plannedDurationMin: numberOrNull(durationSignal.plannedValue),
+    actualDurationMin: numberOrNull(durationSignal.actualValue),
+    durationDeltaMin: numberOrNull(durationSignal.delta),
+    durationDeltaPct: numberOrNull(durationSignal.deltaPct),
+    plannedDistanceKm,
+    actualDistanceKm,
+    distanceDeltaKm:
+      plannedDistanceKm != null && actualDistanceKm != null
+        ? roundNumber(actualDistanceKm - plannedDistanceKm, 2)
+        : null,
+  };
+}
+
+function buildSupportMatrix(args: {
+  signals: WorkoutComparisonSignal[];
+  stepSummary: WorkoutComparisonStepSummary;
+  segmentSummary: WorkoutComparisonSegmentSummary;
+}) {
+  const signalItems = args.signals.map((signal): WorkoutComparisonSupportItem => {
+    return {
+      key: signal.key,
+      label: signal.label,
+      status: supportStatusForFact(signal.status),
+      reason: signal.reason ?? null,
+    };
+  });
+
+  return {
+    signals: [
+      ...signalItems,
+      {
+        key: "step_duration",
+        label: "Step duration",
+        status: args.stepSummary.status === "available" ? "compared" : "not_applicable",
+        reason: args.stepSummary.reason,
+      },
+      {
+        key: "segment_group_duration",
+        label: "Segment-group duration",
+        status: args.segmentSummary.status === "available" ? "compared" : "not_applicable",
+        reason: args.segmentSummary.reason,
+      },
+      {
+        key: "pace",
+        label: "Pace",
+        status: "unsupported",
+        reason:
+          "Pace comparison is intentionally not part of the deterministic contract until planned pace targets and Garmin pace metrics are normalized into one comparable unit.",
+      },
+      {
+        key: "heart_rate",
+        label: "Heart rate",
+        status: "unsupported",
+        reason:
+          "Heart-rate comparison is intentionally not part of the deterministic contract until planned HR targets can be parsed as numeric ranges.",
+      },
+    ],
+  };
+}
+
+function supportStatusForFact(status: WorkoutComparisonFactStatus): WorkoutComparisonSupportStatus {
+  if (status === "missing_actual") {
+    return "missing_actual";
+  }
+
+  if (status === "not_applicable") {
+    return "not_applicable";
+  }
+
+  return "compared";
+}
+
 function compareStepDuration(plannedValue: number | null, actualValue: number | null) {
   if (plannedValue == null || plannedValue <= 0) {
     return buildStaticSignal({
@@ -617,6 +804,52 @@ function canCompareOrderedSteps(steps: PlannedComparisonStep[]) {
   return steps.every((step) => (step.repeats ?? 0) === 0 && !ambiguousTypes.has(step.type));
 }
 
+function segmentGroupForStep(step: PlannedComparisonStep): WorkoutComparisonSegmentGroupKey {
+  const normalizedType = step.type.toLowerCase();
+  const normalizedLabel = step.label?.toLowerCase() ?? "";
+
+  if (normalizedType.includes("warm") || normalizedLabel.includes("warm")) {
+    return "warmup";
+  }
+
+  if (normalizedType.includes("cool") || normalizedLabel.includes("cool")) {
+    return "cooldown";
+  }
+
+  if (normalizedType.includes("recovery") || normalizedLabel.includes("recover")) {
+    return "recovery";
+  }
+
+  if (
+    normalizedType.includes("main") ||
+    normalizedType.includes("tempo") ||
+    normalizedType.includes("interval") ||
+    normalizedType.includes("easy") ||
+    normalizedType.includes("steady") ||
+    normalizedType.includes("long") ||
+    normalizedType.includes("run")
+  ) {
+    return "main";
+  }
+
+  return "other";
+}
+
+function labelForSegmentGroup(key: WorkoutComparisonSegmentGroupKey) {
+  switch (key) {
+    case "warmup":
+      return "Warm-up";
+    case "main":
+      return "Main work";
+    case "cooldown":
+      return "Cooldown";
+    case "recovery":
+      return "Recovery";
+    default:
+      return "Other";
+  }
+}
+
 function meaningfulStructuredStepCount(steps: PlannedComparisonStep[]) {
   if (steps.length === 0) {
     return null;
@@ -679,6 +912,14 @@ function roundNumber(value: number | null, digits: number) {
 
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
+}
+
+function addNullable(left: number | null, right: number | null) {
+  if (right == null) {
+    return left;
+  }
+
+  return roundNumber((left ?? 0) + right, 2);
 }
 
 function dayDiff(left: string, right: string) {

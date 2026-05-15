@@ -8,7 +8,7 @@ Frontend
 
 Last Updated
 
-2026-05-14
+2026-05-15
 
 Context
 
@@ -195,6 +195,7 @@ Backend Responsibilities
 - Apply the safe preserve-default behavior when conflict exists and no destructive override is requested.
 - Enforce continuity protections and block destructive replacement when logs would be detached.
 - Return one canonical apply result contract.
+- Expose `clearUpcomingSchedule` as the separate lifecycle action for cases where the runner chooses to remove the previous active schedule before applying a later-starting imported plan.
 
 The backend should no longer expose apply semantics that depend primarily on imported `start_date` normalization for this flow.
 
@@ -263,6 +264,7 @@ Implementation Update
 - Saved-mode JSON import surfaces now collect the chosen start day and send it as `requestedStartDate`.
 - Existing no-`requestedStartDate` callers keep the previous normalized-start behavior.
 - Chosen-date conflict handling reuses the existing safe default and destructive `replace_first_day` continuity guard.
+- `clearUpcomingSchedule` is now available as the backend-owned way to clear the previous active schedule before a later-starting import while preserving archived history and logged truth.
 
 Exit Criteria
 

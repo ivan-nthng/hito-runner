@@ -1,6 +1,6 @@
 Status
 
-In Progress
+Superseded By 2026-05-14 Refresh
 
 Owner
 
@@ -149,11 +149,11 @@ Exit Criteria
 
 Next Recommended Role
 
-BACKEND
+FRONTEND
 
 Suggested Next Step
 
-Define the implementation-ready deterministic comparison support matrix for workout segments and comparable signals, then scope the first richer comparison slice around only the workout shapes and metrics the current Garmin seam can support honestly.
+Use the refreshed 2026-05-14 track plan as the current source. Backend slice 1 has now implemented deterministic support-matrix and segment-group truth; Frontend can decide whether to expose those facts in `Feedback`.
 
 ## 🔁 HANDOFF BLOCK (MANDATORY)
 
@@ -173,6 +173,7 @@ Completed one canonical prioritization pass for the next product track after the
 
 - The live product already has text-first onboarding, safe plan apply, Garmin FIT/ZIP upload, deterministic comparison, bounded recommendation, and simplified runner-facing surfaces.
 - The next meaningful value now comes from improving the depth of current comparison truth rather than adding a second evidence path immediately.
+- This plan has been superseded by the 2026-05-14 refresh; the first backend richer-comparison slice is now implemented.
 
 ### Constraints
 
@@ -186,9 +187,9 @@ Completed one canonical prioritization pass for the next product track after the
 
 ### Next Recommended Role
 
-BACKEND
+FRONTEND
 
 ### Suggested Next Step
 
-Write the implementation-ready backend plan for the richer comparison support matrix, including which segment shapes and signals are supported first and which remain explicitly not comparable.
+Use the 2026-05-14 refreshed plan and inspect the new deterministic `supportMatrix` plus `segmentSummary` payload fields for a possible small `Feedback` readback slice.
 ```

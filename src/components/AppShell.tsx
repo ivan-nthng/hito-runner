@@ -6,7 +6,7 @@ import {
   Activity,
   Plug,
   NotebookPen,
-  HeartPulse,
+  Settings2,
   ChevronUp,
   LogOut,
   FileJson2,
@@ -15,7 +15,7 @@ import {
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
 import { UploadJsonDialog } from "@/components/UploadJsonDialog";
 import { PlanManagementDialog } from "@/components/PlanManagementDialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,6 +74,7 @@ export function AppShell({
   const profileDetail = getProfileDetail(snapshot, shellSnapshot.mode);
   const profileInitials = buildInitials(profileName);
   const showUploadAction = shellSnapshot.mode !== "preview";
+  const showSettingsAction = shellSnapshot.mode !== "preview";
   const modeTag =
     shellSnapshot.mode === "authenticated"
       ? "saved"
@@ -128,7 +129,7 @@ export function AppShell({
                   </div>
                   <p className="hito-list-row-copy">
                     {shellSnapshot.source === "persisted"
-                      ? "Your saved plan and workout results show up here. JSON export comes later."
+                      ? "Your saved plan and workout results show up here. Open plan also lets you export JSON or Markdown."
                       : "You can browse the preview here until you sign in and save a plan."}
                   </p>
                   <button
@@ -148,6 +149,9 @@ export function AppShell({
             <DropdownMenuTrigger asChild>
               <button type="button" className="hito-shell-profile-trigger group">
                 <Avatar className="h-9 w-9 border border-hairline/80 bg-background/70">
+                  {viewer?.avatarUrl ? (
+                    <AvatarImage src={viewer.avatarUrl} alt={profileName} />
+                  ) : null}
                   <AvatarFallback className="bg-gradient-to-br from-signal to-quality text-[11px] font-medium text-signal-foreground">
                     {profileInitials}
                   </AvatarFallback>
@@ -182,13 +186,14 @@ export function AppShell({
                   Import plan
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem className="hito-shell-menu-item" asChild>
-                <Link to="/body">
-                  <HeartPulse className="h-4 w-4" />
-                  Body notes
-                  <DropdownMenuShortcut>Utility</DropdownMenuShortcut>
-                </Link>
-              </DropdownMenuItem>
+              {showSettingsAction && (
+                <DropdownMenuItem className="hito-shell-menu-item" asChild>
+                  <Link to="/settings">
+                    <Settings2 className="h-4 w-4" />
+                    User settings
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem className="hito-shell-menu-item" asChild>
                 <Link to="/integrations">
                   <Plug className="h-4 w-4" />
@@ -267,13 +272,15 @@ export function AppShell({
               >
                 <Plug className="h-4 w-4" strokeWidth={1.5} />
               </Link>
-              <Link
-                to="/body"
-                aria-label="Open body notes"
-                className="hito-button hito-button-ghost hito-button-sm aspect-square p-0 md:hidden"
-              >
-                <HeartPulse className="h-4 w-4" strokeWidth={1.5} />
-              </Link>
+              {showSettingsAction && (
+                <Link
+                  to="/settings"
+                  aria-label="Open user settings"
+                  className="hito-button hito-button-ghost hito-button-sm aspect-square p-0 md:hidden"
+                >
+                  <Settings2 className="h-4 w-4" strokeWidth={1.5} />
+                </Link>
+              )}
             </div>
           </div>
         </header>
@@ -303,6 +310,7 @@ export function AppShell({
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         defaultStartDate={snapshot?.currentDate}
+        hasActivePlan={Boolean(snapshot?.planMeta)}
       />
       <PlanManagementDialog
         open={planManagementOpen}

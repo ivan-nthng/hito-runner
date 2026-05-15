@@ -1,14 +1,14 @@
 Status
 
-In Progress
+Frontend Readback Slice Implemented
 
 Owner
 
-Architect
+Frontend
 
 Last Updated
 
-2026-05-14
+2026-05-15
 
 Context
 
@@ -59,24 +59,38 @@ What Has Immediate Runner Value
 - better explanation of what the uploaded run matched or missed
 - more useful interpretation of current evidence before broadening into new evidence types
 
+Implementation Update
+
+- Backend slice 1 is implemented on the existing deterministic comparison payload.
+- `difference_payload.supportMatrix` now records which signals are compared, missing, not applicable, or unsupported.
+- `difference_payload.segmentSummary` now groups ordered simple planned-vs-actual steps into warm-up, main, cooldown, recovery, or other duration summaries when that comparison is trustworthy.
+- Pace and heart-rate remain explicit `unsupported` support-matrix entries until planned targets and Garmin actual metrics share one normalized comparable unit.
+- Frontend readback now exposes those facts in workout-detail `Feedback` through a compact `What this review checked` section and a calm `Workout structure` segment summary when available.
+- Screenshot OCR, similar-run comparison, and plan-adjustment workflow remain deferred.
+
 Candidate Tracks
 
 1. Richer comparison model
+
 - deepen the deterministic comparison contract around workout structure and comparable signals
 - candidates:
   warm-up / main run / cooldown
   HR / pace / duration only where honest support exists
 
 2. Screenshot OCR for workout evidence
+
 - allow screenshot-based evidence ingestion for runners who do not have FIT/ZIP files available
 
 3. Similar-run comparison
+
 - add bounded historical context against prior comparable sessions
 
 4. Broader plan-adjustment / plan-note workflow
+
 - escalate feedback into whole-program guidance or next-plan change suggestions
 
 5. Remaining auth or plan-management follow-up
+
 - only if a live defect appears; not as the next default product track
 
 Updated Priority Order
@@ -141,17 +155,19 @@ Risks
 
 Exit Criteria
 
-- the refreshed top 3 next tracks are explicit
-- the immediate next track is confirmed against the new saved-mode plan-management state
-- cleanup or lifecycle tails are explicitly removed from next-track priority unless live defects appear
+- [x] the refreshed top 3 next tracks are explicit
+- [x] the immediate next track is confirmed against the new saved-mode plan-management state
+- [x] cleanup or lifecycle tails are explicitly removed from next-track priority unless live defects appear
+- [x] first backend richer-comparison slice adds deterministic support-matrix and segment-group truth
+- [x] frontend decides whether and how to expose segment-group/support-matrix facts in the visible `Feedback` surface
 
 Next Recommended Role
 
-BACKEND
+QA
 
 Suggested Next Step
 
-Write the implementation-ready richer-comparison plan that freezes the support matrix for structured workout segments and signal types, then keep OCR and historical comparison behind that contract.
+Verify the enriched comparison readback in the workout-detail `Feedback` surface, confirming support-matrix and segment-summary facts stay secondary to the deterministic verdict and pace/heart-rate remain explicitly unsupported.
 
 ## 🔁 HANDOFF BLOCK (MANDATORY)
 
@@ -160,17 +176,21 @@ Write the implementation-ready richer-comparison plan that freezes the support m
 
 ### Summary
 
-Completed a short prioritization refresh after the saved-mode plan-management track and confirmed that richer deterministic comparison remains the next highest-value product track.
+Completed a short prioritization refresh after the saved-mode plan-management track, confirmed richer deterministic comparison as the next product track, implemented the first backend slice, and exposed the new support-matrix and segment-summary facts in `Feedback`.
 
 ### Key Decisions
 
 - The top priority remains richer comparison model depth.
 - Screenshot OCR and similar-run comparison still wait behind that deeper comparison contract.
+- Slice 1 adds support-matrix and segment-group truth to the existing comparison payload instead of creating a parallel richer-comparison model.
 
 ### Current State
 
 - Product lifecycle and management work is now materially complete enough: auth/session stability, saved-mode plan management, chosen-start-date import, and simplification are in place.
 - The biggest remaining runner-value gap is comparison depth inside the existing Garmin evidence loop.
+- The backend now persists `supportMatrix` and `segmentSummary` inside deterministic comparison `difference_payload`.
+- The frontend now reads those fields back through a compact `What this review checked` section and a `Workout structure` grouping when segment data is trustworthy.
+- Pace and heart-rate remain explicitly unsupported in deterministic comparison.
 
 ### Constraints
 
@@ -179,14 +199,14 @@ Completed a short prioritization refresh after the saved-mode plan-management tr
 
 ### Risks / Open Questions
 
-- Comparison depth can sprawl if too many workout shapes or signals are attempted in the first slice.
-- HR and pace must stay conservative and explicitly supported-or-not-supported.
+- Frontend should avoid over-surfacing technical matrix language if it makes `Feedback` feel diagnostic.
+- HR and pace must remain conservative and explicitly unsupported until a later backend slice normalizes comparable units.
 
 ### Next Recommended Role
 
-BACKEND
+QA
 
 ### Suggested Next Step
 
-Prepare the implementation-ready richer-comparison plan, defining which workout segment shapes and which signals are supported first and which remain explicitly not comparable.
+Run Safari QA on workout-detail `Feedback` with a saved Garmin comparison that includes `supportMatrix` and `segmentSummary`, verifying unsupported pace/heart-rate remain quiet and deterministic comparison stays primary.
 ```

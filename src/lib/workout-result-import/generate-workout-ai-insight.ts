@@ -6,6 +6,7 @@ import type {
   WorkoutAiRecommendationLevel,
 } from "@/lib/workout-result-import/types";
 import { serverEnv } from "@/lib/supabase/env";
+import type { BodyNote } from "@/lib/body-notes";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_WORKOUT_FEEDBACK_MODEL = "gpt-5";
@@ -17,8 +18,21 @@ const cautionFlagValues = [
   "duration_longer_than_planned",
   "distance_mismatch",
   "structured_steps_not_comparable",
+  "body_discomfort_context",
   "manual_review_worthwhile",
 ] as const;
+
+export interface WorkoutAiBodyNoteContext {
+  source: "workout_log";
+  interpretationBoundary: "caution_context_only";
+  notes: Array<{
+    area: BodyNote["area"];
+    timing: BodyNote["timing"];
+    sensation: BodyNote["sensation"];
+    severity: BodyNote["severity"];
+    note: string | null;
+  }>;
+}
 
 export interface WorkoutAiPromptInput {
   plannedWorkout: {
@@ -77,6 +91,7 @@ export interface WorkoutAiPromptInput {
     plannedDistanceKm: number | null;
     notes: string | null;
   } | null;
+  bodyNoteContext?: WorkoutAiBodyNoteContext;
 }
 
 export interface GeneratedWorkoutAiInsight {
@@ -228,14 +243,32 @@ export function clampWorkoutAiInsight(
     cautionFlags.add("structured_steps_not_comparable");
   }
 
+  if (input.bodyNoteContext?.notes.length) {
+    cautionFlags.add("body_discomfort_context");
+
+    const maxSeverity = Math.max(
+      ...input.bodyNoteContext.notes.map((bodyNote) => bodyNote.severity),
+    );
+
+    if (maxSeverity >= 4 && recommendationLevel === "keep") {
+      recommendationLevel = "soft_adjust";
+    }
+  }
+
   if (recommendationLevel === "review") {
     cautionFlags.add("manual_review_worthwhile");
   }
 
-  return {
+  const boundedOutput = applyWorkoutAiTextQualityGate(input, {
     ...generated,
     recommendationLevel,
     cautionFlags: [...cautionFlags],
+  });
+
+  return {
+    ...boundedOutput,
+    recommendationLevel,
+    cautionFlags: boundedOutput.cautionFlags,
   };
 }
 
@@ -243,9 +276,13 @@ function buildSystemPrompt() {
   return [
     "You are Hito Running's bounded workout feedback interpreter.",
     "You receive only canonical backend truth: planned workout summary, normalized actual metrics, deterministic comparison, current week context, and the next workout summary.",
-    "You must not invent raw metrics, comparison facts, medical advice, or plan mutations.",
+    "You may also receive saved workout-scoped body notes; use them only as caution context for this workout result.",
+    "You must not invent raw metrics, comparison facts, diagnosis, medical advice, treatment instructions, injury certainty, or plan mutations.",
     "Keep output concise, factual, and conservative.",
+    "Write in plain English only. Use complete sentences. Do not output dangling fragments, bullets, ampersands, markdown, emoji, or non-English characters.",
     "If the deterministic comparison is partial, mismatched, or unclear, say so plainly and avoid overconfident coaching.",
+    "If body notes are present, do not diagnose them or claim causality; at most mention discomfort context, monitoring, or a conservative load choice when relevant.",
+    "If body notes are absent, do not mention body discomfort.",
     "Do not use motivational fluff.",
     "The next-workout recommendation must be one bounded suggestion only, grounded in the supplied facts.",
     "Never imply that the plan was already changed.",
@@ -255,11 +292,196 @@ function buildSystemPrompt() {
 function buildUserPrompt(input: WorkoutAiPromptInput) {
   return [
     "Generate one bounded workout interpretation JSON object.",
+    "All text fields must be clean runner-facing English sentences with normal punctuation.",
     "Interpret only the supplied facts.",
     "If evidence is weak or unclear, keep the recommendation cautious.",
+    "Treat body-note context, if present, as secondary caution context under the deterministic comparison.",
     "Deterministic workout feedback input:",
     JSON.stringify(input, null, 2),
   ].join("\n\n");
+}
+
+export function buildWorkoutAiBodyNoteContext(
+  bodyNotes: BodyNote[],
+): WorkoutAiBodyNoteContext | undefined {
+  const notes = bodyNotes.slice(0, 8).map((bodyNote) => ({
+    area: bodyNote.area,
+    timing: bodyNote.timing,
+    sensation: bodyNote.sensation,
+    severity: bodyNote.severity,
+    note: sanitizeBodyNoteText(bodyNote.note),
+  }));
+
+  if (notes.length === 0) {
+    return undefined;
+  }
+
+  return {
+    source: "workout_log",
+    interpretationBoundary: "caution_context_only",
+    notes,
+  };
+}
+
+function sanitizeBodyNoteText(note: string | null) {
+  const trimmed = note?.trim() ?? "";
+
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.length <= 180 ? trimmed : `${trimmed.slice(0, 177).trimEnd()}...`;
+}
+
+export function applyWorkoutAiTextQualityGate(
+  input: WorkoutAiPromptInput,
+  generated: GeneratedWorkoutAiInsight["output"],
+): GeneratedWorkoutAiInsight["output"] {
+  return {
+    ...generated,
+    analysisSummary:
+      sanitizeRunnerFacingAiText(generated.analysisSummary, 20, 260) ??
+      fallbackAnalysisSummary(input),
+    differenceExplanation:
+      sanitizeRunnerFacingAiText(generated.differenceExplanation, 20, 340) ??
+      fallbackDifferenceExplanation(input),
+    nextWorkoutRecommendation:
+      sanitizeRunnerFacingAiText(generated.nextWorkoutRecommendation, 20, 260) ??
+      fallbackNextWorkoutRecommendation(input, generated.recommendationLevel),
+  };
+}
+
+function sanitizeRunnerFacingAiText(text: string, minLength: number, maxLength: number) {
+  const trimmed = text.normalize("NFKC").replace(/\s+/g, " ").trim();
+
+  if (!trimmed || containsUnsupportedCharacters(trimmed)) {
+    return null;
+  }
+
+  const withTerminalPunctuation = /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+
+  if (!isCompleteRunnerSentence(withTerminalPunctuation)) {
+    return null;
+  }
+
+  if (withTerminalPunctuation.length < minLength || withTerminalPunctuation.length > maxLength) {
+    return null;
+  }
+
+  return withTerminalPunctuation;
+}
+
+function containsUnsupportedCharacters(text: string) {
+  if (/[\uFFFD\u3400-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/u.test(text)) {
+    return true;
+  }
+
+  return /[^\x20-\x7E]/.test(text);
+}
+
+function isCompleteRunnerSentence(text: string) {
+  if (/[,&+\-/:;(]$/.test(text)) {
+    return false;
+  }
+
+  if (/[,&+\-/:;(]\.$/.test(text) || hasDanglingTrailingClause(text)) {
+    return false;
+  }
+
+  if (/\s[&+]\s/.test(text)) {
+    return false;
+  }
+
+  if (/(\bmain\b|\bduration\b|\bdistance\b)\s*[-+]\d+\s*(min|km)\s*,?\s*&/i.test(text)) {
+    return false;
+  }
+
+  return /[A-Za-z0-9][.!?]$/.test(text);
+}
+
+function hasDanglingTrailingClause(text: string) {
+  return /(?:^|[\s,;:])(?:and|or|but|because|while|although|though|when|with|without|for|to)\s*[.!?]$/i.test(
+    text,
+  );
+}
+
+function fallbackAnalysisSummary(input: WorkoutAiPromptInput) {
+  const completion = humanizeCompletionState(input.comparison.completionState);
+
+  return `The deterministic comparison stays primary: this workout currently reads as ${completion}.`;
+}
+
+function fallbackDifferenceExplanation(input: WorkoutAiPromptInput) {
+  const facts = input.comparison.differencePayload.facts;
+  const limitedSignals = [
+    facts.dateAlignment,
+    facts.duration,
+    facts.distance,
+    facts.structuredStepCount,
+  ].filter(
+    (signal) =>
+      signal.status === "partial" ||
+      signal.status === "mismatch" ||
+      signal.status === "missing_actual" ||
+      signal.status === "not_applicable",
+  );
+
+  if (limitedSignals.length === 0) {
+    return "The available factual checks do not show a major mismatch, so use the plan-vs-run section as the source of truth.";
+  }
+
+  const labels = limitedSignals
+    .slice(0, 2)
+    .map((signal) => describeFallbackSignalLimitation(signal))
+    .join(" and ");
+
+  return `Use the factual checks above with care because ${labels}.`;
+}
+
+function describeFallbackSignalLimitation(
+  signal: WorkoutComparisonDifferencePayload["facts"][keyof WorkoutComparisonDifferencePayload["facts"]],
+) {
+  const label = signal.label.toLowerCase();
+
+  if (signal.status === "not_applicable") {
+    return `${label} was not part of this comparison`;
+  }
+
+  if (signal.status === "missing_actual") {
+    return `${label} was missing from the uploaded result`;
+  }
+
+  return `${label} did not line up cleanly`;
+}
+
+function fallbackNextWorkoutRecommendation(
+  input: WorkoutAiPromptInput,
+  recommendationLevel: WorkoutAiRecommendationLevel,
+) {
+  if (recommendationLevel === "review") {
+    return "Review the factual comparison before changing the next workout, and keep the next step conservative.";
+  }
+
+  if (input.bodyNoteContext?.notes.length) {
+    return "Keep the next workout conservative if the noted discomfort is still present, and use the factual comparison above as the main guide.";
+  }
+
+  if (recommendationLevel === "soft_adjust") {
+    return "Keep the next workout easy to moderate, and use the factual comparison above to decide whether to shorten it.";
+  }
+
+  return "The next workout can stay as planned, with the factual comparison above as the primary guide.";
+}
+
+function humanizeCompletionState(completionState: WorkoutComparisonCompletionState) {
+  switch (completionState) {
+    case "matched":
+      return "matched";
+    case "partially_matched":
+      return "a partial match";
+    default:
+      return "unclear";
+  }
 }
 
 function extractStructuredOutputText(response: OpenAiResponseEnvelope) {

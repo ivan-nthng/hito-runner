@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
@@ -18,10 +19,17 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
 import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
 import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
+import { Route as ApiProfileAvatarUploadRouteImport } from './routes/api.profile-avatar.upload'
+import { Route as ApiPlanExportRouteImport } from './routes/api.plan.export'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api.auth.logout'
 import { Route as ApiAuthLocalLoginRouteImport } from './routes/api.auth.local-login'
 import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProgressRoute = ProgressRouteImport.update({
   id: '/progress',
   path: '/progress',
@@ -67,6 +75,16 @@ const ApiWorkoutResultRemoveRoute = ApiWorkoutResultRemoveRouteImport.update({
   path: '/api/workout-result/remove',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProfileAvatarUploadRoute = ApiProfileAvatarUploadRouteImport.update({
+  id: '/api/profile-avatar/upload',
+  path: '/api/profile-avatar/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlanExportRoute = ApiPlanExportRouteImport.update({
+  id: '/api/plan/export',
+  path: '/api/plan/export',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
   id: '/api/auth/logout',
   path: '/api/auth/logout',
@@ -90,10 +108,13 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/plan/export': typeof ApiPlanExportRoute
+  '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
 }
@@ -104,10 +125,13 @@ export interface FileRoutesByTo {
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/plan/export': typeof ApiPlanExportRoute
+  '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
 }
@@ -119,10 +143,13 @@ export interface FileRoutesById {
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
+  '/settings': typeof SettingsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
   '/api/auth/logout': typeof ApiAuthLogoutRoute
+  '/api/plan/export': typeof ApiPlanExportRoute
+  '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
 }
@@ -135,10 +162,13 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/login'
     | '/progress'
+    | '/settings'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
     | '/api/auth/logout'
+    | '/api/plan/export'
+    | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
   fileRoutesByTo: FileRoutesByTo
@@ -149,10 +179,13 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/login'
     | '/progress'
+    | '/settings'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
     | '/api/auth/logout'
+    | '/api/plan/export'
+    | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
   id:
@@ -163,10 +196,13 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/login'
     | '/progress'
+    | '/settings'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
     | '/api/auth/logout'
+    | '/api/plan/export'
+    | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
   fileRoutesById: FileRoutesById
@@ -178,16 +214,26 @@ export interface RootRouteChildren {
   IntegrationsRoute: typeof IntegrationsRoute
   LoginRoute: typeof LoginRoute
   ProgressRoute: typeof ProgressRoute
+  SettingsRoute: typeof SettingsRoute
   WorkoutDateRoute: typeof WorkoutDateRoute
   ApiAuthConfirmRoute: typeof ApiAuthConfirmRoute
   ApiAuthLocalLoginRoute: typeof ApiAuthLocalLoginRoute
   ApiAuthLogoutRoute: typeof ApiAuthLogoutRoute
+  ApiPlanExportRoute: typeof ApiPlanExportRoute
+  ApiProfileAvatarUploadRoute: typeof ApiProfileAvatarUploadRoute
   ApiWorkoutResultRemoveRoute: typeof ApiWorkoutResultRemoveRoute
   ApiWorkoutResultUploadRoute: typeof ApiWorkoutResultUploadRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/progress': {
       id: '/progress'
       path: '/progress'
@@ -251,6 +297,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkoutResultRemoveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/profile-avatar/upload': {
+      id: '/api/profile-avatar/upload'
+      path: '/api/profile-avatar/upload'
+      fullPath: '/api/profile-avatar/upload'
+      preLoaderRoute: typeof ApiProfileAvatarUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/plan/export': {
+      id: '/api/plan/export'
+      path: '/api/plan/export'
+      fullPath: '/api/plan/export'
+      preLoaderRoute: typeof ApiPlanExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/logout': {
       id: '/api/auth/logout'
       path: '/api/auth/logout'
@@ -282,10 +342,13 @@ const rootRouteChildren: RootRouteChildren = {
   IntegrationsRoute: IntegrationsRoute,
   LoginRoute: LoginRoute,
   ProgressRoute: ProgressRoute,
+  SettingsRoute: SettingsRoute,
   WorkoutDateRoute: WorkoutDateRoute,
   ApiAuthConfirmRoute: ApiAuthConfirmRoute,
   ApiAuthLocalLoginRoute: ApiAuthLocalLoginRoute,
   ApiAuthLogoutRoute: ApiAuthLogoutRoute,
+  ApiPlanExportRoute: ApiPlanExportRoute,
+  ApiProfileAvatarUploadRoute: ApiProfileAvatarUploadRoute,
   ApiWorkoutResultRemoveRoute: ApiWorkoutResultRemoveRoute,
   ApiWorkoutResultUploadRoute: ApiWorkoutResultUploadRoute,
 }

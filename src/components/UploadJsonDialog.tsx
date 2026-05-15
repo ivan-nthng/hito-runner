@@ -8,7 +8,7 @@ import {
   validateImportedPlanJson,
 } from "@/lib/imported-plan";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
-import { completeOnboarding } from "@/lib/training-api";
+import { clearUpcomingSchedule, completeOnboarding } from "@/lib/training-api";
 import {
   Dialog,
   DialogContent,
@@ -22,12 +22,15 @@ export function UploadJsonDialog({
   open,
   onOpenChange,
   defaultStartDate,
+  hasActivePlan = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultStartDate?: string | null;
+  hasActivePlan?: boolean;
 }) {
   const completeOnboardingFn = useServerFn(completeOnboarding);
+  const clearUpcomingScheduleFn = useServerFn(clearUpcomingSchedule);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const resolvedDefaultStartDate = defaultStartDate ?? todayLocalIso();
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -37,10 +40,12 @@ export function UploadJsonDialog({
   const [status, setStatus] = useState<"idle" | "parsing" | "applying">("idle");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
+  const [clearBeforeImport, setClearBeforeImport] = useState(false);
 
   const isBusy = status !== "idle";
   const summary = importedPlan ? summarizeImportedPlan(importedPlan) : null;
   const replaceBlockedReason = isReplaceBlockedError(error) ? error : null;
+  const canOfferClearBeforeImport = hasActivePlan && requestedStartDate > resolvedDefaultStartDate;
 
   useEffect(() => {
     if (open) {
@@ -54,6 +59,7 @@ export function UploadJsonDialog({
     setStatus("idle");
     setError(null);
     setFieldErrors([]);
+    setClearBeforeImport(false);
   }, [open, resolvedDefaultStartDate]);
 
   const submitPlan = async (firstDayResolution: FirstDayResolution | null) => {
@@ -71,6 +77,10 @@ export function UploadJsonDialog({
     setError(null);
 
     try {
+      if (clearBeforeImport && canOfferClearBeforeImport) {
+        await clearUpcomingScheduleFn();
+      }
+
       const result = await completeOnboardingFn({
         data: {
           importedPlan,
@@ -98,7 +108,7 @@ export function UploadJsonDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-xl grid-rows-[auto,minmax(0,1fr),auto] overflow-hidden border-hairline bg-background/95 p-0 backdrop-blur-xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl grid-rows-[auto,minmax(0,1fr),auto] overflow-hidden border-hairline bg-background/95 p-0 backdrop-blur-xl sm:max-h-[85dvh]">
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
           <DialogTitle className="font-display text-3xl">Import plan</DialogTitle>
           <DialogDescription className="max-w-lg text-sm leading-relaxed text-muted-foreground">
@@ -106,7 +116,7 @@ export function UploadJsonDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-6 py-5">
           <div className="grid gap-4">
             <input
               ref={fileInputRef}
@@ -278,6 +288,23 @@ export function UploadJsonDialog({
                     </button>
                   </div>
                 </div>
+                {canOfferClearBeforeImport && (
+                  <div className="hito-list-row items-start">
+                    <label className="flex max-w-lg items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={clearBeforeImport}
+                        disabled={isBusy}
+                        onChange={(event) => setClearBeforeImport(event.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
+                      />
+                      <span>
+                        Remove the current upcoming schedule before this later-starting plan is
+                        applied. Saved workout history stays preserved.
+                      </span>
+                    </label>
+                  </div>
+                )}
               </div>
             )}
 

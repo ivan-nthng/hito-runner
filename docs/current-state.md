@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-14
+2026-05-15
 
 ## Where We Are Now
 
@@ -57,8 +57,12 @@ Active
   comparison duration now resolves through the same canonical planned-duration helper used by workout detail, so visible planned duration and comparison planned duration no longer drift apart on distance-backed interval workouts.
 - The richer deterministic Garmin comparison payload slice is now implemented:
   the backend now persists explicit comparison signals, `missing_actual` and `not_applicable` reasons, honest delta/tolerance metadata, session-summary facts, and step-summary data when ordered per-step duration comparison is trustworthy; the saved-mode workout-detail `Feedback` surface now reads that richer structured comparison truth back without adding AI interpretation.
+- The first richer-comparison track implementation slice is now implemented:
+  deterministic comparison payloads now also persist a support matrix plus segment-group summary, so warm-up/main/cooldown-style duration grouping is available only when ordered step comparison is trustworthy, while pace and heart-rate remain explicitly unsupported rather than inferred.
+- The first richer-comparison frontend readback slice is now implemented:
+  workout-detail `Feedback` now shows a compact `What this review checked` support readback plus warm-up/main/cooldown-style `Workout structure` grouping when the deterministic payload includes trustworthy segment summaries, while pace and heart rate stay quiet unsupported facts rather than implied comparisons.
 - The bounded Garmin AI interpretation slice is now implemented:
-  saved-mode workout detail now persists one `workout_ai_insights` row linked to the latest deterministic comparison, generated only from planned workout truth, normalized Garmin actual metrics, deterministic comparison payload, current week context, and next-workout summary; the dedicated `Feedback` surface now reads that bounded AI interpretation back separately from the deterministic facts.
+  saved-mode workout detail now persists one `workout_ai_insights` row linked to the latest deterministic comparison, generated only from planned workout truth, normalized Garmin actual metrics, deterministic comparison payload, current week context, next-workout summary, and optional workout-scoped body-note context; the dedicated `Feedback` surface now reads that bounded AI interpretation back separately from the deterministic facts.
 - The first immediate Garmin UX cleanup slice is now implemented:
   workout-detail `Feedback` now uses one calmer divided hierarchy with plain-language `Upload Garmin file`, `Plan vs run`, and `Recommendation` framing; `Log result` now includes one lightweight path into `Feedback` for deeper review; and `/integrations` no longer contradicts the live Garmin path with stale `Preview / View status / Not connected` placeholder language.
 - The next post-cleanup Garmin entry slice is now implemented:
@@ -81,6 +85,32 @@ Active
   a canonical delete-plan action archives the active `plan_cycle` without deleting planned workouts or logs, leaving the runner in authenticated no-plan/setup-ready state, and the JSON import apply seam can now accept a `requestedStartDate` that becomes the effective schedule authority for saved-mode import.
 - The first saved-mode plan-management frontend slice is now implemented:
   `Open plan` opens a compact active-plan modal with plan summary, primary text-first replacement, secondary JSON import with chosen start day, and a destructive `Delete plan` action wired to the backend archival seam.
+- The saved-mode `Clear upcoming schedule` backend lifecycle slice is now implemented:
+  a canonical action archives the current active plan out of the active schedule from today forward, keeps planned-workout rows and workout logs preserved as archived history, and leaves the runner in no-plan/setup-ready state so later-starting imports or generated plans do not inherit stale future workouts.
+- The saved-mode `Clear upcoming schedule` frontend slice is now implemented:
+  `Open plan` exposes the action as a confirmed secondary schedule-management control distinct from `Delete plan`, tall plan-management dialogs keep their header/footer usable with internal scroll, and later-starting JSON import can explicitly clear the previous upcoming schedule before applying the new backend-owned plan start.
+- The first saved-mode plan-export backend slice is now implemented:
+  one canonical active-plan export payload is derived from the active `plan_cycle` plus saved `planned_workouts`, JSON export projects that payload into `training-plan-v2` using the current applied dates, and Markdown export uses the same payload for a concise runner-readable artifact; visible `Open plan` export controls and PDF remain later slices.
+- The first saved-mode plan-export frontend slice is now implemented:
+  `Open plan` now shows one compact `Export` menu for active plans, downloads backend-owned JSON and Markdown artifacts through real browser file save behavior, hides export when no active plan exists, and still defers PDF.
+- The Safari export-download bugfix is now implemented:
+  `Open plan` no longer depends on a client-side blob/objectURL download helper for active-plan export, so JSON no longer hangs in `Preparing...` and JSON plus Markdown now start through the same authenticated attachment route while still using backend-owned filename, content type, and body truth.
+- The body-notes and user-settings persistence repair is now implemented:
+  the linked Supabase project now has `workout_logs.body_notes`, bounded settings/avatar columns on `runner_profiles`, and the `profile-avatars` bucket; `/settings` and shell viewer profile reads now resolve through the same persisted-user mapping used by saved mode instead of the raw local bypass id.
+- The first frontend follow-up for body notes is now implemented:
+  `Log result` no longer resyncs empty saved state over a newly added body-note draft, so `Add body note` now keeps the workout-scoped form open and the required fields remain available for entry.
+- The first workout-scoped body-note modal slice is now implemented:
+  `Log result` no longer carries the heavy inline body-note editor in the main page flow, a compact summary row now opens one modal editor for bounded body-note entries, and the modal keeps the existing saved schema of area, timing, sensation, severity, and optional note.
+- The Safari body-note modal layout fix is now implemented:
+  the workout-scoped body-note modal now uses the same stable bounded-height dialog pattern as `Open plan`, so Safari keeps the panel in-viewport, scrolls the body region internally, and leaves `Cancel` plus `Save body notes` reachable without page-behind scrolling.
+- The Safari stable-dialog overlay cleanup is now implemented:
+  the same stable dialog pair now also forces closed overlays non-blocking, so saving or cancelling the workout-scoped body-note modal no longer leaves a dimmed pointer-blocking layer over the workout page.
+- The body-note AI context slice is now implemented:
+  saved workout-scoped body notes now feed the existing bounded Garmin recommendation seam as optional caution context only, while deterministic comparison remains primary and the prompt explicitly forbids diagnosis, medical advice, injury certainty, treatment instructions, or silent plan mutation.
+- The workout AI-output hygiene fix is now implemented:
+  the backend now rejects malformed runner-facing AI text such as dangling fragments, ampersand continuations, replacement glyphs, or non-English character artifacts, and persists stable deterministic fallback sentences instead while preserving body-note caution and severity softening behavior.
+- The saved-mode calendar-cell semantics correction is now implemented:
+  month cells restore one broad-family workout-type glyph, one short type label, restrained type color, and a quiet feedback/evidence corner marker while keeping distance, duration, targets, and dashboard-style metric stacks out of month cells.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.
 - The first workout-page refinement pass is now implemented:
   the three-block page structure remains intact, saved result states now surface as check, dash, or cross markers near workout identity and in the right-side context, `Week Status` is progress-driven, `Log result` stays focused on manual completion truth, and the dedicated `Feedback` tab now owns the Garmin FIT/ZIP evidence seam with screenshot still clearly later-only.
@@ -119,11 +149,9 @@ Active
   recent consistency,
   and no static placeholder trend chart or heavy explanatory support frame.
 - The fourth app-wide simplification slice is now implemented:
-  `/body` is no longer a primary desktop or mobile nav destination,
-  remains reachable as a quieter body-notes utility,
-  and its route chrome is reduced to an open body-map geometry area plus divider-based selected-area,
-  daily-notes,
-  and current-scope sections.
+  `/body` is now retired from the product,
+  older `/body` links redirect quietly to `/`,
+  and body-note ownership remains workout-scoped inside `Log result` instead of living as a second standalone surface.
 - The fifth app-wide simplification slice is now implemented:
   `/hitoDS` now follows the simplified live product instead of preserving historical overbuilt examples,
   with open route rhythm,

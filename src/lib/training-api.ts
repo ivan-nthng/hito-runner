@@ -2,8 +2,23 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient, type EmailOtpType } from "@supabase/supabase-js";
 import { z } from "zod";
 import { DEFAULT_AUTH_REDIRECT, sanitizeRedirectPath } from "@/lib/auth-redirect";
+import {
+  BODY_NOTE_AREAS,
+  BODY_NOTE_SENSATIONS,
+  BODY_NOTE_TIMINGS,
+  isBodyNoteArea,
+  isBodyNoteSensation,
+  isBodyNoteTiming,
+  parseBodyNotesValue,
+  type BodyNote,
+} from "@/lib/body-notes";
 import { importedPlanSchema } from "@/lib/imported-plan";
 import { generateCanonicalPlanFromText } from "@/lib/openai-plan-authoring";
+import {
+  buildActivePlanExportPayload,
+  buildPlanExportDocument,
+  type PlanExportDocument,
+} from "@/lib/plan-export";
 import {
   prepareImportedPlanApplyPolicy,
   type FirstDayResolution,
@@ -51,6 +66,18 @@ import {
 export interface ViewerSummary {
   name: string | null;
   email: string | null;
+  avatarUrl: string | null;
+}
+
+export interface UserSettingsSummary {
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  age: number | null;
+  weightKg: number | null;
+  heightCm: number | null;
 }
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
@@ -68,6 +95,9 @@ const requestedStartDateSchema = z
   .string()
   .trim()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a start date in YYYY-MM-DD format.");
+const planExportInputSchema = z.object({
+  format: z.enum(["json", "markdown"]),
+});
 
 const onboardingInputSchema = z.object({
   importedPlan: importedPlanSchema,
@@ -94,6 +124,39 @@ const textAuthoringInputSchema = z.object({
   firstDayResolution: firstDayResolutionSchema.optional().nullable(),
 });
 
+const bodyNoteSchema = z
+  .object({
+    area: z.string().trim(),
+    severity: z.number().int().min(1).max(5),
+    timing: z.string().trim(),
+    sensation: z.string().trim().nullable(),
+    note: z.string().trim().max(300).nullable(),
+  })
+  .transform((value): BodyNote => {
+    if (!isBodyNoteArea(value.area)) {
+      throw new Error("Choose a supported body area.");
+    }
+
+    if (!isBodyNoteTiming(value.timing)) {
+      throw new Error("Choose when the issue showed up.");
+    }
+
+    if (value.sensation && !isBodyNoteSensation(value.sensation)) {
+      throw new Error("Choose a supported sensation.");
+    }
+
+    const sensation =
+      value.sensation && isBodyNoteSensation(value.sensation) ? value.sensation : null;
+
+    return {
+      area: value.area,
+      severity: value.severity as BodyNote["severity"],
+      timing: value.timing,
+      sensation,
+      note: value.note || null,
+    };
+  });
+
 const workoutLogInputSchema = z
   .object({
     plannedWorkoutId: z.string().uuid(),
@@ -103,6 +166,7 @@ const workoutLogInputSchema = z
     rpe: z.number().int().min(1).max(10).nullable(),
     notes: z.string().trim().max(1000).nullable(),
     intervalsCompleted: z.number().int().min(0).max(100).nullable(),
+    bodyNotes: z.array(bodyNoteSchema).max(8),
   })
   .transform((value) => {
     if (value.outcome === "skipped") {
@@ -117,6 +181,15 @@ const workoutLogInputSchema = z
 
     return value;
   });
+
+const userSettingsInputSchema = z.object({
+  firstName: z.string().trim().max(80).nullable(),
+  lastName: z.string().trim().max(80).nullable(),
+  displayName: z.string().trim().max(120).nullable(),
+  age: z.number().int().min(0).max(120).nullable(),
+  weightKg: z.number().min(0).max(500).nullable(),
+  heightCm: z.number().min(0).max(300).nullable(),
+});
 
 type ExistingPlanContext = {
   activePlan: PersistedPlanCycleRow | null;
@@ -135,6 +208,18 @@ export interface DeleteActivePlanResult {
   status: "archived";
   archivedPlanId: string;
   snapshot: TrainingSnapshot;
+}
+
+export interface ClearUpcomingScheduleResult {
+  ok: true;
+  status: "cleared";
+  clearedFromDate: string;
+  archivedPlanId: string;
+  snapshot: TrainingSnapshot;
+}
+
+export interface ExportActivePlanResult extends PlanExportDocument {
+  ok: true;
 }
 
 export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async () => {
@@ -211,6 +296,17 @@ export const getProgressRouteData = createServerFn({ method: "GET" }).handler(as
   };
 });
 
+export const getSettingsRouteData = createServerFn({ method: "GET" }).handler(async () => {
+  const auth = getRequestAuthContext();
+  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+
+  return {
+    snapshot: await getSnapshotForRequest(),
+    viewer: await getViewerForRequest(),
+    settings: persistedUserId ? await getUserSettingsForUserId(persistedUserId, auth.email) : null,
+  };
+});
+
 export const requestMagicLink = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => loginInputSchema.parse(value))
   .handler(async ({ data }) => {
@@ -281,6 +377,30 @@ export const deleteActivePlan = createServerFn({ method: "POST" }).handler(async
   return archiveActivePlanForUser(persistedUserId);
 });
 
+export const clearUpcomingSchedule = createServerFn({ method: "POST" }).handler(async () => {
+  const auth = requireAuthenticatedUser();
+  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+
+  if (!persistedUserId) {
+    throw new Error("Authentication is required for this action.");
+  }
+
+  return clearUpcomingScheduleForUser(persistedUserId);
+});
+
+export const exportActivePlan = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => planExportInputSchema.parse(value))
+  .handler(async ({ data }): Promise<ExportActivePlanResult> => {
+    const auth = requireAuthenticatedUser();
+    const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+
+    if (!persistedUserId) {
+      throw new Error("Authentication is required for this action.");
+    }
+
+    return exportActivePlanForUser(persistedUserId, data.format);
+  });
+
 export const completeStructuredOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => structuredOnboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
@@ -340,6 +460,18 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
     return savePersistedWorkoutLog(await requirePersistedUserIdForCurrentRequest(), data);
   });
 
+export const saveUserSettings = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => userSettingsInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
+    const settings = await updateUserSettingsForUserId(userId, data);
+
+    return {
+      ok: true,
+      settings,
+    };
+  });
+
 async function savePersistedWorkoutLog(
   userId: string,
   data: z.output<typeof workoutLogInputSchema>,
@@ -376,6 +508,7 @@ async function savePersistedWorkoutLog(
         rpe: data.rpe,
         notes: data.notes,
         intervals_completed: data.intervalsCompleted,
+        body_notes: data.bodyNotes,
       },
       { onConflict: "planned_workout_id" },
     )
@@ -436,11 +569,66 @@ export async function applyImportedPlanForUser(
 }
 
 export async function archiveActivePlanForUser(userId: string): Promise<DeleteActivePlanResult> {
+  const archivedPlanId = await archiveCurrentActivePlanForUser(
+    userId,
+    "There is no active plan to delete.",
+  );
+
+  return {
+    ok: true,
+    status: "archived",
+    archivedPlanId,
+    snapshot: await getPersistedSnapshot(userId),
+  };
+}
+
+export async function clearUpcomingScheduleForUser(
+  userId: string,
+  clearedFromDate: string = todayIso(),
+): Promise<ClearUpcomingScheduleResult> {
+  const archivedPlanId = await archiveCurrentActivePlanForUser(
+    userId,
+    "There is no active schedule to clear.",
+  );
+
+  return {
+    ok: true,
+    status: "cleared",
+    clearedFromDate,
+    archivedPlanId,
+    snapshot: await getPersistedSnapshot(userId),
+  };
+}
+
+export async function exportActivePlanForUser(
+  userId: string,
+  format: "json" | "markdown",
+): Promise<ExportActivePlanResult> {
+  const planCycle = await getActivePlan(userId);
+
+  if (!planCycle) {
+    throw new Error("There is no active plan to export.");
+  }
+
+  const workouts = await getPlanWorkouts(planCycle.id);
+  const payload = buildActivePlanExportPayload({
+    planCycle,
+    workouts,
+  });
+  const document = buildPlanExportDocument(payload, format);
+
+  return {
+    ok: true,
+    ...document,
+  };
+}
+
+async function archiveCurrentActivePlanForUser(userId: string, missingMessage: string) {
   const supabase = createAdminSupabaseClient();
   const activePlan = await getActivePlan(userId);
 
   if (!activePlan) {
-    throw new Error("There is no active plan to delete.");
+    throw new Error(missingMessage);
   }
 
   const archived = await supabase
@@ -456,12 +644,7 @@ export async function archiveActivePlanForUser(userId: string): Promise<DeleteAc
     throw new Error(archived.error.message);
   }
 
-  return {
-    ok: true,
-    status: "archived",
-    archivedPlanId: archived.data.id,
-    snapshot: await getPersistedSnapshot(userId),
-  };
+  return archived.data.id;
 }
 
 export async function exchangeCodeForSession(request: Request) {
@@ -523,33 +706,31 @@ async function getViewerForRequest(): Promise<ViewerSummary | null> {
     return null;
   }
 
+  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+  const profile = persistedUserId ? await getRunnerProfileRow(persistedUserId) : null;
+  const profileName = buildProfileDisplayName(profile);
+  const avatarUrl = profile?.avatar_url ?? null;
+
   if (auth.provider === "local") {
     const account = await findLocalAuthAccountByUserId(auth.userId);
     return {
-      name: account?.displayName ?? inferViewerName(auth.email),
+      name: profileName ?? account?.displayName ?? inferViewerName(auth.email),
       email: account?.email ?? auth.email,
+      avatarUrl,
     };
   }
 
   return {
-    name: inferViewerName(auth.email),
+    name: profileName ?? inferViewerName(auth.email),
     email: auth.email,
+    avatarUrl,
   };
 }
 
 async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
-  const supabase = createAdminSupabaseClient();
-  const profileResult = await supabase
-    .from("runner_profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
+  const profileRow = await getRunnerProfileRow(userId);
 
-  if (profileResult.error) {
-    throw new Error(profileResult.error.message);
-  }
-
-  if (!profileResult.data) {
+  if (!profileRow) {
     return {
       mode: "onboarding",
       source: "persisted",
@@ -562,7 +743,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
     };
   }
 
-  const profile = profileRowToSummary(profileResult.data);
+  const profile = profileRowToSummary(profileRow);
   const planCycle = await getActivePlan(userId);
 
   if (!planCycle) {
@@ -612,6 +793,86 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
     profile,
     workouts,
     weekStatus: deriveWeekStatus(workouts, currentDate),
+  };
+}
+
+async function getRunnerProfileRow(userId: string) {
+  const supabase = createAdminSupabaseClient();
+  const profileResult = await supabase
+    .from("runner_profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (profileResult.error) {
+    throw new Error(profileResult.error.message);
+  }
+
+  return profileResult.data;
+}
+
+async function getUserSettingsForUserId(
+  userId: string,
+  email: string | null,
+): Promise<UserSettingsSummary | null> {
+  const profile = await getRunnerProfileRow(userId);
+
+  if (!profile) {
+    return null;
+  }
+
+  return {
+    firstName: profile.first_name,
+    lastName: profile.last_name,
+    displayName: profile.display_name,
+    email,
+    avatarUrl: profile.avatar_url,
+    age: profile.age,
+    weightKg: profile.weight_kg,
+    heightCm: profile.height_cm,
+  };
+}
+
+async function updateUserSettingsForUserId(
+  userId: string,
+  data: z.output<typeof userSettingsInputSchema>,
+): Promise<UserSettingsSummary> {
+  const supabase = createAdminSupabaseClient();
+  const currentProfile = await getRunnerProfileRow(userId);
+
+  if (!currentProfile) {
+    throw new Error("Finish setup before editing user settings.");
+  }
+
+  const updatedProfile = await supabase
+    .from("runner_profiles")
+    .update({
+      first_name: data.firstName || null,
+      last_name: data.lastName || null,
+      display_name: data.displayName || null,
+      age: data.age,
+      weight_kg: data.weightKg,
+      height_cm: data.heightCm,
+    })
+    .eq("user_id", userId)
+    .select("*")
+    .single();
+
+  if (updatedProfile.error) {
+    throw new Error(updatedProfile.error.message);
+  }
+
+  const auth = getRequestAuthContext();
+
+  return {
+    firstName: updatedProfile.data.first_name,
+    lastName: updatedProfile.data.last_name,
+    displayName: updatedProfile.data.display_name,
+    email: auth.email,
+    avatarUrl: updatedProfile.data.avatar_url,
+    age: updatedProfile.data.age,
+    weightKg: updatedProfile.data.weight_kg,
+    heightCm: updatedProfile.data.height_cm,
   };
 }
 
@@ -874,6 +1135,7 @@ function logRowToView(log: Database["public"]["Tables"]["workout_logs"]["Row"]):
     rpe: log.rpe,
     notes: log.notes,
     intervalsCompleted: log.intervals_completed,
+    bodyNotes: parseBodyNotesValue(log.body_notes),
     loggedAt: log.logged_at,
   };
 }
@@ -887,6 +1149,14 @@ function profileRowToSummary(
     baselineSessionsPerWeek: profile.baseline_sessions_per_week,
     baselineLongRunKm: profile.baseline_long_run_km,
     baselineNotes: profile.baseline_notes,
+    firstName: profile.first_name,
+    lastName: profile.last_name,
+    displayName: profile.display_name,
+    avatarUrl: profile.avatar_url,
+    avatarStoragePath: profile.avatar_storage_path,
+    age: profile.age,
+    weightKg: profile.weight_kg,
+    heightCm: profile.height_cm,
   };
 }
 
@@ -915,6 +1185,26 @@ function inferViewerName(email: string | null) {
     .filter(Boolean)
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
+}
+
+function buildProfileDisplayName(
+  profile: Database["public"]["Tables"]["runner_profiles"]["Row"] | null,
+) {
+  if (!profile) {
+    return null;
+  }
+
+  const displayName = profile.display_name?.trim() ?? "";
+
+  if (displayName) {
+    return displayName;
+  }
+
+  const firstName = profile.first_name?.trim() ?? "";
+  const lastName = profile.last_name?.trim() ?? "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  return fullName || null;
 }
 
 function getRuntimeAppBaseUrl(request?: Request) {
@@ -972,6 +1262,24 @@ function parseEmailOtpType(value: string | null): EmailOtpType | null {
 }
 
 async function getPlanWorkoutsWithLogs(planCycleId: string) {
+  const workouts = await getPlanWorkouts(planCycleId);
+  const supabase = createAdminSupabaseClient();
+  const workoutIds = workouts.map((workout) => workout.id);
+  const logsResult = workoutIds.length
+    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", workoutIds)
+    : { data: [], error: null };
+
+  if (logsResult.error) {
+    throw new Error(logsResult.error.message);
+  }
+
+  return {
+    workouts,
+    logsByWorkoutId: new Map(logsResult.data.map((log) => [log.planned_workout_id, log])),
+  };
+}
+
+async function getPlanWorkouts(planCycleId: string) {
   const supabase = createAdminSupabaseClient();
   const workoutsResult = await supabase
     .from("planned_workouts")
@@ -984,19 +1292,7 @@ async function getPlanWorkoutsWithLogs(planCycleId: string) {
     throw new Error(workoutsResult.error.message);
   }
 
-  const workoutIds = workoutsResult.data.map((workout) => workout.id);
-  const logsResult = workoutIds.length
-    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", workoutIds)
-    : { data: [], error: null };
-
-  if (logsResult.error) {
-    throw new Error(logsResult.error.message);
-  }
-
-  return {
-    workouts: workoutsResult.data,
-    logsByWorkoutId: new Map(logsResult.data.map((log) => [log.planned_workout_id, log])),
-  };
+  return workoutsResult.data;
 }
 
 async function getResolvedPlanWorkoutsWithLogs(userId: string, planCycle: PersistedPlanCycleRow) {

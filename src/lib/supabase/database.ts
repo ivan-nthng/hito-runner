@@ -11,6 +11,14 @@ export interface Database {
           baseline_sessions_per_week: number;
           baseline_long_run_km: number;
           baseline_notes: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          display_name: string | null;
+          avatar_url: string | null;
+          avatar_storage_path: string | null;
+          age: number | null;
+          weight_kg: number | null;
+          height_cm: number | null;
           setup_state: "completed";
           setup_completed_at: string;
           created_at: string;
@@ -23,6 +31,14 @@ export interface Database {
           baseline_sessions_per_week: number;
           baseline_long_run_km: number;
           baseline_notes?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          display_name?: string | null;
+          avatar_url?: string | null;
+          avatar_storage_path?: string | null;
+          age?: number | null;
+          weight_kg?: number | null;
+          height_cm?: number | null;
           setup_state?: "completed";
           setup_completed_at?: string;
           created_at?: string;
@@ -121,6 +137,7 @@ export interface Database {
           rpe: number | null;
           notes: string | null;
           intervals_completed: number | null;
+          body_notes: Json;
           logged_at: string;
           updated_at: string;
         };
@@ -134,6 +151,7 @@ export interface Database {
           rpe?: number | null;
           notes?: string | null;
           intervals_completed?: number | null;
+          body_notes?: Json;
           logged_at?: string;
           updated_at?: string;
         };

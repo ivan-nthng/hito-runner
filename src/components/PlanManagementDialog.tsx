@@ -1,11 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   AlertCircle,
+  CalendarX,
   CalendarDays,
   ChevronDown,
   Download,
   FileJson2,
+  FileText,
   Sparkles,
   Trash2,
   Upload,
@@ -18,12 +27,21 @@ import {
 } from "@/lib/imported-plan";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import {
+  clearUpcomingSchedule,
   completeOnboarding,
   completeTextOnboarding,
   deleteActivePlan,
   type ViewerSummary,
 } from "@/lib/training-api";
 import { formatDate, type TrainingSnapshot } from "@/lib/training";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +54,8 @@ import {
 type TextStatus = "idle" | "creating";
 type JsonStatus = "idle" | "parsing" | "importing";
 type DeleteStatus = "idle" | "deleting";
+type ClearStatus = "idle" | "clearing";
+type ExportStatus = "idle" | "exporting-json" | "exporting-markdown";
 
 export function PlanManagementDialog({
   open,
@@ -51,7 +71,10 @@ export function PlanManagementDialog({
   const completeTextOnboardingFn = useServerFn(completeTextOnboarding);
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const deleteActivePlanFn = useServerFn(deleteActivePlan);
+  const clearUpcomingScheduleFn = useServerFn(clearUpcomingSchedule);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const exportResetTimerRef = useRef<number | null>(null);
 
   const planMeta = snapshot?.planMeta;
   const defaultStartDate = snapshot?.currentDate ?? todayLocalIso();
@@ -71,9 +94,22 @@ export function PlanManagementDialog({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
-  const isBusy = textStatus !== "idle" || jsonStatus !== "idle" || deleteStatus !== "idle";
+  const [clearStatus, setClearStatus] = useState<ClearStatus>("idle");
+  const [clearError, setClearError] = useState<string | null>(null);
+  const [clearConfirmed, setClearConfirmed] = useState(false);
+  const [clearBeforeImport, setClearBeforeImport] = useState(false);
+  const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const isBusy =
+    textStatus !== "idle" ||
+    jsonStatus !== "idle" ||
+    deleteStatus !== "idle" ||
+    clearStatus !== "idle" ||
+    exportStatus !== "idle";
   const importedSummary = importedPlan ? summarizeImportedPlan(importedPlan) : null;
   const replaceBlockedReason = isReplaceBlockedError(jsonError) ? jsonError : null;
+  const canOfferClearBeforeImport = Boolean(planMeta && requestedStartDate > defaultStartDate);
   const runnerLabel = planMeta?.createdFor ?? viewer?.name ?? "Runner";
   const planWorkoutCount =
     snapshot?.workouts.filter((workout) => workout.type !== "rest").length ?? 0;
@@ -94,6 +130,16 @@ export function PlanManagementDialog({
       setDeleteStatus("idle");
       setDeleteError(null);
       setDeleteConfirmed(false);
+      setClearStatus("idle");
+      setClearError(null);
+      setClearConfirmed(false);
+      setClearBeforeImport(false);
+      if (exportResetTimerRef.current != null && typeof window !== "undefined") {
+        window.clearTimeout(exportResetTimerRef.current);
+        exportResetTimerRef.current = null;
+      }
+      setExportStatus("idle");
+      setExportError(null);
     }
   }, [defaultStartDate, open]);
 
@@ -173,6 +219,10 @@ export function PlanManagementDialog({
     setJsonError(null);
 
     try {
+      if (clearBeforeImport && canOfferClearBeforeImport) {
+        await clearUpcomingScheduleFn();
+      }
+
       const result = await completeOnboardingFn({
         data: {
           importedPlan,
@@ -194,6 +244,23 @@ export function PlanManagementDialog({
     }
   };
 
+  const submitClearUpcomingSchedule = async () => {
+    setClearStatus("clearing");
+    setClearError(null);
+
+    try {
+      await clearUpcomingScheduleFn();
+      finishAtHome(onOpenChange);
+    } catch (submitError) {
+      setClearStatus("idle");
+      setClearError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not clear the upcoming schedule.",
+      );
+    }
+  };
+
   const submitDeletePlan = async () => {
     setDeleteStatus("deleting");
     setDeleteError(null);
@@ -207,9 +274,29 @@ export function PlanManagementDialog({
     }
   };
 
+  const submitExport = (format: "json" | "markdown") => {
+    setExportStatus(format === "json" ? "exporting-json" : "exporting-markdown");
+    setExportError(null);
+
+    try {
+      startPlanExportDownload(format, exportFrameRef.current?.name);
+      scheduleExportStatusReset(exportResetTimerRef, setExportStatus);
+    } catch (submitError) {
+      setExportStatus("idle");
+      setExportError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not start the active plan download.",
+      );
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl grid-rows-[auto,minmax(0,1fr),auto] overflow-hidden border-hairline bg-background/95 p-0 backdrop-blur-xl">
+      <DialogContent
+        overlayClassName="hito-dialog-overlay-stable"
+        className="hito-dialog-stable h-[min(44rem,calc(100dvh-2rem))] min-h-0 max-w-2xl grid-rows-[auto,minmax(0,1fr),auto] gap-0 overflow-hidden border-hairline bg-background/95 p-0 backdrop-blur-xl"
+      >
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
           <DialogTitle className="font-display text-3xl">Open plan</DialogTitle>
           <DialogDescription className="max-w-lg text-sm leading-relaxed text-muted-foreground">
@@ -217,7 +304,7 @@ export function PlanManagementDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto px-6 py-5">
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-6 py-5">
           <div className="grid gap-6">
             <section className="grid gap-3">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -232,9 +319,50 @@ export function PlanManagementDialog({
                       `Saved schedule for ${runnerLabel}.`}
                   </p>
                 </div>
-                <span className="hito-status-pill" data-tone="success">
-                  Active
-                </span>
+                <div className="flex items-center gap-2">
+                  {planMeta ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          className="hito-button hito-button-ghost hito-button-sm"
+                        >
+                          <Download className="h-4 w-4 text-signal" strokeWidth={1.5} />
+                          {exportStatus === "idle" ? "Export" : "Preparing..."}
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel>Export active plan</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          disabled={isBusy}
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            submitExport("json");
+                          }}
+                        >
+                          <FileJson2 className="h-4 w-4" />
+                          Export as JSON
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={isBusy}
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            submitExport("markdown");
+                          }}
+                        >
+                          <FileText className="h-4 w-4" />
+                          Export as Markdown
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null}
+                  <span className="hito-status-pill" data-tone="success">
+                    Active
+                  </span>
+                </div>
               </div>
 
               <div className="hito-row-group">
@@ -266,6 +394,8 @@ export function PlanManagementDialog({
                   <CalendarDays className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 </div>
               </div>
+
+              {exportError ? <p className="hito-field-error">{exportError}</p> : null}
             </section>
 
             <section className="hito-section-divider grid gap-4 pt-5">
@@ -446,6 +576,23 @@ export function PlanManagementDialog({
                           </button>
                         </div>
                       </div>
+                      {canOfferClearBeforeImport && (
+                        <div className="hito-list-row items-start">
+                          <label className="flex max-w-xl items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={clearBeforeImport}
+                              disabled={isBusy}
+                              onChange={(event) => setClearBeforeImport(event.target.checked)}
+                              className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
+                            />
+                            <span>
+                              Remove the current upcoming schedule before this later-starting plan
+                              is applied. Saved workout history stays preserved.
+                            </span>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -522,6 +669,52 @@ export function PlanManagementDialog({
 
             <details className="hito-disclosure">
               <summary className="hito-disclosure-summary">
+                <span>Clear upcoming schedule</span>
+                <ChevronDown className="hito-disclosure-chevron" />
+              </summary>
+              <div className="hito-disclosure-body">
+                <div className="flex items-start gap-3">
+                  <CalendarX className="mt-0.5 h-4 w-4 shrink-0 text-signal" strokeWidth={1.5} />
+                  <p className="hito-field-helper max-w-xl">
+                    This removes the current active upcoming schedule from view so you can start a
+                    later plan cleanly. Planned workouts and saved workout logs stay preserved as
+                    history.
+                  </p>
+                </div>
+                {clearError && <p className="hito-field-error">{clearError}</p>}
+                <label className="flex max-w-xl items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={clearConfirmed}
+                    disabled={isBusy}
+                    onChange={(event) => setClearConfirmed(event.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
+                  />
+                  <span>
+                    I understand this clears the active upcoming schedule and keeps history
+                    archived.
+                  </span>
+                </label>
+                <div>
+                  <button
+                    type="button"
+                    disabled={isBusy || !planMeta || !clearConfirmed}
+                    onClick={() => {
+                      void submitClearUpcomingSchedule();
+                    }}
+                    className="hito-button hito-button-secondary hito-button-sm"
+                  >
+                    <CalendarX className="h-4 w-4" strokeWidth={1.5} />
+                    {clearStatus === "clearing"
+                      ? "Clearing schedule..."
+                      : "Clear upcoming schedule"}
+                  </button>
+                </div>
+              </div>
+            </details>
+
+            <details className="hito-disclosure">
+              <summary className="hito-disclosure-summary">
                 <span>Delete active plan</span>
                 <ChevronDown className="hito-disclosure-chevron" />
               </summary>
@@ -573,6 +766,23 @@ export function PlanManagementDialog({
             Close
           </button>
         </DialogFooter>
+        <iframe
+          ref={exportFrameRef}
+          name="plan-export-download-frame"
+          title="Plan export download"
+          className="hidden"
+          onLoad={() => {
+            const frame = exportFrameRef.current;
+            const bodyText = frame?.contentDocument?.body?.textContent?.trim();
+
+            if (!bodyText) {
+              return;
+            }
+
+            setExportStatus("idle");
+            setExportError(bodyText);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -584,6 +794,50 @@ function finishAtHome(onOpenChange: (open: boolean) => void) {
   if (typeof window !== "undefined") {
     window.location.assign("/");
   }
+}
+
+function startPlanExportDownload(
+  format: "json" | "markdown",
+  targetFrame = "plan-export-download-frame",
+) {
+  if (typeof window === "undefined") {
+    throw new Error("Plan export can only start in the browser.");
+  }
+
+  const form = window.document.createElement("form");
+  form.method = "GET";
+  form.action = "/api/plan/export";
+  form.target = targetFrame;
+  form.style.display = "none";
+
+  const formatField = window.document.createElement("input");
+  formatField.type = "hidden";
+  formatField.name = "format";
+  formatField.value = format;
+
+  form.appendChild(formatField);
+  window.document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
+function scheduleExportStatusReset(
+  exportResetTimerRef: MutableRefObject<number | null>,
+  setExportStatus: Dispatch<SetStateAction<ExportStatus>>,
+) {
+  if (typeof window === "undefined") {
+    setExportStatus("idle");
+    return;
+  }
+
+  if (exportResetTimerRef.current != null) {
+    window.clearTimeout(exportResetTimerRef.current);
+  }
+
+  exportResetTimerRef.current = window.setTimeout(() => {
+    setExportStatus("idle");
+    exportResetTimerRef.current = null;
+  }, 1200);
 }
 
 function formatIssue(path: (string | number)[], message: string) {

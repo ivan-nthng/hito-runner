@@ -1,4 +1,5 @@
 import "@tanstack/react-start/server-only";
+import { parseBodyNotesValue } from "@/lib/body-notes";
 import type { Database } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/lib/training";
 import { buildDeterministicWorkoutComparison } from "@/lib/workout-result-import/compare-workout-result";
 import {
+  buildWorkoutAiBodyNoteContext,
   clampWorkoutAiInsight,
   generateWorkoutAiInsight,
   type WorkoutAiPromptInput,
@@ -982,6 +984,7 @@ async function buildWorkoutAiPromptInput(args: {
   );
   const comparisonPayload =
     comparison.difference_payload as WorkoutComparisonDifferencePayload | null;
+  const bodyNoteContext = buildWorkoutAiBodyNoteContext(currentWorkout.log?.bodyNotes ?? []);
 
   return {
     plannedWorkout: {
@@ -1047,6 +1050,7 @@ async function buildWorkoutAiPromptInput(args: {
           notes: nextWorkout.notes,
         }
       : null,
+    ...(bodyNoteContext ? { bodyNoteContext } : {}),
   };
 }
 
@@ -1107,6 +1111,7 @@ function persistedWorkoutLogToView(log: PersistedWorkoutLogRow): WorkoutLog {
     rpe: log.rpe,
     notes: log.notes,
     intervalsCompleted: log.intervals_completed,
+    bodyNotes: parseBodyNotesValue(log.body_notes),
     loggedAt: log.logged_at,
   };
 }

@@ -40,7 +40,7 @@
 - `src/routes/progress.tsx`
   renders a compact progress summary using preview or persisted aggregates from the same data seam, with completion, volume, weekly planned-vs-actual mileage, and recent workout consistency kept intentionally small instead of presenting a full analytics dashboard; sparse zero-volume states show short honest copy instead of an empty chart frame
 - `src/routes/body.tsx`
-  renders a quieter body-note utility surface, with the body-map SVG kept as visualization-specific geometry while surrounding severity controls, active-note summaries, and scope copy use open divider-based Hito rhythm instead of a separate widgetized product language
+  exists only as a legacy route guard and redirects `/body` to `/`, so older links no longer fall through to a raw 404 after body-note ownership moved into workout logging
 - `src/routes/integrations.tsx`
   renders a preserved integration shell that now points honestly to the live workout-detail Garmin feedback path and keeps screenshot import plus broader plan adjustments clearly later
 
@@ -74,6 +74,10 @@
   adds the current richer-plan persistence columns that matter at runtime:
   `plan_cycles.schema_version`, `source_kind`, `target_date`, `goal_metadata`, `plan_preferences`
   plus `planned_workouts.source_workout_id`, `source_workout_type`, `planned_rpe`, `estimated_fatigue`, and `recovery_priority`
+- `supabase/migrations/20260515093000_workout_body_notes_and_user_settings.sql`
+  adds the bounded profile/settings persistence used by the current settings slice:
+  `runner_profiles.first_name`, `last_name`, `display_name`, `avatar_url`, `avatar_storage_path`, `age`, `weight_kg`, and `height_cm`
+  plus `workout_logs.body_notes jsonb` for workout-linked manual body notes and the public `profile-avatars` storage bucket for processed avatar images
 
 ## State And Lifecycle Rules
 
@@ -98,6 +102,16 @@
   the default preserved-start-day path still cannot detach logged history, and the only alternate path is explicit destructive `replace_first_day`, which keeps incoming day 1 on the chosen start date and is blocked honestly when it would break exact saved-history carry-forward
 - saved mode now has a backend delete-plan lifecycle action:
   deleting an active plan archives the active `plan_cycle`, keeps its planned workouts and workout logs attached as history, leaves no active plan, and returns the runner to the authenticated no-plan/setup-ready state
+- saved mode also has a narrower backend `Clear upcoming schedule` lifecycle action:
+  clearing the upcoming schedule archives the current active `plan_cycle` from the active schedule view, preserves all planned-workout rows and workout logs under archived history, records the clear cutoff as today for the action result, and returns the runner to the authenticated no-plan/setup-ready state so a later-starting imported or generated plan cannot inherit stale future workouts
+  if today already has logged truth, that log remains attached to its archived planned-workout row; the action removes it only from the active schedule, not from saved history
+- the saved-mode `Open plan` modal now exposes that clear-upcoming lifecycle as a confirmed secondary action distinct from `Delete plan`, and later-starting JSON import surfaces can explicitly clear the current upcoming schedule before applying the new plan through the backend seam
+- saved mode now has a backend-owned active-plan export seam:
+  [src/lib/plan-export.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-export.ts) builds one canonical payload from the current active `plan_cycle` plus its saved `planned_workouts`, then projects that same payload into `training-plan-v2` JSON and runner-readable Markdown
+  exported dates come from the active saved workout rows, so chosen-start-day effects are reflected in the artifact, and runtime-only saved-mode state such as logs, Garmin evidence, comparisons, and AI feedback is intentionally excluded
+  the saved-mode `Open plan` modal now exposes one compact `Export` action for JSON and Markdown download using that same backend-owned document truth and backend-provided filename
+  Safari-compatible delivery now uses one authenticated attachment route for the actual browser download request instead of reconstructing files from a client-side blob URL
+  PDF export remains a later slice, but it must reuse this same payload rather than shaping a second export truth
 - the frontend now mirrors that simplified policy instead of the older symmetric chooser:
   text-first apply and advanced JSON apply both use the safe backend default without a required preserve-vs-ignore modal step
   and only one explicit destructive override remains in the UI, now kept behind a quieter disclosure instead of being shown as an equal sibling of the safe action
@@ -119,7 +133,7 @@
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode advanced import entry point plus sign-out action
 - the saved-mode header `Open plan` action now opens one compact plan-management modal around the active plan summary, text-first replacement, advanced JSON import, and backend-owned plan deletion
 - `/integrations` remains routable as a quiet connections/status utility, but it is no longer part of the primary desktop or mobile runner navigation
-- `/body` remains routable as a quiet body-notes utility, but it is no longer part of the primary desktop or mobile runner navigation
+- `/body` is now a retired legacy path that redirects to `/`, so older bookmarks recover into the current plan experience instead of opening a competing body-notes surface or a raw 404
 - the sidebar plan-note support block is locally dismissible and no longer repeats the same week status already shown in the top header
 - the saved-mode advanced import dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
 - that same saved-mode import dialog now keeps its own internal scroll and calmer copy so long apply/import content fits without turning into an oversized blocking wall
@@ -136,6 +150,7 @@
 - active-plan replacement now carries saved workout logs forward only for exact deterministic matches on logged days by date, workout type, title, notes, and steps; otherwise the apply step is rejected and the current active plan remains unchanged
 - if older broken replacements already stranded logs on archived plan cycles from the same user and plan window, the persisted seam repairs those orphaned same-date logs back onto the current active plan before evaluating visible state or replacement safety
 - saved workout logs can be overwritten from `completed` to `partial` or `skipped`, and skipped truth persists with null actual metrics instead of backfilled planned defaults
+- saved workout logs now also carry optional workout-linked `body_notes` as bounded JSON array truth; those notes belong to the specific workout result and are read back through the same saved-mode workout snapshot seam as completion notes and actual metrics
 - past-due planned workouts without a saved log are treated as `skipped` until the user overwrites them with a real result
 - `week_status` is derived on the backend-facing seam from persisted workout state, not from client-only heuristics
 - rest days no longer render distance, duration, load, or empty target and note sections by default; only genuine assigned rest-day content is surfaced
@@ -146,7 +161,7 @@
 - the workout-detail `Week Status` block now answers one deterministic question through a progress bar:
   completed non-rest workouts in the current week
 - `src/components/CompletionPanel.tsx`
-  now keeps `Log result` focused on manual completion truth, adds one lighter state-aware Garmin continuation row into `Feedback`, and keeps the dedicated workout-detail `Feedback` surface as the canonical owner of the live `FIT / ZIP file` control, parsed Garmin evidence summary, factual plan-vs-run comparison readback, and the bounded AI interpretation readback
+  now keeps `Log result` focused on manual completion truth, uses a compact workout-scoped body-note summary row plus modal editor instead of the older inline body-note block, keeps that body-note modal on the same Safari-stable bounded-height dialog pattern already used by `Open plan` so the title, internal scroll, and footer actions stay reachable, adds one lighter state-aware Garmin continuation row into `Feedback`, and keeps the dedicated workout-detail `Feedback` surface as the canonical owner of the live `FIT / ZIP file` control, parsed Garmin evidence summary, factual plan-vs-run comparison readback, and the bounded AI interpretation readback
 - the first Garmin ingest seam accepts only:
   one `.fit` file
   or one `.zip` archive that contains exactly one usable FIT activity file
@@ -171,11 +186,13 @@
   explicit signal objects for date, duration, distance, and structured-step-count truth
   honest `missing_actual` and `not_applicable` reasons
   bounded delta and tolerance metadata when the metric supports it
-  session-summary facts plus a step-summary block when ordered per-step duration comparison is trustworthy
+  session-summary facts, a deterministic support matrix, an ordered step-summary block, and warm-up/main/cooldown-style segment-group summaries when ordered per-step duration comparison is trustworthy
+  explicit unsupported states for pace and heart-rate comparison until planned targets and Garmin metrics share one normalized comparable unit
   instead of AI verdict prose
 - the next Garmin slice now adds one bounded AI layer on top of those persisted facts only:
-  `workout_ai_insights` is generated from planned workout truth, normalized actual metrics, deterministic comparison payload, week context, and next-workout summary
-  it never parses raw FIT binary and never replaces deterministic comparison
+  `workout_ai_insights` is generated from planned workout truth, normalized actual metrics, deterministic comparison payload, week context, next-workout summary, and optional saved workout-scoped body-note context
+  it never parses raw FIT binary, never replaces deterministic comparison, and treats body notes only as bounded caution context rather than diagnosis or medical advice
+  generated runner-facing text passes through a small backend quality gate before persistence, so malformed fragments or non-English artifacts fall back to stable deterministic copy instead of surfacing in `Feedback`
 - current workout-detail `Feedback` readback now exposes the latest Garmin asset, latest normalized actual metrics, latest deterministic comparison, and latest bounded AI interpretation in a dedicated evidence surface separate from manual completion logging
 - that `Feedback` surface now uses a flatter divided layout with plain-language section framing:
   upload explains why it helps
@@ -202,7 +219,7 @@
 - temporary local-bypass sessions are trusted only as a local account-backed identity bridge into the same Supabase-backed saved mode and remain a removal target
 - the temporary local login path now resolves the runner into a Supabase auth user by email and reads the canonical plan, workouts, and logs from Supabase
 - signed-out preview mode remains untrusted and clearly labeled as preview
-- `/progress`, `/body`, and `/integrations` still preserve shell breadth without claiming provider, AI, OCR, weather, or readiness truth
+- `/progress` and `/integrations` still preserve shell breadth without claiming provider, AI, OCR, weather, or readiness truth
 
 ## Persistence And Storage Rules
 
@@ -220,6 +237,7 @@
 - required Vercel env for the live Supabase-backed auth path is `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - temporary local-only auth env must stay unset on Vercel because the bypass store is a local unblock mechanism, not a production deployment contract
 - server-side writes and persisted reads flow through one backend seam rather than direct client DB access
+- settings, avatar metadata, and settings viewer labels resolve through the same persisted-user mapping used by saved mode, so temporary local-bypass identities do not read settings from the raw local session id
 - `npm run import:current-plan` now exists as the narrow script for importing a canonical `training-plan-v2` file into the canonical Supabase plan tables for the current local bypass user
 - `npm run test-user -- ...` is now the canonical Backend lifecycle tool for tester-account create, reset, optional plan seeding, and delete against the real Supabase auth/data model
 - `npm run author-structured-plan -- --email <tester-email> --input-file <absolute-json-path>` is now the canonical ops path for validating bounded structured authoring input and persisting the generated canonical plan into Supabase without a frontend wizard

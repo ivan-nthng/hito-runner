@@ -1,6 +1,6 @@
 Status
 
-Frontend slice implemented
+Clear Upcoming Frontend Slice Implemented
 
 Owner
 
@@ -8,7 +8,7 @@ Frontend
 
 Last Updated
 
-2026-05-14
+2026-05-15
 
 Context
 
@@ -146,6 +146,39 @@ Why this is the right v1 meaning
 - It preserves auditability and workout history.
 - It avoids inventing a partial “delete only future rows but keep a semi-active plan” state.
 
+Clear Upcoming Schedule Semantics
+
+Canonical meaning in v1
+
+- `Clear upcoming schedule` means:
+  remove today and future planned schedule from active saved-mode view before the runner starts a later new plan
+
+Backend model
+
+- The backend archives the current active `plan_cycle`.
+- Planned-workout rows and workout logs remain attached under archived history.
+- No active plan remains after the action.
+- The returned action status is `cleared`, with `clearedFromDate` set to today.
+
+Why this reuses archive-to-no-plan
+
+- It is the smallest coherent model.
+- It avoids a half-active truncated plan state.
+- It guarantees that a later import/create starts from a clean active schedule.
+- It preserves past and logged truth without asking the frontend to delete rows manually.
+
+Logged truth on today
+
+- If today already has a saved log, the log is preserved under the archived plan.
+- Clearing removes today from the active schedule view only.
+- It does not delete or detach the saved log.
+
+Relationship to new imports
+
+- The frontend can ask whether to remove the previous planned schedule before applying a later-starting plan.
+- If the runner chooses yes, call `clearUpcomingSchedule` first, then apply/create the new plan through the existing backend apply seam.
+- This prevents old future workouts from silently remaining before the new plan starts.
+
 What state the user lands in after delete
 
 - saved-mode no-plan state
@@ -224,6 +257,8 @@ Backend Responsibilities
 - Own current-plan summary truth returned to the modal.
 - Own delete-plan lifecycle semantics.
 - Archive the active plan on delete so saved history remains preserved.
+- Own clear-upcoming lifecycle semantics.
+- Archive the active plan on clear-upcoming so no stale future schedule remains active.
 - Return the post-delete no-plan state cleanly.
 - Own JSON import apply semantics, including user-chosen effective start date.
 - Own continuity-safe replace/default behavior when chosen start date conflicts with an existing workout.
@@ -235,6 +270,8 @@ Frontend Responsibilities
 - Render the active plan summary in small runner-facing language.
 - Present one primary freeform creation surface.
 - Present one secondary advanced JSON import surface.
+- Present one confirmed `Clear upcoming schedule` action distinct from `Delete plan`.
+- Offer a small clear-before-import choice only when applying a later-starting JSON plan over an existing active plan.
 - Present one clear destructive `Delete plan` action with confirmation.
 - Collect chosen start date for JSON import and submit it to the backend.
 - Reflect only backend-owned lifecycle and conflict states.
@@ -283,6 +320,9 @@ Implementation Update
 - Added the first `Open plan` modal UI in saved mode.
 - The modal shows the current plan title, goal/context copy, start/target/workout-count metadata, primary text-first replacement, secondary JSON import, and a quiet destructive delete section.
 - The modal reuses `completeTextOnboarding`, `completeOnboarding`, and `deleteActivePlan` rather than adding client-owned lifecycle logic.
+- The modal now reuses `clearUpcomingSchedule` for a confirmed `Clear upcoming schedule` action, with copy that explains active upcoming schedule is removed while planned workouts and logs stay as history.
+- Saved-mode JSON import surfaces now show a small clear-before-import checkbox only when the chosen start day is later than today and an active plan exists; when selected, the frontend calls `clearUpcomingSchedule` first and then applies the imported plan through the existing `requestedStartDate` seam.
+- Tall plan-management and import dialogs now use internal scroll with fixed header/footer rhythm so controls remain reachable on smaller laptop heights.
 - Archived-plan browsing remains later work.
 
 Exit Criteria
@@ -291,6 +331,9 @@ Exit Criteria
 - [x] `Delete plan` has one explicit safe meaning
 - [x] saved-mode freeform creation is aligned to the existing text-first authoring seam
 - [x] saved-mode JSON import is aligned to the new user-chosen start-date model at the backend seam
+- [x] `Clear upcoming schedule` is exposed through the saved-mode plan-management modal
+- [x] later-starting JSON import can explicitly clear the previous upcoming schedule before apply
+- [x] tall plan-management/import dialogs keep content reachable through internal scroll
 - [x] the slice stays clearly smaller than full plan editing
 
 Next Recommended Role
@@ -299,7 +342,7 @@ QA
 
 Suggested Next Step
 
-Run saved-mode Safari QA for the `Open plan` modal, delete-plan archival flow, text-first replacement, and JSON import with chosen start day.
+Run saved-mode Safari QA for the `Open plan` modal, clear-upcoming schedule flow, delete-plan archival flow, text-first replacement, and JSON import with chosen start day plus optional clear-before-import.
 
 ## 🔁 HANDOFF BLOCK (MANDATORY)
 
@@ -308,28 +351,32 @@ Run saved-mode Safari QA for the `Open plan` modal, delete-plan archival flow, t
 
 ### Summary
 
-Implemented the first saved-mode plan-management modal slice: plan deletion has a backend archival action, JSON import accepts a chosen start date, and `Open plan` now exposes a compact runner-facing modal.
+Implemented the saved-mode plan-management modal slices: plan deletion has a backend archival action, clear-upcoming schedule has a backend lifecycle action and frontend control, JSON import accepts a chosen start date, and `Open plan` exposes a compact runner-facing modal.
 
 ### Key Decisions
 
 - `Delete plan` archives the active plan and preserves logged history rather than physically deleting runner history.
+- `Clear upcoming schedule` is separate from delete: it removes the active upcoming schedule from the current view while preserving planned-workout/log history under archived history.
 - Saved-mode freeform creation reuses the existing text-first authoring seam.
 - Saved-mode JSON import sends `requestedStartDate`; the frontend does not remap schedules locally.
+- Later-starting JSON import can opt into `clearUpcomingSchedule` before apply; the frontend still does not edit individual workouts.
 
 ### Current State
 
 - `Open plan` opens the compact saved-mode management modal.
-- The modal includes active plan summary, text-first replacement, advanced JSON import with chosen start day, and a destructive delete section.
+- The modal includes active plan summary, text-first replacement, advanced JSON import with chosen start day, clear-upcoming schedule, and a destructive delete section.
+- The saved-mode JSON import surfaces expose clear-before-import only when a later start date is selected and an active plan exists.
 
 ### Constraints
 
 - Do not broaden into full plan editing or a training-plan CMS.
 - Keep backend ownership of delete semantics, apply semantics, and continuity rules.
+- Do not add per-day hover-checkbox schedule micromanagement.
 
 ### Risks / Open Questions
 
 - Frontend must not infer delete/remap semantics locally; it should call the backend action/input.
-- Archived-plan browsing is intentionally not implemented.
+- Archived-plan browsing and per-day schedule editing are intentionally not implemented.
 
 ### Next Recommended Role
 
@@ -337,5 +384,5 @@ QA
 
 ### Suggested Next Step
 
-Verify the saved-mode `Open plan` modal in Safari, including close behavior, delete-plan return to no-plan state, JSON `requestedStartDate`, and text-first replacement.
+Verify the saved-mode `Open plan` modal in Safari, including internal scroll, clear-upcoming return to no-plan state, delete-plan return to no-plan state, JSON `requestedStartDate`, optional clear-before-import, and text-first replacement.
 ```

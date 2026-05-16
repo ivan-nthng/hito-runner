@@ -38,6 +38,7 @@ const SECTIONS = [
   { id: "buttons", label: "Buttons" },
   { id: "inputs", label: "Inputs" },
   { id: "surfaces", label: "Composition" },
+  { id: "modals", label: "Modals" },
   { id: "states", label: "States" },
   { id: "analytics", label: "Summary truth" },
   { id: "rows", label: "Rows & disclosure" },
@@ -304,6 +305,91 @@ function HitoDesignSystemPage() {
                     or route-level state. Avoid stacking subcards inside it.
                   </p>
                 </article>
+              </div>
+            </section>
+
+            <section id="modals" className="ds-section">
+              <SectionIntro
+                label="Modals"
+                title="Bounded dialog, scrollable middle, reachable footer."
+                body="Product dialogs use the Open plan and Body notes recipe: stable overlay and content behavior, one bounded panel, a calm header, an internal scroll region, and a footer that remains available."
+              />
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <article className="hito-product-dialog h-[30rem] max-w-xl border border-hairline bg-background/95">
+                  <header className="border-b border-hairline px-6 py-5 text-left">
+                    <p className="hito-label hito-label-signal">Dialog header</p>
+                    <h3 className="font-display mt-2 text-3xl leading-tight">Import plan</h3>
+                    <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
+                      The header names the task and keeps context short.
+                    </p>
+                  </header>
+                  <div className="hito-product-dialog-body">
+                    <div className="grid gap-4">
+                      <div className="hito-row-group">
+                        <div className="hito-list-row items-start">
+                          <div>
+                            <p className="hito-list-row-title">Scrollable body</p>
+                            <p className="hito-list-row-copy">
+                              Long validation, import, or body-note content stays inside the middle
+                              region.
+                            </p>
+                          </div>
+                          <span className="hito-status-pill" data-tone="success">
+                            Stable
+                          </span>
+                        </div>
+                      </div>
+                      <details className="hito-disclosure">
+                        <summary className="hito-disclosure-summary">
+                          <span>Destructive or expert exception</span>
+                          <ChevronDown className="hito-disclosure-chevron" />
+                        </summary>
+                        <div className="hito-disclosure-body">
+                          <button className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                            Replace start day
+                          </button>
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                  <footer className="hito-section-divider px-6 py-4">
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                      <button className="hito-button hito-button-secondary hito-button-md">
+                        Cancel
+                      </button>
+                      <button className="hito-button hito-button-primary hito-button-md">
+                        Continue
+                      </button>
+                    </div>
+                  </footer>
+                </article>
+
+                <div className="hito-row-group self-start">
+                  <div className="hito-list-row items-start">
+                    <div>
+                      <p className="hito-list-row-title">Stable overlay</p>
+                      <p className="hito-list-row-copy">
+                        Closed overlays must become transparent and non-blocking.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="hito-list-row items-start">
+                    <div>
+                      <p className="hito-list-row-title">Local sizing</p>
+                      <p className="hito-list-row-copy">
+                        Width and maximum panel height still follow the task.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="hito-list-row items-start">
+                    <div>
+                      <p className="hito-list-row-title">Action hierarchy</p>
+                      <p className="hito-list-row-copy">
+                        Primary action stays visible. Exceptions sit behind disclosure.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
 

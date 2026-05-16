@@ -166,7 +166,8 @@ This should become the single internal context seam for future AI coaching tasks
 1. workout-specific historical summary
 2. weekly or monthly training dynamics summary
 3. next-workout recommendation with recent-history awareness
-4. future runner-facing "coach summary" surfaces or chat
+4. explicit active-plan refresh or rebuild based on real runner history
+5. future runner-facing "coach summary" surfaces or chat
 
 This is a **backend context layer**, not a new user-facing product by itself.
 
@@ -419,6 +420,26 @@ Why second:
 
 This should wait until the context layer is trustworthy.
 
+### 4. Active-plan refresh from history
+
+Examples:
+
+- "Update my plan. The recent load has been too hard."
+- "I missed the last few days. Rebuild the rest of my plan."
+- "Keep the same goal, but revise the next weeks based on what I actually did."
+
+Why this should be an early downstream use of `RunnerCoachContext`:
+
+- it is high runner value
+- it reuses the already-live text-first plan creation seam
+- it depends on real saved history rather than abstract AI chat
+- it gives the product a real coaching behavior without silent automation
+
+Important boundary:
+
+- this must be an explicit runner-triggered action
+- not an automatic hidden plan mutation
+
 ## Recommended Delivery Sequence
 
 ### Phase 0: Context contract
@@ -519,7 +540,35 @@ Next likely role:
 
 - FRONTEND
 
-### Phase 4: Expand workout-detail historical awareness
+### Phase 4: Active-plan refresh proposal seam
+
+Goal:
+
+- use `RunnerCoachContext` to support one explicit "Update plan" workflow that rebuilds the remaining active schedule from current runner reality
+
+Deliver:
+
+- task-scoped AI prompt input for plan refresh
+- preserved current goal and core runner inputs
+- recent adherence, actual load, body-note caution, and evidence summary in context
+- deterministic validation back into canonical structured authoring input or canonical plan truth
+- explicit apply/replacement confirmation step
+
+Risk:
+
+- AI can overreact to short noisy history
+- the system can blur "recommendation" and "silent plan mutation"
+
+Rollback posture:
+
+- keep it suggestion-only until explicit confirm/apply
+- keep current active plan unchanged on any malformed or weak result
+
+Next likely role:
+
+- BACKEND
+
+### Phase 5: Expand workout-detail historical awareness
 
 Goal:
 
@@ -580,6 +629,8 @@ Next likely role:
 3. When screenshot OCR arrives later, should screenshot-derived normalized metrics merge into the same evidence-history summary with Garmin, or remain source-labeled but shared?
 4. How much archived-plan detail is useful before prompt size becomes wasteful?
 5. Should future heart-rate-zone truth be required before richer physiological coaching, or only additive when available?
+6. For explicit plan refresh, should v1 rebuild only today-and-future workouts, or should it support a chosen restart date using the same current plan-apply seam?
+7. Should the first runner-facing refresh entry live inside `Open plan`, or inside a future coach summary surface after the context layer is proven?
 
 ## Risks
 

@@ -28,7 +28,7 @@
   or the real email auth path only when the request can resolve a non-loopback auth redirect origin
   while loopback local runtimes without a public `APP_BASE_URL` now keep email sign-in honestly unavailable instead of offering broken localhost magic links
 - `src/routes/hitoDS.tsx`
-  renders the internal Hito design-system reference with its own design-system sidebar and no runner-facing shell chrome, documenting the simplified live product language around open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure treatment, shell navigation, controls, and documented visualization geometry exceptions without adding a runner-facing product capability
+  renders the internal Hito design-system reference with its own design-system sidebar and no runner-facing shell chrome, documenting the simplified live product language around open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure treatment, the current bounded product-dialog anatomy, shell navigation, controls, and documented visualization geometry exceptions without adding a runner-facing product capability
 - `src/routes/api.auth.confirm.tsx`
   exchanges the Supabase auth code into a cookie-backed session and now also accepts token-hash email callbacks for SSR-compatible Supabase passwordless flows
 - `src/routes/api.auth.local-login.tsx`
@@ -136,7 +136,7 @@
 - `/body` is now a retired legacy path that redirects to `/`, so older bookmarks recover into the current plan experience instead of opening a competing body-notes surface or a raw 404
 - the sidebar plan-note support block is locally dismissible and no longer repeats the same week status already shown in the top header
 - the saved-mode advanced import dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
-- that same saved-mode import dialog now keeps its own internal scroll and calmer copy so long apply/import content fits without turning into an oversized blocking wall
+- that same saved-mode import dialog now follows the same stable product-dialog recipe as `Open plan` and `Body notes`: bounded panel height, internal body scroll, reachable footer, stable Safari content behavior, and stable non-blocking overlay close behavior
 - after a successful saved-mode advanced import apply, the client now leaves the current page through a fresh document request to `/` instead of relying on an immediate in-place router refresh on the replaced plan state
 - the saved-mode advanced import dialog now accepts only canonical `training-plan-v2` files, and runtime-only v2 fields such as `status`, `completion_state`, and sync or feedback placeholders remain non-canonical
 - the first structured authoring generator now emits the same canonical `training-plan-v2` family used by JSON import, persists it through `plan_cycles` plus `planned_workouts`, and reuses `steps jsonb` as the only structured workout payload
@@ -210,6 +210,8 @@
 - saved-mode home and calendar now render that `feedbackMarker` as a bounded secondary evidence indicator that links directly into the existing workout-detail `Feedback` tab without replacing completion-state truth
 - screenshot OCR, Garmin sync, Strava sync, and any plan-adjustment automation are still later slices
 - the first Hito design-system implementation slices now exist in shared CSS primitives for low-card surfaces, tiered buttons, tiered fields, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact status pills, compact status markers, setup/empty/error state surfaces, compact summary metrics, chart legends, tooltip shells, body severity scales, body severity summaries, shell navigation rows, shell profile triggers, shell dropdown rows, and disclosure; those primitives are applied to auth, onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, deeper workout-structure and completion micro-surfaces, route-level state surfaces, progress summary surfaces, body severity micro-UI, preserved integration utility rows, and the internal `/hitoDS` reference page
+- the product modal family now also has a small shared recipe:
+  `hito-product-dialog` owns the bounded three-row panel structure, `hito-product-dialog-body` owns the internal scroll region, and the existing stable overlay/content classes remain opt-in for real product dialogs rather than being forced onto sheet, alert-dialog, or command scaffolding
 - remaining visualization-specific chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional geometry exceptions rather than generalized Hito component families
 - final Safari QA on the visible runner-facing scope found no obvious stray custom UI drift, so future UI work should extend shared Hito primitives or documented shell families instead of introducing new route-local visual treatments
 

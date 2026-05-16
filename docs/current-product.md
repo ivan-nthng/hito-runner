@@ -26,7 +26,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - login `/login`
   provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, while email sign-in appears only when the runtime can resolve a real non-loopback app URL for auth callbacks and the Supabase-hosted passwordless email path can return through the SSR callback route
 - internal design-system reference `/hitoDS`
-  uses a dedicated design-system sidebar and compact reference surface to document the simplified live Hito product language: open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure patterns, controls, shell navigation, and documented visualization geometry exceptions; it is the internal reference baseline for future UI inspection and primitive extension, not a runner-facing capability
+  uses a dedicated design-system sidebar and compact reference surface to document the simplified live Hito product language: open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure patterns, bounded modal anatomy, controls, shell navigation, and documented visualization geometry exceptions; it is the internal reference baseline for future UI inspection and primitive extension, not a runner-facing capability
 
 ## Interaction Contracts
 
@@ -165,6 +165,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - richer imported workout detail now renders scalar target truth only, so structured metadata no longer leaks into visible `[object Object]` text
 - richer imported interval workouts now keep an honest visible interval identity instead of being mislabeled as easy runs
 - the advanced import flow still includes a lightweight `Download JSON template` affordance for users who already need file-based plan handoff
+- the advanced import modal now follows the same stable bounded modal behavior as `Open plan` and `Body notes`, while keeping its own smaller width and import-specific content
 - that downloadable template now includes one reserved `_ml_agent_template` instruction block so ML-generated files can target the canonical `training-plan-v2` contract more explicitly without turning template-only guidance into runtime truth
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
 - auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress summary metrics and legends, body severity micro-UI, preserved integration utility rows, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share Hito component primitives for low-card surfaces, open/divider grouping, tiered controls, helper/error text, grouped rows, metric rows, compact legends, compact tooltips, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, disclosure, labels, captions, tabs, and dividers, keeping text-first onboarding primary and advanced JSON import secondary

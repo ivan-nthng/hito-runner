@@ -4,6 +4,7 @@ Completed implementation history only.
 
 ## 2026-05-15
 
+- Consolidated the current product modal recipe: `UploadJsonDialog` now uses the same stable bounded panel, internal scroll body, and Safari-safe overlay/content behavior as `Open plan` and `Body notes`, while `/hitoDS` now documents the live modal anatomy and calm action hierarchy.
 - Added a backend text-quality gate for workout AI recommendations: malformed runner-facing output with dangling fragments, ampersand continuations, replacement glyphs, or non-English character artifacts now falls back to stable deterministic copy before persistence, while body-note caution and severity softening remain intact.
 - Added workout-scoped body notes to the bounded Garmin AI recommendation input: saved `workout_logs.body_notes` now reach the existing workout feedback prompt as optional caution context, with explicit guardrails against diagnosis, medical advice, injury certainty, treatment instructions, or plan mutation.
 - Fixed the remaining Safari closed-overlay bug for stable dialogs: the body-note modal and `Open plan` now force their shared Safari-stable overlay into explicit non-blocking closed state, so save/cancel no longer leaves the page dimmed and trapped behind a stale overlay.

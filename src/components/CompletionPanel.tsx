@@ -1099,7 +1099,7 @@ function BodyNotesModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="hito-dialog-overlay-stable"
-        className="hito-dialog-stable h-[min(46rem,calc(100dvh-2rem))] min-h-0 max-w-3xl grid-rows-[auto,minmax(0,1fr),auto] gap-0 overflow-hidden border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog h-[min(46rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
       >
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
           <DialogTitle className="font-display text-3xl">Body notes</DialogTitle>
@@ -1109,7 +1109,7 @@ function BodyNotesModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto overscroll-contain px-6 py-5">
+        <div className="hito-product-dialog-body">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="hito-caption">
               {bodyNotes.length === 0

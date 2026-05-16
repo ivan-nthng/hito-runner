@@ -108,7 +108,10 @@ export function UploadJsonDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl grid-rows-[auto,minmax(0,1fr),auto] overflow-hidden border-hairline bg-background/95 p-0 backdrop-blur-xl sm:max-h-[85dvh]">
+      <DialogContent
+        overlayClassName="hito-dialog-overlay-stable"
+        className="hito-dialog-stable hito-product-dialog h-[min(40rem,calc(100dvh-2rem))] max-w-xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+      >
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
           <DialogTitle className="font-display text-3xl">Import plan</DialogTitle>
           <DialogDescription className="max-w-lg text-sm leading-relaxed text-muted-foreground">
@@ -116,7 +119,7 @@ export function UploadJsonDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto overscroll-contain px-6 py-5">
+        <div className="hito-product-dialog-body">
           <div className="grid gap-4">
             <input
               ref={fileInputRef}

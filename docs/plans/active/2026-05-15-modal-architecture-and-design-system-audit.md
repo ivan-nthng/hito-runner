@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft
+Frontend consolidation slice implemented
 
 ## Owner
 
@@ -490,3 +490,11 @@ FRONTEND
 ## Suggested Next Step
 
 Run one bounded frontend consolidation slice that treats `Open plan` and `Body notes` as the canonical Hito dialog recipe, aligns `UploadJsonDialog` to the same stable overlay/height structure, and adds one matching modal anatomy reference to `/hitoDS`.
+
+## Implementation Update - 2026-05-15
+
+- `UploadJsonDialog` now follows the same stable product-dialog recipe as `Open plan` and `Body notes`.
+- `hito-product-dialog` owns the shared bounded three-row panel structure.
+- `hito-product-dialog-body` owns the shared internal scroll region.
+- stable overlay/content behavior remains opt-in for real product dialogs instead of changing sheet, alert-dialog, or command scaffolding.
+- `/hitoDS` now includes a small modal anatomy section that reflects the live product modal truth.

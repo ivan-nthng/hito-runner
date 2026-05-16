@@ -105,6 +105,8 @@ Active
   the workout-scoped body-note modal now uses the same stable bounded-height dialog pattern as `Open plan`, so Safari keeps the panel in-viewport, scrolls the body region internally, and leaves `Cancel` plus `Save body notes` reachable without page-behind scrolling.
 - The Safari stable-dialog overlay cleanup is now implemented:
   the same stable dialog pair now also forces closed overlays non-blocking, so saving or cancelling the workout-scoped body-note modal no longer leaves a dimmed pointer-blocking layer over the workout page.
+- The bounded modal consolidation slice is now implemented:
+  `UploadJsonDialog` now uses the same stable product-dialog recipe as `Open plan` and `Body notes`, the shared CSS now owns the canonical three-row panel and internal scroll region, and `/hitoDS` documents the live modal anatomy without introducing a broad modal wrapper.
 - The body-note AI context slice is now implemented:
   saved workout-scoped body notes now feed the existing bounded Garmin recommendation seam as optional caution context only, while deterministic comparison remains primary and the prompt explicitly forbids diagnosis, medical advice, injury certainty, treatment instructions, or silent plan mutation.
 - The workout AI-output hygiene fix is now implemented:

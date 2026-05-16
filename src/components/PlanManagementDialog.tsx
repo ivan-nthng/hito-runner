@@ -15,6 +15,7 @@ import {
   Download,
   FileJson2,
   FileText,
+  RefreshCcw,
   Sparkles,
   Trash2,
   Upload,
@@ -31,6 +32,8 @@ import {
   completeOnboarding,
   completeTextOnboarding,
   deleteActivePlan,
+  proposeActivePlanRefresh,
+  type ProposeActivePlanRefreshResult,
   type ViewerSummary,
 } from "@/lib/training-api";
 import { formatDate, type TrainingSnapshot } from "@/lib/training";
@@ -56,6 +59,7 @@ type JsonStatus = "idle" | "parsing" | "importing";
 type DeleteStatus = "idle" | "deleting";
 type ClearStatus = "idle" | "clearing";
 type ExportStatus = "idle" | "exporting-json" | "exporting-markdown";
+type RefreshStatus = "idle" | "proposing";
 
 export function PlanManagementDialog({
   open,
@@ -72,6 +76,7 @@ export function PlanManagementDialog({
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const deleteActivePlanFn = useServerFn(deleteActivePlan);
   const clearUpcomingScheduleFn = useServerFn(clearUpcomingSchedule);
+  const proposeActivePlanRefreshFn = useServerFn(proposeActivePlanRefresh);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
   const exportResetTimerRef = useRef<number | null>(null);
@@ -100,13 +105,18 @@ export function PlanManagementDialog({
   const [clearBeforeImport, setClearBeforeImport] = useState(false);
   const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
   const [exportError, setExportError] = useState<string | null>(null);
+  const [refreshPrompt, setRefreshPrompt] = useState("");
+  const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshResult, setRefreshResult] = useState<ProposeActivePlanRefreshResult | null>(null);
 
   const isBusy =
     textStatus !== "idle" ||
     jsonStatus !== "idle" ||
     deleteStatus !== "idle" ||
     clearStatus !== "idle" ||
-    exportStatus !== "idle";
+    exportStatus !== "idle" ||
+    refreshStatus !== "idle";
   const importedSummary = importedPlan ? summarizeImportedPlan(importedPlan) : null;
   const replaceBlockedReason = isReplaceBlockedError(jsonError) ? jsonError : null;
   const canOfferClearBeforeImport = Boolean(planMeta && requestedStartDate > defaultStartDate);
@@ -140,6 +150,10 @@ export function PlanManagementDialog({
       }
       setExportStatus("idle");
       setExportError(null);
+      setRefreshPrompt("");
+      setRefreshStatus("idle");
+      setRefreshError(null);
+      setRefreshResult(null);
     }
   }, [defaultStartDate, open]);
 
@@ -291,6 +305,38 @@ export function PlanManagementDialog({
     }
   };
 
+  const submitRefreshProposal = async () => {
+    const trimmed = refreshPrompt.trim();
+
+    setRefreshError(null);
+    setRefreshResult(null);
+
+    if (trimmed.length < 8) {
+      setRefreshError("Add a short note about what should change.");
+      return;
+    }
+
+    setRefreshStatus("proposing");
+
+    try {
+      const result = await proposeActivePlanRefreshFn({
+        data: {
+          runnerPrompt: trimmed,
+        },
+      });
+
+      setRefreshResult(result);
+      setRefreshStatus("idle");
+    } catch (submitError) {
+      setRefreshStatus("idle");
+      setRefreshError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not generate a plan update proposal.",
+      );
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -397,6 +443,74 @@ export function PlanManagementDialog({
 
               {exportError ? <p className="hito-field-error">{exportError}</p> : null}
             </section>
+
+            {planMeta ? (
+              <details className="hito-disclosure">
+                <summary className="hito-disclosure-summary">
+                  <span>Update plan</span>
+                  <ChevronDown className="hito-disclosure-chevron" />
+                </summary>
+                <div className="hito-disclosure-body">
+                  <div className="grid gap-4">
+                    <div className="flex items-start gap-3">
+                      <RefreshCcw
+                        className="mt-0.5 h-4 w-4 shrink-0 text-signal"
+                        strokeWidth={1.5}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Ask for a proposal from your saved history.
+                        </p>
+                        <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                          Hito reviews the active plan, recent logs, Garmin-backed comparison
+                          signals, and workout body-note cautions. This does not apply changes.
+                        </p>
+                      </div>
+                    </div>
+
+                    <label className="grid gap-2">
+                      <span className="hito-label">What should change?</span>
+                      <textarea
+                        rows={3}
+                        maxLength={1200}
+                        value={refreshPrompt}
+                        disabled={isBusy}
+                        onChange={(event) => {
+                          setRefreshPrompt(event.target.value);
+                          setRefreshError(null);
+                          setRefreshResult(null);
+                        }}
+                        placeholder="Example: I missed a few days and feel heavy. Adjust the rest of the plan without changing my race goal."
+                        className="hito-field hito-textarea-md resize-y"
+                      />
+                    </label>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={isBusy || refreshPrompt.trim().length < 8}
+                        onClick={() => {
+                          void submitRefreshProposal();
+                        }}
+                        className="hito-button hito-button-secondary hito-button-md"
+                      >
+                        <RefreshCcw className="h-4 w-4" strokeWidth={1.5} />
+                        {refreshStatus === "proposing"
+                          ? "Preparing proposal..."
+                          : "Generate proposal"}
+                      </button>
+                      <span className="hito-field-helper">
+                        Proposal only. Apply/confirm comes later.
+                      </span>
+                    </div>
+
+                    {refreshError ? <p className="hito-field-error">{refreshError}</p> : null}
+
+                    {refreshResult ? <PlanRefreshProposalReview result={refreshResult} /> : null}
+                  </div>
+                </div>
+              </details>
+            ) : null}
 
             <section className="hito-section-divider grid gap-4 pt-5">
               <div>
@@ -785,6 +899,99 @@ export function PlanManagementDialog({
         />
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PlanRefreshProposalReview({ result }: { result: ProposeActivePlanRefreshResult }) {
+  const proposal = result.proposal.output;
+  const review = proposal.review;
+
+  return (
+    <div className="hito-row-group">
+      <div className="hito-list-row items-start">
+        <div>
+          <p className="hito-list-row-title">Proposal only</p>
+          <p className="hito-list-row-copy">{review.summary}</p>
+        </div>
+        <span className="hito-status-pill" data-tone="signal">
+          Review
+        </span>
+      </div>
+
+      <div className="hito-list-row items-start">
+        <div className="min-w-0">
+          <p className="hito-list-row-title">Why this update</p>
+          <ul className="mt-2 grid gap-1.5 text-sm leading-relaxed text-muted-foreground">
+            {review.rationale.map((item) => (
+              <li key={item}>- {item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div className="hito-list-row items-start">
+        <div className="min-w-0">
+          <p className="hito-list-row-title">What would change from today forward</p>
+          <ul className="mt-2 grid gap-1.5 text-sm leading-relaxed text-muted-foreground">
+            {review.proposedChanges.map((item) => (
+              <li key={item}>- {item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {review.keepAsIs.length > 0 ? (
+        <div className="hito-list-row items-start">
+          <div className="min-w-0">
+            <p className="hito-list-row-title">What stays the same</p>
+            <ul className="mt-2 grid gap-1.5 text-sm leading-relaxed text-muted-foreground">
+              {review.keepAsIs.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="hito-list-row items-start">
+        <div>
+          <p className="hito-list-row-title">Scope under review</p>
+          <p className="hito-list-row-copy">{review.scope.label}</p>
+        </div>
+        <span className="hito-status-pill" data-tone="success">
+          Future only
+        </span>
+      </div>
+
+      <div className="hito-list-row items-start">
+        <div>
+          <p className="hito-list-row-title">Caution context</p>
+          {review.cautionContext.included ? (
+            <div className="mt-2 grid gap-1.5">
+              <p className="hito-list-row-copy">{review.cautionContext.note}</p>
+              {review.cautionContext.bodyNoteCautions.map((caution) => (
+                <p key={`${caution.date}-${caution.title}`} className="hito-list-row-copy">
+                  {formatDate(caution.date, { month: "short", day: "numeric" })}: {caution.title},
+                  body-note severity up to {caution.maxSeverity}.
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="hito-list-row-copy">{review.cautionContext.note}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="hito-list-row items-start">
+        <div>
+          <p className="hito-list-row-title">Nothing has changed yet</p>
+          <p className="hito-list-row-copy">{review.boundaryNote}</p>
+        </div>
+        <span className="hito-status-pill" data-tone="warning">
+          Not applied
+        </span>
+      </div>
+    </div>
   );
 }
 

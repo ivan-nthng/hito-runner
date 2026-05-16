@@ -2,15 +2,32 @@
 
 ## Status
 
-Draft
+In progress - first backend context slice implemented
 
 ## Owner
 
-Architect
+Backend
 
 ## Last Updated
 
 2026-05-15
+
+## Implementation Update
+
+2026-05-15 backend slice:
+
+- added [src/lib/runner-coach-context.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/runner-coach-context.ts) as the first canonical `RunnerCoachContext` builder
+- the builder reads only persisted Supabase truth and compacts active plan, remaining schedule, recent workout history, recent adherence/load, Garmin comparison signals, and workout-scoped body-note cautions
+- added [src/lib/plan-refresh-proposal.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-refresh-proposal.ts) as the first task-specific consumer for explicit active-plan refresh proposals
+- no runner-facing longitudinal surface, final apply flow, broad coach chat, or automatic plan mutation exists yet
+
+2026-05-15 proposal-output hygiene slice:
+
+- the active-plan refresh consumer now produces a review-safe output object for runner-facing surfaces
+- backend hygiene removes raw ids, implementation field names, dangling fragments, unsupported characters, and ambiguous scope counts before the review layer reads the proposal
+- the review-safe output now guarantees a dedicated fixed-truth section for past workouts, logged history, and remaining-schedule-only scope
+- targeted count is derived from model refs or, when refs are absent, from the sanitized proposed-change list that the review actually shows
+- proposal-only and remaining-schedule-only boundaries remain unchanged
 
 ## Context
 
@@ -492,7 +509,12 @@ Rollback posture:
 
 Next likely role:
 
-- BACKEND
+- BACKEND / QA for deeper edge-case coverage
+
+Status:
+
+- first compact implementation exists through `RunnerCoachContext`
+- remaining later expansion can add archived-plan rollups and richer trend windows without changing the source-of-record model
 
 ### Phase 2: First longitudinal AI input builder
 
@@ -567,6 +589,11 @@ Rollback posture:
 Next likely role:
 
 - BACKEND
+
+Status:
+
+- first proposal-only seam exists and clamps output scope back to `remaining_active_schedule_only`
+- final deterministic plan conversion, review UI, and apply/confirmation flow remain later work
 
 ### Phase 5: Expand workout-detail historical awareness
 

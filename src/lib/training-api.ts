@@ -15,6 +15,10 @@ import {
 import { importedPlanSchema } from "@/lib/imported-plan";
 import { generateCanonicalPlanFromText } from "@/lib/openai-plan-authoring";
 import {
+  generateActivePlanRefreshProposal,
+  type ActivePlanRefreshProposal,
+} from "@/lib/plan-refresh-proposal";
+import {
   buildActivePlanExportPayload,
   buildPlanExportDocument,
   type PlanExportDocument,
@@ -34,6 +38,7 @@ import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "@/lib/structured-plan-authoring";
+import { buildRunnerCoachContext } from "@/lib/runner-coach-context";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 import {
   buildImportedLogCarryForwardPlan,
@@ -97,6 +102,9 @@ const requestedStartDateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a start date in YYYY-MM-DD format.");
 const planExportInputSchema = z.object({
   format: z.enum(["json", "markdown"]),
+});
+const activePlanRefreshProposalInputSchema = z.object({
+  runnerPrompt: z.string().trim().min(8).max(1200),
 });
 
 const onboardingInputSchema = z.object({
@@ -220,6 +228,11 @@ export interface ClearUpcomingScheduleResult {
 
 export interface ExportActivePlanResult extends PlanExportDocument {
   ok: true;
+}
+
+export interface ProposeActivePlanRefreshResult {
+  ok: true;
+  proposal: ActivePlanRefreshProposal;
 }
 
 export const getHomeRouteData = createServerFn({ method: "GET" }).handler(async () => {
@@ -399,6 +412,28 @@ export const exportActivePlan = createServerFn({ method: "POST" })
     }
 
     return exportActivePlanForUser(persistedUserId, data.format);
+  });
+
+export const proposeActivePlanRefresh = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => activePlanRefreshProposalInputSchema.parse(value))
+  .handler(async ({ data }): Promise<ProposeActivePlanRefreshResult> => {
+    const auth = requireAuthenticatedUser();
+    const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+
+    if (!persistedUserId) {
+      throw new Error("Authentication is required for this action.");
+    }
+
+    const context = await buildRunnerCoachContext({ userId: persistedUserId });
+    const proposal = await generateActivePlanRefreshProposal({
+      context,
+      runnerPrompt: data.runnerPrompt,
+    });
+
+    return {
+      ok: true,
+      proposal,
+    };
   });
 
 export const completeStructuredOnboarding = createServerFn({ method: "POST" })

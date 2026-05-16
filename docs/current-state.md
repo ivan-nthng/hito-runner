@@ -111,6 +111,12 @@ Active
   saved workout-scoped body notes now feed the existing bounded Garmin recommendation seam as optional caution context only, while deterministic comparison remains primary and the prompt explicitly forbids diagnosis, medical advice, injury certainty, treatment instructions, or silent plan mutation.
 - The workout AI-output hygiene fix is now implemented:
   the backend now rejects malformed runner-facing AI text such as dangling fragments, ampersand continuations, replacement glyphs, or non-English character artifacts, and persists stable deterministic fallback sentences instead while preserving body-note caution and severity softening behavior.
+- The first longitudinal AI plan-refresh backend foundation is now implemented:
+  saved mode now has one canonical `RunnerCoachContext` builder over persisted runner/profile/plan/log/Garmin/body-note truth, plus one proposal-only active-plan refresh seam that consumes that bounded context and an explicit runner prompt while targeting only the remaining active schedule; final apply flow and silent plan mutation remain absent.
+- The first runner-facing AI-assisted plan-refresh proposal slice is now implemented:
+  `Open plan` now includes a quiet `Update plan` disclosure where saved-mode runners can enter a short intent, generate a backend-owned refresh proposal from persisted history, and read back why the remaining schedule might change, what would change, relevant caution context, and the explicit not-applied boundary; final apply/confirm remains deferred.
+- The active-plan refresh proposal-output hygiene pass is now implemented:
+  the backend now returns a dedicated review-safe proposal shape without raw workout ids or internal prompt field names, rejects malformed fragments such as dangling clauses or bare abbreviations, guarantees fixed-truth review content, and keeps targeted count consistent with the proposed changes shown in the review so review copy no longer mislabels targeted changes as the whole remaining plan.
 - The saved-mode calendar-cell semantics correction is now implemented:
   month cells restore one broad-family workout-type glyph, one short type label, restrained type color, and a quiet feedback/evidence corner marker while keeping distance, duration, targets, and dashboard-style metric stacks out of month cells.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.

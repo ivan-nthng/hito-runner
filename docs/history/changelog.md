@@ -2,8 +2,16 @@
 
 Completed implementation history only.
 
+## 2026-05-16
+
+- Fixed active-plan refresh proposal scope consistency so review-visible proposed changes can no longer coexist with a `0 targeted workouts` scope count when model refs are missing or discarded.
+- Guaranteed the active-plan refresh proposal review's `What stays the same` content from the backend contract, so runner-facing review always states that past workouts, logged history, and only the remaining active schedule are fixed-scope truths.
+
 ## 2026-05-15
 
+- Tightened the active-plan refresh proposal review contract: backend output now includes a review-safe shape that strips raw workout ids and internal field names, replaces malformed fragments with stable fallback copy, and distinguishes total remaining schedule size from specifically targeted upcoming workouts.
+- Added the first runner-facing proposal-only `Update plan` slice inside `Open plan`: saved-mode runners can enter short refresh intent, call the backend `RunnerCoachContext` / `proposeActivePlanRefresh` seam, and review why the remaining active schedule might change without applying or mutating the active plan.
+- Added the first backend-only longitudinal AI plan-refresh foundation: `RunnerCoachContext` now compacts saved runner profile, active plan, remaining schedule, recent adherence/load, Garmin comparison signals, and workout-scoped body-note cautions, and the active-plan refresh seam now returns a proposal-only artifact without mutating plan rows.
 - Consolidated the current product modal recipe: `UploadJsonDialog` now uses the same stable bounded panel, internal scroll body, and Safari-safe overlay/content behavior as `Open plan` and `Body notes`, while `/hitoDS` now documents the live modal anatomy and calm action hierarchy.
 - Added a backend text-quality gate for workout AI recommendations: malformed runner-facing output with dangling fragments, ampersand continuations, replacement glyphs, or non-English character artifacts now falls back to stable deterministic copy before persistence, while body-note caution and severity softening remain intact.
 - Added workout-scoped body notes to the bounded Garmin AI recommendation input: saved `workout_logs.body_notes` now reach the existing workout feedback prompt as optional caution context, with explicit guardrails against diagnosis, medical advice, injury certainty, treatment instructions, or plan mutation.

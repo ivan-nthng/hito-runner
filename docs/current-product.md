@@ -149,6 +149,11 @@ The product still avoids claims of live coaching, connected integrations, weathe
   it uses only canonical backend truth from the planned workout, parsed Garmin actual metrics, deterministic comparison payload, current week context, next planned workout summary, and optional workout-scoped body-note context
   it does not parse raw FIT, does not overwrite `workout_logs`, does not silently edit the plan, does not diagnose or give medical advice from body notes, and stays cautious when deterministic evidence is partial or unclear
   visibly broken generated phrases are not shown to the runner; the backend replaces malformed recommendation text with shorter stable fallback copy when needed
+- the first proposal-only surface for explicit plan refresh now exists inside `Open plan`:
+  the backend can build one compact `RunnerCoachContext` from saved profile, active plan, remaining schedule, recent adherence, Garmin comparison signals, actual load, and workout-scoped body-note caution context
+  the runner can open a quiet `Update plan` disclosure, enter short intent such as missed days, heavy fatigue, or adjusting the rest of the plan, and review a compact proposal covering why change is suggested, what would change from today forward, what stays fixed, caution context, and the explicit proposal-only boundary
+  the proposal review data is now backend-shaped for runners rather than implementation-shaped: raw ids and internal field names are removed, malformed fragments fall back to clean copy, a dedicated `What stays the same` section is always provided, and scope distinguishes the total remaining schedule from the targeted upcoming changes shown in the review
+  there is still no apply/confirm flow, and no plan is silently mutated
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
 - signed-in surfaces now expose one quiet `Export` action inside `Open plan`
   it downloads the active saved plan as canonical JSON or readable Markdown from the same backend-owned export truth

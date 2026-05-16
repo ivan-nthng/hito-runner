@@ -117,6 +117,12 @@
   and only one explicit destructive override remains in the UI, now kept behind a quieter disclosure instead of being shown as an equal sibling of the safe action
 - OpenAI-generated authoring output never persists directly:
   the app validates the model response, converts it into canonical plan data, and persists through the same `plan_cycles` plus `planned_workouts` seam already used by JSON import and structured authoring
+- saved mode now has the first active-plan refresh foundation and proposal UI:
+  [src/lib/runner-coach-context.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/runner-coach-context.ts) builds one compact `RunnerCoachContext` from persisted runner profile, active plan, remaining active schedule, recent workout logs, Garmin actual/comparison truth, and workout-scoped body-note cautions
+  [src/lib/plan-refresh-proposal.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-refresh-proposal.ts) consumes that context plus an explicit runner prompt to generate a proposal-only `active-plan refresh` artifact scoped to `remaining_active_schedule_only`
+  the returned review contract is runner-facing: it hides raw workout ids and prompt-internal field names, quality-gates incomplete or malformed prose, guarantees a dedicated fixed-truth section for past/logged history and remaining-schedule-only scope, and separately reports total remaining schedule size versus the number of targeted upcoming changes shown in the review
+  this seam does not mutate plan rows, does not apply proposals, and keeps past/logged history fixed until a later explicit apply flow reuses deterministic continuity guards
+  the saved-mode `Open plan` modal now exposes a quiet `Update plan` disclosure that collects a short runner prompt, calls the backend proposal seam, and renders the proposal as review-only without any apply action
 - canonical richer-plan truth now survives more explicitly in that same seam across JSON import, structured authoring, and OpenAI text authoring:
   `plan_cycles` preserves `schema_version`, `source_kind`, `target_date`, goal metadata, and plan preferences
   while `planned_workouts` preserves source workout identity plus normalized fatigue and recovery semantics

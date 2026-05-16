@@ -2,15 +2,41 @@
 
 ## Status
 
-Draft
+In progress - proposal-only frontend review slice implemented
 
 ## Owner
 
-Architect
+Backend / Frontend
 
 ## Last Updated
 
 2026-05-15
+
+## Implementation Update
+
+2026-05-15 backend slice:
+
+- added one proposal-only active-plan refresh seam in [src/lib/plan-refresh-proposal.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-refresh-proposal.ts)
+- added authenticated backend entrypoint `proposeActivePlanRefresh` in [src/lib/training-api.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts)
+- the seam consumes `RunnerCoachContext` plus the runner's explicit prompt and returns structured proposal output only
+- output scope is deterministically clamped to `remaining_active_schedule_only`
+- no plan rows are mutated and no proposal is applied
+
+2026-05-15 frontend slice:
+
+- added a quiet `Update plan` disclosure inside [src/components/PlanManagementDialog.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/PlanManagementDialog.tsx)
+- the disclosure collects one short runner prompt and calls the backend `proposeActivePlanRefresh` seam
+- the readback renders the structured proposal as runner-facing review: summary, rationale, proposed remaining-schedule changes, what stays fixed, scope, body-note caution context, and a clear not-applied boundary
+- no apply button or active-plan mutation exists in this slice
+
+2026-05-15 proposal-output hygiene slice:
+
+- the backend now returns a dedicated review-safe proposal object for the `Open plan` review surface
+- raw workout ids, prompt refs, and implementation field names are no longer part of the review data consumed by the surface
+- proposal text now passes a bounded quality gate that rejects dangling fragments, unsupported characters, raw internal field names, and bare abbreviations such as `HR`
+- proposal scope now exposes two separate counts: total remaining active-schedule workouts and specifically targeted workouts
+- the review-safe object now always carries `What stays the same` fixed-truth content covering past workouts, logged history, and the remaining-active-schedule-only boundary
+- targeted count now falls back to the sanitized proposed-change list when model refs are absent, so review-visible changes cannot appear beside a `0 targeted workouts` scope count
 
 ## Context
 
@@ -24,7 +50,7 @@ Hito already has:
 - bounded workout AI interpretation
 - a newly defined longitudinal `RunnerCoachContext` direction
 
-What it does not yet have is one explicit runner-triggered way to say:
+Before this track, Hito did not have one explicit runner-triggered way to say:
 
 - update my plan
 - this has been too hard
@@ -324,9 +350,9 @@ This should feel like:
 
 ### BACKEND changes
 
-- build task-specific `PlanRefreshPromptInput`
-- connect refresh generation to `RunnerCoachContext`
-- validate refresh output
+- build task-specific `PlanRefreshPromptInput` - first slice implemented
+- connect refresh generation to `RunnerCoachContext` - first slice implemented
+- validate refresh output - first proposal-only schema and review hygiene gate implemented
 - reuse canonical plan build/apply seam
 - preserve current continuity guards
 
@@ -343,6 +369,9 @@ This should feel like:
 - same-goal refresh works after skipped workouts
 - same-goal refresh works after “too hard” runner report
 - malformed AI refresh output cannot overwrite the active plan
+- malformed AI refresh text cannot surface raw ids, internal fields, or dangling fragments in the runner-facing review
+- the proposal review always includes dedicated fixed-truth content for past workouts, logged history, and remaining-schedule-only scope
+- visible proposed changes cannot coexist with a `0 targeted workouts` scope count
 - apply/cancel leaves active-plan state consistent
 
 ## Risks
@@ -360,6 +389,7 @@ This should feel like:
 - deterministic validation and continuity boundaries are explicit
 - placement inside `Open plan` is defined
 - one next recommended role is chosen
+- first backend proposal-only seam exists without applying or mutating plans
 
 ## Next Recommended Role
 
@@ -388,7 +418,8 @@ Defined the first canonical AI-assisted plan-refresh workflow for Hito: an expli
 ### Current State
 
 - Hito already has text-first plan generation, active-plan lifecycle controls, deterministic Garmin comparison, bounded workout AI interpretation, and preserved archived-plan history.
-- Hito does not yet have a longitudinal AI context seam or a dedicated plan-refresh workflow.
+- Hito now has the first longitudinal `RunnerCoachContext` seam, a proposal-only active-plan refresh backend action, and a first runner-facing proposal review entry inside `Open plan`.
+- Hito still does not have a final apply/confirm flow for refresh proposals.
 
 ### Constraints
 

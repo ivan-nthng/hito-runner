@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress - proposal-only frontend review slice implemented
+In progress - first confirm/apply frontend slice implemented
 
 ## Owner
 
@@ -37,6 +37,33 @@ Backend / Frontend
 - proposal scope now exposes two separate counts: total remaining active-schedule workouts and specifically targeted workouts
 - the review-safe object now always carries `What stays the same` fixed-truth content covering past workouts, logged history, and the remaining-active-schedule-only boundary
 - targeted count now falls back to the sanitized proposed-change list when model refs are absent, so review-visible changes cannot appear beside a `0 targeted workouts` scope count
+
+2026-05-16 backend apply foundation slice:
+
+- proposal output now includes a backend-owned apply fingerprint derived from active plan id/update time, refresh boundary, remaining schedule signature, and recent history signature
+- added an explicit backend apply seam for approved refresh proposals; generation still does not auto-apply
+- apply blocks stale proposals before plan generation or mutation
+- successful apply uses archive/replace: the previous active plan is archived, a new `active_plan_refresh_v1` plan becomes active, and fixed workout/log truth is carried forward into the replacement active plan
+
+2026-05-16 frontend confirm/apply slice:
+
+- `Open plan` proposal review now exposes explicit `Apply update` and `Keep current plan` actions
+- `Keep current plan` clears the proposal review and shows a no-change confirmation without calling any mutation seam
+- `Apply update` calls the backend apply seam, shows an applying state, blocks double submit, and returns the runner to the updated active-plan view after success
+- stale apply responses are shown as a specific stale-proposal state with a `Generate fresh proposal` recovery action
+
+2026-05-16 weekday rest-day invariant slice:
+
+- `RunnerCoachContext` now includes the resolved fixed weekday rest-day invariant when saved or imported plan preferences provide one
+- refresh proposal prompts and review fixed-truth content preserve those off-days by default
+- proposal fingerprints include the invariant signature so changed off-day truth makes old proposals stale
+- explicit refresh apply validates generated future workouts against fixed off-days and blocks instead of silently relaxing the constraint
+
+2026-05-16 apply-path hardening slice:
+
+- approved proposal apply now gives the canonical authoring step an explicit refresh-safe schedule contract
+- the original target date is preserved only when it remains valid relative to the new refresh start
+- near-term target-date validation failures are repaired before canonical validation or returned as a bounded blocked apply result
 
 ## Context
 
@@ -372,6 +399,8 @@ This should feel like:
 - malformed AI refresh text cannot surface raw ids, internal fields, or dangling fragments in the runner-facing review
 - the proposal review always includes dedicated fixed-truth content for past workouts, logged history, and remaining-schedule-only scope
 - visible proposed changes cannot coexist with a `0 targeted workouts` scope count
+- stale proposal context cannot apply
+- approved proposal apply uses archive/replace rather than in-place mutation
 - apply/cancel leaves active-plan state consistent
 
 ## Risks

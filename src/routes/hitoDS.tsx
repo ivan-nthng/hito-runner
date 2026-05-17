@@ -265,6 +265,18 @@ function HitoDesignSystemPage() {
                     placeholder="Describe goal, constraints, recent results, or JSON notes."
                   />
                 </label>
+                <label className="grid gap-2 lg:col-span-2">
+                  <span className="hito-label">Read-only field</span>
+                  <input
+                    className="hito-field hito-field-md"
+                    value="runner@example.com"
+                    readOnly
+                    aria-readonly="true"
+                  />
+                  <span className="hito-field-helper">
+                    Read-only values keep field rhythm without becoming editable.
+                  </span>
+                </label>
               </div>
             </section>
 

@@ -27,7 +27,7 @@ Backend
 - backend hygiene removes raw ids, implementation field names, dangling fragments, unsupported characters, and ambiguous scope counts before the review layer reads the proposal
 - the review-safe output now guarantees a dedicated fixed-truth section for past workouts, logged history, and remaining-schedule-only scope
 - targeted count is derived from model refs or, when refs are absent, from the sanitized proposed-change list that the review actually shows
-- proposal-only and remaining-schedule-only boundaries remain unchanged
+- proposal generation remains proposal-only, and the separate explicit apply foundation now requires a fresh matching fingerprint before any archive/replace mutation can occur
 
 ## Context
 

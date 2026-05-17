@@ -10,6 +10,10 @@ import {
   workoutDuration,
   type Step,
 } from "@/lib/training";
+import {
+  resolveWeekdayRestInvariant,
+  type WeekdayRestInvariant,
+} from "@/lib/weekday-rest-invariants";
 import type { WorkoutComparisonDifferencePayload } from "@/lib/workout-result-import/types";
 
 type RunnerProfileRow = Database["public"]["Tables"]["runner_profiles"]["Row"];
@@ -48,7 +52,9 @@ export interface RunnerCoachContext {
     startDate: string;
     endDate: string;
     targetDate: string | null;
+    updatedAt: string;
   } | null;
+  weekdayRestInvariant: WeekdayRestInvariant;
   refreshBoundary: {
     target: "remaining_active_schedule_only";
     firstMutableDate: string | null;
@@ -96,6 +102,7 @@ export interface CoachWorkoutHistorySummary extends CoachWorkoutSummary {
   rpe: number | null;
   hasBodyNotes: boolean;
   hasGarminActual: boolean;
+  logUpdatedAt: string | null;
 }
 
 export interface CoachComparisonSignalSummary {
@@ -204,6 +211,10 @@ export async function buildRunnerCoachContext({
       requiresExplicitApply: true,
     },
     remainingActiveSchedule,
+    weekdayRestInvariant: resolveWeekdayRestInvariant({
+      runnerPreferences: profileResult.data,
+      activePlanPreferences: activePlan?.plan_preferences ?? null,
+    }),
     recentWorkoutHistory,
     recentAdherence: buildRecentAdherence(recentWorkoutHistory, today, lookbackDays),
     recentActualLoad: buildRecentActualLoad(recentWorkoutHistory, actualMetricsByWorkoutId),
@@ -322,6 +333,7 @@ function activePlanToCoachSummary(plan: PlanCycleRow) {
     startDate: plan.start_date,
     endDate: plan.end_date,
     targetDate: plan.target_date,
+    updatedAt: plan.updated_at,
   };
 }
 
@@ -355,6 +367,7 @@ function plannedWorkoutToHistorySummary(
     rpe: log?.rpe ?? null,
     hasBodyNotes: parseBodyNotesValue(log?.body_notes).length > 0,
     hasGarminActual: Boolean(actualMetrics),
+    logUpdatedAt: log?.updated_at ?? null,
   };
 }
 

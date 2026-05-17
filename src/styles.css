@@ -406,6 +406,19 @@
     outline: none;
   }
 
+  .hito-field:disabled,
+  .hito-field[readonly] {
+    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
+    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+    cursor: default;
+  }
+
+  .hito-field:-webkit-autofill {
+    -webkit-text-fill-color: var(--color-foreground);
+    caret-color: var(--color-foreground);
+    box-shadow: 0 0 0 1000px color-mix(in oklch, var(--color-background) 74%, transparent) inset;
+  }
+
   .hito-field-xs {
     min-height: 1.75rem;
     padding: 0 0.5rem;

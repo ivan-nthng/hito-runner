@@ -221,16 +221,22 @@ function SettingsPage() {
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <Field
                   label="First name"
+                  name="firstName"
+                  autoComplete="given-name"
                   value={form.firstName}
                   onChange={(value) => setForm((current) => ({ ...current, firstName: value }))}
                 />
                 <Field
                   label="Last name"
+                  name="lastName"
+                  autoComplete="family-name"
                   value={form.lastName}
                   onChange={(value) => setForm((current) => ({ ...current, lastName: value }))}
                 />
                 <Field
                   label="Display name"
+                  name="displayName"
+                  autoComplete="nickname"
                   value={form.displayName}
                   onChange={(value) => setForm((current) => ({ ...current, displayName: value }))}
                 />
@@ -243,20 +249,26 @@ function SettingsPage() {
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <Field
                   label="Age"
+                  name="age"
                   value={form.age}
                   inputMode="numeric"
+                  autoComplete="off"
                   onChange={(value) => setForm((current) => ({ ...current, age: value }))}
                 />
                 <Field
                   label="Weight (kg)"
+                  name="weightKg"
                   value={form.weightKg}
                   inputMode="decimal"
+                  autoComplete="off"
                   onChange={(value) => setForm((current) => ({ ...current, weightKg: value }))}
                 />
                 <Field
                   label="Height (cm)"
+                  name="heightCm"
                   value={form.heightCm}
                   inputMode="decimal"
+                  autoComplete="off"
                   onChange={(value) => setForm((current) => ({ ...current, heightCm: value }))}
                 />
               </div>
@@ -320,24 +332,30 @@ function SettingsPage() {
 
 function Field({
   label,
+  name,
   value,
   onChange,
   inputMode,
+  autoComplete,
 }: {
   label: string;
+  name: string;
   value: string;
   onChange: (value: string) => void;
   inputMode?: "text" | "numeric" | "decimal";
+  autoComplete?: string;
 }) {
   return (
-    <label className="block">
+    <label className="grid gap-2">
       <span className="hito-label">{label}</span>
       <input
         type="text"
+        name={name}
         inputMode={inputMode}
+        autoComplete={autoComplete}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="hito-field hito-input-md mt-2"
+        className="hito-field hito-field-md"
       />
     </label>
   );
@@ -345,12 +363,18 @@ function Field({
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <label className="grid gap-2">
       <span className="hito-label">{label}</span>
-      <div className="hito-surface-flat mt-2 min-h-11 px-3 py-3 text-sm text-foreground/88">
-        {value}
-      </div>
-    </div>
+      <input
+        type="email"
+        name="email"
+        value={value}
+        readOnly
+        aria-readonly="true"
+        autoComplete="email"
+        className="hito-field hito-field-md"
+      />
+    </label>
   );
 }
 

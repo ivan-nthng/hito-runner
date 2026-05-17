@@ -23,8 +23,14 @@ export interface GeneratedPlanResult {
   responseId: string | null;
 }
 
+export interface GenerateCanonicalPlanFromTextOptions {
+  repairAuthoringInput?: (value: unknown) => unknown;
+  validationErrorPrefix?: string;
+}
+
 export async function generateCanonicalPlanFromText(
   authoringText: string,
+  options: GenerateCanonicalPlanFromTextOptions = {},
 ): Promise<GeneratedPlanResult> {
   const apiKey = serverEnv.openAiApiKey;
 
@@ -87,7 +93,11 @@ export async function generateCanonicalPlanFromText(
     throw new Error("OpenAI returned a non-JSON structured authoring payload.");
   }
 
-  const parsedAuthoringInput = structuredPlanAuthoringInputSchema.safeParse(parsedOutput);
+  const authoringInputCandidate = options.repairAuthoringInput
+    ? options.repairAuthoringInput(parsedOutput)
+    : parsedOutput;
+  const parsedAuthoringInput =
+    structuredPlanAuthoringInputSchema.safeParse(authoringInputCandidate);
 
   if (!parsedAuthoringInput.success) {
     const issueSummary = parsedAuthoringInput.error.issues
@@ -95,7 +105,9 @@ export async function generateCanonicalPlanFromText(
       .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
       .join(" | ");
 
-    throw new Error(`OpenAI authoring input failed validation: ${issueSummary}`);
+    throw new Error(
+      `${options.validationErrorPrefix ?? "OpenAI authoring input failed validation"}: ${issueSummary}`,
+    );
   }
 
   const canonicalPlan = buildStructuredAuthoringPlan(parsedAuthoringInput.data);

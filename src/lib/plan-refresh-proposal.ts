@@ -3,6 +3,7 @@ import "@tanstack/react-start/server-only";
 import { z } from "zod";
 import { serverEnv } from "@/lib/supabase/env";
 import type { RunnerCoachContext } from "@/lib/runner-coach-context";
+import { formatWeekdayList, weekdayRestInvariantToSignature } from "@/lib/weekday-rest-invariants";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_REFRESH_MODEL = "gpt-5";
@@ -17,6 +18,10 @@ export interface ActivePlanRefreshProposal {
   responseId: string | null;
   output: {
     proposalStatus: "proposal_only";
+    applyContext: {
+      generatedAt: string;
+      fingerprint: ActivePlanRefreshFingerprint;
+    };
     summary: string;
     rationale: string[];
     proposedChanges: string[];
@@ -60,11 +65,24 @@ export interface ActivePlanRefreshProposal {
   };
 }
 
+export interface ActivePlanRefreshFingerprint {
+  schemaVersion: "active-plan-refresh-fingerprint-v1";
+  today: string;
+  activePlanId: string;
+  activePlanUpdatedAt: string;
+  firstMutableDate: string | null;
+  lastMutableDate: string | null;
+  weekdayRestInvariantSignature: string;
+  remainingScheduleSignature: string[];
+  recentHistorySignature: string[];
+}
+
 export interface ActivePlanRefreshPromptPayload {
   runnerPrompt: string;
   scope: RunnerCoachContext["refreshBoundary"];
   activePlan: RunnerCoachContext["activePlan"];
   runner: Omit<RunnerCoachContext["runner"], "userId">;
+  weekdayRestInvariant: RunnerCoachContext["weekdayRestInvariant"];
   remainingActiveSchedule: Array<{
     ref: string;
     date: string;
@@ -126,6 +144,7 @@ export function buildActivePlanRefreshPromptPayload(
       baselineLongRunKm: context.runner.baselineLongRunKm,
       baselineNotes: context.runner.baselineNotes,
     },
+    weekdayRestInvariant: context.weekdayRestInvariant,
     remainingActiveSchedule: context.remainingActiveSchedule.map((workout, index) => ({
       ref: workoutRefForIndex(index),
       date: workout.date,
@@ -244,6 +263,7 @@ function buildSystemPrompt() {
     "This is proposal-only guidance. Do not claim that the plan has been changed.",
     "Past workouts, logged workout truth, Garmin actuals, comparisons, and body notes are fixed context only.",
     "You may propose changes only for the remaining active schedule listed in the input.",
+    "Preserve fixed weekday rest days by default. If blocked weekdays are listed, do not place non-rest workouts on those weekdays unless the runner explicitly asked to change that constraint.",
     "When referring to workouts, use dates, titles, and plain workout descriptions, not internal refs or ids.",
     "Do not mention implementation field names such as plannedDurationMin, plannedDistanceKm, targetWorkoutRefs, or targetWorkoutIds.",
     "Keep deterministic comparison facts primary. Use body notes only as cautious discomfort context.",
@@ -285,6 +305,10 @@ export function buildReviewSafeActivePlanRefreshOutput(
 
   return {
     proposalStatus: "proposal_only",
+    applyContext: {
+      generatedAt: context.generatedAt,
+      fingerprint: buildActivePlanRefreshFingerprint(context),
+    },
     summary: runnerFacing.summary,
     rationale: runnerFacing.rationale,
     proposedChanges: runnerFacing.proposedChanges,
@@ -305,6 +329,49 @@ export function buildReviewSafeActivePlanRefreshOutput(
       preservesPastAndLoggedHistory: true,
       doesNotMutatePlan: true,
     },
+    recommendedAuthoringPrompt: proposal.recommendedAuthoringPrompt,
+  };
+}
+
+export function buildActivePlanRefreshFingerprint(
+  context: RunnerCoachContext,
+): ActivePlanRefreshFingerprint {
+  if (!context.activePlan) {
+    throw new Error("An active plan is required before fingerprinting a refresh proposal.");
+  }
+
+  return {
+    schemaVersion: "active-plan-refresh-fingerprint-v1",
+    today: context.today,
+    activePlanId: context.activePlan.id,
+    activePlanUpdatedAt: context.activePlan.updatedAt,
+    firstMutableDate: context.refreshBoundary.firstMutableDate,
+    lastMutableDate: context.refreshBoundary.lastMutableDate,
+    weekdayRestInvariantSignature: weekdayRestInvariantToSignature(context.weekdayRestInvariant),
+    remainingScheduleSignature: context.remainingActiveSchedule.map((workout) =>
+      [
+        workout.id,
+        workout.date,
+        workout.title,
+        workout.workoutType,
+        workout.plannedDurationMin,
+        workout.plannedDistanceKm ?? "",
+        workout.stepCount,
+      ].join("|"),
+    ),
+    recentHistorySignature: context.recentWorkoutHistory.map((workout) =>
+      [
+        workout.id,
+        workout.date,
+        workout.outcome,
+        workout.actualDurationMin ?? "",
+        workout.actualDistanceKm ?? "",
+        workout.rpe ?? "",
+        workout.hasBodyNotes ? "body_notes" : "",
+        workout.hasGarminActual ? "garmin" : "",
+        workout.logUpdatedAt ?? "",
+      ].join("|"),
+    ),
   };
 }
 
@@ -322,7 +389,7 @@ function applyRefreshProposalTextQualityGate(
   const proposedChanges = sanitizeRunnerFacingProposalList(proposal.proposedChanges, 1, 8, [
     fallbackProposedChange(scopeCounts.targetedWorkoutCount),
   ]);
-  const keepAsIs = buildFixedTruthReviewItems(proposal.keepAsIs);
+  const keepAsIs = buildFixedTruthReviewItems(context, proposal.keepAsIs);
 
   return {
     summary,
@@ -350,12 +417,23 @@ function sanitizeRunnerFacingProposalList(
   return fallback.slice(0, Math.max(minItems, 1));
 }
 
-function buildFixedTruthReviewItems(values: string[]) {
+function buildFixedTruthReviewItems(context: RunnerCoachContext, values: string[]) {
   const sanitized = values
     .map((value) => sanitizeRunnerFacingProposalText(value, 10, 220))
     .filter((value): value is string => Boolean(value));
+  const weekdayRestItem = context.weekdayRestInvariant.blockedWeekdays.length
+    ? [
+        `Fixed rest days stay off: ${formatWeekdayList(
+          context.weekdayRestInvariant.blockedWeekdays,
+        )}.`,
+      ]
+    : [];
 
-  return uniqueRunnerFacingItems([...FIXED_TRUTH_REVIEW_ITEMS, ...sanitized]).slice(0, 6);
+  return uniqueRunnerFacingItems([
+    ...FIXED_TRUTH_REVIEW_ITEMS,
+    ...weekdayRestItem,
+    ...sanitized,
+  ]).slice(0, 6);
 }
 
 function uniqueRunnerFacingItems(values: string[]) {

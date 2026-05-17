@@ -2,11 +2,11 @@
 
 ## Status
 
-Draft
+In progress - recommended backend apply foundation started
 
 ## Owner
 
-Architect
+Backend / Frontend
 
 ## Last Updated
 
@@ -44,7 +44,7 @@ What is now true:
 
 What is still not true:
 
-- approved plan-refresh proposals cannot yet be applied
+- approved plan-refresh proposals have a first backend apply foundation, but no frontend confirm/reject controls yet
 - screenshot OCR is still not live
 - similar-run comparison is still not live
 - PDF export is still not live
@@ -76,6 +76,7 @@ Reason:
 - add the missing apply step after review
 - preserve past truth
 - replace only the remaining active schedule
+- first backend apply foundation implemented; frontend confirmation remains next
 
 ### 2. Richer comparison model next refinement
 
@@ -167,6 +168,7 @@ Explicit apply/confirm flow for approved refresh proposals
 - the choice reflects the live proposal-only refresh state
 - lower-priority adjacent tracks are explicitly deferred
 - exactly one next recommended role is chosen
+- first backend apply foundation exists behind the chosen step
 
 ## Next Recommended Role
 
@@ -174,4 +176,4 @@ BACKEND
 
 ## Suggested Next Step
 
-Define and implement the explicit apply/confirm path for approved `Update plan` proposals, reusing the current active-plan lifecycle seam so the runner can replace only the remaining active schedule while preserving past logged truth and existing continuity safeguards.
+Implement the frontend `Apply update` / `Keep current plan` controls against the new backend apply seam, including stale-proposal copy and a fresh-proposal retry path.

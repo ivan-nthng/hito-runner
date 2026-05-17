@@ -63,6 +63,8 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - saved-mode JSON import can now use one explicit chosen start day as the apply authority:
   when the caller sends that date, day 1 of the uploaded plan is intended for the chosen day, the source file’s `start_date` becomes metadata, and the backend shifts the plan block plus target date consistently
 - saved-mode JSON import surfaces now ask for that chosen start day before apply, using one date input plus small Today / Tomorrow / Next week shortcuts while leaving all schedule mapping to the backend
+- when the backend already knows fixed weekday off-days from saved plan preferences or imported metadata, those off-days now override simple day-by-day replay:
+  a chosen start on a blocked weekday is rejected, and imported workouts are placed in their original non-rest sequence across allowed training weekdays while blocked weekdays remain rest days
 - if the applied plan would start on a chosen date with a workout while that date already has a saved planned workout, the default product behavior is now the safe one:
   keep the existing workout on that date, skip the incoming first day, and start the imported original day 2 the following day
 - replacing the chosen start day is now the only explicit override:
@@ -153,7 +155,10 @@ The product still avoids claims of live coaching, connected integrations, weathe
   the backend can build one compact `RunnerCoachContext` from saved profile, active plan, remaining schedule, recent adherence, Garmin comparison signals, actual load, and workout-scoped body-note caution context
   the runner can open a quiet `Update plan` disclosure, enter short intent such as missed days, heavy fatigue, or adjusting the rest of the plan, and review a compact proposal covering why change is suggested, what would change from today forward, what stays fixed, caution context, and the explicit proposal-only boundary
   the proposal review data is now backend-shaped for runners rather than implementation-shaped: raw ids and internal field names are removed, malformed fragments fall back to clean copy, a dedicated `What stays the same` section is always provided, and scope distinguishes the total remaining schedule from the targeted upcoming changes shown in the review
-  there is still no apply/confirm flow, and no plan is silently mutated
+  fixed weekday rest days, when known, now travel through that context as preserved plan truth, appear in the fixed-truth review copy, and are validated before any later explicit refresh apply can persist a replacement plan
+  the proposal review now exposes explicit `Apply update` and `Keep current plan` actions: keeping the plan clears the review without mutation, while applying calls the backend apply seam, revalidates stale/off-day truth, normalizes refresh timeline, goal/baseline defaults, and fixed-rest-day availability so ordinary generated proposals do not leak as broken apply states, archive/replaces the active plan on success, and returns the runner to the updated active-plan view
+  stale proposals show an honest stale message and ask the runner to generate a fresh proposal instead of surfacing a generic error
+  no plan is silently mutated by viewing or dismissing a proposal
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
 - signed-in surfaces now expose one quiet `Export` action inside `Open plan`
   it downloads the active saved plan as canonical JSON or readable Markdown from the same backend-owned export truth

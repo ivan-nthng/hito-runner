@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-15
+2026-05-16
 
 ## Where We Are Now
 
@@ -114,9 +114,18 @@ Active
 - The first longitudinal AI plan-refresh backend foundation is now implemented:
   saved mode now has one canonical `RunnerCoachContext` builder over persisted runner/profile/plan/log/Garmin/body-note truth, plus one proposal-only active-plan refresh seam that consumes that bounded context and an explicit runner prompt while targeting only the remaining active schedule; final apply flow and silent plan mutation remain absent.
 - The first runner-facing AI-assisted plan-refresh proposal slice is now implemented:
-  `Open plan` now includes a quiet `Update plan` disclosure where saved-mode runners can enter a short intent, generate a backend-owned refresh proposal from persisted history, and read back why the remaining schedule might change, what would change, relevant caution context, and the explicit not-applied boundary; final apply/confirm remains deferred.
+  `Open plan` now includes a quiet `Update plan` disclosure where saved-mode runners can enter a short intent, generate a backend-owned refresh proposal from persisted history, and read back why the remaining schedule might change, what would change, relevant caution context, and the explicit not-applied boundary.
+- The first runner-facing active-plan refresh confirm/apply slice is now implemented:
+  proposal review now exposes `Apply update` and `Keep current plan`; keeping the current plan dismisses the proposal without mutation, applying calls the backend seam with stale/off-day revalidation, successful apply returns to the updated active-plan view, and stale proposals show a specific fresh-proposal recovery path.
+- The active-plan refresh apply hardening slice is now implemented:
+  refresh apply now derives one schedule authority from the current remaining active schedule, preserves the original target date only when it is still valid at least seven days after the refresh start, repairs generated schedule, goal, runner-baseline, and fixed-rest-day availability before canonical validation, clamps replacement workouts to the original remaining-schedule window, and returns a bounded blocked result instead of leaking low-level authoring validation text.
 - The active-plan refresh proposal-output hygiene pass is now implemented:
   the backend now returns a dedicated review-safe proposal shape without raw workout ids or internal prompt field names, rejects malformed fragments such as dangling clauses or bare abbreviations, guarantees fixed-truth review content, and keeps targeted count consistent with the proposed changes shown in the review so review copy no longer mislabels targeted changes as the whole remaining plan.
+- The first explicit active-plan refresh apply backend foundation is now implemented:
+  proposal output carries a backend fingerprint, apply must be explicitly called, stale proposal context is blocked before generation or mutation, and successful apply creates a new `active_plan_refresh_v1` active plan while archiving the previous active plan and preserving fixed workout/log truth.
+- The first weekday rest-day invariant backend slice is now implemented:
+  saved-mode JSON import/apply now resolves blocked weekday truth from active plan preferences before imported metadata, rejects chosen starts on blocked weekdays, and maps incoming non-rest workouts in sequence across allowed weekdays instead of blindly replaying every source date offset.
+  `RunnerCoachContext` and active-plan refresh proposal/apply now carry the same resolved invariant, include it in stale-check fingerprints and fixed-truth review copy, and block refresh apply output that schedules non-rest workouts on fixed rest days.
 - The saved-mode calendar-cell semantics correction is now implemented:
   month cells restore one broad-family workout-type glyph, one short type label, restrained type color, and a quiet feedback/evidence corner marker while keeping distance, duration, targets, and dashboard-style metric stacks out of month cells.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.

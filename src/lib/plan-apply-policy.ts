@@ -6,8 +6,14 @@ import {
   type ImportedWorkoutSeed,
 } from "@/lib/imported-plan";
 import { buildImportedLogCarryForwardPlan } from "@/lib/persisted-plan-replacement";
-import { addDaysIso, diffDaysIso, todayIso, weekdayLong, type WorkoutType } from "@/lib/training";
+import { todayIso, weekdayLong, type WorkoutType } from "@/lib/training";
 import type { Database } from "@/lib/supabase/database";
+import {
+  assertStartDateAllowedByWeekdayRestInvariant,
+  mapImportedSeedAcrossAllowedWeekdays,
+  mergeWeekdayRestInvariantIntoPlanPreferences,
+  resolveWeekdayRestInvariant,
+} from "@/lib/weekday-rest-invariants";
 
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
@@ -81,6 +87,7 @@ export function prepareImportedPlanApplyPolicy(
   firstDayResolution: FirstDayResolution | null,
   requestedStartDate: string | null = null,
   currentDate: string = todayIso(),
+  activePlanPreferences: unknown = null,
 ): PreparedPlanApplySuccess {
   const declaredSeed = buildImportedPlanSeed(importedPlan);
   const effectiveStartDate = deriveEffectiveStartDate(
@@ -90,22 +97,39 @@ export function prepareImportedPlanApplyPolicy(
   );
   const normalizedFromStartDate =
     effectiveStartDate !== declaredSeed.startDate ? declaredSeed.startDate : null;
-  const normalizedSeed = shiftImportedSeedToStartDate(declaredSeed, effectiveStartDate);
+  const weekdayRestInvariant = resolveWeekdayRestInvariant({
+    activePlanPreferences,
+    importedPlanPreferences: importedPlan.plan_preferences,
+    importedTrainingConstraints: importedPlan.training_constraints,
+  });
+  assertStartDateAllowedByWeekdayRestInvariant(effectiveStartDate, weekdayRestInvariant);
+  const normalizedSeed = mapImportedSeedAcrossAllowedWeekdays(
+    declaredSeed,
+    effectiveStartDate,
+    weekdayRestInvariant,
+  );
+  const invariantAwareSeed = {
+    ...normalizedSeed,
+    planPreferences: mergeWeekdayRestInvariantIntoPlanPreferences(
+      normalizedSeed.planPreferences,
+      weekdayRestInvariant,
+    ),
+  };
   const hasFirstDayConflict = hasStartDateWorkoutConflict(
     existingWorkouts,
-    normalizedSeed,
+    invariantAwareSeed,
     effectiveStartDate,
   );
   assertReplaceFirstDayAllowed(
     existingWorkouts,
-    normalizedSeed,
+    invariantAwareSeed,
     hasFirstDayConflict,
     firstDayResolution,
   );
 
   const resolvedSeed = resolveImportedSeedForApply(
     existingWorkouts,
-    normalizedSeed,
+    invariantAwareSeed,
     hasFirstDayConflict,
     firstDayResolution,
   );
@@ -152,35 +176,6 @@ export function deriveEffectiveStartDate(
   }
 
   return startDate > currentDate ? startDate : currentDate;
-}
-
-function shiftImportedSeedToStartDate(
-  importedSeed: ReturnType<typeof buildImportedPlanSeed>,
-  startDate: string,
-): ReturnType<typeof buildImportedPlanSeed> {
-  const dayOffset = diffDaysIso(startDate, importedSeed.startDate);
-
-  if (dayOffset === 0) {
-    return importedSeed;
-  }
-
-  const workouts = importedSeed.workouts.map((workout) => {
-    const workoutDate = addDaysIso(workout.workoutDate, dayOffset);
-
-    return {
-      ...workout,
-      workoutDate,
-      weekday: weekdayLong(workoutDate),
-    };
-  });
-
-  return {
-    ...importedSeed,
-    startDate,
-    endDate: workouts.at(-1)?.workoutDate ?? startDate,
-    targetDate: importedSeed.targetDate ? addDaysIso(importedSeed.targetDate, dayOffset) : null,
-    workouts,
-  };
 }
 
 function dropFirstDayFromImportedSeed(importedSeed: ReturnType<typeof buildImportedPlanSeed>) {

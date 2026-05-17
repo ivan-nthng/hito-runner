@@ -32,6 +32,7 @@ import {
   completeOnboarding,
   completeTextOnboarding,
   deleteActivePlan,
+  applyActivePlanRefreshProposal,
   proposeActivePlanRefresh,
   type ProposeActivePlanRefreshResult,
   type ViewerSummary,
@@ -60,6 +61,7 @@ type DeleteStatus = "idle" | "deleting";
 type ClearStatus = "idle" | "clearing";
 type ExportStatus = "idle" | "exporting-json" | "exporting-markdown";
 type RefreshStatus = "idle" | "proposing";
+type RefreshApplyStatus = "idle" | "applying";
 
 export function PlanManagementDialog({
   open,
@@ -77,9 +79,11 @@ export function PlanManagementDialog({
   const deleteActivePlanFn = useServerFn(deleteActivePlan);
   const clearUpcomingScheduleFn = useServerFn(clearUpcomingSchedule);
   const proposeActivePlanRefreshFn = useServerFn(proposeActivePlanRefresh);
+  const applyActivePlanRefreshProposalFn = useServerFn(applyActivePlanRefreshProposal);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
   const exportResetTimerRef = useRef<number | null>(null);
+  const refreshSuccessTimerRef = useRef<number | null>(null);
 
   const planMeta = snapshot?.planMeta;
   const defaultStartDate = snapshot?.currentDate ?? todayLocalIso();
@@ -107,7 +111,10 @@ export function PlanManagementDialog({
   const [exportError, setExportError] = useState<string | null>(null);
   const [refreshPrompt, setRefreshPrompt] = useState("");
   const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
+  const [refreshApplyStatus, setRefreshApplyStatus] = useState<RefreshApplyStatus>("idle");
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshStaleMessage, setRefreshStaleMessage] = useState<string | null>(null);
+  const [refreshDecisionMessage, setRefreshDecisionMessage] = useState<string | null>(null);
   const [refreshResult, setRefreshResult] = useState<ProposeActivePlanRefreshResult | null>(null);
 
   const isBusy =
@@ -116,7 +123,8 @@ export function PlanManagementDialog({
     deleteStatus !== "idle" ||
     clearStatus !== "idle" ||
     exportStatus !== "idle" ||
-    refreshStatus !== "idle";
+    refreshStatus !== "idle" ||
+    refreshApplyStatus !== "idle";
   const importedSummary = importedPlan ? summarizeImportedPlan(importedPlan) : null;
   const replaceBlockedReason = isReplaceBlockedError(jsonError) ? jsonError : null;
   const canOfferClearBeforeImport = Boolean(planMeta && requestedStartDate > defaultStartDate);
@@ -152,8 +160,15 @@ export function PlanManagementDialog({
       setExportError(null);
       setRefreshPrompt("");
       setRefreshStatus("idle");
+      setRefreshApplyStatus("idle");
       setRefreshError(null);
+      setRefreshStaleMessage(null);
+      setRefreshDecisionMessage(null);
       setRefreshResult(null);
+      if (refreshSuccessTimerRef.current != null && typeof window !== "undefined") {
+        window.clearTimeout(refreshSuccessTimerRef.current);
+        refreshSuccessTimerRef.current = null;
+      }
     }
   }, [defaultStartDate, open]);
 
@@ -309,6 +324,9 @@ export function PlanManagementDialog({
     const trimmed = refreshPrompt.trim();
 
     setRefreshError(null);
+    setRefreshStaleMessage(null);
+    setRefreshDecisionMessage(null);
+    setRefreshApplyStatus("idle");
     setRefreshResult(null);
 
     if (trimmed.length < 8) {
@@ -333,6 +351,59 @@ export function PlanManagementDialog({
         submitError instanceof Error
           ? submitError.message
           : "Could not generate a plan update proposal.",
+      );
+    }
+  };
+
+  const keepCurrentPlan = () => {
+    setRefreshResult(null);
+    setRefreshStaleMessage(null);
+    setRefreshError(null);
+    setRefreshApplyStatus("idle");
+    setRefreshDecisionMessage("Kept current plan. Nothing changed.");
+  };
+
+  const submitApplyRefreshProposal = async () => {
+    if (!refreshResult) {
+      setRefreshError("Generate a proposal before applying an update.");
+      return;
+    }
+
+    setRefreshApplyStatus("applying");
+    setRefreshError(null);
+    setRefreshStaleMessage(null);
+    setRefreshDecisionMessage(null);
+
+    try {
+      const result = await applyActivePlanRefreshProposalFn({
+        data: {
+          proposal: refreshResult.proposal,
+        },
+      });
+
+      if (!result.ok) {
+        setRefreshApplyStatus("idle");
+        setRefreshStaleMessage(result.message);
+        return;
+      }
+
+      setRefreshApplyStatus("idle");
+      setRefreshResult(null);
+      setRefreshDecisionMessage(
+        `Plan updated. ${result.refreshedWorkoutCount} future workouts are now in the active plan. Opening the updated plan...`,
+      );
+
+      if (typeof window !== "undefined") {
+        refreshSuccessTimerRef.current = window.setTimeout(() => {
+          finishAtHome(onOpenChange);
+        }, 900);
+      } else {
+        finishAtHome(onOpenChange);
+      }
+    } catch (submitError) {
+      setRefreshApplyStatus("idle");
+      setRefreshError(
+        submitError instanceof Error ? submitError.message : "Could not apply the plan update.",
       );
     }
   };
@@ -478,6 +549,8 @@ export function PlanManagementDialog({
                         onChange={(event) => {
                           setRefreshPrompt(event.target.value);
                           setRefreshError(null);
+                          setRefreshStaleMessage(null);
+                          setRefreshDecisionMessage(null);
                           setRefreshResult(null);
                         }}
                         placeholder="Example: I missed a few days and feel heavy. Adjust the rest of the plan without changing my race goal."
@@ -500,13 +573,30 @@ export function PlanManagementDialog({
                           : "Generate proposal"}
                       </button>
                       <span className="hito-field-helper">
-                        Proposal only. Apply/confirm comes later.
+                        Nothing changes until you choose Apply update.
                       </span>
                     </div>
 
                     {refreshError ? <p className="hito-field-error">{refreshError}</p> : null}
+                    {refreshDecisionMessage ? (
+                      <p className="hito-field-success">{refreshDecisionMessage}</p>
+                    ) : null}
 
-                    {refreshResult ? <PlanRefreshProposalReview result={refreshResult} /> : null}
+                    {refreshResult ? (
+                      <PlanRefreshProposalReview
+                        result={refreshResult}
+                        applyStatus={refreshApplyStatus}
+                        staleMessage={refreshStaleMessage}
+                        isBusy={isBusy}
+                        onApply={() => {
+                          void submitApplyRefreshProposal();
+                        }}
+                        onKeepCurrentPlan={keepCurrentPlan}
+                        onGenerateFresh={() => {
+                          void submitRefreshProposal();
+                        }}
+                      />
+                    ) : null}
                   </div>
                 </div>
               </details>
@@ -902,9 +992,26 @@ export function PlanManagementDialog({
   );
 }
 
-function PlanRefreshProposalReview({ result }: { result: ProposeActivePlanRefreshResult }) {
+function PlanRefreshProposalReview({
+  result,
+  applyStatus,
+  staleMessage,
+  isBusy,
+  onApply,
+  onKeepCurrentPlan,
+  onGenerateFresh,
+}: {
+  result: ProposeActivePlanRefreshResult;
+  applyStatus: RefreshApplyStatus;
+  staleMessage: string | null;
+  isBusy: boolean;
+  onApply: () => void;
+  onKeepCurrentPlan: () => void;
+  onGenerateFresh: () => void;
+}) {
   const proposal = result.proposal.output;
   const review = proposal.review;
+  const isApplying = applyStatus === "applying";
 
   return (
     <div className="hito-row-group">
@@ -987,9 +1094,55 @@ function PlanRefreshProposalReview({ result }: { result: ProposeActivePlanRefres
           <p className="hito-list-row-title">Nothing has changed yet</p>
           <p className="hito-list-row-copy">{review.boundaryNote}</p>
         </div>
-        <span className="hito-status-pill" data-tone="warning">
-          Not applied
+        <span className="hito-status-pill" data-tone={isApplying ? "signal" : "warning"}>
+          {isApplying ? "Applying" : "Not applied"}
         </span>
+      </div>
+
+      {staleMessage ? (
+        <div className="hito-list-row items-start">
+          <div>
+            <p className="hito-list-row-title">Proposal no longer current</p>
+            <p className="hito-list-row-copy">{staleMessage}</p>
+          </div>
+          <button
+            type="button"
+            className="hito-button hito-button-secondary hito-button-sm"
+            disabled={isBusy}
+            onClick={onGenerateFresh}
+          >
+            <RefreshCcw className="h-4 w-4" strokeWidth={1.5} />
+            Generate fresh proposal
+          </button>
+        </div>
+      ) : null}
+
+      <div className="hito-list-row items-start">
+        <div>
+          <p className="hito-list-row-title">Choose what happens</p>
+          <p className="hito-list-row-copy">
+            Hito rechecks the proposal before changing the active plan. Keeping the current plan
+            leaves the schedule untouched.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            className="hito-button hito-button-ghost hito-button-sm"
+            disabled={isBusy}
+            onClick={onKeepCurrentPlan}
+          >
+            Keep current plan
+          </button>
+          <button
+            type="button"
+            className="hito-button hito-button-primary hito-button-sm"
+            disabled={isBusy || Boolean(staleMessage)}
+            onClick={onApply}
+          >
+            {isApplying ? "Applying update..." : "Apply update"}
+          </button>
+        </div>
       </div>
     </div>
   );

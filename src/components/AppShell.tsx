@@ -80,9 +80,7 @@ export function AppShell({
             <span className="font-display text-2xl tracking-tight">{APP_NAME.toLowerCase()}</span>
             <span className="h-1.5 w-1.5 rounded-full bg-signal" />
           </Link>
-          <p className="mt-1 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
-            {modeLabel}
-          </p>
+          <p className="hito-micro-label mt-1">{modeLabel}</p>
         </div>
 
         <nav className="hito-shell-nav px-3">
@@ -111,7 +109,7 @@ export function AppShell({
             <div className="hito-row-group">
               <div className="hito-list-row items-start">
                 <div className="relative min-w-0 flex-1 pr-8">
-                  <div className="flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase text-muted-foreground">
+                  <div className="hito-micro-label flex items-center gap-2">
                     <Icon name="plan-note" size="xs" className="text-signal" />
                     Plan note
                   </div>
@@ -161,9 +159,7 @@ export function AppShell({
                 <div className="mt-1 truncate text-[11px] font-normal text-muted-foreground">
                   {profileDetail}
                 </div>
-                <div className="mt-2 text-[11px] font-normal uppercase tracking-[0.16em] text-muted-foreground">
-                  {modeTag}
-                </div>
+                <div className="hito-micro-label mt-2">{modeTag}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
               {showUploadAction && (
@@ -220,9 +216,7 @@ export function AppShell({
           <div className="flex items-center gap-6 px-6 lg:px-10 h-14">
             <div className="md:hidden font-display text-xl">{APP_NAME.toLowerCase()}</div>
             <div className="hidden md:flex items-baseline gap-3">
-              <span className="text-xs tracking-[0.18em] uppercase text-muted-foreground">
-                Today
-              </span>
+              <span className="hito-micro-label">Today</span>
               <span className="font-mono-num text-sm">
                 {formatDate(shellSnapshot.currentDate, {
                   month: "long",
@@ -316,7 +310,7 @@ export function AppShell({
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="hidden lg:flex items-center gap-2">
-      <span className="text-[11px] tracking-wide text-muted-foreground">{label}</span>
+      <span className="hito-micro-label">{label}</span>
       <span className="hito-status-pill" data-tone={weekStatusTone(value)}>
         {value}
       </span>

@@ -1085,7 +1085,7 @@ function BodyNotesModal({
         overlayClassName="hito-dialog-overlay-stable"
         className="hito-dialog-stable hito-product-dialog h-[min(46rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
       >
-        <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
+        <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Body notes</DialogTitle>
           <DialogDescription className="hito-body max-w-2xl">
             These notes stay attached to this workout result only. Use them to mark where the run
@@ -1093,7 +1093,7 @@ function BodyNotesModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="hito-product-dialog-body">
+        <div className="hito-product-dialog-body-scroll-fill">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="hito-caption">
               {bodyNotes.length === 0
@@ -1141,7 +1141,7 @@ function BodyNotesModal({
           )}
         </div>
 
-        <DialogFooter className="hito-section-divider px-6 py-4 sm:space-x-0">
+        <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="hito-caption">
               Saved fields stay bounded to area, timing, sensation, severity, and an optional note.

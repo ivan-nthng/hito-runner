@@ -191,6 +191,7 @@ export function OnboardingGate() {
                 <button
                   type="button"
                   disabled={isBusy || authoringText.trim().length < 20}
+                  data-tone="error"
                   onClick={() => {
                     const trimmed = authoringText.trim();
 
@@ -201,7 +202,7 @@ export function OnboardingGate() {
 
                     void submitTextPlan(trimmed, "replace_first_day");
                   }}
-                  className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="hito-button hito-button-outlined hito-button-sm"
                 >
                   {textStatus === "saving" ? "Replacing today..." : "Replace today"}
                 </button>
@@ -405,10 +406,11 @@ export function OnboardingGate() {
                     <button
                       type="button"
                       disabled={isBusy || !importedPlan}
+                      data-tone="error"
                       onClick={() => {
                         void submitImportedPlan("replace_first_day");
                       }}
-                      className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      className="hito-button hito-button-outlined hito-button-sm"
                     >
                       {jsonStatus === "saving" ? "Replacing today..." : "Replace today"}
                     </button>

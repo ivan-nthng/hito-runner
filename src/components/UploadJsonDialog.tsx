@@ -112,14 +112,14 @@ export function UploadJsonDialog({
         overlayClassName="hito-dialog-overlay-stable"
         className="hito-dialog-stable hito-product-dialog h-[min(40rem,calc(100dvh-2rem))] max-w-xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
       >
-        <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
+        <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Import plan</DialogTitle>
           <DialogDescription className="hito-body max-w-lg">
             Use this only if you already have a Hito plan file.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="hito-product-dialog-body">
+        <div className="hito-product-dialog-body-scroll-fill">
           <div className="grid gap-4">
             <input
               ref={fileInputRef}
@@ -334,7 +334,7 @@ export function UploadJsonDialog({
           </div>
         </div>
 
-        <DialogFooter className="hito-section-divider grid gap-4 px-6 py-4 sm:space-x-0">
+        <DialogFooter className="hito-product-dialog-footer grid gap-4 sm:space-x-0">
           <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
@@ -379,10 +379,11 @@ export function UploadJsonDialog({
                   disabled={
                     isBusy || !importedPlan || !requestedStartDate || Boolean(replaceBlockedReason)
                   }
+                  data-tone="error"
                   onClick={() => {
                     void submitPlan("replace_first_day");
                   }}
-                  className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="hito-button hito-button-outlined hito-button-sm"
                 >
                   {status === "applying" ? "Replacing..." : "Replace start day"}
                 </button>

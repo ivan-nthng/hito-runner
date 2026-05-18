@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-17
+2026-05-18
 
 ## Where We Are Now
 
@@ -125,6 +125,16 @@ Active
   Radix-backed `DialogTitle` and `DialogDescription` no longer force generic shadcn typography defaults over product classes, so `Open plan`, saved-mode JSON import, and the workout body-note modal resolve their title/description rhythm from canonical Hito roles.
 - The first Hito icon-system normalization slice is now implemented:
   Hito now owns one `lucide-react`-backed `Icon` primitive with stable product names, four canonical sizes, and documented `/hitoDS#icons` usage examples; product-level surfaces consume that layer, while generated UI infra remains the only direct lucide exception and the raw SVG icon folders have been removed.
+- The first `/hitoDS` card-reduction slice is now implemented:
+  the Overview, Typography, and Icons reference sections use open rhythm, divider-led rows, quiet support notes, and one shared usage/demo surface where useful instead of nested bordered card grids; live product component behavior is unchanged.
+- The first modal anatomy helper slice is now implemented:
+  shared Hito modal classes now name content-fit and scroll-fill body modes, header, footer, footer-note, and footer-action anatomy; `/hitoDS#modals` documents short content-fit and tall scroll-fill examples separately so short modals no longer imply a dead zone above the footer, while `Open plan`, `Import plan`, and `Body notes` keep their stable product behavior through the same named helpers.
+- The first `/hitoDS` inputs normalization slice is now implemented:
+  Hito fields now expose primary and secondary variants, demo-able default/hover/active/disabled/read-only states, reusable error/success feedback shell states, canonical icon padding, and matching XS input/button height plus radius rhythm; `/hitoDS#inputs` uses an interactive builder like Buttons while product form behavior remains compatible with existing `hito-field` usage.
+- The Hito button variant semantics fix is now implemented:
+  secondary buttons are now soft, borderless tinted support actions, while outlined buttons remain the border-led neutral-emphasis variant; `/hitoDS#buttons` shows the variant contrast directly.
+- The first semantic button tone slice is now implemented:
+  Hito buttons now compose default, success, and error tones with primary, secondary, outlined, and ghost hierarchy classes; destructive product actions in onboarding, JSON import, and `Open plan` use the canonical error tone instead of local red override classes, and AppShell’s repeated tiny uppercase chrome labels use the shared `hito-micro-label` role.
 - The active-plan refresh apply hardening slice is now implemented:
   refresh apply now derives one schedule authority from the current remaining active schedule, preserves the original target date only when it is still valid at least seven days after the refresh start, repairs generated schedule, goal, runner-baseline, and fixed-rest-day availability before canonical validation, clamps replacement workouts to the original remaining-schedule window, and returns a bounded blocked result instead of leaking low-level authoring validation text.
 - The active-plan refresh proposal-output hygiene pass is now implemented:

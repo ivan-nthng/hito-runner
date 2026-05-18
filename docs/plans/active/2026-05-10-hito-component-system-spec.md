@@ -7,6 +7,7 @@ Last Updated: 2026-05-10
 ## Context
 
 Hito Running now has an approved visual direction and a first implementation slice:
+
 - calm
 - editorial
 - athletic
@@ -32,12 +33,14 @@ Useful reference influences for rigor and consistency:
   disciplined spacing, quiet chrome, and crisp status communication
 
 What Hito should borrow:
+
 - from Radix UI: predictable interaction states and overlay behavior
 - from shadcn/ui: implementation practicality, not ornamental abstraction
 - from Apple Health: quiet data framing and premium restraint
 - from Linear: row density, hierarchy clarity, and low-noise controls
 
 What Hito should avoid:
+
 - copying bright SaaS color systems
 - turning every primitive into a generic enterprise token exercise
 - flattening the product into sterile monochrome minimalism
@@ -58,6 +61,7 @@ What Hito should avoid:
 ### Spacing Scale
 
 Canonical spacing tokens:
+
 - `2`: micro separation inside tight icon or chip layouts
 - `4`: icon-to-label spacing, tight inline grouping
 - `8`: compact control grouping
@@ -69,12 +73,14 @@ Canonical spacing tokens:
 - `40`: hero separation only
 
 Rules:
+
 - `12` and `16` should do most of the product work
 - avoid ad hoc `14`, `18`, `22` spacing unless a component truly needs it
 
 ### Size Scale
 
 Canonical size tiers:
+
 - `XS`
 - `S`
 - `M`
@@ -82,6 +88,7 @@ Canonical size tiers:
 - `XL`
 
 Use:
+
 - `M` as default for most controls
 - `L` for primary CTA or hero-adjacent controls
 - `S` for dense utility actions
@@ -91,6 +98,7 @@ Use:
 ### Radius Scale
 
 Canonical radius tokens:
+
 - `r-xs`: 8px
 - `r-s`: 10px
 - `r-m`: 12px
@@ -99,6 +107,7 @@ Canonical radius tokens:
 - `r-2xl`: 24px
 
 Rules:
+
 - buttons, tabs, inputs, pills: `r-s` to `r-m`
 - grouped support surfaces and cards: `r-l`
 - major hero or feature surfaces: `r-xl` to `r-2xl`
@@ -106,6 +115,7 @@ Rules:
 ### Border Thickness Rules
 
 Canonical border rules:
+
 - default hairline: `1px`
 - no heavy `2px` framing for ordinary components
 - `2px` may be used only for focus ring simulation or explicit active emphasis
@@ -113,6 +123,7 @@ Canonical border rules:
 ### Shadow And Glow Rules
 
 Canonical effects:
+
 - no default component drop shadow
 - subtle atmospheric hero glow allowed
 - subtle signal glow allowed for primary CTA emphasis
@@ -121,6 +132,7 @@ Canonical effects:
 ### Semantic Color Tokens
 
 Core tokens:
+
 - `canvas`
 - `foreground`
 - `muted-foreground`
@@ -135,12 +147,14 @@ Core tokens:
 - `destructive`
 
 Workout semantics:
+
 - `easy`
 - `long`
 - `quality`
 - `rest`
 
 Rules:
+
 - `signal` is the main action accent
 - `success` is for completion or confirmed positive state
 - `warn` is for caution, blocked continuity, or plan risk
@@ -149,6 +163,7 @@ Rules:
 ### Typography Scale
 
 Canonical type sizes:
+
 - `display-xl`: hero titles
 - `display-l`: page titles
 - `title-l`: section emphasis
@@ -231,6 +246,7 @@ Canonical type sizes:
 - use for: auth-first or onboarding-first entry actions only
 
 Rules:
+
 - same tier means same visual height across button and input
 - textarea does not use fixed height, but its padding and text size follow the nearest tier
 
@@ -239,14 +255,17 @@ Rules:
 ### Primary / Accent
 
 Purpose:
+
 - one primary action per surface
 
 Use for:
+
 - `Build my first plan`
 - `Apply plan`
 - `Log in`
 
 Behavior:
+
 - default: signal fill, signal-foreground text
 - hover: slight opacity or tonal lift only
 - active: slightly darker press state
@@ -254,56 +273,68 @@ Behavior:
 - disabled: reduced opacity, no fake emphasis
 
 Icon rules:
+
 - optional leading icon
 - icon-only primary buttons are discouraged outside compact utilities
 
 Sizes:
+
 - default `M` or `L`
 
 ### Secondary
 
 Purpose:
+
 - quiet supporting action
 
 Use for:
+
 - `Download JSON template`
 - `Open login`
 - non-destructive alternate action
 
 Behavior:
-- default: quiet surface fill plus hairline border
-- hover: accent-surface shift
-- active: slightly darker fill
+
+- default: quiet soft surface fill with no visible border
+- hover: slightly stronger surface tint
+- active: slightly darker tint
 - focus: same ring behavior as primary
 - disabled: reduced opacity
 
 ### Outlined
 
 Purpose:
+
 - rare emphasis where border-led clarity is needed without fill
 
 Use for:
+
 - low-frequency neutral actions inside dense grouped panels
 
 Behavior:
+
 - default: transparent or nearly transparent fill, hairline border
 - hover: subtle surface tint
 - active: slightly stronger tint
 
 Note:
+
 - if `secondary` already solves the use case, do not add `outlined`
 
 ### Ghost
 
 Purpose:
+
 - tertiary action
 
 Use for:
+
 - inline tool actions
 - row actions
 - calm non-primary navigation
 
 Behavior:
+
 - default: no border, minimal fill
 - hover: light accent surface
 - active: slightly stronger accent surface
@@ -311,12 +342,15 @@ Behavior:
 ### Destructive / Error
 
 Purpose:
+
 - confirm harmful or irreversible actions
 
 Use for:
+
 - future dangerous replace/delete/reset actions only
 
 Behavior:
+
 - default: destructive emphasis with clear contrast
 - hover: stronger destructive tone
 - disabled: visibly unavailable without implying success
@@ -324,24 +358,51 @@ Behavior:
 ### Success
 
 Purpose:
-- state acknowledgement, not a default CTA family
+
+- state acknowledgement or explicit positive confirmation, not a default CTA family
 
 Use for:
+
 - rare confirmed utility states only
 
 Rule:
-- do not add a broad “success button family” unless a concrete product action requires it
+
+- success is a semantic tone on the existing hierarchy, not a separate button family
+
+### Semantic Button Tones
+
+Supported tones:
+
+- default
+- success
+- error
+
+Rules:
+
+- tone composes with hierarchy instead of replacing it
+- default primary remains signal/orange
+- success primary is a strong positive confirmation
+- success secondary is soft and borderless green-tinted
+- success outlined is border-led green
+- success ghost is quiet green text/tint
+- error primary is clearly red/destructive
+- error secondary is soft and borderless red-tinted
+- error outlined is border-led red
+- error ghost is quiet red text/tint
+- destructive actions use the `error` tone; do not create a second destructive visual system
 
 ## Input System
 
 ### Text Input
 
 Use:
+
 - email
 - username
 - short settings fields
 
 Behavior:
+
 - default: quiet dark field with hairline border
 - hover: slight border-contrast lift
 - focus: signal-adjacent ring and clearer border
@@ -351,11 +412,13 @@ Behavior:
 ### Textarea
 
 Use:
+
 - text-first onboarding
 - notes
 - JSON content
 
 Rules:
+
 - minimum comfortable height for primary authoring
 - no ornamental resize affordances beyond practical vertical resize
 - long-form input is a first-class primitive in Hito
@@ -363,17 +426,21 @@ Rules:
 ### Select
 
 Relevant:
+
 - yes, but not yet a priority primitive in current surfaces
 
 Rule:
+
 - when added, it should match text-input height tiers exactly
 
 ### Search Field
 
 Relevant:
+
 - not yet for product rollout
 
 Rule:
+
 - do not define a separate visual family; inherit from text input when needed later
 
 ### Helper / Error / Success Text
@@ -385,6 +452,7 @@ Rule:
 ### Label Treatment
 
 - uppercase micro-label style is canonical for fields and metadata
+- `hito-micro-label` owns tiny uppercase shell/menu labels and compact chrome metadata
 - use sentence labels only when a component would become unnatural with uppercase metadata styling
 
 ### Placeholder Rules
@@ -398,9 +466,11 @@ Rule:
 ### Checkbox
 
 Relevant:
+
 - future settings or filters only
 
 Specification:
+
 - `M` control default
 - label aligned to text baseline
 - hit target must remain comfortable even if visual box is compact
@@ -408,18 +478,22 @@ Specification:
 ### Radio
 
 Relevant:
+
 - future bounded mutually exclusive choices
 
 Specification:
+
 - same tier logic as checkbox
 - use when the decision is explicit and immediately meaningful
 
 ### Toggle / Switch
 
 Relevant:
+
 - not justified for the current primary product slice
 
 Rule:
+
 - do not introduce until a real binary preference exists in the live product
 
 ## List And Row Primitives
@@ -427,18 +501,22 @@ Rule:
 ### List Item
 
 Purpose:
+
 - default dense informational unit
 
 Rules:
+
 - use alignment and spacing first
 - use divider between peers when they belong to one grouped frame
 
 ### Menu Item
 
 Purpose:
+
 - shell profile dropdown and similar overlays
 
 Rules:
+
 - icon optional
 - label primary
 - shortcut/status secondary
@@ -447,32 +525,39 @@ Rules:
 ### Settings Row
 
 Purpose:
+
 - future preferences/account patterns
 
 Rules:
+
 - left: label plus support text
 - right: value, control, or `Later`
 
 ### Selectable Row
 
 Purpose:
+
 - future list selection and picker behavior
 
 Rules:
+
 - current selection needs clear but quiet emphasis
 - do not rely only on color
 
 ### Metric Row
 
 Purpose:
+
 - canonical product-native primitive
 
 Structure:
+
 - value
 - label
 - optional qualifier
 
 Rules:
+
 - value carries the first visual weight
 - label is smaller and calmer
 - multiple metric rows should align vertically
@@ -480,15 +565,18 @@ Rules:
 ### Grouped Support Panel Row
 
 Purpose:
+
 - canonical right-side support pattern for home/workout
 
 Structure:
+
 - optional micro-label
 - one main content line or block
 - optional support line
 - optional status/pill/value
 
 Rules:
+
 - rows live inside one frame
 - rows are separated by dividers or `12` spacing
 - do not wrap each row in its own card
@@ -504,6 +592,7 @@ Rules:
 ### Pills / Badges
 
 Canonical pill families:
+
 - neutral
 - success
 - warning
@@ -511,40 +600,49 @@ Canonical pill families:
 - workout-state
 
 Use for:
+
 - week state
 - workout result state
 - preview/setup/saved tags where genuinely useful
 
 Do not use for:
+
 - decorative metadata filler
 
 ### Status Labels
 
 Use compact status text plus optional dot/icon when:
+
 - clarity improves
 - scanability matters more than prose
 
 ### Semantic Color Use
 
 Info:
+
 - calm neutral or muted accent use, not bright blue default SaaS behavior
 
 Success:
+
 - completed, confirmed, applied, saved
 
 Warning:
+
 - blocked continuity, partially off track, cautious next step
 
 Error:
+
 - invalid input, failed apply, harmful action
 
 Workout semantics:
+
 - easy
 - long
 - quality
 - rest
 
 Rules:
+
 - never let workout semantic color replace system status color
 - today/current attention uses signal, not success
 - completion uses success, not signal
@@ -606,6 +704,7 @@ Rules:
 - active state depends more on contrast and fill than weight alone
 
 Hierarchy rules:
+
 - display is for identity
 - sans is for operation
 - mono is for measured truth
@@ -694,11 +793,13 @@ Hierarchy rules:
 ## Fastest High-Leverage Frontend Slice
 
 Build the next shared primitive family for:
+
 - grouped support blocks
 - metric rows
 - status pills and semantic state rows
 
 Then demonstrate them on `/hitoDS` and apply them to:
+
 - home support column
 - workout detail right-side grouped panel
 - shell plan note and compact week-state display
@@ -706,9 +807,11 @@ Then demonstrate them on `/hitoDS` and apply them to:
 ## Rollout Recommendation
 
 Best next implementation slice:
+
 - grouped support, metric, and status primitives for primary product-detail surfaces
 
 Why:
+
 - the current system already covers basic surfaces, fields, buttons, labels, and tabs
 - the main remaining inconsistency risk is in home and workout information density
 - solving that next will make later progress/body/integrations cleanup simpler rather than broader

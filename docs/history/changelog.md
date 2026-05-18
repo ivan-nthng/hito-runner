@@ -2,8 +2,17 @@
 
 Completed implementation history only.
 
+## 2026-05-18
+
+- Added semantic Hito button tones across the existing hierarchy: default, success, and error now compose with primary, secondary, outlined, and ghost buttons; onboarding/import/Open plan destructive actions use the canonical error tone, and AppShell’s repeated shell micro-labels use `hito-micro-label`.
+- Corrected Hito button variant semantics: secondary buttons now use a soft borderless tinted surface, outlined remains the visible-border variant, and `/hitoDS#buttons` includes a compact variant-contrast strip.
+- Added canonical input feedback states to the Hito field contract: `hito-field-feedback-error` and `hito-field-feedback-success` now provide calm validation shell styling, and `/hitoDS#inputs` demonstrates error/success fields with matching feedback text and icon tone.
+- Normalized `/hitoDS#inputs` toward button-builder parity: Hito fields now document primary and secondary variants, left/right icon padding, default/hover/active/disabled/read-only states, and XS input/button height plus radius alignment without changing product form workflows.
+- Added the first Hito modal anatomy helper slice: shared modal classes now name content-fit and scroll-fill body modes plus header/footer anatomy, `/hitoDS#modals` shows separate short and tall modal examples without a fake dead zone above the footer, and `Open plan`, `Import plan`, and `Body notes` now use the named helpers without workflow changes.
+
 ## 2026-05-17
 
+- Reduced `/hitoDS` reference-card clutter: Overview now uses divider-led principles, Typography uses quiet ownership copy plus open role specimens, Icons uses a divided registry plus one shared usage surface, and nested specimen/card frames were removed without changing live product components.
 - Added the first Hito icon-system slice: product icon usage now flows through one `lucide-react`-backed Hito `Icon` primitive with stable names and four canonical sizes, `/hitoDS` documents the approved icon gallery and examples, and the raw `icons-line`, `icons-fill`, and `icons-multy` SVG folders were removed instead of becoming a second source of truth.
 - Fixed the shared dialog typography contract: `DialogTitle` and `DialogDescription` no longer force generic title/description utility defaults over canonical Hito role classes, so `Open plan`, JSON import, and body-note dialogs compute their title/body rhythm from `hito-modal-title` and `hito-body`.
 - Added the first canonical typography slice: shared Hito text roles now cover display, modal/panel titles, body/body-small, form labels, nav/menu, metric, status, error/success, and technical mono text; `/hitoDS` documents the full role inventory, and `Open plan`, JSON import, workout `Log result`/`Feedback`, and `User settings` now use those roles for their highest-drift text decisions.

@@ -529,14 +529,14 @@ export function PlanManagementDialog({
         overlayClassName="hito-dialog-overlay-stable"
         className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-2xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
       >
-        <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
+        <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Open plan</DialogTitle>
           <DialogDescription className="hito-body max-w-lg">
             Review the active plan, create a replacement, or clear the current schedule.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="hito-product-dialog-body">
+        <div className="hito-product-dialog-body-scroll-fill">
           <div className="grid gap-6">
             <section className="grid gap-3">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -971,10 +971,11 @@ export function PlanManagementDialog({
                             !requestedStartDate ||
                             Boolean(replaceBlockedReason)
                           }
+                          data-tone="error"
                           onClick={() => {
                             void submitImportedPlan("replace_first_day");
                           }}
-                          className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          className="hito-button hito-button-outlined hito-button-sm"
                         >
                           {jsonStatus === "importing" ? "Replacing..." : "Replace start day"}
                         </button>
@@ -1061,10 +1062,11 @@ export function PlanManagementDialog({
                   <button
                     type="button"
                     disabled={isBusy || !planMeta || !deleteConfirmed}
+                    data-tone="error"
                     onClick={() => {
                       void submitDeletePlan();
                     }}
-                    className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    className="hito-button hito-button-outlined hito-button-sm"
                   >
                     <Icon name="trash" size="sm" />
                     {deleteStatus === "deleting" ? "Deleting plan..." : "Delete plan"}
@@ -1075,7 +1077,7 @@ export function PlanManagementDialog({
           </div>
         </div>
 
-        <DialogFooter className="hito-section-divider px-6 py-4 sm:space-x-0">
+        <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           <button
             type="button"
             onClick={() => onOpenChange(false)}

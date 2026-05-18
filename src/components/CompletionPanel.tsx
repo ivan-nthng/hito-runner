@@ -3,15 +3,6 @@ import { Link } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  ArrowUpRight,
-  CheckCircle2,
-  FileUp,
-  MinusCircle,
-  Plus,
-  Trash2,
-  XCircle,
-} from "lucide-react";
-import {
   BODY_NOTE_AREAS,
   BODY_NOTE_AREA_REGIONS,
   BODY_NOTE_SENSATIONS,
@@ -50,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon, type HitoIconName } from "@/components/ui/icon";
 
 type Outcome = "completed" | "partial" | "skipped";
 type CompletionFormState = {
@@ -225,7 +217,7 @@ export function CompletionPanel({
     return (
       <div className="hito-surface-flat p-5">
         <div className="hito-label">Rest day</div>
-        <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+        <p className="hito-body mt-2">
           Rest days do not need a workout result. If a mobility or strength assignment is added
           later, you can log it here.
         </p>
@@ -262,7 +254,7 @@ export function CompletionPanel({
                       : "Ready to save"
                     : "Preview only"}
         </div>
-        <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
+        <p className="hito-body mt-2">
           {isSaving
             ? `Saving your ${outcome} result now.`
             : error
@@ -305,20 +297,24 @@ export function CompletionPanel({
             [
               {
                 v: "completed",
-                icon: CheckCircle2,
+                icon: "check-circle",
                 label: "Complete",
                 c: "var(--success)",
               },
-              { v: "partial", icon: MinusCircle, label: "Partial", c: "var(--warn)" },
+              { v: "partial", icon: "minus", label: "Partial", c: "var(--warn)" },
               {
                 v: "skipped",
-                icon: XCircle,
+                icon: "x-circle",
                 label: "Skipped",
                 c: "var(--destructive)",
               },
-            ] as const
+            ] satisfies {
+              v: Outcome;
+              icon: HitoIconName;
+              label: string;
+              c: string;
+            }[]
           ).map((option) => {
-            const Icon = option.icon;
             const active = outcome === option.v;
             return (
               <button
@@ -336,11 +332,11 @@ export function CompletionPanel({
                 )}
               >
                 <Icon
-                  className="h-4 w-4"
-                  strokeWidth={1.5}
+                  name={option.icon}
+                  size="sm"
                   style={{ color: active ? option.c : undefined }}
                 />
-                <span className="text-sm">{option.label}</span>
+                <span className="hito-list-row-title">{option.label}</span>
               </button>
             );
           })}
@@ -350,7 +346,7 @@ export function CompletionPanel({
       {isSkipped ? (
         <div className="hito-surface-flat p-4">
           <div className="hito-label">Skipped result</div>
-          <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
+          <p className="hito-body mt-2">
             A skipped result saves without distance, duration, reps, or RPE. You can still leave a
             note for context.
           </p>
@@ -526,9 +522,7 @@ function LogResultFeedbackBridge({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            {state.body}
-          </p>
+          <p className="hito-body-small mt-1 max-w-xl">{state.body}</p>
         </div>
         <Link
           to="/workout/$date"
@@ -536,9 +530,9 @@ function LogResultFeedbackBridge({
           search={{ tab: "feedback" } as never}
           className="hito-button hito-button-secondary hito-button-sm shrink-0"
         >
-          <FileUp className="h-3.5 w-3.5" />
+          <Icon name="file-up" size="xs" />
           {state.cta}
-          <ArrowUpRight className="h-3.5 w-3.5" />
+          <Icon name="arrow-up-right" size="xs" />
         </Link>
       </div>
     </div>
@@ -603,7 +597,7 @@ export function WorkoutFeedbackPanel({
     return (
       <div className="hito-surface-flat p-5">
         <div className="hito-label">Feedback unavailable</div>
-        <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+        <p className="hito-body mt-2">
           Rest days do not support Garmin review right now. If you need to log something, keep it in
           the workout result instead.
         </p>
@@ -617,10 +611,8 @@ export function WorkoutFeedbackPanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="hito-label">Feedback</div>
-            <h2 className="mt-2 text-2xl font-display leading-tight text-foreground">
-              Compare your run with the plan.
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+            <h2 className="hito-section-title mt-2">Compare your run with the plan.</h2>
+            <p className="hito-body mt-2">
               {attachedGarminAsset
                 ? "Your Garmin file and review live here."
                 : "Add a Garmin file if you want a deeper review."}
@@ -789,15 +781,15 @@ export function WorkoutFeedbackPanel({
               <div className="rounded-[1.75rem] border border-white/8 bg-background/[0.18] px-6 py-8 sm:px-8 sm:py-10">
                 <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/8 bg-background/30">
-                    <FileUp className="h-5 w-5 text-foreground/82" />
+                    <Icon name="file-up" size="md" className="text-foreground/82" />
                   </div>
                   <div className="hito-label">Upload Garmin file</div>
-                  <h3 className="mt-3 text-[1.6rem] font-display leading-tight text-foreground sm:text-[1.85rem]">
+                  <h3 className="hito-panel-title mt-3">
                     Add a Garmin run to compare it with the plan.
                   </h3>
-                  <p className="mt-3 max-w-xl text-sm leading-relaxed text-foreground/82">
-                    Use one Garmin <span className="font-mono text-xs">.fit</span> file or one{" "}
-                    <span className="font-mono text-xs">.zip</span> archive with exactly one FIT
+                  <p className="hito-body mt-3 max-w-xl">
+                    Use one Garmin <span className="hito-technical-mono">.fit</span> file or one{" "}
+                    <span className="hito-technical-mono">.zip</span> archive with exactly one FIT
                     activity. That unlocks the comparison below.
                   </p>
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -814,7 +806,7 @@ export function WorkoutFeedbackPanel({
                         !canUploadResult && "disabled:opacity-100",
                       )}
                     >
-                      <FileUp className="h-4 w-4" />
+                      <Icon name="file-up" size="sm" />
                       {isUploading ? "Uploading file..." : "Upload Garmin file"}
                     </button>
                   </div>
@@ -837,11 +829,9 @@ export function WorkoutFeedbackPanel({
         <section className="border-t border-hairline pt-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="max-w-3xl">
-              <h3 className="text-xl font-display leading-tight text-foreground sm:text-[1.7rem]">
-                Plan vs run
-              </h3>
+              <h3 className="hito-panel-title">Plan vs run</h3>
               {!feedbackState?.latestComparison ? (
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-foreground/85">
+                <p className="hito-body mt-2 max-w-2xl">
                   This compares the planned workout with the uploaded run.
                 </p>
               ) : null}
@@ -858,7 +848,7 @@ export function WorkoutFeedbackPanel({
           {feedbackState?.latestComparison ? (
             <DeterministicComparisonReadback comparison={feedbackState.latestComparison} />
           ) : (
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-foreground/85">
+            <p className="hito-body mt-4 max-w-2xl">
               No comparison yet. Once the Garmin file is processed, it will show up here.
             </p>
           )}
@@ -866,11 +856,9 @@ export function WorkoutFeedbackPanel({
 
         <section className="border-t border-hairline pt-6">
           <div className="max-w-3xl">
-            <h3 className="text-xl font-display leading-tight text-foreground sm:text-[1.7rem]">
-              Next step
-            </h3>
+            <h3 className="hito-panel-title">Next step</h3>
             {!feedbackState?.latestAiInsight ? (
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-foreground/85">
+              <p className="hito-body mt-2 max-w-2xl">
                 A short note based on the comparison above.
               </p>
             ) : null}
@@ -881,7 +869,7 @@ export function WorkoutFeedbackPanel({
               comparison={feedbackState.latestComparison ?? null}
             />
           ) : (
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-foreground/85">
+            <p className="hito-body mt-4 max-w-2xl">
               No next-step note yet. After a successful Garmin upload, it can appear here.
             </p>
           )}
@@ -1042,14 +1030,14 @@ function BodyNotesSummaryRow({
           onClick={onOpen}
           className="hito-button hito-button-secondary hito-button-sm"
         >
-          <Plus className="h-4 w-4" strokeWidth={1.5} />
+          <Icon name="plus" size="sm" />
           {hasBodyNotes ? "Edit body notes" : "Add body note"}
         </button>
       </div>
 
       {!hasBodyNotes ? (
         <div className="hito-surface-flat mt-4 p-4">
-          <p className="text-sm leading-relaxed text-foreground/85">
+          <p className="hito-body">
             No body notes saved with this workout result. Leave this empty when the run felt normal.
           </p>
         </div>
@@ -1061,12 +1049,8 @@ function BodyNotesSummaryRow({
               className="hito-surface-flat flex flex-wrap items-center justify-between gap-3 p-4"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium leading-relaxed text-foreground/92">
-                  {bodyNote.area}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {describeBodyNoteDraft(bodyNote)}
-                </p>
+                <p className="hito-list-row-title">{bodyNote.area}</p>
+                <p className="hito-body-small mt-1">{describeBodyNoteDraft(bodyNote)}</p>
               </div>
               <div className="flex items-center gap-3">
                 <SeverityBars severity={bodyNote.severity} />
@@ -1102,8 +1086,8 @@ function BodyNotesModal({
         className="hito-dialog-stable hito-product-dialog h-[min(46rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
       >
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
-          <DialogTitle className="font-display text-3xl">Body notes</DialogTitle>
-          <DialogDescription className="max-w-2xl text-sm leading-relaxed text-foreground/72">
+          <DialogTitle className="hito-modal-title">Body notes</DialogTitle>
+          <DialogDescription className="hito-body max-w-2xl">
             These notes stay attached to this workout result only. Use them to mark where the run
             felt off without turning the result into a second full form.
           </DialogDescription>
@@ -1122,7 +1106,7 @@ function BodyNotesModal({
                 onClick={() => onChange([...bodyNotes, createEmptyBodyNoteDraft()])}
                 className="hito-button hito-button-secondary hito-button-sm"
               >
-                <Plus className="h-4 w-4" strokeWidth={1.5} />
+                <Icon name="plus" size="sm" />
                 Add note
               </button>
             ) : null}
@@ -1130,7 +1114,7 @@ function BodyNotesModal({
 
           {bodyNotes.length === 0 ? (
             <div className="hito-surface-flat mt-5 p-5">
-              <p className="text-sm leading-relaxed text-foreground/85">
+              <p className="hito-body">
                 No body notes will be saved with this workout unless you add one here.
               </p>
               <button
@@ -1138,7 +1122,7 @@ function BodyNotesModal({
                 onClick={() => onChange([createEmptyBodyNoteDraft()])}
                 className="hito-button hito-button-secondary hito-button-sm mt-4"
               >
-                <Plus className="h-4 w-4" strokeWidth={1.5} />
+                <Icon name="plus" size="sm" />
                 Add body note
               </button>
             </div>
@@ -1208,7 +1192,7 @@ function BodyNoteEditorCard({
           onClick={onRemove}
           className="hito-button hito-button-ghost hito-button-xs"
         >
-          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+          <Icon name="trash" size="xs" />
           Remove
         </button>
       </div>
@@ -1348,7 +1332,7 @@ function BodyAreaMapField({
               region.area === value ? "border-signal/35 bg-accent/35" : "hover:bg-accent/25",
             )}
           >
-            <span className="text-sm text-foreground/92">{region.area}</span>
+            <span className="hito-list-row-title">{region.area}</span>
             {region.area === value ? (
               <span className="hito-caption text-signal">Selected</span>
             ) : null}
@@ -1435,7 +1419,7 @@ function NoteSelectField({
 }) {
   return (
     <label className="block">
-      <span className="hito-label">{label}</span>
+      <span className="hito-form-label">{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -1494,7 +1478,7 @@ function FeedbackUploadSummary({
           </span>
         ) : null}
       </div>
-      <p className="text-sm leading-relaxed text-foreground/85">{summary.body}</p>
+      <p className="hito-body">{summary.body}</p>
       {summary.detailLine ? <p className="hito-caption">{summary.detailLine}</p> : null}
     </div>
   );
@@ -1524,9 +1508,7 @@ function AttachedEvidenceReadback({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="hito-label">Attached file</div>
-          <p className="mt-2 text-base font-medium leading-relaxed text-foreground/92">
-            {asset.originalFileName}
-          </p>
+          <p className="hito-list-row-title mt-2">{asset.originalFileName}</p>
           <p className="hito-caption mt-2">{metadata.join(" · ")}</p>
           {asset.primaryFileName && asset.primaryFileName !== asset.originalFileName ? (
             <p className="hito-caption mt-1">Extracted activity: {asset.primaryFileName}</p>
@@ -1540,16 +1522,16 @@ function AttachedEvidenceReadback({
           disabled={isRemoving}
           className="hito-button hito-button-secondary hito-button-md shrink-0 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100"
         >
-          <Trash2 className="h-4 w-4" />
+          <Icon name="trash" size="sm" />
           {isRemoving ? "Removing..." : "Remove file"}
         </button>
       </div>
 
       <div className="mt-4 border-t border-hairline pt-4">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-foreground/92">{summary.label}</p>
+          <p className="hito-list-row-title">{summary.label}</p>
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-foreground/85">{summary.body}</p>
+        <p className="hito-body mt-2">{summary.body}</p>
         {summary.detailLine ? <p className="hito-caption mt-2">{summary.detailLine}</p> : null}
       </div>
     </div>
@@ -1809,14 +1791,14 @@ function DeterministicComparisonReadback({ comparison }: { comparison: WorkoutCo
 
       {sessionItems.length > 0 && (
         <div className="border-t border-hairline pt-4">
-          <p className="text-sm font-medium text-foreground/92">Run summary</p>
+          <p className="hito-list-row-title">Run summary</p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {sessionItems.map((item) => (
               <div key={item.label} title={item.helpText}>
                 <p className="hito-caption">{item.label}</p>
                 <p
                   className={cn(
-                    "mt-1 text-sm font-mono text-foreground/90",
+                    "hito-technical-mono mt-1",
                     item.tone === "success" && "text-success",
                     item.tone === "warning" && "text-warn",
                     item.tone === "destructive" && "text-destructive",
@@ -1825,11 +1807,7 @@ function DeterministicComparisonReadback({ comparison }: { comparison: WorkoutCo
                   {item.direction === "up" ? "↑ " : item.direction === "down" ? "↓ " : ""}
                   {item.value}
                 </p>
-                {item.support ? (
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {item.support}
-                  </p>
-                ) : null}
+                {item.support ? <p className="hito-body-small mt-1">{item.support}</p> : null}
               </div>
             ))}
           </div>
@@ -1856,12 +1834,10 @@ function DeterministicComparisonReadback({ comparison }: { comparison: WorkoutCo
 
       {technicalNotes.length > 0 ? (
         <details className="border-t border-hairline pt-4">
-          <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            Comparison notes
-          </summary>
+          <summary className="hito-label cursor-pointer list-none">Comparison notes</summary>
           <div className="mt-3 space-y-2">
             {technicalNotes.map((note) => (
-              <p key={note} className="text-xs leading-relaxed text-foreground/72">
+              <p key={note} className="hito-body-small">
                 {note}
               </p>
             ))}
@@ -1918,9 +1894,7 @@ function WorkoutAiInsightReadback({
 
       <div className="rounded-xl bg-background/18 px-4 py-4">
         <p className="hito-label">{recommendationSectionLabel}</p>
-        <p className="mt-2 text-sm leading-relaxed text-foreground/90">
-          {insight.nextWorkoutRecommendation}
-        </p>
+        <p className="hito-body mt-2">{insight.nextWorkoutRecommendation}</p>
         <p className="hito-caption mt-3">{recommendationSupport}</p>
       </div>
 
@@ -1930,17 +1904,13 @@ function WorkoutAiInsightReadback({
         <AiInsightSection label={differenceLabel} body={insight.differenceExplanation} />
       ) : (
         <details className="border-t border-hairline pt-4">
-          <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            {differenceLabel}
-          </summary>
+          <summary className="hito-label cursor-pointer list-none">{differenceLabel}</summary>
           <div className="mt-3 space-y-3">
-            <p className="text-xs leading-relaxed text-foreground/75">
-              {insight.differenceExplanation}
-            </p>
+            <p className="hito-body-small">{insight.differenceExplanation}</p>
             {cautionSummary ? (
               <div className="rounded-lg bg-background/18 px-3 py-2">
                 <p className="hito-label">Use with care</p>
-                <p className="mt-2 text-xs leading-relaxed text-foreground/75">{cautionSummary}</p>
+                <p className="hito-body-small mt-2">{cautionSummary}</p>
               </div>
             ) : null}
           </div>
@@ -1953,8 +1923,8 @@ function WorkoutAiInsightReadback({
 function AiInsightSection({ label, body }: { label: string; body: string }) {
   return (
     <div className="pt-1">
-      <p className="text-xs font-medium text-foreground/90">{label}</p>
-      <p className="mt-1 text-xs leading-relaxed text-foreground/70">{body}</p>
+      <p className="hito-list-row-title">{label}</p>
+      <p className="hito-body-small mt-1">{body}</p>
     </div>
   );
 }
@@ -1970,7 +1940,7 @@ function ComparisonMetaItem({
 }) {
   return (
     <div className="px-4 py-3" title={helpText}>
-      <p className="text-sm font-medium text-foreground/92">{value}</p>
+      <p className="hito-technical-mono">{value}</p>
       <p className="hito-caption mt-1">{label}</p>
     </div>
   );
@@ -1979,8 +1949,8 @@ function ComparisonMetaItem({
 function ComparisonSupportReadback({ readback }: { readback: SupportReadback }) {
   return (
     <div className="border-t border-hairline pt-4">
-      <p className="text-sm font-medium text-foreground/92">What this review checked</p>
-      <p className="mt-1 max-w-2xl text-xs leading-relaxed text-foreground/70">
+      <p className="hito-list-row-title">What this review checked</p>
+      <p className="hito-body-small mt-1 max-w-2xl">
         This section explains which parts of the plan-vs-run check are supported by the uploaded
         Garmin file today.
       </p>
@@ -1999,7 +1969,7 @@ function ComparisonSupportReadback({ readback }: { readback: SupportReadback }) 
       </div>
 
       {readback.unsupported.length > 0 ? (
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        <p className="hito-body-small mt-3">
           Not part of this review yet: {formatInlineList(readback.unsupported)}.
         </p>
       ) : null}
@@ -2034,8 +2004,8 @@ function SegmentSummaryReadback({ groups }: { groups: WorkoutComparisonSegmentGr
   return (
     <div className="border-t border-hairline pt-4">
       <div className="max-w-2xl">
-        <p className="text-sm font-medium text-foreground/92">Workout structure</p>
-        <p className="mt-1 text-xs leading-relaxed text-foreground/70">
+        <p className="hito-list-row-title">Workout structure</p>
+        <p className="hito-body-small mt-1">
           Grouped from the aligned workout steps, when warm-up, main work, recovery, or cooldown can
           be compared honestly.
         </p>
@@ -2044,12 +2014,8 @@ function SegmentSummaryReadback({ groups }: { groups: WorkoutComparisonSegmentGr
         {groups.map((group) => (
           <div key={group.key} className="flex flex-wrap items-start justify-between gap-3 py-3">
             <div>
-              <p className="text-sm font-medium text-foreground/90">
-                {humanizeSegmentGroupLabel(group)}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-foreground/70">
-                {describeSegmentGroup(group)}
-              </p>
+              <p className="hito-list-row-title">{humanizeSegmentGroupLabel(group)}</p>
+              <p className="hito-body-small mt-1">{describeSegmentGroup(group)}</p>
             </div>
             <span className="hito-status-pill" data-tone={toneForSignal(group.status)}>
               {humanizeSignalStatus(group.status)}
@@ -2067,14 +2033,12 @@ function SignalReadbackRow({ signal }: { signal: WorkoutComparisonSignal }) {
   return (
     <div className="py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground/90">
-          {humanizeSignalLabel(signal.label, signal.key)}
-        </p>
+        <p className="hito-list-row-title">{humanizeSignalLabel(signal.label, signal.key)}</p>
         <span className="hito-status-pill" data-tone={toneForSignal(signal.status)}>
           {humanizeSignalStatus(signal.status)}
         </span>
       </div>
-      {valueLine && <p className="mt-1 text-xs leading-relaxed text-foreground/70">{valueLine}</p>}
+      {valueLine && <p className="hito-body-small mt-1">{valueLine}</p>}
     </div>
   );
 }
@@ -2919,7 +2883,7 @@ function notNullSessionItem(
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="hito-label">{children}</div>;
+  return <div className="hito-form-label">{children}</div>;
 }
 
 function NumField({
@@ -2938,16 +2902,16 @@ function NumField({
   return (
     <div className="hito-surface-flat p-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="hito-label">{label}</span>
+        <span className="hito-form-label">{label}</span>
         <span className="hito-caption font-mono-num">plan {planned}</span>
       </div>
       <div className="mt-1 flex items-baseline gap-2">
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="bg-transparent font-display text-2xl w-full focus:outline-none"
+          className="hito-panel-title w-full bg-transparent focus:outline-none"
         />
-        <span className="text-xs text-muted-foreground">{suffix}</span>
+        <span className="hito-caption">{suffix}</span>
       </div>
     </div>
   );

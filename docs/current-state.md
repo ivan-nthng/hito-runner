@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-16
+2026-05-17
 
 ## Where We Are Now
 
@@ -117,6 +117,14 @@ Active
   `Open plan` now includes a quiet `Update plan` disclosure where saved-mode runners can enter a short intent, generate a backend-owned refresh proposal from persisted history, and read back why the remaining schedule might change, what would change, relevant caution context, and the explicit not-applied boundary.
 - The first runner-facing active-plan refresh confirm/apply slice is now implemented:
   proposal review now exposes `Apply update` and `Keep current plan`; keeping the current plan dismisses the proposal without mutation, applying calls the backend seam with stale/off-day revalidation, successful apply returns to the updated active-plan view, and stale proposals show a specific fresh-proposal recovery path.
+- The first Hito design-system toast slice is now implemented:
+  `/hitoDS` now documents and exercises the reusable info, working, success, and error toast primitive; working toasts use dismiss-only indeterminate progress with Safari-stable visible state, keep the dismiss action inside the toast anatomy, and can resolve in place to success or error, while `Open plan` proposal generation and `Apply update` consume one shared action-family toast id and keep source buttons plus inline review/stale feedback intact.
+- The first Hito typography canonicalization slice is now implemented:
+  shared CSS roles now cover display, page, modal, section, panel, body, body-small, helper, caption, label, form-label, button, nav/menu, metric, status, error/success, and technical mono text; `/hitoDS` now documents those roles as the canonical reference, and the first high-drift surfaces (`Open plan`, saved-mode JSON import, workout `Log result`/`Feedback`, and `User settings`) use those roles for headings, form labels, helper/body copy, status feedback, and fixed-format metadata.
+- The shared dialog typography contract is now fixed:
+  Radix-backed `DialogTitle` and `DialogDescription` no longer force generic shadcn typography defaults over product classes, so `Open plan`, saved-mode JSON import, and the workout body-note modal resolve their title/description rhythm from canonical Hito roles.
+- The first Hito icon-system normalization slice is now implemented:
+  Hito now owns one `lucide-react`-backed `Icon` primitive with stable product names, four canonical sizes, and documented `/hitoDS#icons` usage examples; product-level surfaces consume that layer, while generated UI infra remains the only direct lucide exception and the raw SVG icon folders have been removed.
 - The active-plan refresh apply hardening slice is now implemented:
   refresh apply now derives one schedule authority from the current remaining active schedule, preserves the original target date only when it is still valid at least seven days after the refresh start, repairs generated schedule, goal, runner-baseline, and fixed-rest-day availability before canonical validation, clamps replacement workouts to the original remaining-schedule window, and returns a bounded blocked result instead of leaking low-level authoring validation text.
 - The active-plan refresh proposal-output hygiene pass is now implemented:

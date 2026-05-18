@@ -1,17 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  CalendarClock,
-  Check,
-  ChevronRight,
-  Minus,
-  NotebookPen,
-  ShieldAlert,
-  X,
-} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { IntervalsViz } from "@/components/IntervalsViz";
 import { CompletionPanel, WorkoutFeedbackPanel } from "@/components/CompletionPanel";
+import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   displayTargetEntries,
@@ -132,7 +123,7 @@ function WorkoutPage() {
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(circle_at_top_left,rgba(209,161,69,0.14),transparent_48%),radial-gradient(circle_at_top_right,rgba(122,162,247,0.12),transparent_44%),radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_62%)]" />
         <div className="flex items-center gap-3 hito-section-subtitle">
           <Link to="/" className="inline-flex items-center gap-1 hover:text-foreground">
-            <ArrowLeft className="h-3 w-3" /> Calendar
+            <Icon name="arrow-left" size="xs" /> Calendar
           </Link>
           <span className="opacity-50">/</span>
           <span>{phase}</span>
@@ -316,7 +307,7 @@ function WorkoutPage() {
 
               <SidebarSection title="About this page" tone="signal">
                 <div className="flex items-start gap-2">
-                  <CalendarClock className="mt-0.5 h-3.5 w-3.5 text-signal" />
+                  <Icon name="calendar-clock" size="xs" className="mt-0.5 text-signal" />
                   <p className="text-xs leading-relaxed text-foreground/80">
                     {snapshot.source === "persisted"
                       ? `${APP_NAME} keeps the same layout here while your plan, results, and week status come from saved data.`
@@ -328,7 +319,7 @@ function WorkoutPage() {
               {status === "skipped" && (
                 <SidebarSection title="Skipped">
                   <div className="flex items-start gap-2">
-                    <ShieldAlert className="mt-0.5 h-3.5 w-3.5 text-destructive" />
+                    <Icon name="shield-alert" size="xs" className="mt-0.5 text-destructive" />
                     <p className="text-xs text-foreground/80">
                       {snapshot.source === "persisted"
                         ? skippedCopy
@@ -506,7 +497,7 @@ function Overview({ workout }: { workout: Workout }) {
 function PreviewPanel() {
   return (
     <div className="hito-surface-flat border-dashed p-8 text-center">
-      <NotebookPen className="h-6 w-6 mx-auto text-signal" strokeWidth={1.4} />
+      <Icon name="plan-note" size="lg" className="mx-auto text-signal" strokeWidth={1.4} />
       <h3 className="mt-4 font-display text-2xl">This tab is not in use yet</h3>
       <p className="hito-support-copy mx-auto mt-3 max-w-md">
         It stays here to hold the tab layout until extra analysis or plan tools are ready.
@@ -596,7 +587,7 @@ function NavCard({
         {direction === "prev" ? (
           <>
             <span className="hito-nav-card-arrow">
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <Icon name="arrow-left" size="xs" />
             </span>
             <span className="hito-nav-card-label">Previous</span>
             <span className="hito-nav-card-date">{formattedDate}</span>
@@ -606,7 +597,7 @@ function NavCard({
             <span className="hito-nav-card-date">{formattedDate}</span>
             <span className="hito-nav-card-label">Next</span>
             <span className="hito-nav-card-arrow">
-              <ChevronRight className="h-3.5 w-3.5" />
+              <Icon name="chevron-right" size="xs" />
             </span>
           </>
         )}
@@ -684,7 +675,7 @@ function resultMetaForStatus(status: Workout["status"]) {
   if (status === "completed") {
     return {
       label: "Completed well",
-      icon: Check,
+      icon: "check",
       tone: "success" as const,
     };
   }
@@ -692,7 +683,7 @@ function resultMetaForStatus(status: Workout["status"]) {
   if (status === "partial") {
     return {
       label: "Partial",
-      icon: Minus,
+      icon: "minus",
       tone: "warn" as const,
     };
   }
@@ -700,7 +691,7 @@ function resultMetaForStatus(status: Workout["status"]) {
   if (status === "skipped") {
     return {
       label: "Skipped",
-      icon: X,
+      icon: "close",
       tone: "destructive" as const,
     };
   }
@@ -727,8 +718,6 @@ function ResultBadge({
   meta: NonNullable<ReturnType<typeof resultMetaForStatus>>;
   mode: "identity" | "sidebar";
 }) {
-  const Icon = meta.icon;
-
   return (
     <span
       className={cn("hito-status-pill", mode === "sidebar" && "text-[11px]")}
@@ -740,7 +729,7 @@ function ResultBadge({
         data-size="xs"
         data-tone={meta.tone === "warn" ? "warning" : meta.tone}
       >
-        <Icon className="h-3.5 w-3.5" strokeWidth={2.2} />
+        <Icon name={meta.icon} size="xs" strokeWidth={2.2} />
       </span>
       {meta.label}
     </span>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, NotebookPen, X } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import {
   feedbackMarkerMeta,
   formatDistanceKm,
@@ -121,7 +121,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
               className="hito-button hito-button-primary hito-button-lg"
             >
               {isRestDay ? "Open day" : "Open workout"}
-              <ArrowUpRight className="h-4 w-4" />
+              <Icon name="arrow-up-right" size="sm" />
             </Link>
             {!isRestDay && (
               <Link
@@ -241,7 +241,7 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
                 className="hito-button hito-button-primary hito-button-lg"
               >
                 Open nearest workout
-                <ArrowUpRight className="h-4 w-4" />
+                <Icon name="arrow-up-right" size="sm" />
               </Link>
             )}
             <Link to="/progress" className="hito-button hito-button-secondary hito-button-lg">
@@ -253,7 +253,7 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
         <div>
           <DismissibleSupportNote
             title="Plan Window"
-            icon={<NotebookPen className="h-3 w-3 text-signal" />}
+            icon={<Icon name="plan-note" size="xs" className="text-signal" />}
           >
             {planStart && planEnd
               ? `${formatDate(planStart, { month: "short", day: "numeric" })} to ${formatDate(planEnd, { month: "short", day: "numeric" })}`
@@ -361,7 +361,7 @@ function DismissibleSupportNote({
           className="hito-button hito-button-ghost hito-button-xs aspect-square shrink-0 p-0 text-muted-foreground hover:text-foreground"
           aria-label={`Dismiss ${title}`}
         >
-          <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+          <Icon name="close" size="xs" />
         </button>
       </div>
     </section>

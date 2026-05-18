@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
-import { Check, ChevronLeft, ChevronRight, Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Icon } from "@/components/ui/icon";
 import {
   displayTargetEntries,
   feedbackMarkerMeta,
@@ -88,7 +88,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
             onClick={() => shift(-1)}
             className="hito-button hito-button-secondary hito-button-sm aspect-square p-0"
           >
-            <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+            <Icon name="chevron-left" size="sm" />
           </button>
           <button
             onClick={() => setCursor(new Date(`${snapshot.currentDate}T00:00:00`))}
@@ -100,7 +100,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
             onClick={() => shift(1)}
             className="hito-button hito-button-secondary hito-button-sm aspect-square p-0"
           >
-            <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+            <Icon name="chevron-right" size="sm" />
           </button>
         </div>
       </div>
@@ -344,7 +344,7 @@ function StatusMark({ status, compact = false }: { status: Status; compact?: boo
         data-size="xs"
         data-tone="success"
       >
-        <Check className="h-3.5 w-3.5" strokeWidth={2.4} />
+        <Icon name="check" size="xs" strokeWidth={2.4} />
       </span>
     );
   }
@@ -356,7 +356,7 @@ function StatusMark({ status, compact = false }: { status: Status; compact?: boo
         data-size="xs"
         data-tone="destructive"
       >
-        <X className="h-3.5 w-3.5" strokeWidth={2.3} />
+        <Icon name="close" size="xs" strokeWidth={2.3} />
       </span>
     );
   }
@@ -367,7 +367,7 @@ function StatusMark({ status, compact = false }: { status: Status; compact?: boo
       data-size="xs"
       data-tone="muted"
     >
-      <Minus className="h-3.5 w-3.5" strokeWidth={2.2} />
+      <Icon name="minus" size="xs" strokeWidth={2.2} />
     </span>
   );
 }

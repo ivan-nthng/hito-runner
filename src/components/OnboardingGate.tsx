@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, Download, Upload } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import {
   FUTURE_TEMPLATE_DOWNLOAD_PATH,
   summarizeImportedPlan,
@@ -180,7 +180,7 @@ export function OnboardingGate() {
           <details className="hito-disclosure max-w-2xl">
             <summary className="hito-disclosure-summary">
               <span>Need the new plan to start today instead?</span>
-              <ChevronDown className="hito-disclosure-chevron" />
+              <Icon name="chevron-down" className="hito-disclosure-chevron" />
             </summary>
             <div className="hito-disclosure-body">
               <p className="hito-field-helper">
@@ -278,7 +278,7 @@ export function OnboardingGate() {
                   onClick={() => fileInputRef.current?.click()}
                   className="hito-button hito-button-secondary hito-button-md"
                 >
-                  <Upload className="h-4 w-4" />
+                  <Icon name="upload" size="sm" />
                   {selectedFileName ? "Choose another file" : "Upload file"}
                 </button>
                 {selectedFileName && (
@@ -289,7 +289,7 @@ export function OnboardingGate() {
               <details className="hito-disclosure">
                 <summary className="hito-disclosure-summary">
                   <span>Paste JSON or download a template</span>
-                  <ChevronDown className="hito-disclosure-chevron" />
+                  <Icon name="chevron-down" className="hito-disclosure-chevron" />
                 </summary>
                 <div className="hito-disclosure-body">
                   <div>
@@ -298,7 +298,7 @@ export function OnboardingGate() {
                       download
                       className="hito-button hito-button-ghost hito-button-sm"
                     >
-                      <Download className="h-4 w-4 text-signal" />
+                      <Icon name="download" size="sm" className="text-signal" />
                       Download JSON template
                     </a>
                   </div>
@@ -394,7 +394,7 @@ export function OnboardingGate() {
               <details className="hito-disclosure max-w-2xl">
                 <summary className="hito-disclosure-summary">
                   <span>Need this file to replace today?</span>
-                  <ChevronDown className="hito-disclosure-chevron" />
+                  <Icon name="chevron-down" className="hito-disclosure-chevron" />
                 </summary>
                 <div className="hito-disclosure-body">
                   <p className="hito-field-helper">

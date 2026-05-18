@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
-import { Activity, Watch, Apple, NotebookPen, ImageIcon, Cog } from "lucide-react";
+import { Icon, type HitoIconName } from "@/components/ui/icon";
 import { findWorkout, type Workout } from "@/lib/training";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
@@ -25,7 +25,7 @@ const ITEMS = [
     id: "garmin",
     name: "Garmin Connect",
     desc: "Not connected yet.",
-    icon: Watch,
+    icon: "watch",
     status: "later",
     category: "Devices",
   },
@@ -33,7 +33,7 @@ const ITEMS = [
     id: "strava",
     name: "Strava",
     desc: "Not connected yet.",
-    icon: Activity,
+    icon: "activity",
     status: "later",
     category: "Devices",
   },
@@ -41,7 +41,7 @@ const ITEMS = [
     id: "apple",
     name: "Apple Health",
     desc: "Not connected yet.",
-    icon: Apple,
+    icon: "apple",
     status: "later",
     category: "Devices",
   },
@@ -49,7 +49,7 @@ const ITEMS = [
     id: "feedback",
     name: "Workout feedback",
     desc: "Available inside each workout in Feedback. Add a Garmin file, compare plan vs run, and read the next-step note there.",
-    icon: NotebookPen,
+    icon: "plan-note",
     status: "live",
     category: "Intelligence",
   },
@@ -57,7 +57,7 @@ const ITEMS = [
     id: "ocr",
     name: "Screenshot import",
     desc: "Not available yet.",
-    icon: ImageIcon,
+    icon: "image",
     status: "later",
     category: "Intelligence",
   },
@@ -65,11 +65,18 @@ const ITEMS = [
     id: "engine",
     name: "Plan adjustments",
     desc: "Not automatic yet.",
-    icon: Cog,
+    icon: "cog",
     status: "later",
     category: "Intelligence",
   },
-];
+] satisfies {
+  id: string;
+  name: string;
+  desc: string;
+  icon: HitoIconName;
+  status: string;
+  category: string;
+}[];
 
 function Integrations() {
   const { snapshot, viewer } = Route.useLoaderData();
@@ -99,7 +106,6 @@ function Integrations() {
               </div>
               <div className="hito-row-group">
                 {ITEMS.filter((i) => i.category === c).map((i) => {
-                  const Icon = i.icon;
                   const canOpenFeedback =
                     i.id === "feedback" &&
                     snapshot.source === "persisted" &&
@@ -114,7 +120,7 @@ function Integrations() {
                     >
                       <div className="flex min-w-0 items-start gap-3">
                         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-hairline bg-background/25">
-                          <Icon className="h-4 w-4" strokeWidth={1.5} />
+                          <Icon name={i.icon} size="sm" />
                         </div>
                         <div className="min-w-0">
                           <h3 className="hito-list-row-title">{i.name}</h3>

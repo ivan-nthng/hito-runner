@@ -1,22 +1,9 @@
-import { useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  Circle,
-  Download,
-  FileJson2,
-  LineChart,
-  Minus,
-  Plug,
-  Search,
-  Settings2,
-  X,
-} from "lucide-react";
 import { APP_NAME } from "@/lib/app-config";
+import { hitoToast } from "@/components/ui/hito-toast";
+import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/hitoDS")({
@@ -35,10 +22,12 @@ export const Route = createFileRoute("/hitoDS")({
 const SECTIONS = [
   { id: "overview", label: "Overview" },
   { id: "typography", label: "Typography" },
+  { id: "icons", label: "Icons" },
   { id: "buttons", label: "Buttons" },
   { id: "inputs", label: "Inputs" },
   { id: "surfaces", label: "Composition" },
   { id: "modals", label: "Modals" },
+  { id: "async-actions", label: "Async toasts" },
   { id: "states", label: "States" },
   { id: "analytics", label: "Summary truth" },
   { id: "rows", label: "Rows & disclosure" },
@@ -50,10 +39,10 @@ const BUTTON_VARIANTS = ["primary", "secondary", "outlined", "ghost"] as const;
 const BUTTON_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
 const FIELD_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
 const STATUS_MARKER_EXAMPLES = [
-  { label: "Completed", tone: "success", icon: Check },
-  { label: "Partial", tone: "warning", icon: Minus },
-  { label: "Skipped", tone: "destructive", icon: X },
-  { label: "Neutral", tone: "muted", icon: Minus },
+  { label: "Completed", tone: "success", icon: "check" },
+  { label: "Partial", tone: "warning", icon: "minus" },
+  { label: "Skipped", tone: "destructive", icon: "close" },
+  { label: "Neutral", tone: "muted", icon: "minus" },
 ] as const;
 
 const FEEDBACK_MARKER_EXAMPLES = [
@@ -75,6 +64,130 @@ const CALENDAR_TYPE_EXAMPLES = [
 
 type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
 type ButtonSize = (typeof BUTTON_SIZES)[number];
+type AsyncToastDemoState = "info" | "working" | "success" | "error";
+
+const HITO_DS_TOAST_ID = "hito-ds-async-action-toast";
+const TYPOGRAPHY_ROLES = [
+  {
+    role: "Display",
+    className: "hito-display-title",
+    sample: "A running plan that stays honest.",
+    use: "Rare editorial emphasis for auth or top-tier entry moments.",
+    spec: "Fraunces · clamp(3.5rem, 7vw, 5rem) · 400 · -0.02em · lh 1",
+  },
+  {
+    role: "Page title",
+    className: "hito-page-title",
+    sample: "Profile details that follow your training.",
+    use: "Top-level route title or major state heading.",
+    spec: "Fraunces · clamp(3rem, 6vw, 4.5rem) · 400 · -0.02em · lh 1",
+  },
+  {
+    role: "Modal title",
+    className: "hito-modal-title",
+    sample: "Open plan",
+    use: "Primary heading inside bounded product dialogs.",
+    spec: "Fraunces · 1.75-2rem · 400 · -0.02em · lh 1.1",
+  },
+  {
+    role: "Section title",
+    className: "hito-section-title",
+    sample: "Body data",
+    use: "Section-level orientation within an open surface.",
+    spec: "Fraunces · 1.5rem · 400 · -0.02em · lh 1.15",
+  },
+  {
+    role: "Panel title",
+    className: "hito-panel-title",
+    sample: "Plan vs run",
+    use: "Compact internal panels, review modules, and feedback sections.",
+    spec: "Fraunces · 1.25-1.375rem · 400 · -0.015em · lh 1.18",
+  },
+  {
+    role: "Body",
+    className: "hito-body",
+    sample: "This compares the planned workout with the uploaded run.",
+    use: "Default readable paragraph for page, modal, and section support.",
+    spec: "Inter · 0.875rem · 400 · lh 1.58",
+  },
+  {
+    role: "Body small",
+    className: "hito-body-small",
+    sample: "Saved workout history stays preserved.",
+    use: "Dense secondary explanations, row support, and metadata.",
+    spec: "Inter · 0.8125rem · 400 · lh 1.5",
+  },
+  {
+    role: "Helper",
+    className: "hito-field-helper",
+    sample: "Nothing changes until you choose Apply update.",
+    use: "Field-adjacent or control-adjacent operational guidance.",
+    spec: "Inter · 0.75rem · 400 · lh 1.45",
+  },
+  {
+    role: "Caption",
+    className: "hito-caption",
+    sample: "Extracted activity: morning-run.fit",
+    use: "Tertiary detail, legends, tiny footnotes, and timestamps.",
+    spec: "Inter · 0.6875rem · 400 · lh 1.45",
+  },
+  {
+    role: "Label",
+    className: "hito-label",
+    sample: "Current plan",
+    use: "Micro orientation, never a substitute for a heading.",
+    spec: "Inter · 0.6875rem · 500 · 0.18em · uppercase",
+  },
+  {
+    role: "Form label",
+    className: "hito-form-label",
+    sample: "Start training",
+    use: "Explicit ownership label for fields and controls.",
+    spec: "Inter · 0.6875rem · 500 · 0.18em · uppercase",
+  },
+  {
+    role: "Button",
+    className: "hito-button hito-button-secondary hito-button-sm",
+    sample: "Generate proposal",
+    use: "Action text tuned by shared Hito button size tiers.",
+    spec: "Inter · tiered 0.6875-0.9375rem · 500 · lh 1",
+  },
+  {
+    role: "Nav / menu",
+    className: "hito-menu-text",
+    sample: "User settings",
+    use: "Shell navigation, dropdown rows, and utility menu text.",
+    spec: "Inter · 0.8125-0.875rem · 500 · lh 1-1.3",
+  },
+  {
+    role: "Metric",
+    className: "hito-metric-value",
+    sample: "42.2 km",
+    use: "Measured truth: distance, duration, pace, counts, and dates.",
+    spec: "JetBrains Mono · 1rem · 500 · tabular · lh 1.1",
+  },
+  {
+    role: "Status",
+    className: "hito-status-pill",
+    sample: "Ready",
+    use: "Semantic state identifier, never a heading.",
+    spec: "Inter · 0.625rem · 500 · 0.12em · uppercase",
+  },
+  {
+    role: "Error / success",
+    className: "hito-field-success",
+    sample: "User settings saved.",
+    use: "Bounded action feedback near the relevant control family.",
+    spec: "Inter · 0.875rem · 500 · lh 1.45",
+  },
+  {
+    role: "Technical mono",
+    className: "hito-technical-mono",
+    sample: '{"schema_version":"training-plan-v2"}',
+    use: "JSON, identifiers, file metadata, timestamps, and fixed-format facts.",
+    spec: "JetBrains Mono · 0.75rem · 400 · tabular · lh 1.45",
+  },
+] as const;
 
 function HitoDesignSystemPage() {
   const [variant, setVariant] = useState<ButtonVariant>("primary");
@@ -82,13 +195,61 @@ function HitoDesignSystemPage() {
   const [leftIcon, setLeftIcon] = useState(true);
   const [rightIcon, setRightIcon] = useState(true);
   const [disabled, setDisabled] = useState(false);
+  const [toastDemoState, setToastDemoState] = useState<AsyncToastDemoState>("working");
+  const toastDemoTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      clearToastDemoTimer(toastDemoTimerRef);
+      hitoToast.dismiss(HITO_DS_TOAST_ID);
+    };
+  }, []);
+
+  const showDemoToast = (state: AsyncToastDemoState) => {
+    clearToastDemoTimer(toastDemoTimerRef);
+    setToastDemoState(state);
+    showHitoToastDemo(state);
+  };
+
+  const showDemoSequence = (outcome: "success" | "error") => {
+    clearToastDemoTimer(toastDemoTimerRef);
+    setToastDemoState("working");
+    hitoToast.working({
+      id: HITO_DS_TOAST_ID,
+      title: "Preparing update",
+      description: "Working state is visible, dismissible, and indeterminate.",
+    });
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    toastDemoTimerRef.current = window.setTimeout(() => {
+      setToastDemoState(outcome);
+
+      if (outcome === "success") {
+        hitoToast.success({
+          id: HITO_DS_TOAST_ID,
+          title: "Update ready",
+          description: "The same toast resolved into a success state.",
+        });
+        return;
+      }
+
+      hitoToast.error({
+        id: HITO_DS_TOAST_ID,
+        title: "Update not applied",
+        description: "The same toast resolved into a bounded error state.",
+      });
+    }, 900);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground canvas-grain">
       <div className="grid min-h-screen lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="border-r border-hairline bg-sidebar/70 px-5 py-6 backdrop-blur lg:sticky lg:top-0 lg:h-screen">
           <div>
-            <div className="font-display text-2xl tracking-tight">hito ds</div>
+            <div className="hito-panel-title">hito ds</div>
             <p className="hito-label mt-2">Component system</p>
           </div>
 
@@ -97,7 +258,7 @@ function HitoDesignSystemPage() {
               <a
                 key={section.id}
                 href={`#${section.id}`}
-                className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
+                className="hito-nav-text rounded-md px-3 py-2 transition-colors hover:bg-accent/45 hover:text-foreground"
               >
                 {section.label}
               </a>
@@ -116,7 +277,7 @@ function HitoDesignSystemPage() {
           <div className="mx-auto max-w-6xl">
             <header id="overview" className="hito-page-header border-t border-hairline pt-8">
               <p className="hito-label hito-label-signal">Hito design system</p>
-              <h1 className="hito-page-title lg:text-7xl">Simplified product language.</h1>
+              <h1 className="hito-page-title">Simplified product language.</h1>
               <p className="hito-page-copy max-w-2xl">
                 A compact reference for the simplified Hito product language: open route rhythm,
                 divider-based grouping, restrained markers, quiet support copy, and explicit
@@ -128,24 +289,119 @@ function HitoDesignSystemPage() {
               <SectionIntro
                 label="Typography"
                 title="Shared roles, not route-local guesses."
-                body="Display is scarce, UI text stays operational, and mono values carry measured truth."
+                body="Display is scarce, UI text stays operational, and mono values carry measured truth. Use these classes before adding route-local text utilities."
               />
-              <div className="grid gap-4 lg:grid-cols-3">
-                <TokenCard
-                  label="Page title"
-                  title="Display identity."
-                  body="One large display title per major surface."
-                />
-                <TokenCard
-                  label="Section title"
-                  title="Compact emphasis."
-                  body="Section headers orient without becoming new hero moments."
-                />
-                <TokenCard
-                  label="Support copy"
-                  title="Short and calm."
-                  body="Muted body copy explains current truth without narration walls."
-                />
+              <div className="grid gap-5">
+                <div className="hito-row-group">
+                  <div className="hito-list-row items-start">
+                    <div>
+                      <p className="hito-list-row-title">Font ownership</p>
+                      <p className="hito-list-row-copy">
+                        Fraunces owns display, page, modal, section, and panel titles. Inter owns
+                        operational UI, labels, body, actions, navigation, and feedback. JetBrains
+                        Mono owns measured or fixed-format truth only.
+                      </p>
+                    </div>
+                    <span className="hito-status-pill" data-tone="signal">
+                      Canonical
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {TYPOGRAPHY_ROLES.map((role) => (
+                    <TypographyRoleCard key={role.role} role={role} />
+                  ))}
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <TokenCard
+                    label="Avoid"
+                    title="Oversized compact headings."
+                    body="Use panel title inside dense feedback, import, and proposal modules instead of route-local display sizes."
+                  />
+                  <TokenCard
+                    label="Avoid"
+                    title="Stacked uppercase micro labels."
+                    body="Labels orient a block once. Repeating them turns support copy into noise."
+                  />
+                  <TokenCard
+                    label="Avoid"
+                    title="Helper text as body copy."
+                    body="Use helper only beside controls; use body or body small for normal explanations."
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section id="icons" className="ds-section">
+              <SectionIntro
+                label="Icons"
+                title="One Hito registry, lucide underneath."
+                body="Product surfaces use the Hito Icon primitive and stable product names. Raw SVG folders are not a design-system source of truth."
+              />
+
+              <div className="grid gap-5">
+                <div className="hito-row-group">
+                  <div className="hito-list-row items-start">
+                    <div>
+                      <p className="hito-list-row-title">Canonical sizing</p>
+                      <p className="hito-list-row-copy">
+                        Icons use four sizes only: xs 14, sm 16, md 20, and lg 24. Small icons use a
+                        1.75 stroke by default; medium and large icons use 1.5.
+                      </p>
+                    </div>
+                    <span className="hito-status-pill" data-tone="signal">
+                      Hito Icon
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {HITO_ICON_META.map((icon) => (
+                    <IconSpecimen key={icon.name} icon={icon} />
+                  ))}
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-5">
+                  <IconUsageCard label="Button">
+                    <button
+                      type="button"
+                      className="hito-button hito-button-secondary hito-button-sm"
+                    >
+                      <Icon name="download" size="sm" />
+                      Export JSON
+                    </button>
+                  </IconUsageCard>
+                  <IconUsageCard label="Input">
+                    <div className="relative">
+                      <Icon
+                        name="search"
+                        size="sm"
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      />
+                      <input className="hito-field hito-field-md pl-9" placeholder="Search plans" />
+                    </div>
+                  </IconUsageCard>
+                  <IconUsageCard label="Nav row">
+                    <div className="hito-shell-nav-row" data-active="true">
+                      <Icon name="calendar" className="hito-shell-nav-icon" />
+                      <span>Calendar</span>
+                      <span className="hito-shell-nav-dot" />
+                    </div>
+                  </IconUsageCard>
+                  <IconUsageCard label="Menu row">
+                    <div className="hito-shell-menu-item">
+                      <Icon name="settings" size="sm" />
+                      User settings
+                    </div>
+                  </IconUsageCard>
+                  <IconUsageCard label="Status marker">
+                    <span className="hito-status-marker" data-size="xs" data-tone="success">
+                      <Icon name="check" size="xs" strokeWidth={2.2} />
+                    </span>
+                  </IconUsageCard>
+                </div>
               </div>
             </section>
 
@@ -248,7 +504,11 @@ function HitoDesignSystemPage() {
                   <label key={fieldSize} className="grid gap-2">
                     <span className="hito-label">Text input {fieldSize.toUpperCase()}</span>
                     <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Icon
+                        name="search"
+                        size="sm"
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      />
                       <input
                         className={cn("hito-field pl-9", `hito-field-${fieldSize}`)}
                         placeholder={`${fieldSize.toUpperCase()} field`}
@@ -290,7 +550,7 @@ function HitoDesignSystemPage() {
                 <article className="border-t border-hairline pt-5">
                   <div className="hito-section-header">
                     <div>
-                      <h3 className="hito-section-title text-3xl">Section with no box.</h3>
+                      <h3 className="hito-section-title">Section with no box.</h3>
                       <p className="hito-support-copy mt-2">
                         This is the default route cadence used by simplified home, progress, and
                         body surfaces.
@@ -311,7 +571,7 @@ function HitoDesignSystemPage() {
                 </article>
                 <article className="hito-surface-flat p-5">
                   <p className="hito-label">Use sparingly</p>
-                  <h3 className="mt-3 hito-section-title text-3xl">Owned payload.</h3>
+                  <h3 className="hito-panel-title mt-3">Owned payload.</h3>
                   <p className="hito-support-copy mt-3">
                     Keep a surface when it contains one active object, like an attached file, form,
                     or route-level state. Avoid stacking subcards inside it.
@@ -330,8 +590,8 @@ function HitoDesignSystemPage() {
                 <article className="hito-product-dialog h-[30rem] max-w-xl border border-hairline bg-background/95">
                   <header className="border-b border-hairline px-6 py-5 text-left">
                     <p className="hito-label hito-label-signal">Dialog header</p>
-                    <h3 className="font-display mt-2 text-3xl leading-tight">Import plan</h3>
-                    <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
+                    <h3 className="hito-modal-title mt-2">Import plan</h3>
+                    <p className="hito-body mt-2 max-w-lg">
                       The header names the task and keeps context short.
                     </p>
                   </header>
@@ -354,7 +614,7 @@ function HitoDesignSystemPage() {
                       <details className="hito-disclosure">
                         <summary className="hito-disclosure-summary">
                           <span>Destructive or expert exception</span>
-                          <ChevronDown className="hito-disclosure-chevron" />
+                          <Icon name="chevron-down" className="hito-disclosure-chevron" />
                         </summary>
                         <div className="hito-disclosure-body">
                           <button className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive">
@@ -405,6 +665,120 @@ function HitoDesignSystemPage() {
               </div>
             </section>
 
+            <section id="async-actions" className="ds-section">
+              <SectionIntro
+                label="Async action toasts"
+                title="Progress without taking over."
+                body="Use this pattern for long-running actions where the runner needs global progress and a short outcome, while validation, proposal review, and stale explanations stay inline."
+              />
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="hito-row-group">
+                  <div className="hito-list-row items-start">
+                    <div>
+                      <p className="hito-list-row-title">DS toast variants</p>
+                      <p className="hito-list-row-copy">
+                        Use these controls to render the real top-center Hito toast primitive. The
+                        dismiss control lives inside the toast anatomy, and the working variant is
+                        dismiss-only without cancelling server work.
+                      </p>
+                    </div>
+                    <span className="hito-status-pill" data-tone="signal">
+                      Primitive
+                    </span>
+                  </div>
+                  <div className="hito-list-row items-start">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="hito-button hito-button-secondary hito-button-sm"
+                        onClick={() => showDemoToast("info")}
+                      >
+                        <Icon name="warning" size="sm" className="text-muted-foreground" />
+                        Info
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-button hito-button-secondary hito-button-sm"
+                        onClick={() => showDemoToast("working")}
+                      >
+                        <Icon
+                          name="loader"
+                          size="sm"
+                          className="animate-spin text-muted-foreground"
+                        />
+                        Working
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-button hito-button-secondary hito-button-sm"
+                        onClick={() => showDemoToast("success")}
+                      >
+                        <Icon name="check-circle" size="sm" className="text-success" />
+                        Proposal ready
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-button hito-button-secondary hito-button-sm"
+                        onClick={() => showDemoToast("error")}
+                      >
+                        <Icon name="warning" size="sm" className="text-destructive" />
+                        Error
+                      </button>
+                    </div>
+                  </div>
+                  <div className="hito-list-row items-start">
+                    <div>
+                      <p className="hito-list-row-title">Resolve in place</p>
+                      <p className="hito-list-row-copy">
+                        These demos start with a working toast, then replace that same action-family
+                        toast id with success or error so older outcomes cannot mask the latest one.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        className="hito-button hito-button-ghost hito-button-sm"
+                        onClick={() => showDemoSequence("success")}
+                      >
+                        Working → success
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-button hito-button-ghost hito-button-sm"
+                        onClick={() => showDemoSequence("error")}
+                      >
+                        Working → error
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <article className="hito-surface-flat p-5">
+                  <p className="hito-label">Current demo state</p>
+                  <h3 className="hito-panel-title mt-3">
+                    {describeToastDemoState(toastDemoState).title}
+                  </h3>
+                  <p className="hito-support-copy mt-3">
+                    {describeToastDemoState(toastDemoState).description}
+                  </p>
+                </article>
+              </div>
+              <div className="hito-row-group mt-5">
+                <div className="hito-list-row items-start">
+                  <div>
+                    <p className="hito-list-row-title">V1 contract</p>
+                    <p className="hito-list-row-copy">
+                      Top-center, Safari-stable visible state, one active async toast, indeterminate
+                      progress, dismiss only, no cancel, and no fake percentages.
+                    </p>
+                  </div>
+                  <span className="hito-status-pill" data-tone="signal">
+                    Bounded
+                  </span>
+                </div>
+              </div>
+            </section>
+
             <section id="states" className="ds-section">
               <SectionIntro
                 label="States"
@@ -413,11 +787,11 @@ function HitoDesignSystemPage() {
               />
               <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <div className="hito-row-group self-start">
-                  {STATUS_MARKER_EXAMPLES.map(({ label, tone, icon: Icon }) => (
+                  {STATUS_MARKER_EXAMPLES.map(({ label, tone, icon }) => (
                     <div key={label} className="hito-list-row py-3">
                       <span className="hito-list-row-title">{label}</span>
                       <span className="hito-status-marker" data-tone={tone}>
-                        <Icon className="h-3.5 w-3.5" strokeWidth={2.2} />
+                        <Icon name={icon} size="xs" strokeWidth={2.2} />
                       </span>
                     </div>
                   ))}
@@ -425,7 +799,7 @@ function HitoDesignSystemPage() {
                 <div className="grid gap-4 lg:grid-cols-2">
                   <article className="hito-state-surface" data-tone="signal">
                     <p className="hito-label hito-label-signal">Setup state</p>
-                    <h3 className="hito-section-title mt-3 text-3xl">Create a first plan.</h3>
+                    <h3 className="hito-section-title mt-3">Create a first plan.</h3>
                     <p className="hito-support-copy mt-3">
                       State surfaces keep route-level setup and empty states consistent.
                     </p>
@@ -437,7 +811,7 @@ function HitoDesignSystemPage() {
                   </article>
                   <article className="hito-state-surface" data-tone="destructive">
                     <p className="hito-label text-destructive">Error state</p>
-                    <h3 className="hito-section-title mt-3 text-3xl">Try again.</h3>
+                    <h3 className="hito-section-title mt-3">Try again.</h3>
                     <p className="hito-support-copy mt-3">
                       Error tone is reserved for real load or save failures, not normal previews.
                     </p>
@@ -538,7 +912,7 @@ function HitoDesignSystemPage() {
                 <article className="hito-row-group">
                   {CALENDAR_TYPE_EXAMPLES.map(({ label, family, color }) => (
                     <div key={label} className="hito-list-row py-3">
-                      <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.14em]">
+                      <span className="hito-label inline-flex items-center gap-2">
                         <span
                           className="hito-calendar-type-glyph"
                           data-family={family}
@@ -645,12 +1019,12 @@ function HitoDesignSystemPage() {
               <details className="hito-disclosure mt-5">
                 <summary className="hito-disclosure-summary">
                   <span>
-                    <span className="block text-sm text-foreground">Destructive override</span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="hito-list-row-title block">Destructive override</span>
+                    <span className="hito-body-small block">
                       Available, but not a permanent sibling to the safe action.
                     </span>
                   </span>
-                  <ChevronDown className="hito-disclosure-chevron h-4 w-4" />
+                  <Icon name="chevron-down" className="hito-disclosure-chevron" />
                 </summary>
                 <div className="hito-disclosure-body">
                   <button className="hito-button hito-button-outlined hito-button-sm">
@@ -670,11 +1044,11 @@ function HitoDesignSystemPage() {
                 <div className="hito-surface-flat p-4">
                   <div className="hito-shell-nav">
                     {[
-                      { label: "Calendar", icon: CalendarDays, active: true },
-                      { label: "Progress", icon: LineChart, active: false },
-                    ].map(({ label, icon: Icon, active }) => (
+                      { label: "Calendar", icon: "calendar", active: true },
+                      { label: "Progress", icon: "progress", active: false },
+                    ].map(({ label, icon, active }) => (
                       <div key={label} className="hito-shell-nav-row" data-active={active}>
-                        <Icon className="hito-shell-nav-icon" strokeWidth={1.5} />
+                        <Icon name={icon as HitoIconName} className="hito-shell-nav-icon" />
                         <span>{label}</span>
                         {active && <span className="hito-shell-nav-dot" />}
                       </div>
@@ -687,17 +1061,15 @@ function HitoDesignSystemPage() {
                       IR
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-foreground">Ivan</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        Half Marathon Plan
-                      </span>
+                      <span className="hito-menu-text block truncate">Ivan</span>
+                      <span className="hito-menu-meta block truncate">Half Marathon Plan</span>
                     </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <Icon name="chevron-down" size="sm" className="text-muted-foreground" />
                   </button>
                   <div className="hito-row-group">
-                    <MenuRow icon={FileJson2} label="Advanced import" meta="Utility" />
-                    <MenuRow icon={Settings2} label="User settings" meta="Utility" />
-                    <MenuRow icon={Plug} label="Connections status" meta="Utility" />
+                    <MenuRow icon="import" label="Advanced import" meta="Utility" />
+                    <MenuRow icon="settings" label="User settings" meta="Utility" />
+                    <MenuRow icon="connections" label="Connections status" meta="Utility" />
                   </div>
                 </div>
               </div>
@@ -713,14 +1085,14 @@ function HitoDesignSystemPage() {
                 <div className="hito-surface-flat p-4">
                   <button className="hito-button hito-button-secondary hito-button-md w-full justify-between">
                     Component menu
-                    <ChevronDown className="h-4 w-4" />
+                    <Icon name="chevron-down" size="sm" />
                   </button>
                 </div>
                 <div className="hito-row-group">
-                  <MenuRow icon={Settings2} label="User settings" meta="Utility" />
-                  <MenuRow icon={Plug} label="Connections status" meta="Utility" />
-                  <MenuRow icon={FileJson2} label="Advanced import" meta="Utility" />
-                  <MenuRow icon={Download} label="Download template" meta="Secondary" />
+                  <MenuRow icon="settings" label="User settings" meta="Utility" />
+                  <MenuRow icon="connections" label="Connections status" meta="Utility" />
+                  <MenuRow icon="import" label="Advanced import" meta="Utility" />
+                  <MenuRow icon="download" label="Download template" meta="Secondary" />
                 </div>
               </div>
             </section>
@@ -736,7 +1108,7 @@ function SectionIntro({ label, title, body }: { label: string; title: string; bo
     <div className="hito-section-header">
       <div>
         <p className="hito-label hito-label-signal">{label}</p>
-        <h2 className="hito-section-title mt-3 text-4xl">{title}</h2>
+        <h2 className="hito-section-title mt-3">{title}</h2>
         <p className="hito-support-copy mt-3 max-w-2xl">{body}</p>
       </div>
     </div>
@@ -747,8 +1119,61 @@ function TokenCard({ label, title, body }: { label: string; title: string; body:
   return (
     <article className="hito-surface-flat p-5">
       <p className="hito-label">{label}</p>
-      <h3 className="mt-3 hito-section-title text-3xl">{title}</h3>
+      <h3 className="hito-panel-title mt-3">{title}</h3>
       <p className="hito-support-copy mt-3">{body}</p>
+    </article>
+  );
+}
+
+function TypographyRoleCard({ role }: { role: (typeof TYPOGRAPHY_ROLES)[number] }) {
+  return (
+    <article className="hito-surface-flat grid gap-4 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="hito-label">{role.role}</p>
+          <p className="hito-caption mt-2">{role.use}</p>
+        </div>
+        <code className="hito-technical-mono rounded-md bg-background/40 px-2 py-1">
+          .{role.className.split(" ")[0]}
+        </code>
+      </div>
+      <div className="rounded-xl border border-hairline bg-background/30 p-4">
+        <div className={role.className}>{role.sample}</div>
+      </div>
+      <p className="hito-caption">{role.spec}</p>
+    </article>
+  );
+}
+
+function IconSpecimen({ icon }: { icon: (typeof HITO_ICON_META)[number] }) {
+  return (
+    <article className="hito-surface-flat grid gap-4 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="hito-list-row-title">{icon.name}</p>
+          <p className="hito-caption mt-1">{icon.category}</p>
+        </div>
+        <span className="hito-status-pill" data-tone="neutral">
+          {icon.label}
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-2 rounded-xl border border-hairline bg-background/25 p-3">
+        {(Object.keys(HITO_ICON_SIZES) as (keyof typeof HITO_ICON_SIZES)[]).map((size) => (
+          <div key={size} className="grid place-items-center gap-2">
+            <Icon name={icon.name} size={size} />
+            <span className="hito-caption uppercase">{size}</span>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function IconUsageCard({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <article className="hito-surface-flat grid min-h-32 gap-4 p-4">
+      <p className="hito-label">{label}</p>
+      <div className="flex items-center">{children}</div>
     </article>
   );
 }
@@ -763,6 +1188,79 @@ function SummaryMetric({ label, value, unit }: { label: string; value: string; u
       <div className="hito-metric-label">{label}</div>
     </div>
   );
+}
+
+function showHitoToastDemo(state: AsyncToastDemoState) {
+  if (state === "info") {
+    hitoToast.info({
+      id: HITO_DS_TOAST_ID,
+      title: "Plan note",
+      description: "Informational toast copy is calm, short, and non-destructive.",
+    });
+    return;
+  }
+
+  if (state === "working") {
+    hitoToast.working({
+      id: HITO_DS_TOAST_ID,
+      title: "Preparing update",
+      description: "Working copy is indeterminate and can be dismissed without cancelling work.",
+    });
+    return;
+  }
+
+  if (state === "success") {
+    hitoToast.success({
+      id: HITO_DS_TOAST_ID,
+      title: "Update ready",
+      description: "Success appears only after the action really completes.",
+    });
+    return;
+  }
+
+  hitoToast.error({
+    id: HITO_DS_TOAST_ID,
+    title: "Update not applied",
+    description: "The proposal is no longer current. Generate a fresh proposal before applying.",
+  });
+}
+
+function describeToastDemoState(state: AsyncToastDemoState) {
+  if (state === "info") {
+    return {
+      title: "Info",
+      description: "Neutral, non-destructive status for short global context.",
+    };
+  }
+
+  if (state === "working") {
+    return {
+      title: "Working",
+      description: "Working state is dismissible, indeterminate, and does not cancel the action.",
+    };
+  }
+
+  if (state === "success") {
+    return {
+      title: "Proposal ready",
+      description: "Success replaces the working toast when the server returns.",
+    };
+  }
+
+  return {
+    title: "Error",
+    description: "Error replaces the working toast and keeps detailed recovery copy inline.",
+  };
+}
+
+function clearToastDemoTimer(timerRef: React.MutableRefObject<number | null>) {
+  if (timerRef.current == null || typeof window === "undefined") {
+    timerRef.current = null;
+    return;
+  }
+
+  window.clearTimeout(timerRef.current);
+  timerRef.current = null;
 }
 
 function LegendDemoItem({
@@ -829,26 +1327,18 @@ function DemoButton({
         `hito-button-${size}`,
       )}
     >
-      {leftIcon && <Circle className="h-3.5 w-3.5" />}
+      {leftIcon && <Icon name="circle" size="xs" />}
       {variant}
-      {rightIcon && <ArrowRight className="h-3.5 w-3.5" />}
+      {rightIcon && <Icon name="arrow-right" size="xs" />}
     </button>
   );
 }
 
-function MenuRow({
-  icon: Icon,
-  label,
-  meta,
-}: {
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-  label: string;
-  meta: string;
-}) {
+function MenuRow({ icon, label, meta }: { icon: HitoIconName; label: string; meta: string }) {
   return (
     <div className="hito-list-row py-3">
       <div className="flex items-center gap-3">
-        <Icon className="h-4 w-4 text-muted-foreground" strokeWidth={1.6} />
+        <Icon name={icon} size="sm" className="text-muted-foreground" strokeWidth={1.6} />
         <span className="hito-list-row-title">{label}</span>
       </div>
       <span className="hito-caption">{meta}</span>

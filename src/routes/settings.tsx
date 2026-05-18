@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, ChevronRight, UserRound } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Icon } from "@/components/ui/icon";
 import { APP_NAME } from "@/lib/app-config";
 import {
   getSettingsRouteData,
@@ -127,7 +127,7 @@ function SettingsPage() {
           <div className="hito-label">
             {isUploadingAvatar ? "Uploading avatar" : isSaving ? "Saving settings" : "Ready"}
           </div>
-          <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+          <p className="hito-body mt-2">
             {error
               ? error
               : message
@@ -160,7 +160,7 @@ function SettingsPage() {
               disabled={isUploadingAvatar}
               onClick={() => fileInputRef.current?.click()}
             >
-              <Camera className="h-4 w-4" strokeWidth={1.5} />
+              <Icon name="camera" size="sm" />
               {isUploadingAvatar ? "Uploading..." : "Upload avatar"}
             </button>
             <input
@@ -215,7 +215,7 @@ function SettingsPage() {
           <div className="space-y-8">
             <section className="border-t border-hairline pt-5">
               <div className="flex items-center gap-2">
-                <UserRound className="h-4 w-4 text-signal" strokeWidth={1.5} />
+                <Icon name="user" size="sm" className="text-signal" />
                 <h2 className="hito-section-title">Identity</h2>
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -320,7 +320,7 @@ function SettingsPage() {
               </button>
               <Link to="/" reloadDocument className="hito-button hito-button-ghost hito-button-lg">
                 Back to calendar
-                <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+                <Icon name="chevron-right" size="sm" />
               </Link>
             </div>
           </div>
@@ -347,7 +347,7 @@ function Field({
 }) {
   return (
     <label className="grid gap-2">
-      <span className="hito-label">{label}</span>
+      <span className="hito-form-label">{label}</span>
       <input
         type="text"
         name={name}
@@ -364,7 +364,7 @@ function Field({
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <label className="grid gap-2">
-      <span className="hito-label">{label}</span>
+      <span className="hito-form-label">{label}</span>
       <input
         type="email"
         name="email"

@@ -8,19 +8,6 @@ import {
 } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  AlertCircle,
-  CalendarX,
-  CalendarDays,
-  ChevronDown,
-  Download,
-  FileJson2,
-  FileText,
-  RefreshCcw,
-  Sparkles,
-  Trash2,
-  Upload,
-} from "lucide-react";
-import {
   FUTURE_TEMPLATE_DOWNLOAD_PATH,
   summarizeImportedPlan,
   type ImportedPlan,
@@ -54,6 +41,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { hitoToast } from "@/components/ui/hito-toast";
+import { Icon } from "@/components/ui/icon";
 
 type TextStatus = "idle" | "creating";
 type JsonStatus = "idle" | "parsing" | "importing";
@@ -62,6 +51,11 @@ type ClearStatus = "idle" | "clearing";
 type ExportStatus = "idle" | "exporting-json" | "exporting-markdown";
 type RefreshStatus = "idle" | "proposing";
 type RefreshApplyStatus = "idle" | "applying";
+
+const REFRESH_ACTION_TOAST_ID = "open-plan-refresh-action";
+const ASYNC_TOAST_STAGE_ONE_MS = 10_000;
+const ASYNC_TOAST_STAGE_TWO_MS = 30_000;
+const APPLY_SUCCESS_REDIRECT_DELAY_MS = 1_800;
 
 export function PlanManagementDialog({
   open,
@@ -84,6 +78,8 @@ export function PlanManagementDialog({
   const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
   const exportResetTimerRef = useRef<number | null>(null);
   const refreshSuccessTimerRef = useRef<number | null>(null);
+  const asyncToastTimersRef = useRef<number[]>([]);
+  const dismissedAsyncToastIdsRef = useRef<Set<string>>(new Set());
 
   const planMeta = snapshot?.planMeta;
   const defaultStartDate = snapshot?.currentDate ?? todayLocalIso();
@@ -171,6 +167,77 @@ export function PlanManagementDialog({
       }
     }
   }, [defaultStartDate, open]);
+
+  useEffect(() => {
+    return () => {
+      clearAsyncToastTimers(asyncToastTimersRef);
+      hitoToast.dismiss(REFRESH_ACTION_TOAST_ID);
+    };
+  }, []);
+
+  const showWorkingAsyncToast = ({
+    id,
+    title,
+    description,
+    stageOneDescription,
+    stageTwoDescription,
+  }: {
+    id: string;
+    title: string;
+    description: string;
+    stageOneDescription: string;
+    stageTwoDescription: string;
+  }) => {
+    clearAsyncToastTimers(asyncToastTimersRef);
+    dismissedAsyncToastIdsRef.current.delete(id);
+    showWorkingToast(id, title, description, dismissedAsyncToastIdsRef);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    asyncToastTimersRef.current = [
+      window.setTimeout(() => {
+        if (!dismissedAsyncToastIdsRef.current.has(id)) {
+          showWorkingToast(id, title, stageOneDescription, dismissedAsyncToastIdsRef);
+        }
+      }, ASYNC_TOAST_STAGE_ONE_MS),
+      window.setTimeout(() => {
+        if (!dismissedAsyncToastIdsRef.current.has(id)) {
+          showWorkingToast(id, title, stageTwoDescription, dismissedAsyncToastIdsRef);
+        }
+      }, ASYNC_TOAST_STAGE_TWO_MS),
+    ];
+  };
+
+  const showResolvedAsyncToast = ({
+    id,
+    type,
+    title,
+    description,
+  }: {
+    id: string;
+    type: "success" | "error";
+    title: string;
+    description: string;
+  }) => {
+    clearAsyncToastTimers(asyncToastTimersRef);
+    dismissedAsyncToastIdsRef.current.delete(id);
+
+    const toastOptions = {
+      id,
+      duration: type === "success" ? 2800 : 7600,
+      title,
+      description,
+    };
+
+    if (type === "success") {
+      hitoToast.success(toastOptions);
+      return;
+    }
+
+    hitoToast.error(toastOptions);
+  };
 
   const validateJsonDraft = (raw: string) => {
     setJsonStatus("parsing");
@@ -335,6 +402,16 @@ export function PlanManagementDialog({
     }
 
     setRefreshStatus("proposing");
+    showWorkingAsyncToast({
+      id: REFRESH_ACTION_TOAST_ID,
+      title: "Preparing plan update",
+      description:
+        "This can take a little while. You can keep reviewing the proposal area while Hito works.",
+      stageOneDescription:
+        "Still working through your saved plan, recent logs, and comparison signals.",
+      stageTwoDescription:
+        "This proposal can take around a minute when the review window is larger.",
+    });
 
     try {
       const result = await proposeActivePlanRefreshFn({
@@ -345,13 +422,25 @@ export function PlanManagementDialog({
 
       setRefreshResult(result);
       setRefreshStatus("idle");
+      showResolvedAsyncToast({
+        id: REFRESH_ACTION_TOAST_ID,
+        type: "success",
+        title: "Proposal ready",
+        description: "Review it before applying anything.",
+      });
     } catch (submitError) {
-      setRefreshStatus("idle");
-      setRefreshError(
+      const message =
         submitError instanceof Error
           ? submitError.message
-          : "Could not generate a plan update proposal.",
-      );
+          : "Could not generate a plan update proposal.";
+      setRefreshStatus("idle");
+      setRefreshError(message);
+      showResolvedAsyncToast({
+        id: REFRESH_ACTION_TOAST_ID,
+        type: "error",
+        title: "Proposal not ready",
+        description: message,
+      });
     }
   };
 
@@ -373,6 +462,14 @@ export function PlanManagementDialog({
     setRefreshError(null);
     setRefreshStaleMessage(null);
     setRefreshDecisionMessage(null);
+    showWorkingAsyncToast({
+      id: REFRESH_ACTION_TOAST_ID,
+      title: "Applying plan update",
+      description: "Hito is rechecking the proposal before changing the active plan.",
+      stageOneDescription: "Still rebuilding the remaining schedule and preserving fixed history.",
+      stageTwoDescription:
+        "This can take a little while when rest-day rules and recent logs need rechecking.",
+    });
 
     try {
       const result = await applyActivePlanRefreshProposalFn({
@@ -384,6 +481,12 @@ export function PlanManagementDialog({
       if (!result.ok) {
         setRefreshApplyStatus("idle");
         setRefreshStaleMessage(result.message);
+        showResolvedAsyncToast({
+          id: REFRESH_ACTION_TOAST_ID,
+          type: "error",
+          title: "Update not applied",
+          description: result.message,
+        });
         return;
       }
 
@@ -392,19 +495,31 @@ export function PlanManagementDialog({
       setRefreshDecisionMessage(
         `Plan updated. ${result.refreshedWorkoutCount} future workouts are now in the active plan. Opening the updated plan...`,
       );
+      showResolvedAsyncToast({
+        id: REFRESH_ACTION_TOAST_ID,
+        type: "success",
+        title: "Plan updated",
+        description: "The refreshed plan is now active.",
+      });
 
       if (typeof window !== "undefined") {
         refreshSuccessTimerRef.current = window.setTimeout(() => {
           finishAtHome(onOpenChange);
-        }, 900);
+        }, APPLY_SUCCESS_REDIRECT_DELAY_MS);
       } else {
         finishAtHome(onOpenChange);
       }
     } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : "Could not apply the plan update.";
       setRefreshApplyStatus("idle");
-      setRefreshError(
-        submitError instanceof Error ? submitError.message : "Could not apply the plan update.",
-      );
+      setRefreshError(message);
+      showResolvedAsyncToast({
+        id: REFRESH_ACTION_TOAST_ID,
+        type: "error",
+        title: "Update not applied",
+        description: message,
+      });
     }
   };
 
@@ -415,8 +530,8 @@ export function PlanManagementDialog({
         className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-2xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
       >
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
-          <DialogTitle className="font-display text-3xl">Open plan</DialogTitle>
-          <DialogDescription className="max-w-lg text-sm leading-relaxed text-muted-foreground">
+          <DialogTitle className="hito-modal-title">Open plan</DialogTitle>
+          <DialogDescription className="hito-body max-w-lg">
             Review the active plan, create a replacement, or clear the current schedule.
           </DialogDescription>
         </DialogHeader>
@@ -427,10 +542,8 @@ export function PlanManagementDialog({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="hito-label hito-label-signal">Current plan</p>
-                  <h2 className="mt-2 font-display text-3xl leading-tight">
-                    {planMeta?.title ?? "Saved plan"}
-                  </h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  <h2 className="hito-section-title mt-2">{planMeta?.title ?? "Saved plan"}</h2>
+                  <p className="hito-body mt-2 max-w-xl">
                     {planMeta?.goal ??
                       snapshot?.profile?.goalLabel ??
                       `Saved schedule for ${runnerLabel}.`}
@@ -445,9 +558,9 @@ export function PlanManagementDialog({
                           disabled={isBusy}
                           className="hito-button hito-button-ghost hito-button-sm"
                         >
-                          <Download className="h-4 w-4 text-signal" strokeWidth={1.5} />
+                          <Icon name="download" size="sm" className="text-signal" />
                           {exportStatus === "idle" ? "Export" : "Preparing..."}
-                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Icon name="chevron-down" size="xs" className="text-muted-foreground" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
@@ -460,7 +573,7 @@ export function PlanManagementDialog({
                             submitExport("json");
                           }}
                         >
-                          <FileJson2 className="h-4 w-4" />
+                          <Icon name="import" size="sm" />
                           Export as JSON
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -470,7 +583,7 @@ export function PlanManagementDialog({
                             submitExport("markdown");
                           }}
                         >
-                          <FileText className="h-4 w-4" />
+                          <Icon name="file-text" size="sm" />
                           Export as Markdown
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -508,7 +621,7 @@ export function PlanManagementDialog({
                         : ""}
                     </p>
                   </div>
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                  <Icon name="calendar" size="sm" className="text-muted-foreground" />
                 </div>
               </div>
 
@@ -519,20 +632,17 @@ export function PlanManagementDialog({
               <details className="hito-disclosure">
                 <summary className="hito-disclosure-summary">
                   <span>Update plan</span>
-                  <ChevronDown className="hito-disclosure-chevron" />
+                  <Icon name="chevron-down" className="hito-disclosure-chevron" />
                 </summary>
                 <div className="hito-disclosure-body">
                   <div className="grid gap-4">
                     <div className="flex items-start gap-3">
-                      <RefreshCcw
-                        className="mt-0.5 h-4 w-4 shrink-0 text-signal"
-                        strokeWidth={1.5}
-                      />
+                      <Icon name="refresh" size="sm" className="mt-0.5 text-signal" />
                       <div>
-                        <p className="text-sm font-medium text-foreground">
+                        <p className="hito-list-row-title">
                           Ask for a proposal from your saved history.
                         </p>
-                        <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        <p className="hito-body-small mt-1 max-w-xl">
                           Hito reviews the active plan, recent logs, Garmin-backed comparison
                           signals, and workout body-note cautions. This does not apply changes.
                         </p>
@@ -540,7 +650,7 @@ export function PlanManagementDialog({
                     </div>
 
                     <label className="grid gap-2">
-                      <span className="hito-label">What should change?</span>
+                      <span className="hito-form-label">What should change?</span>
                       <textarea
                         rows={3}
                         maxLength={1200}
@@ -567,7 +677,7 @@ export function PlanManagementDialog({
                         }}
                         className="hito-button hito-button-secondary hito-button-md"
                       >
-                        <RefreshCcw className="h-4 w-4" strokeWidth={1.5} />
+                        <Icon name="refresh" size="sm" />
                         {refreshStatus === "proposing"
                           ? "Preparing proposal..."
                           : "Generate proposal"}
@@ -605,17 +715,17 @@ export function PlanManagementDialog({
             <section className="hito-section-divider grid gap-4 pt-5">
               <div>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-signal" strokeWidth={1.5} />
-                  <h3 className="text-base font-medium text-foreground">Create a new plan</h3>
+                  <Icon name="sparkles" size="sm" className="text-signal" />
+                  <h3 className="hito-panel-title">Create a new plan</h3>
                 </div>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                <p className="hito-body mt-2 max-w-xl">
                   Describe what should change. Hito will create a fresh saved plan from your
                   request.
                 </p>
               </div>
 
               <label className="grid gap-2">
-                <span className="hito-label">Plan request</span>
+                <span className="hito-form-label">Plan request</span>
                 <textarea
                   rows={5}
                   value={authoringText}
@@ -647,7 +757,7 @@ export function PlanManagementDialog({
             <details className="hito-disclosure">
               <summary className="hito-disclosure-summary">
                 <span>Import from JSON</span>
-                <ChevronDown className="hito-disclosure-chevron" />
+                <Icon name="chevron-down" className="hito-disclosure-chevron" />
               </summary>
               <div className="hito-disclosure-body">
                 <input
@@ -687,24 +797,24 @@ export function PlanManagementDialog({
                       onClick={() => fileInputRef.current?.click()}
                       className="hito-button hito-button-secondary hito-button-md"
                     >
-                      <Upload className="h-4 w-4" />
+                      <Icon name="upload" size="sm" />
                       {selectedFileName ? "Choose another file" : "Upload JSON"}
                     </button>
                     {selectedFileName && (
-                      <span className="text-sm text-muted-foreground">{selectedFileName}</span>
+                      <span className="hito-body-small">{selectedFileName}</span>
                     )}
                     <a
                       href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
                       download
                       className="hito-button hito-button-ghost hito-button-sm"
                     >
-                      <Download className="h-4 w-4 text-signal" />
+                      <Icon name="download" size="sm" className="text-signal" />
                       Template
                     </a>
                   </div>
 
                   <label className="grid gap-2">
-                    <span className="hito-label">Paste plan JSON</span>
+                    <span className="hito-form-label">Paste plan JSON</span>
                     <textarea
                       rows={6}
                       value={jsonDraft}
@@ -715,7 +825,7 @@ export function PlanManagementDialog({
                         setJsonError(null);
                       }}
                       placeholder='{"schema_version":"training-plan-v2","plan_name":"...","planned_workouts":[...]}'
-                      className="hito-field hito-textarea-md font-mono text-xs"
+                      className="hito-field hito-textarea-md hito-technical-mono"
                     />
                   </label>
 
@@ -737,8 +847,7 @@ export function PlanManagementDialog({
                         <div>
                           <p className="hito-list-row-title">Choose the start day</p>
                           <p className="hito-list-row-copy">
-                            {importedSummary.days} days · {importedSummary.workouts} workouts. Your
-                            selected day becomes day 1 of this plan.
+                            {importedSummary.days} days · {importedSummary.workouts} workouts.
                           </p>
                         </div>
                         <span className="hito-status-pill" data-tone="success">
@@ -747,7 +856,7 @@ export function PlanManagementDialog({
                       </div>
                       <div className="hito-list-row items-start">
                         <label className="grid flex-1 gap-2">
-                          <span className="hito-label">Start training</span>
+                          <span className="hito-form-label">Start training</span>
                           <input
                             type="date"
                             min={defaultStartDate}
@@ -755,6 +864,11 @@ export function PlanManagementDialog({
                             onChange={(event) => setRequestedStartDate(event.target.value)}
                             className="hito-field hito-field-md"
                           />
+                          <span className="hito-field-helper">
+                            Hito applies this plan from the date you choose here; the JSON start
+                            date stays source metadata, and fixed rest days may still affect workout
+                            placement.
+                          </span>
                         </label>
                         <div className="flex flex-wrap justify-end gap-2">
                           <button
@@ -782,7 +896,7 @@ export function PlanManagementDialog({
                       </div>
                       {canOfferClearBeforeImport && (
                         <div className="hito-list-row items-start">
-                          <label className="flex max-w-xl items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                          <label className="hito-body flex max-w-xl items-start gap-3">
                             <input
                               type="checkbox"
                               checked={clearBeforeImport}
@@ -828,7 +942,7 @@ export function PlanManagementDialog({
                       }}
                       className="hito-button hito-button-secondary hito-button-md"
                     >
-                      <FileJson2 className="h-4 w-4" />
+                      <Icon name="import" size="sm" />
                       {jsonStatus === "importing" ? "Importing plan..." : "Import JSON plan"}
                     </button>
                   </div>
@@ -836,7 +950,7 @@ export function PlanManagementDialog({
                   <details className="hito-disclosure">
                     <summary className="hito-disclosure-summary">
                       <span>Need the first workout to replace the start day?</span>
-                      <ChevronDown className="hito-disclosure-chevron" />
+                      <Icon name="chevron-down" className="hito-disclosure-chevron" />
                     </summary>
                     <div className="hito-disclosure-body">
                       <p className="hito-field-helper">
@@ -874,11 +988,11 @@ export function PlanManagementDialog({
             <details className="hito-disclosure">
               <summary className="hito-disclosure-summary">
                 <span>Clear upcoming schedule</span>
-                <ChevronDown className="hito-disclosure-chevron" />
+                <Icon name="chevron-down" className="hito-disclosure-chevron" />
               </summary>
               <div className="hito-disclosure-body">
                 <div className="flex items-start gap-3">
-                  <CalendarX className="mt-0.5 h-4 w-4 shrink-0 text-signal" strokeWidth={1.5} />
+                  <Icon name="clear-calendar" size="sm" className="mt-0.5 text-signal" />
                   <p className="hito-field-helper max-w-xl">
                     This removes the current active upcoming schedule from view so you can start a
                     later plan cleanly. Planned workouts and saved workout logs stay preserved as
@@ -886,7 +1000,7 @@ export function PlanManagementDialog({
                   </p>
                 </div>
                 {clearError && <p className="hito-field-error">{clearError}</p>}
-                <label className="flex max-w-xl items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                <label className="hito-body flex max-w-xl items-start gap-3">
                   <input
                     type="checkbox"
                     checked={clearConfirmed}
@@ -908,7 +1022,7 @@ export function PlanManagementDialog({
                     }}
                     className="hito-button hito-button-secondary hito-button-sm"
                   >
-                    <CalendarX className="h-4 w-4" strokeWidth={1.5} />
+                    <Icon name="clear-calendar" size="sm" />
                     {clearStatus === "clearing"
                       ? "Clearing schedule..."
                       : "Clear upcoming schedule"}
@@ -920,18 +1034,18 @@ export function PlanManagementDialog({
             <details className="hito-disclosure">
               <summary className="hito-disclosure-summary">
                 <span>Delete active plan</span>
-                <ChevronDown className="hito-disclosure-chevron" />
+                <Icon name="chevron-down" className="hito-disclosure-chevron" />
               </summary>
               <div className="hito-disclosure-body">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <Icon name="warning" size="sm" className="mt-0.5 text-destructive" />
                   <p className="hito-field-helper max-w-xl">
                     This archives the current active plan and clears your schedule. Logged workout
                     history stays attached to the archived plan.
                   </p>
                 </div>
                 {deleteError && <p className="hito-field-error">{deleteError}</p>}
-                <label className="flex max-w-xl items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                <label className="hito-body flex max-w-xl items-start gap-3">
                   <input
                     type="checkbox"
                     checked={deleteConfirmed}
@@ -952,7 +1066,7 @@ export function PlanManagementDialog({
                     }}
                     className="hito-button hito-button-outlined hito-button-sm border-destructive/28 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Icon name="trash" size="sm" />
                     {deleteStatus === "deleting" ? "Deleting plan..." : "Delete plan"}
                   </button>
                 </div>
@@ -1028,7 +1142,7 @@ function PlanRefreshProposalReview({
       <div className="hito-list-row items-start">
         <div className="min-w-0">
           <p className="hito-list-row-title">Why this update</p>
-          <ul className="mt-2 grid gap-1.5 text-sm leading-relaxed text-muted-foreground">
+          <ul className="hito-body-small mt-2 grid gap-1.5">
             {review.rationale.map((item) => (
               <li key={item}>- {item}</li>
             ))}
@@ -1039,7 +1153,7 @@ function PlanRefreshProposalReview({
       <div className="hito-list-row items-start">
         <div className="min-w-0">
           <p className="hito-list-row-title">What would change from today forward</p>
-          <ul className="mt-2 grid gap-1.5 text-sm leading-relaxed text-muted-foreground">
+          <ul className="hito-body-small mt-2 grid gap-1.5">
             {review.proposedChanges.map((item) => (
               <li key={item}>- {item}</li>
             ))}
@@ -1051,7 +1165,7 @@ function PlanRefreshProposalReview({
         <div className="hito-list-row items-start">
           <div className="min-w-0">
             <p className="hito-list-row-title">What stays the same</p>
-            <ul className="mt-2 grid gap-1.5 text-sm leading-relaxed text-muted-foreground">
+            <ul className="hito-body-small mt-2 grid gap-1.5">
               {review.keepAsIs.map((item) => (
                 <li key={item}>- {item}</li>
               ))}
@@ -1111,7 +1225,7 @@ function PlanRefreshProposalReview({
             disabled={isBusy}
             onClick={onGenerateFresh}
           >
-            <RefreshCcw className="h-4 w-4" strokeWidth={1.5} />
+            <Icon name="refresh" size="sm" />
             Generate fresh proposal
           </button>
         </div>
@@ -1198,6 +1312,32 @@ function scheduleExportStatusReset(
     setExportStatus("idle");
     exportResetTimerRef.current = null;
   }, 1200);
+}
+
+function clearAsyncToastTimers(timerRef: MutableRefObject<number[]>) {
+  if (typeof window === "undefined") {
+    timerRef.current = [];
+    return;
+  }
+
+  timerRef.current.forEach((timerId) => window.clearTimeout(timerId));
+  timerRef.current = [];
+}
+
+function showWorkingToast(
+  id: string,
+  title: string,
+  description: string,
+  dismissedIdsRef: MutableRefObject<Set<string>>,
+) {
+  hitoToast.working({
+    id,
+    title,
+    description,
+    onDismiss: () => {
+      dismissedIdsRef.current.add(id);
+    },
+  });
 }
 
 function formatIssue(path: (string | number)[], message: string) {

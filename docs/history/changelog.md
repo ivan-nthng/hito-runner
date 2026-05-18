@@ -2,6 +2,18 @@
 
 Completed implementation history only.
 
+## 2026-05-17
+
+- Added the first Hito icon-system slice: product icon usage now flows through one `lucide-react`-backed Hito `Icon` primitive with stable names and four canonical sizes, `/hitoDS` documents the approved icon gallery and examples, and the raw `icons-line`, `icons-fill`, and `icons-multy` SVG folders were removed instead of becoming a second source of truth.
+- Fixed the shared dialog typography contract: `DialogTitle` and `DialogDescription` no longer force generic title/description utility defaults over canonical Hito role classes, so `Open plan`, JSON import, and body-note dialogs compute their title/body rhythm from `hito-modal-title` and `hito-body`.
+- Added the first canonical typography slice: shared Hito text roles now cover display, modal/panel titles, body/body-small, form labels, nav/menu, metric, status, error/success, and technical mono text; `/hitoDS` documents the full role inventory, and `Open plan`, JSON import, workout `Log result`/`Feedback`, and `User settings` now use those roles for their highest-drift text decisions.
+- Fixed working-toast dismissal at the DS layer: `hitoToast.working` now bypasses Sonner's loading/action button path and renders a custom Hito working-toast body with a normal in-content `Dismiss notification` button that hides the toast without cancelling the underlying action.
+- Tightened Hito toast coordination and anatomy: `Open plan` refresh proposal/apply feedback now uses one shared action-family toast id so apply results replace older proposal toasts, and the DS dismiss control now sits inside the toast container instead of floating over it.
+- Promoted the async toast work into a Hito design-system primitive: `/hitoDS` now documents and exercises info, working, success, and error toast variants with Safari-stable visible state, while `Open plan` proposal generation and `Apply update` consume the shared helper instead of direct Sonner calls.
+- Fixed the live Sonner working-toast dismiss control: loading toasts now render an explicit icon-only dismiss action in the DOM, and `/hitoDS` demonstrates one real top-center toast updating through the async states instead of three simultaneous inline toast cards.
+- Polished the v1 Hito async-action toast pattern: loading toasts now force a visible dismiss affordance without cancel semantics, and `Apply update` keeps its success state visible briefly before returning to the refreshed active-plan view.
+- Added the first Hito async-action toast slice: the existing Sonner seam is now mounted as a top-center Hito toast pattern, `Open plan` proposal generation and `Apply update` show working/success/error toast lifecycles with staged indeterminate waiting copy, and `/hitoDS` documents the bounded dismiss-only pattern while inline proposal and stale-state feedback remain in place.
+
 ## 2026-05-16
 
 - Finished the active-plan refresh apply reliability hardening: refresh apply now repairs ordinary model-returned goal, runner-baseline, schedule, and availability fields from persisted context before canonical validation, so fresh proposals with null baseline fields or blocked-day availability can archive/replace safely while malformed unsafe output still returns bounded `invalid_refresh_plan` without mutation.

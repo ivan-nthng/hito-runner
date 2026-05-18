@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertCircle, ChevronDown, Download, Upload } from "lucide-react";
 import {
   FUTURE_TEMPLATE_DOWNLOAD_PATH,
   summarizeImportedPlan,
@@ -17,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 
 export function UploadJsonDialog({
   open,
@@ -113,8 +113,8 @@ export function UploadJsonDialog({
         className="hito-dialog-stable hito-product-dialog h-[min(40rem,calc(100dvh-2rem))] max-w-xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
       >
         <DialogHeader className="border-b border-hairline px-6 py-5 text-left">
-          <DialogTitle className="font-display text-3xl">Import plan</DialogTitle>
-          <DialogDescription className="max-w-lg text-sm leading-relaxed text-muted-foreground">
+          <DialogTitle className="hito-modal-title">Import plan</DialogTitle>
+          <DialogDescription className="hito-body max-w-lg">
             Use this only if you already have a Hito plan file.
           </DialogDescription>
         </DialogHeader>
@@ -162,18 +162,16 @@ export function UploadJsonDialog({
                 onClick={() => fileInputRef.current?.click()}
                 className="hito-button hito-button-primary hito-button-md"
               >
-                <Upload className="h-4 w-4" />
+                <Icon name="upload" size="sm" />
                 {selectedFileName ? "Choose another file" : "Upload file"}
               </button>
-              {selectedFileName && (
-                <span className="text-sm text-muted-foreground">{selectedFileName}</span>
-              )}
+              {selectedFileName && <span className="hito-body-small">{selectedFileName}</span>}
             </div>
 
             <details className="hito-disclosure">
               <summary className="hito-disclosure-summary">
                 <span>Paste JSON or download a template</span>
-                <ChevronDown className="hito-disclosure-chevron" />
+                <Icon name="chevron-down" className="hito-disclosure-chevron" />
               </summary>
               <div className="hito-disclosure-body">
                 <div>
@@ -182,12 +180,12 @@ export function UploadJsonDialog({
                     download
                     className="hito-button hito-button-ghost hito-button-sm"
                   >
-                    <Download className="h-4 w-4 text-signal" />
+                    <Icon name="download" size="sm" className="text-signal" />
                     Download JSON template
                   </a>
                 </div>
                 <label className="grid gap-2">
-                  <span className="hito-label">Paste plan JSON</span>
+                  <span className="hito-form-label">Paste plan JSON</span>
                   <textarea
                     rows={10}
                     value={jsonDraft}
@@ -198,7 +196,7 @@ export function UploadJsonDialog({
                       setError(null);
                     }}
                     placeholder='{"schema_version":"training-plan-v2","plan_name":"...","generated_for":"...","start_date":"...","planned_workouts":[...]}'
-                    className="hito-field hito-textarea-md font-mono text-xs"
+                    className="hito-field hito-textarea-md hito-technical-mono"
                   />
                 </label>
 
@@ -236,7 +234,7 @@ export function UploadJsonDialog({
                     >
                       {replaceBlockedReason ? (
                         <span className="inline-flex items-center gap-2">
-                          <AlertCircle className="h-3.5 w-3.5" />
+                          <Icon name="warning" size="xs" />
                           Replace today is unavailable.
                         </span>
                       ) : (
@@ -258,7 +256,7 @@ export function UploadJsonDialog({
                 </div>
                 <div className="hito-list-row items-start">
                   <label className="grid flex-1 gap-2">
-                    <span className="hito-label">Start training</span>
+                    <span className="hito-form-label">Start training</span>
                     <input
                       type="date"
                       min={resolvedDefaultStartDate}
@@ -266,6 +264,10 @@ export function UploadJsonDialog({
                       onChange={(event) => setRequestedStartDate(event.target.value)}
                       className="hito-field hito-field-md"
                     />
+                    <span className="hito-field-helper">
+                      Hito applies this plan from the date you choose here; the JSON start date
+                      stays source metadata, and fixed rest days may still affect workout placement.
+                    </span>
                   </label>
                   <div className="flex flex-wrap justify-end gap-2">
                     <button
@@ -293,7 +295,7 @@ export function UploadJsonDialog({
                 </div>
                 {canOfferClearBeforeImport && (
                   <div className="hito-list-row items-start">
-                    <label className="flex max-w-lg items-start gap-3 text-sm leading-relaxed text-muted-foreground">
+                    <label className="hito-body flex max-w-lg items-start gap-3">
                       <input
                         type="checkbox"
                         checked={clearBeforeImport}
@@ -359,7 +361,7 @@ export function UploadJsonDialog({
           <details className="hito-disclosure">
             <summary className="hito-disclosure-summary">
               <span>Need this file to replace today?</span>
-              <ChevronDown className="hito-disclosure-chevron" />
+              <Icon name="chevron-down" className="hito-disclosure-chevron" />
             </summary>
             <div className="hito-disclosure-body">
               <p className="hito-field-helper max-w-lg">

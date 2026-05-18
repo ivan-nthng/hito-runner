@@ -885,6 +885,53 @@
     box-shadow: 0 0 0 1000px color-mix(in oklch, var(--color-background) 74%, transparent) inset;
   }
 
+  .hito-field[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .hito-field[type="number"]::-webkit-inner-spin-button,
+  .hito-field[type="number"]::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+  }
+
+  .hito-onboarding-surface {
+    padding-bottom: 8rem;
+  }
+
+  .hito-onboarding-submit-footer {
+    position: fixed;
+    right: 1rem;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: 1rem;
+    z-index: 30;
+    margin-inline: auto;
+    max-width: 64rem;
+    pointer-events: none;
+  }
+
+  .hito-onboarding-submit-footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: 1.5rem;
+    background: color-mix(in oklch, var(--color-background) 90%, transparent);
+    padding: 0.75rem;
+    box-shadow: 0 18px 56px color-mix(in oklch, var(--color-foreground) 14%, transparent);
+    backdrop-filter: blur(18px);
+    pointer-events: auto;
+  }
+
+  @media (min-width: 640px) {
+    .hito-onboarding-submit-footer-inner {
+      padding: 0.875rem 1rem;
+    }
+  }
+
   .hito-field-xs {
     min-height: 1.75rem;
     border-radius: var(--radius-sm);

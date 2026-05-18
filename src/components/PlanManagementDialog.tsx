@@ -111,7 +111,10 @@ export function PlanManagementDialog({
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshStaleMessage, setRefreshStaleMessage] = useState<string | null>(null);
   const [refreshDecisionMessage, setRefreshDecisionMessage] = useState<string | null>(null);
-  const [refreshResult, setRefreshResult] = useState<ProposeActivePlanRefreshResult | null>(null);
+  const [refreshResult, setRefreshResult] = useState<Extract<
+    ProposeActivePlanRefreshResult,
+    { ok: true }
+  > | null>(null);
 
   const isBusy =
     textStatus !== "idle" ||
@@ -419,6 +422,18 @@ export function PlanManagementDialog({
           runnerPrompt: trimmed,
         },
       });
+
+      if (!result.ok) {
+        setRefreshStatus("idle");
+        setRefreshError(result.message);
+        showResolvedAsyncToast({
+          id: REFRESH_ACTION_TOAST_ID,
+          type: "error",
+          title: "Proposal not available",
+          description: result.message,
+        });
+        return;
+      }
 
       setRefreshResult(result);
       setRefreshStatus("idle");

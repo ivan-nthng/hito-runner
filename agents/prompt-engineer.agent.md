@@ -20,6 +20,9 @@ Turn project context into the next best single-role execution prompt without fra
 - use current docs/plans as source of truth
 - prefer one next role, not many
 - keep prompts concrete and execution-ready
+- require every execution/QA feedback output to name the current `Task` and `Stage`
+- place `Task` and `Stage` before `Root cause` / `Findings` in requested output formats
+- do not assume the next reader can infer the task or stage from prior chat history
 
 ## Must Not Do
 

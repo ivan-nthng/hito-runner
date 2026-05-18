@@ -78,6 +78,12 @@ export const structuredPlanAuthoringInputSchema = z
       .object({
         recentResultSummary: z.string().trim().max(500).optional().nullable(),
         recentRaceResults: z.array(recentRaceResultSchema).max(5).default([]),
+        recent5kPaceSecondsPerKm: z
+          .number()
+          .positive()
+          .max(20 * 60)
+          .optional()
+          .nullable(),
         currentEasyPaceRange: z.string().trim().max(120).optional().nullable(),
         currentTrainingLoadSummary: z.string().trim().max(500).optional().nullable(),
       })
@@ -439,6 +445,7 @@ function buildSteadyWorkout({
   normalized,
 }: BuildWorkoutContext) {
   const steadyDurationMin = deriveEasyDurationMin(normalized, weekNumber) + 10;
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
   return {
     workout_id: workoutId,
@@ -463,6 +470,7 @@ function buildSteadyWorkout({
         },
         target: {
           intensity: "steady_aerobic",
+          ...(paceTargets?.steady ? { pace_min_per_km_range: paceTargets.steady } : {}),
           cue: "Controlled breathing, still sustainable.",
         },
       },
@@ -512,7 +520,7 @@ function buildLongRunWorkout({
         ...(normalized.runnerProfile.baselineLongRunKm
           ? { distance_km: distanceKm }
           : { duration_min: durationMin }),
-        target: buildEasyTarget(normalized),
+        target: buildLongRunTarget(normalized),
       },
     ],
   };
@@ -562,8 +570,10 @@ function buildRollingHillsWorkout({
   weekday,
   weekNumber,
   phase,
+  normalized,
 }: BuildWorkoutContext) {
   const repeatCount = Math.min(8, 4 + Math.floor((weekNumber - 1) / 4));
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
   return {
     workout_id: workoutId,
@@ -576,7 +586,7 @@ function buildRollingHillsWorkout({
     summary: `${repeatCount} relaxed hill pickups on rolling terrain with easy recovery.`,
     planned_rpe: 7,
     segments: [
-      buildWarmupSegment(workoutId, 1, 12),
+      buildWarmupSegment(workoutId, 1, 12, normalized),
       {
         segment_id: `${workoutId}_seg_2`,
         sequence: 2,
@@ -598,11 +608,12 @@ function buildRollingHillsWorkout({
         },
         target: {
           intensity: "controlled_hill_effort",
+          ...(paceTargets?.rollingHill ? { pace_min_per_km_range: paceTargets.rollingHill } : {}),
           cue: "Smooth uphill form; no exact elevation target.",
         },
-        recovery_target: buildRepeatRecoveryTarget(),
+        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
-      buildCooldownSegment(workoutId, 3, 10),
+      buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
   };
 }
@@ -613,8 +624,10 @@ function buildHillRepeatsWorkout({
   weekday,
   weekNumber,
   phase,
+  normalized,
 }: BuildWorkoutContext) {
   const repeatCount = Math.min(10, 5 + Math.floor((weekNumber - 1) / 3));
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
   return {
     workout_id: workoutId,
@@ -627,7 +640,7 @@ function buildHillRepeatsWorkout({
     summary: `${repeatCount} controlled uphill repeats with easy downhill or flat recovery.`,
     planned_rpe: 7,
     segments: [
-      buildWarmupSegment(workoutId, 1, 12),
+      buildWarmupSegment(workoutId, 1, 12, normalized),
       {
         segment_id: `${workoutId}_seg_2`,
         sequence: 2,
@@ -649,11 +662,12 @@ function buildHillRepeatsWorkout({
         },
         target: {
           intensity: "uphill_strength",
-          cue: "Strong but controlled climbing effort.",
+          ...(paceTargets?.hillRepeat ? { pace_min_per_km_range: paceTargets.hillRepeat } : {}),
+          cue: "Use effort first on climbs; pace may drift slower on steeper grades.",
         },
-        recovery_target: buildRepeatRecoveryTarget(),
+        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
-      buildCooldownSegment(workoutId, 3, 10),
+      buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
   };
 }
@@ -667,6 +681,7 @@ function buildClimbingSteadyWorkout({
   normalized,
 }: BuildWorkoutContext) {
   const durationMin = deriveEasyDurationMin(normalized, weekNumber) + 10;
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
   return {
     workout_id: workoutId,
@@ -692,6 +707,7 @@ function buildClimbingSteadyWorkout({
         },
         target: {
           intensity: "steady_climbing",
+          ...(paceTargets?.hillSteady ? { pace_min_per_km_range: paceTargets.hillSteady } : {}),
           cue: "Controlled climbing rhythm with relaxed descents.",
         },
       },
@@ -699,8 +715,16 @@ function buildClimbingSteadyWorkout({
   };
 }
 
-function buildTempoWorkout({ workoutId, date, weekday, weekNumber, phase }: BuildWorkoutContext) {
+function buildTempoWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
   const tempoDurationMin = Math.min(35, 16 + (weekNumber - 1) * 2);
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
   return {
     workout_id: workoutId,
@@ -713,7 +737,7 @@ function buildTempoWorkout({ workoutId, date, weekday, weekNumber, phase }: Buil
     summary: `${tempoDurationMin} min controlled tempo running between easy and race effort.`,
     planned_rpe: 7,
     segments: [
-      buildWarmupSegment(workoutId, 1, 12),
+      buildWarmupSegment(workoutId, 1, 12, normalized),
       {
         segment_id: `${workoutId}_seg_2`,
         sequence: 2,
@@ -727,10 +751,11 @@ function buildTempoWorkout({ workoutId, date, weekday, weekNumber, phase }: Buil
         duration_min: tempoDurationMin,
         target: {
           intensity: "tempo",
+          ...(paceTargets?.tempo ? { pace_min_per_km_range: paceTargets.tempo } : {}),
           cue: "Comfortably hard, sustainable for the whole block.",
         },
       },
-      buildCooldownSegment(workoutId, 3, 8),
+      buildCooldownSegment(workoutId, 3, 8, normalized),
     ],
   };
 }
@@ -741,8 +766,10 @@ function buildDistanceIntervalsWorkout({
   weekday,
   weekNumber,
   phase,
+  normalized,
 }: BuildWorkoutContext) {
   const repeatCount = Math.min(8, 4 + Math.floor((weekNumber - 1) / 3));
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
   return {
     workout_id: workoutId,
@@ -755,7 +782,7 @@ function buildDistanceIntervalsWorkout({
     summary: `${repeatCount} x 400m at controlled 5K effort with 2 min recovery.`,
     planned_rpe: 7,
     segments: [
-      buildWarmupSegment(workoutId, 1, 12),
+      buildWarmupSegment(workoutId, 1, 12, normalized),
       {
         segment_id: `${workoutId}_seg_2`,
         sequence: 2,
@@ -776,11 +803,12 @@ function buildDistanceIntervalsWorkout({
         },
         target: {
           intensity: "5k_effort",
+          ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
           cue: "Fast but controlled, never sprinting.",
         },
-        recovery_target: buildRepeatRecoveryTarget(),
+        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
-      buildCooldownSegment(workoutId, 3, 10),
+      buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
   };
 }
@@ -791,8 +819,10 @@ function buildTimeIntervalsWorkout({
   weekday,
   weekNumber,
   phase,
+  normalized,
 }: BuildWorkoutContext) {
   const repeatCount = Math.min(7, 4 + Math.floor((weekNumber - 1) / 4));
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
   return {
     workout_id: workoutId,
@@ -805,7 +835,7 @@ function buildTimeIntervalsWorkout({
     summary: `${repeatCount} x 3 min controlled intervals with 2 min recovery.`,
     planned_rpe: 7,
     segments: [
-      buildWarmupSegment(workoutId, 1, 12),
+      buildWarmupSegment(workoutId, 1, 12, normalized),
       {
         segment_id: `${workoutId}_seg_2`,
         sequence: 2,
@@ -826,16 +856,24 @@ function buildTimeIntervalsWorkout({
         },
         target: {
           intensity: "10k_effort",
+          ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
           cue: "Quick, rhythmic running with controlled recovery.",
         },
-        recovery_target: buildRepeatRecoveryTarget(),
+        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
-      buildCooldownSegment(workoutId, 3, 10),
+      buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
   };
 }
 
-function buildWarmupSegment(workoutId: string, sequence: number, durationMin: number) {
+function buildWarmupSegment(
+  workoutId: string,
+  sequence: number,
+  durationMin: number,
+  normalized: NormalizedStructuredInput,
+) {
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
   return {
     segment_id: `${workoutId}_seg_${sequence}`,
     sequence,
@@ -848,12 +886,20 @@ function buildWarmupSegment(workoutId: string, sequence: number, durationMin: nu
     duration_min: durationMin,
     target: {
       intensity: "easy",
+      ...(paceTargets?.easy ? { pace_min_per_km_range: paceTargets.easy } : {}),
       cue: "Start gently and loosen up.",
     },
   };
 }
 
-function buildCooldownSegment(workoutId: string, sequence: number, durationMin: number) {
+function buildCooldownSegment(
+  workoutId: string,
+  sequence: number,
+  durationMin: number,
+  normalized: NormalizedStructuredInput,
+) {
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
   return {
     segment_id: `${workoutId}_seg_${sequence}`,
     sequence,
@@ -865,29 +911,123 @@ function buildCooldownSegment(workoutId: string, sequence: number, durationMin: 
     },
     duration_min: durationMin,
     target: {
+      ...(paceTargets?.recovery ? { pace_min_per_km_range: paceTargets.recovery } : {}),
       hint: "Walk if needed before stopping.",
     },
   };
 }
 
-function buildRepeatRecoveryTarget() {
+function buildRepeatRecoveryTarget(normalized: NormalizedStructuredInput) {
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
   return {
     intensity: "very_easy_recovery",
+    ...(paceTargets?.recovery ? { pace_min_per_km_range: paceTargets.recovery } : {}),
     hint: "Very easy jog or walk; let breathing settle.",
   };
 }
 
 function buildEasyTarget(normalized: NormalizedStructuredInput) {
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
   return {
     intensity: "easy_aerobic",
-    ...(normalized.currentLevel.currentEasyPaceRange
-      ? { pace_min_per_km_range: normalized.currentLevel.currentEasyPaceRange }
+    ...((paceTargets?.easy ?? normalized.currentLevel.currentEasyPaceRange)
+      ? { pace_min_per_km_range: paceTargets?.easy ?? normalized.currentLevel.currentEasyPaceRange }
       : {}),
     cue:
       normalized.runnerProfile.preferredEffortLanguage === "heart_rate"
         ? "Stay clearly below hard effort and keep the heart rate drifting smoothly."
         : "Conversational effort throughout.",
   };
+}
+
+function buildLongRunTarget(normalized: NormalizedStructuredInput) {
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
+  return {
+    intensity: "easy_aerobic",
+    ...((paceTargets?.longRun ?? normalized.currentLevel.currentEasyPaceRange)
+      ? {
+          pace_min_per_km_range:
+            paceTargets?.longRun ?? normalized.currentLevel.currentEasyPaceRange,
+        }
+      : {}),
+    cue: "Comfortable enough to keep the full run controlled.",
+  };
+}
+
+function deriveBenchmarkPaceTargets(normalized: NormalizedStructuredInput) {
+  const recent5kPaceSecondsPerKm = getRecent5kPaceSecondsPerKm(normalized);
+
+  if (!recent5kPaceSecondsPerKm) {
+    return null;
+  }
+
+  return {
+    easy: buildPaceRange(recent5kPaceSecondsPerKm, 90, 150),
+    recovery: buildPaceRange(recent5kPaceSecondsPerKm, 135, 225),
+    longRun: buildPaceRange(recent5kPaceSecondsPerKm, 100, 170),
+    steady: buildPaceRange(recent5kPaceSecondsPerKm, 60, 105),
+    tempo: buildPaceRange(recent5kPaceSecondsPerKm, 25, 55),
+    interval: buildPaceRange(recent5kPaceSecondsPerKm, 0, 25),
+    rollingHill: buildPaceRange(recent5kPaceSecondsPerKm, 55, 120),
+    hillRepeat: buildPaceRange(recent5kPaceSecondsPerKm, 70, 165),
+    hillSteady: buildPaceRange(recent5kPaceSecondsPerKm, 75, 145),
+  };
+}
+
+function getRecent5kPaceSecondsPerKm(normalized: NormalizedStructuredInput) {
+  if (normalized.currentLevel.recent5kPaceSecondsPerKm) {
+    return normalized.currentLevel.recent5kPaceSecondsPerKm;
+  }
+
+  const recent5k = normalized.currentLevel.recentRaceResults.find((result) =>
+    /^5\s*k(m)?$/i.test(result.distance.trim()),
+  );
+  const resultSeconds = recent5k ? parseDurationSeconds(recent5k.resultTime) : null;
+
+  return resultSeconds ? resultSeconds / 5 : null;
+}
+
+function buildPaceRange(
+  recent5kPaceSecondsPerKm: number,
+  fastDeltaSeconds: number,
+  slowDeltaSeconds: number,
+) {
+  return `${formatPaceSecondsPerKm(
+    recent5kPaceSecondsPerKm + fastDeltaSeconds,
+  )}-${formatPaceSecondsPerKm(recent5kPaceSecondsPerKm + slowDeltaSeconds)}/km`;
+}
+
+function formatPaceSecondsPerKm(secondsPerKm: number) {
+  const roundedSeconds = Math.round(secondsPerKm / 5) * 5;
+  const minutes = Math.floor(roundedSeconds / 60);
+  const seconds = roundedSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function parseDurationSeconds(value: string) {
+  const parts = value
+    .trim()
+    .split(":")
+    .map((part) => Number(part));
+
+  if (parts.length !== 2 && parts.length !== 3) return null;
+  if (parts.some((part) => !Number.isInteger(part) || part < 0)) return null;
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+
+    if (seconds == null || seconds >= 60) return null;
+    return minutes! * 60 + seconds;
+  }
+
+  const [hours, minutes, seconds] = parts;
+
+  if (minutes == null || seconds == null || minutes >= 60 || seconds >= 60) return null;
+  return hours! * 3600 + minutes * 60 + seconds;
 }
 
 function buildLongRunGuidance(normalized: NormalizedStructuredInput) {

@@ -54,11 +54,20 @@ Default response shape for execution requests:
 
 Required default output shape for implementation work:
 
-1. Root cause
-2. Files changed
-3. What changed
-4. Validation results
-5. Blockers (only if any)
+1. Task
+2. Stage
+3. Root cause
+4. Files changed
+5. What changed
+6. Validation results
+7. Blockers (only if any)
+
+Feedback and handoff reports must always name:
+
+- the task being worked on
+- the current stage of that task, for example `ARCHITECT plan`, `BACKEND implementation`, `FRONTEND implementation`, `QA validation`, `COPY pass`, or `DESIGNER audit`
+
+Do not assume the reader can infer the task from prior chat history.
 
 ## 2.5) Anti Over-Engineering Rule (Mandatory)
 

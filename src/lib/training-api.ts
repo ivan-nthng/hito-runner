@@ -18,6 +18,7 @@ import {
   type ImportedPlanSeed,
   type ImportedWorkoutSeed,
 } from "@/lib/imported-plan";
+import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
 import {
   generateCanonicalPlanFromText,
   type GeneratedPlanResult,
@@ -56,6 +57,7 @@ import {
   structuredPlanAuthoringInputSchema,
 } from "@/lib/structured-plan-authoring";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
+import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
 import {
   buildImportedLogCarryForwardPlan,
   buildPersistedWorkoutInsertRows,
@@ -212,6 +214,8 @@ const textAuthoringInputSchema = z.object({
   authoringText: z.string().trim().min(20).max(4000),
   firstDayResolution: firstDayResolutionSchema.optional().nullable(),
 });
+const voiceToPlanInputSchema = z.unknown();
+const voiceToPlanConfirmInputSchema = z.unknown();
 
 const bodyNoteSchema = z
   .object({
@@ -311,10 +315,12 @@ export interface ExportActivePlanResult extends PlanExportDocument {
   ok: true;
 }
 
-export interface ProposeActivePlanRefreshResult {
-  ok: true;
-  proposal: ActivePlanRefreshProposal;
-}
+export type ProposeActivePlanRefreshResult =
+  | {
+      ok: true;
+      proposal: ActivePlanRefreshProposal;
+    }
+  | CapabilityLockedResponse;
 
 export type ApplyActivePlanRefreshProposalResult =
   | {
@@ -336,6 +342,32 @@ export type ApplyActivePlanRefreshProposalResult =
       ok: false;
       status: "blocked";
       reason: "invalid_refresh_plan";
+      message: string;
+    };
+
+export type ConfirmVoiceToPlanDraftResult =
+  | CapabilityLockedResponse
+  | {
+      ok: true;
+      status: "created";
+      effectiveStartDate: string;
+      appliedStartDate: string;
+      normalizedFromStartDate: string | null;
+      firstDayResolution: FirstDayResolution | null;
+      workoutCount: number;
+      schemaVersion: string;
+      sourceKind: string | undefined;
+      onboardingContract: "voice_to_plan_v1";
+      safety: {
+        requiresExplicitApply: false;
+        doesNotMutatePlan: false;
+        rawTranscriptPersisted: false;
+      };
+    }
+  | {
+      ok: false;
+      status: "blocked";
+      reason: "invalid_draft" | "active_plan_exists" | "apply_blocked";
       message: string;
     };
 
@@ -528,12 +560,29 @@ export const proposeActivePlanRefresh = createServerFn({ method: "POST" })
       throw new Error("Authentication is required for this action.");
     }
 
+    const { checkRunnerCapability, capabilityLockedResponse } =
+      await import("@/lib/entitlements/check-runner-capability");
+    const capabilityCheck = await checkRunnerCapability({
+      userId: persistedUserId,
+      capabilityKey: "ai_plan_update",
+    });
+
+    if (!capabilityCheck.allowed) {
+      return capabilityLockedResponse(capabilityCheck);
+    }
+
     const { buildRunnerCoachContext } = await import("@/lib/runner-coach-context");
     const { generateActivePlanRefreshProposal } = await import("@/lib/plan-refresh-proposal");
     const context = await buildRunnerCoachContext({ userId: persistedUserId });
     const proposal = await generateActivePlanRefreshProposal({
       context,
       runnerPrompt: data.runnerPrompt,
+    });
+    const { recordRunnerCapabilityUsage } =
+      await import("@/lib/entitlements/record-runner-capability-usage");
+    await recordRunnerCapabilityUsage({
+      userId: persistedUserId,
+      capabilityKey: "ai_plan_update",
     });
 
     return {
@@ -614,6 +663,98 @@ export const completeTextOnboarding = createServerFn({ method: "POST" })
           responseId: generatedPlan.responseId,
           importedPlan: generatedPlan.canonicalPlan,
         };
+  });
+
+export const generateVoiceToPlanDraft = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => voiceToPlanInputSchema.parse(value))
+  .handler(async ({ data }): Promise<VoiceToPlanDraftResult> => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
+    const { generateVoiceToPlanDraftForUser } = await import("@/lib/voice-to-plan-authoring");
+
+    return generateVoiceToPlanDraftForUser({
+      userId,
+      request: data,
+    });
+  });
+
+export const confirmVoiceToPlanDraft = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => voiceToPlanConfirmInputSchema.parse(value))
+  .handler(async ({ data }): Promise<ConfirmVoiceToPlanDraftResult> => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
+    const { checkRunnerCapability, capabilityLockedResponse } =
+      await import("@/lib/entitlements/check-runner-capability");
+    const capabilityCheck = await checkRunnerCapability({
+      userId,
+      capabilityKey: "voice_to_plan",
+    });
+
+    if (!capabilityCheck.allowed) {
+      return capabilityLockedResponse(capabilityCheck);
+    }
+
+    const activePlan = await getActivePlan(userId);
+
+    if (activePlan) {
+      return {
+        ok: false,
+        status: "blocked",
+        reason: "active_plan_exists",
+        message:
+          "Voice-to-plan can create a first plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
+      };
+    }
+
+    const { parseVoiceToPlanConfirmRequest } = await import("@/lib/voice-to-plan-authoring");
+    const parsed = parseVoiceToPlanConfirmRequest(data);
+
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        status: "blocked",
+        reason: parsed.reason,
+        message: parsed.message,
+      };
+    }
+
+    try {
+      const applyResult = await applyImportedPlanForUser(
+        userId,
+        parsed.canonicalPlan,
+        null,
+        null,
+        parsed.profilePatch,
+      );
+
+      if (!applyResult.ok) {
+        return {
+          ok: false,
+          status: "blocked",
+          reason: "apply_blocked",
+          message: "This voice draft needs review before it can create a plan.",
+        };
+      }
+
+      return {
+        ...applyResult,
+        status: "created",
+        schemaVersion: parsed.canonicalPlan.schema_version,
+        sourceKind: parsed.canonicalPlan.source_kind,
+        onboardingContract: "voice_to_plan_v1",
+        safety: {
+          requiresExplicitApply: false,
+          doesNotMutatePlan: false,
+          rawTranscriptPersisted: false,
+        },
+      };
+    } catch {
+      return {
+        ok: false,
+        status: "blocked",
+        reason: "invalid_draft",
+        message:
+          "This voice draft is no longer valid. Generate a fresh review before creating a plan.",
+      };
+    }
   });
 
 export const saveWorkoutLog = createServerFn({ method: "POST" })

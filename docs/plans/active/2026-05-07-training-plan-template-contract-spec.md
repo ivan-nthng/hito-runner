@@ -16,6 +16,8 @@ Architect Agent
 - The latest backend slice now preserves canonical segment metadata, bounded target keys, and repeat-based prescription structure inside `planned_workouts.steps jsonb` while keeping current route compatibility.
 - The latest contract hardening now guarantees instruction completeness before workout detail readback:
   every visible non-rest segment plus expanded repeat work/recovery row has target or guidance copy, with safe fallback cues when precise pace or heart-rate truth is absent.
+- The structured first-plan generator now prefers real benchmark-derived pace targets before those text fallbacks:
+  recent 5K time or pace can produce broad `pace_min_per_km_range` values for generated running segments and repeat work/recovery units, while unknown benchmarks still use bounded cue/hint fallback copy and HR targets remain absent unless real HR-zone truth exists.
 - Plan-level provenance fields such as stable `plan_id`, source-kind persistence, and richer editability-oriented storage remain intentionally deferred.
 
 ## Context

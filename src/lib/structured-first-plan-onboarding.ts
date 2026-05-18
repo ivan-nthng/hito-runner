@@ -366,6 +366,8 @@ function deriveBaselineLongRunKm(input: StructuredFirstPlanOnboardingInput) {
 
 function buildCurrentLevel(benchmark: StructuredFirstPlanOnboardingInput["benchmark"]) {
   if (benchmark.kind === "recent_5k_time") {
+    const recent5kPaceSecondsPerKm = parseDurationSeconds(benchmark.recent5kTime)! / 5;
+
     return {
       recentResultSummary: `Recent 5K time: ${benchmark.recent5kTime}.`,
       recentRaceResults: [
@@ -375,16 +377,20 @@ function buildCurrentLevel(benchmark: StructuredFirstPlanOnboardingInput["benchm
           resultDate: null,
         },
       ],
-      currentEasyPaceRange: null,
+      recent5kPaceSecondsPerKm,
+      currentEasyPaceRange: buildEasyPaceRange(recent5kPaceSecondsPerKm),
       currentTrainingLoadSummary: null,
     };
   }
 
   if (benchmark.kind === "recent_5k_pace") {
+    const recent5kPaceSecondsPerKm = parsePaceSecondsPerKm(benchmark.recent5kPace)!;
+
     return {
       recentResultSummary: `Recent 5K pace: ${benchmark.recent5kPace}.`,
       recentRaceResults: [],
-      currentEasyPaceRange: null,
+      recent5kPaceSecondsPerKm,
+      currentEasyPaceRange: buildEasyPaceRange(recent5kPaceSecondsPerKm),
       currentTrainingLoadSummary: null,
     };
   }
@@ -392,6 +398,7 @@ function buildCurrentLevel(benchmark: StructuredFirstPlanOnboardingInput["benchm
   return {
     recentResultSummary: null,
     recentRaceResults: [],
+    recent5kPaceSecondsPerKm: null,
     currentEasyPaceRange: null,
     currentTrainingLoadSummary: null,
   };
@@ -631,4 +638,22 @@ function parsePaceSecondsPerKm(value: string) {
   const pace = normalized.replace(/\/?km$/, "");
 
   return parseDurationSeconds(pace);
+}
+
+function buildEasyPaceRange(recent5kPaceSecondsPerKm: number) {
+  return formatPaceRange(recent5kPaceSecondsPerKm + 90, recent5kPaceSecondsPerKm + 150);
+}
+
+function formatPaceRange(fastSecondsPerKm: number, slowSecondsPerKm: number) {
+  return `${formatPaceSecondsPerKm(fastSecondsPerKm)}-${formatPaceSecondsPerKm(
+    slowSecondsPerKm,
+  )}/km`;
+}
+
+function formatPaceSecondsPerKm(secondsPerKm: number) {
+  const roundedSeconds = Math.round(secondsPerKm / 5) * 5;
+  const minutes = Math.floor(roundedSeconds / 60);
+  const seconds = roundedSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }

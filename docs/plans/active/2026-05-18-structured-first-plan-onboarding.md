@@ -73,6 +73,13 @@ This plan now refines that live baseline instead of replacing it.
 - the optional supporting textarea label is now `Comment`
 - the constructor has a sticky `Create plan` footer disabled until required fields and conditional target-time requirements are complete
 
+2026-05-18 backend segment-target follow-up delivered:
+
+- recent 5K time and recent 5K pace are now translated into internal authoring pace truth
+- generated structured plans now attach broad `pace_min_per_km_range` targets to warmup, easy, long, steady, tempo, interval work, recovery, cooldown, and hill-oriented running segments when that benchmark truth exists
+- unknown benchmarks continue to produce safe effort/cue/hint fallback instructions without fake pace or heart-rate values
+- benchmark-derived pace remains generation context only and is not persisted as raw long-lived runner profile truth
+
 Checklist
 
 - [x] Keep structured onboarding as the only normal first-plan path
@@ -89,6 +96,7 @@ Checklist
 - [x] Make `Mountain running` imply mountain terrain by default
 - [x] Rename optional text field label to `Comment`
 - [x] Add sticky disabled-until-valid `Create plan` footer behavior
+- [x] Derive broad generated segment pace targets from recent 5K benchmark truth
 - [ ] Complete targeted QA for 5K time, 5K pace, and Advanced apply regression
 
 Product Decision
@@ -333,8 +341,8 @@ Frontend must not ask for exact run weekdays in v1.
 
 Recommended v1 mapping remains:
 
-- `recent_5k_time` -> race-result style current-level input
-- `recent_5k_pace` -> bounded pace-based current-level summary
+- `recent_5k_time` -> race-result style current-level input plus derived recent 5K pace for broad generated segment targets
+- `recent_5k_pace` -> bounded pace-based current-level summary plus broad generated segment targets
 - `unknown` -> benchmark-related current-level fields left empty
 
 Do not infer fake race results from pace-only input.

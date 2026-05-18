@@ -10,6 +10,12 @@ The implemented product is now a hybrid running-plan experience for Hito Running
 
 The product still avoids claims of live coaching, connected integrations, weather-aware adaptation, or biometric authority.
 
+The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
+
+- users without an explicit entitlement row still resolve as effective `Pro`, so current real users keep access
+- explicit `Basic` rows can enforce the first AI boundaries later
+- no Stripe, billing, pricing, or subscription UI is live in this slice
+
 ## Main User Surfaces
 
 - home `/`
@@ -49,14 +55,20 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - setup-required accounts now see `Create a Plan` in the home header where saved-mode accounts see `Open plan`
 - the backend now also supports one first-pass free-text authoring seam:
   one user message is turned into validated canonical plan data server-side through OpenAI before the saved weekly plan opens
+- the backend now also supports one first-pass voice-to-plan transcript draft seam:
+  a confirmed transcript can be checked against `voice_to_plan`, validated for bounded length/usefulness and essential planning truth, and returned as either `clarification_required` with missing fields/questions or `draft_ready` with a runner-facing review of what Hito understood and the broad plan shape
+  when Hito proposes a different goal style than an obvious dictated cue, such as changing balanced to relaxed, the review assumptions now call out that style change before the runner can confirm creation
+  transcript review is non-mutating; the separate explicit `confirmVoiceToPlanDraft` backend action creates a first active plan only after confirmation, rechecks entitlement, blocks if an active plan already exists, and still does not persist the raw transcript
+  the no-plan onboarding surface now exposes this as a compact Pro `AI setup` assist above the structured constructor: the runner pastes or types what they would say out loud, asks Hito to review it, sees either missing-detail clarification or a `draft_ready` review, and only `Yes, create plan` calls the mutating confirm action
+  this first UI slice still has no microphone UI, no raw audio upload, no transcript persistence as profile truth, no usage counting, and no silent plan creation or replacement
 - the visible onboarding UI now consumes the structured first-plan constructor contract:
   profile measurements, one bounded 5K benchmark mode, fixed rest days, goal distance/style/target, conditional terrain focus, strength preference, and an optional supporting comment can be submitted through one authenticated action
   the frontend keeps running-day choice out of the primary UI and sends a conservative hidden running-days count that fits outside fixed rest days; the backend derives actual training weekdays, preserves fixed rest days as plan-level weekday invariant truth, creates the plan through direct structured generation, and persists only age/weight/height as runner profile fields
   age, weight, and height are required in the backend contract; goal distance now includes ultra marathon and mountain running, terrain defaults to standard unless a relevant goal supplies it, mountain running normalizes to mountain terrain, and target time/date context only affects target-time goals
-  terrain focus can influence rolling or mountain/hill-oriented workouts without creating exact elevation targets or route matching, and benchmark, terrain, target, and optional comment context are treated only as bounded generation nuance rather than raw profile truth
+  terrain focus can influence rolling or mountain/hill-oriented workouts without creating exact elevation targets or route matching, recent 5K benchmark truth can produce broad runner-level pace targets on generated workout segments, and benchmark, terrain, target, and optional comment context are treated only as bounded generation nuance rather than raw profile truth
 - advanced JSON upload remains available as a secondary fallback path for existing plan artifacts, migration, and testing
 - the temporary local login path behaves as signed-in saved mode for the configured local admin account only on loopback local runtimes, can still expand to a few local test accounts later without changing routes, and uses Supabase as the only authenticated plan store; those same loopback local runtimes no longer offer email magic links unless a real public `APP_BASE_URL` is configured
-- onboarding now leads with the structured constructor, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
+- onboarding keeps the structured constructor as the reliable primary setup path while placing the compact Pro AI assist above it, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
 - authenticated no-plan or no-workout states now render the same visible structured plan creation surface instead of stranding users on a retry-only empty state
 - the internal structured authoring slice remains backend-only:
   it validates goal, schedule, runner basics, recent result context, available days, constraints, and preferences, then generates one canonical `training-plan-v2` plan into the same persisted saved-mode seam without changing routes
@@ -157,6 +169,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
   it uses only canonical backend truth from the planned workout, parsed Garmin actual metrics, deterministic comparison payload, current week context, next planned workout summary, and optional workout-scoped body-note context
   it does not parse raw FIT, does not overwrite `workout_logs`, does not silently edit the plan, does not diagnose or give medical advice from body notes, and stays cautious when deterministic evidence is partial or unclear
   visibly broken generated phrases are not shown to the runner; the backend replaces malformed recommendation text with shorter stable fallback copy when needed
+  Pro gating applies only to the AI interpretation portion; deterministic Garmin upload, parse, comparison, and feedback readback remain core saved-mode truth when AI interpretation is locked
 - the first proposal-only surface for explicit plan refresh now exists inside `Open plan`:
   the backend can build one compact `RunnerCoachContext` from saved profile, active plan, remaining schedule, recent adherence, Garmin comparison signals, actual load, and workout-scoped body-note caution context
   the runner can open a quiet `Update plan` disclosure, enter short intent such as missed days, heavy fatigue, or adjusting the rest of the plan, and review a compact proposal covering why change is suggested, what would change from today forward, what stays fixed, caution context, and the explicit proposal-only boundary
@@ -165,6 +178,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
   the proposal review now exposes explicit `Apply update` and `Keep current plan` actions: keeping the plan clears the review without mutation, while applying calls the backend apply seam, revalidates stale/off-day truth, normalizes refresh timeline, goal/baseline defaults, and fixed-rest-day availability so ordinary generated proposals do not leak as broken apply states, archive/replaces the active plan on success, and returns the runner to the updated active-plan view
   stale proposals show an honest stale message and ask the runner to generate a fresh proposal instead of surfacing a generic error
   no plan is silently mutated by viewing or dismissing a proposal
+  the backend now checks `ai_plan_update` entitlement before generating a proposal; missing entitlement rows remain effective `Pro`, explicit Basic gets one included successful proposal generation, and applying an approved proposal does not consume another use
 - the first Hito design-system toast primitive now supports those long-running `Open plan` refresh actions:
   `/hitoDS` defines info, working, success, and error toast variants with Safari-stable top-center visibility, inside-toast dismiss anatomy, dismiss-only indeterminate progress for working state, and in-place working-to-success/error resolution; proposal generation and `Apply update` consume one shared action-family toast id so the latest refresh outcome replaces older proposal feedback while validation errors, proposal review, stale explanation, and mutation boundaries stay inline
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state

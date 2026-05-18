@@ -879,6 +879,16 @@ async function tryPersistWorkoutAiInsight(args: {
   const { userId, plannedWorkout, actualMetrics, comparison } = args;
 
   try {
+    const { checkRunnerCapability } = await import("@/lib/entitlements/check-runner-capability");
+    const capabilityCheck = await checkRunnerCapability({
+      userId,
+      capabilityKey: "garmin_ai_interpretation",
+    });
+
+    if (!capabilityCheck.allowed) {
+      return null;
+    }
+
     const promptInput = await buildWorkoutAiPromptInput(args);
     const generated = await generateWorkoutAiInsight(promptInput);
     const boundedOutput = clampWorkoutAiInsight(promptInput, generated.output);

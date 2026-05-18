@@ -57,17 +57,23 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, structured first-plan onboarding, text compatibility onboarding, advanced JSON import, internal structured authoring, and workout logging; the email sign-in path now requests PKCE-oriented Supabase links and the callback accepts either an auth code or an email token hash before writing the cookie-backed session
+  owns server-backed loading and mutation entry points for home, workout detail, progress, login, structured first-plan onboarding, transcript-backed voice-to-plan draft generation, text compatibility onboarding, advanced JSON import, internal structured authoring, and workout logging; the email sign-in path now requests PKCE-oriented Supabase links and the callback accepts either an auth code or an email token hash before writing the cookie-backed session
 - `src/lib/structured-first-plan-onboarding.ts`
   owns the backend contract for the structured first-plan constructor:
   required age, weight, and height profile basics, one bounded 5K benchmark mode, `runningDaysPerWeek`, `fixedRestDays`, goal distance/style/conditional terrain, bounded strength preference, and an optional supporting comment
-  it translates that visible contract into the existing structured authoring input, derives preferred running days from running-days/week plus fixed rest days, keeps fixed rest days in the weekday rest-day invariant system, and persists only approved profile measurements to `runner_profiles`
+  it translates that visible contract into the existing structured authoring input, derives preferred running days from running-days/week plus fixed rest days, derives broad internal pace context from recent 5K time or pace when provided, keeps fixed rest days in the weekday rest-day invariant system, and persists only approved profile measurements to `runner_profiles`
 - `src/lib/imported-plan.ts`
   owns the canonical `training-plan-v2` import contract, JSON validation helpers, the runtime-noise exclusions for v2, the bounded canonical target and prescription normalization rules, the accepted-but-ignored `_ml_agent_template` instruction block, and the mapping from accepted import shapes into the canonical saved workout shape
 - `src/lib/structured-plan-authoring.ts`
-  owns the first server-side structured authoring contract, its normalization rules, and the deterministic generator that emits canonical `training-plan-v2` plan truth before persistence; it now also accepts bounded `terrainFocus`, `ultra_marathon`, and `mountain_running` context and can generate rolling or mountain/hill-oriented workout guidance without route matching or exact elevation targets
+  owns the first server-side structured authoring contract, its normalization rules, and the deterministic generator that emits canonical `training-plan-v2` plan truth before persistence; it now also accepts bounded `terrainFocus`, `ultra_marathon`, and `mountain_running` context, can generate rolling or mountain/hill-oriented workout guidance without route matching or exact elevation targets, and attaches broad benchmark-derived pace ranges to generated running segments when recent 5K truth exists
 - `src/lib/openai-plan-authoring.ts`
   owns the first server-side OpenAI text-to-plan seam, prompts the model for bounded structured authoring input, validates that model output, and converts the validated authoring input into canonical `training-plan-v2` truth before persistence
+- `src/lib/voice-to-plan-authoring.ts`
+  owns the first backend voice-to-plan authoring seam:
+  it accepts confirmed transcript text plus optional structured supplements, checks `voice_to_plan` entitlement, applies transcript length/noise, fixed-rest-day, and planning-sufficiency validation, returns either `draft_ready` with a runner-facing review verdict or `clarification_required` with missing fields/questions, explicitly calls out obvious requested-vs-proposed goal-style changes in review assumptions, and can parse an explicit confirm payload into canonical structured authoring truth without persisting raw transcript text
+- `src/lib/entitlements/*`
+  owns the first backend-only Basic/Pro entitlement foundation:
+  one canonical capability registry for `ai_plan_update`, `voice_to_plan`, and `garmin_ai_interpretation`; entitlement resolution that treats a missing row as effective `Pro`; capability checks with bounded locked responses; and metered lifetime usage recording for included Basic AI plan updates
 - `src/lib/local-auth.ts`
   owns the temporary local account credential contract, account discovery, and cookie session helpers
 - `src/lib/local-auth-supabase.ts`
@@ -82,21 +88,36 @@
   adds the bounded profile/settings persistence used by the current settings slice:
   `runner_profiles.first_name`, `last_name`, `display_name`, `avatar_url`, `avatar_storage_path`, `age`, `weight_kg`, and `height_cm`
   plus `workout_logs.body_notes jsonb` for workout-linked manual body notes and the public `profile-avatars` storage bucket for processed avatar images
+- `supabase/migrations/20260518183000_basic_pro_entitlement_foundation.sql`
+  adds the first entitlement storage foundation:
+  `runner_entitlements` for explicit backend-owned Basic/Pro rows and `runner_capability_usage` for lifetime metered capability counters; both tables have RLS enabled with authenticated read-own policies only, while writes remain server/admin-owned
 
 ## State And Lifecycle Rules
 
 - signed-out users now hit a login-first entry surface on `/` and do not create trusted history
 - signed-out preview routes can still render on direct route access when real Supabase env values are absent, but they are no longer the primary entry experience
 - temporary local-bypass users may still enter saved mode through visible credentials login on loopback local runtimes only, while deploy-like runtimes expose only the real auth surface and authenticated saved-mode truth always resolves through Supabase
+- entitlement rollout is backend-owned and pre-billing:
+  if a user has no `runner_entitlements` row, the effective tier is `Pro`; an explicit active `basic` row can enforce the first limits, including one lifetime included `ai_plan_update`, while `voice_to_plan` and `garmin_ai_interpretation` are Pro-only capabilities
 - authenticated users without `runner_profile` are routed into setup on `/`
 - authenticated users with a saved profile but no active `plan_cycle` now also stay honestly in setup until a canonical creation path succeeds
 - visible onboarding on `/` is now structured-first:
   authenticated users without setup answer the bounded first-plan constructor for required profile basics, benchmark, fixed rest-day availability, goal, conditional target/terrain context, strength/mobility support, and optional comment; the frontend calls `completeStructuredFirstPlanOnboarding`, and the backend turns that contract into canonical `training-plan-v2` plan data before persistence
+- the same no-plan onboarding surface also exposes a compact Pro transcript-first `AI setup` assist:
+  it sits above the manual structured constructor, calls `generateVoiceToPlanDraft` from `Review AI setup`, renders backend-owned `clarification_required` or `draft_ready` review data inline, and calls `confirmVoiceToPlanDraft` only from the explicit `Yes, create plan` action after a ready draft
+  the frontend does not store transcript text outside component state and does not call confirm from the review/generate path
+- the no-plan onboarding frontend implementation now keeps orchestration in `OnboardingGate` while the structured constructor, Dictate-to-Plan review panel, Advanced JSON import panel, and shared onboarding form model live in focused `src/components/onboarding/*` modules so those paths share option registries and request-building helpers instead of maintaining separate local truth
 - the backend now also has one first-pass free-text authoring seam:
   authenticated saved mode can accept one free-text request server-side, ask OpenAI for bounded structured authoring input, validate that output deterministically, and only then generate canonical `training-plan-v2` plan truth for persistence
+- the backend now has one first-pass voice-to-plan transcript seam:
+  authenticated callers can submit a bounded confirmed transcript plus optional constructor context/supplements, the server checks `voice_to_plan`, rejects empty/noisy/too-long or impossible rest-day context with bounded copy, returns `clarification_required` when essential profile/goal/readiness/availability/timeline truth is missing, and returns `draft_ready` with runner-understanding and plan-shape review data when enough truth exists
+  if the transcript clearly asks for one goal style such as relaxed, balanced, ambitious, or target-time, but the reviewed draft proposes a different style, the backend adds a runner-facing assumption explaining the change instead of silently hiding it or forcing the requested style; explicit transcript style cues are compared before constructor supplement defaults so frontend state cannot mask a dictated style change
+  transcript review never mutates saved truth; only the explicit `confirmVoiceToPlanDraft` action can create the first active plan, and it rechecks `voice_to_plan`, blocks if an active plan already exists, rebuilds the canonical plan from validated structured authoring input, persists profile age/weight/height, preserves fixed rest-day invariant truth, and still does not persist the raw transcript
+  this slice does not handle raw audio, does not persist the transcript as profile truth, does not count usage, and does not replace an existing active plan
 - the backend now has one structured first-plan onboarding action used by the normal onboarding UI:
   authenticated no-plan callers can submit the bounded constructor contract instead of a free-text prompt, the backend validates required profile basics, impossible running-day/rest-day combinations, supported goal distance, benchmark, target-time, target-date, and terrain formats, translates the request into deterministic structured authoring input, creates the canonical plan through the same persisted apply seam, and writes only `age`, `weight_kg`, and `height_cm` from the request into `runner_profiles`
   benchmark, terrain focus, target-time/date details, and the optional comment remain generation/plan context rather than long-lived runner profile truth; omitted terrain defaults to `standard` for normal goals, `mountain_running` normalizes to `mountain`, and non-target-time target fields are ignored after valid parsing
+  recent 5K time or pace is used only as generation context to derive broad pace ranges for generated warmups, easy/long/steady/tempo/interval work, recovery, cooldown, and hill-oriented segments; unknown benchmark keeps effort/cue fallbacks, and HR ranges are not invented without real HR-zone truth
 - the visible constructor now derives its hidden `runningDaysPerWeek` value conservatively from fixed rest-day availability, capped at four running days and never exceeding available weekdays, so the primary UI asks for fixed rest days without becoming a schedule editor
 - advanced JSON import remains available inside onboarding as a demoted fallback path for existing Hito plan files, migration, and testing
 - structured first-plan onboarding, advanced JSON import, backend text compatibility authoring, and internal structured authoring all create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
@@ -135,6 +156,7 @@
   past/logged history remains fixed by carrying fixed workout/log truth into the replacement active plan and retaining the previous plan as archived audit history
   the saved-mode `Open plan` modal now exposes a quiet `Update plan` disclosure that collects a short runner prompt, calls the backend proposal seam, renders the proposal review, and lets the runner explicitly choose `Apply update` or `Keep current plan`
   `Apply update` calls the backend apply seam and returns to the refreshed active-plan view after success; `Keep current plan` clears the proposal review without mutation; stale apply responses stay in the modal with a fresh-proposal recovery action
+  proposal generation now checks `ai_plan_update` entitlement before OpenAI generation and records usage only after successful proposal generation for explicit Basic users; applying an approved proposal does not consume additional usage
 - canonical richer-plan truth now survives more explicitly in that same seam across JSON import, structured authoring, and OpenAI text authoring:
   `plan_cycles` preserves `schema_version`, `source_kind`, `target_date`, goal metadata, and plan preferences
   while `planned_workouts` preserves source workout identity plus normalized fatigue and recovery semantics
@@ -162,7 +184,7 @@
   while one bounded interval DSL supports both distance-based and time-based repeat units
   older persisted rows may still carry legacy target aliases, but new writes now persist only the canonical target keys
 - executable workout steps are now normalized with runner-facing instruction truth before workout detail readback:
-  non-rest segments and expanded repeat work/recovery units must carry a target or guidance, and when no precise pace or heart-rate target exists the backend adds bounded cue/hint fallbacks such as easy warmup, very easy recovery, repeatable hard work, or supportive mobility/strength guidance instead of inventing fake metrics
+  non-rest segments and expanded repeat work/recovery units must carry a target or guidance; generated structured plans prefer broad benchmark-derived `pace_min_per_km_range` targets when recent 5K truth exists, and when no measurable pace or heart-rate truth exists the backend adds bounded cue/hint fallbacks such as easy warmup, very easy recovery, repeatable hard work, or supportive mobility/strength guidance instead of inventing fake metrics
 - richer route-facing target shaping now exposes only display-safe scalar target values and suppresses opaque nested metadata instead of letting structured extras leak into visible `[object Object]` strings
 - saved-mode workout identity now keeps richer imported source workout type truth available at runtime, so canonical `intervals`, `progression`, `race`, and `recovery` imports do not silently collapse into misleading visible `easy` labels
 - saved-mode rendering now keeps distance-first interval reps visible as distance-first in workout structure UI, resolves tempo-backed quality workouts to a tempo-specific visible identity, and formats visible distance totals through one shared rounding seam
@@ -213,6 +235,7 @@
   `workout_ai_insights` is generated from planned workout truth, normalized actual metrics, deterministic comparison payload, week context, next-workout summary, and optional saved workout-scoped body-note context
   it never parses raw FIT binary, never replaces deterministic comparison, and treats body notes only as bounded caution context rather than diagnosis or medical advice
   generated runner-facing text passes through a small backend quality gate before persistence, so malformed fragments or non-English artifacts fall back to stable deterministic copy instead of surfacing in `Feedback`
+  `garmin_ai_interpretation` entitlement gates only this AI insight generation step; Garmin upload, parsing, normalized actual metrics, deterministic comparison, and feedback persistence stay available when AI interpretation is locked
 - current workout-detail `Feedback` readback now exposes the latest Garmin asset, latest normalized actual metrics, latest deterministic comparison, and latest bounded AI interpretation in a dedicated evidence surface separate from manual completion logging
 - that `Feedback` surface now uses a flatter divided layout with plain-language section framing:
   upload explains why it helps

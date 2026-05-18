@@ -1827,65 +1827,16 @@
   }
 
   .hito-calendar-type-glyph {
-    --hito-calendar-type-color: var(--color-muted-foreground);
-    position: relative;
     display: inline-block;
     width: 0.72rem;
     height: 0.72rem;
     flex: 0 0 auto;
-    color: var(--hito-calendar-type-color);
+    color: inherit;
+    overflow: visible;
   }
 
-  .hito-calendar-type-glyph::before,
-  .hito-calendar-type-glyph::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    display: block;
-    border-radius: 999px;
-  }
-
-  .hito-calendar-type-glyph::before {
-    border: 1px solid currentColor;
-    opacity: 0.72;
-  }
-
-  .hito-calendar-type-glyph[data-family="easy"]::after {
-    inset: 0.24rem;
-    background: currentColor;
-    opacity: 0.62;
-  }
-
-  .hito-calendar-type-glyph[data-family="long"] {
+  .hito-calendar-type-glyph[data-glyph="long"] {
     width: 0.92rem;
-  }
-
-  .hito-calendar-type-glyph[data-family="long"]::before {
-    border-radius: 999px;
-    background: color-mix(in oklch, currentColor 16%, transparent);
-  }
-
-  .hito-calendar-type-glyph[data-family="quality"]::before {
-    border-radius: 0.18rem;
-    transform: rotate(45deg) scale(0.82);
-    background: color-mix(in oklch, currentColor 14%, transparent);
-  }
-
-  .hito-calendar-type-glyph[data-family="quality"]::after {
-    inset: 0.18rem auto 0.18rem 50%;
-    width: 1px;
-    border-radius: 999px;
-    background: currentColor;
-    opacity: 0.72;
-    transform: translateX(-50%) rotate(45deg);
-  }
-
-  .hito-calendar-type-glyph[data-family="rest"]::before {
-    border-color: color-mix(in oklch, currentColor 62%, transparent);
-  }
-
-  .hito-calendar-type-glyph[data-family="rest"]::after {
-    display: none;
   }
 
   .hito-feedback-marker {

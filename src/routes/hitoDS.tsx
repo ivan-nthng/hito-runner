@@ -4,6 +4,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { APP_NAME } from "@/lib/app-config";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconName } from "@/components/ui/icon";
+import { WorkoutGlyph } from "@/components/WorkoutGlyph";
+import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/hitoDS")({
@@ -54,16 +56,21 @@ const FEEDBACK_MARKER_EXAMPLES = [
   { label: "Feedback", state: "feedback_ready" },
 ] as const;
 
-const CALENDAR_TYPE_EXAMPLES = [
-  { label: "Easy", family: "easy", color: "var(--easy)" },
-  { label: "Recovery", family: "easy", color: "var(--easy)" },
-  { label: "Long", family: "long", color: "var(--long)" },
-  { label: "Tempo", family: "quality", color: "var(--quality)" },
-  { label: "Intervals", family: "quality", color: "var(--quality)" },
-  { label: "Progression", family: "quality", color: "var(--quality)" },
-  { label: "Race", family: "quality", color: "var(--quality)" },
-  { label: "Quality", family: "quality", color: "var(--quality)" },
-  { label: "Rest", family: "rest", color: "var(--rest)" },
+const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
+  label: string;
+  glyph: WorkoutGlyphKind;
+  family: "easy" | "long" | "quality" | "rest";
+  color: string;
+}> = [
+  { label: "Easy", glyph: "easy", family: "easy", color: "var(--easy)" },
+  { label: "Recovery", glyph: "recovery", family: "easy", color: "var(--easy)" },
+  { label: "Long", glyph: "long", family: "long", color: "var(--long)" },
+  { label: "Tempo", glyph: "tempo", family: "quality", color: "var(--quality)" },
+  { label: "Intervals", glyph: "intervals", family: "quality", color: "var(--quality)" },
+  { label: "Progression", glyph: "progression", family: "quality", color: "var(--quality)" },
+  { label: "Race", glyph: "race", family: "quality", color: "var(--quality)" },
+  { label: "Quality", glyph: "quality", family: "quality", color: "var(--quality)" },
+  { label: "Rest", glyph: "rest", family: "rest", color: "var(--rest)" },
 ] as const;
 
 type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
@@ -1256,24 +1263,25 @@ function HitoDesignSystemPage() {
               </div>
               <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <article className="hito-row-group">
-                  {CALENDAR_TYPE_EXAMPLES.map(({ label, family, color }) => (
+                  {CALENDAR_TYPE_EXAMPLES.map(({ label, glyph, family, color }) => (
                     <div key={label} className="hito-list-row py-3">
                       <span className="hito-label inline-flex items-center gap-2">
-                        <span
+                        <WorkoutGlyph
+                          kind={glyph}
                           className="hito-calendar-type-glyph"
-                          data-family={family}
-                          style={{ "--hito-calendar-type-color": color } as CSSProperties}
+                          style={{ color }}
                         />
                         <span style={{ color }}>{label}</span>
                       </span>
-                      <span className="hito-caption">Month cell</span>
+                      <span className="hito-caption">{family} color</span>
                     </div>
                   ))}
                 </article>
                 <article className="hito-surface-flat p-5">
                   <p className="hito-label">Calendar type identity</p>
                   <p className="hito-support-copy mt-3">
-                    Month cells use one broad-family glyph plus one short label. Distance, duration,
+                    Month cells use distinct tiny glyphs for visible workout labels while preserving
+                    the existing easy, long, quality, and rest color families. Distance, duration,
                     and target details stay in hover or workout detail.
                   </p>
                 </article>

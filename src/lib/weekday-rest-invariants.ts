@@ -115,6 +115,15 @@ export function mapImportedSeedAcrossAllowedWeekdays(
     return shiftImportedSeedToStartDate(importedSeed, startDate);
   }
 
+  const allowedTrainingWeekdays = resolveAllowedTrainingWeekdays(importedSeed, invariant);
+  const startWeekday = weekdayLong(startDate) as WeekdayName;
+
+  if (!allowedTrainingWeekdays.includes(startWeekday)) {
+    throw new Error(
+      `Choose a start date that is on an allowed training day. ${startWeekday} is not in the resolved training weekdays.`,
+    );
+  }
+
   const workouts: ImportedWorkoutSeed[] = [];
   let workoutIndex = 0;
   let cursorDate = startDate;
@@ -125,7 +134,7 @@ export function mapImportedSeedAcrossAllowedWeekdays(
   while (workoutIndex < nonRestWorkouts.length) {
     const cursorWeekday = weekdayLong(cursorDate) as WeekdayName;
 
-    if (invariant.blockedWeekdays.includes(cursorWeekday)) {
+    if (!allowedTrainingWeekdays.includes(cursorWeekday)) {
       workouts.push(buildInsertedRestWorkout(importedSeed, startDate, cursorDate, workouts.length));
       cursorDate = addDaysIso(cursorDate, 1);
       continue;
@@ -236,6 +245,23 @@ function shiftImportedSeedToStartDate(importedSeed: ImportedPlanSeed, startDate:
     targetDate: importedSeed.targetDate ? addDaysIso(importedSeed.targetDate, dayOffset) : null,
     workouts,
   };
+}
+
+function resolveAllowedTrainingWeekdays(
+  importedSeed: ImportedPlanSeed,
+  invariant: WeekdayRestInvariant,
+) {
+  const preferredTrainingDays = uniqueWeekdays(
+    PREFERRED_TRAINING_DAY_KEYS.flatMap((key) =>
+      readWeekdayArray(asRecord(importedSeed.planPreferences)?.[key]),
+    ),
+  ).filter((weekday) => !invariant.blockedWeekdays.includes(weekday));
+
+  if (preferredTrainingDays.length) {
+    return preferredTrainingDays;
+  }
+
+  return WEEKDAY_NAMES.filter((weekday) => !invariant.blockedWeekdays.includes(weekday));
 }
 
 function buildInsertedRestWorkout(

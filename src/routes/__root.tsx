@@ -35,14 +35,14 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "A running-plan baseline focused on login-first entry, JSON-first onboarding, and saved workout truth.",
+          "A running-plan baseline focused on login-first entry, structured onboarding, and saved workout truth.",
       },
       { name: "author", content: APP_NAME },
       { property: "og:title", content: `${APP_NAME} — Running plan` },
       {
         property: "og:description",
         content:
-          "A running-plan baseline focused on login-first entry, JSON-first onboarding, and saved workout truth.",
+          "A running-plan baseline focused on login-first entry, structured onboarding, and saved workout truth.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

@@ -323,7 +323,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
     type: workout.type,
     title: workout.title,
     notes: workout.notes ?? null,
-    steps: workout.steps,
+    steps: normalizeExecutableStepInstructions(workout.steps),
     feedbackMarker: null,
     log: null,
     status: inferWorkoutStatus(workout.type, workout.date, currentDate, null),
@@ -552,6 +552,144 @@ export function displayTargetEntries(target: StepTarget | undefined) {
   }
 
   return entries;
+}
+
+export function normalizeExecutableStepInstructions(steps: Step[]): Step[] {
+  return steps.map((step) => normalizeExecutableStepInstruction(step));
+}
+
+function normalizeExecutableStepInstruction(step: Step, role?: "work" | "recovery"): Step {
+  const normalized: Step = {
+    ...step,
+    ...(step.target ? { target: { ...step.target } } : {}),
+    ...(step.work ? { work: normalizeExecutableStepInstruction(step.work, "work") } : {}),
+    ...(step.recovery
+      ? {
+          recovery: isExecutableStep(step.recovery)
+            ? normalizeExecutableStepInstruction(step.recovery, "recovery")
+            : {
+                ...step.recovery,
+                ...(step.recovery.target ? { target: { ...step.recovery.target } } : {}),
+              },
+        }
+      : {}),
+  };
+
+  if (!isExecutableStep(normalized)) {
+    return normalized;
+  }
+
+  const guidance = readStepGuidance(normalized);
+
+  if (hasStepInstruction(normalized)) {
+    if (!hasTargetInstruction(normalized.target) && guidance) {
+      return {
+        ...normalized,
+        guidance,
+        target: addHintTarget(normalized.target, guidance),
+      };
+    }
+
+    return normalized;
+  }
+
+  const fallbackInstruction = fallbackInstructionForStep(normalized, role);
+
+  return {
+    ...normalized,
+    guidance: guidance ?? fallbackInstruction,
+    target: addHintTarget(normalized.target, fallbackInstruction),
+  };
+}
+
+function isExecutableStep(step: Step) {
+  const kind = `${step.segment_type ?? ""} ${step.type ?? ""}`.toLowerCase();
+
+  if (/\b(rest|fueling)\b/.test(kind)) {
+    return false;
+  }
+
+  if (
+    /\brecovery\b/.test(kind) &&
+    step.prescription?.mode === "none" &&
+    !step.duration_min &&
+    !step.distance_km
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function hasStepInstruction(step: Step) {
+  return hasTargetInstruction(step.target) || Boolean(readStepGuidance(step));
+}
+
+function hasTargetInstruction(target: StepTarget | undefined) {
+  if (!target) {
+    return false;
+  }
+
+  return displayTargetEntries(target).length > 0;
+}
+
+function addHintTarget(target: StepTarget | undefined, hint: string): StepTarget {
+  const trimmedHint = hint.trim();
+
+  return {
+    ...(target ?? {}),
+    hint: target?.hint?.trim() ? target.hint : trimmedHint,
+  };
+}
+
+function readStepGuidance(step: Step) {
+  const guidance = (step as { guidance?: unknown }).guidance;
+
+  if (typeof guidance === "string") {
+    const trimmed = guidance.trim();
+    return trimmed || null;
+  }
+
+  if (guidance && typeof guidance === "object" && "guidance" in guidance) {
+    const nestedGuidance = (guidance as { guidance?: unknown }).guidance;
+
+    if (typeof nestedGuidance !== "string") {
+      return null;
+    }
+
+    const trimmed = nestedGuidance.trim();
+    return trimmed || null;
+  }
+
+  return null;
+}
+
+function fallbackInstructionForStep(step: Step, role?: "work" | "recovery") {
+  const kind = `${role ?? ""} ${step.segment_type ?? ""} ${step.type ?? ""} ${step.label ?? ""}`
+    .toLowerCase()
+    .trim();
+
+  if (/\bwarm\s*up\b|\bwarmup\b/.test(kind)) {
+    return "Easy and controlled.";
+  }
+
+  if (/\bcool\s*down\b|\bcooldown\b/.test(kind)) {
+    return "Easy jog or walk before stopping.";
+  }
+
+  if (/\brecovery\b/.test(kind)) {
+    return "Very easy jog or walk; let breathing settle.";
+  }
+
+  if (/\bmobility\b|\bstrength\b|\bactivation\b|\bdrills\b/.test(kind)) {
+    return "Move smoothly; keep this supportive, not maximal.";
+  }
+
+  if (/\bwork\b|\binterval\b|\btempo\b|\bstride\b|\bhill\b|\bquality\b/.test(kind)) {
+    return "Controlled hard effort; stay repeatable.";
+  }
+
+  return "Easy and controlled.";
 }
 
 export function stepPlannedDistanceKm(step: Step) {

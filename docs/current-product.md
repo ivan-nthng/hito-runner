@@ -43,21 +43,26 @@ The product still avoids claims of live coaching, connected integrations, weathe
 ## Workflow And Status Behavior
 
 - signed-out users open into a minimal auth-first entry surface with `Hito.` branding
-- authenticated users without setup complete are gated into a compact text-first onboarding request on `/`
-- the primary onboarding surface now asks for one free-text description of the goal and current running context, then builds the first saved plan through the backend authoring seam
+- authenticated users without setup complete are gated into a compact structured first-plan constructor on `/`
+- the primary onboarding surface now collects required profile basics, one bounded fitness benchmark, fixed rest days, goal distance/style, conditional target and terrain context, strength/mobility preference, and one optional supporting comment before creating the first saved plan
 - if a signed-in user has no active saved plan yet, the app now stays honestly in that setup state instead of silently assigning a preview-derived plan
 - setup-required accounts now see `Create a Plan` in the home header where saved-mode accounts see `Open plan`
 - the backend now also supports one first-pass free-text authoring seam:
   one user message is turned into validated canonical plan data server-side through OpenAI before the saved weekly plan opens
+- the visible onboarding UI now consumes the structured first-plan constructor contract:
+  profile measurements, one bounded 5K benchmark mode, fixed rest days, goal distance/style/target, conditional terrain focus, strength preference, and an optional supporting comment can be submitted through one authenticated action
+  the frontend keeps running-day choice out of the primary UI and sends a conservative hidden running-days count that fits outside fixed rest days; the backend derives actual training weekdays, preserves fixed rest days as plan-level weekday invariant truth, creates the plan through direct structured generation, and persists only age/weight/height as runner profile fields
+  age, weight, and height are required in the backend contract; goal distance now includes ultra marathon and mountain running, terrain defaults to standard unless a relevant goal supplies it, mountain running normalizes to mountain terrain, and target time/date context only affects target-time goals
+  terrain focus can influence rolling or mountain/hill-oriented workouts without creating exact elevation targets or route matching, and benchmark, terrain, target, and optional comment context are treated only as bounded generation nuance rather than raw profile truth
 - advanced JSON upload remains available as a secondary fallback path for existing plan artifacts, migration, and testing
 - the temporary local login path behaves as signed-in saved mode for the configured local admin account only on loopback local runtimes, can still expand to a few local test accounts later without changing routes, and uses Supabase as the only authenticated plan store; those same loopback local runtimes no longer offer email magic links unless a real public `APP_BASE_URL` is configured
-- onboarding now leads with one compact text request, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
-- authenticated no-plan or no-workout states now render the same visible text-first plan creation surface instead of stranding users on a retry-only empty state
-- the first structured authoring slice is backend-only for now:
+- onboarding now leads with the structured constructor, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
+- authenticated no-plan or no-workout states now render the same visible structured plan creation surface instead of stranding users on a retry-only empty state
+- the internal structured authoring slice remains backend-only:
   it validates goal, schedule, runner basics, recent result context, available days, constraints, and preferences, then generates one canonical `training-plan-v2` plan into the same persisted saved-mode seam without changing routes
 - the first OpenAI-backed text authoring slice is also backend-only for now:
   it treats the user message as intent only, asks OpenAI for bounded structured authoring input, validates that output, and persists only the resulting canonical plan through the same saved-mode seam
-- setup writes one profile and creates one active plan from the text-first authoring result, with JSON import retained only as an advanced fallback
+- setup writes one profile and creates one active plan from the structured constructor result, with JSON import retained only as an advanced fallback
 - applying a generated or imported plan now uses one shared backend start-date policy:
   explicit future starts are preserved, past or non-future starts normalize to today, and the plan is persisted only after those effective dates are resolved
 - saved-mode JSON import can now use one explicit chosen start day as the apply authority:
@@ -94,7 +99,8 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - saved-mode shell links that return to home now intentionally reopen `/` through a fresh request so the calendar page stays reliable even from long-lived tabs
 - completed calendar days now read more clearly at a glance through a green confirmation treatment without overriding the primary today highlight
 - home/calendar now uses a lighter scan rhythm:
-  month cells carry date, completion truth, one broad-family workout glyph, one short workout-type label, the compact workout title, and a secondary feedback/evidence cue without inline distance, duration, target data, or dashboard clutter
+  month cells carry date, completion truth, one distinct tiny workout-type glyph, one short workout-type label, the compact workout title, and a secondary feedback/evidence cue without inline distance, duration, target data, or dashboard clutter
+  the current distinct glyph set covers Easy, Recovery, Long, Tempo, Intervals, Progression, Race, Quality, and Rest while preserving the existing easy, long, quality, and rest color families
 - saved workout logging now distinguishes preview-only drafts from persisted saves, supports truthful overwrite between `completed`, `partial`, and `skipped`, and surfaces pending, success, and failure feedback without hiding backend failures
 - saved workout logging now also supports workout-linked body notes as part of the saved result:
   body notes persist with the specific workout log, reload with that workout, open from a focused modal inside `Log result`, and stay out of plan-adjustment truth while optionally informing Garmin feedback only as bounded caution context
@@ -171,6 +177,8 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - when that advanced import apply succeeds, the product now returns to saved home through a fresh page load instead of leaving users in a stale in-place route refresh state
 - structured imports now persist one clearer segment DSL in saved mode:
   interval-by-distance and interval-by-time both normalize into the same repeat prescription shape, and the existing home plus workout-detail routes keep rendering from that one stored contract
+- workout-detail structure rows now have backend-owned execution instructions:
+  every non-rest segment and expanded repeat work/recovery row reaches the UI with a real target or clear cue, using safe fallback hints when the plan does not define pace or heart-rate targets
 - saved-mode plan truth now also preserves higher-value richer semantics across import, structured authoring, and text authoring without adding a second runtime model:
   target date, goal metadata, plan preferences, source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority all persist into the same canonical Supabase plan rows
 - home, calendar, and workout detail now render tempo workouts with a tempo-specific visible identity instead of flattening every quality workout into the same generic label, and distance-first interval reps keep visible distance-first cues in the workout structure UI
@@ -180,7 +188,7 @@ The product still avoids claims of live coaching, connected integrations, weathe
 - the advanced import modal now follows the same stable bounded modal behavior as `Open plan` and `Body notes`, while keeping its own smaller width and import-specific content
 - that downloadable template now includes one reserved `_ml_agent_template` instruction block so ML-generated files can target the canonical `training-plan-v2` contract more explicitly without turning template-only guidance into runtime truth
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
-- auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress summary metrics and legends, body severity micro-UI, preserved integration utility rows, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share Hito component primitives for canonical typography roles, low-card surfaces, open/divider grouping, tiered controls, helper/error text, grouped rows, metric rows, compact legends, compact tooltips, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, disclosure, labels, captions, tabs, and dividers, keeping text-first onboarding primary and advanced JSON import secondary
+- auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress summary metrics and legends, body severity micro-UI, preserved integration utility rows, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share Hito component primitives for canonical typography roles, low-card surfaces, open/divider grouping, tiered controls, helper/error text, grouped rows, metric rows, compact legends, compact tooltips, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, disclosure, labels, captions, tabs, and dividers, keeping structured first-plan onboarding primary and advanced JSON import secondary
 - the first typography canonicalization pass is implemented for the highest-drift runner-facing surfaces: `Open plan`, saved-mode JSON import, workout `Log result`/`Feedback`, and `User settings` now use shared modal title, panel title, body/body-small, form-label, feedback, and technical-mono roles instead of local heading and helper/body recipes where practical
 - the first icon canonicalization pass is implemented on top of `lucide-react`: product surfaces now consume stable Hito icon names through the shared `Icon` primitive, `/hitoDS` documents approved icon names, categories, and sizes, and raw SVG icon folders are not part of the product design-system source
 - remaining chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are treated as product visualization geometry, not runner-facing component chrome

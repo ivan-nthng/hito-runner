@@ -57,11 +57,15 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text-first onboarding, advanced JSON import, internal structured authoring, and workout logging; the email sign-in path now requests PKCE-oriented Supabase links and the callback accepts either an auth code or an email token hash before writing the cookie-backed session
+  owns server-backed loading and mutation entry points for home, workout detail, progress, login, structured first-plan onboarding, text compatibility onboarding, advanced JSON import, internal structured authoring, and workout logging; the email sign-in path now requests PKCE-oriented Supabase links and the callback accepts either an auth code or an email token hash before writing the cookie-backed session
+- `src/lib/structured-first-plan-onboarding.ts`
+  owns the backend contract for the structured first-plan constructor:
+  required age, weight, and height profile basics, one bounded 5K benchmark mode, `runningDaysPerWeek`, `fixedRestDays`, goal distance/style/conditional terrain, bounded strength preference, and an optional supporting comment
+  it translates that visible contract into the existing structured authoring input, derives preferred running days from running-days/week plus fixed rest days, keeps fixed rest days in the weekday rest-day invariant system, and persists only approved profile measurements to `runner_profiles`
 - `src/lib/imported-plan.ts`
   owns the canonical `training-plan-v2` import contract, JSON validation helpers, the runtime-noise exclusions for v2, the bounded canonical target and prescription normalization rules, the accepted-but-ignored `_ml_agent_template` instruction block, and the mapping from accepted import shapes into the canonical saved workout shape
 - `src/lib/structured-plan-authoring.ts`
-  owns the first server-side structured authoring contract, its normalization rules, and the deterministic generator that emits canonical `training-plan-v2` plan truth before persistence
+  owns the first server-side structured authoring contract, its normalization rules, and the deterministic generator that emits canonical `training-plan-v2` plan truth before persistence; it now also accepts bounded `terrainFocus`, `ultra_marathon`, and `mountain_running` context and can generate rolling or mountain/hill-oriented workout guidance without route matching or exact elevation targets
 - `src/lib/openai-plan-authoring.ts`
   owns the first server-side OpenAI text-to-plan seam, prompts the model for bounded structured authoring input, validates that model output, and converts the validated authoring input into canonical `training-plan-v2` truth before persistence
 - `src/lib/local-auth.ts`
@@ -86,12 +90,16 @@
 - temporary local-bypass users may still enter saved mode through visible credentials login on loopback local runtimes only, while deploy-like runtimes expose only the real auth surface and authenticated saved-mode truth always resolves through Supabase
 - authenticated users without `runner_profile` are routed into setup on `/`
 - authenticated users with a saved profile but no active `plan_cycle` now also stay honestly in setup until a canonical creation path succeeds
-- visible onboarding on `/` is now text-first:
-  authenticated users without setup describe their goal and current context in one compact request, the backend turns that request into bounded structured authoring input through OpenAI, validates it deterministically, and only then generates canonical `training-plan-v2` plan data before persistence
+- visible onboarding on `/` is now structured-first:
+  authenticated users without setup answer the bounded first-plan constructor for required profile basics, benchmark, fixed rest-day availability, goal, conditional target/terrain context, strength/mobility support, and optional comment; the frontend calls `completeStructuredFirstPlanOnboarding`, and the backend turns that contract into canonical `training-plan-v2` plan data before persistence
 - the backend now also has one first-pass free-text authoring seam:
   authenticated saved mode can accept one free-text request server-side, ask OpenAI for bounded structured authoring input, validate that output deterministically, and only then generate canonical `training-plan-v2` plan truth for persistence
+- the backend now has one structured first-plan onboarding action used by the normal onboarding UI:
+  authenticated no-plan callers can submit the bounded constructor contract instead of a free-text prompt, the backend validates required profile basics, impossible running-day/rest-day combinations, supported goal distance, benchmark, target-time, target-date, and terrain formats, translates the request into deterministic structured authoring input, creates the canonical plan through the same persisted apply seam, and writes only `age`, `weight_kg`, and `height_cm` from the request into `runner_profiles`
+  benchmark, terrain focus, target-time/date details, and the optional comment remain generation/plan context rather than long-lived runner profile truth; omitted terrain defaults to `standard` for normal goals, `mountain_running` normalizes to `mountain`, and non-target-time target fields are ignored after valid parsing
+- the visible constructor now derives its hidden `runningDaysPerWeek` value conservatively from fixed rest-day availability, capped at four running days and never exceeding available weekdays, so the primary UI asks for fixed rest days without becoming a schedule editor
 - advanced JSON import remains available inside onboarding as a demoted fallback path for existing Hito plan files, migration, and testing
-- text-first authoring, advanced JSON import, and internal structured authoring all create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
+- structured first-plan onboarding, advanced JSON import, backend text compatibility authoring, and internal structured authoring all create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
 - canonical apply-time start normalization now lives in [src/lib/plan-apply-policy.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-apply-policy.ts):
   explicit future `start_date` is preserved, while past or non-future `start_date` normalizes to `today` before persistence
 - saved-mode JSON import now collects an explicit start day in the visible saved-mode import surfaces and passes it as backend-owned `requestedStartDate`; when present, that date becomes the effective apply authority, the imported JSON `start_date` remains source metadata, and the imported workout sequence is shifted as one block around the chosen date
@@ -149,10 +157,12 @@
 - that same saved-mode import dialog now follows the same stable product-dialog recipe as `Open plan` and `Body notes`: bounded panel height, internal body scroll, reachable footer, stable Safari content behavior, and stable non-blocking overlay close behavior
 - after a successful saved-mode advanced import apply, the client now leaves the current page through a fresh document request to `/` instead of relying on an immediate in-place router refresh on the replaced plan state
 - the saved-mode advanced import dialog now accepts only canonical `training-plan-v2` files, and runtime-only v2 fields such as `status`, `completion_state`, and sync or feedback placeholders remain non-canonical
-- the first structured authoring generator now emits the same canonical `training-plan-v2` family used by JSON import, persists it through `plan_cycles` plus `planned_workouts`, and reuses `steps jsonb` as the only structured workout payload
+- the structured first-plan constructor and the internal structured authoring generator now emit the same canonical `training-plan-v2` family used by JSON import, persist it through `plan_cycles` plus `planned_workouts`, and reuse `steps jsonb` as the only structured workout payload
 - normalized `planned_workouts.steps jsonb` now preserves explicit segment-level `segment_id`, `segment_type`, `sequence`, `prescription`, and canonical target keys such as `hr_bpm_range` and `pace_min_per_km_range`
   while one bounded interval DSL supports both distance-based and time-based repeat units
   older persisted rows may still carry legacy target aliases, but new writes now persist only the canonical target keys
+- executable workout steps are now normalized with runner-facing instruction truth before workout detail readback:
+  non-rest segments and expanded repeat work/recovery units must carry a target or guidance, and when no precise pace or heart-rate target exists the backend adds bounded cue/hint fallbacks such as easy warmup, very easy recovery, repeatable hard work, or supportive mobility/strength guidance instead of inventing fake metrics
 - richer route-facing target shaping now exposes only display-safe scalar target values and suppresses opaque nested metadata instead of letting structured extras leak into visible `[object Object]` strings
 - saved-mode workout identity now keeps richer imported source workout type truth available at runtime, so canonical `intervals`, `progression`, `race`, and `recovery` imports do not silently collapse into misleading visible `easy` labels
 - saved-mode rendering now keeps distance-first interval reps visible as distance-first in workout structure UI, resolves tempo-backed quality workouts to a tempo-specific visible identity, and formats visible distance totals through one shared rounding seam

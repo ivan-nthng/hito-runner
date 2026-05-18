@@ -14,6 +14,8 @@ Architect Agent
 
 - Current saved-mode imports already normalize both legacy and first-pass `training-plan-v2` inputs into one canonical persisted seam.
 - The latest backend slice now preserves canonical segment metadata, bounded target keys, and repeat-based prescription structure inside `planned_workouts.steps jsonb` while keeping current route compatibility.
+- The latest contract hardening now guarantees instruction completeness before workout detail readback:
+  every visible non-rest segment plus expanded repeat work/recovery row has target or guidance copy, with safe fallback cues when precise pace or heart-rate truth is absent.
 - Plan-level provenance fields such as stable `plan_id`, source-kind persistence, and richer editability-oriented storage remain intentionally deferred.
 
 ## Context

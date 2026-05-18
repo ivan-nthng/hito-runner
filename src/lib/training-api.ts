@@ -28,6 +28,14 @@ import type {
 } from "@/lib/plan-refresh-proposal";
 import type { RunnerCoachContext } from "@/lib/runner-coach-context";
 import {
+  buildStructuredFirstPlanAuthoringInput,
+  buildStructuredFirstPlanProfilePatch,
+  buildStructuredFirstPlanResultContext,
+  parseStructuredFirstPlanOnboardingInput,
+  type StructuredFirstPlanOnboardingInput,
+  type StructuredFirstPlanProfilePatch,
+} from "@/lib/structured-first-plan-onboarding";
+import {
   buildActivePlanExportPayload,
   buildPlanExportDocument,
   type PlanExportDocument,
@@ -60,6 +68,7 @@ import {
   findWorkout,
   getPreviewSnapshot,
   inferWorkoutStatus,
+  normalizeExecutableStepInstructions,
   todayIso,
   weekdayLong,
   type RunnerProfileSummary,
@@ -570,6 +579,14 @@ export const completeStructuredOnboarding = createServerFn({ method: "POST" })
         };
   });
 
+export const completeStructuredFirstPlanOnboarding = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => parseStructuredFirstPlanOnboardingInput(value))
+  .handler(async ({ data }) => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
+
+    return completeStructuredFirstPlanOnboardingForUser(userId, data);
+  });
+
 export const completeTextOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => textAuthoringInputSchema.parse(value))
   .handler(async ({ data }) => {
@@ -695,6 +712,7 @@ export async function applyImportedPlanForUser(
   importedPlan: ImportedPlanInput,
   firstDayResolution: FirstDayResolution | null,
   requestedStartDate: string | null = null,
+  profilePatch: StructuredFirstPlanProfilePatch | null = null,
 ): Promise<PlanApplyResult> {
   const preparedApply = await prepareImportedPlanApply(
     userId,
@@ -707,10 +725,48 @@ export async function applyImportedPlanForUser(
     return preparedApply;
   }
 
-  await upsertRunnerProfile(userId, preparedApply.importedSeed.profile);
+  await upsertRunnerProfile(userId, preparedApply.importedSeed.profile, profilePatch);
   await replaceActivePlanWithImportedInput(userId, preparedApply, preparedApply.planContext);
 
   return preparedApply.result;
+}
+
+export async function completeStructuredFirstPlanOnboardingForUser(
+  userId: string,
+  input: StructuredFirstPlanOnboardingInput,
+) {
+  try {
+    const authoringInput = buildStructuredFirstPlanAuthoringInput(input);
+    const generatedPlan = buildStructuredAuthoringPlan(authoringInput);
+    const profilePatch = buildStructuredFirstPlanProfilePatch(input);
+    const applyResult = await applyImportedPlanForUser(
+      userId,
+      generatedPlan,
+      null,
+      null,
+      profilePatch,
+    );
+
+    return applyResult.ok
+      ? {
+          ...applyResult,
+          schemaVersion: generatedPlan.schema_version,
+          sourceKind: generatedPlan.source_kind,
+          workoutCount: generatedPlan.planned_workouts.length,
+          onboardingContract: "structured_first_plan_onboarding_v1" as const,
+          generationContext: buildStructuredFirstPlanResultContext(input),
+        }
+      : {
+          ...applyResult,
+          schemaVersion: generatedPlan.schema_version,
+          sourceKind: generatedPlan.source_kind,
+          workoutCount: generatedPlan.planned_workouts.length,
+          onboardingContract: "structured_first_plan_onboarding_v1" as const,
+          generationContext: buildStructuredFirstPlanResultContext(input),
+        };
+  } catch (error) {
+    throw new Error(mapStructuredFirstPlanOnboardingError(error));
+  }
 }
 
 export async function archiveActivePlanForUser(userId: string): Promise<DeleteActivePlanResult> {
@@ -1411,7 +1467,7 @@ function persistedWorkoutRowToRefreshSeed(
     plannedRpe: workout.planned_rpe ?? null,
     estimatedFatigue: workout.estimated_fatigue ?? null,
     recoveryPriority: workout.recovery_priority ?? null,
-    steps: ((workout.steps as Step[] | null) ?? []).map((step) => ({ ...step })),
+    steps: normalizeExecutableStepInstructions((workout.steps as Step[] | null) ?? []),
     displayOrder: workout.display_order,
   };
 }
@@ -1988,8 +2044,13 @@ async function getExistingPlanContext(userId: string): Promise<ExistingPlanConte
   };
 }
 
-async function upsertRunnerProfile(userId: string, profile: RunnerProfileSummary) {
+async function upsertRunnerProfile(
+  userId: string,
+  profile: RunnerProfileSummary,
+  profilePatch: StructuredFirstPlanProfilePatch | null = null,
+) {
   const supabase = createAdminSupabaseClient();
+  const baselineNotes = profilePatch ? profilePatch.baselineNotes : (profile.baselineNotes ?? null);
   const profileUpsert = await supabase
     .from("runner_profiles")
     .upsert({
@@ -1998,7 +2059,14 @@ async function upsertRunnerProfile(userId: string, profile: RunnerProfileSummary
       goal_label: profile.goalLabel,
       baseline_sessions_per_week: profile.baselineSessionsPerWeek,
       baseline_long_run_km: profile.baselineLongRunKm,
-      baseline_notes: profile.baselineNotes ?? null,
+      baseline_notes: baselineNotes,
+      ...(profilePatch
+        ? {
+            age: profilePatch.age,
+            weight_kg: profilePatch.weightKg,
+            height_cm: profilePatch.heightCm,
+          }
+        : {}),
       setup_state: "completed",
     })
     .select("user_id")
@@ -2007,6 +2075,46 @@ async function upsertRunnerProfile(userId: string, profile: RunnerProfileSummary
   if (profileUpsert.error) {
     throw new Error(profileUpsert.error.message);
   }
+}
+
+function mapStructuredFirstPlanOnboardingError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+
+  if (
+    /running days per week|fixed rest days|available running day|allowed training day/i.test(
+      message,
+    )
+  ) {
+    return "Choose running days and fixed rest days that can fit together.";
+  }
+
+  if (
+    /profile\.age|\bage\b|profile\.weightKg|\bweight\b|profile\.heightCm|\bheight\b/i.test(message)
+  ) {
+    return "Enter age, weight, and height within the supported ranges before creating the plan.";
+  }
+
+  if (/goalDistance|goal distance/i.test(message)) {
+    return "Choose a supported goal distance.";
+  }
+
+  if (/target date|at least 7 days|calendar date/i.test(message)) {
+    return "Choose a target date that is valid and at least 7 days from the plan start.";
+  }
+
+  if (/target time|recent 5k|pace|time like/i.test(message)) {
+    return "Check the benchmark or target time format before creating the plan.";
+  }
+
+  if (/terrain/i.test(message)) {
+    return "Choose a supported terrain focus: standard, rolling, or mountain.";
+  }
+
+  if (/Fixed rest-day|fixed rest day|blocked/i.test(message)) {
+    return "This setup would place training on a fixed rest day. Adjust the rest days or running days and try again.";
+  }
+
+  return "We could not create a plan from these setup answers. Check the details and try again.";
 }
 
 function dbWorkoutToView(
@@ -2027,7 +2135,7 @@ function dbWorkoutToView(
     sourceWorkoutType: workout.source_workout_type,
     title: workout.title,
     notes: workout.notes,
-    steps: (workout.steps as Step[]) ?? [],
+    steps: normalizeExecutableStepInstructions((workout.steps as Step[] | null) ?? []),
     feedbackMarker,
     log: mappedLog,
     status: inferWorkoutStatus(workout.workout_type, workout.workout_date, currentDate, mappedLog),

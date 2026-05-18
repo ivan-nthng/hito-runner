@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
+import { WorkoutGlyph } from "@/components/WorkoutGlyph";
+import { workoutGlyphKind, type WorkoutGlyphKind } from "@/lib/workout-glyph";
 import {
   displayTargetEntries,
   feedbackMarkerMeta,
@@ -24,7 +25,7 @@ type View = "month" | "week";
 type CalendarWorkoutIdentity = {
   label: string;
   color: string;
-  glyph: "easy" | "long" | "quality" | "rest";
+  glyph: WorkoutGlyphKind;
 };
 
 export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
@@ -237,15 +238,9 @@ function DayCell({
               )}
               style={{ color: identity?.color }}
             >
-              <span
-                className="hito-calendar-type-glyph"
-                data-family={identity?.glyph}
-                style={
-                  {
-                    "--hito-calendar-type-color": identity?.color,
-                  } as CSSProperties
-                }
-              />
+              {identity && (
+                <WorkoutGlyph kind={identity.glyph} className="hito-calendar-type-glyph" />
+              )}
               <span className="truncate">{identity?.label}</span>
             </div>
             <div
@@ -264,15 +259,7 @@ function DayCell({
               className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
               style={{ color: identity.color }}
             >
-              <span
-                className="hito-calendar-type-glyph"
-                data-family={identity.glyph}
-                style={
-                  {
-                    "--hito-calendar-type-color": identity.color,
-                  } as CSSProperties
-                }
-              />
+              <WorkoutGlyph kind={identity.glyph} className="hito-calendar-type-glyph" />
               <span>{identity.label}</span>
             </div>
           </div>
@@ -317,7 +304,7 @@ function calendarWorkoutIdentity(workout: Workout): CalendarWorkoutIdentity {
     return {
       label: "Long",
       color: meta.color,
-      glyph: "long",
+      glyph: workoutGlyphKind(workout),
     };
   }
 
@@ -325,14 +312,14 @@ function calendarWorkoutIdentity(workout: Workout): CalendarWorkoutIdentity {
     return {
       label,
       color: meta.color,
-      glyph: "quality",
+      glyph: workoutGlyphKind(workout),
     };
   }
 
   return {
     label,
     color: meta.color,
-    glyph: "easy",
+    glyph: workoutGlyphKind(workout),
   };
 }
 

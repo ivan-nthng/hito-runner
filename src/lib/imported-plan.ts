@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { stepPlannedDistanceKm, stepPlannedDurationMin } from "@/lib/training";
+import {
+  normalizeExecutableStepInstructions,
+  stepPlannedDistanceKm,
+  stepPlannedDurationMin,
+} from "@/lib/training";
 import type {
   RunnerProfileSummary,
   Step,
@@ -149,6 +153,7 @@ const v2PlanPreferencesSchema = z
     injury_constraints: z.array(z.string().trim().min(1)).optional(),
     hard_constraints: z.array(z.string().trim().min(1)).optional(),
     preferred_workout_mix: z.string().trim().min(1).optional(),
+    terrain_focus: z.enum(["standard", "rolling", "mountain"]).optional(),
     strength_or_mobility_interest: z.string().trim().min(1).optional(),
     indoor_treadmill_ok: z.boolean().optional(),
     notes: z.string().trim().min(1).optional(),
@@ -633,6 +638,14 @@ function deriveRunnerGoalType(
     return "first_race";
   }
 
+  if (goalType === "ultra_marathon") {
+    return "first_race";
+  }
+
+  if (goalType === "mountain_running") {
+    return "distance_build";
+  }
+
   if (goalType === "distance_build") {
     return "distance_build";
   }
@@ -765,6 +778,9 @@ function buildPersistedPlanPreferences(plan: TrainingPlanV2): Json | null {
     ...(plan.plan_preferences?.preferred_workout_mix
       ? { preferred_workout_mix: plan.plan_preferences.preferred_workout_mix }
       : {}),
+    ...(plan.plan_preferences?.terrain_focus
+      ? { terrain_focus: plan.plan_preferences.terrain_focus }
+      : {}),
     ...(plan.plan_preferences?.strength_or_mobility_interest
       ? {
           strength_or_mobility_interest: plan.plan_preferences.strength_or_mobility_interest,
@@ -823,13 +839,15 @@ function buildV2Notes(workout: TrainingPlanV2["planned_workouts"][number]) {
 function normalizeV2Segments(
   segments: TrainingPlanV2["planned_workouts"][number]["segments"],
 ): Step[] {
-  return segments.flatMap((segment, index) => {
+  const normalizedSegments = segments.flatMap((segment, index) => {
     if (segment.segment_type === "rest") {
       return [];
     }
 
     return [normalizeV2Segment(segment, index + 1)];
   });
+
+  return normalizeExecutableStepInstructions(normalizedSegments);
 }
 
 function normalizeV2Segment(
@@ -838,6 +856,7 @@ function normalizeV2Segment(
 ): Step {
   const target = normalizeSegmentTarget(segment.target);
   const guidance = extractSegmentGuidance(segment);
+  const guidanceText = guidance.guidance;
   const segmentId = segment.segment_id ?? `segment-${sequence}`;
   const label = segment.label ?? buildDefaultSegmentLabel(segment.segment_type, sequence);
   const prescription = buildSegmentPrescription(segment);
@@ -855,12 +874,13 @@ function normalizeV2Segment(
       segment_type: segment.segment_type,
       sequence: segment.sequence ?? sequence,
       label,
-      guidance,
+      guidance: guidanceText,
       prescription,
       type: repeatedType,
       repeats: prescription.repeat_count,
       work: {
         type: "work",
+        ...(guidanceText ? { guidance: guidanceText } : {}),
         ...(prescription.repeat_unit?.distance_km
           ? { distance_km: prescription.repeat_unit.distance_km }
           : {}),
@@ -889,7 +909,7 @@ function normalizeV2Segment(
     segment_type: segment.segment_type,
     sequence: segment.sequence ?? sequence,
     label,
-    guidance,
+    guidance: guidanceText,
     prescription,
     type: mapSegmentTypeToStepType(segment.segment_type),
     ...(prescription.duration_min ? { duration_min: prescription.duration_min } : {}),

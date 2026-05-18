@@ -36,6 +36,8 @@ export const structuredPlanAuthoringInputSchema = z
         "10k",
         "half_marathon",
         "marathon",
+        "ultra_marathon",
+        "mountain_running",
       ]),
       goalLabel: z.string().trim().min(1).max(160),
       targetEventName: z.string().trim().max(160).optional().nullable(),
@@ -118,6 +120,7 @@ export const structuredPlanAuthoringInputSchema = z
           .enum(["balanced", "easy_heavy", "quality_light", "long_run_focus"])
           .optional()
           .nullable(),
+        terrainFocus: z.enum(["standard", "rolling", "mountain"]).default("standard"),
         strengthOrMobilityInterest: z
           .enum(["none", "mobility", "strength", "both"])
           .optional()
@@ -250,6 +253,7 @@ export function buildStructuredAuthoringPlan(input: StructuredPlanAuthoringInput
       ...(normalized.preferences.preferredWorkoutMix
         ? { preferred_workout_mix: normalized.preferences.preferredWorkoutMix }
         : {}),
+      terrain_focus: normalized.preferences.terrainFocus,
       ...(normalized.preferences.strengthOrMobilityInterest
         ? {
             strength_or_mobility_interest: normalized.preferences.strengthOrMobilityInterest,
@@ -495,7 +499,7 @@ function buildLongRunWorkout({
         sequence: 1,
         segment_type: "main" as const,
         label: "Long run",
-        guidance: "Keep the effort comfortable enough to finish feeling in control.",
+        guidance: buildLongRunGuidance(normalized),
         prescription: normalized.runnerProfile.baselineLongRunKm
           ? {
               mode: "distance" as const,
@@ -524,6 +528,16 @@ function buildQualityWorkout({
 }: BuildWorkoutContext) {
   const workoutPattern = weekNumber % 3;
 
+  if (normalized.preferences.terrainFocus === "mountain") {
+    return workoutPattern === 1
+      ? buildHillRepeatsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized })
+      : buildClimbingSteadyWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+  }
+
+  if (normalized.preferences.terrainFocus === "rolling" && workoutPattern === 2) {
+    return buildRollingHillsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+  }
+
   if (workoutPattern === 1) {
     return buildTempoWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
   }
@@ -540,6 +554,149 @@ function buildQualityWorkout({
   }
 
   return buildTimeIntervalsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+}
+
+function buildRollingHillsWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+}: BuildWorkoutContext) {
+  const repeatCount = Math.min(8, 4 + Math.floor((weekNumber - 1) / 4));
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "quality" as const,
+    title: "Rolling hills session",
+    summary: `${repeatCount} relaxed hill pickups on rolling terrain with easy recovery.`,
+    planned_rpe: 7,
+    segments: [
+      buildWarmupSegment(workoutId, 1, 12),
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "interval_block" as const,
+        label: `${repeatCount} rolling hill pickups`,
+        guidance:
+          "Use gentle rolling terrain. Keep each uphill controlled and recover fully on easy ground.",
+        prescription: {
+          mode: "repeats" as const,
+          repeat_count: repeatCount,
+          repeat_unit: {
+            mode: "time" as const,
+            duration_min: 2,
+          },
+          recovery_unit: {
+            mode: "time" as const,
+            duration_min: 2,
+          },
+        },
+        target: {
+          intensity: "controlled_hill_effort",
+          cue: "Smooth uphill form; no exact elevation target.",
+        },
+        recovery_target: buildRepeatRecoveryTarget(),
+      },
+      buildCooldownSegment(workoutId, 3, 10),
+    ],
+  };
+}
+
+function buildHillRepeatsWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+}: BuildWorkoutContext) {
+  const repeatCount = Math.min(10, 5 + Math.floor((weekNumber - 1) / 3));
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "quality" as const,
+    title: "Uphill repeats",
+    summary: `${repeatCount} controlled uphill repeats with easy downhill or flat recovery.`,
+    planned_rpe: 7,
+    segments: [
+      buildWarmupSegment(workoutId, 1, 12),
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "interval_block" as const,
+        label: `${repeatCount} uphill repeats`,
+        guidance:
+          "Run uphill with short, steady form. Recover easily downhill or on flat ground; do not chase elevation numbers.",
+        prescription: {
+          mode: "repeats" as const,
+          repeat_count: repeatCount,
+          repeat_unit: {
+            mode: "time" as const,
+            duration_min: 2,
+          },
+          recovery_unit: {
+            mode: "time" as const,
+            duration_min: 2,
+          },
+        },
+        target: {
+          intensity: "uphill_strength",
+          cue: "Strong but controlled climbing effort.",
+        },
+        recovery_target: buildRepeatRecoveryTarget(),
+      },
+      buildCooldownSegment(workoutId, 3, 10),
+    ],
+  };
+}
+
+function buildClimbingSteadyWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const durationMin = deriveEasyDurationMin(normalized, weekNumber) + 10;
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "steady_or_easy" as const,
+    title: "Climbing steady run",
+    summary: `${durationMin} min steady run with intentional hill exposure.`,
+    planned_rpe: 6,
+    segments: [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Steady hill exposure",
+        guidance:
+          "Use rolling or hilly terrain if available. Keep effort steady and controlled; avoid exact elevation targets.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: durationMin,
+        },
+        target: {
+          intensity: "steady_climbing",
+          cue: "Controlled climbing rhythm with relaxed descents.",
+        },
+      },
+    ],
+  };
 }
 
 function buildTempoWorkout({ workoutId, date, weekday, weekNumber, phase }: BuildWorkoutContext) {
@@ -621,6 +778,7 @@ function buildDistanceIntervalsWorkout({
           intensity: "5k_effort",
           cue: "Fast but controlled, never sprinting.",
         },
+        recovery_target: buildRepeatRecoveryTarget(),
       },
       buildCooldownSegment(workoutId, 3, 10),
     ],
@@ -670,6 +828,7 @@ function buildTimeIntervalsWorkout({
           intensity: "10k_effort",
           cue: "Quick, rhythmic running with controlled recovery.",
         },
+        recovery_target: buildRepeatRecoveryTarget(),
       },
       buildCooldownSegment(workoutId, 3, 10),
     ],
@@ -711,6 +870,13 @@ function buildCooldownSegment(workoutId: string, sequence: number, durationMin: 
   };
 }
 
+function buildRepeatRecoveryTarget() {
+  return {
+    intensity: "very_easy_recovery",
+    hint: "Very easy jog or walk; let breathing settle.",
+  };
+}
+
 function buildEasyTarget(normalized: NormalizedStructuredInput) {
   return {
     intensity: "easy_aerobic",
@@ -722,6 +888,18 @@ function buildEasyTarget(normalized: NormalizedStructuredInput) {
         ? "Stay clearly below hard effort and keep the heart rate drifting smoothly."
         : "Conversational effort throughout.",
   };
+}
+
+function buildLongRunGuidance(normalized: NormalizedStructuredInput) {
+  if (normalized.preferences.terrainFocus === "mountain") {
+    return "Keep the effort comfortable and include hills or rolling terrain when available; no exact elevation target.";
+  }
+
+  if (normalized.preferences.terrainFocus === "rolling") {
+    return "Keep the effort comfortable and let mild rolling terrain be part of the run when available.";
+  }
+
+  return "Keep the effort comfortable enough to finish feeling in control.";
 }
 
 function deriveEasyDurationMin(normalized: NormalizedStructuredInput, weekNumber: number) {

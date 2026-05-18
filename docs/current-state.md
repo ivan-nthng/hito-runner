@@ -43,11 +43,13 @@ Active
   `SUPABASE_SERVICE_ROLE_KEY` has been removed from the active runtime and CLI env contract, so server-side Supabase admin/write access now resolves only from `SUPABASE_SECRET_KEY`.
 - The third actual deletion slice from the final Phase 5 plan is now implemented:
   deprecated single-account local auth env support has been removed from the active runtime and local tooling, so loopback local bypass now resolves only through `LOCAL_AUTH_BYPASS_ENABLED=true` plus `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE=...`.
-- The unauthenticated root flow is now login-first, and first-time onboarding is now text-first against the live OpenAI authoring seam, with JSON import visibly demoted to an advanced file-based fallback.
+- The unauthenticated root flow is now login-first, and first-time onboarding is now structured-first against the `completeStructuredFirstPlanOnboarding` seam, with JSON import visibly demoted to an advanced file-based fallback.
 - The product-path recovery fix is now implemented:
   authenticated no-plan or no-workout states now show the same obvious text-entry plan creation surface, with advanced import kept secondary below it.
-- The text-first onboarding post-submit transition fix is now implemented:
+- The onboarding post-submit transition fix is now implemented:
   successful plan creation now automatically opens a fresh saved-mode home request instead of leaving users stuck in the setup pending state.
+- The structured first-plan onboarding frontend slice is now implemented:
+  the normal no-plan setup surface collects required age/weight/height, a bounded 5K benchmark or unknown state, fixed rest days through a compact weekday selector, goal distance/style with ultra marathon and mountain running options, target time/date only for target-time goals, terrain only for marathon/ultra while mountain running implies mountain context, strength/mobility preference, and one optional `Comment`, then calls `completeStructuredFirstPlanOnboarding`; the create action stays in a sticky footer and remains disabled until required answers are complete, the large free-text-only creation prompt is no longer visible, and JSON import remains demoted under Advanced.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
 - Home/calendar now resolve `today` from the real runtime local date and default the planning surface to that day instead of a frozen demo date.
 - The saved-mode home/calendar page now keeps the main `Today` hierarchy intact as a lighter open header, uses one divided support module on the right, removes the lower metadata strip, and marks day status with compact check/dash/cross symbols instead of bulky per-day pills.
@@ -146,6 +148,8 @@ Active
   `RunnerCoachContext` and active-plan refresh proposal/apply now carry the same resolved invariant, include it in stale-check fingerprints and fixed-truth review copy, and block refresh apply output that schedules non-rest workouts on fixed rest days.
 - The saved-mode calendar-cell semantics correction is now implemented:
   month cells restore one broad-family workout-type glyph, one short type label, restrained type color, and a quiet feedback/evidence corner marker while keeping distance, duration, targets, and dashboard-style metric stacks out of month cells.
+- The workout-type glyph semantics slice is now implemented:
+  month cells and the shared workout glyph renderer now use distinct tiny one-color glyphs for Easy, Recovery, Long, Tempo, Intervals, Progression, Race, Quality, and Rest while preserving the existing easy, long, quality, and rest color families and avoiding any new Strength/OFP calendar type.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.
 - The first workout-page refinement pass is now implemented:
   the three-block page structure remains intact, saved result states now surface as check, dash, or cross markers near workout identity and in the right-side context, `Week Status` is progress-driven, `Log result` stays focused on manual completion truth, and the dedicated `Feedback` tab now owns the Garmin FIT/ZIP evidence seam with screenshot still clearly later-only.
@@ -202,16 +206,20 @@ Active
   New writes now persist canonical target keys only, while legacy target aliases remain read-compatible for older rows instead of being written again.
 - The first post-Phase-3 correction pass is now implemented:
   richer `training-plan-v2` normalization now accepts the live fuller segment DSL used by the richer reference files, workout-detail target shaping no longer leaks opaque structured metadata into `[object Object]`, and richer imported interval workouts no longer collapse into misleading visible easy-run identity.
+- The workout segment instruction-completeness contract is now implemented:
+  imported, generated, preview, and persisted readback steps are normalized so every visible non-rest segment and expanded repeat work/recovery row has target or guidance text; missing work/recovery instructions receive bounded cue/hint fallbacks instead of fake pace or heart-rate values.
 - The first structured plan-authoring backend slice is now implemented:
   the service accepts one bounded structured input contract, normalizes it server-side, generates canonical `training-plan-v2` plan data, and persists that plan through the same Supabase `plan_cycles` plus `planned_workouts` seam already used by JSON import.
-  That bounded contract remains a backend and ops asset behind the visible text-first onboarding UI, and Backend plus ops can still validate and persist generated structured plans through `npm run author-structured-plan -- --email <tester-email> --input-file <absolute-json-path>`.
+  That bounded contract remains a backend and ops asset behind the visible structured onboarding UI, and Backend plus ops can still validate and persist generated structured plans through `npm run author-structured-plan -- --email <tester-email> --input-file <absolute-json-path>`.
 - The first OpenAI-backed text-to-plan backend slice is now implemented:
   the service accepts one bounded free-text request, asks OpenAI for structured authoring input, validates that model output deterministically, and persists only the resulting canonical `training-plan-v2` plan through the same Supabase seam already used by JSON import and structured authoring.
   The visible onboarding UI is now wired to this path, and local live validation is green with a working `OPENAI_API_KEY`.
-- The Phase 4 frontend cleanup slice is now implemented:
-  visible no-plan and shell surfaces present text-first plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
+- The structured first-plan onboarding backend contract slice is now implemented:
+  a new authenticated `completeStructuredFirstPlanOnboarding` seam accepts the approved constructor contract, requires bounded age/weight/height profile basics, validates benchmark/target-time/terrain/rest-day combinations, accepts ultra marathon and mountain running goal options, normalizes omitted or hidden terrain to the canonical generation context, translates `runningDaysPerWeek + fixedRestDays` into deterministic preferred running days, preserves fixed rest days through the existing weekday invariant plan preferences, persists only age/weight/height to `runner_profiles`, and uses direct structured generation so terrain focus can produce rolling or mountain/hill-oriented workouts without free text as the primary contract.
+- The Phase 4 frontend cleanup slice has been superseded by the structured first-plan constructor:
+  visible no-plan and shell surfaces present structured plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
 - The first Hito design-system implementation slices are now implemented:
-  shared low-card CSS primitives exist for core surfaces, tiered buttons, tiered inputs, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact summary metrics, compact chart legends, compact tooltip shells, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell navigation rows, shell profile triggers, shell dropdown rows, disclosure, and setup/empty/error state surfaces; auth, text-first onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, route-level state surfaces, progress summary surfaces, body severity micro-UI, preserved integration utility rows, calendar and workout-structure tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now use those primitives; `/hitoDS` provides an internal simplified product-language reference with dedicated design-system navigation instead of runner-facing shell chrome; and chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional visualization geometry exceptions.
+  shared low-card CSS primitives exist for core surfaces, tiered buttons, tiered inputs, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact summary metrics, compact chart legends, compact tooltip shells, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell navigation rows, shell profile triggers, shell dropdown rows, disclosure, and setup/empty/error state surfaces; auth, structured onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, route-level state surfaces, progress summary surfaces, body severity micro-UI, preserved integration utility rows, calendar and workout-structure tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now use those primitives; `/hitoDS` provides an internal simplified product-language reference with dedicated design-system navigation instead of runner-facing shell chrome; and chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional visualization geometry exceptions.
 - The full Hito design-system normalization track is now effectively complete from the visible product perspective:
   final Safari QA found no obvious stray custom UI drift in the tested runner-facing scope, `/hitoDS` is the accepted internal reference baseline, and only documented visualization geometry exceptions remain outside the shared Hito component families.
 - The remaining first-pass v2 rendering-truth gaps are now fixed:
@@ -231,8 +239,8 @@ the visible interface is now treated as owned by shared Hito DS primitives and d
 
 ## Next Recommended Steps
 
-1. QA + validate the visible free-text authoring flow end to end alongside the demoted advanced JSON fallback, with emphasis on richer-plan route rendering and replacement continuity.
-2. QA + verify that no-plan accounts read as one text-first product path in Safari and that advanced import remains discoverable without competing with onboarding.
+1. QA + validate structured constructor generation, fixed rest-day preservation, terrain-focus output, and Advanced JSON regression in Safari.
+2. QA + verify that no-plan accounts read as one structured product path and that Advanced JSON remains discoverable without competing with onboarding.
 3. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use `/hitoDS` as the inspection surface before shipping new visual patterns.
 
 ## Canonical References

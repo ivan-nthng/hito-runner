@@ -23,6 +23,8 @@ Implementation Update
 - active-plan refresh stale fingerprints now include the weekday invariant signature, and explicit refresh apply validates generated future workouts against fixed off-days before archive/replace persistence
 - refresh apply now also repairs model-generated availability against resolved fixed rest days before canonical validation, so a schema-valid model response cannot keep a blocked weekday as a preferred or long-run day
 - the final refresh apply hardening pass verified repeated archive/replace applies preserve Wednesday/Sunday fixed rest days while malformed unsafe output still blocks without mutation
+- the structured first-plan onboarding backend contract now reuses the same invariant:
+  fixed rest days from the constructor persist as `blocked_days`, generated preferred run days exclude blocked weekdays, and invariant-aware remapping honors explicit preferred run days instead of compressing workouts onto every non-blocked weekday
 
 Still deferred:
 

@@ -57,13 +57,19 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text compatibility onboarding, advanced JSON import, saved-mode lifecycle work, active-plan refresh orchestration, and workout logging; it re-exports the first-plan action names for compatibility, but no longer owns their implementation bodies
+  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text compatibility onboarding, advanced JSON import, active-plan refresh orchestration, and workout logging; it re-exports first-plan, active-plan export, and active-plan lifecycle action names for compatibility, but no longer owns those implementation bodies
 - `src/lib/first-plan-actions.ts`
   owns the first-plan server-action layer for the structured constructor and transcript-backed voice-to-plan path:
   `completeStructuredFirstPlanOnboarding`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public imports through `training-api.ts`; the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
 - `src/lib/active-plan-persistence.ts`
   owns the shared imported-plan apply and active-plan persistence primitives used by first-plan creation and saved-mode flows:
   `applyImportedPlanForUser`, active-plan lookup, planned-workout/log readback with archived-log recovery, assigned-plan insertion, profile upsert during apply, and rollback of inserted plans now live there so first-plan actions no longer depend backward on `training-api.ts`
+- `src/lib/active-plan-export-actions.ts`
+  owns the active-plan export server-action and user-scoped export helper:
+  it resolves the authenticated persisted user, reads the current active plan through `active-plan-persistence`, delegates payload/document shaping to `plan-export.ts`, and keeps the old `training-api.ts` public export names as compatibility re-exports
+- `src/lib/active-plan-lifecycle-actions.ts`
+  owns the active-plan lifecycle server-action layer for delete/archive and clear-upcoming schedule:
+  it resolves the authenticated persisted user, archives the current active plan without deleting planned workouts or logs, and accepts the existing persisted snapshot loader from `training-api.ts` so the old public action results keep returning the same refreshed saved-mode snapshot without making the lifecycle module own route snapshot shaping
 - `src/lib/first-plan-authoring-utils.ts`
   owns the small shared first-plan authoring helper layer used by structured onboarding and Dictate-to-Plan:
   bounded goal distance/style/terrain values, weekday de-duplication and long-run/day spreading helpers, goal label formatting, and duration/pace parsing live there instead of being duplicated across first-plan modules
@@ -147,7 +153,7 @@
   if today already has logged truth, that log remains attached to its archived planned-workout row; the action removes it only from the active schedule, not from saved history
 - the saved-mode `Open plan` modal now exposes that clear-upcoming lifecycle as a confirmed secondary action distinct from `Delete plan`, and later-starting JSON import surfaces can explicitly clear the current upcoming schedule before applying the new plan through the backend seam
 - saved mode now has a backend-owned active-plan export seam:
-  [src/lib/plan-export.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-export.ts) builds one canonical payload from the current active `plan_cycle` plus its saved `planned_workouts`, then projects that same payload into `training-plan-v2` JSON and runner-readable Markdown
+  [src/lib/active-plan-export-actions.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-export-actions.ts) owns the authenticated action/helper layer and [src/lib/plan-export.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-export.ts) builds one canonical payload from the current active `plan_cycle` plus its saved `planned_workouts`, then projects that same payload into `training-plan-v2` JSON and runner-readable Markdown
   exported dates come from the active saved workout rows, so chosen-start-day effects are reflected in the artifact, and runtime-only saved-mode state such as logs, Garmin evidence, comparisons, and AI feedback is intentionally excluded
   the saved-mode `Open plan` modal now exposes one compact `Export` action for JSON and Markdown download using that same backend-owned document truth and backend-provided filename
   Safari-compatible delivery now uses one authenticated attachment route for the actual browser download request instead of reconstructing files from a client-side blob URL

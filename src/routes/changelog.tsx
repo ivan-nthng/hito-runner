@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { APP_NAME } from "@/lib/app-config";
 import changelogMarkdown from "../../docs/history/changelog.md?raw";
@@ -10,8 +10,14 @@ interface ChangelogDay {
 
 interface ChangelogMonth {
   key: string;
+  year: string;
   label: string;
   days: ChangelogDay[];
+}
+
+interface ChangelogYear<TMonth> {
+  year: string;
+  months: TMonth[];
 }
 
 type ChangelogEntryKind = "milestone" | "update";
@@ -40,6 +46,7 @@ interface ChangelogHighlightDay {
 
 interface ChangelogHighlightMonth {
   key: string;
+  year: string;
   label: string;
   days: ChangelogHighlightDay[];
 }
@@ -75,7 +82,9 @@ export const Route = createFileRoute("/changelog")({
 
 const changelogDays = parseChangelog(changelogMarkdown);
 const changelogMonths = groupChangelogByMonth(changelogDays);
+const changelogYears = groupMonthsByYear(changelogMonths);
 const changelogHighlightMonths = getHighlightMonths(changelogDays);
+const changelogHighlightYears = groupMonthsByYear(changelogHighlightMonths);
 const latestChangelogDate = changelogDays[0]?.date ?? null;
 
 function ChangelogPage() {
@@ -140,9 +149,9 @@ function ChangelogPage() {
           </div>
 
           {activeTab === "highlights" ? (
-            <HighlightsTimeline months={changelogHighlightMonths} />
+            <HighlightsTimeline years={changelogHighlightYears} />
           ) : (
-            <TechnicalTimeline months={changelogMonths} />
+            <TechnicalTimeline years={changelogYears} />
           )}
         </section>
       </div>
@@ -150,66 +159,111 @@ function ChangelogPage() {
   );
 }
 
-function HighlightsTimeline({ months }: { months: ChangelogHighlightMonth[] }) {
-  if (months.length === 0) {
+function HighlightsTimeline({ years }: { years: Array<ChangelogYear<ChangelogHighlightMonth>> }) {
+  if (years.length === 0) {
     return <EmptyChangelogState />;
   }
 
   return (
-    <div className="grid gap-18">
-      {months.map((month) => (
-        <section
-          key={month.key}
-          aria-labelledby={`changelog-highlights-${month.key}`}
-          className="grid gap-6 md:grid-cols-[10rem_minmax(0,1fr)] md:gap-10 lg:grid-cols-[12rem_minmax(0,1fr)]"
+    <div className="grid gap-24">
+      {years.map((year) => (
+        <YearSection
+          key={`highlights-${year.year}`}
+          year={year.year}
+          labelId={`changelog-highlights-${year.year}`}
         >
-          <div className="md:relative">
-            <h2
-              id={`changelog-highlights-${month.key}`}
-              className="hito-section-title md:sticky md:top-8"
+          {year.months.map((month) => (
+            <MonthSection
+              key={month.key}
+              month={month}
+              labelId={`changelog-highlights-${month.key}`}
             >
-              {month.label}
-            </h2>
-          </div>
-
-          <div className="grid gap-12">
-            {month.days.map((day) => (
-              <HighlightDaySection key={day.date} day={day} />
-            ))}
-          </div>
-        </section>
+              {month.days.map((day) => (
+                <HighlightDaySection key={day.date} day={day} />
+              ))}
+            </MonthSection>
+          ))}
+        </YearSection>
       ))}
     </div>
   );
 }
 
-function TechnicalTimeline({ months }: { months: ChangelogMonth[] }) {
-  if (months.length === 0) {
+function TechnicalTimeline({ years }: { years: Array<ChangelogYear<ChangelogMonth>> }) {
+  if (years.length === 0) {
     return <EmptyChangelogState />;
   }
 
   return (
-    <div className="grid gap-20">
-      {months.map((month) => (
-        <section
-          key={month.key}
-          aria-labelledby={`changelog-${month.key}`}
-          className="grid gap-6 md:grid-cols-[10rem_minmax(0,1fr)] md:gap-10 lg:grid-cols-[12rem_minmax(0,1fr)]"
-        >
-          <div className="md:relative">
-            <h2 id={`changelog-${month.key}`} className="hito-section-title md:sticky md:top-8">
-              {month.label}
-            </h2>
-          </div>
-
-          <div className="grid gap-14">
-            {month.days.map((day) => (
-              <DaySection key={day.date} day={day} />
-            ))}
-          </div>
-        </section>
+    <div className="grid gap-24">
+      {years.map((year) => (
+        <YearSection key={year.year} year={year.year} labelId={`changelog-${year.year}`}>
+          {year.months.map((month) => (
+            <MonthSection key={month.key} month={month} labelId={`changelog-${month.key}`}>
+              {month.days.map((day) => (
+                <DaySection key={day.date} day={day} />
+              ))}
+            </MonthSection>
+          ))}
+        </YearSection>
       ))}
     </div>
+  );
+}
+
+function YearSection({
+  year,
+  labelId,
+  children,
+}: {
+  year: string;
+  labelId: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      aria-labelledby={labelId}
+      className="grid gap-8 md:grid-cols-[7rem_minmax(0,1fr)] md:gap-8 lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-10"
+    >
+      <div className="md:relative">
+        <h2
+          id={labelId}
+          className="font-serif text-[clamp(3rem,9vw,5.5rem)] leading-none tracking-[-0.075em] text-foreground/78 md:sticky md:top-8"
+        >
+          {year}
+        </h2>
+      </div>
+
+      <div className="grid gap-16">{children}</div>
+    </section>
+  );
+}
+
+function MonthSection({
+  month,
+  labelId,
+  children,
+}: {
+  month: ChangelogMonth | ChangelogHighlightMonth;
+  labelId: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      aria-labelledby={labelId}
+      className="grid gap-5 md:grid-cols-[6rem_minmax(0,1fr)] md:gap-6 lg:grid-cols-[7rem_minmax(0,1fr)] lg:gap-7"
+    >
+      <div className="md:relative">
+        <h3
+          id={labelId}
+          className="font-serif text-[clamp(2rem,5vw,3.45rem)] leading-none tracking-[-0.055em] text-foreground md:sticky md:top-8"
+        >
+          {month.label}
+        </h3>
+      </div>
+
+      <div className="grid gap-12">{children}</div>
+    </section>
   );
 }
 
@@ -217,12 +271,13 @@ function DaySection({ day }: { day: ChangelogDay }) {
   return (
     <section
       aria-labelledby={`changelog-${day.date}`}
-      className="grid gap-4 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-7 lg:grid-cols-[5.5rem_minmax(0,1fr)]"
+      className="grid gap-4 sm:grid-cols-[4.25rem_minmax(0,1fr)] sm:gap-6 lg:grid-cols-[5rem_minmax(0,1fr)] lg:gap-7"
     >
       <time
         id={`changelog-${day.date}`}
         dateTime={day.date}
-        className="hito-micro-label text-muted-foreground sm:sticky sm:top-8 sm:self-start"
+        aria-label={formatFullDate(day.date)}
+        className="font-serif text-[clamp(2rem,5vw,3.45rem)] leading-none tracking-[-0.055em] text-foreground sm:sticky sm:top-8 sm:self-start"
       >
         {formatDayLabel(day.date)}
       </time>
@@ -244,12 +299,13 @@ function HighlightDaySection({ day }: { day: ChangelogHighlightDay }) {
   return (
     <section
       aria-labelledby={`changelog-highlights-${day.date}`}
-      className="grid gap-4 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-7 lg:grid-cols-[5.5rem_minmax(0,1fr)]"
+      className="grid gap-4 sm:grid-cols-[4.25rem_minmax(0,1fr)] sm:gap-6 lg:grid-cols-[5rem_minmax(0,1fr)] lg:gap-7"
     >
       <time
         id={`changelog-highlights-${day.date}`}
         dateTime={day.date}
-        className="hito-micro-label text-muted-foreground sm:sticky sm:top-8 sm:self-start"
+        aria-label={formatFullDate(day.date)}
+        className="font-serif text-[clamp(2rem,5vw,3.45rem)] leading-none tracking-[-0.055em] text-foreground sm:sticky sm:top-8 sm:self-start"
       >
         {formatDayLabel(day.date)}
       </time>
@@ -417,6 +473,7 @@ function getHighlightMonths(days: ChangelogDay[]): ChangelogHighlightMonth[] {
     .sort(([left], [right]) => right.localeCompare(left))
     .map(([key, monthDays]) => ({
       key,
+      year: formatYearLabel(key),
       label: formatMonthLabel(key),
       days: monthDays.sort((left, right) => right.date.localeCompare(left.date)),
     }));
@@ -740,16 +797,40 @@ function groupChangelogByMonth(days: ChangelogDay[]): ChangelogMonth[] {
     .sort(([left], [right]) => right.localeCompare(left))
     .map(([key, monthDays]) => ({
       key,
+      year: formatYearLabel(key),
       label: formatMonthLabel(key),
       days: monthDays.sort((left, right) => right.date.localeCompare(left.date)),
     }));
+}
+
+function groupMonthsByYear<TMonth extends { year: string }>(
+  months: TMonth[],
+): Array<ChangelogYear<TMonth>> {
+  const yearMap = new Map<string, TMonth[]>();
+
+  for (const month of months) {
+    const yearMonths = yearMap.get(month.year) ?? [];
+    yearMonths.push(month);
+    yearMap.set(month.year, yearMonths);
+  }
+
+  return Array.from(yearMap.entries())
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([year, yearMonths]) => ({
+      year,
+      months: yearMonths,
+    }));
+}
+
+function formatYearLabel(monthKey: string) {
+  const [year] = monthKey.split("-");
+  return year;
 }
 
 function formatMonthLabel(monthKey: string) {
   const [year, month] = monthKey.split("-").map(Number);
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
-    year: "numeric",
     timeZone: "UTC",
   }).format(new Date(Date.UTC(year, month - 1, 1)));
 }

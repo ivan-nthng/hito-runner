@@ -125,7 +125,7 @@ Checklist
 
 - [ ] Remove dead compatibility seams from `training-api.ts`
 - [ ] Fix Garmin server-only browser-boundary warning path
-- [ ] Reduce `training-api.ts` to a narrower route/data hub
+- [x] Reduce `training-api.ts` to a narrower route/data hub
 - [ ] Split `PlanManagementDialog.tsx` by product responsibility
 - [ ] Split `CompletionPanel.tsx` by feedback/logging/body-note sections
 - [ ] Collapse duplicated JSON import validation/paste flow
@@ -629,30 +629,27 @@ P3
 
 Recommended Next Slice
 
-Start with one bounded backend slice that combines only:
+Continue with one bounded cleanup slice from Phase 3 or Phase 4:
 
-- Phase 1
-- Phase 2
+- extract one more coherent `training-api.ts` cluster, such as settings/profile or workout-log persistence
+- or start the `PlanManagementDialog.tsx` split if Backend cleanup is paused
 
 Why this is the best next move
 
-- highest confidence
-- deletion-first
-- resolves the clearest build warning
-- reduces architectural confusion before larger UI extraction work
+- Phase 1 and Phase 2 are already complete
+- the first Phase 3 backend extraction moved active-plan export action ownership out of `training-api.ts`
+- the second Phase 3 backend extraction moved active-plan lifecycle action ownership out of `training-api.ts`
+- one slice at a time keeps the cleanup behavior-preserving
 
 Files Most Likely Involved First
 
 - `src/lib/training-api.ts`
-- `src/lib/workout-result-import/ingest-garmin-result.ts`
-- `src/routes/api.workout-result.upload.tsx`
-- `src/routes/api.workout-result.remove.tsx`
-- maybe one or two import-boundary helpers only if strictly necessary
+- one focused new module for the chosen cluster
+- docs/current-state/changelog updates only for implemented ownership
 
 Risks
 
 - removing a compatibility seam still used indirectly
-- tightening Garmin server-only boundaries in the wrong place and breaking upload/remove
 - turning this cleanup into a large refactor instead of bounded slices
 
 Mitigations
@@ -708,8 +705,8 @@ BACKEND
 
 Suggested Next Step
 
-Execute the first bounded cleanup slice only:
+Execute one next bounded cleanup slice only:
 
-- remove dead compatibility seams from `training-api.ts`
-- fix Garmin server-only/browser-boundary import issues
-- rebuild and verify that onboarding/import/upload behavior stays unchanged
+- extract one additional coherent `training-api.ts` responsibility cluster if Backend continues
+- or hand off to Frontend for the first `PlanManagementDialog.tsx` section split
+- rebuild and verify unchanged behavior

@@ -2,6 +2,11 @@
 
 Completed implementation history only.
 
+## 2026-05-19
+
+- Extracted active-plan lifecycle action ownership from `training-api.ts` into `src/lib/active-plan-lifecycle-actions.ts`, preserving the same delete/clear compatibility exports and refreshed snapshot result shape.
+- Extracted active-plan export action ownership from `training-api.ts` into `src/lib/active-plan-export-actions.ts`, keeping the same compatibility exports while leaving canonical export payload/document shaping in `src/lib/plan-export.ts`.
+
 ## 2026-05-18
 
 - Removed dead first-plan compatibility seams from `training-api.ts`, collapsed duplicated structured/voice first-plan helper logic into `src/lib/first-plan-authoring-utils.ts`, and split Garmin feedback readback into a non-ingest server module so shared route data no longer pulls Node-only FIT/ZIP dependencies into the browser build.

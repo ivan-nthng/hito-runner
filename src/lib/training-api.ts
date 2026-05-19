@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { createClient, type EmailOtpType } from "@supabase/supabase-js";
 import { z } from "zod";
 import { DEFAULT_AUTH_REDIRECT, sanitizeRedirectPath } from "@/lib/auth-redirect";
@@ -24,13 +24,18 @@ import {
   createAssignedPlanFromImportedSeed,
   getActivePlan,
   getExistingPlanContext,
-  getPlanWorkouts,
   getResolvedPlanWorkoutsWithLogs,
   rollbackInsertedPlan,
   type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
   type PersistedWorkoutLogRow,
 } from "@/lib/active-plan-persistence";
+import {
+  archiveActivePlanForUser as archiveActivePlanForUserWithSnapshot,
+  clearUpcomingScheduleForUser as clearUpcomingScheduleForUserWithSnapshot,
+  createClearUpcomingScheduleAction,
+  createDeleteActivePlanAction,
+} from "@/lib/active-plan-lifecycle-actions";
 import {
   generateCanonicalPlanFromText,
   type GeneratedPlanResult,
@@ -40,11 +45,6 @@ import type {
   ActivePlanRefreshProposal,
 } from "@/lib/plan-refresh-proposal";
 import type { RunnerCoachContext } from "@/lib/runner-coach-context";
-import {
-  buildActivePlanExportPayload,
-  buildPlanExportDocument,
-  type PlanExportDocument,
-} from "@/lib/plan-export";
 import { type FirstDayResolution, type PlanApplyResult } from "@/lib/plan-apply-policy";
 import {
   getPersistedUserIdForAuthContext,
@@ -95,6 +95,15 @@ export {
   generateVoiceToPlanDraft,
   type ConfirmVoiceToPlanDraftResult,
 } from "@/lib/first-plan-actions";
+export {
+  exportActivePlan,
+  exportActivePlanForUser,
+  type ExportActivePlanResult,
+} from "@/lib/active-plan-export-actions";
+export type {
+  ClearUpcomingScheduleResult,
+  DeleteActivePlanResult,
+} from "@/lib/active-plan-lifecycle-actions";
 
 export interface ViewerSummary {
   name: string | null;
@@ -125,9 +134,6 @@ const requestedStartDateSchema = z
   .string()
   .trim()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a start date in YYYY-MM-DD format.");
-const planExportInputSchema = z.object({
-  format: z.enum(["json", "markdown"]),
-});
 const activePlanRefreshProposalInputSchema = z.object({
   runnerPrompt: z.string().trim().min(8).max(1200),
 });
@@ -271,25 +277,6 @@ const userSettingsInputSchema = z.object({
   weightKg: z.number().min(0).max(500).nullable(),
   heightCm: z.number().min(0).max(300).nullable(),
 });
-
-export interface DeleteActivePlanResult {
-  ok: true;
-  status: "archived";
-  archivedPlanId: string;
-  snapshot: TrainingSnapshot;
-}
-
-export interface ClearUpcomingScheduleResult {
-  ok: true;
-  status: "cleared";
-  clearedFromDate: string;
-  archivedPlanId: string;
-  snapshot: TrainingSnapshot;
-}
-
-export interface ExportActivePlanResult extends PlanExportDocument {
-  ok: true;
-}
 
 export type ProposeActivePlanRefreshResult =
   | {
@@ -465,40 +452,9 @@ export const completeOnboarding = createServerFn({ method: "POST" })
     );
   });
 
-export const deleteActivePlan = createServerFn({ method: "POST" }).handler(async () => {
-  const auth = requireAuthenticatedUser();
-  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+export const deleteActivePlan = createDeleteActivePlanAction(getPersistedSnapshot);
 
-  if (!persistedUserId) {
-    throw new Error("Authentication is required for this action.");
-  }
-
-  return archiveActivePlanForUser(persistedUserId);
-});
-
-export const clearUpcomingSchedule = createServerFn({ method: "POST" }).handler(async () => {
-  const auth = requireAuthenticatedUser();
-  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
-
-  if (!persistedUserId) {
-    throw new Error("Authentication is required for this action.");
-  }
-
-  return clearUpcomingScheduleForUser(persistedUserId);
-});
-
-export const exportActivePlan = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => planExportInputSchema.parse(value))
-  .handler(async ({ data }): Promise<ExportActivePlanResult> => {
-    const auth = requireAuthenticatedUser();
-    const persistedUserId = await getPersistedUserIdForAuthContext(auth);
-
-    if (!persistedUserId) {
-      throw new Error("Authentication is required for this action.");
-    }
-
-    return exportActivePlanForUser(persistedUserId, data.format);
-  });
+export const clearUpcomingSchedule = createClearUpcomingScheduleAction(getPersistedSnapshot);
 
 export const proposeActivePlanRefresh = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => activePlanRefreshProposalInputSchema.parse(value))
@@ -674,59 +630,12 @@ async function persistImportedPlanForCurrentRequest(
   );
 }
 
-export async function archiveActivePlanForUser(userId: string): Promise<DeleteActivePlanResult> {
-  const archivedPlanId = await archiveCurrentActivePlanForUser(
-    userId,
-    "There is no active plan to delete.",
-  );
-
-  return {
-    ok: true,
-    status: "archived",
-    archivedPlanId,
-    snapshot: await getPersistedSnapshot(userId),
-  };
+export function archiveActivePlanForUser(userId: string) {
+  return archiveActivePlanForUserWithSnapshot(userId, getPersistedSnapshot);
 }
 
-export async function clearUpcomingScheduleForUser(
-  userId: string,
-  clearedFromDate: string = todayIso(),
-): Promise<ClearUpcomingScheduleResult> {
-  const archivedPlanId = await archiveCurrentActivePlanForUser(
-    userId,
-    "There is no active schedule to clear.",
-  );
-
-  return {
-    ok: true,
-    status: "cleared",
-    clearedFromDate,
-    archivedPlanId,
-    snapshot: await getPersistedSnapshot(userId),
-  };
-}
-
-export async function exportActivePlanForUser(
-  userId: string,
-  format: "json" | "markdown",
-): Promise<ExportActivePlanResult> {
-  const planCycle = await getActivePlan(userId);
-
-  if (!planCycle) {
-    throw new Error("There is no active plan to export.");
-  }
-
-  const workouts = await getPlanWorkouts(planCycle.id);
-  const payload = buildActivePlanExportPayload({
-    planCycle,
-    workouts,
-  });
-  const document = buildPlanExportDocument(payload, format);
-
-  return {
-    ok: true,
-    ...document,
-  };
+export function clearUpcomingScheduleForUser(userId: string, clearedFromDate: string = todayIso()) {
+  return clearUpcomingScheduleForUserWithSnapshot(userId, getPersistedSnapshot, clearedFromDate);
 }
 
 export async function applyActivePlanRefreshProposalForUser(
@@ -1490,30 +1399,6 @@ async function replaceActivePlanWithRefreshSeed(
   };
 }
 
-async function archiveCurrentActivePlanForUser(userId: string, missingMessage: string) {
-  const supabase = createAdminSupabaseClient();
-  const activePlan = await getActivePlan(userId);
-
-  if (!activePlan) {
-    throw new Error(missingMessage);
-  }
-
-  const archived = await supabase
-    .from("plan_cycles")
-    .update({ status: "archived" })
-    .eq("id", activePlan.id)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .select("id")
-    .single();
-
-  if (archived.error) {
-    throw new Error(archived.error.message);
-  }
-
-  return archived.data.id;
-}
-
 export async function exchangeCodeForSession(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -1743,19 +1628,23 @@ async function updateUserSettingsForUserId(
   };
 }
 
-async function getLatestWorkoutResultFeedbackForServer(plannedWorkoutId: string) {
-  const { getLatestWorkoutResultFeedback } =
-    await import("@/lib/workout-result-import/read-workout-result-feedback");
+const getLatestWorkoutResultFeedbackForServer = createServerOnlyFn(
+  async (plannedWorkoutId: string) => {
+    const { getLatestWorkoutResultFeedback } =
+      await import("@/lib/workout-result-import/read-workout-result-feedback");
 
-  return getLatestWorkoutResultFeedback(plannedWorkoutId);
-}
+    return getLatestWorkoutResultFeedback(plannedWorkoutId);
+  },
+);
 
-async function getWorkoutFeedbackMarkerMapForServer(plannedWorkoutIds: string[]) {
-  const { getWorkoutFeedbackMarkerMap } =
-    await import("@/lib/workout-result-import/read-workout-result-feedback");
+const getWorkoutFeedbackMarkerMapForServer = createServerOnlyFn(
+  async (plannedWorkoutIds: string[]) => {
+    const { getWorkoutFeedbackMarkerMap } =
+      await import("@/lib/workout-result-import/read-workout-result-feedback");
 
-  return getWorkoutFeedbackMarkerMap(plannedWorkoutIds);
-}
+    return getWorkoutFeedbackMarkerMap(plannedWorkoutIds);
+  },
+);
 
 function dbWorkoutToView(
   workout: Database["public"]["Tables"]["planned_workouts"]["Row"],

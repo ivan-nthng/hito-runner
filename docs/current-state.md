@@ -82,6 +82,10 @@ Active
   `src/lib/active-plan-persistence.ts` now owns the shared imported-plan apply/persistence primitives, and `first-plan-actions.ts` imports that lower-level seam directly instead of dynamically importing back into `training-api.ts`; public compatibility exports remain intact.
 - The first-plan simplification and server-boundary cleanup slice is now implemented:
   the unused `completeStructuredOnboarding` action and unused `training-api.ts` apply re-export are removed, duplicated first-plan weekday/goal/duration/pace helpers now live in `src/lib/first-plan-authoring-utils.ts`, and Garmin feedback readback no longer imports the Node-only FIT/ZIP ingest module from the shared training API path.
+- The next `training-api.ts` narrowing slice is now implemented:
+  active-plan export action ownership has moved into `src/lib/active-plan-export-actions.ts`, while `training-api.ts` remains a compatibility facade for the same public `exportActivePlan` and `exportActivePlanForUser` names.
+- The active-plan lifecycle action extraction slice is now implemented:
+  `src/lib/active-plan-lifecycle-actions.ts` owns delete/archive and clear-upcoming action behavior, while `training-api.ts` binds those actions to the existing persisted snapshot loader and preserves the same public `deleteActivePlan`, `clearUpcomingSchedule`, `archiveActivePlanForUser`, and `clearUpcomingScheduleForUser` names.
 - The Dictate-to-Plan review assumption clarity follow-up is now implemented:
   when an obvious dictated goal-style cue differs from the reviewed draft style, such as balanced becoming relaxed, the backend adds an explicit runner-facing assumption rather than forcing the requested style or silently hiding the change; the real frontend-shaped request path now compares transcript style cues before constructor supplement defaults, so the dictated cue cannot be masked by structured state.
 - The first immediate Garmin UX cleanup slice is now implemented:

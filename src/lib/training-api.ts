@@ -45,6 +45,7 @@ import type {
   ActivePlanRefreshProposal,
 } from "@/lib/plan-refresh-proposal";
 import type { RunnerCoachContext } from "@/lib/runner-coach-context";
+import { loadSettingsRouteData } from "@/lib/user-settings-actions";
 import { type FirstDayResolution, type PlanApplyResult } from "@/lib/plan-apply-policy";
 import {
   getPersistedUserIdForAuthContext,
@@ -104,22 +105,12 @@ export type {
   ClearUpcomingScheduleResult,
   DeleteActivePlanResult,
 } from "@/lib/active-plan-lifecycle-actions";
+export { saveUserSettings, type UserSettingsSummary } from "@/lib/user-settings-actions";
 
 export interface ViewerSummary {
   name: string | null;
   email: string | null;
   avatarUrl: string | null;
-}
-
-export interface UserSettingsSummary {
-  firstName: string | null;
-  lastName: string | null;
-  displayName: string | null;
-  email: string | null;
-  avatarUrl: string | null;
-  age: number | null;
-  weightKg: number | null;
-  heightCm: number | null;
 }
 
 type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
@@ -269,15 +260,6 @@ const workoutLogInputSchema = z
     return value;
   });
 
-const userSettingsInputSchema = z.object({
-  firstName: z.string().trim().max(80).nullable(),
-  lastName: z.string().trim().max(80).nullable(),
-  displayName: z.string().trim().max(120).nullable(),
-  age: z.number().int().min(0).max(120).nullable(),
-  weightKg: z.number().min(0).max(500).nullable(),
-  heightCm: z.number().min(0).max(300).nullable(),
-});
-
 export type ProposeActivePlanRefreshResult =
   | {
       ok: true;
@@ -383,14 +365,10 @@ export const getProgressRouteData = createServerFn({ method: "GET" }).handler(as
 });
 
 export const getSettingsRouteData = createServerFn({ method: "GET" }).handler(async () => {
-  const auth = getRequestAuthContext();
-  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
-
-  return {
-    snapshot: await getSnapshotForRequest(),
-    viewer: await getViewerForRequest(),
-    settings: persistedUserId ? await getUserSettingsForUserId(persistedUserId, auth.email) : null,
-  };
+  return loadSettingsRouteData({
+    loadSnapshot: getSnapshotForRequest,
+    loadViewer: getViewerForRequest,
+  });
 });
 
 export const requestMagicLink = createServerFn({ method: "POST" })
@@ -543,18 +521,6 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
     return savePersistedWorkoutLog(await requirePersistedUserIdForCurrentRequest(), data);
-  });
-
-export const saveUserSettings = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => userSettingsInputSchema.parse(value))
-  .handler(async ({ data }) => {
-    const userId = await requirePersistedUserIdForCurrentRequest();
-    const settings = await updateUserSettingsForUserId(userId, data);
-
-    return {
-      ok: true,
-      settings,
-    };
   });
 
 async function savePersistedWorkoutLog(
@@ -1561,71 +1527,6 @@ async function getRunnerProfileRow(userId: string) {
   }
 
   return profileResult.data;
-}
-
-async function getUserSettingsForUserId(
-  userId: string,
-  email: string | null,
-): Promise<UserSettingsSummary | null> {
-  const profile = await getRunnerProfileRow(userId);
-
-  if (!profile) {
-    return null;
-  }
-
-  return {
-    firstName: profile.first_name,
-    lastName: profile.last_name,
-    displayName: profile.display_name,
-    email,
-    avatarUrl: profile.avatar_url,
-    age: profile.age,
-    weightKg: profile.weight_kg,
-    heightCm: profile.height_cm,
-  };
-}
-
-async function updateUserSettingsForUserId(
-  userId: string,
-  data: z.output<typeof userSettingsInputSchema>,
-): Promise<UserSettingsSummary> {
-  const supabase = createAdminSupabaseClient();
-  const currentProfile = await getRunnerProfileRow(userId);
-
-  if (!currentProfile) {
-    throw new Error("Finish setup before editing user settings.");
-  }
-
-  const updatedProfile = await supabase
-    .from("runner_profiles")
-    .update({
-      first_name: data.firstName || null,
-      last_name: data.lastName || null,
-      display_name: data.displayName || null,
-      age: data.age,
-      weight_kg: data.weightKg,
-      height_cm: data.heightCm,
-    })
-    .eq("user_id", userId)
-    .select("*")
-    .single();
-
-  if (updatedProfile.error) {
-    throw new Error(updatedProfile.error.message);
-  }
-
-  const auth = getRequestAuthContext();
-
-  return {
-    firstName: updatedProfile.data.first_name,
-    lastName: updatedProfile.data.last_name,
-    displayName: updatedProfile.data.display_name,
-    email: auth.email,
-    avatarUrl: updatedProfile.data.avatar_url,
-    age: updatedProfile.data.age,
-    weightKg: updatedProfile.data.weight_kg,
-    heightCm: updatedProfile.data.height_cm,
-  };
 }
 
 const getLatestWorkoutResultFeedbackForServer = createServerOnlyFn(

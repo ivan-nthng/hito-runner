@@ -223,12 +223,12 @@ function YearSection({
   return (
     <section
       aria-labelledby={labelId}
-      className="grid gap-8 md:grid-cols-[7rem_minmax(0,1fr)] md:gap-8 lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-10"
+      className="grid gap-6 md:grid-cols-[4.5rem_minmax(0,1fr)] md:gap-6 lg:grid-cols-[5.25rem_minmax(0,1fr)] lg:gap-8"
     >
       <div className="md:relative">
         <h2
           id={labelId}
-          className="font-serif text-[clamp(3rem,9vw,5.5rem)] leading-none tracking-[-0.075em] text-foreground/78 md:sticky md:top-8"
+          className="font-serif text-[clamp(1.45rem,2vw,1.9rem)] leading-[1.05] tracking-[-0.035em] text-foreground/78 md:sticky md:top-8"
         >
           {year}
         </h2>
@@ -251,12 +251,12 @@ function MonthSection({
   return (
     <section
       aria-labelledby={labelId}
-      className="grid gap-5 md:grid-cols-[6rem_minmax(0,1fr)] md:gap-6 lg:grid-cols-[7rem_minmax(0,1fr)] lg:gap-7"
+      className="grid gap-4 md:grid-cols-[4.75rem_minmax(0,1fr)] md:gap-5 lg:grid-cols-[5.25rem_minmax(0,1fr)] lg:gap-6"
     >
       <div className="md:relative">
         <h3
           id={labelId}
-          className="font-serif text-[clamp(2rem,5vw,3.45rem)] leading-none tracking-[-0.055em] text-foreground md:sticky md:top-8"
+          className="font-serif text-[clamp(1.45rem,2vw,1.9rem)] leading-[1.05] tracking-[-0.035em] text-foreground md:sticky md:top-8"
         >
           {month.label}
         </h3>
@@ -271,13 +271,13 @@ function DaySection({ day }: { day: ChangelogDay }) {
   return (
     <section
       aria-labelledby={`changelog-${day.date}`}
-      className="grid gap-4 sm:grid-cols-[4.25rem_minmax(0,1fr)] sm:gap-6 lg:grid-cols-[5rem_minmax(0,1fr)] lg:gap-7"
+      className="grid gap-4 sm:grid-cols-[3.25rem_minmax(0,1fr)] sm:gap-5 lg:grid-cols-[3.75rem_minmax(0,1fr)] lg:gap-6"
     >
       <time
         id={`changelog-${day.date}`}
         dateTime={day.date}
         aria-label={formatFullDate(day.date)}
-        className="font-serif text-[clamp(2rem,5vw,3.45rem)] leading-none tracking-[-0.055em] text-foreground sm:sticky sm:top-8 sm:self-start"
+        className="font-serif text-[clamp(1.45rem,2vw,1.9rem)] leading-[1.05] tracking-[-0.035em] text-foreground sm:sticky sm:top-8 sm:self-start"
       >
         {formatDayLabel(day.date)}
       </time>
@@ -299,13 +299,13 @@ function HighlightDaySection({ day }: { day: ChangelogHighlightDay }) {
   return (
     <section
       aria-labelledby={`changelog-highlights-${day.date}`}
-      className="grid gap-4 sm:grid-cols-[4.25rem_minmax(0,1fr)] sm:gap-6 lg:grid-cols-[5rem_minmax(0,1fr)] lg:gap-7"
+      className="grid gap-4 sm:grid-cols-[3.25rem_minmax(0,1fr)] sm:gap-5 lg:grid-cols-[3.75rem_minmax(0,1fr)] lg:gap-6"
     >
       <time
         id={`changelog-highlights-${day.date}`}
         dateTime={day.date}
         aria-label={formatFullDate(day.date)}
-        className="font-serif text-[clamp(2rem,5vw,3.45rem)] leading-none tracking-[-0.055em] text-foreground sm:sticky sm:top-8 sm:self-start"
+        className="font-serif text-[clamp(1.45rem,2vw,1.9rem)] leading-[1.05] tracking-[-0.035em] text-foreground sm:sticky sm:top-8 sm:self-start"
       >
         {formatDayLabel(day.date)}
       </time>

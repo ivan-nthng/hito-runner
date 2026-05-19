@@ -126,6 +126,9 @@ Checklist
 - [ ] Remove dead compatibility seams from `training-api.ts`
 - [ ] Fix Garmin server-only browser-boundary warning path
 - [x] Reduce `training-api.ts` to a narrower route/data hub
+  - active-plan export actions moved to `src/lib/active-plan-export-actions.ts`
+  - active-plan lifecycle actions moved to `src/lib/active-plan-lifecycle-actions.ts`
+  - user-settings actions moved to `src/lib/user-settings-actions.ts`
 - [ ] Split `PlanManagementDialog.tsx` by product responsibility
 - [ ] Split `CompletionPanel.tsx` by feedback/logging/body-note sections
 - [ ] Collapse duplicated JSON import validation/paste flow
@@ -270,8 +273,9 @@ Primary targets
 
 Recommended extraction candidates
 
-- settings/account route mutations and summary types
-- export helpers and export server action glue
+- settings/account route mutations and summary types — completed through `src/lib/user-settings-actions.ts`
+- export helpers and export server action glue — completed through `src/lib/active-plan-export-actions.ts`
+- active-plan lifecycle delete/clear action glue — completed through `src/lib/active-plan-lifecycle-actions.ts`
 - refresh proposal/apply action glue if a dedicated active-plan module removes more code than it adds
 - workout-result upload/remove route helper glue if still mixed into the general hub
 
@@ -631,7 +635,7 @@ Recommended Next Slice
 
 Continue with one bounded cleanup slice from Phase 3 or Phase 4:
 
-- extract one more coherent `training-api.ts` cluster, such as settings/profile or workout-log persistence
+- extract one more coherent `training-api.ts` cluster, such as workout-log persistence or refresh proposal/apply glue
 - or start the `PlanManagementDialog.tsx` split if Backend cleanup is paused
 
 Why this is the best next move
@@ -639,6 +643,7 @@ Why this is the best next move
 - Phase 1 and Phase 2 are already complete
 - the first Phase 3 backend extraction moved active-plan export action ownership out of `training-api.ts`
 - the second Phase 3 backend extraction moved active-plan lifecycle action ownership out of `training-api.ts`
+- the third Phase 3 backend extraction moved user-settings action ownership out of `training-api.ts`
 - one slice at a time keeps the cleanup behavior-preserving
 
 Files Most Likely Involved First

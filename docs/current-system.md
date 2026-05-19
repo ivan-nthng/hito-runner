@@ -57,7 +57,7 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text compatibility onboarding, advanced JSON import, active-plan refresh orchestration, and workout logging; it re-exports first-plan, active-plan export, and active-plan lifecycle action names for compatibility, but no longer owns those implementation bodies
+  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text compatibility onboarding, advanced JSON import, active-plan refresh orchestration, and workout logging; it re-exports first-plan, active-plan export, active-plan lifecycle, and user-settings action names for compatibility, but no longer owns those implementation bodies
 - `src/lib/first-plan-actions.ts`
   owns the first-plan server-action layer for the structured constructor and transcript-backed voice-to-plan path:
   `completeStructuredFirstPlanOnboarding`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public imports through `training-api.ts`; the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
@@ -70,6 +70,9 @@
 - `src/lib/active-plan-lifecycle-actions.ts`
   owns the active-plan lifecycle server-action layer for delete/archive and clear-upcoming schedule:
   it resolves the authenticated persisted user, archives the current active plan without deleting planned workouts or logs, and accepts the existing persisted snapshot loader from `training-api.ts` so the old public action results keep returning the same refreshed saved-mode snapshot without making the lifecycle module own route snapshot shaping
+- `src/lib/user-settings-actions.ts`
+  owns the user-settings route/action layer:
+  it resolves settings route data through the same persisted-user mapping as saved mode, reads and updates bounded `runner_profiles` settings fields, and accepts the existing snapshot/viewer loaders from `training-api.ts` so the `/settings` route data shape and compatibility imports stay unchanged
 - `src/lib/first-plan-authoring-utils.ts`
   owns the small shared first-plan authoring helper layer used by structured onboarding and Dictate-to-Plan:
   bounded goal distance/style/terrain values, weekday de-duplication and long-run/day spreading helpers, goal label formatting, and duration/pace parsing live there instead of being duplicated across first-plan modules

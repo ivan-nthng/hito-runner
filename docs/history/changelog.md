@@ -4,6 +4,7 @@ Completed implementation history only.
 
 ## 2026-05-19
 
+- Extracted user-settings action ownership from `training-api.ts` into `src/lib/user-settings-actions.ts`, preserving the same `/settings` route data shape, profile-save behavior, and compatibility exports.
 - Extracted active-plan lifecycle action ownership from `training-api.ts` into `src/lib/active-plan-lifecycle-actions.ts`, preserving the same delete/clear compatibility exports and refreshed snapshot result shape.
 - Extracted active-plan export action ownership from `training-api.ts` into `src/lib/active-plan-export-actions.ts`, keeping the same compatibility exports while leaving canonical export payload/document shaping in `src/lib/plan-export.ts`.
 

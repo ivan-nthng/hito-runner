@@ -21,6 +21,8 @@ Provide trustworthy release-readiness evidence for changed behavior.
 - report failures with repro steps and severity
 - verify data outcomes where relevant
 - use Computer Use in Safari for browser QA by default
+- end every QA report with an explicit verdict line: `Verdict: Passed` or `Verdict: Failed`
+- include a short final summary of what was validated before the verdict
 
 ## Must Not Do
 

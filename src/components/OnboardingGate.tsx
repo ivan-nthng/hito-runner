@@ -31,6 +31,7 @@ import {
 
 type ConstructorStatus = "idle" | "saving" | "finishing";
 type JsonStatus = "idle" | "parsing" | "saving" | "finishing";
+type SetupMode = "quick" | "talk";
 
 const VOICE_TO_PLAN_TOAST_ID = "onboarding-voice-to-plan";
 
@@ -65,6 +66,7 @@ export function OnboardingGate() {
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const [voiceResult, setVoiceResult] = useState<VoiceToPlanDraftResult | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [setupMode, setSetupMode] = useState<SetupMode>("quick");
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -104,6 +106,9 @@ export function OnboardingGate() {
     setImportedPlan,
     setJsonStatus,
   });
+  const openSavedHome = () => {
+    window.location.assign("/");
+  };
 
   const addMoreVoiceDetails = () => {
     setVoiceError(null);
@@ -121,7 +126,10 @@ export function OnboardingGate() {
   };
 
   const useStructuredSetup = () => {
-    structuredFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setSetupMode("quick");
+    window.requestAnimationFrame(() =>
+      structuredFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
   };
 
   const submitVoiceReview = async () => {
@@ -136,7 +144,7 @@ export function OnboardingGate() {
     setVoiceError(null);
     hitoToast.working({
       id: VOICE_TO_PLAN_TOAST_ID,
-      title: "Reviewing AI setup",
+      title: "Reviewing draft",
       description: "Hito is checking the transcript before anything is created.",
     });
 
@@ -169,7 +177,7 @@ export function OnboardingGate() {
       if (result.status === "draft_ready") {
         hitoToast.success({
           id: VOICE_TO_PLAN_TOAST_ID,
-          title: "Setup draft ready",
+          title: "Draft ready",
           description: "Review what Hito understood before creating anything.",
         });
         return;
@@ -205,7 +213,7 @@ export function OnboardingGate() {
     setVoiceError(null);
     hitoToast.working({
       id: VOICE_TO_PLAN_TOAST_ID,
-      title: "Creating AI setup plan",
+      title: "Creating plan",
       description: "Hito is creating the active plan from the reviewed draft.",
     });
 
@@ -317,67 +325,101 @@ export function OnboardingGate() {
   };
 
   return (
-    <section className="hito-surface hito-onboarding-surface mx-auto max-w-5xl p-6 lg:p-10">
+    <section
+      className="hito-surface hito-onboarding-surface mx-auto max-w-5xl px-6 pt-6 lg:px-10 lg:pt-10"
+      data-mode={setupMode}
+    >
       <div className="max-w-3xl">
         <p className="hito-micro-label" data-tone="signal">
           Create a plan
         </p>
-        <h1 className="hito-page-title mt-3">Build your first running plan.</h1>
+        <h1 className="hito-page-title mt-3">Let&apos;s build your plan.</h1>
         <p className="hito-body mt-4 text-muted-foreground">
-          Answer a few bounded setup questions. Hito uses them to create the first saved plan while
-          keeping profile truth, fixed rest days, and plan context separate.
+          We&apos;ll ask a few simple questions and turn them into your first plan.
         </p>
       </div>
 
-      <DictateToPlanPanel
-        voiceTranscriptRef={voiceTranscriptRef}
-        transcript={voiceTranscript}
-        setTranscript={(value) => {
-          setVoiceTranscript(value);
-          setVoiceError(null);
-        }}
-        result={voiceResult}
-        error={voiceError}
-        status={voiceStatus}
-        isBusy={isBusy}
-        submitReview={() => {
-          void submitVoiceReview();
-        }}
-        confirmDraft={() => {
-          void confirmVoicePlan();
-        }}
-        addMoreDetails={addMoreVoiceDetails}
-        startOver={startVoiceOver}
-        useStructuredSetup={useStructuredSetup}
-      />
+      <div className="mt-7">
+        <div className="hito-tabs hito-tabs-simple" role="tablist" aria-label="Setup mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={setupMode === "quick"}
+            className="hito-tab"
+            data-active={setupMode === "quick"}
+            disabled={isBusy}
+            onClick={() => setSetupMode("quick")}
+          >
+            Quick setup
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={setupMode === "talk"}
+            className="hito-tab"
+            data-active={setupMode === "talk"}
+            disabled={isBusy}
+            onClick={() => setSetupMode("talk")}
+          >
+            <span>Talk it through</span>
+            <span className="hito-tab-badge" data-variant="text">
+              Pro
+            </span>
+          </button>
+        </div>
+      </div>
 
-      <StructuredPlanConstructor
-        formRef={structuredFormRef}
-        state={constructorState}
-        setState={{
-          setAge,
-          setWeightKg,
-          setHeightCm,
-          setBenchmarkKind,
-          setRecent5kTime,
-          setRecent5kPace,
-          setFixedRestDays,
-          setGoalDistance,
-          setGoalStyle,
-          setTargetTime,
-          setTargetDate,
-          setTerrainFocus,
-          setStrengthPreference,
-          setComment,
-        }}
-        constructorStatus={constructorStatus}
-        constructorError={constructorError}
-        isBusy={isBusy}
-        isConstructorReady={isConstructorReady}
-        onSubmit={() => {
-          void submitStructuredPlan();
-        }}
-      />
+      {setupMode === "talk" ? (
+        <DictateToPlanPanel
+          voiceTranscriptRef={voiceTranscriptRef}
+          transcript={voiceTranscript}
+          setTranscript={(value) => {
+            setVoiceTranscript(value);
+            setVoiceError(null);
+          }}
+          result={voiceResult}
+          error={voiceError}
+          status={voiceStatus}
+          isBusy={isBusy}
+          submitReview={() => {
+            void submitVoiceReview();
+          }}
+          confirmDraft={() => {
+            void confirmVoicePlan();
+          }}
+          addMoreDetails={addMoreVoiceDetails}
+          startOver={startVoiceOver}
+          useStructuredSetup={useStructuredSetup}
+        />
+      ) : (
+        <StructuredPlanConstructor
+          formRef={structuredFormRef}
+          state={constructorState}
+          setState={{
+            setAge,
+            setWeightKg,
+            setHeightCm,
+            setBenchmarkKind,
+            setRecent5kTime,
+            setRecent5kPace,
+            setFixedRestDays,
+            setGoalDistance,
+            setGoalStyle,
+            setTargetTime,
+            setTargetDate,
+            setTerrainFocus,
+            setStrengthPreference,
+            setComment,
+          }}
+          constructorStatus={constructorStatus}
+          constructorError={constructorError}
+          isBusy={isBusy}
+          isConstructorReady={isConstructorReady}
+          onSubmit={() => {
+            void submitStructuredPlan();
+          }}
+        />
+      )}
 
       <details
         className="hito-disclosure hito-section-divider mt-8 pt-6"
@@ -386,12 +428,9 @@ export function OnboardingGate() {
       >
         <summary className="hito-disclosure-summary">
           <span>
-            <span className="hito-micro-label block">Advanced</span>
-            <span className="mt-1 block hito-body-small text-foreground/90">
-              Import an existing Hito plan file
-            </span>
+            <span className="hito-body-small block text-foreground/90">Import existing plan</span>
             <span className="mt-1 block hito-helper">
-              JSON import remains available for existing plan artifacts, migration, and testing.
+              Quiet fallback for existing Hito plan JSON.
             </span>
           </span>
           <Icon name="chevron-down" className="hito-disclosure-chevron" />
@@ -478,8 +517,4 @@ function validateJsonDraftFactory({
     setImportedPlan(validation.data);
     setJsonStatus("idle");
   };
-}
-
-function openSavedHome() {
-  window.location.assign("/");
 }

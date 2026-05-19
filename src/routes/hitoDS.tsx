@@ -26,6 +26,7 @@ const SECTIONS = [
   { id: "typography", label: "Typography" },
   { id: "icons", label: "Icons" },
   { id: "buttons", label: "Buttons" },
+  { id: "tabs", label: "Tabs" },
   { id: "inputs", label: "Inputs" },
   { id: "surfaces", label: "Composition" },
   { id: "modals", label: "Modals" },
@@ -568,6 +569,137 @@ function HitoDesignSystemPage() {
               </div>
             </section>
 
+            <section id="tabs" className="ds-section">
+              <SectionIntro
+                label="Tabs"
+                title="Simple and enclosed mode switches."
+                body="Tabs organize nearby views without becoming another card system. Use simple tabs for calm page-level switches and enclosed tabs when a local control cluster needs a stronger boundary."
+              />
+
+              <div className="hito-reference-list">
+                <article className="hito-reference-row">
+                  <div className="min-w-0">
+                    <p className="hito-label">Simple</p>
+                    <p className="hito-caption mt-2 max-w-xl">
+                      Transparent list, active underline, no filled active background. Best for
+                      setup modes and calm page sections.
+                    </p>
+                  </div>
+                  <div className="min-w-0 overflow-x-auto pb-1">
+                    <div
+                      className="hito-tabs hito-tabs-simple"
+                      role="tablist"
+                      aria-label="Simple tab example"
+                    >
+                      <button
+                        type="button"
+                        className="hito-tab"
+                        data-active="true"
+                        aria-selected="true"
+                      >
+                        Quick setup
+                      </button>
+                      <button type="button" className="hito-tab" aria-selected="false">
+                        <span>Talk it through</span>
+                        <span className="hito-tab-badge" data-variant="text">
+                          Pro
+                        </span>
+                      </button>
+                      <button type="button" className="hito-tab" disabled aria-selected="false">
+                        Archived
+                      </button>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="hito-reference-row">
+                  <div className="min-w-0">
+                    <p className="hito-label">Enclosed</p>
+                    <p className="hito-caption mt-2 max-w-xl">
+                      Rounded bounded container, active soft fill, no underline. Use for stronger
+                      local mode switches without nesting a card inside a card.
+                    </p>
+                  </div>
+                  <div className="min-w-0 overflow-x-auto pb-1">
+                    <div
+                      className="hito-tabs hito-tabs-enclosed"
+                      role="tablist"
+                      aria-label="Enclosed tab example"
+                    >
+                      <button
+                        type="button"
+                        className="hito-tab"
+                        data-active="true"
+                        aria-selected="true"
+                      >
+                        <Icon name="calendar" size="sm" className="hito-tab-icon" />
+                        Plan
+                      </button>
+                      <button type="button" className="hito-tab" aria-selected="false">
+                        <Icon name="progress" size="sm" className="hito-tab-icon" />
+                        Progress
+                        <span className="hito-tab-badge" data-variant="count">
+                          3
+                        </span>
+                      </button>
+                      <button type="button" className="hito-tab" aria-selected="false">
+                        Updates
+                        <span className="hito-tab-dot" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="hito-reference-row">
+                  <div className="min-w-0">
+                    <p className="hito-label">States</p>
+                    <p className="hito-caption mt-2 max-w-xl">
+                      Hover and focus-visible stay distinct from the active underline. Badges are
+                      supporting metadata, not tab labels.
+                    </p>
+                  </div>
+                  <div className="min-w-0 overflow-x-auto pb-1">
+                    <div
+                      className="hito-tabs hito-tabs-simple"
+                      role="tablist"
+                      aria-label="Tab states example"
+                    >
+                      <button type="button" className="hito-tab" aria-selected="false">
+                        Default
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-tab"
+                        data-demo-state="hover"
+                        aria-selected="false"
+                      >
+                        Hover
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-tab"
+                        data-active="true"
+                        aria-selected="true"
+                      >
+                        Active
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-tab"
+                        data-demo-state="focus"
+                        aria-selected="false"
+                      >
+                        Focus
+                      </button>
+                      <button type="button" className="hito-tab" disabled aria-selected="false">
+                        Disabled
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </section>
+
             <section id="inputs" className="ds-section">
               <SectionIntro
                 label="Inputs"
@@ -795,6 +927,158 @@ function HitoDesignSystemPage() {
                         placeholder="Describe goal, constraints, recent results, or JSON notes."
                       />
                     </label>
+                  </div>
+
+                  <div className="border-t border-hairline pt-5">
+                    <div className="mb-4">
+                      <p className="hito-label">Editable value chip</p>
+                      <p className="hito-caption mt-2 max-w-2xl">
+                        Compact scalar facts use editable value chips, not full form cards or normal
+                        text rows. Use for profile or settings values such as age, height, or
+                        weight; avoid for long text and multi-step choices.
+                      </p>
+                    </div>
+                    <div className="hito-reference-list">
+                      <article className="hito-reference-row">
+                        <div>
+                          <p className="hito-list-row-title">Empty chip</p>
+                          <p className="hito-caption mt-2">
+                            Borderless by default, with a clear hover/focus backdrop.
+                          </p>
+                        </div>
+                        <div className="hito-editable-value-chip-group">
+                          <button
+                            type="button"
+                            className="hito-editable-value-chip"
+                            data-state="empty"
+                          >
+                            <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
+                            <span className="hito-editable-value-chip-content">Age</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="hito-editable-value-chip"
+                            data-state="empty"
+                          >
+                            <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
+                            <span className="hito-editable-value-chip-content">Height</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="hito-editable-value-chip"
+                            data-state="empty"
+                          >
+                            <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
+                            <span className="hito-editable-value-chip-content">Weight</span>
+                          </button>
+                        </div>
+                      </article>
+                      <article className="hito-reference-row">
+                        <div>
+                          <p className="hito-list-row-title">Editing chip</p>
+                          <p className="hito-caption mt-2">
+                            The input is wider than the chip, stays the same height, and focuses in
+                            place. Click-away discards unsaved text; only check commits.
+                          </p>
+                        </div>
+                        <div className="hito-editable-value-chip-frame" data-state="editing">
+                          <div className="hito-editable-value-chip-input-shell">
+                            <input
+                              id="ds-editable-weight"
+                              value="72"
+                              readOnly
+                              className="hito-editable-value-chip-input"
+                              aria-label="Weight"
+                            />
+                            <button
+                              type="button"
+                              className="hito-editable-value-chip-clear"
+                              aria-label="Clear weight"
+                            >
+                              <Icon name="close" size="xs" />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="hito-editable-value-chip-action"
+                            data-action="save"
+                            aria-label="Save weight"
+                          >
+                            <Icon name="check" size="sm" />
+                          </button>
+                        </div>
+                      </article>
+                      <article className="hito-reference-row">
+                        <div>
+                          <p className="hito-list-row-title">Invalid or empty edit</p>
+                          <p className="hito-caption mt-2">
+                            Until the value is valid, the external control stays as dismiss/cancel
+                            and does not save profile truth.
+                          </p>
+                        </div>
+                        <div className="hito-editable-value-chip-frame" data-state="editing">
+                          <div className="hito-editable-value-chip-input-shell">
+                            <input
+                              id="ds-editable-empty-age"
+                              value=""
+                              readOnly
+                              className="hito-editable-value-chip-input"
+                              aria-label="Age"
+                              placeholder="34"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="hito-editable-value-chip-action"
+                            data-action="cancel"
+                            aria-label="Cancel age edit"
+                          >
+                            <Icon name="close" size="sm" />
+                          </button>
+                        </div>
+                      </article>
+                      <article className="hito-reference-row">
+                        <div>
+                          <p className="hito-list-row-title">Saved chip</p>
+                          <p className="hito-caption mt-2">
+                            Compact uppercase label plus value. Pencil stays subtle and appears on
+                            hover/focus.
+                          </p>
+                        </div>
+                        <div className="hito-editable-value-chip-group">
+                          <button
+                            type="button"
+                            className="hito-editable-value-chip"
+                            data-state="saved"
+                          >
+                            <span className="hito-editable-value-chip-content">
+                              <span className="hito-editable-value-chip-label">Age</span>
+                              <span className="hito-editable-value-chip-text">36</span>
+                            </span>
+                            <Icon
+                              name="edit"
+                              size="sm"
+                              className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            className="hito-editable-value-chip"
+                            data-state="saved"
+                          >
+                            <span className="hito-editable-value-chip-content">
+                              <span className="hito-editable-value-chip-label">Weight</span>
+                              <span className="hito-editable-value-chip-text">72 kg</span>
+                            </span>
+                            <Icon
+                              name="edit"
+                              size="sm"
+                              className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
+                            />
+                          </button>
+                        </div>
+                      </article>
+                    </div>
                   </div>
                 </div>
               </div>

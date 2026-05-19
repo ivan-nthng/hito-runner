@@ -45,28 +45,25 @@ export function DictateToPlanPanel({
   const isClarificationRequired = result?.ok === true && result.status === "clarification_required";
 
   return (
-    <section className="hito-section-divider mt-6 grid gap-4 pt-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+    <section className="hito-section-divider mt-6 grid gap-y-4 gap-x-0 pt-5 md:grid-cols-[220px_minmax(0,1fr)] md:gap-x-12 lg:gap-x-16">
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <p className="hito-micro-label" data-tone="signal">
-            AI setup
+            Talk it through
           </p>
           <span className="hito-status-pill">Pro feature</span>
         </div>
-        <h2 className="hito-panel-title mt-2">Dictate your setup.</h2>
+        <h2 className="hito-panel-title mt-2">Tell us about your running</h2>
         <p className="hito-helper mt-2">
-          Tell Hito your basics, running history, experience, constraints, and goal. Hito will draft
-          the setup for review before anything is created.
-        </p>
-        <p className="hito-caption mt-2 text-muted-foreground">
-          Manual structured setup remains the reliable direct path below.
+          Describe your basics, running history, constraints, and goal. Hito will draft the setup
+          for review before anything is created.
         </p>
       </div>
 
       <div className="grid gap-4">
         <div className="grid gap-2">
           <label htmlFor="voice-to-plan-transcript" className="hito-form-label">
-            Paste or type what you would say out loud
+            Describe your goal in your own words
           </label>
           <textarea
             id="voice-to-plan-transcript"
@@ -78,8 +75,7 @@ export function DictateToPlanPanel({
             className={ONBOARDING_TEXTAREA_CLASS}
           />
           <span className="hito-field-helper">
-            Hito uses AI to fill and review setup from transcript text. No microphone yet: paste or
-            type what you would say out loud.
+            Paste or type what you would say out loud. No microphone yet.
           </span>
         </div>
 
@@ -90,7 +86,7 @@ export function DictateToPlanPanel({
             onClick={submitReview}
             className="hito-button hito-button-secondary hito-button-md"
           >
-            {status === "reviewing" ? "Reviewing setup..." : "Review AI setup"}
+            {status === "reviewing" ? "Reviewing draft..." : "Review draft"}
           </button>
           <button
             type="button"
@@ -100,7 +96,7 @@ export function DictateToPlanPanel({
           >
             Start over
           </button>
-          <span className="hito-field-helper">Transcript text is not saved as profile truth.</span>
+          <span className="hito-field-helper">Nothing is created until you confirm.</span>
         </div>
 
         {error ? <p className="hito-field-error">{error}</p> : null}
@@ -143,7 +139,7 @@ function VoiceLockedOrError({ result }: { result: Exclude<VoiceToPlanDraftResult
           </p>
           <p className="hito-list-row-copy">
             {locked
-              ? "This AI assist is not available for this account yet. Manual structured setup is still available below."
+              ? "This AI assist is not available for this account yet. Quick setup is still available."
               : voiceResultMessage(result)}
           </p>
         </div>
@@ -237,7 +233,7 @@ function VoiceClarificationReview({
             onClick={useStructuredSetup}
             className="hito-button hito-button-ghost hito-button-md"
           >
-            Use structured setup
+            Use quick setup
           </button>
         </div>
       </div>

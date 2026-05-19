@@ -129,7 +129,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
               </div>
             ))}
           </div>
-          <div className="hito-calendar-month-grid grid grid-cols-7">
+          <div className="grid grid-cols-7">
             {cells.map((iso, index) => (
               <DayCell
                 key={index}
@@ -188,7 +188,7 @@ function DayCell({
   hovered: string | null;
   snapshot: TrainingSnapshot;
 }) {
-  if (!iso) return <div className="hito-calendar-month-cell border-r border-b border-hairline" />;
+  if (!iso) return <div className="aspect-[5/4] border-r border-b border-hairline" />;
   const workout = findWorkout(snapshot.workouts, iso);
   const isToday = iso === snapshot.currentDate;
   const status = workout?.status ?? "rest";
@@ -209,7 +209,6 @@ function DayCell({
         onMouseLeave={() => onHover(null)}
         className={cn(
           "block aspect-[5/4] border-r border-b border-hairline p-3 transition-colors group",
-          "hito-calendar-month-cell",
           !inMonth && "opacity-30",
           isToday && "relative z-10 outline outline-1 outline-offset-[-1px] outline-signal/60",
           isCompleted && !isToday && "bg-success/[0.04]",

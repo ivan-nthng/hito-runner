@@ -6,6 +6,32 @@ import { requestMagicLink } from "@/lib/training-api";
 
 type AuthEntryStatus = "error" | "invalid_credentials" | "local_unavailable" | undefined;
 
+function validateEmailInput(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return "Enter your email address.";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
+    return "Enter a valid email address.";
+  }
+
+  return null;
+}
+
+function magicLinkErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.includes("public app URL")) {
+    return "Email sign-in links are available from a public Hito app URL.";
+  }
+
+  if (error instanceof Error && error.message.includes("not configured")) {
+    return "Email sign-in links are not available in this environment yet.";
+  }
+
+  return "Could not send the sign-in link. Try again.";
+}
+
 export function AuthEntryScreen({
   localBypassEnabled,
   magicLinkEnabled,
@@ -25,6 +51,8 @@ export function AuthEntryScreen({
   const [activeTab, setActiveTab] = useState<"login" | "signup">(
     localBypassEnabled ? "login" : "signup",
   );
+  const hasEmailText = email.trim().length > 0;
+  const emailValidationMessage = error ?? null;
 
   return (
     <div className="auth-hero min-h-screen bg-background text-foreground">
@@ -145,35 +173,34 @@ export function AuthEntryScreen({
                   </p>
                 )}
 
-                {phase === "sent" && (
-                  <p className="hito-field-success mt-4">Check {email} for your sign-in link.</p>
-                )}
-
-                {error && <p className="hito-field-error mt-4">{error}</p>}
-
                 {magicLinkEnabled ? (
                   <form
+                    noValidate
                     className="mt-5 grid gap-5"
                     onSubmit={async (event) => {
                       event.preventDefault();
+                      const validationMessage = validateEmailInput(email);
+
+                      if (validationMessage) {
+                        setPhase("idle");
+                        setError(validationMessage);
+                        return;
+                      }
+
                       setPhase("sending");
                       setError(null);
 
                       try {
                         await requestMagicLinkFn({
                           data: {
-                            email,
+                            email: email.trim(),
                             next,
                           },
                         });
                         setPhase("sent");
                       } catch (requestError) {
                         setPhase("idle");
-                        setError(
-                          requestError instanceof Error
-                            ? requestError.message
-                            : "Could not send the sign-in link.",
-                        );
+                        setError(magicLinkErrorMessage(requestError));
                       }
                     }}
                   >
@@ -182,20 +209,57 @@ export function AuthEntryScreen({
                       <input
                         type="email"
                         name="email"
-                        required
                         value={email}
-                        onChange={(event) => setEmail(event.target.value)}
+                        onChange={(event) => {
+                          setEmail(event.target.value);
+                          setError(null);
+                          if (phase === "sent") {
+                            setPhase("idle");
+                          }
+                        }}
                         placeholder="name@example.com"
-                        className="hito-field hito-field-lg"
+                        aria-invalid={Boolean(emailValidationMessage)}
+                        aria-describedby={
+                          emailValidationMessage ? "email-sign-in-error" : undefined
+                        }
+                        className={`hito-field hito-field-lg ${emailValidationMessage ? "hito-field-feedback-error" : ""}`}
                       />
+                      {emailValidationMessage ? (
+                        <span id="email-sign-in-error" className="hito-field-error">
+                          {emailValidationMessage}
+                        </span>
+                      ) : null}
                     </label>
-                    <button
-                      type="submit"
-                      disabled={phase === "sending"}
-                      className="hito-button hito-button-secondary hito-button-lg"
-                    >
-                      {phase === "sending" ? "Sending link..." : "Send sign-in link"}
-                    </button>
+                    {hasEmailText ? (
+                      <div className="grid gap-3">
+                        <button
+                          type={phase === "sent" ? "button" : "submit"}
+                          disabled={phase === "sending"}
+                          data-tone={phase === "sent" ? "success" : undefined}
+                          className={
+                            phase === "sent"
+                              ? "hito-button hito-button-primary hito-button-lg"
+                              : "hito-button hito-button-secondary hito-button-lg"
+                          }
+                        >
+                          {phase === "sending" ? (
+                            "Sending link..."
+                          ) : phase === "sent" ? (
+                            <>
+                              <Icon name="check" size="sm" />
+                              Sent
+                            </>
+                          ) : (
+                            "Send sign-in link"
+                          )}
+                        </button>
+                        {phase === "sent" ? (
+                          <p className="hito-field-success">
+                            Check your email for the sign-in link.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </form>
                 ) : (
                   <p className="mt-4 text-sm leading-relaxed text-muted-foreground">

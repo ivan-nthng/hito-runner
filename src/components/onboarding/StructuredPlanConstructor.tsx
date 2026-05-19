@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   type Dispatch,
   type FormEvent,
@@ -28,6 +29,7 @@ import {
 } from "./onboarding-form-model";
 
 type ConstructorStatus = "idle" | "saving" | "finishing";
+type ProfileBasicEditableKey = "age" | "heightCm" | "weightKg";
 
 interface StructuredPlanConstructorProps {
   formRef: RefObject<HTMLFormElement | null>;
@@ -71,6 +73,7 @@ export function StructuredPlanConstructor({
   const showsTerrainSelector =
     state.goalDistance === "marathon" || state.goalDistance === "ultra_marathon";
   const impliedMountainTerrain = state.goalDistance === "mountain_running";
+  const [activeEditableKey, setActiveEditableKey] = useState<ProfileBasicEditableKey | null>(null);
 
   return (
     <form
@@ -87,26 +90,43 @@ export function StructuredPlanConstructor({
     >
       <ConstructorSection
         eyebrow="01"
-        title="Profile basics"
-        body="Required for first-plan generation. These are the only profile fields saved from this constructor."
+        title="About you"
+        body="Add the basics Hito needs to size the plan."
       >
-        <div className="grid gap-2">
-          <ProfileBasicControl
+        <div className="hito-editable-value-chip-group">
+          <EditableValueChip
+            fieldKey="age"
             label="Age"
-            addLabel="Add age"
             value={state.age}
             setValue={setState.setAge}
+            activeEditableKey={activeEditableKey}
+            setActiveEditableKey={setActiveEditableKey}
             placeholder="34"
             min={13}
             max={100}
             step={1}
             inputMode="numeric"
           />
-          <ProfileBasicControl
+          <EditableValueChip
+            fieldKey="heightCm"
+            label="Height"
+            value={state.heightCm}
+            setValue={setState.setHeightCm}
+            activeEditableKey={activeEditableKey}
+            setActiveEditableKey={setActiveEditableKey}
+            placeholder="178"
+            min={120}
+            max={230}
+            step={1}
+            inputMode="numeric"
+          />
+          <EditableValueChip
+            fieldKey="weightKg"
             label="Weight"
-            addLabel="Add weight"
             value={state.weightKg}
             setValue={setState.setWeightKg}
+            activeEditableKey={activeEditableKey}
+            setActiveEditableKey={setActiveEditableKey}
             placeholder="72"
             min={30}
             max={250}
@@ -114,25 +134,13 @@ export function StructuredPlanConstructor({
             inputMode="decimal"
             unit="kg"
           />
-          <ProfileBasicControl
-            label="Height"
-            addLabel="Add height"
-            value={state.heightCm}
-            setValue={setState.setHeightCm}
-            placeholder="178"
-            min={120}
-            max={230}
-            step={1}
-            inputMode="numeric"
-            unit="cm"
-          />
         </div>
       </ConstructorSection>
 
       <ConstructorSection
         eyebrow="02"
-        title="Current fitness benchmark"
-        body="Use one recent 5K signal if you know it. If not, Hito starts from availability and goal style."
+        title="Current running"
+        body="Share a recent 5K signal if you know it."
       >
         <div className="grid gap-2">
           {BENCHMARK_OPTIONS.map((option) => (
@@ -171,8 +179,8 @@ export function StructuredPlanConstructor({
 
       <ConstructorSection
         eyebrow="03"
-        title="Availability"
-        body="Mark fixed rest days only. Hito will fit a conservative first schedule around the available weekdays."
+        title="Your week"
+        body="Mark the days you want to keep as rest days."
       >
         <Field
           label="Fixed rest days"
@@ -213,8 +221,8 @@ export function StructuredPlanConstructor({
 
       <ConstructorSection
         eyebrow="04"
-        title="Goal"
-        body="Pick the destination and tone. Target time only becomes required when you choose target-time style."
+        title="What you're training for"
+        body="Pick the distance and how hard you want the plan to lean."
       >
         <Field label="Goal distance">
           <OptionGrid>
@@ -305,8 +313,8 @@ export function StructuredPlanConstructor({
 
       <ConstructorSection
         eyebrow="05"
-        title="Strength / mobility support"
-        body="The running plan remains primary. This only allows simple support notes, not a detailed gym program."
+        title="Extras"
+        body="Add light mobility or strength support if you want it."
       >
         <div className="grid gap-2">
           {STRENGTH_OPTIONS.map((option) => (
@@ -324,7 +332,7 @@ export function StructuredPlanConstructor({
       <ConstructorSection
         eyebrow="06"
         title="Optional comment"
-        body="Supporting context only. Hito will not treat this as a free-text plan prompt."
+        body="Add anything small Hito should keep in mind."
       >
         <label className="grid gap-2">
           <span className="hito-form-label">Comment</span>
@@ -347,7 +355,7 @@ export function StructuredPlanConstructor({
             ) : null}
             {!constructorError && constructorStatus !== "finishing" ? (
               <p className="hito-field-helper max-w-xl">
-                Fixed rest days stay authoritative after the plan is created.
+                Add the required chips to create your plan.
               </p>
             ) : null}
           </div>
@@ -380,7 +388,7 @@ export function ConstructorSection({
   children: ReactNode;
 }) {
   return (
-    <section className="hito-section-divider grid gap-4 pt-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+    <section className="hito-section-divider grid gap-y-4 gap-x-0 pt-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-x-12 lg:gap-x-16">
       <div>
         <p className="hito-micro-label">{eyebrow}</p>
         <h2 className="hito-panel-title mt-2">{title}</h2>
@@ -409,11 +417,13 @@ export function Field({
   );
 }
 
-function ProfileBasicControl({
+function EditableValueChip({
+  fieldKey,
   label,
-  addLabel,
   value,
   setValue,
+  activeEditableKey,
+  setActiveEditableKey,
   placeholder,
   min,
   max,
@@ -421,10 +431,12 @@ function ProfileBasicControl({
   inputMode,
   unit,
 }: {
+  fieldKey: ProfileBasicEditableKey;
   label: string;
-  addLabel: string;
   value: string;
   setValue: (value: string) => void;
+  activeEditableKey: ProfileBasicEditableKey | null;
+  setActiveEditableKey: (value: ProfileBasicEditableKey | null) => void;
   placeholder: string;
   min: number;
   max: number;
@@ -433,103 +445,181 @@ function ProfileBasicControl({
   unit?: string;
 }) {
   const hasSavedValue = isProfileBasicValueValid(value, { min, max, step });
-  const [isEditing, setIsEditing] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isEditing = activeEditableKey === fieldKey;
   const [draftValue, setDraftValue] = useState(value);
   const canSave = isProfileBasicValueValid(draftValue, { min, max, step });
+  const saveValue = formatProfileBasicDraft(draftValue);
 
   useEffect(() => {
-    setDraftValue(value);
-    setIsEditing(Boolean(value.trim()) && !isProfileBasicValueValid(value, { min, max, step }));
-  }, [max, min, step, value]);
+    if (!isEditing) {
+      setDraftValue(value);
+    }
+  }, [isEditing, value]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      return;
+    }
+
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (target instanceof Node && rowRef.current?.contains(target)) {
+        return;
+      }
+
+      setDraftValue(value);
+      setActiveEditableKey(null);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [isEditing, setActiveEditableKey, value]);
 
   if (!isEditing) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setDraftValue(value);
-          setIsEditing(true);
-        }}
-        className={cn(
-          "hito-button hito-button-sm group min-h-9 w-full justify-between text-left",
-          hasSavedValue ? "hito-button-secondary" : "hito-button-outlined",
-        )}
-      >
-        <span className="flex min-w-0 items-baseline gap-2">
+      <div ref={rowRef} className="hito-editable-value-chip-frame">
+        <button
+          type="button"
+          aria-label={hasSavedValue ? `Edit ${label.toLowerCase()}` : `Add ${label.toLowerCase()}`}
+          onClick={() => {
+            setDraftValue(value);
+            setActiveEditableKey(fieldKey);
+          }}
+          className="hito-editable-value-chip"
+          data-state={hasSavedValue ? "saved" : "empty"}
+        >
+          {!hasSavedValue ? (
+            <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
+          ) : null}
+          <span className="hito-editable-value-chip-content">
+            {hasSavedValue ? (
+              <>
+                <span className="hito-editable-value-chip-label">{label}</span>
+                <span className="hito-editable-value-chip-text">
+                  {value}
+                  {unit ? ` ${unit}` : ""}
+                </span>
+              </>
+            ) : (
+              <span>{label}</span>
+            )}
+          </span>
           {hasSavedValue ? (
-            <>
-              <span className="hito-form-label shrink-0">{label}</span>
-              <span className="truncate font-mono-num">
-                {value}
-                {unit ? ` ${unit}` : ""}
-              </span>
-            </>
-          ) : (
-            <span>{addLabel}</span>
-          )}
-        </span>
-        <Icon
-          name={hasSavedValue ? "edit" : "plus"}
-          size="sm"
-          className={cn(
-            "transition-opacity",
-            hasSavedValue && "opacity-55 group-hover:opacity-100",
-          )}
-        />
-      </button>
+            <Icon
+              name="edit"
+              size="sm"
+              className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
+            />
+          ) : null}
+        </button>
+      </div>
     );
   }
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <label className="hito-form-label w-16 shrink-0" htmlFor={`profile-${label.toLowerCase()}`}>
-        {label}
-      </label>
-      <input
-        id={`profile-${label.toLowerCase()}`}
-        type="number"
-        inputMode={inputMode}
-        min={min}
-        max={max}
-        step={step}
-        required
-        value={draftValue}
-        onChange={(event) => setDraftValue(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && canSave) {
-            event.preventDefault();
-            setValue(draftValue.trim());
-            setIsEditing(false);
+    <div ref={rowRef} className="hito-editable-value-chip-frame" data-state="editing">
+      <div className="hito-editable-value-chip-input-shell">
+        <input
+          ref={inputRef}
+          id={`profile-${label.toLowerCase()}`}
+          type="text"
+          inputMode={inputMode}
+          required
+          value={draftValue}
+          onChange={(event) =>
+            setDraftValue(sanitizeProfileBasicDraft(event.target.value, inputMode))
           }
-        }}
-        placeholder={placeholder}
-        className="hito-field hito-field-secondary hito-field-sm min-w-[7rem] flex-1"
-      />
-      <button
-        type="button"
-        disabled={!canSave}
-        onClick={() => {
-          setValue(draftValue.trim());
-          setIsEditing(false);
-        }}
-        className="hito-button hito-button-primary hito-button-sm aspect-square p-0"
-        aria-label={`Save ${label.toLowerCase()}`}
-      >
-        <Icon name="check" size="sm" />
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setDraftValue(value);
-          setIsEditing(false);
-        }}
-        className="hito-button hito-button-ghost hito-button-sm aspect-square p-0"
-        aria-label={`Cancel ${label.toLowerCase()} edit`}
-      >
-        <Icon name="close" size="sm" />
-      </button>
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+            }
+          }}
+          aria-label={label}
+          placeholder={placeholder}
+          className="hito-editable-value-chip-input"
+        />
+        {draftValue ? (
+          <button
+            type="button"
+            className="hito-editable-value-chip-clear"
+            onClick={() => {
+              setDraftValue("");
+              window.requestAnimationFrame(() => inputRef.current?.focus());
+            }}
+            aria-label={`Clear ${label.toLowerCase()}`}
+          >
+            <Icon name="close" size="xs" />
+          </button>
+        ) : null}
+      </div>
+      {canSave ? (
+        <button
+          type="button"
+          onClick={() => {
+            setValue(saveValue);
+            setActiveEditableKey(null);
+          }}
+          className="hito-editable-value-chip-action"
+          data-action="save"
+          aria-label={`Save ${label.toLowerCase()}`}
+        >
+          <Icon name="check" size="sm" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setDraftValue(value);
+            setActiveEditableKey(null);
+          }}
+          className="hito-editable-value-chip-action"
+          data-action="cancel"
+          aria-label={`Cancel ${label.toLowerCase()} edit`}
+        >
+          <Icon name="close" size="sm" />
+        </button>
+      )}
     </div>
   );
+}
+
+function sanitizeProfileBasicDraft(rawValue: string, inputMode: "numeric" | "decimal") {
+  if (inputMode === "numeric") {
+    return rawValue.replace(/\D/g, "");
+  }
+
+  const normalized = rawValue.replace(",", ".");
+  const [integerPart = "", ...decimalParts] = normalized.split(".");
+  const integerDigits = integerPart.replace(/\D/g, "");
+  const decimalDigits = decimalParts.join("").replace(/\D/g, "");
+
+  if (normalized.includes(".")) {
+    return `${integerDigits}.${decimalDigits}`;
+  }
+
+  return integerDigits;
+}
+
+function formatProfileBasicDraft(rawValue: string) {
+  const parsed = Number(rawValue);
+
+  if (!Number.isFinite(parsed)) {
+    return rawValue.trim();
+  }
+
+  return String(parsed);
 }
 
 function isProfileBasicValueValid(

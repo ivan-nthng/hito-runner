@@ -64,6 +64,7 @@ Current Hotspots
 Highest-risk oversized or mixed-responsibility files:
 
 - `src/components/CompletionPanel.tsx`
+- `src/routes/changelog.tsx`
 - `src/components/PlanManagementDialog.tsx`
 - `src/lib/training-api.ts`
 - `src/lib/voice-to-plan-authoring.ts`
@@ -74,6 +75,7 @@ Highest-risk oversized or mixed-responsibility files:
 Current file sizes at audit time:
 
 - `src/components/CompletionPanel.tsx` — 2963 lines
+- `src/routes/changelog.tsx` — 713 lines
 - `src/routes/hitoDS.tsx` — 1949 lines
 - `src/lib/training-api.ts` — 1918 lines
 - `src/lib/voice-to-plan-authoring.ts` — 1482 lines
@@ -91,6 +93,24 @@ The architecture has three real problems:
 1. Central hubs still carry too many unrelated responsibilities.
 2. Utility and validation logic is still duplicated in a few neighboring flows.
 3. Client bundle boundaries are looser than they should be for utility dialogs and server-only Garmin code.
+
+4. A few utility/reference routes now carry too much local parsing and presentation logic in one file.
+
+The clearest example is:
+
+- `src/routes/changelog.tsx`
+
+It currently mixes:
+
+- route shell and tab state
+- markdown parsing
+- month/day grouping
+- highlight classification heuristics
+- milestone title derivation
+- inline markdown rendering
+- date/count formatting
+
+This is acceptable for a non-primary utility route in the short term, but it should not stay as an unowned 700+ line mixed file indefinitely.
 
 This means the right cleanup is not “rewrite the app”.
 
@@ -111,6 +131,7 @@ Checklist
 - [ ] Collapse duplicated JSON import validation/paste flow
 - [ ] Further reduce `voice-to-plan-authoring.ts` into bounded submodules
 - [ ] Recheck `imported-plan.ts` for contract-vs-normalization-vs-summary split
+- [ ] Simplify `src/routes/changelog.tsx` into a small utility route plus extracted changelog parsing/presentation helpers
 - [ ] Lazy-load utility dialogs from shell
 - [ ] Re-run build and focused regression after each bounded slice
 
@@ -509,6 +530,80 @@ QA expectation
 
 - no product behavior drift
 
+Phase 9 — Simplify `ChangeLog` Utility Route
+
+Goal
+
+Keep the `ChangeLog` page useful without letting it remain a growing mixed-responsibility utility route.
+
+Primary targets
+
+- `src/routes/changelog.tsx`
+- optionally one small extracted helper such as:
+  - `src/lib/changelog-page.ts`
+  - or `src/lib/changelog-view-model.ts`
+
+Current problem
+
+`src/routes/changelog.tsx` is now large enough to justify cleanup, but it is not a core runner-facing path.
+
+It currently combines:
+
+- route-level page rendering
+- tab state
+- raw markdown parsing from `docs/history/changelog.md`
+- day/month grouping
+- highlight extraction heuristics
+- milestone classification/title derivation
+- date/count formatting helpers
+- inline markdown token rendering
+
+Why this is later, not earlier
+
+- it is isolated
+- it is not part of the main plan/workout/auth critical path
+- the page is functionally fine today
+- the larger core architecture wins are still elsewhere
+
+Preferred simplification direction
+
+- keep one route component
+- extract pure changelog parsing/presentation helpers out of the route file
+- do not turn changelog into a CMS
+- do not add server persistence, search, filters, or pagination unless a real product need appears
+
+Suggested bounded split
+
+- route page shell + tab state stays in `src/routes/changelog.tsx`
+- pure parsing and grouping moves to one small helper module
+- pure highlight classification/title/badge heuristics moves to the same helper module unless it becomes too large
+- `InlineMarkdown` may stay local if it remains tiny
+
+Expected outcome
+
+- smaller route file
+- easier future updates to changelog heuristics
+- less accidental coupling between docs parsing and page rendering
+
+Risk
+
+- low; this is a utility surface
+
+Mitigation
+
+- keep visible output unchanged
+- regression-check latest dates, highlight tab, technical tab, and empty state behavior
+
+Owner
+
+FRONTEND
+
+QA expectation
+
+- `/changelog` still renders latest entries correctly
+- highlights and technical log tabs remain unchanged in behavior
+- `Last updated` and entry count remain correct
+
 Priority Order
 
 P0
@@ -527,6 +622,10 @@ P2
 - Phase 6
 - Phase 7
 - Phase 8
+
+P3
+
+- Phase 9
 
 Recommended Next Slice
 
@@ -591,6 +690,7 @@ Exit Criteria
 - `PlanManagementDialog.tsx` and `CompletionPanel.tsx` are no longer mega-components
 - duplicated JSON import flow is reduced to one small shared implementation seam
 - voice-to-plan backend file is decomposed into clearer internal ownership
+- the `ChangeLog` page no longer carries route UI, markdown parsing, and highlight heuristics in one large utility route file
 - no runner-facing product behavior regresses
 
 What We Explicitly Will Not Do In This Cleanup
@@ -613,4 +713,3 @@ Execute the first bounded cleanup slice only:
 - remove dead compatibility seams from `training-api.ts`
 - fix Garmin server-only/browser-boundary import issues
 - rebuild and verify that onboarding/import/upload behavior stays unchanged
-

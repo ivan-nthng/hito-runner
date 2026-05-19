@@ -791,7 +791,7 @@ function HitoDesignSystemPage() {
                       <span className="hito-label">Textarea</span>
                       <textarea
                         rows={5}
-                        className="hito-field hito-field-primary hito-textarea-md resize-y"
+                        className="hito-field hito-field-primary hito-textarea-md resize-none"
                         placeholder="Describe goal, constraints, recent results, or JSON notes."
                       />
                     </label>

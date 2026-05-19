@@ -1,4 +1,17 @@
 import { z } from "zod";
+import {
+  chooseLongRunDay,
+  FIRST_PLAN_GOAL_DISTANCE_VALUES,
+  FIRST_PLAN_GOAL_STYLE_VALUES,
+  FIRST_PLAN_TERRAIN_FOCUS_VALUES,
+  formatGoalDistance,
+  formatGoalStyle,
+  isRealIsoDate,
+  parseDurationSeconds,
+  parsePaceSecondsPerKm,
+  pickEvenly,
+  uniqueWeekdays,
+} from "@/lib/first-plan-authoring-utils";
 import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring";
 import { diffDaysIso, todayIso } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
@@ -104,17 +117,9 @@ const availabilitySchema = z
     }
   });
 
-const goalDistanceSchema = z.enum([
-  "build_consistency",
-  "5k",
-  "10k",
-  "half_marathon",
-  "marathon",
-  "ultra_marathon",
-  "mountain_running",
-]);
-const goalStyleSchema = z.enum(["relaxed", "balanced", "ambitious", "target_time"]);
-const terrainFocusSchema = z.enum(["standard", "rolling", "mountain"]);
+const goalDistanceSchema = z.enum(FIRST_PLAN_GOAL_DISTANCE_VALUES);
+const goalStyleSchema = z.enum(FIRST_PLAN_GOAL_STYLE_VALUES);
+const terrainFocusSchema = z.enum(FIRST_PLAN_TERRAIN_FOCUS_VALUES);
 
 const goalSchema = z
   .object({
@@ -277,47 +282,13 @@ function formatStructuredFirstPlanOnboardingError(error: z.ZodError) {
 }
 
 function buildGoalLabel(goal: StructuredFirstPlanOnboardingInput["goal"]) {
-  const parts = [formatGoalDistance(goal.goalDistance), formatGoalStyle(goal.goalStyle)];
+  const parts = [formatGoalDistance(goal.goalDistance), formatGoalStyle(goal.goalStyle, "title")];
 
   if (goal.goalStyle === "target_time" && goal.targetTime) {
     parts.push(goal.targetTime);
   }
 
   return parts.join(" · ");
-}
-
-function formatGoalDistance(
-  goalDistance: StructuredFirstPlanOnboardingInput["goal"]["goalDistance"],
-) {
-  switch (goalDistance) {
-    case "build_consistency":
-      return "Build consistency";
-    case "5k":
-      return "5K";
-    case "10k":
-      return "10K";
-    case "half_marathon":
-      return "Half marathon";
-    case "marathon":
-      return "Marathon";
-    case "ultra_marathon":
-      return "Ultra marathon";
-    case "mountain_running":
-      return "Mountain running";
-  }
-}
-
-function formatGoalStyle(goalStyle: StructuredFirstPlanOnboardingInput["goal"]["goalStyle"]) {
-  switch (goalStyle) {
-    case "relaxed":
-      return "Relaxed";
-    case "balanced":
-      return "Balanced";
-    case "ambitious":
-      return "Ambitious";
-    case "target_time":
-      return "Target time";
-  }
 }
 
 function defaultHorizonWeeks(
@@ -522,14 +493,6 @@ function buildBoundedCommentConstraint(comment: string | null | undefined) {
   return "Runner provided optional context; treat it as secondary nuance only.";
 }
 
-function chooseLongRunDay(allowedWeekdays: WeekdayName[]) {
-  if (allowedWeekdays.includes("Sunday")) {
-    return "Sunday";
-  }
-
-  return allowedWeekdays.at(-1) ?? "Saturday";
-}
-
 function deriveStartDateForTrainingWeekdays(trainingWeekdays: WeekdayName[]) {
   let candidate = todayIso();
 
@@ -573,71 +536,6 @@ function choosePreferredRunningDays(
   const filled = uniqueWeekdays([...selected, ...allowedWeekdays]).slice(0, runningDaysPerWeek);
 
   return filled;
-}
-
-function pickEvenly<T>(values: readonly T[], count: number) {
-  if (count <= 0 || values.length === 0) return [];
-  if (count >= values.length) return [...values];
-  if (count === 1) return [values[Math.floor(values.length / 2)]!];
-
-  const selected: T[] = [];
-
-  for (let index = 0; index < count; index += 1) {
-    const sourceIndex = Math.round((index * (values.length - 1)) / (count - 1));
-    const value = values[sourceIndex]!;
-
-    if (!selected.includes(value)) {
-      selected.push(value);
-    }
-  }
-
-  for (const value of values) {
-    if (selected.length >= count) break;
-    if (!selected.includes(value)) {
-      selected.push(value);
-    }
-  }
-
-  return selected;
-}
-
-function uniqueWeekdays(values: readonly WeekdayName[]) {
-  return WEEKDAY_NAMES.filter((weekday) => values.includes(weekday));
-}
-
-function isRealIsoDate(value: string) {
-  const date = new Date(`${value}T00:00:00Z`);
-
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-function parseDurationSeconds(value: string) {
-  const parts = value
-    .trim()
-    .split(":")
-    .map((part) => Number(part));
-
-  if (parts.length !== 2 && parts.length !== 3) return null;
-  if (parts.some((part) => !Number.isInteger(part) || part < 0)) return null;
-
-  if (parts.length === 2) {
-    const [minutes, seconds] = parts;
-
-    if (seconds == null || seconds >= 60) return null;
-    return minutes! * 60 + seconds;
-  }
-
-  const [hours, minutes, seconds] = parts;
-
-  if (minutes == null || seconds == null || minutes >= 60 || seconds >= 60) return null;
-  return hours! * 3600 + minutes * 60 + seconds;
-}
-
-function parsePaceSecondsPerKm(value: string) {
-  const normalized = value.trim().toLowerCase().replace(/\s+/g, "");
-  const pace = normalized.replace(/\/?km$/, "");
-
-  return parseDurationSeconds(pace);
 }
 
 function buildEasyPaceRange(recent5kPaceSecondsPerKm: number) {

@@ -7,6 +7,19 @@ import {
 } from "@/lib/entitlements/check-runner-capability";
 import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
 import {
+  chooseLongRunDay,
+  FIRST_PLAN_GOAL_DISTANCE_VALUES,
+  FIRST_PLAN_GOAL_STYLE_VALUES,
+  FIRST_PLAN_TERRAIN_FOCUS_VALUES,
+  formatGoalDistance,
+  formatGoalStyle,
+  isWeekdayName,
+  pickEvenly,
+  uniqueWeekdays,
+  type FirstPlanGoalDistance,
+  type FirstPlanGoalStyle,
+} from "@/lib/first-plan-authoring-utils";
+import {
   generateCanonicalPlanFromText,
   type GeneratedPlanResult,
 } from "@/lib/openai-plan-authoring";
@@ -22,25 +35,17 @@ const MAX_TRANSCRIPT_LENGTH = 4000;
 const MIN_USEFUL_TRANSCRIPT_LENGTH = 12;
 
 const weekdaySchema = z.enum(WEEKDAY_NAMES);
-const goalDistanceSchema = z.enum([
-  "build_consistency",
-  "5k",
-  "10k",
-  "half_marathon",
-  "marathon",
-  "ultra_marathon",
-  "mountain_running",
-]);
-const goalStyleSchema = z.enum(["relaxed", "balanced", "ambitious", "target_time"]);
-const terrainFocusSchema = z.enum(["standard", "rolling", "mountain"]);
+const goalDistanceSchema = z.enum(FIRST_PLAN_GOAL_DISTANCE_VALUES);
+const goalStyleSchema = z.enum(FIRST_PLAN_GOAL_STYLE_VALUES);
+const terrainFocusSchema = z.enum(FIRST_PLAN_TERRAIN_FOCUS_VALUES);
 const strengthPreferenceSchema = z.enum(["none", "mobility", "strength_mobility"]);
 const isoDateSchema = z
   .string()
   .trim()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date in YYYY-MM-DD format.");
 const durationLikeSchema = z.string().trim().min(3).max(40);
-type VoiceGoalDistance = z.infer<typeof goalDistanceSchema>;
-type VoiceGoalStyle = z.infer<typeof goalStyleSchema>;
+type VoiceGoalDistance = FirstPlanGoalDistance;
+type VoiceGoalStyle = FirstPlanGoalStyle;
 
 const voiceToPlanContextSchema = z
   .object({
@@ -1013,37 +1018,6 @@ function fillPreferredRunningDays(
   return uniqueWeekdays(selected).slice(0, runningDayCount);
 }
 
-function pickEvenly<T>(values: readonly T[], count: number) {
-  if (count <= 0 || values.length === 0) return [];
-  if (count >= values.length) return [...values];
-  if (count === 1) return [values[Math.floor(values.length / 2)]!];
-
-  const selected: T[] = [];
-
-  for (let index = 0; index < count; index += 1) {
-    const sourceIndex = Math.round((index * (values.length - 1)) / (count - 1));
-    const value = values[sourceIndex]!;
-
-    if (!selected.includes(value)) {
-      selected.push(value);
-    }
-  }
-
-  return selected;
-}
-
-function chooseLongRunDay(preferredRunningDays: readonly WeekdayName[]) {
-  if (preferredRunningDays.includes("Sunday")) {
-    return "Sunday";
-  }
-
-  if (preferredRunningDays.includes("Saturday")) {
-    return "Saturday";
-  }
-
-  return preferredRunningDays.at(-1) ?? "Sunday";
-}
-
 function normalizeVoiceSupplement(supplement: VoiceToPlanSupplement): VoiceToPlanSupplement {
   return {
     ...supplement,
@@ -1398,38 +1372,6 @@ function buildSupplementGoalLabel({
   return parts.join(" · ");
 }
 
-function formatGoalDistance(goalDistance: z.infer<typeof goalDistanceSchema>) {
-  switch (goalDistance) {
-    case "build_consistency":
-      return "Build consistency";
-    case "5k":
-      return "5K";
-    case "10k":
-      return "10K";
-    case "half_marathon":
-      return "Half marathon";
-    case "marathon":
-      return "Marathon";
-    case "ultra_marathon":
-      return "Ultra marathon";
-    case "mountain_running":
-      return "Mountain running";
-  }
-}
-
-function formatGoalStyle(goalStyle: z.infer<typeof goalStyleSchema>) {
-  switch (goalStyle) {
-    case "relaxed":
-      return "relaxed";
-    case "balanced":
-      return "balanced";
-    case "ambitious":
-      return "ambitious";
-    case "target_time":
-      return "target time";
-  }
-}
-
 function formatExperienceLevel(
   value: VoiceToPlanAuthoringInput["runnerProfile"]["experienceLevel"],
 ) {
@@ -1510,14 +1452,6 @@ function readWeekdays(value: unknown) {
   }
 
   return uniqueWeekdays(value.filter(isWeekdayName));
-}
-
-function uniqueWeekdays(values: readonly WeekdayName[]) {
-  return WEEKDAY_NAMES.filter((weekday) => values.includes(weekday));
-}
-
-function isWeekdayName(value: unknown): value is WeekdayName {
-  return typeof value === "string" && WEEKDAY_NAMES.includes(value as WeekdayName);
 }
 
 function normalizeTranscript(value: string) {

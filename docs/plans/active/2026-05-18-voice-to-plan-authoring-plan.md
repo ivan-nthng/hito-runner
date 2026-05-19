@@ -195,6 +195,27 @@ Current frontend non-goals still true:
 - no replacement of the structured constructor
 - no silent plan creation from review
 
+## Missing Backend Transport Slice
+
+The current plan is already strong on:
+
+- transcript review
+- clarification handling
+- review verdict
+- explicit confirm before plan creation
+
+What is still underspecified is the raw backend transport for:
+
+- `audio -> validation -> transcription -> transcript response`
+
+That slice should be added to this same canonical plan.
+
+It should not create:
+
+- a second planner
+- a second review system
+- a second plan-generation action
+
 ## Why This Shape
 
 This shape is best because:
@@ -233,6 +254,149 @@ Do not use in first release unless quality data says `mini` is not enough:
 - `whisper-1`
   usable, but not the preferred current first choice when the newer transcription models exist
 
+## Backend Audio-To-Transcript Slice
+
+The first raw-audio slice should stay deliberately small.
+
+It should do only this:
+
+1. accept one short single-speaker audio input
+2. validate that the file is acceptable before any expensive model call
+3. check auth and `voice_to_plan` entitlement before transcription
+4. send the file to one speech-to-text model
+5. normalize the returned transcript
+6. return transcript text for review
+7. let the existing transcript-review backend continue from there
+
+It must not:
+
+- generate a plan directly from raw audio
+- create a second authoring contract
+- run a summarization model between transcription and transcript review
+- archive voice recordings as product truth
+
+## Input Contract
+
+Recommended first-release input contract:
+
+```text
+type VoiceAudioTranscriptionRequest = {
+  sourceKind: "voice_audio";
+  file: File;
+};
+```
+
+The input must be:
+
+- one file only
+- one short runner voice note only
+- no multi-file batching
+- no multi-speaker handling
+
+Accepted first-release formats:
+
+- `audio/webm`
+- `audio/mp4`
+- `audio/m4a`
+- `audio/wav`
+- optionally `audio/mpeg`
+
+Practical file-extension acceptance should map to:
+
+- `.webm`
+- `.mp4`
+- `.m4a`
+- `.wav`
+- optionally `.mp3`
+
+Canonical rule:
+
+- keep the accepted list aligned with OpenAI speech-to-text supported upload formats
+- reject everything else before calling the transcription model
+
+## Validation And Limits
+
+The backend should validate, in order:
+
+1. authenticated runner exists
+2. `voice_to_plan` entitlement is allowed
+3. file exists
+4. file is non-empty
+5. content type or extension is accepted
+6. file size is within first-release bounds
+7. optional estimated duration is within first-release bounds if known
+
+Recommended first-release product limits:
+
+- target usage guidance:
+  - `30-90 seconds`
+- soft warning threshold:
+  - around `90 seconds`
+- hard-stop product limit:
+  - around `2 minutes`
+
+Recommended file-size rule:
+
+- define one explicit backend byte cap for v1
+- keep it conservative for short voice notes
+- reject obviously oversized files before any transcription call
+
+If exact duration is not cheaply available server-side:
+
+- keep duration as product guidance first
+- use file size as the hard reject
+- let the recording UI provide exact duration later when available
+
+## Temporary File Handling
+
+Raw audio should not become product truth.
+
+Recommended first-release handling:
+
+- keep audio in request memory or short-lived temp handling only as long as needed for the transcription call
+- do not persist raw audio in Supabase storage
+- do not attach raw audio to the runner profile or plan
+- do not store long-lived file references in canonical saved-mode truth
+
+Acceptable lightweight observability later:
+
+- transcription model name
+- source kind
+- text length
+- audio duration if known
+- success/failure status
+
+But even that should remain:
+
+- transient request metadata
+- or a minimal operational audit seam
+
+not runner-facing product truth
+
+## Backend Flow
+
+Recommended first-release backend flow:
+
+1. runner uploads or records one short audio file
+2. backend route or server action receives the file
+3. backend runs auth check
+4. backend runs entitlement check for `voice_to_plan`
+5. backend validates format, size, and obvious emptiness
+6. backend sends the file to OpenAI transcription
+7. backend receives transcript text
+8. backend normalizes:
+   - trims whitespace
+   - collapses obvious spacing noise
+   - rejects empty or useless result
+9. backend returns transcript review payload
+10. runner reviews transcript
+11. existing `generateVoiceToPlanDraft` and `confirmVoiceToPlanDraft` flow continues unchanged
+
+Important:
+
+- the audio transport slice ends at transcript review payload
+- it does not create or apply a plan
+
 ## Token Discipline
 
 The cost boundary matters more than the novelty here.
@@ -244,6 +408,7 @@ The cost boundary matters more than the novelty here.
 3. Do not send both raw audio and transcript into plan generation.
 4. Do not store or replay very long recordings in the first release.
 5. Do not auto-regenerate plans after every transcript edit.
+6. Do not add a cleanup LLM call between transcription and transcript review.
 
 ### Recommended first-release limits
 
@@ -259,6 +424,7 @@ The cheapest safe first-release path is:
 - one audio transcription call
 - one plan-generation call
 - zero intermediate summarization calls
+- zero intermediate cleanup model calls
 
 The runner should edit the transcript manually if it is too long or noisy instead of the system running another costly compression model call automatically.
 
@@ -570,6 +736,20 @@ type VoiceAuthoringRequest = {
 
 This should remain request-level processing data, not a new canonical persisted runner entity.
 
+Recommended adjacent transcription transport result:
+
+```text
+type VoiceAudioTranscriptResult = {
+  sourceKind: "voice_audio";
+  transcriptText: string;
+  audioDurationSec: number | null;
+  transcriptionModel: string;
+  responseId: string | null;
+};
+```
+
+This result should feed transcript review only.
+
 ### Optional lightweight audit table
 
 If the product needs basic operational observability, add one small audit table such as:
@@ -588,12 +768,46 @@ Do not create a broad media-ingestion subsystem for this slice.
 
 ## Architecture Direction
 
+### Transcript response contract
+
+Recommended transcript-ready response shape:
+
+```text
+{
+  ok: true,
+  status: "transcript_ready",
+  sourceKind: "voice_audio",
+  transcript: {
+    text: string,
+    characterCount: number
+  },
+  audio: {
+    originalFileName: string | null,
+    mimeType: string | null,
+    durationSec: number | null
+  },
+  model: string,
+  responseId: string | null,
+  safety: {
+    rawAudioPersisted: false,
+    requiresTranscriptReview: true
+  }
+}
+```
+
+Canonical handoff rule:
+
+- this payload should feed the existing transcript-review state
+- not a second downstream authoring path
+
 ### Backend seams
 
 Recommended new backend modules:
 
 - `src/lib/voice-authoring/transcribe-audio.ts`
+- `src/lib/voice-authoring/validate-audio-input.ts`
 - `src/lib/voice-authoring/validate-transcript.ts`
+- `src/lib/voice-authoring/normalize-transcript.ts`
 - `src/lib/voice-authoring/types.ts`
 
 Current backend transcript seam:
@@ -608,7 +822,7 @@ Reuse existing backend seam:
 
 Recommended first actions:
 
-- `transcribeVoiceAuthoringInput(file)`
+- `transcribeVoiceAuthoringAudio(file)`
 - `generatePlanFromConfirmedTranscript(transcriptText)`
 
 Current backend action:
@@ -619,6 +833,7 @@ Important:
 
 - do not create a second plan-generation action with different rules
 - the confirmed transcript should end in the same authoring/generation path already used by free text
+- the transcription action should stop at transcript delivery and not silently continue into plan draft generation
 
 ## Validation And Safety Direction
 
@@ -669,6 +884,28 @@ When the verdict is `draft_ready`:
 - do not treat the review verdict as active plan truth
 - do not discard the runner transcript or manual supplements before the runner confirms
 - do not hide inferred assumptions; expose them so the runner can correct them
+
+### Audio transport safety
+
+When raw audio is invalid or transcription fails:
+
+- do not fall through into the draft-generation seam
+- do not create partial transcript truth
+- do not persist raw audio as fallback product state
+- return the runner to a retryable transcript-entry state
+
+### Failure modes
+
+The raw-audio slice must return bounded non-500 business failures for:
+
+- `capability_locked`
+- `unsupported_audio_format`
+- `audio_too_large`
+- `audio_too_long`
+- `empty_audio`
+- `transcription_failed`
+- `empty_transcript`
+- `unusable_transcript`
 
 ## Option Evaluation
 
@@ -726,15 +963,17 @@ Decision:
 
 ## Recommended Delivery Sequence
 
-### Phase 1: Voice transcript transport
+### Phase 1: Backend audio-to-transcript transport
 
 Deliver:
 
-- short audio capture or upload
+- accepted audio-file contract
+- auth + entitlement before transcription
 - server-side transcription
-- transcript readback UI
+- transcript-ready response payload
+- bounded error handling
 
-### Phase 2: Confirmed transcript handoff
+### Phase 2: Transcript review wiring
 
 Deliver:
 
@@ -793,7 +1032,10 @@ Not before the basic bounded path is stable.
 
 - [x] define the bounded voice-to-plan product scope
 - [x] add backend `voice_to_plan` capability check for the confirmed-transcript path
-- [ ] add one transcription seam separate from the plan model
+- [ ] add one raw-audio transcription seam separate from the plan model
+- [ ] define accepted audio formats and extension handling
+- [ ] define explicit file-size and duration guardrails for the raw-audio path
+- [ ] return a transcript-ready response contract before draft generation
 - [x] add one transcript review and edit step
 - [x] route confirmed transcript into the existing text-to-plan generation seam
 - [x] set transcript-length and filler/noise guardrails
@@ -808,14 +1050,21 @@ Not before the basic bounded path is stable.
 - [x] return review-only draft output without active-plan mutation
 - [x] ensure review verdict calls create no plan/profile/workout rows
 - [ ] validate the end-to-end runner flow in saved-mode onboarding
+- [ ] validate raw audio transport failures:
+  - unsupported format
+  - too large
+  - too long
+  - transcription failure
+  - empty/unusable transcript
 
 ## Exit Criteria
 
 - A runner can paste or type one transcript-style request as a secondary onboarding path.
 - The system reviews that transcript before plan creation.
 - Confirmed draft text uses the same canonical plan-authoring path as existing structured authoring.
+- The backend can accept one short supported audio file and return transcript text for review through a separate transport seam.
 - The first release avoids realtime voice and avoids extra summarization model calls.
-- Token usage stays bounded to one plan-generation call for this transcript-text slice; audio transcription remains a later additive step.
+- Token usage stays bounded to one transcription call plus one later plan-generation call, with no intermediate cleanup/summarization model pass.
 
 ## 🔁 HANDOFF BLOCK (MANDATORY)
 

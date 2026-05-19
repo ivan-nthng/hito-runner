@@ -4,7 +4,11 @@ import type {
   VoiceToPlanDraftResult,
   VoiceToPlanDraftSuccess,
 } from "@/lib/voice-to-plan-authoring";
-import { formatTerrainFocus, voiceResultMessage } from "./onboarding-form-model";
+import {
+  formatTerrainFocus,
+  ONBOARDING_TEXTAREA_CLASS,
+  voiceResultMessage,
+} from "./onboarding-form-model";
 
 export type VoiceStatus = "idle" | "reviewing" | "creating" | "created";
 
@@ -60,21 +64,24 @@ export function DictateToPlanPanel({
       </div>
 
       <div className="grid gap-4">
-        <label className="grid gap-2 rounded-[1.5rem] bg-muted/20 p-3 sm:p-4">
-          <span className="hito-form-label">Paste or type what you would say out loud</span>
+        <div className="grid gap-2">
+          <label htmlFor="voice-to-plan-transcript" className="hito-form-label">
+            Paste or type what you would say out loud
+          </label>
           <textarea
+            id="voice-to-plan-transcript"
             ref={voiceTranscriptRef}
             rows={3}
             value={transcript}
             onChange={(event) => setTranscript(event.target.value)}
             placeholder="I am 35, 72 kg, 178 cm. I want to train for a 10K in about 10 weeks. I can run four days a week, rest Wednesdays and Sundays, and my recent 5K is around 25 minutes..."
-            className="hito-field hito-field-secondary hito-textarea-md resize-y"
+            className={ONBOARDING_TEXTAREA_CLASS}
           />
           <span className="hito-field-helper">
             Hito uses AI to fill and review setup from transcript text. No microphone yet: paste or
             type what you would say out loud.
           </span>
-        </label>
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button

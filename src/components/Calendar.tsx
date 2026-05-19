@@ -129,7 +129,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7">
+          <div className="hito-calendar-month-grid grid grid-cols-7">
             {cells.map((iso, index) => (
               <DayCell
                 key={index}
@@ -188,7 +188,7 @@ function DayCell({
   hovered: string | null;
   snapshot: TrainingSnapshot;
 }) {
-  if (!iso) return <div className="aspect-[5/4] border-r border-b border-hairline" />;
+  if (!iso) return <div className="hito-calendar-month-cell border-r border-b border-hairline" />;
   const workout = findWorkout(snapshot.workouts, iso);
   const isToday = iso === snapshot.currentDate;
   const status = workout?.status ?? "rest";
@@ -209,6 +209,7 @@ function DayCell({
         onMouseLeave={() => onHover(null)}
         className={cn(
           "block aspect-[5/4] border-r border-b border-hairline p-3 transition-colors group",
+          "hito-calendar-month-cell",
           !inMonth && "opacity-30",
           isToday && "relative z-10 outline outline-1 outline-offset-[-1px] outline-signal/60",
           isCompleted && !isToday && "bg-success/[0.04]",
@@ -233,7 +234,7 @@ function DayCell({
           <div className="mt-3">
             <div
               className={cn(
-                "inline-flex max-w-full items-center gap-1.5 text-[10px] uppercase tracking-[0.14em]",
+                "inline-flex max-w-full min-w-0 items-center gap-1.5 text-[10px] uppercase tracking-[0.14em]",
                 status === "skipped" && "line-through opacity-50",
               )}
               style={{ color: identity?.color }}
@@ -245,7 +246,7 @@ function DayCell({
             </div>
             <div
               className={cn(
-                "mt-1.5 text-xs leading-tight text-foreground/85 line-clamp-2",
+                "mt-1.5 line-clamp-2 overflow-hidden text-xs leading-tight text-foreground/85",
                 feedbackMeta && "pr-7",
               )}
             >
@@ -256,11 +257,11 @@ function DayCell({
         {workout && workout.type === "rest" && identity && (
           <div className="mt-3">
             <div
-              className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+              className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
               style={{ color: identity.color }}
             >
               <WorkoutGlyph kind={identity.glyph} className="hito-calendar-type-glyph" />
-              <span>{identity.label}</span>
+              <span className="truncate">{identity.label}</span>
             </div>
           </div>
         )}

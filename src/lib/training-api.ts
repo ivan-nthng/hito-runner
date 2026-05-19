@@ -20,6 +20,18 @@ import {
 } from "@/lib/imported-plan";
 import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
 import {
+  applyImportedPlanForUser,
+  createAssignedPlanFromImportedSeed,
+  getActivePlan,
+  getExistingPlanContext,
+  getPlanWorkouts,
+  getResolvedPlanWorkoutsWithLogs,
+  rollbackInsertedPlan,
+  type PersistedPlanCycleRow,
+  type PersistedPlannedWorkoutRow,
+  type PersistedWorkoutLogRow,
+} from "@/lib/active-plan-persistence";
+import {
   generateCanonicalPlanFromText,
   type GeneratedPlanResult,
 } from "@/lib/openai-plan-authoring";
@@ -29,39 +41,17 @@ import type {
 } from "@/lib/plan-refresh-proposal";
 import type { RunnerCoachContext } from "@/lib/runner-coach-context";
 import {
-  buildStructuredFirstPlanAuthoringInput,
-  buildStructuredFirstPlanProfilePatch,
-  buildStructuredFirstPlanResultContext,
-  parseStructuredFirstPlanOnboardingInput,
-  type StructuredFirstPlanOnboardingInput,
-  type StructuredFirstPlanProfilePatch,
-} from "@/lib/structured-first-plan-onboarding";
-import {
   buildActivePlanExportPayload,
   buildPlanExportDocument,
   type PlanExportDocument,
 } from "@/lib/plan-export";
-import {
-  prepareImportedPlanApplyPolicy,
-  type FirstDayResolution,
-  type PlanApplyResult,
-  type PlanApplySuccessResult,
-  type PreparedPlanApplySuccess,
-} from "@/lib/plan-apply-policy";
+import { type FirstDayResolution, type PlanApplyResult } from "@/lib/plan-apply-policy";
 import {
   getPersistedUserIdForAuthContext,
   requirePersistedUserIdForCurrentRequest,
 } from "@/lib/request-persisted-user";
-import {
-  buildStructuredAuthoringPlan,
-  structuredPlanAuthoringInputSchema,
-} from "@/lib/structured-plan-authoring";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
-import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
-import {
-  buildImportedLogCarryForwardPlan,
-  buildPersistedWorkoutInsertRows,
-} from "@/lib/persisted-plan-replacement";
+import { buildImportedLogCarryForwardPlan } from "@/lib/persisted-plan-replacement";
 import { findLocalAuthAccountByUserId, isLocalAuthBypassEnabled } from "@/lib/local-auth";
 import {
   addDaysIso,
@@ -98,6 +88,14 @@ import {
   type WeekdayRestInvariant,
 } from "@/lib/weekday-rest-invariants";
 
+export {
+  completeStructuredFirstPlanOnboarding,
+  completeStructuredFirstPlanOnboardingForUser,
+  confirmVoiceToPlanDraft,
+  generateVoiceToPlanDraft,
+  type ConfirmVoiceToPlanDraftResult,
+} from "@/lib/first-plan-actions";
+
 export interface ViewerSummary {
   name: string | null;
   email: string | null;
@@ -115,9 +113,6 @@ export interface UserSettingsSummary {
   heightCm: number | null;
 }
 
-type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
-type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
-type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
 
 const loginInputSchema = z.object({
@@ -196,11 +191,6 @@ const onboardingInputSchema = z.object({
   requestedStartDate: requestedStartDateSchema.optional().nullable(),
 });
 
-const structuredOnboardingInputSchema = z.object({
-  authoringInput: structuredPlanAuthoringInputSchema,
-  firstDayResolution: firstDayResolutionSchema.optional().nullable(),
-});
-
 const emailOtpTypeSchema = z.enum([
   "signup",
   "invite",
@@ -214,8 +204,6 @@ const textAuthoringInputSchema = z.object({
   authoringText: z.string().trim().min(20).max(4000),
   firstDayResolution: firstDayResolutionSchema.optional().nullable(),
 });
-const voiceToPlanInputSchema = z.unknown();
-const voiceToPlanConfirmInputSchema = z.unknown();
 
 const bodyNoteSchema = z
   .object({
@@ -284,18 +272,6 @@ const userSettingsInputSchema = z.object({
   heightCm: z.number().min(0).max(300).nullable(),
 });
 
-type ExistingPlanContext = {
-  activePlan: PersistedPlanCycleRow | null;
-  existingWorkouts: {
-    workouts: PersistedPlannedWorkoutRow[];
-    logsByWorkoutId: Map<string, PersistedWorkoutLogRow>;
-  };
-};
-
-type PreparedImportedPlanApply = PreparedPlanApplySuccess & {
-  planContext: ExistingPlanContext;
-};
-
 export interface DeleteActivePlanResult {
   ok: true;
   status: "archived";
@@ -342,32 +318,6 @@ export type ApplyActivePlanRefreshProposalResult =
       ok: false;
       status: "blocked";
       reason: "invalid_refresh_plan";
-      message: string;
-    };
-
-export type ConfirmVoiceToPlanDraftResult =
-  | CapabilityLockedResponse
-  | {
-      ok: true;
-      status: "created";
-      effectiveStartDate: string;
-      appliedStartDate: string;
-      normalizedFromStartDate: string | null;
-      firstDayResolution: FirstDayResolution | null;
-      workoutCount: number;
-      schemaVersion: string;
-      sourceKind: string | undefined;
-      onboardingContract: "voice_to_plan_v1";
-      safety: {
-        requiresExplicitApply: false;
-        doesNotMutatePlan: false;
-        rawTranscriptPersisted: false;
-      };
-    }
-  | {
-      ok: false;
-      status: "blocked";
-      reason: "invalid_draft" | "active_plan_exists" | "apply_blocked";
       message: string;
     };
 
@@ -604,38 +554,6 @@ export const applyActivePlanRefreshProposal = createServerFn({ method: "POST" })
     return applyActivePlanRefreshProposalForUser(persistedUserId, data.proposal);
   });
 
-export const completeStructuredOnboarding = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => structuredOnboardingInputSchema.parse(value))
-  .handler(async ({ data }) => {
-    const generatedPlan = buildStructuredAuthoringPlan(data.authoringInput);
-    const applyResult = await persistImportedPlanForCurrentRequest(
-      generatedPlan,
-      data.firstDayResolution ?? null,
-    );
-
-    return applyResult.ok
-      ? {
-          ...applyResult,
-          schemaVersion: generatedPlan.schema_version,
-          sourceKind: generatedPlan.source_kind,
-          workoutCount: generatedPlan.planned_workouts.length,
-        }
-      : {
-          ...applyResult,
-          schemaVersion: generatedPlan.schema_version,
-          sourceKind: generatedPlan.source_kind,
-          workoutCount: generatedPlan.planned_workouts.length,
-        };
-  });
-
-export const completeStructuredFirstPlanOnboarding = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => parseStructuredFirstPlanOnboardingInput(value))
-  .handler(async ({ data }) => {
-    const userId = await requirePersistedUserIdForCurrentRequest();
-
-    return completeStructuredFirstPlanOnboardingForUser(userId, data);
-  });
-
 export const completeTextOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => textAuthoringInputSchema.parse(value))
   .handler(async ({ data }) => {
@@ -663,98 +581,6 @@ export const completeTextOnboarding = createServerFn({ method: "POST" })
           responseId: generatedPlan.responseId,
           importedPlan: generatedPlan.canonicalPlan,
         };
-  });
-
-export const generateVoiceToPlanDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => voiceToPlanInputSchema.parse(value))
-  .handler(async ({ data }): Promise<VoiceToPlanDraftResult> => {
-    const userId = await requirePersistedUserIdForCurrentRequest();
-    const { generateVoiceToPlanDraftForUser } = await import("@/lib/voice-to-plan-authoring");
-
-    return generateVoiceToPlanDraftForUser({
-      userId,
-      request: data,
-    });
-  });
-
-export const confirmVoiceToPlanDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => voiceToPlanConfirmInputSchema.parse(value))
-  .handler(async ({ data }): Promise<ConfirmVoiceToPlanDraftResult> => {
-    const userId = await requirePersistedUserIdForCurrentRequest();
-    const { checkRunnerCapability, capabilityLockedResponse } =
-      await import("@/lib/entitlements/check-runner-capability");
-    const capabilityCheck = await checkRunnerCapability({
-      userId,
-      capabilityKey: "voice_to_plan",
-    });
-
-    if (!capabilityCheck.allowed) {
-      return capabilityLockedResponse(capabilityCheck);
-    }
-
-    const activePlan = await getActivePlan(userId);
-
-    if (activePlan) {
-      return {
-        ok: false,
-        status: "blocked",
-        reason: "active_plan_exists",
-        message:
-          "Voice-to-plan can create a first plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
-      };
-    }
-
-    const { parseVoiceToPlanConfirmRequest } = await import("@/lib/voice-to-plan-authoring");
-    const parsed = parseVoiceToPlanConfirmRequest(data);
-
-    if (!parsed.ok) {
-      return {
-        ok: false,
-        status: "blocked",
-        reason: parsed.reason,
-        message: parsed.message,
-      };
-    }
-
-    try {
-      const applyResult = await applyImportedPlanForUser(
-        userId,
-        parsed.canonicalPlan,
-        null,
-        null,
-        parsed.profilePatch,
-      );
-
-      if (!applyResult.ok) {
-        return {
-          ok: false,
-          status: "blocked",
-          reason: "apply_blocked",
-          message: "This voice draft needs review before it can create a plan.",
-        };
-      }
-
-      return {
-        ...applyResult,
-        status: "created",
-        schemaVersion: parsed.canonicalPlan.schema_version,
-        sourceKind: parsed.canonicalPlan.source_kind,
-        onboardingContract: "voice_to_plan_v1",
-        safety: {
-          requiresExplicitApply: false,
-          doesNotMutatePlan: false,
-          rawTranscriptPersisted: false,
-        },
-      };
-    } catch {
-      return {
-        ok: false,
-        status: "blocked",
-        reason: "invalid_draft",
-        message:
-          "This voice draft is no longer valid. Generate a fresh review before creating a plan.",
-      };
-    }
   });
 
 export const saveWorkoutLog = createServerFn({ method: "POST" })
@@ -846,68 +672,6 @@ async function persistImportedPlanForCurrentRequest(
     firstDayResolution,
     requestedStartDate,
   );
-}
-
-export async function applyImportedPlanForUser(
-  userId: string,
-  importedPlan: ImportedPlanInput,
-  firstDayResolution: FirstDayResolution | null,
-  requestedStartDate: string | null = null,
-  profilePatch: StructuredFirstPlanProfilePatch | null = null,
-): Promise<PlanApplyResult> {
-  const preparedApply = await prepareImportedPlanApply(
-    userId,
-    importedPlan,
-    firstDayResolution,
-    requestedStartDate,
-  );
-
-  if ("ok" in preparedApply && !preparedApply.ok) {
-    return preparedApply;
-  }
-
-  await upsertRunnerProfile(userId, preparedApply.importedSeed.profile, profilePatch);
-  await replaceActivePlanWithImportedInput(userId, preparedApply, preparedApply.planContext);
-
-  return preparedApply.result;
-}
-
-export async function completeStructuredFirstPlanOnboardingForUser(
-  userId: string,
-  input: StructuredFirstPlanOnboardingInput,
-) {
-  try {
-    const authoringInput = buildStructuredFirstPlanAuthoringInput(input);
-    const generatedPlan = buildStructuredAuthoringPlan(authoringInput);
-    const profilePatch = buildStructuredFirstPlanProfilePatch(input);
-    const applyResult = await applyImportedPlanForUser(
-      userId,
-      generatedPlan,
-      null,
-      null,
-      profilePatch,
-    );
-
-    return applyResult.ok
-      ? {
-          ...applyResult,
-          schemaVersion: generatedPlan.schema_version,
-          sourceKind: generatedPlan.source_kind,
-          workoutCount: generatedPlan.planned_workouts.length,
-          onboardingContract: "structured_first_plan_onboarding_v1" as const,
-          generationContext: buildStructuredFirstPlanResultContext(input),
-        }
-      : {
-          ...applyResult,
-          schemaVersion: generatedPlan.schema_version,
-          sourceKind: generatedPlan.source_kind,
-          workoutCount: generatedPlan.planned_workouts.length,
-          onboardingContract: "structured_first_plan_onboarding_v1" as const,
-          generationContext: buildStructuredFirstPlanResultContext(input),
-        };
-  } catch (error) {
-    throw new Error(mapStructuredFirstPlanOnboardingError(error));
-  }
 }
 
 export async function archiveActivePlanForUser(userId: string): Promise<DeleteActivePlanResult> {
@@ -1981,281 +1745,16 @@ async function updateUserSettingsForUserId(
 
 async function getLatestWorkoutResultFeedbackForServer(plannedWorkoutId: string) {
   const { getLatestWorkoutResultFeedback } =
-    await import("@/lib/workout-result-import/ingest-garmin-result");
+    await import("@/lib/workout-result-import/read-workout-result-feedback");
 
   return getLatestWorkoutResultFeedback(plannedWorkoutId);
 }
 
 async function getWorkoutFeedbackMarkerMapForServer(plannedWorkoutIds: string[]) {
   const { getWorkoutFeedbackMarkerMap } =
-    await import("@/lib/workout-result-import/ingest-garmin-result");
+    await import("@/lib/workout-result-import/read-workout-result-feedback");
 
   return getWorkoutFeedbackMarkerMap(plannedWorkoutIds);
-}
-
-async function getActivePlan(userId: string) {
-  const supabase = createAdminSupabaseClient();
-  const existing = await supabase
-    .from("plan_cycles")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existing.error) {
-    throw new Error(existing.error.message);
-  }
-
-  return existing.data;
-}
-
-async function createAssignedPlanFromImportedSeed(
-  userId: string,
-  importedSeed: ImportedPlanSeed,
-  status: PersistedPlanCycleRow["status"] = "active",
-) {
-  const supabase = createAdminSupabaseClient();
-  const planInsert = await supabase
-    .from("plan_cycles")
-    .insert({
-      user_id: userId,
-      status,
-      title: importedSeed.title,
-      goal_summary: importedSeed.goalSummary,
-      source_template: importedSeed.sourceTemplate,
-      schema_version: importedSeed.schemaVersion,
-      source_kind: importedSeed.sourceKind,
-      start_date: importedSeed.startDate,
-      end_date: importedSeed.endDate,
-      target_date: importedSeed.targetDate,
-      goal_metadata: importedSeed.goalMetadata,
-      plan_preferences: importedSeed.planPreferences,
-    })
-    .select("*")
-    .single();
-
-  if (planInsert.error) {
-    throw new Error(planInsert.error.message);
-  }
-
-  const workoutInsert = await supabase
-    .from("planned_workouts")
-    .insert(buildPersistedWorkoutInsertRows(planInsert.data.id, userId, importedSeed.workouts))
-    .select("*");
-
-  if (workoutInsert.error) {
-    throw new Error(workoutInsert.error.message);
-  }
-
-  return {
-    planCycle: planInsert.data,
-    workouts: workoutInsert.data,
-  };
-}
-
-async function replaceActivePlanWithImportedInput(
-  userId: string,
-  preparedApply: PreparedPlanApplySuccess,
-  planContext: ExistingPlanContext,
-) {
-  const supabase = createAdminSupabaseClient();
-  const { importedSeed, preservationPlan } = preparedApply;
-  const insertedPlan = await createAssignedPlanFromImportedSeed(
-    userId,
-    importedSeed,
-    planContext.activePlan ? "archived" : "active",
-  );
-  const insertedWorkoutsByDate = new Map(
-    insertedPlan.workouts.map((workout) => [workout.workout_date, workout]),
-  );
-
-  if (preservationPlan.logs.length > 0) {
-    const copiedLogs = preservationPlan.logs.map(({ log, workoutDate }) => {
-      const nextWorkout = insertedWorkoutsByDate.get(workoutDate);
-
-      if (!nextWorkout) {
-        throw new Error(
-          `Imported plan replacement lost the inserted workout for ${workoutDate}. Current plan is unchanged.`,
-        );
-      }
-
-      return {
-        planned_workout_id: nextWorkout.id,
-        user_id: userId,
-        outcome: log.outcome,
-        actual_distance_km: log.actual_distance_km,
-        actual_duration_min: log.actual_duration_min,
-        rpe: log.rpe,
-        notes: log.notes,
-        intervals_completed: log.intervals_completed,
-        logged_at: log.logged_at,
-        updated_at: log.updated_at,
-      };
-    });
-
-    const logInsert = await supabase.from("workout_logs").insert(copiedLogs);
-
-    if (logInsert.error) {
-      await rollbackInsertedPlan(insertedPlan.planCycle.id);
-      throw new Error(logInsert.error.message);
-    }
-  }
-
-  if (!planContext.activePlan) {
-    return insertedPlan.planCycle;
-  }
-
-  const archiveExisting = await supabase
-    .from("plan_cycles")
-    .update({ status: "archived" })
-    .eq("id", planContext.activePlan.id)
-    .eq("status", "active");
-
-  if (archiveExisting.error) {
-    await rollbackInsertedPlan(insertedPlan.planCycle.id);
-    throw new Error(archiveExisting.error.message);
-  }
-
-  const activateInserted = await supabase
-    .from("plan_cycles")
-    .update({ status: "active" })
-    .eq("id", insertedPlan.planCycle.id)
-    .eq("status", "archived")
-    .select("*")
-    .single();
-
-  if (activateInserted.error) {
-    await supabase
-      .from("plan_cycles")
-      .update({ status: "active" })
-      .eq("id", planContext.activePlan.id);
-    await rollbackInsertedPlan(insertedPlan.planCycle.id);
-    throw new Error(activateInserted.error.message);
-  }
-
-  const deletePreviousPlan = await supabase
-    .from("plan_cycles")
-    .delete()
-    .eq("id", planContext.activePlan.id);
-
-  if (deletePreviousPlan.error) {
-    throw new Error(deletePreviousPlan.error.message);
-  }
-
-  return activateInserted.data;
-}
-
-async function prepareImportedPlanApply(
-  userId: string,
-  importedPlan: ImportedPlanInput,
-  firstDayResolution: FirstDayResolution | null,
-  requestedStartDate: string | null,
-): Promise<PreparedImportedPlanApply> {
-  const planContext = await getExistingPlanContext(userId);
-  const policyResult = prepareImportedPlanApplyPolicy(
-    importedPlan,
-    planContext.existingWorkouts,
-    firstDayResolution,
-    requestedStartDate,
-    todayIso(),
-    planContext.activePlan?.plan_preferences ?? null,
-  );
-
-  return {
-    result: policyResult.result,
-    importedSeed: policyResult.importedSeed,
-    planContext,
-    preservationPlan: policyResult.preservationPlan,
-  };
-}
-
-async function getExistingPlanContext(userId: string): Promise<ExistingPlanContext> {
-  const activePlan = await getActivePlan(userId);
-
-  return {
-    activePlan,
-    existingWorkouts: activePlan
-      ? await getResolvedPlanWorkoutsWithLogs(userId, activePlan)
-      : {
-          workouts: [] as PersistedPlannedWorkoutRow[],
-          logsByWorkoutId: new Map<string, PersistedWorkoutLogRow>(),
-        },
-  };
-}
-
-async function upsertRunnerProfile(
-  userId: string,
-  profile: RunnerProfileSummary,
-  profilePatch: StructuredFirstPlanProfilePatch | null = null,
-) {
-  const supabase = createAdminSupabaseClient();
-  const baselineNotes = profilePatch ? profilePatch.baselineNotes : (profile.baselineNotes ?? null);
-  const profileUpsert = await supabase
-    .from("runner_profiles")
-    .upsert({
-      user_id: userId,
-      goal_type: profile.goalType,
-      goal_label: profile.goalLabel,
-      baseline_sessions_per_week: profile.baselineSessionsPerWeek,
-      baseline_long_run_km: profile.baselineLongRunKm,
-      baseline_notes: baselineNotes,
-      ...(profilePatch
-        ? {
-            age: profilePatch.age,
-            weight_kg: profilePatch.weightKg,
-            height_cm: profilePatch.heightCm,
-          }
-        : {}),
-      setup_state: "completed",
-    })
-    .select("user_id")
-    .single();
-
-  if (profileUpsert.error) {
-    throw new Error(profileUpsert.error.message);
-  }
-}
-
-function mapStructuredFirstPlanOnboardingError(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-
-  if (
-    /running days per week|fixed rest days|available running day|allowed training day/i.test(
-      message,
-    )
-  ) {
-    return "Choose running days and fixed rest days that can fit together.";
-  }
-
-  if (
-    /profile\.age|\bage\b|profile\.weightKg|\bweight\b|profile\.heightCm|\bheight\b/i.test(message)
-  ) {
-    return "Enter age, weight, and height within the supported ranges before creating the plan.";
-  }
-
-  if (/goalDistance|goal distance/i.test(message)) {
-    return "Choose a supported goal distance.";
-  }
-
-  if (/target date|at least 7 days|calendar date/i.test(message)) {
-    return "Choose a target date that is valid and at least 7 days from the plan start.";
-  }
-
-  if (/target time|recent 5k|pace|time like/i.test(message)) {
-    return "Check the benchmark or target time format before creating the plan.";
-  }
-
-  if (/terrain/i.test(message)) {
-    return "Choose a supported terrain focus: standard, rolling, or mountain.";
-  }
-
-  if (/Fixed rest-day|fixed rest day|blocked/i.test(message)) {
-    return "This setup would place training on a fixed rest day. Adjust the rest days or running days and try again.";
-  }
-
-  return "We could not create a plan from these setup answers. Check the details and try again.";
 }
 
 function dbWorkoutToView(
@@ -2416,187 +1915,4 @@ function parseEmailOtpType(value: string | null): EmailOtpType | null {
 
   const parsed = emailOtpTypeSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
-}
-
-async function getPlanWorkoutsWithLogs(planCycleId: string) {
-  const workouts = await getPlanWorkouts(planCycleId);
-  const supabase = createAdminSupabaseClient();
-  const workoutIds = workouts.map((workout) => workout.id);
-  const logsResult = workoutIds.length
-    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", workoutIds)
-    : { data: [], error: null };
-
-  if (logsResult.error) {
-    throw new Error(logsResult.error.message);
-  }
-
-  return {
-    workouts,
-    logsByWorkoutId: new Map(logsResult.data.map((log) => [log.planned_workout_id, log])),
-  };
-}
-
-async function getPlanWorkouts(planCycleId: string) {
-  const supabase = createAdminSupabaseClient();
-  const workoutsResult = await supabase
-    .from("planned_workouts")
-    .select("*")
-    .eq("plan_cycle_id", planCycleId)
-    .order("workout_date", { ascending: true })
-    .order("display_order", { ascending: true });
-
-  if (workoutsResult.error) {
-    throw new Error(workoutsResult.error.message);
-  }
-
-  return workoutsResult.data;
-}
-
-async function getResolvedPlanWorkoutsWithLogs(userId: string, planCycle: PersistedPlanCycleRow) {
-  const direct = await getPlanWorkoutsWithLogs(planCycle.id);
-  const recovered = await recoverArchivedLogsOntoActivePlan(userId, planCycle, direct);
-
-  if (!recovered) {
-    return direct;
-  }
-
-  return getPlanWorkoutsWithLogs(planCycle.id);
-}
-
-async function recoverArchivedLogsOntoActivePlan(
-  userId: string,
-  activePlan: PersistedPlanCycleRow,
-  direct: {
-    workouts: PersistedPlannedWorkoutRow[];
-    logsByWorkoutId: Map<string, PersistedWorkoutLogRow>;
-  },
-) {
-  const unresolvedDates = direct.workouts
-    .filter((workout) => workout.workout_type !== "rest" && !direct.logsByWorkoutId.has(workout.id))
-    .map((workout) => workout.workout_date);
-
-  if (unresolvedDates.length === 0) {
-    return false;
-  }
-
-  const supabase = createAdminSupabaseClient();
-  const archivedPlansResult = await supabase
-    .from("plan_cycles")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("status", "archived")
-    .eq("title", activePlan.title)
-    .eq("start_date", activePlan.start_date)
-    .eq("end_date", activePlan.end_date)
-    .eq("source_template", activePlan.source_template)
-    .order("created_at", { ascending: false });
-
-  if (archivedPlansResult.error) {
-    throw new Error(archivedPlansResult.error.message);
-  }
-
-  if (archivedPlansResult.data.length === 0) {
-    return false;
-  }
-
-  const planOrder = new Map(archivedPlansResult.data.map((plan, index) => [plan.id, index]));
-  const archivedPlanIds = archivedPlansResult.data.map((plan) => plan.id);
-  const archivedWorkoutsResult = await supabase
-    .from("planned_workouts")
-    .select("*")
-    .in("plan_cycle_id", archivedPlanIds)
-    .in("workout_date", unresolvedDates)
-    .order("workout_date", { ascending: true })
-    .order("display_order", { ascending: true });
-
-  if (archivedWorkoutsResult.error) {
-    throw new Error(archivedWorkoutsResult.error.message);
-  }
-
-  const archivedWorkoutIds = archivedWorkoutsResult.data.map((workout) => workout.id);
-  const archivedLogsResult = archivedWorkoutIds.length
-    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", archivedWorkoutIds)
-    : { data: [], error: null };
-
-  if (archivedLogsResult.error) {
-    throw new Error(archivedLogsResult.error.message);
-  }
-
-  const archivedLogsByWorkoutId = new Map(
-    archivedLogsResult.data.map((log) => [log.planned_workout_id, log]),
-  );
-  const archivedCandidatesByDate = new Map<
-    string,
-    Array<{
-      planOrder: number;
-      workout: PersistedPlannedWorkoutRow;
-      log: PersistedWorkoutLogRow;
-    }>
-  >();
-
-  for (const workout of archivedWorkoutsResult.data) {
-    const log = archivedLogsByWorkoutId.get(workout.id);
-
-    if (!log) {
-      continue;
-    }
-
-    const entries = archivedCandidatesByDate.get(workout.workout_date) ?? [];
-    entries.push({
-      planOrder: planOrder.get(workout.plan_cycle_id) ?? Number.MAX_SAFE_INTEGER,
-      workout,
-      log,
-    });
-    archivedCandidatesByDate.set(workout.workout_date, entries);
-  }
-
-  const recoveredLogs = direct.workouts.flatMap((activeWorkout) => {
-    if (activeWorkout.workout_type === "rest" || direct.logsByWorkoutId.has(activeWorkout.id)) {
-      return [];
-    }
-
-    const candidates = archivedCandidatesByDate.get(activeWorkout.workout_date) ?? [];
-    const matched = candidates
-      .slice()
-      .sort((left, right) => left.planOrder - right.planOrder)
-      .find((candidate) => candidate.workout.workout_date === activeWorkout.workout_date);
-
-    if (!matched) {
-      return [];
-    }
-
-    return [
-      {
-        planned_workout_id: activeWorkout.id,
-        user_id: userId,
-        outcome: matched.log.outcome,
-        actual_distance_km: matched.log.actual_distance_km,
-        actual_duration_min: matched.log.actual_duration_min,
-        rpe: matched.log.rpe,
-        notes: matched.log.notes,
-        intervals_completed: matched.log.intervals_completed,
-        logged_at: matched.log.logged_at,
-        updated_at: matched.log.updated_at,
-      },
-    ];
-  });
-
-  if (recoveredLogs.length === 0) {
-    return false;
-  }
-
-  const recoveredInsert = await supabase.from("workout_logs").upsert(recoveredLogs, {
-    onConflict: "planned_workout_id",
-  });
-
-  if (recoveredInsert.error) {
-    throw new Error(recoveredInsert.error.message);
-  }
-
-  return true;
-}
-
-async function rollbackInsertedPlan(planCycleId: string) {
-  const supabase = createAdminSupabaseClient();
-  await supabase.from("plan_cycles").delete().eq("id", planCycleId);
 }

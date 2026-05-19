@@ -4,6 +4,9 @@ Completed implementation history only.
 
 ## 2026-05-18
 
+- Removed dead first-plan compatibility seams from `training-api.ts`, collapsed duplicated structured/voice first-plan helper logic into `src/lib/first-plan-authoring-utils.ts`, and split Garmin feedback readback into a non-ingest server module so shared route data no longer pulls Node-only FIT/ZIP dependencies into the browser build.
+- Extracted shared imported-plan apply and active-plan persistence primitives into `src/lib/active-plan-persistence.ts`, so `first-plan-actions.ts` no longer dynamically imports back into `training-api.ts` while compatibility exports and sequential apply behavior remain unchanged.
+- Extracted first-plan server-action ownership from `training-api.ts` into `src/lib/first-plan-actions.ts`, keeping compatibility re-exports for the structured constructor and Dictate-to-Plan draft/confirm actions while preserving the sequential canonical generation/apply path.
 - Refined Dictate-to-Plan into a compact Pro `AI setup` assist above the manual structured constructor: runners paste/type transcript text, review a clearer non-mutating setup verdict, and create only through explicit `Yes, create plan`, while Advanced JSON remains demoted.
 - Fixed the real Dictate-to-Plan style-mismatch assumption path so explicit transcript cues such as `balanced 10K` are compared before structured constructor supplement defaults; a reviewed `Relaxed 10K` draft now carries an explicit style-change assumption instead of silently changing the runner's requested style.
 - Refactored no-plan onboarding frontend ownership without changing behavior: `OnboardingGate` now orchestrates state/actions while focused onboarding modules own the structured constructor UI, Dictate-to-Plan review UI, Advanced JSON panel, and shared constructor/voice form model.

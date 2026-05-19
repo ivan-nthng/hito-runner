@@ -34,6 +34,9 @@ export interface StructuredConstructorState {
   comment: string;
 }
 
+export const ONBOARDING_TEXTAREA_CLASS =
+  "hito-field hito-field-secondary hito-textarea-md resize-none";
+
 export const WEEKDAY_OPTIONS: { value: WeekdayName; label: string }[] = [
   { value: "Monday", label: "Mon" },
   { value: "Tuesday", label: "Tue" },

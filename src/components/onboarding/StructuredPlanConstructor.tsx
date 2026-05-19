@@ -1,10 +1,19 @@
-import type { Dispatch, FormEvent, ReactNode, RefObject, SetStateAction } from "react";
+import {
+  useEffect,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type ReactNode,
+  type RefObject,
+  type SetStateAction,
+} from "react";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import {
   BENCHMARK_OPTIONS,
   GOAL_DISTANCE_OPTIONS,
   GOAL_STYLE_OPTIONS,
+  ONBOARDING_TEXTAREA_CLASS,
   STRENGTH_OPTIONS,
   TERRAIN_OPTIONS,
   WEEKDAY_OPTIONS,
@@ -81,49 +90,42 @@ export function StructuredPlanConstructor({
         title="Profile basics"
         body="Required for first-plan generation. These are the only profile fields saved from this constructor."
       >
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Age">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={13}
-              max={100}
-              step={1}
-              required
-              value={state.age}
-              onChange={(event) => setState.setAge(event.target.value)}
-              placeholder="34"
-              className="hito-field hito-field-primary hito-field-md"
-            />
-          </Field>
-          <Field label="Weight">
-            <input
-              type="number"
-              inputMode="decimal"
-              min={30}
-              max={250}
-              step={0.5}
-              required
-              value={state.weightKg}
-              onChange={(event) => setState.setWeightKg(event.target.value)}
-              placeholder="72.0"
-              className="hito-field hito-field-primary hito-field-md"
-            />
-          </Field>
-          <Field label="Height">
-            <input
-              type="number"
-              inputMode="numeric"
-              min={120}
-              max={230}
-              step={1}
-              required
-              value={state.heightCm}
-              onChange={(event) => setState.setHeightCm(event.target.value)}
-              placeholder="178"
-              className="hito-field hito-field-primary hito-field-md"
-            />
-          </Field>
+        <div className="grid gap-2">
+          <ProfileBasicControl
+            label="Age"
+            addLabel="Add age"
+            value={state.age}
+            setValue={setState.setAge}
+            placeholder="34"
+            min={13}
+            max={100}
+            step={1}
+            inputMode="numeric"
+          />
+          <ProfileBasicControl
+            label="Weight"
+            addLabel="Add weight"
+            value={state.weightKg}
+            setValue={setState.setWeightKg}
+            placeholder="72"
+            min={30}
+            max={250}
+            step={0.5}
+            inputMode="decimal"
+            unit="kg"
+          />
+          <ProfileBasicControl
+            label="Height"
+            addLabel="Add height"
+            value={state.heightCm}
+            setValue={setState.setHeightCm}
+            placeholder="178"
+            min={120}
+            max={230}
+            step={1}
+            inputMode="numeric"
+            unit="cm"
+          />
         </div>
       </ConstructorSection>
 
@@ -196,7 +198,7 @@ export function StructuredPlanConstructor({
                   }}
                   className={cn(
                     "hito-button hito-button-xs min-w-0 px-0",
-                    active ? "hito-button-primary" : "hito-button-ghost",
+                    active ? "hito-button-primary" : "hito-button-secondary",
                   )}
                   aria-pressed={active}
                   aria-label={`${weekday.value}${active ? " fixed rest day" : ""}`}
@@ -331,7 +333,7 @@ export function StructuredPlanConstructor({
             value={state.comment}
             onChange={(event) => setState.setComment(event.target.value)}
             placeholder="Right knee discomfort, avoid intensity, prefer mornings, conservative plan..."
-            className="hito-field hito-field-secondary hito-textarea-md resize-y"
+            className={ONBOARDING_TEXTAREA_CLASS}
           />
         </label>
       </ConstructorSection>
@@ -405,6 +407,143 @@ export function Field({
       {helper ? <span className="hito-field-helper">{helper}</span> : null}
     </div>
   );
+}
+
+function ProfileBasicControl({
+  label,
+  addLabel,
+  value,
+  setValue,
+  placeholder,
+  min,
+  max,
+  step,
+  inputMode,
+  unit,
+}: {
+  label: string;
+  addLabel: string;
+  value: string;
+  setValue: (value: string) => void;
+  placeholder: string;
+  min: number;
+  max: number;
+  step: number;
+  inputMode: "numeric" | "decimal";
+  unit?: string;
+}) {
+  const hasSavedValue = isProfileBasicValueValid(value, { min, max, step });
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftValue, setDraftValue] = useState(value);
+  const canSave = isProfileBasicValueValid(draftValue, { min, max, step });
+
+  useEffect(() => {
+    setDraftValue(value);
+    setIsEditing(Boolean(value.trim()) && !isProfileBasicValueValid(value, { min, max, step }));
+  }, [max, min, step, value]);
+
+  if (!isEditing) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setDraftValue(value);
+          setIsEditing(true);
+        }}
+        className={cn(
+          "hito-button hito-button-sm group min-h-9 w-full justify-between text-left",
+          hasSavedValue ? "hito-button-secondary" : "hito-button-outlined",
+        )}
+      >
+        <span className="flex min-w-0 items-baseline gap-2">
+          {hasSavedValue ? (
+            <>
+              <span className="hito-form-label shrink-0">{label}</span>
+              <span className="truncate font-mono-num">
+                {value}
+                {unit ? ` ${unit}` : ""}
+              </span>
+            </>
+          ) : (
+            <span>{addLabel}</span>
+          )}
+        </span>
+        <Icon
+          name={hasSavedValue ? "edit" : "plus"}
+          size="sm"
+          className={cn(
+            "transition-opacity",
+            hasSavedValue && "opacity-55 group-hover:opacity-100",
+          )}
+        />
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <label className="hito-form-label w-16 shrink-0" htmlFor={`profile-${label.toLowerCase()}`}>
+        {label}
+      </label>
+      <input
+        id={`profile-${label.toLowerCase()}`}
+        type="number"
+        inputMode={inputMode}
+        min={min}
+        max={max}
+        step={step}
+        required
+        value={draftValue}
+        onChange={(event) => setDraftValue(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && canSave) {
+            event.preventDefault();
+            setValue(draftValue.trim());
+            setIsEditing(false);
+          }
+        }}
+        placeholder={placeholder}
+        className="hito-field hito-field-secondary hito-field-sm min-w-[7rem] flex-1"
+      />
+      <button
+        type="button"
+        disabled={!canSave}
+        onClick={() => {
+          setValue(draftValue.trim());
+          setIsEditing(false);
+        }}
+        className="hito-button hito-button-primary hito-button-sm aspect-square p-0"
+        aria-label={`Save ${label.toLowerCase()}`}
+      >
+        <Icon name="check" size="sm" />
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setDraftValue(value);
+          setIsEditing(false);
+        }}
+        className="hito-button hito-button-ghost hito-button-sm aspect-square p-0"
+        aria-label={`Cancel ${label.toLowerCase()} edit`}
+      >
+        <Icon name="close" size="sm" />
+      </button>
+    </div>
+  );
+}
+
+function isProfileBasicValueValid(
+  rawValue: string,
+  { min, max, step }: { min: number; max: number; step: number },
+) {
+  const value = Number(rawValue);
+
+  if (!rawValue.trim() || !Number.isFinite(value) || value < min || value > max) {
+    return false;
+  }
+
+  const nearestStep = Math.round(value / step) * step;
+  return Math.abs(nearestStep - value) < 0.000001;
 }
 
 function OptionGrid({ children }: { children: ReactNode }) {

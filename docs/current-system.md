@@ -57,7 +57,16 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, structured first-plan onboarding, transcript-backed voice-to-plan draft generation, text compatibility onboarding, advanced JSON import, internal structured authoring, and workout logging; the email sign-in path now requests PKCE-oriented Supabase links and the callback accepts either an auth code or an email token hash before writing the cookie-backed session
+  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text compatibility onboarding, advanced JSON import, saved-mode lifecycle work, active-plan refresh orchestration, and workout logging; it re-exports the first-plan action names for compatibility, but no longer owns their implementation bodies
+- `src/lib/first-plan-actions.ts`
+  owns the first-plan server-action layer for the structured constructor and transcript-backed voice-to-plan path:
+  `completeStructuredFirstPlanOnboarding`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public imports through `training-api.ts`; the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
+- `src/lib/active-plan-persistence.ts`
+  owns the shared imported-plan apply and active-plan persistence primitives used by first-plan creation and saved-mode flows:
+  `applyImportedPlanForUser`, active-plan lookup, planned-workout/log readback with archived-log recovery, assigned-plan insertion, profile upsert during apply, and rollback of inserted plans now live there so first-plan actions no longer depend backward on `training-api.ts`
+- `src/lib/first-plan-authoring-utils.ts`
+  owns the small shared first-plan authoring helper layer used by structured onboarding and Dictate-to-Plan:
+  bounded goal distance/style/terrain values, weekday de-duplication and long-run/day spreading helpers, goal label formatting, and duration/pace parsing live there instead of being duplicated across first-plan modules
 - `src/lib/structured-first-plan-onboarding.ts`
   owns the backend contract for the structured first-plan constructor:
   required age, weight, and height profile basics, one bounded 5K benchmark mode, `runningDaysPerWeek`, `fixedRestDays`, goal distance/style/conditional terrain, bounded strength preference, and an optional supporting comment
@@ -120,7 +129,7 @@
   recent 5K time or pace is used only as generation context to derive broad pace ranges for generated warmups, easy/long/steady/tempo/interval work, recovery, cooldown, and hill-oriented segments; unknown benchmark keeps effort/cue fallbacks, and HR ranges are not invented without real HR-zone truth
 - the visible constructor now derives its hidden `runningDaysPerWeek` value conservatively from fixed rest-day availability, capped at four running days and never exceeding available weekdays, so the primary UI asks for fixed rest days without becoming a schedule editor
 - advanced JSON import remains available inside onboarding as a demoted fallback path for existing Hito plan files, migration, and testing
-- structured first-plan onboarding, advanced JSON import, backend text compatibility authoring, and internal structured authoring all create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
+- structured first-plan onboarding, advanced JSON import, and backend text compatibility authoring all create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
 - canonical apply-time start normalization now lives in [src/lib/plan-apply-policy.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-apply-policy.ts):
   explicit future `start_date` is preserved, while past or non-future `start_date` normalizes to `today` before persistence
 - saved-mode JSON import now collects an explicit start day in the visible saved-mode import surfaces and passes it as backend-owned `requestedStartDate`; when present, that date becomes the effective apply authority, the imported JSON `start_date` remains source metadata, and the imported workout sequence is shifted as one block around the chosen date
@@ -237,6 +246,8 @@
   generated runner-facing text passes through a small backend quality gate before persistence, so malformed fragments or non-English artifacts fall back to stable deterministic copy instead of surfacing in `Feedback`
   `garmin_ai_interpretation` entitlement gates only this AI insight generation step; Garmin upload, parsing, normalized actual metrics, deterministic comparison, and feedback persistence stay available when AI interpretation is locked
 - current workout-detail `Feedback` readback now exposes the latest Garmin asset, latest normalized actual metrics, latest deterministic comparison, and latest bounded AI interpretation in a dedicated evidence surface separate from manual completion logging
+- Garmin feedback readback now lives outside the Node-only FIT/ZIP ingest module:
+  `src/lib/workout-result-import/read-workout-result-feedback.ts` owns latest-feedback and calendar-marker read queries, while `src/lib/workout-result-import/ingest-garmin-result.ts` remains the server-only upload, storage, extraction, parsing, comparison, and AI-interpretation write path
 - that `Feedback` surface now uses a flatter divided layout with plain-language section framing:
   upload explains why it helps
   attached Garmin evidence now shows the live file state and supports explicit removal through the same saved-mode seam

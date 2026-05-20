@@ -128,9 +128,30 @@ Checklist
 - [x] Reduce `training-api.ts` to a narrower route/data hub
   - active-plan export actions moved to `src/lib/active-plan-export-actions.ts`
   - active-plan lifecycle actions moved to `src/lib/active-plan-lifecycle-actions.ts`
+    with public delete/clear server-action wrappers now bound top-level in `training-api.ts` for TanStack request-auth compatibility
   - user-settings actions moved to `src/lib/user-settings-actions.ts`
+  - active-plan refresh actions moved to `src/lib/active-plan-refresh-actions.ts`
+  - plan-replacement actions moved to `src/lib/plan-replacement-actions.ts`
 - [ ] Split `PlanManagementDialog.tsx` by product responsibility
+  - [x] First bounded frontend slice:
+        exported the saved-mode `Open plan` export dropdown UI into `src/components/plan-management/PlanExportMenu.tsx` while leaving export actions, status, errors, and iframe download orchestration in the parent dialog.
+  - [x] Second bounded frontend slice:
+        exported the refresh proposal prompt/review UI into `src/components/plan-management/PlanRefreshPanel.tsx` while leaving proposal generation, apply calls, refresh state, stale/error handling, and success navigation in the parent dialog.
+  - [x] Third bounded frontend slice:
+        exported the advanced JSON import UI into `src/components/plan-management/PlanImportPanel.tsx` while leaving imported-plan validation, file-read state updates, import/apply server calls, clear-before-import sequencing, and success/failure navigation in the parent dialog.
+  - [x] Fourth bounded frontend slice:
+        exported the clear-upcoming and delete/archive lifecycle controls into `src/components/plan-management/PlanLifecycleControls.tsx` while leaving confirmation state, lifecycle action calls, status/error handling, and success navigation in the parent dialog.
+  - [x] Fifth bounded frontend slice:
+        exported the text-based replacement UI into `src/components/plan-management/PlanTextReplacementPanel.tsx` while leaving prompt state, minimum-length validation, `completeTextOnboarding` server calls, replacement status/errors, and success navigation in the parent dialog.
+  - [x] Sixth bounded frontend slice:
+        exported the active-plan summary/header UI into `src/components/plan-management/PlanSummaryHeader.tsx` while leaving export status/errors, export download orchestration, timers, reset behavior, and server-action calls in the parent dialog.
+  - [ ] Next candidate:
+        decide whether the remaining parent should stay as the modal orchestrator or be considered complete for this phase.
 - [ ] Split `CompletionPanel.tsx` by feedback/logging/body-note sections
+  - [x] First bounded frontend slice:
+        exported the workout-scoped body-note summary/modal editor UI into `src/components/workout-completion/BodyNotesEditor.tsx` while leaving completion form state, workout-log save payload construction, `saveWorkoutLog`, route invalidation, Garmin upload/remove, and feedback/readback orchestration in the parent panel.
+  - [ ] Next candidate:
+        extract one non-mutating Feedback readback/upload presentation slice while keeping Garmin mutations and AI/readback state in the parent.
 - [ ] Collapse duplicated JSON import validation/paste flow
 - [ ] Further reduce `voice-to-plan-authoring.ts` into bounded submodules
 - [ ] Recheck `imported-plan.ts` for contract-vs-normalization-vs-summary split
@@ -275,8 +296,12 @@ Recommended extraction candidates
 
 - settings/account route mutations and summary types — completed through `src/lib/user-settings-actions.ts`
 - export helpers and export server action glue — completed through `src/lib/active-plan-export-actions.ts`
-- active-plan lifecycle delete/clear action glue — completed through `src/lib/active-plan-lifecycle-actions.ts`
-- refresh proposal/apply action glue if a dedicated active-plan module removes more code than it adds
+- active-plan lifecycle delete/clear helper glue — completed through `src/lib/active-plan-lifecycle-actions.ts`, with top-level server-action wrappers retained in `training-api.ts`
+- workout-log save validation and persistence — completed through `src/lib/workout-log-actions.ts`
+- auth/login route data, Magic Link, and callback exchange helpers — completed through `src/lib/auth-actions.ts`
+- home/shell/workout/progress route-data helper shaping — completed through `src/lib/route-data-actions.ts`
+- refresh proposal/apply action glue — completed through `src/lib/active-plan-refresh-actions.ts`
+- imported-plan/text-plan replacement action glue — completed through `src/lib/plan-replacement-actions.ts`
 - workout-result upload/remove route helper glue if still mixed into the general hub
 
 What not to do
@@ -635,7 +660,7 @@ Recommended Next Slice
 
 Continue with one bounded cleanup slice from Phase 3 or Phase 4:
 
-- extract one more coherent `training-api.ts` cluster, such as workout-log persistence or refresh proposal/apply glue
+- extract one more coherent `training-api.ts` cluster, such as refresh proposal/apply glue or workout-result route helper glue
 - or start the `PlanManagementDialog.tsx` split if Backend cleanup is paused
 
 Why this is the best next move
@@ -644,6 +669,12 @@ Why this is the best next move
 - the first Phase 3 backend extraction moved active-plan export action ownership out of `training-api.ts`
 - the second Phase 3 backend extraction moved active-plan lifecycle action ownership out of `training-api.ts`
 - the third Phase 3 backend extraction moved user-settings action ownership out of `training-api.ts`
+- the fourth Phase 3 backend extraction moved workout-log save ownership out of `training-api.ts`
+- the fifth Phase 3 backend extraction moved auth/login action ownership out of `training-api.ts`
+- the sixth Phase 3 backend extraction moved route-data loader ownership out of `training-api.ts`
+- the seventh Phase 3 backend extraction moved active-plan refresh proposal/apply ownership out of `training-api.ts`
+- the eighth Phase 3 backend extraction moved imported-plan/text-plan replacement ownership out of `training-api.ts`
+- the lifecycle auth repair kept delete/clear server-action wrappers top-level in `training-api.ts` while preserving lifecycle helper ownership in `active-plan-lifecycle-actions.ts`
 - one slice at a time keeps the cleanup behavior-preserving
 
 Files Most Likely Involved First
@@ -712,6 +743,6 @@ Suggested Next Step
 
 Execute one next bounded cleanup slice only:
 
-- extract one additional coherent `training-api.ts` responsibility cluster if Backend continues
+- extract one additional coherent `training-api.ts` responsibility cluster, such as workout-result route helper glue, if Backend continues
 - or hand off to Frontend for the first `PlanManagementDialog.tsx` section split
 - rebuild and verify unchanged behavior

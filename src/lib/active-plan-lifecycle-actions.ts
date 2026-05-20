@@ -1,7 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
 import { getActivePlan } from "@/lib/active-plan-persistence";
-import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
-import { requireAuthenticatedUser } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { todayIso, type TrainingSnapshot } from "@/lib/training";
 
@@ -20,22 +17,6 @@ export interface ClearUpcomingScheduleResult {
   clearedFromDate: string;
   archivedPlanId: string;
   snapshot: TrainingSnapshot;
-}
-
-export function createDeleteActivePlanAction(loadSnapshot: PersistedSnapshotLoader) {
-  return createServerFn({ method: "POST" }).handler(async () => {
-    const userId = await requireLifecycleUserId();
-
-    return archiveActivePlanForUser(userId, loadSnapshot);
-  });
-}
-
-export function createClearUpcomingScheduleAction(loadSnapshot: PersistedSnapshotLoader) {
-  return createServerFn({ method: "POST" }).handler(async () => {
-    const userId = await requireLifecycleUserId();
-
-    return clearUpcomingScheduleForUser(userId, loadSnapshot);
-  });
 }
 
 export async function archiveActivePlanForUser(
@@ -72,17 +53,6 @@ export async function clearUpcomingScheduleForUser(
     archivedPlanId,
     snapshot: await loadSnapshot(userId),
   };
-}
-
-async function requireLifecycleUserId() {
-  const auth = requireAuthenticatedUser();
-  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
-
-  if (!persistedUserId) {
-    throw new Error("Authentication is required for this action.");
-  }
-
-  return persistedUserId;
 }
 
 async function archiveCurrentActivePlanForUser(userId: string, missingMessage: string) {

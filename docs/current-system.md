@@ -57,7 +57,13 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns server-backed loading and mutation entry points for home, workout detail, progress, login, text compatibility onboarding, advanced JSON import, active-plan refresh orchestration, and workout logging; it re-exports first-plan, active-plan export, active-plan lifecycle, and user-settings action names for compatibility, but no longer owns those implementation bodies
+  owns the remaining route-facing server-function wrapper layer for home, shell, workout detail, progress, settings, login, text compatibility onboarding, advanced JSON import, and active-plan refresh server-action binding; it re-exports auth/login, first-plan, route-data, active-plan export, active-plan lifecycle, active-plan refresh, plan replacement, user-settings, and workout-log action names for compatibility, but no longer owns those extracted implementation bodies
+- `src/lib/route-data-actions.ts`
+  owns the shared route-data helper layer:
+  home, shell, workout-detail, and progress data shaping now live there behind injected snapshot/viewer/feedback loaders, while `training-api.ts` keeps the public TanStack `createServerFn` wrappers so existing route imports and loader data shapes stay stable
+- `src/lib/auth-actions.ts`
+  owns the auth/login helper layer:
+  login route data shaping, loopback local-login availability, safe Magic Link availability, Magic Link request validation and Supabase OTP request behavior, and `/api/auth/confirm` code or token-hash callback exchange now live there while `training-api.ts` keeps the public route-facing wrappers/import path stable
 - `src/lib/first-plan-actions.ts`
   owns the first-plan server-action layer for the structured constructor and transcript-backed voice-to-plan path:
   `completeStructuredFirstPlanOnboarding`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public imports through `training-api.ts`; the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
@@ -68,11 +74,20 @@
   owns the active-plan export server-action and user-scoped export helper:
   it resolves the authenticated persisted user, reads the current active plan through `active-plan-persistence`, delegates payload/document shaping to `plan-export.ts`, and keeps the old `training-api.ts` public export names as compatibility re-exports
 - `src/lib/active-plan-lifecycle-actions.ts`
-  owns the active-plan lifecycle server-action layer for delete/archive and clear-upcoming schedule:
-  it resolves the authenticated persisted user, archives the current active plan without deleting planned workouts or logs, and accepts the existing persisted snapshot loader from `training-api.ts` so the old public action results keep returning the same refreshed saved-mode snapshot without making the lifecycle module own route snapshot shaping
+  owns the active-plan lifecycle helper layer for delete/archive and clear-upcoming schedule:
+  it archives the current active plan without deleting planned workouts or logs and accepts the existing persisted snapshot loader from `training-api.ts` so the old public action results keep returning the same refreshed saved-mode snapshot without making the lifecycle module own route snapshot shaping; `training-api.ts` owns the top-level TanStack server-action wrappers so lifecycle clicks resolve auth through the same persisted-user seam as other working mutations
+- `src/lib/active-plan-refresh-actions.ts`
+  owns the active-plan refresh proposal/apply action layer:
+  it checks `ai_plan_update` entitlement before proposal generation, records usage only after a successful proposal, validates stale fingerprints before apply, repairs and validates the approved remaining-schedule replacement plan, archive/replaces the active plan while preserving fixed history/logged truth, and accepts the existing persisted snapshot loader from `training-api.ts` so public action result shapes remain stable
+- `src/lib/plan-replacement-actions.ts`
+  owns the saved-mode plan replacement action layer:
+  advanced JSON import and text compatibility replacement actions validate their existing inputs, resolve the authenticated persisted user, preserve start-date and first-day resolution behavior, and apply canonical `training-plan-v2` plan truth through `active-plan-persistence` while `training-api.ts` keeps the old public action names as compatibility re-exports
 - `src/lib/user-settings-actions.ts`
   owns the user-settings route/action layer:
   it resolves settings route data through the same persisted-user mapping as saved mode, reads and updates bounded `runner_profiles` settings fields, and accepts the existing snapshot/viewer loaders from `training-api.ts` so the `/settings` route data shape and compatibility imports stay unchanged
+- `src/lib/workout-log-actions.ts`
+  owns the workout-log save action helper layer:
+  it validates completed, partial, and skipped workout-result payloads, normalizes skipped results to null actual metrics, validates bounded workout-scoped body notes, checks that the planned workout belongs to the persisted user and is not a rest day, and upserts the canonical `workout_logs` row while `training-api.ts` keeps the public `saveWorkoutLog` server-action wrapper for compatibility
 - `src/lib/first-plan-authoring-utils.ts`
   owns the small shared first-plan authoring helper layer used by structured onboarding and Dictate-to-Plan:
   bounded goal distance/style/terrain values, weekday de-duplication and long-run/day spreading helpers, goal label formatting, and duration/pace parsing live there instead of being duplicated across first-plan modules
@@ -155,15 +170,20 @@
   clearing the upcoming schedule archives the current active `plan_cycle` from the active schedule view, preserves all planned-workout rows and workout logs under archived history, records the clear cutoff as today for the action result, and returns the runner to the authenticated no-plan/setup-ready state so a later-starting imported or generated plan cannot inherit stale future workouts
   if today already has logged truth, that log remains attached to its archived planned-workout row; the action removes it only from the active schedule, not from saved history
 - the saved-mode `Open plan` modal now exposes that clear-upcoming lifecycle as a confirmed secondary action distinct from `Delete plan`, and later-starting JSON import surfaces can explicitly clear the current upcoming schedule before applying the new plan through the backend seam
+  the clear-upcoming and delete/archive controls are isolated in [src/components/plan-management/PlanLifecycleControls.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanLifecycleControls.tsx), while `PlanManagementDialog` remains the owner of confirmation state, lifecycle server calls, errors, status transitions, and success navigation
 - saved mode now has a backend-owned active-plan export seam:
   [src/lib/active-plan-export-actions.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-export-actions.ts) owns the authenticated action/helper layer and [src/lib/plan-export.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-export.ts) builds one canonical payload from the current active `plan_cycle` plus its saved `planned_workouts`, then projects that same payload into `training-plan-v2` JSON and runner-readable Markdown
   exported dates come from the active saved workout rows, so chosen-start-day effects are reflected in the artifact, and runtime-only saved-mode state such as logs, Garmin evidence, comparisons, and AI feedback is intentionally excluded
   the saved-mode `Open plan` modal now exposes one compact `Export` action for JSON and Markdown download using that same backend-owned document truth and backend-provided filename
   Safari-compatible delivery now uses one authenticated attachment route for the actual browser download request instead of reconstructing files from a client-side blob URL
+  the active-plan summary/header UI is isolated in [src/components/plan-management/PlanSummaryHeader.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanSummaryHeader.tsx), preserving title, goal fallback, active status, date/count/target summary, export menu placement, and export error rendering
+  the export dropdown UI is isolated in [src/components/plan-management/PlanExportMenu.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanExportMenu.tsx), while `PlanManagementDialog` remains the owner of export status, errors, iframe download orchestration, and the surrounding plan-management modal state
   PDF export remains a later slice, but it must reuse this same payload rather than shaping a second export truth
 - the frontend now mirrors that simplified policy instead of the older symmetric chooser:
   text-first apply and advanced JSON apply both use the safe backend default without a required preserve-vs-ignore modal step
   and only one explicit destructive override remains in the UI, now kept behind a quieter disclosure instead of being shown as an equal sibling of the safe action
+  the saved-mode `Open plan` text replacement UI is isolated in [src/components/plan-management/PlanTextReplacementPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanTextReplacementPanel.tsx), while `PlanManagementDialog` remains the owner of prompt state, minimum-length validation, `completeTextOnboarding` server calls, replacement status/errors, and success navigation
+  the saved-mode `Open plan` JSON import UI is isolated in [src/components/plan-management/PlanImportPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanImportPanel.tsx), while `PlanManagementDialog` remains the owner of imported-plan validation state, file-read state updates, import/apply server calls, clear-before-import sequencing, and success/failure navigation
 - OpenAI-generated authoring output never persists directly:
   the app validates the model response, converts it into canonical plan data, and persists through the same `plan_cycles` plus `planned_workouts` seam already used by JSON import and structured authoring
 - saved mode now has the first active-plan refresh foundation and proposal UI:
@@ -173,6 +193,7 @@
   explicit proposal apply now exists as a backend-only seam: apply must be called intentionally, revalidates a backend fingerprint against current active-plan/context truth including fixed weekday rest-day constraints, repairs refresh-generation schedule, goal, runner-baseline, and availability authority so near-term original target dates, null baseline fields, and model-returned rest-day conflicts do not break ordinary canonical apply, clamps generated replacements to the original remaining-schedule window, blocks stale or genuinely invalid proposals with bounded proposal-specific copy, and uses archive/replace by creating a new `active_plan_refresh_v1` plan while archiving the previous active plan
   past/logged history remains fixed by carrying fixed workout/log truth into the replacement active plan and retaining the previous plan as archived audit history
   the saved-mode `Open plan` modal now exposes a quiet `Update plan` disclosure that collects a short runner prompt, calls the backend proposal seam, renders the proposal review, and lets the runner explicitly choose `Apply update` or `Keep current plan`
+  the refresh proposal disclosure and review UI are isolated in [src/components/plan-management/PlanRefreshPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanRefreshPanel.tsx), while `PlanManagementDialog` remains the owner of proposal/apply server calls, refresh state transitions, stale/error handling, and success navigation
   `Apply update` calls the backend apply seam and returns to the refreshed active-plan view after success; `Keep current plan` clears the proposal review without mutation; stale apply responses stay in the modal with a fresh-proposal recovery action
   proposal generation now checks `ai_plan_update` entitlement before OpenAI generation and records usage only after successful proposal generation for explicit Basic users; applying an approved proposal does not consume additional usage
 - canonical richer-plan truth now survives more explicitly in that same seam across JSON import, structured authoring, and OpenAI text authoring:
@@ -222,6 +243,7 @@
   completed non-rest workouts in the current week
 - `src/components/CompletionPanel.tsx`
   now keeps `Log result` focused on manual completion truth, uses a compact workout-scoped body-note summary row plus modal editor instead of the older inline body-note block, keeps that body-note modal on the same Safari-stable bounded-height dialog pattern already used by `Open plan` so the title, internal scroll, and footer actions stay reachable, adds one lighter state-aware Garmin continuation row into `Feedback`, and keeps the dedicated workout-detail `Feedback` surface as the canonical owner of the live `FIT / ZIP file` control, parsed Garmin evidence summary, factual plan-vs-run comparison readback, and the bounded AI interpretation readback
+  the workout-scoped body-note summary/modal editor UI is isolated in [src/components/workout-completion/BodyNotesEditor.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/workout-completion/BodyNotesEditor.tsx), while `CompletionPanel` remains the owner of completion form state, save payload construction, `saveWorkoutLog`, route invalidation, Garmin upload/remove behavior, and feedback/readback orchestration
 - the first Garmin ingest seam accepts only:
   one `.fit` file
   or one `.zip` archive that contains exactly one usable FIT activity file

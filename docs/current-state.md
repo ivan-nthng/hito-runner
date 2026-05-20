@@ -84,10 +84,36 @@ Active
   the unused `completeStructuredOnboarding` action and unused `training-api.ts` apply re-export are removed, duplicated first-plan weekday/goal/duration/pace helpers now live in `src/lib/first-plan-authoring-utils.ts`, and Garmin feedback readback no longer imports the Node-only FIT/ZIP ingest module from the shared training API path.
 - The next `training-api.ts` narrowing slice is now implemented:
   active-plan export action ownership has moved into `src/lib/active-plan-export-actions.ts`, while `training-api.ts` remains a compatibility facade for the same public `exportActivePlan` and `exportActivePlanForUser` names.
+- The first `PlanManagementDialog` decomposition slice is now implemented:
+  the saved-mode `Open plan` export dropdown UI now lives in `src/components/plan-management/PlanExportMenu.tsx`, while the parent dialog still owns export status, error handling, the authenticated iframe download path, and all existing plan-management actions.
+- The second `PlanManagementDialog` decomposition slice is now implemented:
+  the saved-mode `Open plan` refresh proposal prompt/review UI now lives in `src/components/plan-management/PlanRefreshPanel.tsx`, while the parent dialog still owns proposal generation, apply calls, refresh state, errors, stale recovery, and the explicit mutation boundary.
+- The third `PlanManagementDialog` decomposition slice is now implemented:
+  the saved-mode `Open plan` JSON import UI now lives in `src/components/plan-management/PlanImportPanel.tsx`, while the parent dialog still owns imported-plan validation state, file-read state updates, `completeOnboarding` apply calls, clear-before-import sequencing, and success/failure navigation.
+- The fourth `PlanManagementDialog` decomposition slice is now implemented:
+  the saved-mode `Open plan` clear-upcoming and delete/archive lifecycle controls now live in `src/components/plan-management/PlanLifecycleControls.tsx`, while the parent dialog still owns confirmation state, lifecycle action calls, errors, status transitions, and success navigation.
+- The fifth `PlanManagementDialog` decomposition slice is now implemented:
+  the saved-mode `Open plan` text replacement UI now lives in `src/components/plan-management/PlanTextReplacementPanel.tsx`, while the parent dialog still owns the prompt state, minimum-length validation, `completeTextOnboarding` call, replacement status/error state, and success navigation.
+- The sixth `PlanManagementDialog` decomposition slice is now implemented:
+  the saved-mode `Open plan` active-plan summary/header UI now lives in `src/components/plan-management/PlanSummaryHeader.tsx`, while the parent dialog still owns export status/errors, export download orchestration, timers, reset behavior, and all server-action calls.
+- The first `CompletionPanel` decomposition slice is now implemented:
+  the workout-scoped body-note summary and modal editor UI now live in `src/components/workout-completion/BodyNotesEditor.tsx`, while the parent panel still owns completion form state, workout-log payload construction, `saveWorkoutLog`, route invalidation, Garmin upload/remove, and feedback/readback orchestration.
 - The active-plan lifecycle action extraction slice is now implemented:
   `src/lib/active-plan-lifecycle-actions.ts` owns delete/archive and clear-upcoming action behavior, while `training-api.ts` binds those actions to the existing persisted snapshot loader and preserves the same public `deleteActivePlan`, `clearUpcomingSchedule`, `archiveActivePlanForUser`, and `clearUpcomingScheduleForUser` names.
+- The active-plan lifecycle auth integration fix is now implemented:
+  `deleteActivePlan` and `clearUpcomingSchedule` are top-level `training-api.ts` server-action wrappers again, resolving the current persisted user through the same request-auth seam as other working saved-mode mutations before delegating to `active-plan-lifecycle-actions.ts`.
 - The user-settings action extraction slice is now implemented:
   `src/lib/user-settings-actions.ts` owns `/settings` route data, bounded profile readback, and profile-settings save behavior, while `training-api.ts` binds the existing snapshot/viewer loaders and preserves the same public `getSettingsRouteData`, `saveUserSettings`, and `UserSettingsSummary` imports.
+- The workout-log save action extraction slice is now implemented:
+  `src/lib/workout-log-actions.ts` owns manual workout-result validation and persistence for completed, partial, skipped, and workout-scoped body-note payloads, while `training-api.ts` keeps the same public `saveWorkoutLog` server-action wrapper used by `CompletionPanel`.
+- The auth/login action extraction slice is now implemented:
+  `src/lib/auth-actions.ts` owns login route data shaping, Magic Link validation/request behavior, auth callback exchange, and local-vs-public auth availability helpers, while `training-api.ts` keeps the same public `getLoginRouteData`, `requestMagicLink`, and `exchangeCodeForSession` import path.
+- The route-data loader extraction slice is now implemented:
+  `src/lib/route-data-actions.ts` owns home, shell, workout-detail, and progress route data shaping behind injected snapshot/viewer/feedback loaders, while `training-api.ts` keeps the same public `getHomeRouteData`, `getShellRouteData`, `getWorkoutRouteData`, and `getProgressRouteData` server-function wrappers.
+- The active-plan refresh action extraction slice is now implemented:
+  `src/lib/active-plan-refresh-actions.ts` owns refresh proposal entitlement/usage behavior, stale fingerprint checks, refresh-apply authoring repair, weekday rest-day validation, and archive/replace persistence for approved updates, while `training-api.ts` keeps the same public `proposeActivePlanRefresh`, `applyActivePlanRefreshProposal`, and `applyActivePlanRefreshProposalForUser` compatibility names.
+- The plan-replacement action extraction slice is now implemented:
+  `src/lib/plan-replacement-actions.ts` owns advanced JSON/imported-plan replacement and saved-mode text replacement action behavior, while `training-api.ts` keeps the same public `completeOnboarding`, `completeTextOnboarding`, and `persistImportedPlanForCurrentRequest` compatibility names.
 - The Dictate-to-Plan review assumption clarity follow-up is now implemented:
   when an obvious dictated goal-style cue differs from the reviewed draft style, such as balanced becoming relaxed, the backend adds an explicit runner-facing assumption rather than forcing the requested style or silently hiding the change; the real frontend-shaped request path now compares transcript style cues before constructor supplement defaults, so the dictated cue cannot be masked by structured state.
 - The first immediate Garmin UX cleanup slice is now implemented:

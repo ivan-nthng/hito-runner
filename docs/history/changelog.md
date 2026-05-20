@@ -2,8 +2,24 @@
 
 Completed implementation history only.
 
+## 2026-05-20
+
+- Extracted the workout-scoped body-note editor UI from `CompletionPanel.tsx` into `src/components/workout-completion/BodyNotesEditor.tsx`, preserving the summary row, modal editor, body map, select fields, severity controls, and body-note helper behavior while keeping workout-log save orchestration in the parent panel.
+- Extracted the saved-mode `Open plan` active-plan summary/header UI into `src/components/plan-management/PlanSummaryHeader.tsx`, preserving title, goal fallback, active status, date/count/target summary, export menu placement, and export error rendering while keeping export orchestration in the parent dialog.
+- Extracted the saved-mode `Open plan` text replacement UI into `src/components/plan-management/PlanTextReplacementPanel.tsx`, preserving prompt copy, minimum-length gating, loading label, error rendering, and explicit `Create new plan` action while keeping `completeTextOnboarding` state and server calls in the parent dialog.
+
 ## 2026-05-19
 
+- Fixed active-plan lifecycle server-action auth resolution after extraction: `deleteActivePlan` and `clearUpcomingSchedule` now bind as top-level `training-api.ts` server actions and resolve the persisted user through the same request-auth seam as other saved-mode mutations before delegating to lifecycle helpers.
+- Extracted the saved-mode `Open plan` lifecycle controls into `src/components/plan-management/PlanLifecycleControls.tsx`, preserving clear-upcoming and delete/archive copy, confirmation checkboxes, disabled states, loading labels, and error rendering while keeping lifecycle actions and state in the parent dialog.
+- Extracted the saved-mode `Open plan` JSON import UI into `src/components/plan-management/PlanImportPanel.tsx`, preserving upload, paste, template download, validation, start-date, clear-before-import, safe import, and replace-start-day behavior while keeping import state and server apply actions in the parent dialog.
+- Extracted the saved-mode `Open plan` refresh proposal UI into `src/components/plan-management/PlanRefreshPanel.tsx`, preserving the same prompt, proposal review, locked/error/stale messaging, and explicit apply/keep-current boundaries while keeping backend actions and state in the parent dialog.
+- Extracted the saved-mode `Open plan` export dropdown UI into `src/components/plan-management/PlanExportMenu.tsx`, preserving the same JSON/Markdown export action, authenticated iframe download path, status handling, and dialog behavior.
+- Extracted advanced JSON/imported-plan replacement and saved-mode text replacement action ownership from `training-api.ts` into `src/lib/plan-replacement-actions.ts`, preserving the same public action names, authenticated persisted-user checks, start-date handling, first-day semantics, and canonical apply sequencing.
+- Extracted active-plan refresh proposal/apply ownership from `training-api.ts` into `src/lib/active-plan-refresh-actions.ts`, preserving the same `Open plan` public server actions, entitlement usage timing, stale fingerprint checks, weekday rest-day validation, and archive/replace behavior.
+- Extracted home, shell, workout-detail, and progress route-data helper ownership from `training-api.ts` into `src/lib/route-data-actions.ts`, preserving the same route loader imports, loader data shapes, and feedback lookup behavior.
+- Extracted auth/login action ownership from `training-api.ts` into `src/lib/auth-actions.ts`, preserving the same login route data shape, Magic Link request behavior, SSR auth callback exchange, local bypass availability, and compatibility exports.
+- Extracted workout-log save action ownership from `training-api.ts` into `src/lib/workout-log-actions.ts`, preserving the same public `saveWorkoutLog` server action, completed/partial/skipped semantics, and workout-scoped body-note persistence.
 - Extracted user-settings action ownership from `training-api.ts` into `src/lib/user-settings-actions.ts`, preserving the same `/settings` route data shape, profile-save behavior, and compatibility exports.
 - Extracted active-plan lifecycle action ownership from `training-api.ts` into `src/lib/active-plan-lifecycle-actions.ts`, preserving the same delete/clear compatibility exports and refreshed snapshot result shape.
 - Extracted active-plan export action ownership from `training-api.ts` into `src/lib/active-plan-export-actions.ts`, keeping the same compatibility exports while leaving canonical export payload/document shaping in `src/lib/plan-export.ts`.

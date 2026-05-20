@@ -8,7 +8,6 @@ import {
 } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  FUTURE_TEMPLATE_DOWNLOAD_PATH,
   summarizeImportedPlan,
   type ImportedPlan,
   validateImportedPlanJson,
@@ -24,15 +23,7 @@ import {
   type ProposeActivePlanRefreshResult,
   type ViewerSummary,
 } from "@/lib/training-api";
-import { formatDate, type TrainingSnapshot } from "@/lib/training";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import type { TrainingSnapshot } from "@/lib/training";
 import {
   Dialog,
   DialogContent,
@@ -41,16 +32,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { PlanExportStatus } from "@/components/plan-management/PlanExportMenu";
+import {
+  PlanImportPanel,
+  type PlanImportStatus,
+} from "@/components/plan-management/PlanImportPanel";
+import {
+  PlanLifecycleControls,
+  type PlanLifecycleClearStatus,
+  type PlanLifecycleDeleteStatus,
+} from "@/components/plan-management/PlanLifecycleControls";
+import {
+  PlanRefreshPanel,
+  type PlanRefreshApplyStatus,
+  type PlanRefreshStatus,
+} from "@/components/plan-management/PlanRefreshPanel";
+import {
+  PlanTextReplacementPanel,
+  type PlanTextReplacementStatus,
+} from "@/components/plan-management/PlanTextReplacementPanel";
+import { PlanSummaryHeader } from "@/components/plan-management/PlanSummaryHeader";
 import { hitoToast } from "@/components/ui/hito-toast";
-import { Icon } from "@/components/ui/icon";
-
-type TextStatus = "idle" | "creating";
-type JsonStatus = "idle" | "parsing" | "importing";
-type DeleteStatus = "idle" | "deleting";
-type ClearStatus = "idle" | "clearing";
-type ExportStatus = "idle" | "exporting-json" | "exporting-markdown";
-type RefreshStatus = "idle" | "proposing";
-type RefreshApplyStatus = "idle" | "applying";
 
 const REFRESH_ACTION_TOAST_ID = "open-plan-refresh-action";
 const ASYNC_TOAST_STAGE_ONE_MS = 10_000;
@@ -84,30 +86,30 @@ export function PlanManagementDialog({
   const planMeta = snapshot?.planMeta;
   const defaultStartDate = snapshot?.currentDate ?? todayLocalIso();
   const [authoringText, setAuthoringText] = useState("");
-  const [textStatus, setTextStatus] = useState<TextStatus>("idle");
+  const [textStatus, setTextStatus] = useState<PlanTextReplacementStatus>("idle");
   const [textError, setTextError] = useState<string | null>(null);
 
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [jsonDraft, setJsonDraft] = useState("");
   const [importedPlan, setImportedPlan] = useState<ImportedPlan | null>(null);
   const [requestedStartDate, setRequestedStartDate] = useState(defaultStartDate);
-  const [jsonStatus, setJsonStatus] = useState<JsonStatus>("idle");
+  const [jsonStatus, setJsonStatus] = useState<PlanImportStatus>("idle");
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
 
-  const [deleteStatus, setDeleteStatus] = useState<DeleteStatus>("idle");
+  const [deleteStatus, setDeleteStatus] = useState<PlanLifecycleDeleteStatus>("idle");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
-  const [clearStatus, setClearStatus] = useState<ClearStatus>("idle");
+  const [clearStatus, setClearStatus] = useState<PlanLifecycleClearStatus>("idle");
   const [clearError, setClearError] = useState<string | null>(null);
   const [clearConfirmed, setClearConfirmed] = useState(false);
   const [clearBeforeImport, setClearBeforeImport] = useState(false);
-  const [exportStatus, setExportStatus] = useState<ExportStatus>("idle");
+  const [exportStatus, setExportStatus] = useState<PlanExportStatus>("idle");
   const [exportError, setExportError] = useState<string | null>(null);
   const [refreshPrompt, setRefreshPrompt] = useState("");
-  const [refreshStatus, setRefreshStatus] = useState<RefreshStatus>("idle");
-  const [refreshApplyStatus, setRefreshApplyStatus] = useState<RefreshApplyStatus>("idle");
+  const [refreshStatus, setRefreshStatus] = useState<PlanRefreshStatus>("idle");
+  const [refreshApplyStatus, setRefreshApplyStatus] = useState<PlanRefreshApplyStatus>("idle");
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshStaleMessage, setRefreshStaleMessage] = useState<string | null>(null);
   const [refreshDecisionMessage, setRefreshDecisionMessage] = useState<string | null>(null);
@@ -553,542 +555,130 @@ export function PlanManagementDialog({
 
         <div className="hito-product-dialog-body-scroll-fill">
           <div className="grid gap-6">
-            <section className="grid gap-3">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="hito-label hito-label-signal">Current plan</p>
-                  <h2 className="hito-section-title mt-2">{planMeta?.title ?? "Saved plan"}</h2>
-                  <p className="hito-body mt-2 max-w-xl">
-                    {planMeta?.goal ??
-                      snapshot?.profile?.goalLabel ??
-                      `Saved schedule for ${runnerLabel}.`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {planMeta ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          className="hito-button hito-button-ghost hito-button-sm"
-                        >
-                          <Icon name="download" size="sm" className="text-signal" />
-                          {exportStatus === "idle" ? "Export" : "Preparing..."}
-                          <Icon name="chevron-down" size="xs" className="text-muted-foreground" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>Export active plan</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          disabled={isBusy}
-                          onSelect={(event) => {
-                            event.preventDefault();
-                            submitExport("json");
-                          }}
-                        >
-                          <Icon name="import" size="sm" />
-                          Export as JSON
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={isBusy}
-                          onSelect={(event) => {
-                            event.preventDefault();
-                            submitExport("markdown");
-                          }}
-                        >
-                          <Icon name="file-text" size="sm" />
-                          Export as Markdown
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : null}
-                  <span className="hito-status-pill" data-tone="success">
-                    Active
-                  </span>
-                </div>
-              </div>
+            <PlanSummaryHeader
+              planMeta={planMeta}
+              goalFallback={snapshot?.profile?.goalLabel}
+              runnerLabel={runnerLabel}
+              planDayCount={planDayCount}
+              planWorkoutCount={planWorkoutCount}
+              defaultStartDate={defaultStartDate}
+              exportStatus={exportStatus}
+              exportError={exportError}
+              isBusy={isBusy}
+              onExport={submitExport}
+            />
 
-              <div className="hito-row-group">
-                <div className="hito-list-row">
-                  <div>
-                    <p className="hito-list-row-title">
-                      {planMeta
-                        ? `${planMeta.startDate >= defaultStartDate ? "Starts" : "Started"} ${formatDate(
-                            planMeta.startDate,
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
-                          )}`
-                        : "Plan dates unavailable"}
-                    </p>
-                    <p className="hito-list-row-copy">
-                      {planDayCount} days · {planWorkoutCount} workouts
-                      {planMeta?.raceDate
-                        ? ` · target ${formatDate(planMeta.raceDate, {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}`
-                        : ""}
-                    </p>
-                  </div>
-                  <Icon name="calendar" size="sm" className="text-muted-foreground" />
-                </div>
-              </div>
+            <PlanRefreshPanel
+              available={Boolean(planMeta)}
+              prompt={refreshPrompt}
+              status={refreshStatus}
+              applyStatus={refreshApplyStatus}
+              result={refreshResult}
+              error={refreshError}
+              staleMessage={refreshStaleMessage}
+              decisionMessage={refreshDecisionMessage}
+              isBusy={isBusy}
+              onPromptChange={(value) => {
+                setRefreshPrompt(value);
+                setRefreshError(null);
+                setRefreshStaleMessage(null);
+                setRefreshDecisionMessage(null);
+                setRefreshResult(null);
+              }}
+              onGenerate={() => {
+                void submitRefreshProposal();
+              }}
+              onApply={() => {
+                void submitApplyRefreshProposal();
+              }}
+              onKeepCurrentPlan={keepCurrentPlan}
+            />
 
-              {exportError ? <p className="hito-field-error">{exportError}</p> : null}
-            </section>
+            <PlanTextReplacementPanel
+              text={authoringText}
+              status={textStatus}
+              error={textError}
+              isBusy={isBusy}
+              onTextChange={(value) => {
+                setAuthoringText(value);
+                setTextError(null);
+              }}
+              onCreatePlan={() => {
+                void submitTextPlan();
+              }}
+            />
 
-            {planMeta ? (
-              <details className="hito-disclosure">
-                <summary className="hito-disclosure-summary">
-                  <span>Update plan</span>
-                  <Icon name="chevron-down" className="hito-disclosure-chevron" />
-                </summary>
-                <div className="hito-disclosure-body">
-                  <div className="grid gap-4">
-                    <div className="flex items-start gap-3">
-                      <Icon name="refresh" size="sm" className="mt-0.5 text-signal" />
-                      <div>
-                        <p className="hito-list-row-title">
-                          Ask for a proposal from your saved history.
-                        </p>
-                        <p className="hito-body-small mt-1 max-w-xl">
-                          Hito reviews the active plan, recent logs, Garmin-backed comparison
-                          signals, and workout body-note cautions. This does not apply changes.
-                        </p>
-                      </div>
-                    </div>
+            <PlanImportPanel
+              fileInputRef={fileInputRef}
+              isBusy={isBusy}
+              selectedFileName={selectedFileName}
+              jsonDraft={jsonDraft}
+              importedPlanAvailable={Boolean(importedPlan)}
+              importedSummary={importedSummary}
+              requestedStartDate={requestedStartDate}
+              defaultStartDate={defaultStartDate}
+              clearBeforeImport={clearBeforeImport}
+              canOfferClearBeforeImport={canOfferClearBeforeImport}
+              fieldErrors={fieldErrors}
+              jsonError={jsonError}
+              status={jsonStatus}
+              replaceBlockedReason={replaceBlockedReason}
+              onFileChange={(file) => {
+                setImportedPlan(null);
+                setFieldErrors([]);
+                setJsonError(null);
 
-                    <label className="grid gap-2">
-                      <span className="hito-form-label">What should change?</span>
-                      <textarea
-                        rows={3}
-                        maxLength={1200}
-                        value={refreshPrompt}
-                        disabled={isBusy}
-                        onChange={(event) => {
-                          setRefreshPrompt(event.target.value);
-                          setRefreshError(null);
-                          setRefreshStaleMessage(null);
-                          setRefreshDecisionMessage(null);
-                          setRefreshResult(null);
-                        }}
-                        placeholder="Example: I missed a few days and feel heavy. Adjust the rest of the plan without changing my race goal."
-                        className="hito-field hito-textarea-md resize-y"
-                      />
-                    </label>
+                if (!file) {
+                  setSelectedFileName(null);
+                  return;
+                }
 
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="button"
-                        disabled={isBusy || refreshPrompt.trim().length < 8}
-                        onClick={() => {
-                          void submitRefreshProposal();
-                        }}
-                        className="hito-button hito-button-secondary hito-button-md"
-                      >
-                        <Icon name="refresh" size="sm" />
-                        {refreshStatus === "proposing"
-                          ? "Preparing proposal..."
-                          : "Generate proposal"}
-                      </button>
-                      <span className="hito-field-helper">
-                        Nothing changes until you choose Apply update.
-                      </span>
-                    </div>
+                setSelectedFileName(file.name);
 
-                    {refreshError ? <p className="hito-field-error">{refreshError}</p> : null}
-                    {refreshDecisionMessage ? (
-                      <p className="hito-field-success">{refreshDecisionMessage}</p>
-                    ) : null}
+                void file
+                  .text()
+                  .then((raw) => {
+                    setJsonDraft(raw);
+                    validateJsonDraft(raw);
+                  })
+                  .catch(() => {
+                    setJsonStatus("idle");
+                    setJsonError("The file could not be read as valid JSON.");
+                  });
+              }}
+              onUploadClick={() => fileInputRef.current?.click()}
+              onJsonDraftChange={(value) => {
+                setJsonDraft(value);
+                setImportedPlan(null);
+                setFieldErrors([]);
+                setJsonError(null);
+              }}
+              onValidateJson={() => validateJsonDraft(jsonDraft)}
+              onRequestedStartDateChange={setRequestedStartDate}
+              onClearBeforeImportChange={setClearBeforeImport}
+              onImport={(firstDayResolution) => {
+                void submitImportedPlan(firstDayResolution);
+              }}
+            />
 
-                    {refreshResult ? (
-                      <PlanRefreshProposalReview
-                        result={refreshResult}
-                        applyStatus={refreshApplyStatus}
-                        staleMessage={refreshStaleMessage}
-                        isBusy={isBusy}
-                        onApply={() => {
-                          void submitApplyRefreshProposal();
-                        }}
-                        onKeepCurrentPlan={keepCurrentPlan}
-                        onGenerateFresh={() => {
-                          void submitRefreshProposal();
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              </details>
-            ) : null}
-
-            <section className="hito-section-divider grid gap-4 pt-5">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Icon name="sparkles" size="sm" className="text-signal" />
-                  <h3 className="hito-panel-title">Create a new plan</h3>
-                </div>
-                <p className="hito-body mt-2 max-w-xl">
-                  Describe what should change. Hito will create a fresh saved plan from your
-                  request.
-                </p>
-              </div>
-
-              <label className="grid gap-2">
-                <span className="hito-form-label">Plan request</span>
-                <textarea
-                  rows={5}
-                  value={authoringText}
-                  onChange={(event) => {
-                    setAuthoringText(event.target.value);
-                    setTextError(null);
-                  }}
-                  placeholder="Example: Build me a 10-week half marathon plan starting from 4 runs per week. Keep Mondays free and make the long run on Sunday."
-                  className="hito-field hito-textarea-md resize-y"
-                />
-              </label>
-
-              {textError && <p className="hito-field-error">{textError}</p>}
-
-              <div>
-                <button
-                  type="button"
-                  disabled={isBusy || authoringText.trim().length < 20}
-                  onClick={() => {
-                    void submitTextPlan();
-                  }}
-                  className="hito-button hito-button-primary hito-button-md"
-                >
-                  {textStatus === "creating" ? "Creating plan..." : "Create new plan"}
-                </button>
-              </div>
-            </section>
-
-            <details className="hito-disclosure">
-              <summary className="hito-disclosure-summary">
-                <span>Import from JSON</span>
-                <Icon name="chevron-down" className="hito-disclosure-chevron" />
-              </summary>
-              <div className="hito-disclosure-body">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/json,.json"
-                  className="hidden"
-                  onChange={async (event) => {
-                    const file = event.target.files?.[0];
-                    setImportedPlan(null);
-                    setFieldErrors([]);
-                    setJsonError(null);
-
-                    if (!file) {
-                      setSelectedFileName(null);
-                      return;
-                    }
-
-                    setSelectedFileName(file.name);
-
-                    try {
-                      const raw = await file.text();
-                      setJsonDraft(raw);
-                      validateJsonDraft(raw);
-                    } catch {
-                      setJsonStatus("idle");
-                      setJsonError("The file could not be read as valid JSON.");
-                    }
-                  }}
-                />
-
-                <div className="grid gap-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="hito-button hito-button-secondary hito-button-md"
-                    >
-                      <Icon name="upload" size="sm" />
-                      {selectedFileName ? "Choose another file" : "Upload JSON"}
-                    </button>
-                    {selectedFileName && (
-                      <span className="hito-body-small">{selectedFileName}</span>
-                    )}
-                    <a
-                      href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
-                      download
-                      className="hito-button hito-button-ghost hito-button-sm"
-                    >
-                      <Icon name="download" size="sm" className="text-signal" />
-                      Template
-                    </a>
-                  </div>
-
-                  <label className="grid gap-2">
-                    <span className="hito-form-label">Paste plan JSON</span>
-                    <textarea
-                      rows={6}
-                      value={jsonDraft}
-                      onChange={(event) => {
-                        setJsonDraft(event.target.value);
-                        setImportedPlan(null);
-                        setFieldErrors([]);
-                        setJsonError(null);
-                      }}
-                      placeholder='{"schema_version":"training-plan-v2","plan_name":"...","planned_workouts":[...]}'
-                      className="hito-field hito-textarea-md hito-technical-mono"
-                    />
-                  </label>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={isBusy || !jsonDraft.trim()}
-                      onClick={() => validateJsonDraft(jsonDraft)}
-                      className="hito-button hito-button-secondary hito-button-md"
-                    >
-                      Check JSON
-                    </button>
-                    <span className="hito-field-helper">JSON stays the advanced path.</span>
-                  </div>
-
-                  {importedSummary && (
-                    <div className="hito-row-group">
-                      <div className="hito-list-row items-start">
-                        <div>
-                          <p className="hito-list-row-title">Choose the start day</p>
-                          <p className="hito-list-row-copy">
-                            {importedSummary.days} days · {importedSummary.workouts} workouts.
-                          </p>
-                        </div>
-                        <span className="hito-status-pill" data-tone="success">
-                          Valid
-                        </span>
-                      </div>
-                      <div className="hito-list-row items-start">
-                        <label className="grid flex-1 gap-2">
-                          <span className="hito-form-label">Start training</span>
-                          <input
-                            type="date"
-                            min={defaultStartDate}
-                            value={requestedStartDate}
-                            onChange={(event) => setRequestedStartDate(event.target.value)}
-                            className="hito-field hito-field-md"
-                          />
-                          <span className="hito-field-helper">
-                            Hito applies this plan from the date you choose here; the JSON start
-                            date stays source metadata, and fixed rest days may still affect workout
-                            placement.
-                          </span>
-                        </label>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button
-                            type="button"
-                            className="hito-button hito-button-ghost hito-button-xs"
-                            onClick={() => setRequestedStartDate(defaultStartDate)}
-                          >
-                            Today
-                          </button>
-                          <button
-                            type="button"
-                            className="hito-button hito-button-ghost hito-button-xs"
-                            onClick={() => setRequestedStartDate(addDaysIso(defaultStartDate, 1))}
-                          >
-                            Tomorrow
-                          </button>
-                          <button
-                            type="button"
-                            className="hito-button hito-button-ghost hito-button-xs"
-                            onClick={() => setRequestedStartDate(addDaysIso(defaultStartDate, 7))}
-                          >
-                            Next week
-                          </button>
-                        </div>
-                      </div>
-                      {canOfferClearBeforeImport && (
-                        <div className="hito-list-row items-start">
-                          <label className="hito-body flex max-w-xl items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={clearBeforeImport}
-                              disabled={isBusy}
-                              onChange={(event) => setClearBeforeImport(event.target.checked)}
-                              className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
-                            />
-                            <span>
-                              Remove the current upcoming schedule before this later-starting plan
-                              is applied. Saved workout history stays preserved.
-                            </span>
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {fieldErrors.length > 0 && (
-                    <div className="hito-row-group">
-                      <div className="hito-list-row items-start">
-                        <div>
-                          <p className="hito-label text-destructive">JSON issues</p>
-                          <div className="mt-2 space-y-1">
-                            {fieldErrors.slice(0, 5).map((issue) => (
-                              <p key={issue} className="hito-field-error">
-                                {issue}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {jsonError && <p className="hito-field-error">{jsonError}</p>}
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={isBusy || !importedPlan || !requestedStartDate}
-                      onClick={() => {
-                        void submitImportedPlan(null);
-                      }}
-                      className="hito-button hito-button-secondary hito-button-md"
-                    >
-                      <Icon name="import" size="sm" />
-                      {jsonStatus === "importing" ? "Importing plan..." : "Import JSON plan"}
-                    </button>
-                  </div>
-
-                  <details className="hito-disclosure">
-                    <summary className="hito-disclosure-summary">
-                      <span>Need the first workout to replace the start day?</span>
-                      <Icon name="chevron-down" className="hito-disclosure-chevron" />
-                    </summary>
-                    <div className="hito-disclosure-body">
-                      <p className="hito-field-helper">
-                        Safe import keeps the existing workout on that date if one is present.
-                        Replace only if the file&apos;s first workout should overwrite it.
-                      </p>
-                      {replaceBlockedReason ? (
-                        <p className="hito-field-error">
-                          Replace is unavailable because it would detach saved workout history.
-                        </p>
-                      ) : null}
-                      <div>
-                        <button
-                          type="button"
-                          disabled={
-                            isBusy ||
-                            !importedPlan ||
-                            !requestedStartDate ||
-                            Boolean(replaceBlockedReason)
-                          }
-                          data-tone="error"
-                          onClick={() => {
-                            void submitImportedPlan("replace_first_day");
-                          }}
-                          className="hito-button hito-button-outlined hito-button-sm"
-                        >
-                          {jsonStatus === "importing" ? "Replacing..." : "Replace start day"}
-                        </button>
-                      </div>
-                    </div>
-                  </details>
-                </div>
-              </div>
-            </details>
-
-            <details className="hito-disclosure">
-              <summary className="hito-disclosure-summary">
-                <span>Clear upcoming schedule</span>
-                <Icon name="chevron-down" className="hito-disclosure-chevron" />
-              </summary>
-              <div className="hito-disclosure-body">
-                <div className="flex items-start gap-3">
-                  <Icon name="clear-calendar" size="sm" className="mt-0.5 text-signal" />
-                  <p className="hito-field-helper max-w-xl">
-                    This removes the current active upcoming schedule from view so you can start a
-                    later plan cleanly. Planned workouts and saved workout logs stay preserved as
-                    history.
-                  </p>
-                </div>
-                {clearError && <p className="hito-field-error">{clearError}</p>}
-                <label className="hito-body flex max-w-xl items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={clearConfirmed}
-                    disabled={isBusy}
-                    onChange={(event) => setClearConfirmed(event.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
-                  />
-                  <span>
-                    I understand this clears the active upcoming schedule and keeps history
-                    archived.
-                  </span>
-                </label>
-                <div>
-                  <button
-                    type="button"
-                    disabled={isBusy || !planMeta || !clearConfirmed}
-                    onClick={() => {
-                      void submitClearUpcomingSchedule();
-                    }}
-                    className="hito-button hito-button-secondary hito-button-sm"
-                  >
-                    <Icon name="clear-calendar" size="sm" />
-                    {clearStatus === "clearing"
-                      ? "Clearing schedule..."
-                      : "Clear upcoming schedule"}
-                  </button>
-                </div>
-              </div>
-            </details>
-
-            <details className="hito-disclosure">
-              <summary className="hito-disclosure-summary">
-                <span>Delete active plan</span>
-                <Icon name="chevron-down" className="hito-disclosure-chevron" />
-              </summary>
-              <div className="hito-disclosure-body">
-                <div className="flex items-start gap-3">
-                  <Icon name="warning" size="sm" className="mt-0.5 text-destructive" />
-                  <p className="hito-field-helper max-w-xl">
-                    This archives the current active plan and clears your schedule. Logged workout
-                    history stays attached to the archived plan.
-                  </p>
-                </div>
-                {deleteError && <p className="hito-field-error">{deleteError}</p>}
-                <label className="hito-body flex max-w-xl items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={deleteConfirmed}
-                    disabled={isBusy}
-                    onChange={(event) => setDeleteConfirmed(event.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
-                  />
-                  <span>
-                    I understand this clears the active schedule and keeps history archived.
-                  </span>
-                </label>
-                <div>
-                  <button
-                    type="button"
-                    disabled={isBusy || !planMeta || !deleteConfirmed}
-                    data-tone="error"
-                    onClick={() => {
-                      void submitDeletePlan();
-                    }}
-                    className="hito-button hito-button-outlined hito-button-sm"
-                  >
-                    <Icon name="trash" size="sm" />
-                    {deleteStatus === "deleting" ? "Deleting plan..." : "Delete plan"}
-                  </button>
-                </div>
-              </div>
-            </details>
+            <PlanLifecycleControls
+              planAvailable={Boolean(planMeta)}
+              isBusy={isBusy}
+              clearStatus={clearStatus}
+              clearError={clearError}
+              clearConfirmed={clearConfirmed}
+              deleteStatus={deleteStatus}
+              deleteError={deleteError}
+              deleteConfirmed={deleteConfirmed}
+              onClearConfirmedChange={setClearConfirmed}
+              onDeleteConfirmedChange={setDeleteConfirmed}
+              onClearUpcomingSchedule={() => {
+                void submitClearUpcomingSchedule();
+              }}
+              onDeletePlan={() => {
+                void submitDeletePlan();
+              }}
+            />
           </div>
         </div>
 
@@ -1120,162 +710,6 @@ export function PlanManagementDialog({
         />
       </DialogContent>
     </Dialog>
-  );
-}
-
-function PlanRefreshProposalReview({
-  result,
-  applyStatus,
-  staleMessage,
-  isBusy,
-  onApply,
-  onKeepCurrentPlan,
-  onGenerateFresh,
-}: {
-  result: ProposeActivePlanRefreshResult;
-  applyStatus: RefreshApplyStatus;
-  staleMessage: string | null;
-  isBusy: boolean;
-  onApply: () => void;
-  onKeepCurrentPlan: () => void;
-  onGenerateFresh: () => void;
-}) {
-  const proposal = result.proposal.output;
-  const review = proposal.review;
-  const isApplying = applyStatus === "applying";
-
-  return (
-    <div className="hito-row-group">
-      <div className="hito-list-row items-start">
-        <div>
-          <p className="hito-list-row-title">Proposal only</p>
-          <p className="hito-list-row-copy">{review.summary}</p>
-        </div>
-        <span className="hito-status-pill" data-tone="signal">
-          Review
-        </span>
-      </div>
-
-      <div className="hito-list-row items-start">
-        <div className="min-w-0">
-          <p className="hito-list-row-title">Why this update</p>
-          <ul className="hito-body-small mt-2 grid gap-1.5">
-            {review.rationale.map((item) => (
-              <li key={item}>- {item}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div className="hito-list-row items-start">
-        <div className="min-w-0">
-          <p className="hito-list-row-title">What would change from today forward</p>
-          <ul className="hito-body-small mt-2 grid gap-1.5">
-            {review.proposedChanges.map((item) => (
-              <li key={item}>- {item}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {review.keepAsIs.length > 0 ? (
-        <div className="hito-list-row items-start">
-          <div className="min-w-0">
-            <p className="hito-list-row-title">What stays the same</p>
-            <ul className="hito-body-small mt-2 grid gap-1.5">
-              {review.keepAsIs.map((item) => (
-                <li key={item}>- {item}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="hito-list-row items-start">
-        <div>
-          <p className="hito-list-row-title">Scope under review</p>
-          <p className="hito-list-row-copy">{review.scope.label}</p>
-        </div>
-        <span className="hito-status-pill" data-tone="success">
-          Future only
-        </span>
-      </div>
-
-      <div className="hito-list-row items-start">
-        <div>
-          <p className="hito-list-row-title">Caution context</p>
-          {review.cautionContext.included ? (
-            <div className="mt-2 grid gap-1.5">
-              <p className="hito-list-row-copy">{review.cautionContext.note}</p>
-              {review.cautionContext.bodyNoteCautions.map((caution) => (
-                <p key={`${caution.date}-${caution.title}`} className="hito-list-row-copy">
-                  {formatDate(caution.date, { month: "short", day: "numeric" })}: {caution.title},
-                  body-note severity up to {caution.maxSeverity}.
-                </p>
-              ))}
-            </div>
-          ) : (
-            <p className="hito-list-row-copy">{review.cautionContext.note}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="hito-list-row items-start">
-        <div>
-          <p className="hito-list-row-title">Nothing has changed yet</p>
-          <p className="hito-list-row-copy">{review.boundaryNote}</p>
-        </div>
-        <span className="hito-status-pill" data-tone={isApplying ? "signal" : "warning"}>
-          {isApplying ? "Applying" : "Not applied"}
-        </span>
-      </div>
-
-      {staleMessage ? (
-        <div className="hito-list-row items-start">
-          <div>
-            <p className="hito-list-row-title">Proposal no longer current</p>
-            <p className="hito-list-row-copy">{staleMessage}</p>
-          </div>
-          <button
-            type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
-            disabled={isBusy}
-            onClick={onGenerateFresh}
-          >
-            <Icon name="refresh" size="sm" />
-            Generate fresh proposal
-          </button>
-        </div>
-      ) : null}
-
-      <div className="hito-list-row items-start">
-        <div>
-          <p className="hito-list-row-title">Choose what happens</p>
-          <p className="hito-list-row-copy">
-            Hito rechecks the proposal before changing the active plan. Keeping the current plan
-            leaves the schedule untouched.
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            className="hito-button hito-button-ghost hito-button-sm"
-            disabled={isBusy}
-            onClick={onKeepCurrentPlan}
-          >
-            Keep current plan
-          </button>
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-sm"
-            disabled={isBusy || Boolean(staleMessage)}
-            onClick={onApply}
-          >
-            {isApplying ? "Applying update..." : "Apply update"}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1314,7 +748,7 @@ function startPlanExportDownload(
 
 function scheduleExportStatusReset(
   exportResetTimerRef: MutableRefObject<number | null>,
-  setExportStatus: Dispatch<SetStateAction<ExportStatus>>,
+  setExportStatus: Dispatch<SetStateAction<PlanExportStatus>>,
 ) {
   if (typeof window === "undefined") {
     setExportStatus("idle");
@@ -1393,17 +827,6 @@ function isReplaceBlockedError(message: string | null) {
 function todayLocalIso() {
   const date = new Date();
   return toLocalIso(date);
-}
-
-function addDaysIso(iso: string, days: number) {
-  const date = parseIsoDate(iso);
-  date.setDate(date.getDate() + days);
-  return toLocalIso(date);
-}
-
-function parseIsoDate(iso: string) {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(year, month - 1, day);
 }
 
 function toLocalIso(date: Date) {

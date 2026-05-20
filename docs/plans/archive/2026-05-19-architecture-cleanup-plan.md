@@ -1,6 +1,6 @@
 Status
 
-Active
+Complete / Closed
 
 Owner
 
@@ -8,7 +8,7 @@ Architect / Backend / Frontend / QA
 
 Last Updated
 
-2026-05-19
+2026-05-20
 
 Task
 
@@ -16,7 +16,21 @@ Bring the current Hito Running architecture back under control without changing 
 
 Stage
 
-ARCHITECT plan
+ARCHITECT closeout
+
+Closeout Note
+
+This cleanup track achieved its main purpose and is archived. `training-api.ts` was narrowed from a broad backend hub to wrapper/facade shape, `PlanManagementDialog.tsx` was decomposed into focused plan-management components, `CompletionPanel.tsx` was reduced through body-note, deterministic comparison, and AI insight readback extractions, and `/changelog` helper logic moved into `src/lib/changelog-utils.ts`.
+
+Remaining candidates are backlog, not blockers:
+
+- duplicated JSON import validation/paste flow
+- `voice-to-plan-authoring.ts` internal decomposition
+- `imported-plan.ts` contract/normalization/summary split
+- utility dialog lazy-loading
+- any remaining Garmin browser-boundary warning only if still reproduced by build output
+
+No immediate next cleanup slice is recommended.
 
 Context
 
@@ -150,12 +164,20 @@ Checklist
 - [ ] Split `CompletionPanel.tsx` by feedback/logging/body-note sections
   - [x] First bounded frontend slice:
         exported the workout-scoped body-note summary/modal editor UI into `src/components/workout-completion/BodyNotesEditor.tsx` while leaving completion form state, workout-log save payload construction, `saveWorkoutLog`, route invalidation, Garmin upload/remove, and feedback/readback orchestration in the parent panel.
+  - [x] Follow-up fix:
+        reconciled `CompletionPanel` local form state and dirty baseline immediately after successful workout-log saves, then refreshed route data non-blockingly so Safari no longer stays in a stale saving/unsaved state after persisted completed, partial, or skipped results.
+  - [x] Second bounded frontend slice:
+        exported the deterministic plan-vs-run comparison readback UI into `src/components/workout-completion/WorkoutComparisonReadback.tsx` while leaving Garmin upload/remove mutation orchestration, file input handling, route invalidation, manual save logic, body-note integration, and AI insight rendering in the parent panel.
+  - [x] Third bounded frontend slice:
+        exported the bounded AI insight readback UI into `src/components/workout-completion/WorkoutAiInsightReadback.tsx` while leaving `WorkoutFeedbackPanel`, feedback data selection, Garmin upload/remove mutation orchestration, file input handling, route invalidation, manual save logic, and body-note integration in the parent panel.
   - [ ] Next candidate:
-        extract one non-mutating Feedback readback/upload presentation slice while keeping Garmin mutations and AI/readback state in the parent.
+        extract one non-mutating Feedback upload/result presentation slice while keeping Garmin mutations and feedback tab state in the parent.
 - [ ] Collapse duplicated JSON import validation/paste flow
 - [ ] Further reduce `voice-to-plan-authoring.ts` into bounded submodules
 - [ ] Recheck `imported-plan.ts` for contract-vs-normalization-vs-summary split
-- [ ] Simplify `src/routes/changelog.tsx` into a small utility route plus extracted changelog parsing/presentation helpers
+- [x] Simplify `src/routes/changelog.tsx` into a small utility route plus extracted changelog parsing/presentation helpers
+  - [x] First bounded frontend slice:
+        moved pure markdown parsing, date/month/year grouping, source-derived count and last-updated helpers, highlight classification, and milestone title derivation into `src/lib/changelog-utils.ts` while keeping route shell, tab state, timeline JSX, visual hierarchy, and the raw markdown source import in `src/routes/changelog.tsx`.
 - [ ] Lazy-load utility dialogs from shell
 - [ ] Re-run build and focused regression after each bounded slice
 
@@ -613,6 +635,7 @@ Expected outcome
 - smaller route file
 - easier future updates to changelog heuristics
 - less accidental coupling between docs parsing and page rendering
+- first bounded slice implemented with pure helpers in `src/lib/changelog-utils.ts` and route rendering left in `src/routes/changelog.tsx`
 
 Risk
 

@@ -98,6 +98,14 @@ Active
   the saved-mode `Open plan` active-plan summary/header UI now lives in `src/components/plan-management/PlanSummaryHeader.tsx`, while the parent dialog still owns export status/errors, export download orchestration, timers, reset behavior, and all server-action calls.
 - The first `CompletionPanel` decomposition slice is now implemented:
   the workout-scoped body-note summary and modal editor UI now live in `src/components/workout-completion/BodyNotesEditor.tsx`, while the parent panel still owns completion form state, workout-log payload construction, `saveWorkoutLog`, route invalidation, Garmin upload/remove, and feedback/readback orchestration.
+- The `CompletionPanel` post-save reconciliation fix is now implemented:
+  after a successful completed, partial, or skipped workout-log save, the panel reconciles its local form and dirty baseline from the saved payload before refreshing route data, so Safari no longer depends on a completed route invalidation to leave `Saving result` or clear stale `Unsaved changes`.
+- The second `CompletionPanel` decomposition slice is now implemented:
+  the deterministic plan-vs-run comparison readback UI now lives in `src/components/workout-completion/WorkoutComparisonReadback.tsx`, while the parent panel still owns Garmin upload/remove mutation state, file input handling, route invalidation, manual save logic, body-note integration, and AI insight rendering.
+- The third `CompletionPanel` decomposition slice is now implemented:
+  the bounded AI insight readback UI now lives in `src/components/workout-completion/WorkoutAiInsightReadback.tsx`, while the parent panel still owns `WorkoutFeedbackPanel`, feedback data selection, Garmin upload/remove mutation state, file input handling, route invalidation, manual save logic, and body-note integration.
+- The `/changelog` utility-route extraction slice is now implemented:
+  markdown parsing, date/month/year grouping, source-derived count and last-updated helpers, highlight classification, and milestone title derivation now live in `src/lib/changelog-utils.ts`, while `src/routes/changelog.tsx` keeps the public route shell, tabs, timeline rendering, and inline markdown rendering.
 - The active-plan lifecycle action extraction slice is now implemented:
   `src/lib/active-plan-lifecycle-actions.ts` owns delete/archive and clear-upcoming action behavior, while `training-api.ts` binds those actions to the existing persisted snapshot loader and preserves the same public `deleteActivePlan`, `clearUpcomingSchedule`, `archiveActivePlanForUser`, and `clearUpcomingScheduleForUser` names.
 - The active-plan lifecycle auth integration fix is now implemented:

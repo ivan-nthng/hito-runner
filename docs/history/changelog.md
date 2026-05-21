@@ -2,6 +2,10 @@
 
 Completed implementation history only.
 
+## 2026-05-21
+
+- Replaced Hito’s primary sans font from Inter to Poppins at the design-system foundations layer: `src/styles.css` now loads Poppins and maps `--font-sans` to it, while `/hitoDS#foundations` documents Poppins for body, label, control, navigation, and feedback roles without changing type scale, spacing, Fraunces display roles, or JetBrains Mono technical roles.
+
 ## 2026-05-20
 
 - Migrated the Settings DS cleanup slice: the large profile avatar and fallback now use DS-owned profile avatar recipes instead of route-local arbitrary radius and gradient fallback styling while preserving settings loader, save, validation, and avatar upload behavior.

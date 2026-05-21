@@ -136,13 +136,13 @@ const TYPOGRAPHY_FAMILIES = [
   },
   {
     family: "Body",
-    font: "Inter",
+    font: "Poppins",
     roles: "body, body small, support copy, caption",
     rule: "Use for readable explanatory copy, metadata, helper text, and timestamps.",
   },
   {
     family: "Label",
-    font: "Inter",
+    font: "Poppins",
     roles: "label, form label, micro label, nav/menu text",
     rule: "Use for orientation and shell chrome; avoid local uppercase tracking recipes.",
   },
@@ -204,63 +204,63 @@ const TYPOGRAPHY_ROLES = [
     className: "hito-body",
     sample: "This compares the planned workout with the uploaded run.",
     use: "Default readable paragraph for page, modal, and section support.",
-    spec: "Inter · 0.875rem · 400 · lh 1.58",
+    spec: "Poppins · 0.875rem · 400 · lh 1.58",
   },
   {
     role: "Body small",
     className: "hito-body-small",
     sample: "Saved workout history stays preserved.",
     use: "Dense secondary explanations, row support, and metadata.",
-    spec: "Inter · 0.8125rem · 400 · lh 1.5",
+    spec: "Poppins · 0.8125rem · 400 · lh 1.5",
   },
   {
     role: "Helper",
     className: "hito-field-helper",
     sample: "Nothing changes until you choose Apply update.",
     use: "Field-adjacent or control-adjacent operational guidance.",
-    spec: "Inter · 0.75rem · 400 · lh 1.45",
+    spec: "Poppins · 0.75rem · 400 · lh 1.45",
   },
   {
     role: "Caption",
     className: "hito-caption",
     sample: "Extracted activity: morning-run.fit",
     use: "Tertiary detail, legends, tiny footnotes, and timestamps.",
-    spec: "Inter · 0.6875rem · 400 · lh 1.45",
+    spec: "Poppins · 0.6875rem · 400 · lh 1.45",
   },
   {
     role: "Label",
     className: "hito-label",
     sample: "Current plan",
     use: "Micro orientation, never a substitute for a heading.",
-    spec: "Inter · 0.6875rem · 500 · 0.18em · uppercase",
+    spec: "Poppins · 0.6875rem · 500 · 0.18em · uppercase",
   },
   {
     role: "Form label",
     className: "hito-form-label",
     sample: "Start training",
     use: "Explicit ownership label for fields and controls.",
-    spec: "Inter · 0.6875rem · 500 · 0.18em · uppercase",
+    spec: "Poppins · 0.6875rem · 500 · 0.18em · uppercase",
   },
   {
     role: "Micro label",
     className: "hito-micro-label",
     sample: "Saved mode",
     use: "Tiny uppercase shell/menu labels and compact chrome metadata.",
-    spec: "Inter · 0.6875rem · 500 · 0.18em · uppercase · lh 1.2",
+    spec: "Poppins · 0.6875rem · 500 · 0.18em · uppercase · lh 1.2",
   },
   {
     role: "Button",
     className: "hito-button hito-button-secondary hito-button-sm",
     sample: "Generate proposal",
     use: "Action text tuned by shared Hito button size tiers.",
-    spec: "Inter · tiered 0.6875-0.9375rem · 500 · lh 1",
+    spec: "Poppins · tiered 0.6875-0.9375rem · 500 · lh 1",
   },
   {
     role: "Nav / menu",
     className: "hito-menu-text",
     sample: "User settings",
     use: "Shell navigation, dropdown rows, and utility menu text.",
-    spec: "Inter · 0.8125-0.875rem · 500 · lh 1-1.3",
+    spec: "Poppins · 0.8125-0.875rem · 500 · lh 1-1.3",
   },
   {
     role: "Metric",
@@ -274,14 +274,14 @@ const TYPOGRAPHY_ROLES = [
     className: "hito-status-pill",
     sample: "Ready",
     use: "Semantic state identifier, never a heading.",
-    spec: "Inter · 0.625rem · 500 · 0.12em · uppercase",
+    spec: "Poppins · 0.625rem · 500 · 0.12em · uppercase",
   },
   {
     role: "Error / success",
     className: "hito-field-success",
     sample: "User settings saved.",
     use: "Bounded action feedback near the relevant control family.",
-    spec: "Inter · 0.875rem · 500 · lh 1.45",
+    spec: "Poppins · 0.875rem · 500 · lh 1.45",
   },
   {
     role: "Technical mono",
@@ -533,7 +533,7 @@ function HitoDesignSystemPage() {
                 <div className="hito-reference-note">
                   <p className="hito-label">Font ownership</p>
                   <p className="hito-body-small mt-2 max-w-3xl">
-                    Fraunces owns display, page, modal, section, and panel titles. Inter owns
+                    Fraunces owns display, page, modal, section, and panel titles. Poppins owns
                     operational UI, labels, body, actions, navigation, and feedback. JetBrains Mono
                     owns measured or fixed-format truth only.
                   </p>

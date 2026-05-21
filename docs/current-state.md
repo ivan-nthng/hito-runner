@@ -118,6 +118,8 @@ Active
   `src/components/AuthEntryScreen.tsx` and `src/routes/login.tsx` now use canonical Hito micro-label, tab, surface, body, modal-title, and button primitives for the login/signup tabs, email heading, already-signed-in state, and primary CTA; the auth hero keeps its existing layout while the signal dot glow now maps through the Hito signal token instead of a hard-coded rgba shadow.
 - The Settings DS foundations cleanup slice is now implemented:
   `src/routes/settings.tsx` keeps the same loader, save, validation, and avatar upload behavior while the large profile avatar/fallback now uses `hito-profile-avatar` and `hito-profile-avatar-fallback` instead of route-local arbitrary radius and gradient fallback styling.
+- The Hito primary sans font swap is now implemented:
+  `src/styles.css` loads Poppins through the canonical Hito font import and maps `--font-sans` to Poppins, while `/hitoDS#foundations` names Poppins for body, label, control, navigation, and feedback roles without changing typography sizes, line heights, spacing, Fraunces display roles, or JetBrains Mono technical roles.
 - The active-plan lifecycle action extraction slice is now implemented:
   `src/lib/active-plan-lifecycle-actions.ts` owns delete/archive and clear-upcoming action behavior, while `training-api.ts` binds those actions to the existing persisted snapshot loader and preserves the same public `deleteActivePlan`, `clearUpcomingSchedule`, `archiveActivePlanForUser`, and `clearUpcomingScheduleForUser` names.
 - The active-plan lifecycle auth integration fix is now implemented:

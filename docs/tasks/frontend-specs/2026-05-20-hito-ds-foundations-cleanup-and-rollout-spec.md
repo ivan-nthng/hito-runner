@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft
+Complete / Paused for backlog
 
 ## Owner
 
@@ -10,7 +10,7 @@ Design System Agent
 
 ## Last Updated
 
-2026-05-20
+2026-05-21
 
 ## Task
 
@@ -18,7 +18,31 @@ Clean up and formalize the Hito design system so Frontend can migrate the servic
 
 ## Stage
 
-FRONTEND implementation spec
+ARCHITECT closeout
+
+## Closeout Note
+
+This rollout is effectively complete from the visible product perspective.
+
+Completed QA-green slices:
+
+- foundations, raw primitives, semantic token mapping, spacing aliases, and `/hitoDS#foundations`
+- workout-detail / `CompletionPanel` DS drift cleanup
+- calendar surface DS role migration
+- shell / `AppShell` cleanup plus avatar fallback fix
+- auth/login surface cleanup
+- settings surface cleanup
+
+Major visible product surfaces are now DS-owned. No immediate next DS rollout slice is recommended.
+
+Remaining items are backlog, not blockers:
+
+- onboarding/no-plan constructor still has small local drifts around the weekday selector local radius and option-copy `text-xs`; defer until a product-facing onboarding pass
+- import / `Open plan` residual cleanup is low value right now because those surfaces already use modal, disclosure, button, field, and typography primitives heavily
+- `/changelog` still has local serif/glow/highlight recipes, but it is secondary utility cleanup rather than runner-core
+- `/hitoDS` demo exceptions should only be touched when a stale pattern is found, not as broad cleanup
+
+Future work should extend existing Hito primitives or documented visualization/demo exceptions rather than reopening broad DS rollout.
 
 ## Purpose
 

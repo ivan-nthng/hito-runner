@@ -23,6 +23,7 @@ export const Route = createFileRoute("/hitoDS")({
 
 const SECTIONS = [
   { id: "overview", label: "Overview" },
+  { id: "foundations", label: "Foundations" },
   { id: "typography", label: "Typography" },
   { id: "icons", label: "Icons" },
   { id: "buttons", label: "Buttons" },
@@ -72,6 +73,85 @@ const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
   { label: "Race", glyph: "race", family: "quality", color: "var(--quality)" },
   { label: "Quality", glyph: "quality", family: "quality", color: "var(--quality)" },
   { label: "Rest", glyph: "rest", family: "rest", color: "var(--rest)" },
+] as const;
+
+const RAW_COLOR_PRIMITIVES = [
+  { name: "stone-950", value: "var(--stone-950)", use: "Sidebar and deepest chrome" },
+  { name: "stone-900", value: "var(--stone-900)", use: "Page canvas" },
+  { name: "stone-850", value: "var(--stone-850)", use: "Base surface" },
+  { name: "stone-800", value: "var(--stone-800)", use: "Elevated or muted surface" },
+  { name: "stone-700", value: "var(--stone-700)", use: "Accent wash foundation" },
+  { name: "sand-100", value: "var(--sand-100)", use: "Primary text" },
+  { name: "sand-500", value: "var(--sand-500)", use: "Muted text" },
+  { name: "amber-500", value: "var(--amber-500)", use: "Signal accent" },
+  { name: "blue-500", value: "var(--blue-500)", use: "Easy workout family" },
+  { name: "terracotta-500", value: "var(--terracotta-500)", use: "Quality workout family" },
+  { name: "green-500", value: "var(--green-500)", use: "Success tone" },
+  { name: "orange-500", value: "var(--orange-500)", use: "Warning tone" },
+  { name: "red-500", value: "var(--red-500)", use: "Error/destructive tone" },
+] as const;
+
+const SEMANTIC_COLOR_TOKENS = [
+  { name: "background", value: "var(--background)", mapsTo: "stone-900" },
+  { name: "foreground", value: "var(--foreground)", mapsTo: "sand-100" },
+  { name: "surface", value: "var(--surface)", mapsTo: "stone-850" },
+  { name: "surface-elevated", value: "var(--surface-elevated)", mapsTo: "stone-800" },
+  { name: "hairline", value: "var(--hairline)", mapsTo: "sand-alpha-06" },
+  { name: "muted", value: "var(--muted)", mapsTo: "stone-800" },
+  { name: "muted-foreground", value: "var(--muted-foreground)", mapsTo: "sand-500" },
+  { name: "accent", value: "var(--accent)", mapsTo: "stone-700" },
+  { name: "signal", value: "var(--signal)", mapsTo: "amber-500" },
+  { name: "success", value: "var(--success)", mapsTo: "green-500" },
+  { name: "warn", value: "var(--warn)", mapsTo: "orange-500" },
+  { name: "destructive", value: "var(--destructive)", mapsTo: "red-500" },
+  { name: "easy", value: "var(--easy)", mapsTo: "blue-500" },
+  { name: "long", value: "var(--long)", mapsTo: "signal" },
+  { name: "quality", value: "var(--quality)", mapsTo: "terracotta-500" },
+  { name: "rest", value: "var(--rest)", mapsTo: "stone-500" },
+] as const;
+
+const SPACING_PRIMITIVES = [
+  { name: "space-1", value: "0.25rem", use: "Tiny internal offsets" },
+  { name: "space-2", value: "0.5rem", use: "XS control inset and tight pairs" },
+  { name: "space-3", value: "0.75rem", use: "Small control inset and compact row gaps" },
+  { name: "space-4", value: "1rem", use: "Default control inset and compact panel padding" },
+  { name: "space-5", value: "1.25rem", use: "Emphasized panel padding" },
+  { name: "space-6", value: "1.5rem", use: "Section and grouped-route rhythm" },
+  { name: "space-8", value: "2rem", use: "Open page section rhythm" },
+  { name: "space-10", value: "2.5rem", use: "Hero/top-level route moments only" },
+] as const;
+
+const TYPOGRAPHY_FAMILIES = [
+  {
+    family: "Display",
+    font: "Fraunces",
+    roles: "display title, page title",
+    rule: "Use for scarce editorial moments and route-level identity.",
+  },
+  {
+    family: "Title",
+    font: "Fraunces",
+    roles: "modal, section, and panel titles",
+    rule: "Use to orient product surfaces without inventing route-local serif sizes.",
+  },
+  {
+    family: "Body",
+    font: "Inter",
+    roles: "body, body small, support copy, caption",
+    rule: "Use for readable explanatory copy, metadata, helper text, and timestamps.",
+  },
+  {
+    family: "Label",
+    font: "Inter",
+    roles: "label, form label, micro label, nav/menu text",
+    rule: "Use for orientation and shell chrome; avoid local uppercase tracking recipes.",
+  },
+  {
+    family: "Mono",
+    font: "JetBrains Mono",
+    roles: "technical mono, metric value, metric label",
+    rule: "Use only for measured truth, identifiers, JSON, and fixed-format values.",
+  },
 ] as const;
 
 type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
@@ -329,6 +409,119 @@ function HitoDesignSystemPage() {
                 body="Reserve framed surfaces for actual component specimens, payload-like examples, or shells whose border is part of the contract."
               />
             </div>
+
+            <section id="foundations" className="ds-section">
+              <SectionIntro
+                label="Foundations"
+                title="Raw primitives before product semantics."
+                body="Hito now names the first layer of color and spacing so product surfaces can compose from semantic tokens instead of re-inventing local values."
+              />
+
+              <div className="grid gap-8">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="grid gap-4">
+                    <div>
+                      <p className="hito-label">Raw color primitives</p>
+                      <p className="hito-body-small mt-2 max-w-2xl">
+                        Primitive names can describe appearance. Use them to map semantic tokens,
+                        not directly in product UI unless a DS primitive specimen needs them.
+                      </p>
+                    </div>
+                    <div className="hito-reference-list">
+                      {RAW_COLOR_PRIMITIVES.map((token) => (
+                        <ColorSwatchRow
+                          key={token.name}
+                          name={token.name}
+                          value={token.value}
+                          meta={token.use}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4">
+                    <div>
+                      <p className="hito-label">Semantic color tokens</p>
+                      <p className="hito-body-small mt-2 max-w-2xl">
+                        Product code should prefer semantic tokens. This keeps signal, feedback,
+                        surfaces, and workout color meaning stable across screens.
+                      </p>
+                    </div>
+                    <div className="hito-reference-list">
+                      {SEMANTIC_COLOR_TOKENS.map((token) => (
+                        <ColorSwatchRow
+                          key={token.name}
+                          name={token.name}
+                          value={token.value}
+                          meta={`maps to ${token.mapsTo}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="hito-row-group">
+                  <ReferenceListRow
+                    label="Tone rule"
+                    title="Signal is the product accent, not the generic positive state."
+                    body="Use signal for primary Hito action and brand emphasis. Use success only for completed/saved/confirmed states."
+                  />
+                  <ReferenceListRow
+                    label="Tone rule"
+                    title="Warn and destructive are bounded feedback tones."
+                    body="Use warn for caution/review states. Use destructive for irreversible, dangerous, failed, or error-risk action semantics."
+                  />
+                  <ReferenceListRow
+                    label="Workout rule"
+                    title="Workout colors describe training identity, not CTA hierarchy."
+                    body="Easy, long, quality, and rest colors support calendar and workout-type meaning. They should not replace button tones."
+                  />
+                </div>
+
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="hito-reference-note">
+                    <p className="hito-label">Typography families</p>
+                    <div className="mt-4 grid gap-4">
+                      {TYPOGRAPHY_FAMILIES.map((item) => (
+                        <TypographyFamilyRow key={item.family} item={item} />
+                      ))}
+                    </div>
+                    <p className="hito-caption mt-4 max-w-2xl">
+                      Banned drift patterns: local uppercase micro-label recipes, route-local serif
+                      section headings, and tiny metadata text when caption or micro-label already
+                      fits.
+                    </p>
+                  </div>
+
+                  <div className="hito-reference-note">
+                    <p className="hito-label">Spacing primitives</p>
+                    <div className="mt-4 grid gap-3">
+                      {SPACING_PRIMITIVES.map((space) => (
+                        <SpacingPrimitiveRow key={space.name} space={space} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="hito-reference-list">
+                  <ReferenceListRow
+                    label="Inset"
+                    title="Controls map size tiers to space primitives."
+                    body="XS uses space-2, SM uses space-3, MD/LG center around space-4, and XL can reach space-5."
+                  />
+                  <ReferenceListRow
+                    label="Panels"
+                    title="Panel padding stays compact."
+                    body="Compact panels use space-4. Emphasized or review-like panels use space-5. Route sections should breathe with space-6 or space-8."
+                  />
+                  <ReferenceListRow
+                    label="Hero"
+                    title="Only top-level moments reach space-10."
+                    body="Hero spacing is reserved for route identity. Component clusters should not simulate hero spacing locally."
+                  />
+                </div>
+              </div>
+            </section>
 
             <section id="typography" className="ds-section">
               <SectionIntro
@@ -1695,9 +1888,7 @@ function HitoDesignSystemPage() {
                 </div>
                 <div className="grid gap-4">
                   <button type="button" className="hito-shell-profile-trigger">
-                    <span className="grid h-9 w-9 place-items-center rounded-full border border-hairline bg-signal text-[11px] font-medium text-signal-foreground">
-                      IR
-                    </span>
+                    <span className="hito-shell-avatar-fallback h-9 w-9 rounded-full">IR</span>
                     <span className="min-w-0 flex-1">
                       <span className="hito-menu-text block truncate">Ivan</span>
                       <span className="hito-menu-meta block truncate">Half Marathon Plan</span>
@@ -1769,6 +1960,57 @@ function ReferenceListRow({ label, title, body }: { label: string; title: string
         <p className="hito-label">{label}</p>
         <p className="hito-list-row-title mt-2">{title}</p>
         <p className="hito-list-row-copy">{body}</p>
+      </div>
+    </div>
+  );
+}
+
+function ColorSwatchRow({ name, value, meta }: { name: string; value: string; meta: string }) {
+  return (
+    <article className="hito-reference-row">
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="h-8 w-8 shrink-0 rounded-xl border border-hairline"
+          style={{ background: value } satisfies CSSProperties}
+        />
+        <div className="min-w-0">
+          <p className="hito-list-row-title">{name}</p>
+          <p className="hito-caption mt-1">{meta}</p>
+        </div>
+      </div>
+      <code className="hito-technical-mono">{value}</code>
+    </article>
+  );
+}
+
+function TypographyFamilyRow({ item }: { item: (typeof TYPOGRAPHY_FAMILIES)[number] }) {
+  return (
+    <div className="border-t border-hairline pt-4 first:border-t-0 first:pt-0">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <p className="hito-list-row-title">{item.family}</p>
+        <span className="hito-caption">{item.font}</span>
+      </div>
+      <p className="hito-body-small mt-1">{item.roles}</p>
+      <p className="hito-caption mt-2">{item.rule}</p>
+    </div>
+  );
+}
+
+function SpacingPrimitiveRow({ space }: { space: (typeof SPACING_PRIMITIVES)[number] }) {
+  return (
+    <div className="grid gap-2 border-t border-hairline pt-3 first:border-t-0 first:pt-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="hito-list-row-title">{space.name}</p>
+        <code className="hito-technical-mono">{space.value}</code>
+      </div>
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="h-2 rounded-full bg-signal"
+          style={{ width: `calc(${space.value} * 5)` } satisfies CSSProperties}
+        />
+        <p className="hito-caption">{space.use}</p>
       </div>
     </div>
   );

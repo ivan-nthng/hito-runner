@@ -356,7 +356,7 @@ export function CompletionPanel({
                         }))
                       }
                       className={cn(
-                        "flex-1 h-8 rounded border text-[10px] font-mono-num",
+                        "hito-technical-mono h-8 flex-1 rounded-md border",
                         index < form.intervalsCompleted
                           ? "bg-quality/30 border-quality/40 text-foreground"
                           : "border-hairline text-muted-foreground",
@@ -761,9 +761,9 @@ export function WorkoutFeedbackPanel({
             />
           ) : (
             <>
-              <div className="rounded-[1.75rem] border border-white/8 bg-background/[0.18] px-6 py-8 sm:px-8 sm:py-10">
+              <div className="hito-surface px-6 py-8 sm:px-8 sm:py-10">
                 <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/8 bg-background/30">
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-hairline bg-surface/40">
                     <Icon name="file-up" size="md" className="text-foreground/82" />
                   </div>
                   <div className="hito-label">Upload Garmin file</div>

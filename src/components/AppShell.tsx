@@ -138,13 +138,13 @@ export function AppShell({
                   {viewer?.avatarUrl ? (
                     <AvatarImage src={viewer.avatarUrl} alt={profileName} />
                   ) : null}
-                  <AvatarFallback className="bg-gradient-to-br from-signal to-quality text-[11px] font-medium text-signal-foreground">
+                  <AvatarFallback className="hito-shell-avatar-fallback">
                     {profileInitials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1 leading-tight">
-                  <div className="truncate text-sm text-foreground">{profileName}</div>
-                  <div className="truncate text-[11px] text-muted-foreground">{profileDetail}</div>
+                  <div className="hito-menu-text truncate">{profileName}</div>
+                  <div className="hito-menu-meta truncate">{profileDetail}</div>
                 </div>
                 <Icon
                   name="chevron-up"
@@ -155,10 +155,8 @@ export function AppShell({
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="hito-shell-menu w-[208px]">
               <DropdownMenuLabel className="pb-1">
-                <div className="text-sm font-medium text-foreground">{profileName}</div>
-                <div className="mt-1 truncate text-[11px] font-normal text-muted-foreground">
-                  {profileDetail}
-                </div>
+                <div className="hito-menu-text">{profileName}</div>
+                <div className="hito-menu-meta mt-1 truncate">{profileDetail}</div>
                 <div className="hito-micro-label mt-2">{modeTag}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
@@ -203,7 +201,7 @@ export function AppShell({
             <Link
               to="/login"
               search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
-              className="hito-button hito-button-secondary hito-button-sm tracking-wide"
+              className="hito-button hito-button-secondary hito-button-sm"
             >
               Sign in
             </Link>
@@ -217,7 +215,7 @@ export function AppShell({
             <div className="md:hidden font-display text-xl">{APP_NAME.toLowerCase()}</div>
             <div className="hidden md:flex items-baseline gap-3">
               <span className="hito-micro-label">Today</span>
-              <span className="font-mono-num text-sm">
+              <span className="hito-technical-mono">
                 {formatDate(shellSnapshot.currentDate, {
                   month: "long",
                   day: "numeric",
@@ -231,7 +229,7 @@ export function AppShell({
                 <button
                   type="button"
                   onClick={() => setPlanManagementOpen(true)}
-                  className="hito-button hito-button-secondary hito-button-sm tracking-wide"
+                  className="hito-button hito-button-secondary hito-button-sm"
                 >
                   <Icon name="activity" size="xs" />
                   Open plan
@@ -245,7 +243,7 @@ export function AppShell({
                       ? { next: nextPath }
                       : undefined
                   }
-                  className="hito-button hito-button-secondary hito-button-sm tracking-wide"
+                  className="hito-button hito-button-secondary hito-button-sm"
                 >
                   <Icon name="activity" size="xs" />
                   {shellSnapshot.mode === "preview" ? "Sign in to save" : "Create plan"}

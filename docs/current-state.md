@@ -106,6 +106,18 @@ Active
   the bounded AI insight readback UI now lives in `src/components/workout-completion/WorkoutAiInsightReadback.tsx`, while the parent panel still owns `WorkoutFeedbackPanel`, feedback data selection, Garmin upload/remove mutation state, file input handling, route invalidation, manual save logic, and body-note integration.
 - The `/changelog` utility-route extraction slice is now implemented:
   markdown parsing, date/month/year grouping, source-derived count and last-updated helpers, highlight classification, and milestone title derivation now live in `src/lib/changelog-utils.ts`, while `src/routes/changelog.tsx` keeps the public route shell, tabs, timeline rendering, and inline markdown rendering.
+- The first Hito DS foundations cleanup slice is now implemented:
+  `src/styles.css` now defines a small raw color primitive layer underneath the existing semantic product tokens, exposes compact spacing primitives through CSS and Tailwind aliases, and `/hitoDS#foundations` documents primitive swatches, semantic mappings, typography families, semantic tone rules, workout-color boundaries, and spacing rhythm before any runner-facing screen migration.
+- The second Hito DS foundations cleanup slice is now implemented:
+  workout-detail route chrome now uses existing Hito surface, row-group, hairline, tab-badge, micro-label, body-small, and technical-mono primitives instead of local radial/linear gradients, white-alpha borders, bespoke radius values, and tiny text recipes in `src/routes/workout.$date.tsx` and the Garmin upload/interval controls in `CompletionPanel`.
+- The third Hito DS foundations cleanup slice is now started with a bounded calendar surface migration:
+  `src/components/Calendar.tsx` now uses canonical Hito micro-label, body-small, technical-mono, metric-label, tab, and button primitives for month headers, week-strip metadata, workout type tags, tooltip metadata, compact metric readbacks, and view controls instead of local tiny text, tracking, mono, and button-spacing recipes.
+- The Shell/AppShell DS foundations cleanup slice is now implemented:
+  `src/components/AppShell.tsx` now uses canonical Hito menu text, menu metadata, technical-mono, button, and a small `hito-shell-avatar-fallback` primitive for profile trigger, dropdown label, top-bar date, shell CTAs, and avatar fallback styling instead of local text sizes, tracking overrides, mono helpers, and gradient avatar recipes.
+- The Auth/Login DS foundations cleanup slice is now implemented:
+  `src/components/AuthEntryScreen.tsx` and `src/routes/login.tsx` now use canonical Hito micro-label, tab, surface, body, modal-title, and button primitives for the login/signup tabs, email heading, already-signed-in state, and primary CTA; the auth hero keeps its existing layout while the signal dot glow now maps through the Hito signal token instead of a hard-coded rgba shadow.
+- The Settings DS foundations cleanup slice is now implemented:
+  `src/routes/settings.tsx` keeps the same loader, save, validation, and avatar upload behavior while the large profile avatar/fallback now uses `hito-profile-avatar` and `hito-profile-avatar-fallback` instead of route-local arbitrary radius and gradient fallback styling.
 - The active-plan lifecycle action extraction slice is now implemented:
   `src/lib/active-plan-lifecycle-actions.ts` owns delete/archive and clear-upcoming action behavior, while `training-api.ts` binds those actions to the existing persisted snapshot loader and preserves the same public `deleteActivePlan`, `clearUpcomingSchedule`, `archiveActivePlanForUser`, and `clearUpcomingScheduleForUser` names.
 - The active-plan lifecycle auth integration fix is now implemented:

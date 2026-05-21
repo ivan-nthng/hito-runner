@@ -67,20 +67,14 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
             <button
               onClick={() => setView("month")}
               data-active={view === "month"}
-              className={cn(
-                "hito-tab px-3 py-1.5 text-xs tracking-wide",
-                view !== "month" && "text-muted-foreground",
-              )}
+              className={cn("hito-tab", view !== "month" && "text-muted-foreground")}
             >
               Month
             </button>
             <button
               onClick={() => setView("week")}
               data-active={view === "week"}
-              className={cn(
-                "hito-tab px-3 py-1.5 text-xs tracking-wide",
-                view !== "week" && "text-muted-foreground",
-              )}
+              className={cn("hito-tab", view !== "week" && "text-muted-foreground")}
             >
               Week
             </button>
@@ -93,7 +87,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
           </button>
           <button
             onClick={() => setCursor(new Date(`${snapshot.currentDate}T00:00:00`))}
-            className="hito-button hito-button-secondary hito-button-sm tracking-wide"
+            className="hito-button hito-button-secondary hito-button-sm"
           >
             Today
           </button>
@@ -124,7 +118,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
         <div className="border-b border-hairline">
           <div className="grid grid-cols-7 border-b border-hairline">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-              <div key={day} className="px-3 py-2 hito-section-subtitle text-[10px]">
+              <div key={day} className="hito-micro-label px-3 py-2">
                 {day}
               </div>
             ))}
@@ -219,7 +213,7 @@ function DayCell({
           <div className="flex items-center gap-1.5">
             <div
               className={cn(
-                "font-mono-num text-xs",
+                "hito-technical-mono",
                 isToday ? "text-signal" : "text-muted-foreground",
               )}
             >
@@ -233,7 +227,7 @@ function DayCell({
           <div className="mt-3">
             <div
               className={cn(
-                "inline-flex max-w-full min-w-0 items-center gap-1.5 text-[10px] uppercase tracking-[0.14em]",
+                "hito-micro-label inline-flex max-w-full min-w-0 items-center gap-1.5",
                 status === "skipped" && "line-through opacity-50",
               )}
               style={{ color: identity?.color }}
@@ -245,7 +239,7 @@ function DayCell({
             </div>
             <div
               className={cn(
-                "mt-1.5 line-clamp-2 overflow-hidden text-xs leading-tight text-foreground/85",
+                "hito-body-small mt-1.5 line-clamp-2 overflow-hidden text-foreground/85",
                 feedbackMeta && "pr-7",
               )}
             >
@@ -256,7 +250,7 @@ function DayCell({
         {workout && workout.type === "rest" && identity && (
           <div className="mt-3">
             <div
-              className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+              className="hito-micro-label inline-flex max-w-full min-w-0 items-center gap-1.5"
               style={{ color: identity.color }}
             >
               <WorkoutGlyph kind={identity.glyph} className="hito-calendar-type-glyph" />
@@ -369,10 +363,10 @@ function Tooltip({ workout }: { workout: Workout }) {
   return (
     <div className="hito-tooltip w-72 max-w-72">
       <div className="flex items-center justify-between">
-        <span className="hito-label text-[10px]" style={{ color: meta.color }}>
+        <span className="hito-micro-label" style={{ color: meta.color }}>
           {meta.label}
         </span>
-        <span className="hito-tooltip-meta uppercase tracking-wider">
+        <span className="hito-micro-label">
           {formatDate(workout.date, { month: "short", day: "numeric", weekday: "short" })}
         </span>
       </div>
@@ -388,7 +382,7 @@ function Tooltip({ workout }: { workout: Workout }) {
             .slice(0, 2)
             .map((entry) => (
               <div key={entry.key} className="flex justify-between gap-3">
-                <span className="hito-label text-[10px]">{entry.label}</span>
+                <span className="hito-micro-label">{entry.label}</span>
                 <span className="text-foreground/80 truncate">{entry.value}</span>
               </div>
             ))}
@@ -401,8 +395,8 @@ function Tooltip({ workout }: { workout: Workout }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="hito-metric">
-      <div className="hito-metric-value text-xs capitalize">{value}</div>
-      <div className="hito-metric-label text-[9px]">{label}</div>
+      <div className="hito-technical-mono capitalize">{value}</div>
+      <div className="hito-metric-label">{label}</div>
     </div>
   );
 }
@@ -430,32 +424,27 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
                 isCompleted && !isToday && "bg-success/[0.04]",
               )}
             >
-              <div className="flex items-center justify-between hito-section-subtitle text-[10px]">
+              <div className="hito-micro-label flex items-center justify-between">
                 <span>{weekdayShort(iso)}</span>
                 <div className="flex items-center gap-1.5">
                   {hasWorkout && <StatusMark status={status} />}
-                  <span className="font-mono-num">{iso.slice(8)}</span>
+                  <span className="hito-technical-mono">{iso.slice(8)}</span>
                 </div>
               </div>
               {hasWorkout && meta ? (
                 <>
-                  <div
-                    className="mt-3 text-[11px] uppercase tracking-wider"
-                    style={{ color: meta.color }}
-                  >
+                  <div className="hito-micro-label mt-3" style={{ color: meta.color }}>
                     {meta.short}
                   </div>
                   <div className={cn("mt-1 text-sm leading-snug", feedbackMeta && "pr-16")}>
                     {workout.title}
                   </div>
-                  <div className="mt-auto pt-3 font-mono-num text-[11px] text-muted-foreground">
+                  <div className="hito-technical-mono mt-auto pt-3 text-muted-foreground">
                     {compactWorkoutSummary(workout)}
                   </div>
                 </>
               ) : (
-                <div className="mt-auto text-xs uppercase tracking-wider text-muted-foreground">
-                  Rest
-                </div>
+                <div className="hito-micro-label mt-auto">Rest</div>
               )}
             </Link>
 

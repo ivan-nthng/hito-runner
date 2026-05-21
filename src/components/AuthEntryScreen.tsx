@@ -63,7 +63,7 @@ export function AuthEntryScreen({
           <div className="flex flex-col justify-center gap-8">
             <div className="flex items-center gap-4">
               <div className="hito-surface-flat flex h-12 w-12 items-center justify-center">
-                <div className="h-3.5 w-3.5 rounded-full bg-signal shadow-[0_0_20px_rgba(243,167,74,0.35)]" />
+                <div className="auth-hero-signal-dot" />
               </div>
               <div className="font-display text-5xl leading-none tracking-tight lg:text-7xl">
                 Hito.
@@ -79,7 +79,7 @@ export function AuthEntryScreen({
 
           <div className="auth-hero-card hito-surface-flat p-5 lg:p-6">
             {localBypassEnabled ? (
-              <div className="hito-tab-list">
+              <div className="hito-tabs hito-tabs-simple">
                 {(
                   [
                     { key: "login", label: "Log in" },
@@ -157,7 +157,7 @@ export function AuthEntryScreen({
               </div>
             ) : (
               <div className="mt-6">
-                <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="hito-micro-label flex items-center gap-2">
                   <Icon name="mail" size="xs" className="text-signal" />
                   <span>Continue with email</span>
                 </div>

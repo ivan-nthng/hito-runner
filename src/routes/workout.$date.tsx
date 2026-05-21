@@ -120,7 +120,6 @@ function WorkoutPage() {
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="relative max-w-6xl px-6 py-8 lg:px-10">
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(circle_at_top_left,rgba(209,161,69,0.14),transparent_48%),radial-gradient(circle_at_top_right,rgba(122,162,247,0.12),transparent_44%),radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_62%)]" />
         <div className="flex items-center gap-3 hito-section-subtitle">
           <Link to="/" className="inline-flex items-center gap-1 hover:text-foreground">
             <Icon name="arrow-left" size="xs" /> Calendar
@@ -200,7 +199,7 @@ function WorkoutPage() {
               >
                 {tabOption.l}
                 {tabOption.v === "preview" && (
-                  <span className="ml-2 text-[10px] uppercase tracking-wider text-signal">
+                  <span className="hito-tab-badge" data-variant="text">
                     later
                   </span>
                 )}
@@ -213,14 +212,10 @@ function WorkoutPage() {
           <div
             className={cn(
               "relative",
-              (tab === "complete" || tab === "preview") &&
-                "overflow-hidden rounded-[24px] border border-white/8 bg-[linear-gradient(150deg,rgba(16,22,28,0.86),rgba(29,36,46,0.7))] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.18)]",
+              (tab === "complete" || tab === "preview") && "hito-surface overflow-hidden p-6",
               tab === "feedback" && "p-1",
             )}
           >
-            {(tab === "complete" || tab === "preview") && (
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-            )}
             {tab === "overview" && <Overview workout={workout} />}
             {tab === "complete" && (
               <CompletionPanel workout={workout} snapshot={snapshot} feedback={feedback} />
@@ -294,7 +289,7 @@ function WorkoutPage() {
                 </div>
                 <div className="mt-3 h-2 rounded-full overflow-hidden bg-hairline/80">
                   <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,rgba(122,162,247,0.95),rgba(209,161,69,0.92))]"
+                    className="h-full rounded-full bg-signal"
                     style={{ width: `${weekProgress.percent}%` }}
                   />
                 </div>
@@ -308,7 +303,7 @@ function WorkoutPage() {
               <SidebarSection title="About this page" tone="signal">
                 <div className="flex items-start gap-2">
                   <Icon name="calendar-clock" size="xs" className="mt-0.5 text-signal" />
-                  <p className="text-xs leading-relaxed text-foreground/80">
+                  <p className="hito-body-small">
                     {snapshot.source === "persisted"
                       ? `${APP_NAME} keeps the same layout here while your plan, results, and week status come from saved data.`
                       : `You're viewing the preview. Results and plan changes are not saved here yet.`}
@@ -320,7 +315,7 @@ function WorkoutPage() {
                 <SidebarSection title="Skipped">
                   <div className="flex items-start gap-2">
                     <Icon name="shield-alert" size="xs" className="mt-0.5 text-destructive" />
-                    <p className="text-xs text-foreground/80">
+                    <p className="hito-body-small">
                       {snapshot.source === "persisted"
                         ? skippedCopy
                         : "This sample status comes from preview logic only."}
@@ -413,7 +408,7 @@ function Overview({ workout }: { workout: Workout }) {
 
   if (workout.type === "rest") {
     return (
-      <section className="flex min-h-[220px] flex-col border-t border-white/8 pt-6">
+      <section className="flex min-h-[220px] flex-col border-t border-hairline pt-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="hito-label">Recovery day</p>
@@ -424,14 +419,14 @@ function Overview({ workout }: { workout: Workout }) {
             </p>
           </div>
           <div className="hidden items-end gap-2 opacity-50 sm:flex">
-            <div className="h-8 w-8 rounded-full border border-white/8 bg-background/25" />
-            <div className="h-12 w-12 rounded-full border border-white/8 bg-background/20" />
-            <div className="h-6 w-6 rounded-full border border-white/8 bg-background/25" />
+            <div className="h-8 w-8 rounded-full border border-hairline bg-background/25" />
+            <div className="h-12 w-12 rounded-full border border-hairline bg-background/20" />
+            <div className="h-6 w-6 rounded-full border border-hairline bg-background/25" />
           </div>
         </div>
 
         {restAssignment && (
-          <div className="mt-auto border-t border-white/8 pt-5">
+          <div className="mt-auto border-t border-hairline pt-5">
             <div>
               <p className="hito-label">Assignment</p>
               <p className="mt-3 text-sm leading-relaxed text-foreground/85">{restAssignment}</p>
@@ -470,8 +465,7 @@ function Overview({ workout }: { workout: Workout }) {
 
       <div>
         <h3 className="hito-label">Fueling & recovery</h3>
-        <div className="relative mt-4 overflow-hidden rounded-2xl bg-[linear-gradient(145deg,rgba(15,19,24,0.92),rgba(21,26,32,0.82))] shadow-[0_14px_35px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.04)] sm:grid sm:grid-cols-3">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        <div className="hito-row-group mt-4 sm:grid sm:grid-cols-3">
           {[
             { t: "Pre", v: "Light carb 60 min prior" },
             {
@@ -482,10 +476,10 @@ function Overview({ workout }: { workout: Workout }) {
           ].map((item) => (
             <div
               key={item.t}
-              className="border-t border-white/8 px-4 py-4 text-foreground first:border-t-0 sm:border-t-0 sm:border-l sm:border-white/8 sm:first:border-l-0"
+              className="border-t border-hairline px-4 py-4 first:border-t-0 sm:border-t-0 sm:border-l sm:first:border-l-0"
             >
-              <div className="hito-section-subtitle text-[10px] text-white/50">{item.t}</div>
-              <div className="mt-1 text-sm text-white/92">{item.v}</div>
+              <div className="hito-micro-label">{item.t}</div>
+              <div className="hito-body-small mt-1 text-foreground/90">{item.v}</div>
             </div>
           ))}
         </div>
@@ -720,7 +714,7 @@ function ResultBadge({
 }) {
   return (
     <span
-      className={cn("hito-status-pill", mode === "sidebar" && "text-[11px]")}
+      className="hito-status-pill"
       data-icon="false"
       data-tone={meta.tone === "warn" ? "warning" : meta.tone}
     >

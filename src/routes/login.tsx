@@ -44,25 +44,22 @@ function LoginPage() {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="px-6 py-10 lg:px-10">
-          <section className="max-w-3xl rounded-2xl border border-hairline bg-gradient-to-br from-surface-elevated to-surface p-6 lg:p-10">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          <section className="hito-surface max-w-3xl p-6 lg:p-10">
+            <p className="hito-micro-label">
               {snapshot.mode === "authenticated" ? "Saved mode" : "Setup required"}
             </p>
-            <h1 className="mt-3 font-display text-4xl leading-[1.05] lg:text-5xl">
+            <h1 className="hito-modal-title mt-3">
               {snapshot.mode === "authenticated"
                 ? "You’re already signed in."
                 : "You’re signed in. Create your plan next."}
             </h1>
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            <p className="hito-body mt-4 max-w-xl text-muted-foreground">
               {snapshot.mode === "authenticated"
                 ? "Your profile, plan, and workout results are already saved."
                 : "Your account is ready. Go home and describe your goal to create your plan."}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                to="/"
-                className="rounded-md bg-signal px-5 py-2.5 text-sm font-medium text-signal-foreground transition-opacity hover:opacity-90"
-              >
+              <Link to="/" className="hito-button hito-button-primary hito-button-md">
                 {snapshot.mode === "authenticated" ? "Open my plan" : "Finish setup"}
               </Link>
               <Link

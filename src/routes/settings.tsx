@@ -139,13 +139,11 @@ function SettingsPage() {
         <section className="grid gap-8 lg:grid-cols-[240px_1fr]">
           <div className="space-y-4 border-t border-hairline pt-5">
             <div className="flex items-center gap-3">
-              <Avatar className="h-24 w-24 rounded-[26px] border border-hairline/80 bg-background/70">
+              <Avatar className="hito-profile-avatar h-24 w-24">
                 {settings.avatarUrl ? (
                   <AvatarImage src={settings.avatarUrl} alt="Profile avatar" />
                 ) : null}
-                <AvatarFallback className="rounded-[26px] bg-gradient-to-br from-signal to-quality text-xl font-medium text-signal-foreground">
-                  {initials}
-                </AvatarFallback>
+                <AvatarFallback className="hito-profile-avatar-fallback">{initials}</AvatarFallback>
               </Avatar>
               <div>
                 <p className="hito-label">Avatar</p>

@@ -164,13 +164,14 @@ export function PlanImportPanel({
               </div>
               {canOfferClearBeforeImport ? (
                 <div className="hito-list-row items-start">
-                  <label className="hito-body flex max-w-xl items-start gap-3">
+                  <label className="hito-control-label hito-control-label-sm max-w-xl">
                     <input
                       type="checkbox"
                       checked={clearBeforeImport}
+                      data-state={clearBeforeImport ? "checked" : "unchecked"}
                       disabled={isBusy}
                       onChange={(event) => onClearBeforeImportChange(event.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
+                      className={`hito-checkbox hito-checkbox-sm${clearBeforeImport ? " hito-checkbox-checked" : ""}`}
                     />
                     <span>
                       Remove the current upcoming schedule before this later-starting plan is

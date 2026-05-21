@@ -29,6 +29,7 @@ const SECTIONS = [
   { id: "buttons", label: "Buttons" },
   { id: "tabs", label: "Tabs" },
   { id: "inputs", label: "Inputs" },
+  { id: "selection-controls", label: "Selection" },
   { id: "surfaces", label: "Composition" },
   { id: "modals", label: "Modals" },
   { id: "async-actions", label: "Async toasts" },
@@ -1274,6 +1275,233 @@ function HitoDesignSystemPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section id="selection-controls" className="ds-section">
+              <SectionIntro
+                label="Selection controls"
+                title="Signal-selected, never browser-native."
+                body="Checkboxes, radios, and toggle radios share Hito focus, disabled, invalid, and signal-selected states. Destructive confirmation uses warning copy and destructive buttons; the selected checkbox itself stays signal."
+              />
+
+              <div className="hito-reference-list">
+                <article className="hito-reference-row">
+                  <div>
+                    <p className="hito-label">Checkbox</p>
+                    <p className="hito-caption mt-2 max-w-xl">
+                      Use when a choice can be independently on or off. Labels are the hit target:
+                      SM rows are at least 32px high and MD rows are at least 40px high.
+                    </p>
+                  </div>
+                  <div className="grid gap-3">
+                    <label className="hito-control-label hito-control-label-sm">
+                      <input type="checkbox" className="hito-checkbox hito-checkbox-sm" />
+                      <span>SM checkbox</span>
+                    </label>
+                    <label className="hito-control-label hito-control-label-sm">
+                      <input
+                        type="checkbox"
+                        className="hito-checkbox hito-checkbox-sm"
+                        defaultChecked
+                        data-state="checked"
+                      />
+                      <span>SM checked uses signal</span>
+                    </label>
+                    <label className="hito-control-label hito-control-label-md">
+                      <input
+                        type="checkbox"
+                        className="hito-checkbox hito-checkbox-md"
+                        defaultChecked
+                        data-state="checked"
+                      />
+                      <span>MD checkbox with larger hit target</span>
+                    </label>
+                  </div>
+                </article>
+
+                <article className="hito-reference-row">
+                  <div>
+                    <p className="hito-label">Radio</p>
+                    <p className="hito-caption mt-2 max-w-xl">
+                      Use when one option must be selected from a small set. Keep labels plain and
+                      keep focus-visible distinct from the selected dot.
+                    </p>
+                  </div>
+                  <div className="grid gap-3" role="radiogroup" aria-label="Radio example">
+                    <label className="hito-control-label hito-control-label-sm">
+                      <input
+                        type="radio"
+                        name="ds-radio-sm"
+                        className="hito-radio hito-radio-sm"
+                        defaultChecked
+                      />
+                      <span>SM selected</span>
+                    </label>
+                    <label className="hito-control-label hito-control-label-sm">
+                      <input type="radio" name="ds-radio-sm" className="hito-radio hito-radio-sm" />
+                      <span>SM default</span>
+                    </label>
+                    <label className="hito-control-label hito-control-label-md">
+                      <input
+                        type="radio"
+                        name="ds-radio-md"
+                        className="hito-radio hito-radio-md"
+                        defaultChecked
+                      />
+                      <span>MD selected</span>
+                    </label>
+                  </div>
+                </article>
+
+                <article className="hito-reference-row">
+                  <div>
+                    <p className="hito-label">Toggle radio</p>
+                    <p className="hito-caption mt-2 max-w-xl">
+                      Use for compact segmented option groups where the option surface is the label.
+                      Do not convert ordinary chips or buttons unless the interaction is truly a
+                      single-choice radio decision.
+                    </p>
+                  </div>
+                  <div className="grid gap-4">
+                    <div
+                      className="hito-choice-toggle-group"
+                      role="radiogroup"
+                      aria-label="Small toggle radio example"
+                    >
+                      <button
+                        type="button"
+                        className="hito-choice-toggle hito-choice-toggle-sm"
+                        role="radio"
+                        aria-checked="true"
+                      >
+                        Easy
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-choice-toggle hito-choice-toggle-sm"
+                        role="radio"
+                        aria-checked="false"
+                      >
+                        Balanced
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-choice-toggle hito-choice-toggle-sm"
+                        role="radio"
+                        aria-checked="false"
+                      >
+                        Ambitious
+                      </button>
+                    </div>
+                    <div
+                      className="hito-choice-toggle-group"
+                      role="radiogroup"
+                      aria-label="Medium toggle radio example"
+                    >
+                      <button
+                        type="button"
+                        className="hito-choice-toggle hito-choice-toggle-md"
+                        role="radio"
+                        aria-checked="false"
+                      >
+                        Short
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-choice-toggle hito-choice-toggle-md"
+                        role="radio"
+                        aria-checked="true"
+                      >
+                        Marathon
+                      </button>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="hito-reference-row">
+                  <div>
+                    <p className="hito-label">Disabled and invalid</p>
+                    <p className="hito-caption mt-2 max-w-xl">
+                      Disabled lowers contrast. Invalid uses the error ring, but selected state
+                      still does not become destructive red.
+                    </p>
+                  </div>
+                  <div className="grid gap-3">
+                    <label className="hito-control-label hito-control-label-sm">
+                      <input
+                        type="checkbox"
+                        className="hito-checkbox hito-checkbox-sm"
+                        defaultChecked
+                        data-state="checked"
+                        disabled
+                      />
+                      <span>Disabled checked</span>
+                    </label>
+                    <label className="hito-control-label hito-control-label-sm">
+                      <input
+                        type="radio"
+                        name="ds-radio-invalid"
+                        className="hito-radio hito-radio-sm"
+                        aria-invalid="true"
+                      />
+                      <span>Invalid radio</span>
+                    </label>
+                    <div className="hito-choice-toggle-group">
+                      <button
+                        type="button"
+                        className="hito-choice-toggle hito-choice-toggle-sm"
+                        role="radio"
+                        aria-checked="true"
+                        aria-invalid="true"
+                      >
+                        Invalid selected
+                      </button>
+                      <button
+                        type="button"
+                        className="hito-choice-toggle hito-choice-toggle-sm"
+                        disabled
+                      >
+                        Disabled
+                      </button>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="hito-reference-row">
+                  <div>
+                    <p className="hito-label">Destructive confirmation</p>
+                    <p className="hito-caption mt-2 max-w-xl">
+                      The checkbox confirms understanding and stays signal-selected. Destructive
+                      meaning belongs to the warning icon, explanatory copy, and final destructive
+                      action.
+                    </p>
+                  </div>
+                  <div className="grid max-w-xl gap-3">
+                    <div className="flex items-start gap-3">
+                      <Icon name="warning" size="sm" className="mt-1 text-destructive" />
+                      <p className="hito-field-helper">
+                        This archives the active plan and clears the active schedule view.
+                      </p>
+                    </div>
+                    <label className="hito-control-label hito-control-label-sm">
+                      <input
+                        type="checkbox"
+                        className="hito-checkbox hito-checkbox-sm"
+                        defaultChecked
+                        data-state="checked"
+                      />
+                      <span>I understand this keeps history archived.</span>
+                    </label>
+                    <button
+                      type="button"
+                      data-tone="error"
+                      className="hito-button hito-button-outlined hito-button-sm justify-self-start"
+                    >
+                      Delete plan
+                    </button>
+                  </div>
+                </article>
               </div>
             </section>
 

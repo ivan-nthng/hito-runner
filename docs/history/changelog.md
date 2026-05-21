@@ -4,6 +4,7 @@ Completed implementation history only.
 
 ## 2026-05-21
 
+- Added Hito-owned checkbox, radio, and toggle-radio selection-control recipes in `sm` and `md` sizes, documented them in `/hitoDS#selection-controls`, and migrated saved-mode plan/import confirmation checkboxes to signal-selected Hito styling while preserving existing destructive and import gating behavior.
 - Replaced Hito’s primary sans font from Inter to Poppins at the design-system foundations layer: `src/styles.css` now loads Poppins and maps `--font-sans` to it, while `/hitoDS#foundations` documents Poppins for body, label, control, navigation, and feedback roles without changing type scale, spacing, Fraunces display roles, or JetBrains Mono technical roles.
 
 ## 2026-05-20

@@ -46,13 +46,14 @@ export function PlanLifecycleControls({
             </p>
           </div>
           {clearError ? <p className="hito-field-error">{clearError}</p> : null}
-          <label className="hito-body flex max-w-xl items-start gap-3">
+          <label className="hito-control-label hito-control-label-sm max-w-xl">
             <input
               type="checkbox"
               checked={clearConfirmed}
+              data-state={clearConfirmed ? "checked" : "unchecked"}
               disabled={isBusy}
               onChange={(event) => onClearConfirmedChange(event.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
+              className={`hito-checkbox hito-checkbox-sm${clearConfirmed ? " hito-checkbox-checked" : ""}`}
             />
             <span>
               I understand this clears the active upcoming schedule and keeps history archived.
@@ -86,13 +87,14 @@ export function PlanLifecycleControls({
             </p>
           </div>
           {deleteError ? <p className="hito-field-error">{deleteError}</p> : null}
-          <label className="hito-body flex max-w-xl items-start gap-3">
+          <label className="hito-control-label hito-control-label-sm max-w-xl">
             <input
               type="checkbox"
               checked={deleteConfirmed}
+              data-state={deleteConfirmed ? "checked" : "unchecked"}
               disabled={isBusy}
               onChange={(event) => onDeleteConfirmedChange(event.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-hairline text-signal focus:ring-signal"
+              className={`hito-checkbox hito-checkbox-sm${deleteConfirmed ? " hito-checkbox-checked" : ""}`}
             />
             <span>I understand this clears the active schedule and keeps history archived.</span>
           </label>

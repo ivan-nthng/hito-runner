@@ -2610,6 +2610,87 @@
     width: 0.92rem;
   }
 
+  .hito-calendar-mobile-list {
+    display: grid;
+    gap: 0.625rem;
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 768px) {
+    .hito-calendar-mobile-list {
+      display: none;
+    }
+  }
+
+  .hito-calendar-mobile-row {
+    display: flex;
+    min-width: 0;
+    min-height: 4.75rem;
+    align-items: center;
+    gap: 0.875rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-background) 48%, transparent);
+    padding: 0.875rem;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .hito-calendar-mobile-row:hover {
+    border-color: color-mix(in oklch, var(--color-foreground) 18%, transparent);
+    background: color-mix(in oklch, var(--color-accent) 34%, transparent);
+  }
+
+  .hito-calendar-mobile-row:focus-visible {
+    outline: none;
+    border-color: color-mix(in oklch, var(--color-signal) 46%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
+  }
+
+  .hito-calendar-mobile-row-today {
+    border-color: color-mix(in oklch, var(--color-signal) 56%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-signal) 34%, transparent);
+  }
+
+  .hito-calendar-mobile-row-completed {
+    background: color-mix(in oklch, var(--color-success) 5%, transparent);
+  }
+
+  .hito-calendar-mobile-date {
+    display: grid;
+    width: 3rem;
+    flex: 0 0 auto;
+    gap: 0.125rem;
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .hito-calendar-mobile-date span {
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+  }
+
+  .hito-calendar-mobile-date strong {
+    color: var(--color-foreground);
+    font-size: 1.125rem;
+    font-weight: 500;
+  }
+
+  .hito-calendar-mobile-feedback-marker {
+    position: absolute;
+    right: 0.875rem;
+    bottom: 0.75rem;
+    z-index: 2;
+    padding: 0.25rem 0.375rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--color-background) 82%, transparent);
+  }
+
   .hito-feedback-marker {
     display: inline-flex;
     align-items: center;

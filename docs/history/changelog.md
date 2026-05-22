@@ -2,6 +2,10 @@
 
 Completed implementation history only.
 
+## 2026-05-22
+
+- Fixed Calendar tooltip and mobile month usability: month tooltips now render through a viewport-clamped fixed layer, while narrow month view switches to a vertical day list that preserves workout links, glyphs, status, and feedback markers instead of squeezing the desktop seven-column grid.
+
 ## 2026-05-21
 
 - Added Hito-owned checkbox, radio, and toggle-radio selection-control recipes in `sm` and `md` sizes, documented them in `/hitoDS#selection-controls`, and migrated saved-mode plan/import confirmation checkboxes to signal-selected Hito styling while preserving existing destructive and import gating behavior.

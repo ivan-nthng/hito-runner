@@ -113,6 +113,8 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - home/calendar now uses a lighter scan rhythm:
   month cells carry date, completion truth, one distinct tiny workout-type glyph, one short workout-type label, the compact workout title, and a secondary feedback/evidence cue without inline distance, duration, target data, or dashboard clutter
   the current distinct glyph set covers Easy, Recovery, Long, Tempo, Intervals, Progression, Race, Quality, and Rest while preserving the existing easy, long, quality, and rest color families
+  desktop and tablet month view keep the seven-column calendar grid, while narrow month view uses a vertical day list so dates, workout type, title, status, and feedback cues remain readable without horizontal squeeze
+  workout hover/focus tooltips are viewport-contained so edge cells do not push tooltip content off-screen
 - saved workout logging now distinguishes preview-only drafts from persisted saves, supports truthful overwrite between `completed`, `partial`, and `skipped`, and surfaces pending, success, and failure feedback without hiding backend failures
 - saved workout logging now also supports workout-linked body notes as part of the saved result:
   body notes persist with the specific workout log, reload with that workout, open from a focused modal inside `Log result`, and stay out of plan-adjustment truth while optionally informing Garmin feedback only as bounded caution context

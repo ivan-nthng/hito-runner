@@ -210,6 +210,7 @@
 - saved-mode home-return affordances in the shell now reopen `/` through a fresh document request so already-open tabs can recover the authoritative home route even when a stale client fetch path fails
 - calendar day cells now mark completed workouts with a clearer green confirmation state while keeping today and rest states readable
 - saved-mode home/calendar now follows the simplified P0 rhythm: cells prioritize date, workout identity, completion marker, and secondary feedback cue while detailed distance/duration context stays in hover or the larger week context
+- calendar month tooltips now render through one viewport-clamped fixed layer instead of absolute cell-local placement, and narrow month view switches to a vertical day list while preserving workout links, glyphs, status markers, today/completed treatment, and feedback markers
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode advanced import entry point plus sign-out action
 - the saved-mode header `Open plan` action now opens one compact plan-management modal around the active plan summary, text-first replacement, advanced JSON import, and backend-owned plan deletion

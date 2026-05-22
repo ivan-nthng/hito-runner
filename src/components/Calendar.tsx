@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
@@ -27,14 +27,29 @@ type CalendarWorkoutIdentity = {
   color: string;
   glyph: WorkoutGlyphKind;
 };
+type TooltipAnchor = {
+  iso: string;
+  rect: Pick<DOMRect, "bottom" | "height" | "left" | "right" | "top" | "width">;
+};
+type TooltipPosition = {
+  left: number;
+  top: number;
+};
+
+const TOOLTIP_VIEWPORT_MARGIN = 12;
+const TOOLTIP_ANCHOR_GAP = 10;
 
 export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(() => new Date(`${snapshot.currentDate}T00:00:00`));
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [tooltipAnchor, setTooltipAnchor] = useState<TooltipAnchor | null>(null);
 
   const cells = useMemo(() => buildMonth(cursor), [cursor]);
+  const mobileMonthDates = useMemo(() => buildMonthDays(cursor), [cursor]);
   const monthLabel = cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const tooltipWorkout = tooltipAnchor
+    ? (findWorkout(snapshot.workouts, tooltipAnchor.iso) ?? null)
+    : null;
 
   const weekCells = useMemo(() => {
     const date = new Date(cursor);
@@ -53,6 +68,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
     if (view === "month") date.setMonth(date.getMonth() + amount);
     else date.setDate(date.getDate() + amount * 7);
     setCursor(date);
+    setTooltipAnchor(null);
   }
 
   return (
@@ -86,7 +102,10 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
             <Icon name="chevron-left" size="sm" />
           </button>
           <button
-            onClick={() => setCursor(new Date(`${snapshot.currentDate}T00:00:00`))}
+            onClick={() => {
+              setCursor(new Date(`${snapshot.currentDate}T00:00:00`));
+              setTooltipAnchor(null);
+            }}
             className="hito-button hito-button-secondary hito-button-sm"
           >
             Today
@@ -115,32 +134,215 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
       </div>
 
       {view === "month" ? (
-        <div className="border-b border-hairline">
-          <div className="grid grid-cols-7 border-b border-hairline">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-              <div key={day} className="hito-micro-label px-3 py-2">
-                {day}
-              </div>
-            ))}
+        <>
+          <div className="hidden border-b border-hairline md:block">
+            <div className="grid grid-cols-7 border-b border-hairline">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                <div key={day} className="hito-micro-label px-3 py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {cells.map((iso, index) => (
+                <DayCell
+                  key={index}
+                  iso={iso}
+                  inMonth={
+                    iso ? new Date(`${iso}T00:00:00`).getMonth() === cursor.getMonth() : false
+                  }
+                  onTooltipChange={setTooltipAnchor}
+                  snapshot={snapshot}
+                />
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-7">
-            {cells.map((iso, index) => (
-              <DayCell
-                key={index}
-                iso={iso}
-                inMonth={iso ? new Date(`${iso}T00:00:00`).getMonth() === cursor.getMonth() : false}
-                onHover={setHovered}
-                hovered={hovered}
-                snapshot={snapshot}
-              />
-            ))}
-          </div>
-        </div>
+          <MobileMonthList dates={mobileMonthDates} snapshot={snapshot} />
+        </>
       ) : (
         <WeekStrip dates={weekCells} snapshot={snapshot} />
       )}
+
+      {tooltipAnchor && tooltipWorkout ? (
+        <CalendarTooltipLayer anchor={tooltipAnchor}>
+          <Tooltip workout={tooltipWorkout} />
+        </CalendarTooltipLayer>
+      ) : null}
     </div>
   );
+}
+
+function CalendarTooltipLayer({
+  anchor,
+  children,
+}: {
+  anchor: TooltipAnchor;
+  children: ReactNode;
+}) {
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<TooltipPosition | null>(null);
+
+  useEffect(() => {
+    function updatePosition() {
+      if (typeof window === "undefined") return;
+
+      const tooltip = tooltipRef.current;
+      const tooltipWidth = tooltip?.offsetWidth ?? 288;
+      const tooltipHeight = tooltip?.offsetHeight ?? 190;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const preferredLeft = anchor.rect.left + anchor.rect.width / 2 - tooltipWidth / 2;
+      const left = clamp(
+        preferredLeft,
+        TOOLTIP_VIEWPORT_MARGIN,
+        Math.max(TOOLTIP_VIEWPORT_MARGIN, viewportWidth - tooltipWidth - TOOLTIP_VIEWPORT_MARGIN),
+      );
+      const belowTop = anchor.rect.bottom + TOOLTIP_ANCHOR_GAP;
+      const aboveTop = anchor.rect.top - tooltipHeight - TOOLTIP_ANCHOR_GAP;
+      const hasRoomBelow = belowTop + tooltipHeight <= viewportHeight - TOOLTIP_VIEWPORT_MARGIN;
+      const hasRoomAbove = aboveTop >= TOOLTIP_VIEWPORT_MARGIN;
+      const preferredTop =
+        hasRoomBelow || !hasRoomAbove
+          ? Math.min(belowTop, viewportHeight - tooltipHeight - TOOLTIP_VIEWPORT_MARGIN)
+          : aboveTop;
+      const top = clamp(
+        preferredTop,
+        TOOLTIP_VIEWPORT_MARGIN,
+        Math.max(TOOLTIP_VIEWPORT_MARGIN, viewportHeight - tooltipHeight - TOOLTIP_VIEWPORT_MARGIN),
+      );
+
+      setPosition({ left, top });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchor]);
+
+  return (
+    <div
+      className="pointer-events-none fixed z-50"
+      style={{
+        left: position?.left ?? -9999,
+        top: position?.top ?? -9999,
+        opacity: position ? 1 : 0,
+      }}
+    >
+      <div ref={tooltipRef}>{children}</div>
+    </div>
+  );
+}
+
+function MobileMonthList({ dates, snapshot }: { dates: string[]; snapshot: TrainingSnapshot }) {
+  return (
+    <div className="hito-calendar-mobile-list md:hidden">
+      {dates.map((iso) => {
+        const workout = findWorkout(snapshot.workouts, iso);
+        const isToday = iso === snapshot.currentDate;
+        const status = workout?.status ?? "rest";
+        const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
+        const hasWorkout = workout && workout.type !== "rest";
+        const isCompleted = status === "completed";
+        const identity = workout ? calendarWorkoutIdentity(workout) : null;
+
+        return (
+          <div key={iso} className="relative">
+            <Link
+              to="/workout/$date"
+              params={{ date: iso }}
+              search={{} as never}
+              className={cn(
+                "hito-calendar-mobile-row group",
+                isToday && "hito-calendar-mobile-row-today",
+                isCompleted && !isToday && "hito-calendar-mobile-row-completed",
+              )}
+            >
+              <div className="hito-calendar-mobile-date">
+                <span>{weekdayShort(iso)}</span>
+                <strong>{iso.slice(8)}</strong>
+              </div>
+
+              <div className="min-w-0 flex-1">
+                {identity ? (
+                  <div
+                    className="hito-micro-label inline-flex max-w-full min-w-0 items-center gap-1.5"
+                    style={{ color: identity.color }}
+                  >
+                    <WorkoutGlyph kind={identity.glyph} className="hito-calendar-type-glyph" />
+                    <span className="truncate">{identity.label}</span>
+                    {hasWorkout && <StatusMark status={status} compact />}
+                  </div>
+                ) : (
+                  <div className="hito-micro-label">Rest</div>
+                )}
+
+                <div
+                  className={cn(
+                    "hito-body-small mt-1 min-w-0 truncate text-foreground/85",
+                    status === "skipped" && "line-through opacity-50",
+                  )}
+                >
+                  {workout?.title.replace(/^(Аэробный |Лёгкий )/, "") ?? "Rest day"}
+                </div>
+
+                {hasWorkout ? (
+                  <div className="hito-technical-mono mt-2 text-muted-foreground">
+                    {compactWorkoutSummary(workout)}
+                  </div>
+                ) : null}
+              </div>
+            </Link>
+
+            {hasWorkout && feedbackMeta && (
+              <Link
+                to="/workout/$date"
+                params={{ date: iso }}
+                search={{ tab: "feedback" } as never}
+                className="hito-feedback-marker hito-calendar-mobile-feedback-marker"
+                data-state={feedbackMeta.state}
+                aria-label={`${feedbackMeta.label}. Open workout feedback.`}
+              >
+                <span className="hito-feedback-marker-dot" />
+                <span>{feedbackMeta.shortLabel}</span>
+              </Link>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function buildMonthDays(cursor: Date): string[] {
+  const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const date = new Date(cursor.getFullYear(), cursor.getMonth(), index + 1);
+    return date.toISOString().slice(0, 10);
+  });
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function tooltipAnchorFromElement(iso: string, element: HTMLElement): TooltipAnchor {
+  const rect = element.getBoundingClientRect();
+  return {
+    iso,
+    rect: {
+      bottom: rect.bottom,
+      height: rect.height,
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      width: rect.width,
+    },
+  };
 }
 
 function buildMonth(cursor: Date): (string | null)[] {
@@ -172,14 +374,12 @@ function buildMonth(cursor: Date): (string | null)[] {
 function DayCell({
   iso,
   inMonth,
-  onHover,
-  hovered,
+  onTooltipChange,
   snapshot,
 }: {
   iso: string | null;
   inMonth: boolean;
-  onHover: (value: string | null) => void;
-  hovered: string | null;
+  onTooltipChange: (value: TooltipAnchor | null) => void;
   snapshot: TrainingSnapshot;
 }) {
   if (!iso) return <div className="aspect-[5/4] border-r border-b border-hairline" />;
@@ -187,7 +387,6 @@ function DayCell({
   const isToday = iso === snapshot.currentDate;
   const status = workout?.status ?? "rest";
   const day = parseInt(iso.split("-")[2], 10);
-  const isHover = hovered === iso;
   const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
   const hasWorkout = workout && workout.type !== "rest";
   const isCompleted = status === "completed";
@@ -199,8 +398,15 @@ function DayCell({
       <Link
         to="/workout/$date"
         params={{ date: iso }}
-        onMouseEnter={() => onHover(iso)}
-        onMouseLeave={() => onHover(null)}
+        search={{} as never}
+        onMouseEnter={(event) => {
+          if (hasWorkout) onTooltipChange(tooltipAnchorFromElement(iso, event.currentTarget));
+        }}
+        onMouseLeave={() => onTooltipChange(null)}
+        onFocus={(event) => {
+          if (hasWorkout) onTooltipChange(tooltipAnchorFromElement(iso, event.currentTarget));
+        }}
+        onBlur={() => onTooltipChange(null)}
         className={cn(
           "block aspect-[5/4] border-r border-b border-hairline p-3 transition-colors group",
           !inMonth && "opacity-30",
@@ -271,12 +477,6 @@ function DayCell({
         >
           <span className="hito-feedback-marker-dot" />
         </Link>
-      )}
-
-      {isHover && hasWorkout && (
-        <div className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 pointer-events-none">
-          <Tooltip workout={workout} />
-        </div>
       )}
     </div>
   );
@@ -417,6 +617,7 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
             <Link
               to="/workout/$date"
               params={{ date: iso }}
+              search={{} as never}
               className={cn(
                 "flex min-h-[170px] flex-col border-b border-hairline p-4 transition-colors hover:bg-accent/30 md:border-r md:border-b-0",
                 isToday &&

@@ -223,6 +223,8 @@ Active
   `RunnerCoachContext` and active-plan refresh proposal/apply now carry the same resolved invariant, include it in stale-check fingerprints and fixed-truth review copy, and block refresh apply output that schedules non-rest workouts on fixed rest days.
 - The saved-mode calendar-cell semantics correction is now implemented:
   month cells restore one broad-family workout-type glyph, one short type label, restrained type color, and a quiet feedback/evidence corner marker while keeping distance, duration, targets, and dashboard-style metric stacks out of month cells.
+- The Calendar viewport/mobile layout fix is now implemented:
+  desktop month cells keep their seven-column grid, hover/focus tooltips now clamp to the visible viewport instead of overflowing near screen edges, and narrow month view renders as a vertical day list preserving workout links, glyphs, status, today/completed treatment, and feedback markers.
 - The workout-type glyph semantics slice is now implemented:
   month cells and the shared workout glyph renderer now use distinct tiny one-color glyphs for Easy, Recovery, Long, Tempo, Intervals, Progression, Race, Quality, and Rest while preserving the existing easy, long, quality, and rest color families and avoiding any new Strength/OFP calendar type.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.

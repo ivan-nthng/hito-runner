@@ -53,9 +53,13 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 export {
   completeStructuredFirstPlanOnboarding,
   completeStructuredFirstPlanOnboardingForUser,
+  confirmStructuredFirstPlanDraft,
   confirmVoiceToPlanDraft,
+  generateStructuredFirstPlanDraft,
   generateVoiceToPlanDraft,
+  type ConfirmStructuredFirstPlanDraftResult,
   type ConfirmVoiceToPlanDraftResult,
+  type StructuredFirstPlanDraftResult,
 } from "@/lib/first-plan-actions";
 export {
   exportActivePlan,

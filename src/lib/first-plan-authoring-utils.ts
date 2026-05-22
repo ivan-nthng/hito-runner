@@ -19,9 +19,62 @@ export const FIRST_PLAN_GOAL_STYLE_VALUES = [
 
 export const FIRST_PLAN_TERRAIN_FOCUS_VALUES = ["standard", "rolling", "mountain"] as const;
 
+export const FIRST_PLAN_WATCH_ACCESS_VALUES = ["none", "watch_or_app", "unknown"] as const;
+
+export const FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES = [
+  "effort",
+  "pace",
+  "heart_rate",
+  "mixed",
+] as const;
+
 export type FirstPlanGoalDistance = (typeof FIRST_PLAN_GOAL_DISTANCE_VALUES)[number];
 export type FirstPlanGoalStyle = (typeof FIRST_PLAN_GOAL_STYLE_VALUES)[number];
 export type FirstPlanTerrainFocus = (typeof FIRST_PLAN_TERRAIN_FOCUS_VALUES)[number];
+export type FirstPlanWatchAccess = (typeof FIRST_PLAN_WATCH_ACCESS_VALUES)[number];
+export type FirstPlanGuidancePreference = (typeof FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES)[number];
+export type FirstPlanPreferredEffortLanguage = "pace" | "heart_rate" | "rpe" | "mixed";
+
+export interface FirstPlanExecutionMode {
+  watchAccess: FirstPlanWatchAccess;
+  guidancePreference: FirstPlanGuidancePreference;
+}
+
+export const DEFAULT_FIRST_PLAN_EXECUTION_MODE: FirstPlanExecutionMode = {
+  watchAccess: "unknown",
+  guidancePreference: "effort",
+};
+
+export function normalizeFirstPlanExecutionMode(
+  value:
+    | Partial<{
+        watchAccess: FirstPlanWatchAccess | null;
+        guidancePreference: FirstPlanGuidancePreference | null;
+      }>
+    | null
+    | undefined,
+): FirstPlanExecutionMode {
+  return {
+    watchAccess: value?.watchAccess ?? DEFAULT_FIRST_PLAN_EXECUTION_MODE.watchAccess,
+    guidancePreference:
+      value?.guidancePreference ?? DEFAULT_FIRST_PLAN_EXECUTION_MODE.guidancePreference,
+  };
+}
+
+export function guidancePreferenceToPreferredEffortLanguage(
+  guidancePreference: FirstPlanGuidancePreference,
+): FirstPlanPreferredEffortLanguage {
+  switch (guidancePreference) {
+    case "pace":
+      return "pace";
+    case "heart_rate":
+      return "heart_rate";
+    case "mixed":
+      return "mixed";
+    case "effort":
+      return "rpe";
+  }
+}
 
 export function uniqueWeekdays(values: readonly WeekdayName[]) {
   return WEEKDAY_NAMES.filter((weekday) => values.includes(weekday));

@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-18
+2026-05-22
 
 ## Where We Are Now
 
@@ -43,13 +43,17 @@ Active
   `SUPABASE_SERVICE_ROLE_KEY` has been removed from the active runtime and CLI env contract, so server-side Supabase admin/write access now resolves only from `SUPABASE_SECRET_KEY`.
 - The third actual deletion slice from the final Phase 5 plan is now implemented:
   deprecated single-account local auth env support has been removed from the active runtime and local tooling, so loopback local bypass now resolves only through `LOCAL_AUTH_BYPASS_ENABLED=true` plus `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE=...`.
-- The unauthenticated root flow is now login-first, and first-time onboarding is now structured-first against the `completeStructuredFirstPlanOnboarding` seam, with JSON import visibly demoted to an advanced file-based fallback.
+- The unauthenticated root flow is now login-first, and first-time onboarding is now structured-first against the `generateStructuredFirstPlanDraft` / `confirmStructuredFirstPlanDraft` review-before-create seam, with JSON import visibly demoted to an advanced file-based fallback.
 - The product-path recovery fix is now implemented:
   authenticated no-plan or no-workout states now show the same obvious text-entry plan creation surface, with advanced import kept secondary below it.
 - The onboarding post-submit transition fix is now implemented:
   successful plan creation now automatically opens a fresh saved-mode home request instead of leaving users stuck in the setup pending state.
 - The structured first-plan onboarding frontend slice is now implemented:
-  the normal no-plan setup surface collects required age/weight/height, a bounded 5K benchmark or unknown state, fixed rest days through a compact weekday selector, goal distance/style with ultra marathon and mountain running options, target time/date only for target-time goals, terrain only for marathon/ultra while mountain running implies mountain context, strength/mobility preference, and one optional `Comment`, then calls `completeStructuredFirstPlanOnboarding`; the create action stays in a sticky footer and remains disabled until required answers are complete, the large free-text-only creation prompt is no longer visible, and JSON import remains demoted under Advanced.
+  the normal no-plan setup surface collects required age/weight/height, a bounded 5K benchmark or unknown state, fixed rest days through a compact weekday selector, compact execution preference, goal distance/style with ultra marathon and mountain running options, target time/date only for target-time goals, terrain only for marathon/ultra while mountain running implies mountain context, strength/mobility preference, and one optional `Comment`, then calls `generateStructuredFirstPlanDraft`; the review action stays in a sticky footer and remains disabled until required answers are complete, ready drafts show backend-owned runner/profile, goal, availability/rest-day, horizon, workout-mix, metric-policy, assumption, and safety copy, and only the explicit `Yes, create plan` action calls `confirmStructuredFirstPlanDraft`.
+- The plan-authoring quality backend refinement is now implemented through slice 3:
+  structured authoring accepts generation-only execution mode, uses a metric-mode resolver so numeric pace targets require watch/app pace preference plus usable recent 5K truth, keeps HR numeric targets disabled without real HR-zone truth, and now emits exact generated workout identity plus cutback/long-run steady-finish structure inside valid `training-plan-v2` workout data.
+- The structured review-before-create backend slice is now implemented:
+  `generateStructuredFirstPlanDraft` produces a non-mutating structured setup review and canonical draft plan without creating profile, plan, workout, log, usage, or raw transient rows, while `confirmStructuredFirstPlanDraft` revalidates the draft, blocks if an active plan already exists, and creates the first active plan only after explicit confirmation.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
 - Home/calendar now resolve `today` from the real runtime local date and default the planning surface to that day instead of a frozen demo date.
 - The saved-mode home/calendar page now keeps the main `Today` hierarchy intact as a lighter open header, uses one divided support module on the right, removes the lower metadata strip, and marks day status with compact check/dash/cross symbols instead of bulky per-day pills.
@@ -287,6 +291,10 @@ Active
   imported, generated, preview, and persisted readback steps are normalized so every visible non-rest segment and expanded repeat work/recovery row has target or guidance text; missing work/recovery instructions receive bounded cue/hint fallbacks instead of fake pace or heart-rate values.
 - The structured segment target personalization follow-up is now implemented:
   recent 5K time or pace supplied through structured first-plan onboarding now becomes internal authoring pace truth, generated running segments receive broad `pace_min_per_km_range` targets for warmup, easy, long, steady, tempo, interval work, recovery, cooldown, and hill-oriented work where appropriate, unknown benchmarks still keep safe effort/hint fallbacks, and HR ranges are still not emitted without real HR-zone truth.
+- The first plan-authoring quality refinement backend slice is now implemented:
+  structured first-plan onboarding and the shared structured authoring input now accept bounded execution-mode context (`watchAccess` plus `guidancePreference`), default omitted values to unknown watch/app access plus effort guidance, and pass voice-to-plan structured supplements through the same contract without changing persistence, rest-day invariants, or the existing voice draft/confirm boundary.
+- The second plan-authoring quality refinement backend slice is now implemented:
+  generated structured plans now use one metric-mode resolver before emitting numeric workout targets: pace ranges require watch/app access, pace or mixed guidance preference, and usable recent 5K benchmark truth; omitted execution mode, no-watch mode, unknown benchmark, and HR preference without HR-zone truth stay effort/cue based and do not emit `pace_min_per_km_range` or `hr_bpm_range`.
 - The first structured plan-authoring backend slice is now implemented:
   the service accepts one bounded structured input contract, normalizes it server-side, generates canonical `training-plan-v2` plan data, and persists that plan through the same Supabase `plan_cycles` plus `planned_workouts` seam already used by JSON import.
   That bounded contract remains a backend and ops asset behind the visible structured onboarding UI, and Backend plus ops can still validate and persist generated structured plans through `npm run author-structured-plan -- --email <tester-email> --input-file <absolute-json-path>`.

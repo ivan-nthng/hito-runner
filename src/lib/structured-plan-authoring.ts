@@ -4,6 +4,11 @@ import {
   trainingPlanV2Schema,
   type TrainingPlanV2,
 } from "@/lib/imported-plan";
+import {
+  DEFAULT_FIRST_PLAN_EXECUTION_MODE,
+  FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES,
+  FIRST_PLAN_WATCH_ACCESS_VALUES,
+} from "@/lib/first-plan-authoring-utils";
 import { addDaysIso, diffDaysIso, todayIso } from "@/lib/training";
 
 const weekdayValues = [
@@ -17,6 +22,22 @@ const weekdayValues = [
 ] as const;
 
 const weekdaySchema = z.enum(weekdayValues);
+
+const watchAccessSchema = z.enum(FIRST_PLAN_WATCH_ACCESS_VALUES);
+
+const guidancePreferenceSchema = z.enum(FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES);
+
+const executionModeSchema = z.preprocess(
+  (value) => value ?? DEFAULT_FIRST_PLAN_EXECUTION_MODE,
+  z
+    .object({
+      watchAccess: watchAccessSchema.default(DEFAULT_FIRST_PLAN_EXECUTION_MODE.watchAccess),
+      guidancePreference: guidancePreferenceSchema.default(
+        DEFAULT_FIRST_PLAN_EXECUTION_MODE.guidancePreference,
+      ),
+    })
+    .strict(),
+);
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -137,6 +158,7 @@ export const structuredPlanAuthoringInputSchema = z
       .default({
         indoorTreadmillOk: false,
       }),
+    execution: executionModeSchema,
   })
   .superRefine((value, context) => {
     if (!value.schedule.targetDate && !value.schedule.preparationHorizonWeeks) {
@@ -173,6 +195,12 @@ interface NormalizedStructuredInput extends StructuredPlanAuthoringInput {
     qualityDay: (typeof weekdayValues)[number] | null;
     steadyDay: (typeof weekdayValues)[number] | null;
   };
+}
+
+interface StructuredMetricMode {
+  paceTargetsAllowed: boolean;
+  heartRateTargetsAllowed: boolean;
+  recent5kPaceSecondsPerKm: number | null;
 }
 
 export function buildStructuredAuthoringPlan(input: StructuredPlanAuthoringInput): TrainingPlanV2 {
@@ -384,6 +412,7 @@ function buildRestWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "rest" as const,
+    source_workout_type: "rest_and_recovery",
     title: "Rest and recovery",
     summary: shouldAvoidQuality(normalized)
       ? "Recovery day that keeps current constraints intact."
@@ -416,6 +445,7 @@ function buildEasyWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "easy" as const,
+    source_workout_type: "easy_aerobic_run",
     title: "Easy aerobic run",
     summary: `${easyDurationMin} min comfortable aerobic running.`,
     planned_rpe: 4,
@@ -454,6 +484,7 @@ function buildSteadyWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "steady_or_easy" as const,
+    source_workout_type: "steady_aerobic_run",
     title: "Steady aerobic run",
     summary: `${steadyDurationMin} min steady aerobic support run.`,
     planned_rpe: 5,
@@ -488,6 +519,13 @@ function buildLongRunWorkout({
 }: BuildWorkoutContext) {
   const distanceKm = deriveLongRunDistanceKm(normalized, weekNumber);
   const durationMin = deriveLongRunDurationMin(normalized, weekNumber, distanceKm);
+  const cutback = isCutbackWeek(weekNumber, normalized);
+  const hasSteadyFinish = shouldAddLongRunSteadyFinish(normalized, weekNumber);
+  const title = cutback
+    ? "Cutback long run"
+    : hasSteadyFinish
+      ? "Long run with steady finish"
+      : "Long aerobic run";
 
   return {
     workout_id: workoutId,
@@ -496,18 +534,70 @@ function buildLongRunWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "long_run" as const,
-    title: "Long run",
-    summary: normalized.runnerProfile.baselineLongRunKm
-      ? `${distanceKm} km long aerobic run.`
-      : `${durationMin} min long aerobic run.`,
+    source_workout_type: cutback
+      ? "cutback_long_run"
+      : hasSteadyFinish
+        ? "long_run_with_steady_finish"
+        : "long_aerobic_run",
+    title,
+    summary: buildLongRunSummary(normalized, distanceKm, durationMin, cutback, hasSteadyFinish),
     planned_rpe: 5,
-    segments: [
+    segments: buildLongRunSegments({
+      workoutId,
+      normalized,
+      distanceKm,
+      durationMin,
+      cutback,
+      hasSteadyFinish,
+    }),
+  };
+}
+
+function buildLongRunSummary(
+  normalized: NormalizedStructuredInput,
+  distanceKm: number,
+  durationMin: number,
+  cutback: boolean,
+  hasSteadyFinish: boolean,
+) {
+  const loadLabel = normalized.runnerProfile.baselineLongRunKm
+    ? `${distanceKm} km`
+    : `${durationMin} min`;
+
+  if (cutback) {
+    return `${loadLabel} lower-load long run to absorb the block.`;
+  }
+
+  if (hasSteadyFinish) {
+    return `${loadLabel} long run with an easy base and a controlled steady finish.`;
+  }
+
+  return `${loadLabel} long aerobic run.`;
+}
+
+function buildLongRunSegments({
+  workoutId,
+  normalized,
+  distanceKm,
+  durationMin,
+  cutback,
+  hasSteadyFinish,
+}: {
+  workoutId: string;
+  normalized: NormalizedStructuredInput;
+  distanceKm: number;
+  durationMin: number;
+  cutback: boolean;
+  hasSteadyFinish: boolean;
+}) {
+  if (!hasSteadyFinish) {
+    return [
       {
         segment_id: `${workoutId}_seg_1`,
         sequence: 1,
         segment_type: "main" as const,
-        label: "Long run",
-        guidance: buildLongRunGuidance(normalized),
+        label: cutback ? "Cutback long aerobic running" : "Long aerobic running",
+        guidance: buildLongRunGuidance(normalized, cutback),
         prescription: normalized.runnerProfile.baselineLongRunKm
           ? {
               mode: "distance" as const,
@@ -522,8 +612,74 @@ function buildLongRunWorkout({
           : { duration_min: durationMin }),
         target: buildLongRunTarget(normalized),
       },
-    ],
-  };
+    ];
+  }
+
+  if (normalized.runnerProfile.baselineLongRunKm) {
+    const steadyFinishDistanceKm = Number(Math.max(1, distanceKm * 0.22).toFixed(1));
+    const baseDistanceKm = Number(Math.max(1, distanceKm - steadyFinishDistanceKm).toFixed(1));
+
+    return [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Easy long-run base",
+        guidance: buildLongRunGuidance(normalized, false),
+        prescription: {
+          mode: "distance" as const,
+          distance_km: baseDistanceKm,
+        },
+        distance_km: baseDistanceKm,
+        target: buildLongRunTarget(normalized),
+      },
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "main" as const,
+        label: "Controlled steady finish",
+        guidance: "Gently lift the effort late, but keep it sustainable and relaxed.",
+        prescription: {
+          mode: "distance" as const,
+          distance_km: steadyFinishDistanceKm,
+        },
+        distance_km: steadyFinishDistanceKm,
+        target: buildSteadyFinishTarget(normalized),
+      },
+    ];
+  }
+
+  const steadyFinishDurationMin = roundToFive(Math.min(25, Math.max(10, durationMin * 0.22)));
+  const baseDurationMin = Math.max(25, durationMin - steadyFinishDurationMin);
+
+  return [
+    {
+      segment_id: `${workoutId}_seg_1`,
+      sequence: 1,
+      segment_type: "main" as const,
+      label: "Easy long-run base",
+      guidance: buildLongRunGuidance(normalized, false),
+      prescription: {
+        mode: "time" as const,
+        duration_min: baseDurationMin,
+      },
+      duration_min: baseDurationMin,
+      target: buildLongRunTarget(normalized),
+    },
+    {
+      segment_id: `${workoutId}_seg_2`,
+      sequence: 2,
+      segment_type: "main" as const,
+      label: "Controlled steady finish",
+      guidance: "Gently lift the effort late, but keep it sustainable and relaxed.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: steadyFinishDurationMin,
+      },
+      duration_min: steadyFinishDurationMin,
+      target: buildSteadyFinishTarget(normalized),
+    },
+  ];
 }
 
 function buildQualityWorkout({
@@ -534,6 +690,10 @@ function buildQualityWorkout({
   phase,
   normalized,
 }: BuildWorkoutContext) {
+  if (isCutbackWeek(weekNumber, normalized)) {
+    return buildCutbackAerobicWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+  }
+
   const workoutPattern = weekNumber % 3;
 
   if (normalized.preferences.terrainFocus === "mountain") {
@@ -564,6 +724,45 @@ function buildQualityWorkout({
   return buildTimeIntervalsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
 }
 
+function buildCutbackAerobicWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const durationMin = Math.max(25, deriveEasyDurationMin(normalized, weekNumber) - 10);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "easy" as const,
+    source_workout_type: "cutback_aerobic_run",
+    title: "Cutback aerobic run",
+    summary: `${durationMin} min deliberately easy aerobic running for a lower-load week.`,
+    planned_rpe: 4,
+    segments: [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Reduced aerobic running",
+        guidance:
+          "Keep this intentionally easy so the week absorbs training instead of adding a new stressor.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: durationMin,
+        },
+        target: buildEasyTarget(normalized),
+      },
+    ],
+  };
+}
+
 function buildRollingHillsWorkout({
   workoutId,
   date,
@@ -582,6 +781,7 @@ function buildRollingHillsWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "quality" as const,
+    source_workout_type: "rolling_hills_session",
     title: "Rolling hills session",
     summary: `${repeatCount} relaxed hill pickups on rolling terrain with easy recovery.`,
     planned_rpe: 7,
@@ -636,6 +836,7 @@ function buildHillRepeatsWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "quality" as const,
+    source_workout_type: "uphill_repeats",
     title: "Uphill repeats",
     summary: `${repeatCount} controlled uphill repeats with easy downhill or flat recovery.`,
     planned_rpe: 7,
@@ -690,6 +891,7 @@ function buildClimbingSteadyWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "steady_or_easy" as const,
+    source_workout_type: "climbing_steady_run",
     title: "Climbing steady run",
     summary: `${durationMin} min steady run with intentional hill exposure.`,
     planned_rpe: 6,
@@ -733,6 +935,7 @@ function buildTempoWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "tempo" as const,
+    source_workout_type: "controlled_tempo_session",
     title: "Controlled tempo session",
     summary: `${tempoDurationMin} min controlled tempo running between easy and race effort.`,
     planned_rpe: 7,
@@ -778,7 +981,8 @@ function buildDistanceIntervalsWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "quality" as const,
-    title: "Intervals session",
+    source_workout_type: "distance_intervals",
+    title: "Distance intervals",
     summary: `${repeatCount} x 400m at controlled 5K effort with 2 min recovery.`,
     planned_rpe: 7,
     segments: [
@@ -831,7 +1035,8 @@ function buildTimeIntervalsWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "quality" as const,
-    title: "Intervals session",
+    source_workout_type: "time_intervals",
+    title: "Time intervals",
     summary: `${repeatCount} x 3 min controlled intervals with 2 min recovery.`,
     planned_rpe: 7,
     segments: [
@@ -932,13 +1137,8 @@ function buildEasyTarget(normalized: NormalizedStructuredInput) {
 
   return {
     intensity: "easy_aerobic",
-    ...((paceTargets?.easy ?? normalized.currentLevel.currentEasyPaceRange)
-      ? { pace_min_per_km_range: paceTargets?.easy ?? normalized.currentLevel.currentEasyPaceRange }
-      : {}),
-    cue:
-      normalized.runnerProfile.preferredEffortLanguage === "heart_rate"
-        ? "Stay clearly below hard effort and keep the heart rate drifting smoothly."
-        : "Conversational effort throughout.",
+    ...(paceTargets?.easy ? { pace_min_per_km_range: paceTargets.easy } : {}),
+    cue: buildEasyCue(normalized),
   };
 }
 
@@ -947,20 +1147,26 @@ function buildLongRunTarget(normalized: NormalizedStructuredInput) {
 
   return {
     intensity: "easy_aerobic",
-    ...((paceTargets?.longRun ?? normalized.currentLevel.currentEasyPaceRange)
-      ? {
-          pace_min_per_km_range:
-            paceTargets?.longRun ?? normalized.currentLevel.currentEasyPaceRange,
-        }
-      : {}),
+    ...(paceTargets?.longRun ? { pace_min_per_km_range: paceTargets.longRun } : {}),
     cue: "Comfortable enough to keep the full run controlled.",
   };
 }
 
-function deriveBenchmarkPaceTargets(normalized: NormalizedStructuredInput) {
-  const recent5kPaceSecondsPerKm = getRecent5kPaceSecondsPerKm(normalized);
+function buildSteadyFinishTarget(normalized: NormalizedStructuredInput) {
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
-  if (!recent5kPaceSecondsPerKm) {
+  return {
+    intensity: "steady_finish",
+    ...(paceTargets?.steady ? { pace_min_per_km_range: paceTargets.steady } : {}),
+    cue: "Slightly stronger than easy, never a race finish.",
+  };
+}
+
+function deriveBenchmarkPaceTargets(normalized: NormalizedStructuredInput) {
+  const metricMode = resolveStructuredMetricMode(normalized);
+  const recent5kPaceSecondsPerKm = metricMode.recent5kPaceSecondsPerKm;
+
+  if (!metricMode.paceTargetsAllowed || !recent5kPaceSecondsPerKm) {
     return null;
   }
 
@@ -975,6 +1181,30 @@ function deriveBenchmarkPaceTargets(normalized: NormalizedStructuredInput) {
     hillRepeat: buildPaceRange(recent5kPaceSecondsPerKm, 70, 165),
     hillSteady: buildPaceRange(recent5kPaceSecondsPerKm, 75, 145),
   };
+}
+
+function resolveStructuredMetricMode(normalized: NormalizedStructuredInput): StructuredMetricMode {
+  const recent5kPaceSecondsPerKm = getRecent5kPaceSecondsPerKm(normalized);
+  const canFollowNumericTargets = normalized.execution.watchAccess === "watch_or_app";
+  const wantsPaceTargets =
+    normalized.execution.guidancePreference === "pace" ||
+    normalized.execution.guidancePreference === "mixed";
+
+  return {
+    paceTargetsAllowed: Boolean(
+      canFollowNumericTargets && wantsPaceTargets && recent5kPaceSecondsPerKm,
+    ),
+    heartRateTargetsAllowed: false,
+    recent5kPaceSecondsPerKm,
+  };
+}
+
+function buildEasyCue(normalized: NormalizedStructuredInput) {
+  if (normalized.execution.guidancePreference === "heart_rate") {
+    return "Use easy effort for now; no heart-rate zone target is available yet.";
+  }
+
+  return "Conversational effort throughout.";
 }
 
 function getRecent5kPaceSecondsPerKm(normalized: NormalizedStructuredInput) {
@@ -1030,7 +1260,11 @@ function parseDurationSeconds(value: string) {
   return hours! * 3600 + minutes * 60 + seconds;
 }
 
-function buildLongRunGuidance(normalized: NormalizedStructuredInput) {
+function buildLongRunGuidance(normalized: NormalizedStructuredInput, cutback: boolean) {
+  if (cutback) {
+    return "Keep this deliberately comfortable and shorter than the surrounding long runs.";
+  }
+
   if (normalized.preferences.terrainFocus === "mountain") {
     return "Keep the effort comfortable and include hills or rolling terrain when available; no exact elevation target.";
   }
@@ -1040,6 +1274,24 @@ function buildLongRunGuidance(normalized: NormalizedStructuredInput) {
   }
 
   return "Keep the effort comfortable enough to finish feeling in control.";
+}
+
+function isCutbackWeek(weekNumber: number, normalized: NormalizedStructuredInput) {
+  return weekNumber > 1 && weekNumber < normalized.schedule.horizonWeeks && weekNumber % 4 === 0;
+}
+
+function shouldAddLongRunSteadyFinish(normalized: NormalizedStructuredInput, weekNumber: number) {
+  if (isCutbackWeek(weekNumber, normalized)) return false;
+  if (weekNumber <= Math.ceil(normalized.schedule.horizonWeeks * 0.45)) return false;
+  if (normalized.runnerProfile.baselineSessionsPerWeek < 4) return false;
+  if (normalized.preferences.preferredWorkoutMix === "easy_heavy") return false;
+
+  return (
+    normalized.preferences.preferredWorkoutMix === "long_run_focus" ||
+    ["half_marathon", "marathon", "ultra_marathon", "mountain_running"].includes(
+      normalized.goal.goalType,
+    )
+  );
 }
 
 function deriveEasyDurationMin(normalized: NormalizedStructuredInput, weekNumber: number) {

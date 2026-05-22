@@ -2,21 +2,115 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { applyImportedPlanForUser } from "@/lib/active-plan-persistence";
 import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
+import { importedPlanSchema, type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   buildStructuredFirstPlanAuthoringInput,
+  buildStructuredFirstPlanDraftReview,
+  buildStructuredFirstPlanDraftSummary,
   buildStructuredFirstPlanProfilePatch,
   buildStructuredFirstPlanResultContext,
   parseStructuredFirstPlanOnboardingInput,
+  structuredFirstPlanOnboardingInputSchema,
+  type StructuredFirstPlanAuthoringInput,
+  type StructuredFirstPlanDraftReview,
+  type StructuredFirstPlanDraftSummary,
   type StructuredFirstPlanOnboardingInput,
 } from "@/lib/structured-first-plan-onboarding";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
-import { buildStructuredAuthoringPlan } from "@/lib/structured-plan-authoring";
+import {
+  buildStructuredAuthoringPlan,
+  structuredPlanAuthoringInputSchema,
+} from "@/lib/structured-plan-authoring";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
 
+const structuredFirstPlanDraftInputSchema = z.unknown();
+const structuredFirstPlanConfirmInputSchema = z.unknown();
 const voiceToPlanInputSchema = z.unknown();
 const voiceToPlanConfirmInputSchema = z.unknown();
+
+const structuredFirstPlanDraftPayloadSchema = z
+  .object({
+    input: structuredFirstPlanOnboardingInputSchema,
+    authoringInput: structuredPlanAuthoringInputSchema,
+    canonicalPlan: importedPlanSchema,
+    summary: z.unknown().optional(),
+  })
+  .strict();
+
+const structuredFirstPlanConfirmRequestSchema = z
+  .object({
+    draft: structuredFirstPlanDraftPayloadSchema,
+  })
+  .strict();
+
+export type StructuredFirstPlanDraftResult =
+  | StructuredFirstPlanDraftSuccess
+  | StructuredFirstPlanCorrectionRequired
+  | {
+      ok: false;
+      reason: "generation_failed";
+      message: string;
+    };
+
+export interface StructuredFirstPlanDraftSuccess {
+  ok: true;
+  status: "draft_ready";
+  sourceKind: "structured_constructor";
+  review: StructuredFirstPlanDraftReview;
+  draft: {
+    input: StructuredFirstPlanOnboardingInput;
+    authoringInput: StructuredFirstPlanAuthoringInput;
+    canonicalPlan: TrainingPlanV2;
+    summary: StructuredFirstPlanDraftSummary;
+  };
+  safety: StructuredFirstPlanDraftSafety;
+}
+
+export interface StructuredFirstPlanCorrectionRequired {
+  ok: true;
+  status: "correction_required";
+  sourceKind: "structured_constructor";
+  reason: "invalid_structured_input";
+  correction: {
+    message: string;
+    fields: string[];
+  };
+  safety: StructuredFirstPlanDraftSafety;
+}
+
+export interface StructuredFirstPlanDraftSafety {
+  requiresExplicitApply: true;
+  doesNotMutatePlan: true;
+  rawInputPersisted: false;
+  usesCanonicalStructuredAuthoring: true;
+}
+
+export type ConfirmStructuredFirstPlanDraftResult =
+  | {
+      ok: true;
+      status: "created";
+      effectiveStartDate: string;
+      appliedStartDate: string;
+      normalizedFromStartDate: string | null;
+      firstDayResolution: FirstDayResolution | null;
+      workoutCount: number;
+      schemaVersion: string;
+      sourceKind: string | undefined;
+      onboardingContract: "structured_first_plan_onboarding_v1";
+      safety: {
+        requiresExplicitApply: false;
+        doesNotMutatePlan: false;
+        rawInputPersisted: false;
+      };
+    }
+  | {
+      ok: false;
+      status: "blocked";
+      reason: "invalid_draft" | "active_plan_exists" | "apply_blocked";
+      message: string;
+    };
 
 export type ConfirmVoiceToPlanDraftResult =
   | CapabilityLockedResponse
@@ -50,6 +144,22 @@ export const completeStructuredFirstPlanOnboarding = createServerFn({ method: "P
     const userId = await requirePersistedUserIdForCurrentRequest();
 
     return completeStructuredFirstPlanOnboardingForUser(userId, data);
+  });
+
+export const generateStructuredFirstPlanDraft = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => structuredFirstPlanDraftInputSchema.parse(value))
+  .handler(async ({ data }): Promise<StructuredFirstPlanDraftResult> => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
+
+    return generateStructuredFirstPlanDraftForUser(userId, data);
+  });
+
+export const confirmStructuredFirstPlanDraft = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => structuredFirstPlanConfirmInputSchema.parse(value))
+  .handler(async ({ data }): Promise<ConfirmStructuredFirstPlanDraftResult> => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
+
+    return confirmStructuredFirstPlanDraftForUser(userId, data);
   });
 
 export const generateVoiceToPlanDraft = createServerFn({ method: "POST" })
@@ -142,6 +252,134 @@ export const confirmVoiceToPlanDraft = createServerFn({ method: "POST" })
     }
   });
 
+export async function generateStructuredFirstPlanDraftForUser(
+  userId: string,
+  input: unknown,
+): Promise<StructuredFirstPlanDraftResult> {
+  void userId;
+
+  const parsed = parseStructuredFirstPlanDraftInput(input);
+
+  if (!parsed.ok) {
+    return parsed.result;
+  }
+
+  try {
+    const authoringInput = buildStructuredFirstPlanAuthoringInput(parsed.input);
+    const canonicalPlan = buildStructuredAuthoringPlan(authoringInput);
+    const summary = buildStructuredFirstPlanDraftSummary(canonicalPlan, authoringInput);
+
+    return {
+      ok: true,
+      status: "draft_ready",
+      sourceKind: "structured_constructor",
+      review: buildStructuredFirstPlanDraftReview(parsed.input, canonicalPlan, authoringInput),
+      draft: {
+        input: parsed.input,
+        authoringInput,
+        canonicalPlan,
+        summary,
+      },
+      safety: buildStructuredDraftSafety(),
+    };
+  } catch (error) {
+    return buildStructuredCorrectionResult(error);
+  }
+}
+
+export async function confirmStructuredFirstPlanDraftForUser(
+  userId: string,
+  input: unknown,
+): Promise<ConfirmStructuredFirstPlanDraftResult> {
+  if (await hasActivePlanForUser(userId)) {
+    return {
+      ok: false,
+      status: "blocked",
+      reason: "active_plan_exists",
+      message:
+        "Structured setup can create a first plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
+    };
+  }
+
+  const parsed = parseStructuredFirstPlanConfirmRequest(input);
+
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      status: "blocked",
+      reason: "invalid_draft",
+      message: parsed.message,
+    };
+  }
+
+  try {
+    const rebuiltAuthoringInput = buildStructuredFirstPlanAuthoringInput(
+      parsed.request.draft.input,
+    );
+
+    if (!sameJson(rebuiltAuthoringInput, parsed.request.draft.authoringInput)) {
+      return {
+        ok: false,
+        status: "blocked",
+        reason: "invalid_draft",
+        message:
+          "This structured draft no longer matches the setup answers. Generate a fresh review before creating a plan.",
+      };
+    }
+
+    const generatedPlan = buildStructuredAuthoringPlan(rebuiltAuthoringInput);
+
+    if (!draftPlanStillMatches(parsed.request.draft.canonicalPlan, generatedPlan)) {
+      return {
+        ok: false,
+        status: "blocked",
+        reason: "invalid_draft",
+        message:
+          "This structured draft is no longer current. Generate a fresh review before creating a plan.",
+      };
+    }
+
+    const profilePatch = buildStructuredFirstPlanProfilePatch(parsed.request.draft.input);
+    const applyResult = await applyImportedPlanForUser(
+      userId,
+      generatedPlan,
+      null,
+      null,
+      profilePatch,
+    );
+
+    if (!applyResult.ok) {
+      return {
+        ok: false,
+        status: "blocked",
+        reason: "apply_blocked",
+        message: "This structured draft needs review before it can create a plan.",
+      };
+    }
+
+    return {
+      ...applyResult,
+      status: "created",
+      schemaVersion: generatedPlan.schema_version,
+      sourceKind: generatedPlan.source_kind,
+      onboardingContract: "structured_first_plan_onboarding_v1",
+      safety: {
+        requiresExplicitApply: false,
+        doesNotMutatePlan: false,
+        rawInputPersisted: false,
+      },
+    };
+  } catch {
+    return {
+      ok: false,
+      status: "blocked",
+      reason: "invalid_draft",
+      message:
+        "This structured draft is no longer valid. Generate a fresh review before creating a plan.",
+    };
+  }
+}
+
 export async function completeStructuredFirstPlanOnboardingForUser(
   userId: string,
   input: StructuredFirstPlanOnboardingInput,
@@ -170,6 +408,112 @@ export async function completeStructuredFirstPlanOnboardingForUser(
   } catch (error) {
     throw new Error(mapStructuredFirstPlanOnboardingError(error));
   }
+}
+
+function parseStructuredFirstPlanDraftInput(input: unknown):
+  | {
+      ok: true;
+      input: StructuredFirstPlanOnboardingInput;
+    }
+  | {
+      ok: false;
+      result: StructuredFirstPlanCorrectionRequired;
+    } {
+  const result = structuredFirstPlanOnboardingInputSchema.safeParse(input);
+
+  if (!result.success) {
+    return {
+      ok: false,
+      result: buildStructuredCorrectionResult(result.error),
+    };
+  }
+
+  return {
+    ok: true,
+    input: result.data,
+  };
+}
+
+function parseStructuredFirstPlanConfirmRequest(input: unknown):
+  | {
+      ok: true;
+      request: z.output<typeof structuredFirstPlanConfirmRequestSchema>;
+    }
+  | {
+      ok: false;
+      message: string;
+    } {
+  const result = structuredFirstPlanConfirmRequestSchema.safeParse(input);
+
+  if (!result.success) {
+    return {
+      ok: false,
+      message: "This structured draft is missing required review data. Generate a fresh review.",
+    };
+  }
+
+  return {
+    ok: true,
+    request: result.data,
+  };
+}
+
+function buildStructuredCorrectionResult(error: unknown): StructuredFirstPlanCorrectionRequired {
+  return {
+    ok: true,
+    status: "correction_required",
+    sourceKind: "structured_constructor",
+    reason: "invalid_structured_input",
+    correction: {
+      message: mapStructuredFirstPlanOnboardingError(error),
+      fields: collectStructuredCorrectionFields(error),
+    },
+    safety: buildStructuredDraftSafety(),
+  };
+}
+
+function collectStructuredCorrectionFields(error: unknown) {
+  if (!(error instanceof z.ZodError)) {
+    return [];
+  }
+
+  return Array.from(new Set(error.issues.map((issue) => issue.path.join(".")).filter(Boolean)));
+}
+
+function buildStructuredDraftSafety(): StructuredFirstPlanDraftSafety {
+  return {
+    requiresExplicitApply: true,
+    doesNotMutatePlan: true,
+    rawInputPersisted: false,
+    usesCanonicalStructuredAuthoring: true,
+  };
+}
+
+function sameJson(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function draftPlanStillMatches(reviewedPlan: TrainingPlanV2, generatedPlan: TrainingPlanV2) {
+  return sameJson(planComparisonPayload(reviewedPlan), planComparisonPayload(generatedPlan));
+}
+
+function planComparisonPayload(plan: TrainingPlanV2) {
+  return {
+    schemaVersion: plan.schema_version,
+    sourceKind: plan.source_kind,
+    planName: plan.plan_name,
+    startDate: plan.start_date,
+    targetDate: plan.target_date ?? null,
+    workoutCount: plan.planned_workouts.length,
+    workouts: plan.planned_workouts.map((workout) => ({
+      date: workout.date,
+      workoutType: workout.workout_type,
+      sourceWorkoutType: workout.source_workout_type ?? null,
+      title: workout.title,
+      summary: workout.summary,
+      segments: workout.segments,
+    })),
+  };
 }
 
 async function hasActivePlanForUser(userId: string) {

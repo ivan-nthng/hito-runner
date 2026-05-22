@@ -8,16 +8,22 @@ import {
 import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
 import {
   chooseLongRunDay,
+  FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES,
   FIRST_PLAN_GOAL_DISTANCE_VALUES,
   FIRST_PLAN_GOAL_STYLE_VALUES,
   FIRST_PLAN_TERRAIN_FOCUS_VALUES,
+  FIRST_PLAN_WATCH_ACCESS_VALUES,
   formatGoalDistance,
   formatGoalStyle,
+  guidancePreferenceToPreferredEffortLanguage,
   isWeekdayName,
+  normalizeFirstPlanExecutionMode,
   pickEvenly,
   uniqueWeekdays,
+  type FirstPlanGuidancePreference,
   type FirstPlanGoalDistance,
   type FirstPlanGoalStyle,
+  type FirstPlanWatchAccess,
 } from "@/lib/first-plan-authoring-utils";
 import {
   generateCanonicalPlanFromText,
@@ -38,6 +44,8 @@ const weekdaySchema = z.enum(WEEKDAY_NAMES);
 const goalDistanceSchema = z.enum(FIRST_PLAN_GOAL_DISTANCE_VALUES);
 const goalStyleSchema = z.enum(FIRST_PLAN_GOAL_STYLE_VALUES);
 const terrainFocusSchema = z.enum(FIRST_PLAN_TERRAIN_FOCUS_VALUES);
+const watchAccessSchema = z.enum(FIRST_PLAN_WATCH_ACCESS_VALUES);
+const guidancePreferenceSchema = z.enum(FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES);
 const strengthPreferenceSchema = z.enum(["none", "mobility", "strength_mobility"]);
 const isoDateSchema = z
   .string()
@@ -78,6 +86,8 @@ const voiceToPlanSupplementSchema = z
     recent5kTime: durationLikeSchema.optional().nullable(),
     recent5kPace: durationLikeSchema.optional().nullable(),
     terrainFocus: terrainFocusSchema.optional().nullable(),
+    watchAccess: watchAccessSchema.optional().nullable(),
+    guidancePreference: guidancePreferenceSchema.optional().nullable(),
     strengthPreference: strengthPreferenceSchema.optional().nullable(),
     comment: z.string().trim().max(600).optional().nullable(),
   })
@@ -668,6 +678,7 @@ function repairVoiceAuthoringInput(value: unknown, request: VoiceToPlanDraftRequ
     availability: repairVoiceAvailability(record.availability, request.context),
     constraints: repairVoiceConstraints(record.constraints, request.supplement),
     preferences: repairVoicePreferences(record.preferences, request.supplement),
+    execution: repairVoiceExecution(record.execution, request.supplement),
   };
 }
 
@@ -702,10 +713,21 @@ function repairVoiceSchedule(value: unknown, supplement: VoiceToPlanSupplement) 
 
 function repairVoiceRunnerProfile(value: unknown, supplement: VoiceToPlanSupplement) {
   const runnerProfile = readObject(value);
+  const execution = normalizeFirstPlanExecutionMode({
+    watchAccess: supplement.watchAccess ?? null,
+    guidancePreference: supplement.guidancePreference ?? null,
+  });
 
   return {
     ...(runnerProfile ?? {}),
     ...(supplement.age ? { age: supplement.age } : {}),
+    ...(supplement.guidancePreference
+      ? {
+          preferredEffortLanguage: guidancePreferenceToPreferredEffortLanguage(
+            execution.guidancePreference,
+          ),
+        }
+      : {}),
   };
 }
 
@@ -815,6 +837,16 @@ function repairVoicePreferences(value: unknown, supplement: VoiceToPlanSupplemen
       : {}),
     ...(supplement.comment ? { notes: supplement.comment } : {}),
   };
+}
+
+function repairVoiceExecution(value: unknown, supplement: VoiceToPlanSupplement) {
+  const execution = readObject(value);
+
+  return normalizeFirstPlanExecutionMode({
+    watchAccess: supplement.watchAccess ?? readWatchAccess(execution?.watchAccess),
+    guidancePreference:
+      supplement.guidancePreference ?? readGuidancePreference(execution?.guidancePreference),
+  });
 }
 
 function buildVoiceDraftSuccess(
@@ -1048,6 +1080,8 @@ function mergeSupplementWithTranscriptInference(
     recent5kTime: supplement.recent5kTime ?? inferred.recent5kTime ?? null,
     recent5kPace: supplement.recent5kPace ?? inferred.recent5kPace ?? null,
     terrainFocus: supplement.terrainFocus ?? inferred.terrainFocus ?? null,
+    watchAccess: supplement.watchAccess ?? null,
+    guidancePreference: supplement.guidancePreference ?? null,
     strengthPreference: supplement.strengthPreference ?? inferred.strengthPreference ?? null,
     comment: supplement.comment ?? null,
   });
@@ -1347,6 +1381,14 @@ function buildSupplementPromptLines(supplement: VoiceToPlanSupplement) {
     lines.push(`Manual supplement: terrain focus is ${supplement.terrainFocus}.`);
   }
 
+  if (supplement.watchAccess) {
+    lines.push(`Manual supplement: workout-following access is ${supplement.watchAccess}.`);
+  }
+
+  if (supplement.guidancePreference) {
+    lines.push(`Manual supplement: guidance preference is ${supplement.guidancePreference}.`);
+  }
+
   if (supplement.comment) {
     lines.push(`Manual supplement comment: ${supplement.comment}`);
   }
@@ -1440,6 +1482,18 @@ function weekdayCountWordToNumber(value: string) {
 
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readWatchAccess(value: unknown): FirstPlanWatchAccess | null {
+  return typeof value === "string" && watchAccessSchema.safeParse(value).success
+    ? (value as FirstPlanWatchAccess)
+    : null;
+}
+
+function readGuidancePreference(value: unknown): FirstPlanGuidancePreference | null {
+  return typeof value === "string" && guidancePreferenceSchema.safeParse(value).success
+    ? (value as FirstPlanGuidancePreference)
+    : null;
 }
 
 function readWeekday(value: unknown): WeekdayName | null {

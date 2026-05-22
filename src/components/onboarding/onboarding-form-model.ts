@@ -13,6 +13,12 @@ export type BenchmarkKind = StructuredFirstPlanOnboardingInput["benchmark"]["kin
 export type GoalDistance = StructuredFirstPlanOnboardingInput["goal"]["goalDistance"];
 export type GoalStyle = StructuredFirstPlanOnboardingInput["goal"]["goalStyle"];
 export type TerrainFocus = StructuredFirstPlanOnboardingInput["goal"]["terrainFocus"];
+export type WatchAccess = NonNullable<
+  NonNullable<StructuredFirstPlanOnboardingInput["execution"]>["watchAccess"]
+>;
+export type GuidancePreference = NonNullable<
+  NonNullable<StructuredFirstPlanOnboardingInput["execution"]>["guidancePreference"]
+>;
 export type StrengthPreference = NonNullable<
   NonNullable<StructuredFirstPlanOnboardingInput["strength"]>["preference"]
 >;
@@ -30,6 +36,8 @@ export interface StructuredConstructorState {
   targetTime: string;
   targetDate: string;
   terrainFocus: TerrainFocus;
+  watchAccess: WatchAccess;
+  guidancePreference: GuidancePreference;
   strengthPreference: StrengthPreference;
   comment: string;
 }
@@ -88,6 +96,27 @@ export const TERRAIN_OPTIONS: { value: TerrainFocus; label: string; copy: string
   { value: "mountain", label: "Mountain", copy: "Prepare for sustained climbs or descents." },
 ];
 
+export const WATCH_ACCESS_OPTIONS: { value: WatchAccess; label: string; copy: string }[] = [
+  { value: "unknown", label: "Not sure yet", copy: "Hito will keep targets conservative." },
+  { value: "watch_or_app", label: "Watch or app", copy: "You can follow pace or workout targets." },
+  { value: "none", label: "No watch/app", copy: "Use effort cues instead of precise targets." },
+];
+
+export const GUIDANCE_PREFERENCE_OPTIONS: {
+  value: GuidancePreference;
+  label: string;
+  copy: string;
+}[] = [
+  { value: "effort", label: "Effort", copy: "Use RPE and simple running cues." },
+  {
+    value: "pace",
+    label: "Pace",
+    copy: "Use broad pace targets when benchmark truth supports it.",
+  },
+  { value: "heart_rate", label: "Heart rate", copy: "Use effort for now unless HR zones exist." },
+  { value: "mixed", label: "Mixed", copy: "Blend cues with safe numeric targets when available." },
+];
+
 export const STRENGTH_OPTIONS: { value: StrengthPreference; label: string; copy: string }[] = [
   { value: "none", label: "None", copy: "Keep the plan running-only." },
   { value: "mobility", label: "Mobility", copy: "Add light mobility support where useful." },
@@ -111,6 +140,8 @@ export function buildStructuredInput({
   targetTime,
   targetDate,
   terrainFocus,
+  watchAccess,
+  guidancePreference,
   strengthPreference,
   comment,
 }: StructuredConstructorState):
@@ -200,6 +231,10 @@ export function buildStructuredInput({
         targetTime: goalStyle === "target_time" ? trimmedTargetTime : null,
         targetDate: goalStyle === "target_time" ? trimmedTargetDate || null : null,
       },
+      execution: {
+        watchAccess,
+        guidancePreference,
+      },
       strength: {
         preference: strengthPreference,
       },
@@ -218,6 +253,8 @@ export function buildVoiceSupplementFromConstructorState({
   targetTime,
   targetDate,
   terrainFocus,
+  watchAccess,
+  guidancePreference,
   strengthPreference,
   recent5kTime,
   recent5kPace,
@@ -269,6 +306,14 @@ export function buildVoiceSupplementFromConstructorState({
 
   if (terrainFocus && terrainFocus !== "standard") {
     supplement.terrainFocus = terrainFocus;
+  }
+
+  if (watchAccess !== "unknown") {
+    supplement.watchAccess = watchAccess;
+  }
+
+  if (guidancePreference !== "effort") {
+    supplement.guidancePreference = guidancePreference;
   }
 
   if (strengthPreference !== "none") {

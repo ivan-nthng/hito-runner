@@ -1,17 +1,22 @@
 import { z } from "zod";
 import {
   chooseLongRunDay,
+  FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES,
   FIRST_PLAN_GOAL_DISTANCE_VALUES,
   FIRST_PLAN_GOAL_STYLE_VALUES,
   FIRST_PLAN_TERRAIN_FOCUS_VALUES,
+  FIRST_PLAN_WATCH_ACCESS_VALUES,
   formatGoalDistance,
   formatGoalStyle,
+  guidancePreferenceToPreferredEffortLanguage,
   isRealIsoDate,
+  normalizeFirstPlanExecutionMode,
   parseDurationSeconds,
   parsePaceSecondsPerKm,
   pickEvenly,
   uniqueWeekdays,
 } from "@/lib/first-plan-authoring-utils";
+import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring";
 import { diffDaysIso, todayIso } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
@@ -120,6 +125,17 @@ const availabilitySchema = z
 const goalDistanceSchema = z.enum(FIRST_PLAN_GOAL_DISTANCE_VALUES);
 const goalStyleSchema = z.enum(FIRST_PLAN_GOAL_STYLE_VALUES);
 const terrainFocusSchema = z.enum(FIRST_PLAN_TERRAIN_FOCUS_VALUES);
+const watchAccessSchema = z.enum(FIRST_PLAN_WATCH_ACCESS_VALUES);
+const guidancePreferenceSchema = z.enum(FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES);
+
+const executionSchema = z
+  .object({
+    watchAccess: watchAccessSchema.optional().nullable(),
+    guidancePreference: guidancePreferenceSchema.optional().nullable(),
+  })
+  .strict()
+  .optional()
+  .nullable();
 
 const goalSchema = z
   .object({
@@ -167,6 +183,7 @@ export const structuredFirstPlanOnboardingInputSchema = z
     availability: availabilitySchema,
     goal: goalSchema,
     strength: strengthSchema,
+    execution: executionSchema,
     comment: z.string().trim().max(600).optional().nullable(),
   })
   .strict();
@@ -175,11 +192,46 @@ export type StructuredFirstPlanOnboardingInput = z.output<
   typeof structuredFirstPlanOnboardingInputSchema
 >;
 
+export type StructuredFirstPlanAuthoringInput = z.output<typeof structuredPlanAuthoringInputSchema>;
+
 export interface StructuredFirstPlanProfilePatch {
   age: number;
   weightKg: number;
   heightCm: number;
   baselineNotes: string | null;
+}
+
+export interface StructuredFirstPlanDraftReview {
+  runnerUnderstanding: {
+    profile: string;
+    benchmark: string;
+    goal: string;
+    availability: string;
+    execution: string;
+  };
+  planShape: {
+    durationLabel: string;
+    runningDaysPerWeek: number;
+    fixedRestDays: WeekdayName[];
+    activityMix: string[];
+    terrainFocus: "standard" | "rolling" | "mountain";
+    workoutCount: number;
+    longRunDay: WeekdayName | null;
+    qualityRhythm: string;
+    metricPolicy: string;
+  };
+  assumptions: string[];
+  safetyNotes: string[];
+  nextActions: Array<"ok_create_plan" | "back_and_edit">;
+}
+
+export interface StructuredFirstPlanDraftSummary {
+  planName: string;
+  startDate: string;
+  targetDate: string | null;
+  workoutCount: number;
+  fixedRestDays: WeekdayName[];
+  runningDaysPerWeek: number;
 }
 
 export function parseStructuredFirstPlanOnboardingInput(value: unknown) {
@@ -203,6 +255,7 @@ export function buildStructuredFirstPlanAuthoringInput(input: StructuredFirstPla
   );
   const startDate = deriveStartDateForTrainingWeekdays(preferredRunningDays);
   const terrainFocus = normalizeTerrainFocus(input.goal);
+  const execution = normalizeFirstPlanExecutionMode(input.execution);
   const targetDate =
     input.goal.goalStyle === "target_time" ? (input.goal.targetDate ?? null) : null;
   const authoringInput = {
@@ -226,7 +279,9 @@ export function buildStructuredFirstPlanAuthoringInput(input: StructuredFirstPla
       baselineLongRunDurationMin: null,
       age: input.profile.age,
       recentInjuryRecoveryContext: null,
-      preferredEffortLanguage: "rpe",
+      preferredEffortLanguage: guidancePreferenceToPreferredEffortLanguage(
+        execution.guidancePreference,
+      ),
     },
     currentLevel: buildCurrentLevel(input.benchmark),
     availability: {
@@ -247,6 +302,7 @@ export function buildStructuredFirstPlanAuthoringInput(input: StructuredFirstPla
       indoorTreadmillOk: false,
       notes: buildPlanNotes(input),
     },
+    execution,
   } satisfies z.input<typeof structuredPlanAuthoringInputSchema>;
 
   return structuredPlanAuthoringInputSchema.parse(authoringInput);
@@ -268,9 +324,220 @@ export function buildStructuredFirstPlanResultContext(input: StructuredFirstPlan
     benchmarkKind: input.benchmark.kind,
     hasComment: Boolean(input.comment?.trim()),
     terrainFocus: normalizeTerrainFocus(input.goal),
+    execution: normalizeFirstPlanExecutionMode(input.execution),
     fixedRestDays: uniqueWeekdays(input.availability.fixedRestDays),
     runningDaysPerWeek: input.availability.runningDaysPerWeek,
   };
+}
+
+export function buildStructuredFirstPlanDraftSummary(
+  canonicalPlan: TrainingPlanV2,
+  authoringInput: StructuredFirstPlanAuthoringInput,
+): StructuredFirstPlanDraftSummary {
+  return {
+    planName: canonicalPlan.plan_name,
+    startDate: canonicalPlan.start_date,
+    targetDate: canonicalPlan.target_date ?? null,
+    workoutCount: canonicalPlan.planned_workouts.length,
+    fixedRestDays: uniqueWeekdays(authoringInput.availability.unavailableDays),
+    runningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+  };
+}
+
+export function buildStructuredFirstPlanDraftReview(
+  input: StructuredFirstPlanOnboardingInput,
+  canonicalPlan: TrainingPlanV2,
+  authoringInput: StructuredFirstPlanAuthoringInput,
+): StructuredFirstPlanDraftReview {
+  const fixedRestDays = uniqueWeekdays(authoringInput.availability.unavailableDays);
+  const horizonWeeks =
+    authoringInput.schedule.preparationHorizonWeeks ??
+    (canonicalPlan.preparation_horizon_weeks || null);
+  const terrainFocus = authoringInput.preferences.terrainFocus ?? "standard";
+
+  return {
+    runnerUnderstanding: {
+      profile: `${input.profile.age} years old, ${input.profile.weightKg} kg, ${input.profile.heightCm} cm.`,
+      benchmark: formatBenchmarkReview(input.benchmark),
+      goal: authoringInput.goal.goalLabel,
+      availability: `${authoringInput.availability.maxRunningDaysPerWeek} running day(s) per week${
+        fixedRestDays.length ? `, fixed rest on ${fixedRestDays.join(", ")}` : ""
+      }.`,
+      execution: formatExecutionReview(input),
+    },
+    planShape: {
+      durationLabel: authoringInput.schedule.targetDate
+        ? `${canonicalPlan.start_date} to ${authoringInput.schedule.targetDate}`
+        : horizonWeeks
+          ? `${horizonWeeks} weeks`
+          : "Flexible horizon",
+      runningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+      fixedRestDays,
+      activityMix: buildStructuredActivityMix(canonicalPlan, authoringInput),
+      terrainFocus,
+      workoutCount: canonicalPlan.planned_workouts.length,
+      longRunDay: authoringInput.availability.preferredLongRunDay ?? null,
+      qualityRhythm: buildQualityRhythm(authoringInput),
+      metricPolicy: buildMetricPolicyReview(input),
+    },
+    assumptions: buildStructuredReviewAssumptions(input, authoringInput),
+    safetyNotes: [
+      "Nothing has been created yet.",
+      "Creating the plan requires explicit confirmation.",
+      "Profile basics are saved only after confirmation.",
+      "The optional comment is generation context, not permanent profile truth.",
+    ],
+    nextActions: ["ok_create_plan", "back_and_edit"],
+  };
+}
+
+function formatBenchmarkReview(benchmark: StructuredFirstPlanOnboardingInput["benchmark"]) {
+  switch (benchmark.kind) {
+    case "recent_5k_time":
+      return `Recent 5K time: ${benchmark.recent5kTime}.`;
+    case "recent_5k_pace":
+      return `Recent 5K pace: ${benchmark.recent5kPace}.`;
+    case "unknown":
+      return "No recent 5K benchmark supplied.";
+  }
+}
+
+function formatExecutionReview(input: StructuredFirstPlanOnboardingInput) {
+  const execution = normalizeFirstPlanExecutionMode(input.execution);
+  const watchLabel =
+    execution.watchAccess === "watch_or_app"
+      ? "watch or app available"
+      : execution.watchAccess === "none"
+        ? "no watch or app targets"
+        : "watch/app access unknown";
+
+  return `${formatGuidancePreference(execution.guidancePreference)} guidance with ${watchLabel}.`;
+}
+
+function formatGuidancePreference(
+  preference: NonNullable<ReturnType<typeof normalizeFirstPlanExecutionMode>["guidancePreference"]>,
+) {
+  switch (preference) {
+    case "pace":
+      return "pace";
+    case "heart_rate":
+      return "heart-rate";
+    case "mixed":
+      return "mixed";
+    case "effort":
+      return "effort";
+  }
+}
+
+function buildStructuredActivityMix(
+  canonicalPlan: TrainingPlanV2,
+  authoringInput: StructuredFirstPlanAuthoringInput,
+) {
+  const sourceTypes = new Set(
+    canonicalPlan.planned_workouts
+      .filter((workout) => workout.workout_type !== "rest")
+      .map((workout) => workout.source_workout_type ?? workout.workout_type),
+  );
+  const mix = ["easy aerobic running", "long-run progression"];
+
+  if (
+    sourceTypes.has("controlled_tempo_session") ||
+    sourceTypes.has("distance_intervals") ||
+    sourceTypes.has("time_intervals")
+  ) {
+    mix.push("controlled quality work");
+  }
+
+  if (
+    sourceTypes.has("rolling_hills_session") ||
+    sourceTypes.has("uphill_repeats") ||
+    sourceTypes.has("climbing_steady_run")
+  ) {
+    mix.push("hill-oriented preparation");
+  }
+
+  if (sourceTypes.has("cutback_aerobic_run") || sourceTypes.has("cutback_long_run")) {
+    mix.push("cutback weeks for recovery");
+  }
+
+  if (sourceTypes.has("long_run_with_steady_finish")) {
+    mix.push("later long runs with steady finish");
+  }
+
+  if (
+    authoringInput.preferences.strengthOrMobilityInterest &&
+    authoringInput.preferences.strengthOrMobilityInterest !== "none"
+  ) {
+    mix.push("simple strength or mobility support");
+  }
+
+  return mix;
+}
+
+function buildQualityRhythm(authoringInput: StructuredFirstPlanAuthoringInput) {
+  const nonLongRunDays = authoringInput.availability.preferredRunningDays.filter(
+    (weekday) => weekday !== authoringInput.availability.preferredLongRunDay,
+  );
+  const qualityDay = nonLongRunDays[0] ?? null;
+
+  if (!qualityDay || authoringInput.availability.maxRunningDaysPerWeek < 3) {
+    return "No regular quality day; runs stay mostly easy.";
+  }
+
+  return `Quality work is planned around ${qualityDay}, with cutback weeks simplified.`;
+}
+
+function buildMetricPolicyReview(input: StructuredFirstPlanOnboardingInput) {
+  const execution = normalizeFirstPlanExecutionMode(input.execution);
+  const hasBenchmark = input.benchmark.kind !== "unknown";
+
+  if (
+    execution.watchAccess === "watch_or_app" &&
+    (execution.guidancePreference === "pace" || execution.guidancePreference === "mixed") &&
+    hasBenchmark
+  ) {
+    return "Broad pace targets may appear where the recent 5K benchmark supports them.";
+  }
+
+  if (execution.guidancePreference === "heart_rate") {
+    return "Heart-rate preference is noted, but numeric HR targets are omitted until real HR-zone truth exists.";
+  }
+
+  return "Targets stay effort/cue based unless watch/app access and benchmark-supported pace guidance are available.";
+}
+
+function buildStructuredReviewAssumptions(
+  input: StructuredFirstPlanOnboardingInput,
+  authoringInput: StructuredFirstPlanAuthoringInput,
+) {
+  const assumptions = [];
+  const execution = normalizeFirstPlanExecutionMode(input.execution);
+
+  if (input.benchmark.kind === "unknown") {
+    assumptions.push("No recent 5K benchmark was supplied, so Hito keeps targets effort-based.");
+  }
+
+  if (execution.guidancePreference === "heart_rate") {
+    assumptions.push(
+      "Heart-rate guidance was requested, but this draft does not use numeric HR targets because no HR-zone truth exists yet.",
+    );
+  }
+
+  if (!input.goal.targetDate && !authoringInput.schedule.targetDate) {
+    assumptions.push("Timeline uses Hito's default horizon for this goal instead of a race date.");
+  }
+
+  if (normalizeTerrainFocus(input.goal) === "standard" && !input.goal.terrainFocus) {
+    assumptions.push(
+      "Terrain is treated as standard because no hill or mountain focus was supplied.",
+    );
+  }
+
+  if (!input.strength?.preference || input.strength.preference === "none") {
+    assumptions.push("Strength and mobility support stays minimal.");
+  }
+
+  return assumptions;
 }
 
 function formatStructuredFirstPlanOnboardingError(error: z.ZodError) {

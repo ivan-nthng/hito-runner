@@ -388,6 +388,7 @@ const v2WorkoutSchema = z
     user_feedback_placeholder: placeholderEnvelopeSchema.optional(),
     pain_tracking_placeholder: placeholderEnvelopeSchema.optional(),
     segments: z.array(v2SegmentSchema).min(1),
+    source_workout_type: z.string().trim().min(1).optional(),
     workout_type: z.enum([
       "easy",
       "steady_or_easy",
@@ -532,7 +533,7 @@ function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
       phase: entry.phase,
       workoutType: normalizeV2WorkoutType(entry.workout_type),
       sourceWorkoutId: entry.workout_id,
-      sourceWorkoutType: entry.workout_type,
+      sourceWorkoutType: entry.source_workout_type ?? entry.workout_type,
       title: entry.title,
       notes: buildV2Notes(entry),
       plannedRpe: entry.planned_rpe ?? null,

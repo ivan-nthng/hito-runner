@@ -24,21 +24,23 @@ import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
 import {
   completeOnboarding,
-  completeStructuredFirstPlanOnboarding,
+  confirmStructuredFirstPlanDraft,
   confirmVoiceToPlanDraft,
+  generateStructuredFirstPlanDraft,
   generateVoiceToPlanDraft,
+  type StructuredFirstPlanDraftResult,
 } from "@/lib/training-api";
 
-type ConstructorStatus = "idle" | "saving" | "finishing";
+type ConstructorStatus = "idle" | "reviewing" | "creating" | "finishing";
 type JsonStatus = "idle" | "parsing" | "saving" | "finishing";
 type SetupMode = "quick" | "talk";
 
 const VOICE_TO_PLAN_TOAST_ID = "onboarding-voice-to-plan";
+const STRUCTURED_REVIEW_TOAST_ID = "onboarding-structured-review";
 
 export function OnboardingGate() {
-  const completeStructuredFirstPlanOnboardingFn = useServerFn(
-    completeStructuredFirstPlanOnboarding,
-  );
+  const generateStructuredFirstPlanDraftFn = useServerFn(generateStructuredFirstPlanDraft);
+  const confirmStructuredFirstPlanDraftFn = useServerFn(confirmStructuredFirstPlanDraft);
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const generateVoiceToPlanDraftFn = useServerFn(generateVoiceToPlanDraft);
   const confirmVoiceToPlanDraftFn = useServerFn(confirmVoiceToPlanDraft);
@@ -58,9 +60,15 @@ export function OnboardingGate() {
   const [targetTime, setTargetTime] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [terrainFocus, setTerrainFocus] = useState<TerrainFocus>("standard");
+  const [watchAccess, setWatchAccess] =
+    useState<StructuredConstructorState["watchAccess"]>("unknown");
+  const [guidancePreference, setGuidancePreference] =
+    useState<StructuredConstructorState["guidancePreference"]>("effort");
   const [strengthPreference, setStrengthPreference] = useState<StrengthPreference>("none");
   const [comment, setComment] = useState("");
   const [constructorStatus, setConstructorStatus] = useState<ConstructorStatus>("idle");
+  const [structuredDraftResult, setStructuredDraftResult] =
+    useState<StructuredFirstPlanDraftResult | null>(null);
   const [constructorError, setConstructorError] = useState<string | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
@@ -91,6 +99,8 @@ export function OnboardingGate() {
     targetTime,
     targetDate,
     terrainFocus,
+    watchAccess,
+    guidancePreference,
     strengthPreference,
     comment,
   };
@@ -108,6 +118,12 @@ export function OnboardingGate() {
   });
   const openSavedHome = () => {
     window.location.assign("/");
+  };
+
+  const clearStructuredReview = () => {
+    setStructuredDraftResult(null);
+    setConstructorError(null);
+    hitoToast.dismiss(STRUCTURED_REVIEW_TOAST_ID);
   };
 
   const addMoreVoiceDetails = () => {
@@ -258,36 +274,111 @@ export function OnboardingGate() {
     }
   };
 
-  const submitStructuredPlan = async () => {
+  const submitStructuredReview = async () => {
     const inputResult = buildStructuredInput(effectiveConstructorState);
 
     setConstructorError(null);
+    setStructuredDraftResult(null);
 
     if (!inputResult.ok) {
       setConstructorError(inputResult.error);
       return;
     }
 
-    setConstructorStatus("saving");
+    setConstructorStatus("reviewing");
+    hitoToast.working({
+      id: STRUCTURED_REVIEW_TOAST_ID,
+      title: "Reviewing setup",
+      description: "Hito is preparing a draft review before anything is created.",
+    });
 
     try {
-      const result = await completeStructuredFirstPlanOnboardingFn({
+      const result = await generateStructuredFirstPlanDraftFn({
         data: inputResult.input,
+      });
+
+      setStructuredDraftResult(result);
+      setConstructorStatus("idle");
+
+      if (!result.ok || result.status === "correction_required") {
+        const message = structuredDraftResultMessage(result);
+        setConstructorError(message);
+        hitoToast.error({
+          id: STRUCTURED_REVIEW_TOAST_ID,
+          title: result.ok ? "Setup needs correction" : "Review failed",
+          description: message,
+        });
+        return;
+      }
+
+      hitoToast.success({
+        id: STRUCTURED_REVIEW_TOAST_ID,
+        title: "Draft ready",
+        description: "Review what Hito will create before confirming.",
+      });
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : "Could not review the setup.";
+      setConstructorStatus("idle");
+      setConstructorError(message);
+      hitoToast.error({
+        id: STRUCTURED_REVIEW_TOAST_ID,
+        title: "Review failed",
+        description: message,
+      });
+    }
+  };
+
+  const confirmStructuredPlan = async () => {
+    if (!structuredDraftResult?.ok || structuredDraftResult.status !== "draft_ready") {
+      setConstructorError("Generate a ready review before creating the plan.");
+      return;
+    }
+
+    setConstructorStatus("creating");
+    setConstructorError(null);
+    hitoToast.working({
+      id: STRUCTURED_REVIEW_TOAST_ID,
+      title: "Creating plan",
+      description: "Hito is creating the active plan from the reviewed setup.",
+    });
+
+    try {
+      const result = await confirmStructuredFirstPlanDraftFn({
+        data: {
+          draft: structuredDraftResult.draft,
+        },
       });
 
       if (!result.ok) {
         setConstructorStatus("idle");
         setConstructorError(resultFailureMessage(result));
+        hitoToast.error({
+          id: STRUCTURED_REVIEW_TOAST_ID,
+          title: "Plan not created",
+          description: resultFailureMessage(result),
+        });
         return;
       }
 
       setConstructorStatus("finishing");
+      hitoToast.success({
+        id: STRUCTURED_REVIEW_TOAST_ID,
+        title: "Plan created",
+        description: "Opening your saved plan now.",
+        duration: 2600,
+      });
       openSavedHome();
     } catch (submitError) {
       setConstructorStatus("idle");
-      setConstructorError(
-        submitError instanceof Error ? submitError.message : "Could not create the plan.",
-      );
+      const message =
+        submitError instanceof Error ? submitError.message : "Could not create the plan.";
+      setConstructorError(message);
+      hitoToast.error({
+        id: STRUCTURED_REVIEW_TOAST_ID,
+        title: "Plan not created",
+        description: message,
+      });
     }
   };
 
@@ -408,15 +499,24 @@ export function OnboardingGate() {
             setTargetTime,
             setTargetDate,
             setTerrainFocus,
+            setWatchAccess,
+            setGuidancePreference,
             setStrengthPreference,
             setComment,
           }}
           constructorStatus={constructorStatus}
+          draftResult={structuredDraftResult}
           constructorError={constructorError}
           isBusy={isBusy}
           isConstructorReady={isConstructorReady}
           onSubmit={() => {
-            void submitStructuredPlan();
+            void submitStructuredReview();
+          }}
+          onConfirmDraft={() => {
+            void confirmStructuredPlan();
+          }}
+          onBackToEdit={() => {
+            clearStructuredReview();
           }}
         />
       )}
@@ -471,6 +571,18 @@ function resultFailureMessage(result: { status?: string; message?: string }) {
   }
 
   return "Could not apply that plan yet. Check the setup answers and try again.";
+}
+
+function structuredDraftResultMessage(result: StructuredFirstPlanDraftResult) {
+  if (!result.ok) {
+    return result.message;
+  }
+
+  if (result.status === "correction_required") {
+    return result.correction.message;
+  }
+
+  return "Review the draft before creating your plan.";
 }
 
 function formatIssue(path: (string | number)[], message: string) {

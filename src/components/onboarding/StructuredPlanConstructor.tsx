@@ -12,24 +12,38 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import {
   BENCHMARK_OPTIONS,
+  GUIDANCE_PREFERENCE_OPTIONS,
   GOAL_DISTANCE_OPTIONS,
   GOAL_STYLE_OPTIONS,
   ONBOARDING_TEXTAREA_CLASS,
   STRENGTH_OPTIONS,
   TERRAIN_OPTIONS,
+  WATCH_ACCESS_OPTIONS,
   WEEKDAY_OPTIONS,
   deriveRunningDaysPerWeek,
+  formatTerrainFocus,
   type BenchmarkKind,
+  type GuidancePreference,
   type GoalDistance,
   type GoalStyle,
   type StrengthPreference,
   type StructuredConstructorState,
   type TerrainFocus,
+  type WatchAccess,
   type WeekdayName,
 } from "./onboarding-form-model";
+import type { StructuredFirstPlanDraftResult } from "@/lib/training-api";
 
-type ConstructorStatus = "idle" | "saving" | "finishing";
+type ConstructorStatus = "idle" | "reviewing" | "creating" | "finishing";
 type ProfileBasicEditableKey = "age" | "heightCm" | "weightKg";
+type StructuredDraftReady = Extract<
+  StructuredFirstPlanDraftResult,
+  { ok: true; status: "draft_ready" }
+>;
+type StructuredCorrectionRequired = Extract<
+  StructuredFirstPlanDraftResult,
+  { ok: true; status: "correction_required" }
+>;
 
 interface StructuredPlanConstructorProps {
   formRef: RefObject<HTMLFormElement | null>;
@@ -47,14 +61,19 @@ interface StructuredPlanConstructorProps {
     setTargetTime: (value: string) => void;
     setTargetDate: (value: string) => void;
     setTerrainFocus: (value: TerrainFocus) => void;
+    setWatchAccess: (value: WatchAccess) => void;
+    setGuidancePreference: (value: GuidancePreference) => void;
     setStrengthPreference: (value: StrengthPreference) => void;
     setComment: (value: string) => void;
   };
   constructorStatus: ConstructorStatus;
+  draftResult: StructuredFirstPlanDraftResult | null;
   constructorError: string | null;
   isBusy: boolean;
   isConstructorReady: boolean;
   onSubmit: () => void;
+  onConfirmDraft: () => void;
+  onBackToEdit: () => void;
 }
 
 export function StructuredPlanConstructor({
@@ -62,10 +81,13 @@ export function StructuredPlanConstructor({
   state,
   setState,
   constructorStatus,
+  draftResult,
   constructorError,
   isBusy,
   isConstructorReady,
   onSubmit,
+  onConfirmDraft,
+  onBackToEdit,
 }: StructuredPlanConstructorProps) {
   const runningDaysPerWeek = deriveRunningDaysPerWeek(state.fixedRestDays);
   const allowedRunningDayCount = WEEKDAY_OPTIONS.length - state.fixedRestDays.length;
@@ -74,6 +96,9 @@ export function StructuredPlanConstructor({
     state.goalDistance === "marathon" || state.goalDistance === "ultra_marathon";
   const impliedMountainTerrain = state.goalDistance === "mountain_running";
   const [activeEditableKey, setActiveEditableKey] = useState<ProfileBasicEditableKey | null>(null);
+  const isDraftReady = draftResult?.ok === true && draftResult.status === "draft_ready";
+  const isCorrectionRequired =
+    draftResult?.ok === true && draftResult.status === "correction_required";
 
   return (
     <form
@@ -81,297 +106,346 @@ export function StructuredPlanConstructor({
       className="mt-8 grid gap-8 pb-28"
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (!isConstructorReady || isBusy) {
+        if (!isConstructorReady || isBusy || isDraftReady) {
           return;
         }
 
         onSubmit();
       }}
     >
-      <ConstructorSection
-        eyebrow="01"
-        title="About you"
-        body="Add the basics Hito needs to size the plan."
-      >
-        <div className="hito-editable-value-chip-group">
-          <EditableValueChip
-            fieldKey="age"
-            label="Age"
-            value={state.age}
-            setValue={setState.setAge}
-            activeEditableKey={activeEditableKey}
-            setActiveEditableKey={setActiveEditableKey}
-            placeholder="34"
-            min={13}
-            max={100}
-            step={1}
-            inputMode="numeric"
-          />
-          <EditableValueChip
-            fieldKey="heightCm"
-            label="Height"
-            value={state.heightCm}
-            setValue={setState.setHeightCm}
-            activeEditableKey={activeEditableKey}
-            setActiveEditableKey={setActiveEditableKey}
-            placeholder="178"
-            min={120}
-            max={230}
-            step={1}
-            inputMode="numeric"
-          />
-          <EditableValueChip
-            fieldKey="weightKg"
-            label="Weight"
-            value={state.weightKg}
-            setValue={setState.setWeightKg}
-            activeEditableKey={activeEditableKey}
-            setActiveEditableKey={setActiveEditableKey}
-            placeholder="72"
-            min={30}
-            max={250}
-            step={0.5}
-            inputMode="decimal"
-            unit="kg"
-          />
-        </div>
-      </ConstructorSection>
-
-      <ConstructorSection
-        eyebrow="02"
-        title="Current running"
-        body="Share a recent 5K signal if you know it."
-      >
-        <div className="grid gap-2">
-          {BENCHMARK_OPTIONS.map((option) => (
-            <OptionRow
-              key={option.value}
-              active={state.benchmarkKind === option.value}
-              label={option.label}
-              copy={option.copy}
-              onClick={() => setState.setBenchmarkKind(option.value)}
-            />
-          ))}
-        </div>
-
-        {state.benchmarkKind === "recent_5k_time" && (
-          <Field label="Recent 5K time" helper="Use a format like 25:00 or 1:02:30.">
-            <input
-              value={state.recent5kTime}
-              onChange={(event) => setState.setRecent5kTime(event.target.value)}
-              placeholder="25:00"
-              className="hito-field hito-field-primary hito-field-md"
-            />
-          </Field>
-        )}
-
-        {state.benchmarkKind === "recent_5k_pace" && (
-          <Field label="Recent 5K pace" helper="Use a format like 5:30/km.">
-            <input
-              value={state.recent5kPace}
-              onChange={(event) => setState.setRecent5kPace(event.target.value)}
-              placeholder="5:30/km"
-              className="hito-field hito-field-primary hito-field-md"
-            />
-          </Field>
-        )}
-      </ConstructorSection>
-
-      <ConstructorSection
-        eyebrow="03"
-        title="Your week"
-        body="Mark the days you want to keep as rest days."
-      >
-        <Field
-          label="Fixed rest days"
-          helper={
-            allowedRunningDayCount > 0
-              ? `Hito will use up to ${runningDaysPerWeek} running days outside fixed rest days.`
-              : "Leave at least one day available for running."
-          }
-        >
-          <div className="grid grid-cols-7 gap-1.5 rounded-[1.25rem] bg-muted/20 p-1.5">
-            {WEEKDAY_OPTIONS.map((weekday) => {
-              const active = state.fixedRestDays.includes(weekday.value);
-              return (
-                <button
-                  key={weekday.value}
-                  type="button"
-                  onClick={() => {
-                    setState.setFixedRestDays((current) =>
-                      active
-                        ? current.filter((item) => item !== weekday.value)
-                        : [...current, weekday.value],
-                    );
-                  }}
-                  className={cn(
-                    "hito-button hito-button-xs min-w-0 px-0",
-                    active ? "hito-button-primary" : "hito-button-secondary",
-                  )}
-                  aria-pressed={active}
-                  aria-label={`${weekday.value}${active ? " fixed rest day" : ""}`}
-                >
-                  {weekday.label}
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-      </ConstructorSection>
-
-      <ConstructorSection
-        eyebrow="04"
-        title="What you're training for"
-        body="Pick the distance and how hard you want the plan to lean."
-      >
-        <Field label="Goal distance">
-          <OptionGrid>
-            {GOAL_DISTANCE_OPTIONS.map((option) => (
-              <OptionButton
-                key={option.value}
-                active={state.goalDistance === option.value}
-                label={option.label}
-                onClick={() => setState.setGoalDistance(option.value)}
+      {isDraftReady ? (
+        <StructuredDraftReadyReview
+          result={draftResult}
+          status={constructorStatus}
+          isBusy={isBusy}
+          onConfirmDraft={onConfirmDraft}
+          onBackToEdit={onBackToEdit}
+        />
+      ) : (
+        <>
+          <ConstructorSection
+            eyebrow="01"
+            title="About you"
+            body="Add the basics Hito needs to size the plan."
+          >
+            <div className="hito-editable-value-chip-group">
+              <EditableValueChip
+                fieldKey="age"
+                label="Age"
+                value={state.age}
+                setValue={setState.setAge}
+                activeEditableKey={activeEditableKey}
+                setActiveEditableKey={setActiveEditableKey}
+                placeholder="34"
+                min={13}
+                max={100}
+                step={1}
+                inputMode="numeric"
               />
-            ))}
-          </OptionGrid>
-        </Field>
-
-        <Field label="Goal style">
-          <OptionGrid>
-            {GOAL_STYLE_OPTIONS.map((option) => (
-              <OptionButton
-                key={option.value}
-                active={state.goalStyle === option.value}
-                label={option.label}
-                onClick={() => setState.setGoalStyle(option.value)}
+              <EditableValueChip
+                fieldKey="heightCm"
+                label="Height"
+                value={state.heightCm}
+                setValue={setState.setHeightCm}
+                activeEditableKey={activeEditableKey}
+                setActiveEditableKey={setActiveEditableKey}
+                placeholder="178"
+                min={120}
+                max={230}
+                step={1}
+                inputMode="numeric"
               />
-            ))}
-          </OptionGrid>
-        </Field>
-
-        {showsTargetFields ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Target time" helper="Required. Use 25:00 or 1:45:00.">
-              <input
-                value={state.targetTime}
-                onChange={(event) => setState.setTargetTime(event.target.value)}
-                placeholder="1:45:00"
-                required
-                className={cn(
-                  "hito-field hito-field-primary hito-field-md",
-                  !state.targetTime.trim() && "hito-field-feedback-error",
-                )}
+              <EditableValueChip
+                fieldKey="weightKg"
+                label="Weight"
+                value={state.weightKg}
+                setValue={setState.setWeightKg}
+                activeEditableKey={activeEditableKey}
+                setActiveEditableKey={setActiveEditableKey}
+                placeholder="72"
+                min={30}
+                max={250}
+                step={0.5}
+                inputMode="decimal"
+                unit="kg"
               />
-            </Field>
-            <Field label="Target date" helper="Optional. If used, choose at least 7 days out.">
-              <input
-                type="date"
-                value={state.targetDate}
-                onChange={(event) => setState.setTargetDate(event.target.value)}
-                className="hito-field hito-field-primary hito-field-md"
-              />
-            </Field>
-          </div>
-        ) : (
-          <p className="hito-field-helper">
-            Hito will estimate a realistic direction from your benchmark, availability, and goal
-            style. No target time is needed for this mode.
-          </p>
-        )}
+            </div>
+          </ConstructorSection>
 
-        {showsTerrainSelector && (
-          <Field label="Terrain focus">
-            <OptionGrid>
-              {TERRAIN_OPTIONS.map((option) => (
-                <OptionButton
+          <ConstructorSection
+            eyebrow="02"
+            title="Current running"
+            body="Share a recent 5K signal if you know it."
+          >
+            <div className="grid gap-2">
+              {BENCHMARK_OPTIONS.map((option) => (
+                <OptionRow
                   key={option.value}
-                  active={state.terrainFocus === option.value}
+                  active={state.benchmarkKind === option.value}
                   label={option.label}
                   copy={option.copy}
-                  onClick={() => setState.setTerrainFocus(option.value)}
+                  onClick={() => setState.setBenchmarkKind(option.value)}
                 />
               ))}
-            </OptionGrid>
-          </Field>
-        )}
+            </div>
 
-        {impliedMountainTerrain && (
-          <div className="hito-row-group">
-            <div className="hito-list-row">
-              <div>
-                <p className="hito-list-row-title">Mountain terrain</p>
-                <p className="hito-list-row-copy">
-                  Mountain running uses mountain terrain context automatically.
-                </p>
+            {state.benchmarkKind === "recent_5k_time" && (
+              <Field label="Recent 5K time" helper="Use a format like 25:00 or 1:02:30.">
+                <input
+                  value={state.recent5kTime}
+                  onChange={(event) => setState.setRecent5kTime(event.target.value)}
+                  placeholder="25:00"
+                  className="hito-field hito-field-primary hito-field-md"
+                />
+              </Field>
+            )}
+
+            {state.benchmarkKind === "recent_5k_pace" && (
+              <Field label="Recent 5K pace" helper="Use a format like 5:30/km.">
+                <input
+                  value={state.recent5kPace}
+                  onChange={(event) => setState.setRecent5kPace(event.target.value)}
+                  placeholder="5:30/km"
+                  className="hito-field hito-field-primary hito-field-md"
+                />
+              </Field>
+            )}
+          </ConstructorSection>
+
+          <ConstructorSection
+            eyebrow="03"
+            title="Your week"
+            body="Mark the days you want to keep as rest days."
+          >
+            <Field
+              label="Fixed rest days"
+              helper={
+                allowedRunningDayCount > 0
+                  ? `Hito will use up to ${runningDaysPerWeek} running days outside fixed rest days.`
+                  : "Leave at least one day available for running."
+              }
+            >
+              <div className="grid grid-cols-7 gap-1.5 rounded-[1.25rem] bg-muted/20 p-1.5">
+                {WEEKDAY_OPTIONS.map((weekday) => {
+                  const active = state.fixedRestDays.includes(weekday.value);
+                  return (
+                    <button
+                      key={weekday.value}
+                      type="button"
+                      onClick={() => {
+                        setState.setFixedRestDays((current) =>
+                          active
+                            ? current.filter((item) => item !== weekday.value)
+                            : [...current, weekday.value],
+                        );
+                      }}
+                      className={cn(
+                        "hito-button hito-button-xs min-w-0 px-0",
+                        active ? "hito-button-primary" : "hito-button-secondary",
+                      )}
+                      aria-pressed={active}
+                      aria-label={`${weekday.value}${active ? " fixed rest day" : ""}`}
+                    >
+                      {weekday.label}
+                    </button>
+                  );
+                })}
               </div>
-              <span className="hito-status-pill">Implied</span>
+            </Field>
+          </ConstructorSection>
+
+          <ConstructorSection
+            eyebrow="04"
+            title="How you'll follow workouts"
+            body="Choose how Hito should phrase workout guidance."
+          >
+            <Field label="Target tools">
+              <div className="grid gap-2">
+                {WATCH_ACCESS_OPTIONS.map((option) => (
+                  <OptionRow
+                    key={option.value}
+                    active={state.watchAccess === option.value}
+                    label={option.label}
+                    copy={option.copy}
+                    onClick={() => setState.setWatchAccess(option.value)}
+                  />
+                ))}
+              </div>
+            </Field>
+
+            <Field label="Guidance style">
+              <OptionGrid>
+                {GUIDANCE_PREFERENCE_OPTIONS.map((option) => (
+                  <OptionButton
+                    key={option.value}
+                    active={state.guidancePreference === option.value}
+                    label={option.label}
+                    copy={option.copy}
+                    onClick={() => setState.setGuidancePreference(option.value)}
+                  />
+                ))}
+              </OptionGrid>
+            </Field>
+          </ConstructorSection>
+
+          <ConstructorSection
+            eyebrow="05"
+            title="What you're training for"
+            body="Pick the distance and how hard you want the plan to lean."
+          >
+            <Field label="Goal distance">
+              <OptionGrid>
+                {GOAL_DISTANCE_OPTIONS.map((option) => (
+                  <OptionButton
+                    key={option.value}
+                    active={state.goalDistance === option.value}
+                    label={option.label}
+                    onClick={() => setState.setGoalDistance(option.value)}
+                  />
+                ))}
+              </OptionGrid>
+            </Field>
+
+            <Field label="Goal style">
+              <OptionGrid>
+                {GOAL_STYLE_OPTIONS.map((option) => (
+                  <OptionButton
+                    key={option.value}
+                    active={state.goalStyle === option.value}
+                    label={option.label}
+                    onClick={() => setState.setGoalStyle(option.value)}
+                  />
+                ))}
+              </OptionGrid>
+            </Field>
+
+            {showsTargetFields ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Target time" helper="Required. Use 25:00 or 1:45:00.">
+                  <input
+                    value={state.targetTime}
+                    onChange={(event) => setState.setTargetTime(event.target.value)}
+                    placeholder="1:45:00"
+                    required
+                    className={cn(
+                      "hito-field hito-field-primary hito-field-md",
+                      !state.targetTime.trim() && "hito-field-feedback-error",
+                    )}
+                  />
+                </Field>
+                <Field label="Target date" helper="Optional. If used, choose at least 7 days out.">
+                  <input
+                    type="date"
+                    value={state.targetDate}
+                    onChange={(event) => setState.setTargetDate(event.target.value)}
+                    className="hito-field hito-field-primary hito-field-md"
+                  />
+                </Field>
+              </div>
+            ) : (
+              <p className="hito-field-helper">
+                Hito will estimate a realistic direction from your benchmark, availability, and goal
+                style. No target time is needed for this mode.
+              </p>
+            )}
+
+            {showsTerrainSelector && (
+              <Field label="Terrain focus">
+                <OptionGrid>
+                  {TERRAIN_OPTIONS.map((option) => (
+                    <OptionButton
+                      key={option.value}
+                      active={state.terrainFocus === option.value}
+                      label={option.label}
+                      copy={option.copy}
+                      onClick={() => setState.setTerrainFocus(option.value)}
+                    />
+                  ))}
+                </OptionGrid>
+              </Field>
+            )}
+
+            {impliedMountainTerrain && (
+              <div className="hito-row-group">
+                <div className="hito-list-row">
+                  <div>
+                    <p className="hito-list-row-title">Mountain terrain</p>
+                    <p className="hito-list-row-copy">
+                      Mountain running uses mountain terrain context automatically.
+                    </p>
+                  </div>
+                  <span className="hito-status-pill">Implied</span>
+                </div>
+              </div>
+            )}
+          </ConstructorSection>
+
+          <ConstructorSection
+            eyebrow="06"
+            title="Extras"
+            body="Add light mobility or strength support if you want it."
+          >
+            <div className="grid gap-2">
+              {STRENGTH_OPTIONS.map((option) => (
+                <OptionRow
+                  key={option.value}
+                  active={state.strengthPreference === option.value}
+                  label={option.label}
+                  copy={option.copy}
+                  onClick={() => setState.setStrengthPreference(option.value)}
+                />
+              ))}
+            </div>
+          </ConstructorSection>
+
+          <ConstructorSection
+            eyebrow="07"
+            title="Optional comment"
+            body="Add anything small Hito should keep in mind."
+          >
+            <label className="grid gap-2">
+              <span className="hito-form-label">Comment</span>
+              <textarea
+                rows={5}
+                value={state.comment}
+                onChange={(event) => setState.setComment(event.target.value)}
+                placeholder="Right knee discomfort, avoid intensity, prefer mornings, conservative plan..."
+                className={ONBOARDING_TEXTAREA_CLASS}
+              />
+            </label>
+          </ConstructorSection>
+
+          {isCorrectionRequired ? <StructuredCorrectionNotice result={draftResult} /> : null}
+          {draftResult && !draftResult.ok ? <StructuredReviewError result={draftResult} /> : null}
+
+          <div className="hito-onboarding-submit-footer">
+            <div className="hito-onboarding-submit-footer-inner">
+              <div className="min-w-0">
+                {constructorError ? <p className="hito-field-error">{constructorError}</p> : null}
+                {constructorStatus === "finishing" ? (
+                  <p className="hito-field-success">Your plan is ready. Opening it now...</p>
+                ) : null}
+                {!constructorError && constructorStatus !== "finishing" ? (
+                  <p className="hito-field-helper max-w-xl">
+                    Review your setup first. Nothing is created until you confirm the draft.
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="submit"
+                disabled={isBusy || !isConstructorReady}
+                className="hito-button hito-button-primary hito-button-lg shrink-0"
+              >
+                {constructorStatus === "reviewing"
+                  ? "Reviewing draft..."
+                  : constructorStatus === "finishing"
+                    ? "Opening your plan..."
+                    : "Review setup"}
+              </button>
             </div>
           </div>
-        )}
-      </ConstructorSection>
-
-      <ConstructorSection
-        eyebrow="05"
-        title="Extras"
-        body="Add light mobility or strength support if you want it."
-      >
-        <div className="grid gap-2">
-          {STRENGTH_OPTIONS.map((option) => (
-            <OptionRow
-              key={option.value}
-              active={state.strengthPreference === option.value}
-              label={option.label}
-              copy={option.copy}
-              onClick={() => setState.setStrengthPreference(option.value)}
-            />
-          ))}
-        </div>
-      </ConstructorSection>
-
-      <ConstructorSection
-        eyebrow="06"
-        title="Optional comment"
-        body="Add anything small Hito should keep in mind."
-      >
-        <label className="grid gap-2">
-          <span className="hito-form-label">Comment</span>
-          <textarea
-            rows={5}
-            value={state.comment}
-            onChange={(event) => setState.setComment(event.target.value)}
-            placeholder="Right knee discomfort, avoid intensity, prefer mornings, conservative plan..."
-            className={ONBOARDING_TEXTAREA_CLASS}
-          />
-        </label>
-      </ConstructorSection>
-
-      <div className="hito-onboarding-submit-footer">
-        <div className="hito-onboarding-submit-footer-inner">
-          <div className="min-w-0">
-            {constructorError ? <p className="hito-field-error">{constructorError}</p> : null}
-            {constructorStatus === "finishing" ? (
-              <p className="hito-field-success">Your plan is ready. Opening it now...</p>
-            ) : null}
-            {!constructorError && constructorStatus !== "finishing" ? (
-              <p className="hito-field-helper max-w-xl">
-                Add the required chips to create your plan.
-              </p>
-            ) : null}
-          </div>
-          <button
-            type="submit"
-            disabled={isBusy || !isConstructorReady}
-            className="hito-button hito-button-primary hito-button-lg shrink-0"
-          >
-            {constructorStatus === "saving"
-              ? "Creating your plan..."
-              : constructorStatus === "finishing"
-                ? "Opening your plan..."
-                : "Create plan"}
-          </button>
-        </div>
-      </div>
+        </>
+      )}
     </form>
   );
 }
@@ -413,6 +487,194 @@ export function Field({
       <span className="hito-form-label">{label}</span>
       {children}
       {helper ? <span className="hito-field-helper">{helper}</span> : null}
+    </div>
+  );
+}
+
+function StructuredDraftReadyReview({
+  result,
+  status,
+  isBusy,
+  onConfirmDraft,
+  onBackToEdit,
+}: {
+  result: StructuredDraftReady;
+  status: ConstructorStatus;
+  isBusy: boolean;
+  onConfirmDraft: () => void;
+  onBackToEdit: () => void;
+}) {
+  const review = result.review;
+  const summary = result.draft.summary;
+
+  return (
+    <ConstructorSection
+      eyebrow="Review"
+      title="Review your setup"
+      body="Nothing has been created yet. Confirm only if this matches what you want."
+    >
+      <div className="hito-row-group">
+        <div className="hito-list-row items-start">
+          <div className="min-w-0">
+            <p className="hito-list-row-title">Draft ready</p>
+            <p className="hito-list-row-copy">
+              Hito reviewed your answers and prepared a plan draft. The active plan is created only
+              after the next explicit confirmation.
+            </p>
+          </div>
+          <span className="hito-status-pill" data-tone="success">
+            Review
+          </span>
+        </div>
+
+        <div className="hito-list-row items-start">
+          <div className="grid gap-3">
+            <p className="hito-form-label">What Hito understood</p>
+            <StructuredReviewLine label="Runner" value={review.runnerUnderstanding.profile} />
+            <StructuredReviewLine label="Benchmark" value={review.runnerUnderstanding.benchmark} />
+            <StructuredReviewLine label="Goal" value={review.runnerUnderstanding.goal} />
+            <StructuredReviewLine
+              label="Availability"
+              value={review.runnerUnderstanding.availability}
+            />
+            <StructuredReviewLine
+              label="Workout guidance"
+              value={review.runnerUnderstanding.execution}
+            />
+          </div>
+        </div>
+
+        <div className="hito-list-row items-start">
+          <div className="grid gap-3">
+            <p className="hito-form-label">Plan setup summary</p>
+            <StructuredReviewLine label="Plan" value={summary.planName} />
+            <StructuredReviewLine
+              label="Estimated horizon"
+              value={review.planShape.durationLabel}
+            />
+            <StructuredReviewLine
+              label="Days per week"
+              value={`${review.planShape.runningDaysPerWeek}`}
+            />
+            <StructuredReviewLine
+              label="Rest days"
+              value={
+                review.planShape.fixedRestDays.length
+                  ? review.planShape.fixedRestDays.join(", ")
+                  : "No fixed rest days"
+              }
+            />
+            <StructuredReviewLine
+              label="Workouts"
+              value={`${review.planShape.workoutCount} planned workouts`}
+            />
+            <StructuredReviewLine
+              label="Long run"
+              value={review.planShape.longRunDay ?? "No fixed long-run day"}
+            />
+            <StructuredReviewLine label="Quality rhythm" value={review.planShape.qualityRhythm} />
+            <StructuredReviewLine label="Metric policy" value={review.planShape.metricPolicy} />
+            <StructuredReviewLine
+              label="Terrain"
+              value={formatTerrainFocus(review.planShape.terrainFocus)}
+            />
+            {review.planShape.activityMix.length > 0 ? (
+              <div>
+                <p className="hito-label">Workout mix</p>
+                <p className="hito-body-small text-muted-foreground">
+                  {review.planShape.activityMix.join(", ")}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="hito-list-row items-start">
+          <div>
+            <p className="hito-form-label">Assumptions and safety</p>
+            <ul className="mt-2 grid gap-1">
+              {[...review.assumptions, ...review.safetyNotes].map((note) => (
+                <li key={note} className="hito-body-small text-muted-foreground">
+                  {note}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="hito-list-row">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={onConfirmDraft}
+              className="hito-button hito-button-primary hito-button-md"
+            >
+              {status === "creating" ? "Creating plan..." : "Yes, create plan"}
+            </button>
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={onBackToEdit}
+              className="hito-button hito-button-secondary hito-button-md"
+            >
+              Back and edit
+            </button>
+          </div>
+        </div>
+      </div>
+    </ConstructorSection>
+  );
+}
+
+function StructuredCorrectionNotice({ result }: { result: StructuredCorrectionRequired }) {
+  return (
+    <div className="hito-row-group">
+      <div className="hito-list-row items-start">
+        <div className="min-w-0">
+          <p className="hito-list-row-title">Review needs one correction</p>
+          <p className="hito-list-row-copy">{result.correction.message}</p>
+          {result.correction.fields.length > 0 ? (
+            <p className="hito-field-helper mt-2">Check: {result.correction.fields.join(", ")}</p>
+          ) : null}
+          <p className="hito-field-helper mt-2">
+            No plan was created. Adjust the setup and review again.
+          </p>
+        </div>
+        <span className="hito-status-pill" data-tone="warning">
+          Correct
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function StructuredReviewError({
+  result,
+}: {
+  result: Extract<StructuredFirstPlanDraftResult, { ok: false }>;
+}) {
+  return (
+    <div className="hito-row-group">
+      <div className="hito-list-row items-start">
+        <div>
+          <p className="hito-list-row-title">Review failed</p>
+          <p className="hito-list-row-copy">{result.message}</p>
+          <p className="hito-field-helper mt-2">No plan was created.</p>
+        </div>
+        <span className="hito-status-pill" data-tone="error">
+          Error
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function StructuredReviewLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="hito-label">{label}</p>
+      <p className="hito-body-small text-muted-foreground">{value}</p>
     </div>
   );
 }

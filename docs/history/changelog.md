@@ -4,6 +4,11 @@ Completed implementation history only.
 
 ## 2026-05-22
 
+- Migrated manual Quick setup onboarding to structured review-before-create: the constructor now includes compact execution-preference controls, `Review setup` calls `generateStructuredFirstPlanDraft` without creating rows, and only the explicit `Yes, create plan` review action calls `confirmStructuredFirstPlanDraft`.
+- Added the structured constructor review-before-create backend seam: `generateStructuredFirstPlanDraft` returns a non-mutating setup review and canonical draft plan, while `confirmStructuredFirstPlanDraft` revalidates that draft, blocks existing active plans, and creates the first active plan only through explicit confirmation.
+- Refined structured plan generator doctrine: generated `training-plan-v2` workouts now preserve exact `source_workout_type` identity, use clearer distance/time interval titles, simplify quality days during cutback weeks, and split appropriate later long runs into easy-base plus controlled steady-finish segments while preserving metric-mode safety.
+- Added the plan-authoring metric-mode resolver: generated structured plans now emit `pace_min_per_km_range` only when execution mode allows watch/app pace guidance and recent 5K benchmark truth exists, while omitted execution mode, no-watch mode, unknown benchmark, and HR preference without HR-zone truth stay effort/cue based without numeric HR or pace targets.
+- Added the first plan-authoring quality backend slice: structured onboarding, shared structured authoring, and Dictate-to-Plan supplements now accept bounded execution-mode context (`watchAccess` and `guidancePreference`), default omitted values safely to unknown watch/app access plus effort guidance, and keep the context generation-only without changing persistence or the existing voice review/confirm boundary.
 - Fixed Calendar tooltip and mobile month usability: month tooltips now render through a viewport-clamped fixed layer, while narrow month view switches to a vertical day list that preserves workout links, glyphs, status, and feedback markers instead of squeezing the desktop seven-column grid.
 
 ## 2026-05-21

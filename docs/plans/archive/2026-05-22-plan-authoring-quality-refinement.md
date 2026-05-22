@@ -2,7 +2,7 @@
 
 ## Status
 
-Active - architecture plan ready for backend implementation
+Complete / Closed
 
 ## Owner
 
@@ -11,6 +11,23 @@ Architect / Backend / Frontend / QA
 ## Last Updated
 
 2026-05-22
+
+## Checklist
+
+- [x] Backend slice 1: add execution-mode fields to structured onboarding parsing and structured authoring input.
+- [x] Backend slice 2: add the metric-mode resolver used by segment target builders.
+- [x] Backend slice 3: refine structured generator doctrine, workout rotation, and structure defaults.
+- [x] Backend slice 4: add non-mutating structured draft/review plus explicit confirm actions.
+- [x] Frontend: add compact execution-preference controls and switch structured onboarding to review-before-create.
+- [x] QA: run the fixed authoring-quality fixture matrix across metric safety, workout specificity, rest-day invariants, and non-mutating review behavior.
+
+## Closeout Note
+
+This track is complete and closed. Implementation and the final deterministic QA fixture matrix passed for the execution-mode contract, metric-mode resolver, generator doctrine/workout structure, structured draft/confirm backend actions, and structured review-before-create frontend UI.
+
+Remaining follow-up is non-blocking hygiene only:
+
+- Align `confirmStructuredFirstPlanDraftForUser.workoutCount` with the persisted planned-workout count if downstream UI relies on that result field. One QA fixture returned `workoutCount: 40` while DB truth correctly persisted `70` planned workouts; saved-plan creation and DB truth were correct.
 
 ## Context
 
@@ -387,9 +404,8 @@ Required rendering implications:
 
 ## Next Recommended Role
 
-BACKEND
+FRONTEND
 
 ## Suggested Next Step
 
-Implement the backend slice first: add execution-mode input fields, create the metric-mode resolver, refine structured generator doctrine/rotation rules, and add non-mutating structured draft plus explicit confirm actions before frontend changes the constructor flow.
-
+Migrate the structured constructor UI from direct create to the backend draft/review/confirm flow: call `generateStructuredFirstPlanDraft`, show the non-mutating review, and create only through `confirmStructuredFirstPlanDraft`. Keep legacy direct structured creation as backend compatibility only unless the product explicitly needs it, and preserve the existing voice-to-plan two-step flow plus Advanced JSON behavior.

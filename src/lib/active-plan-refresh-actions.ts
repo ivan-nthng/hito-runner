@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   createAssignedPlanFromImportedSeed,
   getExistingPlanContext,
@@ -13,7 +12,6 @@ import {
   checkRunnerCapability,
 } from "@/lib/entitlements/check-runner-capability";
 import { recordRunnerCapabilityUsage } from "@/lib/entitlements/record-runner-capability-usage";
-import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
 import {
   buildImportedPlanSeed,
   type ImportedPlanSeed,
@@ -23,10 +21,13 @@ import {
   generateCanonicalPlanFromText,
   type GeneratedPlanResult,
 } from "@/lib/openai-plan-authoring";
-import {
-  type ActivePlanRefreshFingerprint,
-  type ActivePlanRefreshProposal,
-} from "@/lib/plan-refresh-proposal";
+import { type ActivePlanRefreshFingerprint } from "@/lib/plan-refresh-proposal";
+import type {
+  ActivePlanRefreshApplyPayload,
+  ActivePlanRefreshProposalInput,
+  ApplyActivePlanRefreshProposalResult,
+  ProposeActivePlanRefreshResult,
+} from "@/lib/active-plan-refresh-contract";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import type { RunnerCoachContext } from "@/lib/runner-coach-context";
 import type { Json } from "@/lib/supabase/database";
@@ -49,57 +50,18 @@ import {
   type WeekdayRestInvariant,
 } from "@/lib/weekday-rest-invariants";
 
+export {
+  activePlanRefreshApplyInputSchema,
+  activePlanRefreshProposalInputSchema,
+} from "@/lib/active-plan-refresh-contract";
+export type {
+  ActivePlanRefreshApplyPayload,
+  ActivePlanRefreshProposalInput,
+  ApplyActivePlanRefreshProposalResult,
+  ProposeActivePlanRefreshResult,
+} from "@/lib/active-plan-refresh-contract";
+
 type PersistedSnapshotLoader = (userId: string) => Promise<TrainingSnapshot>;
-
-const requestedStartDateSchema = z
-  .string()
-  .trim()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a start date in YYYY-MM-DD format.");
-
-export const activePlanRefreshProposalInputSchema = z.object({
-  runnerPrompt: z.string().trim().min(8).max(1200),
-});
-
-const activePlanRefreshFingerprintSchema = z.object({
-  schemaVersion: z.literal("active-plan-refresh-fingerprint-v1"),
-  today: requestedStartDateSchema,
-  activePlanId: z.string().uuid(),
-  activePlanUpdatedAt: z.string().trim().min(1),
-  firstMutableDate: requestedStartDateSchema.nullable(),
-  lastMutableDate: requestedStartDateSchema.nullable(),
-  weekdayRestInvariantSignature: z.string().trim(),
-  remainingScheduleSignature: z.array(z.string()).max(80),
-  recentHistorySignature: z.array(z.string()).max(80),
-});
-
-export const activePlanRefreshApplyInputSchema = z.object({
-  proposal: z.object({
-    model: z.string().trim().min(1),
-    responseId: z.string().trim().min(1).nullable(),
-    output: z.object({
-      proposalStatus: z.literal("proposal_only"),
-      applyContext: z.object({
-        generatedAt: z.string().trim().min(1),
-        fingerprint: activePlanRefreshFingerprintSchema,
-      }),
-      review: z.object({
-        summary: z.string().trim().min(1).max(400),
-        proposedChanges: z.array(z.string().trim().min(1).max(220)).min(1).max(8),
-      }),
-      safety: z.object({
-        requiresExplicitApply: z.literal(true),
-        preservesPastAndLoggedHistory: z.literal(true),
-        doesNotMutatePlan: z.literal(true),
-      }),
-      recommendedAuthoringPrompt: z.string().trim().min(20).max(1600),
-    }),
-  }),
-});
-
-type ActivePlanRefreshProposalInput = z.output<typeof activePlanRefreshProposalInputSchema>;
-export type ActivePlanRefreshApplyPayload = z.output<
-  typeof activePlanRefreshApplyInputSchema
->["proposal"];
 
 const refreshApplyGoalTypes = [
   "build_consistency",
@@ -119,36 +81,6 @@ const refreshApplyExperienceLevels = [
 type RefreshApplyExperienceLevel = (typeof refreshApplyExperienceLevels)[number];
 const refreshApplyEffortLanguages = ["pace", "heart_rate", "rpe", "mixed"] as const;
 type RefreshApplyEffortLanguage = (typeof refreshApplyEffortLanguages)[number];
-
-export type ProposeActivePlanRefreshResult =
-  | {
-      ok: true;
-      proposal: ActivePlanRefreshProposal;
-    }
-  | CapabilityLockedResponse;
-
-export type ApplyActivePlanRefreshProposalResult =
-  | {
-      ok: true;
-      status: "applied";
-      archivedPlanId: string;
-      activePlanId: string;
-      fixedWorkoutCount: number;
-      refreshedWorkoutCount: number;
-      snapshot: TrainingSnapshot;
-    }
-  | {
-      ok: false;
-      status: "stale";
-      reason: "stale_proposal";
-      message: string;
-    }
-  | {
-      ok: false;
-      status: "blocked";
-      reason: "invalid_refresh_plan";
-      message: string;
-    };
 
 export async function proposeActivePlanRefreshForCurrentRequest(
   data: ActivePlanRefreshProposalInput,

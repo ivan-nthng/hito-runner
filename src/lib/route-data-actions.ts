@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { canUseMagicLinkForRequest, isLocalAuthBypassEnabledForRequest } from "@/lib/auth-actions";
 import { getRequestAuthContext } from "@/lib/backend/auth";
+import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import { findWorkout, type TrainingSnapshot, type Workout } from "@/lib/training";
+import { getUserSettingsForUserId } from "@/lib/user-settings-actions";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 
 export const workoutRouteInputSchema = z.object({ date: z.string() });
@@ -17,10 +19,14 @@ type WorkoutRouteDataLoaders = RouteDataLoaders & {
 
 export async function loadHomeRouteData({ loadSnapshot, loadViewer }: RouteDataLoaders) {
   const auth = getRequestAuthContext();
+  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
 
   return {
     snapshot: await loadSnapshot(),
     viewer: await loadViewer(),
+    onboardingDefaults: persistedUserId
+      ? await getUserSettingsForUserId(persistedUserId, auth.email)
+      : null,
     localBypassEnabled: await isLocalAuthBypassEnabledForRequest(auth.appBaseUrl),
     magicLinkEnabled: canUseMagicLinkForRequest(auth.appBaseUrl),
   };

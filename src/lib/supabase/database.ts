@@ -204,6 +204,7 @@ export type Database = {
           last_name: string | null;
           setup_completed_at: string;
           setup_state: Database["public"]["Enums"]["runner_setup_state"];
+          training_preferences: Json | null;
           updated_at: string;
           user_id: string;
           weight_kg: number | null;
@@ -224,6 +225,7 @@ export type Database = {
           last_name?: string | null;
           setup_completed_at?: string;
           setup_state?: Database["public"]["Enums"]["runner_setup_state"];
+          training_preferences?: Json | null;
           updated_at?: string;
           user_id: string;
           weight_kg?: number | null;
@@ -244,6 +246,7 @@ export type Database = {
           last_name?: string | null;
           setup_completed_at?: string;
           setup_state?: Database["public"]["Enums"]["runner_setup_state"];
+          training_preferences?: Json | null;
           updated_at?: string;
           user_id?: string;
           weight_kg?: number | null;

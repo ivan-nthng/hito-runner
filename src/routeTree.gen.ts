@@ -18,6 +18,7 @@ import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
 import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
 import { Route as ApiProfileAvatarUploadRouteImport } from './routes/api.profile-avatar.upload'
@@ -71,6 +72,11 @@ const WorkoutDateRoute = WorkoutDateRouteImport.update({
   path: '/workout/$date',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/admin/analytics',
+  path: '/admin/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiWorkoutResultUploadRoute = ApiWorkoutResultUploadRouteImport.update({
   id: '/api/workout-result/upload',
   path: '/api/workout-result/upload',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
+    | '/admin/analytics'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -191,6 +201,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
+    | '/admin/analytics'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -209,6 +220,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
+    | '/admin/analytics'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -228,6 +240,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   WorkoutDateRoute: typeof WorkoutDateRoute
   ApiAuthConfirmRoute: typeof ApiAuthConfirmRoute
   ApiAuthLocalLoginRoute: typeof ApiAuthLocalLoginRoute
@@ -303,6 +316,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkoutDateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/admin/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/workout-result/upload': {
       id: '/api/workout-result/upload'
       path: '/api/workout-result/upload'
@@ -364,6 +384,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
   WorkoutDateRoute: WorkoutDateRoute,
   ApiAuthConfirmRoute: ApiAuthConfirmRoute,
   ApiAuthLocalLoginRoute: ApiAuthLocalLoginRoute,

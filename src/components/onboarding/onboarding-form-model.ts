@@ -1,4 +1,8 @@
-import type { StructuredFirstPlanOnboardingInput } from "@/lib/structured-first-plan-onboarding";
+import type {
+  StructuredFirstPlanOnboardingInput,
+  StructuredFirstPlanOnboardingRequestInput,
+} from "@/lib/structured-first-plan-onboarding";
+import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { VoiceToPlanSupplement } from "@/lib/voice-to-plan-authoring";
 
 export type WeekdayName =
@@ -9,7 +13,6 @@ export type WeekdayName =
   | "Friday"
   | "Saturday"
   | "Sunday";
-export type BenchmarkKind = StructuredFirstPlanOnboardingInput["benchmark"]["kind"];
 export type GoalDistance = StructuredFirstPlanOnboardingInput["goal"]["goalDistance"];
 export type GoalStyle = StructuredFirstPlanOnboardingInput["goal"]["goalStyle"];
 export type TerrainFocus = StructuredFirstPlanOnboardingInput["goal"]["terrainFocus"];
@@ -27,10 +30,13 @@ export interface StructuredConstructorState {
   age: string;
   weightKg: string;
   heightCm: string;
-  benchmarkKind: BenchmarkKind;
+  fitnessLevel: RunnerFitnessLevel;
   recent5kTime: string;
   recent5kPace: string;
   fixedRestDays: WeekdayName[];
+  restDaysAnswered: boolean;
+  maxRunningDaysPerWeek: string;
+  preferredLongRunDay: WeekdayName | "";
   goalDistance: GoalDistance;
   goalStyle: GoalStyle;
   targetTime: string;
@@ -55,21 +61,35 @@ export const WEEKDAY_OPTIONS: { value: WeekdayName; label: string }[] = [
   { value: "Sunday", label: "Sun" },
 ] as const;
 
-export const BENCHMARK_OPTIONS: { value: BenchmarkKind; label: string; copy: string }[] = [
+export const FITNESS_LEVEL_OPTIONS: {
+  value: RunnerFitnessLevel;
+  label: string;
+  copy: string;
+}[] = [
   {
-    value: "recent_5k_time",
-    label: "Recent 5K time",
-    copy: "Use a race or hard recent effort.",
+    value: "new_to_running",
+    label: "New to running",
+    copy: "Start gently and build the habit first.",
   },
   {
-    value: "recent_5k_pace",
-    label: "Recent 5K pace",
-    copy: "Useful if you remember pace, not finish time.",
+    value: "beginner",
+    label: "Beginner",
+    copy: "You run sometimes and want a steady base.",
   },
   {
-    value: "unknown",
-    label: "I do not know",
-    copy: "Hito will start more conservatively.",
+    value: "running_regularly",
+    label: "Running regularly",
+    copy: "You already run most weeks.",
+  },
+  {
+    value: "performance_focused",
+    label: "Performance focused",
+    copy: "You can handle more structured quality work.",
+  },
+  {
+    value: "custom",
+    label: "I know my recent 5K",
+    copy: "Use a recent 5K time between 18:00 and 55:00.",
   },
 ];
 
@@ -131,10 +151,12 @@ export function buildStructuredInput({
   age,
   weightKg,
   heightCm,
-  benchmarkKind,
+  fitnessLevel,
   recent5kTime,
-  recent5kPace,
   fixedRestDays,
+  restDaysAnswered,
+  maxRunningDaysPerWeek,
+  preferredLongRunDay,
   goalDistance,
   goalStyle,
   targetTime,
@@ -145,12 +167,12 @@ export function buildStructuredInput({
   strengthPreference,
   comment,
 }: StructuredConstructorState):
-  | { ok: true; input: StructuredFirstPlanOnboardingInput }
+  | { ok: true; input: StructuredFirstPlanOnboardingRequestInput }
   | {
       ok: false;
       error: string;
     } {
-  const runningDaysPerWeek = deriveRunningDaysPerWeek(fixedRestDays);
+  const runningDaysPerWeek = resolveRunningDaysPerWeek(fixedRestDays, maxRunningDaysPerWeek);
   const profileNumbers = {
     age: requiredNumber(age, "Age", { min: 13, max: 100, integer: true }),
     weightKg: requiredNumber(weightKg, "Weight", { min: 30, max: 250, increment: 0.5 }),
@@ -169,6 +191,20 @@ export function buildStructuredInput({
     };
   }
 
+  if (!restDaysAnswered) {
+    return {
+      ok: false,
+      error: "Choose fixed rest days or No fixed rest days.",
+    };
+  }
+
+  if (!maxRunningDaysPerWeek.trim()) {
+    return {
+      ok: false,
+      error: "Choose default running days per week.",
+    };
+  }
+
   if (runningDaysPerWeek > WEEKDAY_OPTIONS.length - fixedRestDays.length) {
     return {
       ok: false,
@@ -177,17 +213,12 @@ export function buildStructuredInput({
   }
 
   const trimmed5kTime = recent5kTime.trim();
-  const trimmed5kPace = recent5kPace.trim();
   const trimmedTargetTime = targetTime.trim();
   const trimmedTargetDate = targetDate.trim();
   const trimmedComment = comment.trim();
 
-  if (benchmarkKind === "recent_5k_time" && !trimmed5kTime) {
-    return { ok: false, error: "Add a recent 5K time or choose I do not know." };
-  }
-
-  if (benchmarkKind === "recent_5k_pace" && !trimmed5kPace) {
-    return { ok: false, error: "Add a recent 5K pace or choose I do not know." };
+  if (fitnessLevel === "custom" && !isRecent5kTimeInAcceptedRange(trimmed5kTime)) {
+    return { ok: false, error: "Use a recent 5K time between 18:00 and 55:00." };
   }
 
   if (goalStyle === "target_time" && !trimmedTargetTime) {
@@ -202,27 +233,14 @@ export function buildStructuredInput({
         weightKg: profileNumbers.weightKg.value,
         heightCm: profileNumbers.heightCm.value,
       },
-      benchmark:
-        benchmarkKind === "recent_5k_time"
-          ? {
-              kind: "recent_5k_time",
-              recent5kTime: trimmed5kTime,
-              recent5kPace: null,
-            }
-          : benchmarkKind === "recent_5k_pace"
-            ? {
-                kind: "recent_5k_pace",
-                recent5kPace: trimmed5kPace,
-                recent5kTime: null,
-              }
-            : {
-                kind: "unknown",
-                recent5kTime: null,
-                recent5kPace: null,
-              },
+      benchmark: {
+        fitnessLevel,
+        recent5kTime: fitnessLevel === "custom" ? trimmed5kTime : null,
+      },
       availability: {
         runningDaysPerWeek,
         fixedRestDays,
+        preferredLongRunDay: preferredLongRunDay || null,
       },
       goal: {
         goalDistance,
@@ -341,6 +359,16 @@ export function deriveRunningDaysPerWeek(fixedRestDays: WeekdayName[]) {
   return Math.min(4, Math.max(1, allowedDayCount));
 }
 
+export function resolveRunningDaysPerWeek(fixedRestDays: WeekdayName[], requestedValue: string) {
+  const parsed = Number.parseInt(requestedValue.trim(), 10);
+
+  if (!Number.isFinite(parsed)) {
+    return deriveRunningDaysPerWeek(fixedRestDays);
+  }
+
+  return parsed;
+}
+
 export function resolveTerrainFocus(goalDistance: GoalDistance, terrainFocus: TerrainFocus) {
   if (goalDistance === "mountain_running") {
     return "mountain";
@@ -357,10 +385,11 @@ export function isStructuredConstructorReady({
   age,
   weightKg,
   heightCm,
-  benchmarkKind,
+  fitnessLevel,
   recent5kTime,
-  recent5kPace,
   fixedRestDays,
+  restDaysAnswered,
+  maxRunningDaysPerWeek,
   goalStyle,
   targetTime,
 }: Pick<
@@ -368,10 +397,11 @@ export function isStructuredConstructorReady({
   | "age"
   | "weightKg"
   | "heightCm"
-  | "benchmarkKind"
+  | "fitnessLevel"
   | "recent5kTime"
-  | "recent5kPace"
   | "fixedRestDays"
+  | "restDaysAnswered"
+  | "maxRunningDaysPerWeek"
   | "goalStyle"
   | "targetTime"
 >) {
@@ -380,13 +410,60 @@ export function isStructuredConstructorReady({
     requiredNumber(weightKg, "Weight", { min: 30, max: 250, increment: 0.5 }).ok &&
     requiredNumber(heightCm, "Height", { min: 120, max: 230, integer: true }).ok;
   const benchmarkComplete =
-    benchmarkKind === "unknown" ||
-    (benchmarkKind === "recent_5k_time" && Boolean(recent5kTime.trim())) ||
-    (benchmarkKind === "recent_5k_pace" && Boolean(recent5kPace.trim()));
+    fitnessLevel !== "custom" || isRecent5kTimeInAcceptedRange(recent5kTime.trim());
   const hasTrainingDay = fixedRestDays.length < WEEKDAY_OPTIONS.length;
+  const runningDaysPerWeek = resolveRunningDaysPerWeek(fixedRestDays, maxRunningDaysPerWeek);
+  const runningDaysAnswered = maxRunningDaysPerWeek.trim().length > 0;
+  const runningDayCountValid =
+    restDaysAnswered &&
+    runningDaysAnswered &&
+    Number.isInteger(runningDaysPerWeek) &&
+    runningDaysPerWeek >= 1 &&
+    runningDaysPerWeek <= WEEKDAY_OPTIONS.length - fixedRestDays.length;
   const targetComplete = goalStyle !== "target_time" || Boolean(targetTime.trim());
 
-  return profileComplete && benchmarkComplete && hasTrainingDay && targetComplete;
+  return (
+    profileComplete && benchmarkComplete && hasTrainingDay && runningDayCountValid && targetComplete
+  );
+}
+
+export function isRecent5kTimeInAcceptedRange(value: string) {
+  const seconds = parseDurationSeconds(value);
+
+  return seconds != null && seconds >= 18 * 60 && seconds <= 55 * 60;
+}
+
+function parseDurationSeconds(value: string) {
+  const parts = value
+    .trim()
+    .split(":")
+    .map((part) => Number(part));
+
+  if (parts.length !== 2 && parts.length !== 3) {
+    return null;
+  }
+
+  if (parts.some((part) => !Number.isInteger(part) || part < 0)) {
+    return null;
+  }
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+
+    if (minutes == null || seconds == null || seconds >= 60) {
+      return null;
+    }
+
+    return minutes * 60 + seconds;
+  }
+
+  const [hours, minutes, seconds] = parts;
+
+  if (hours == null || minutes == null || seconds == null || minutes >= 60 || seconds >= 60) {
+    return null;
+  }
+
+  return hours * 3600 + minutes * 60 + seconds;
 }
 
 export function formatTerrainFocus(terrainFocus: NonNullable<TerrainFocus>) {

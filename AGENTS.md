@@ -82,6 +82,54 @@ Goal:
 
 Make the system smaller, not smarter.
 
+## 2.6) Canonical Hito Architecture Approach (Mandatory)
+
+Every agent must preserve one canonical Hito architecture. Do not create parallel product systems
+for the same truth.
+
+Canonical pipeline:
+
+`runner/provider input -> backend validation -> normalization -> canonical persisted entities -> deterministic product truth -> optional AI/enrichment -> explicit review/confirm when mutation is risky -> UI rendering`
+
+Architecture rules:
+
+- Backend owns truth:
+  validation, normalization, persistence, lifecycle rules, entitlement checks, mutation safety,
+  provider ingest, plan application, and auditability.
+- Frontend owns interaction:
+  collect input, show backend-shaped state, render async/error/review states, and never invent
+  schedule, billing, AI, entitlement, or persistence rules locally.
+- Canonical entities win:
+  reuse existing runner profile, plan cycle, planned workout, workout log, result asset, actual
+  metrics, comparison, AI insight, entitlement, and settings/profile seams before adding storage.
+- Raw external truth is preserved before interpretation:
+  provider files/API payloads/transcripts should be validated and normalized into canonical Hito
+  entities before they affect product truth.
+- Deterministic truth comes before AI:
+  AI may draft, explain, summarize, or recommend from bounded canonical context, but must not
+  silently mutate plans, logs, settings, or trusted history.
+- Risky mutations need explicit human control:
+  plan creation, plan refresh apply, destructive actions, imports/replacements, and profile-level
+  defaults must have clear review/confirm or confirmation boundaries.
+- Runner-level defaults and active-plan truth are distinct:
+  settings/profile preferences can prefill future work, but must not silently rewrite an existing
+  active plan.
+- Design-system primitives are the UI contract:
+  prefer Hito DS tokens/classes/components over route-local styling and do not add one-off visual
+  systems without replacing real repeated drift.
+- Documentation follows implementation:
+  `docs/current-system.md` and `docs/current-product.md` describe implemented behavior only;
+  active plans describe next work; archived plans are history.
+
+Default architectural bias:
+
+- one pipeline over many paths
+- canonical storage over duplicate models
+- explicit review over silent mutation
+- deterministic comparison over AI confidence
+- bounded slices over broad rewrites
+- deletion and consolidation over abstraction
+
 ## 3) Required Context And Source Hierarchy
 
 Read in this order for non-trivial work:

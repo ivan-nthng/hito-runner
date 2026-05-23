@@ -69,7 +69,7 @@
   `completeStructuredFirstPlanOnboarding`, `generateStructuredFirstPlanDraft`, `confirmStructuredFirstPlanDraft`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public imports through `training-api.ts`; the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
 - `src/lib/active-plan-persistence.ts`
   owns the shared imported-plan apply and active-plan persistence primitives used by first-plan creation and saved-mode flows:
-  `applyImportedPlanForUser`, active-plan lookup, planned-workout/log readback with archived-log recovery, assigned-plan insertion, profile upsert during apply, and rollback of inserted plans now live there so first-plan actions no longer depend backward on `training-api.ts`
+  `applyImportedPlanForUser`, active-plan lookup, planned-workout/log readback with archived-log recovery, assigned-plan insertion, profile upsert during apply including structured first-plan training preference snapshots, and rollback of inserted plans now live there so first-plan actions no longer depend backward on `training-api.ts`
 - `src/lib/active-plan-export-actions.ts`
   owns the active-plan export server-action and user-scoped export helper:
   it resolves the authenticated persisted user, reads the current active plan through `active-plan-persistence`, delegates payload/document shaping to `plan-export.ts`, and keeps the old `training-api.ts` public export names as compatibility re-exports
@@ -86,7 +86,10 @@
   owns pure `/changelog` markdown parsing, date/month/year grouping, source-derived shipped-change count and last-updated helpers, highlight classification, and milestone title derivation while the public route keeps shell, tabs, timeline rendering, and the existing `docs/history/changelog.md?raw` source import
 - `src/lib/user-settings-actions.ts`
   owns the user-settings route/action layer:
-  it resolves settings route data through the same persisted-user mapping as saved mode, reads and updates bounded `runner_profiles` settings fields, and accepts the existing snapshot/viewer loaders from `training-api.ts` so the `/settings` route data shape and compatibility imports stay unchanged
+  it resolves settings route data through the same persisted-user mapping as saved mode, reads and updates bounded `runner_profiles` settings fields, delegates runner-level `training_preferences` validation to the shared runner training-preference contract, and accepts the existing snapshot/viewer loaders from `training-api.ts` so the `/settings` route data shape and compatibility imports stay backward-safe
+- `src/lib/runner-training-preferences.ts`
+  owns the shared pure runner training-preference contract used by settings and structured first-plan setup:
+  it maps product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` into the stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day` shape; validates that fixed rest days leave at least one trainable weekday, default running days fit the available weekdays, and long-run day is not blocked; derives the Sunday/Saturday/latest-available long-run fallback for generation/review without storing that fallback as an explicit runner choice; and exposes bounded fitness-level mapping where only `custom` plus a direct recent 5K time produces numeric benchmark truth
 - `src/lib/workout-log-actions.ts`
   owns the workout-log save action helper layer:
   it validates completed, partial, and skipped workout-result payloads, normalizes skipped results to null actual metrics, validates bounded workout-scoped body notes, checks that the planned workout belongs to the persisted user and is not a rest day, and upserts the canonical `workout_logs` row while `training-api.ts` keeps the public `saveWorkoutLog` server-action wrapper for compatibility
@@ -95,8 +98,8 @@
   bounded goal distance/style/terrain/execution values, safe execution defaults, guidance-preference-to-effort-language mapping, weekday de-duplication and long-run/day spreading helpers, goal label formatting, and duration/pace parsing live there instead of being duplicated across first-plan modules
 - `src/lib/structured-first-plan-onboarding.ts`
   owns the backend contract for the structured first-plan constructor:
-  required age, weight, and height profile basics, one bounded 5K benchmark mode, `runningDaysPerWeek`, `fixedRestDays`, goal distance/style/conditional terrain, optional execution mode (`watchAccess`, `guidancePreference`), bounded strength preference, and an optional supporting comment
-  it translates that visible contract into the existing structured authoring input, derives preferred running days from running-days/week plus fixed rest days, defaults omitted execution mode to unknown watch/app access plus effort guidance, derives broad internal pace context from recent 5K time or pace when provided, builds a runner-facing non-mutating review summary for the structured draft path, keeps fixed rest days in the weekday rest-day invariant system, and persists only approved profile measurements to `runner_profiles`
+  required age, weight, and height profile basics, one bounded 5K benchmark mode plus backend-compatible fitness-level input, `runningDaysPerWeek`, `fixedRestDays`, goal distance/style/conditional terrain, optional execution mode (`watchAccess`, `guidancePreference`), bounded strength preference, and an optional supporting comment
+  it translates that visible contract into the existing structured authoring input, derives preferred running days from running-days/week plus fixed rest days, defaults omitted execution mode to unknown watch/app access plus effort guidance, derives broad internal pace context only from recent 5K time or pace truth, builds a runner-facing non-mutating review summary for the structured draft path, keeps fixed rest days in the weekday rest-day invariant system, and persists only approved profile measurements plus stable weekly training preference defaults to `runner_profiles`
 - `src/lib/imported-plan.ts`
   owns the canonical `training-plan-v2` import contract, JSON validation helpers, the runtime-noise exclusions for v2, the bounded canonical target and prescription normalization rules, the accepted-but-ignored `_ml_agent_template` instruction block, optional exact `source_workout_type` identity, and the mapping from accepted import shapes into the canonical saved workout shape
 - `src/lib/structured-plan-authoring.ts`
@@ -113,6 +116,15 @@
   owns the temporary local account credential contract, account discovery, and cookie session helpers
 - `src/lib/local-auth-supabase.ts`
   owns the temporary local-account to Supabase-user resolution used when the local bypass enters the canonical Supabase storage seam
+- `src/lib/admin-local-test-accounts.ts`
+  owns the first backend contract for local admin test-account management:
+  it exposes server-action-ready list and delete seams for the `/admin/analytics` `Test accounts` section, while the server-only implementation reads `.tanstack/hito-running-local-accounts.json`, returns bounded local account view data only after local-runtime plus admin checks, marks protected admin accounts as non-deletable, and deletes only local tester accounts through the same local-file plus Supabase-auth-user safety semantics as the tester lifecycle script
+- `src/lib/admin-analytics.ts`
+  owns the Phase 1 backend admin analytics contract:
+  it exposes a server-action-ready loader for `/admin/analytics` overview/funnel/integrations/AI/user sections, while the server-only implementation verifies admin access, reads only existing Supabase truth through the admin client, and returns bounded aggregate counts plus per-user rows without raw payloads, prompts, transcripts, FIT contents, body-note text, storage paths, service keys, tokens, or sessions
+- `src/routes/admin.analytics.tsx`
+  owns the Phase 1 admin analytics UI plus the local-only Test accounts UI:
+  it renders backend-shaped Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs, formats server-provided counts and rows only for presentation, and leaves admin checks, account-file access, Supabase deletion, analytics aggregation, and all credential/sensitive-payload safety rules on server contracts
 - `supabase/migrations/20260506025058_phase_2_phase_3_backend_foundation.sql`
   defines the minimum persisted schema and RLS posture for runner profiles, plan cycles, planned workouts, and workout logs
 - `supabase/migrations/20260508104250_phase_3_tighten_persisted_plan_semantics.sql`
@@ -126,6 +138,8 @@
 - `supabase/migrations/20260518183000_basic_pro_entitlement_foundation.sql`
   adds the first entitlement storage foundation:
   `runner_entitlements` for explicit backend-owned Basic/Pro rows and `runner_capability_usage` for lifetime metered capability counters; both tables have RLS enabled with authenticated read-own policies only, while writes remain server/admin-owned
+- `supabase/migrations/20260522153725_runner_profile_training_preferences.sql`
+  adds `runner_profiles.training_preferences jsonb` for bounded runner-level training defaults using plan-preference-compatible keys such as `blocked_days`, `preferred_long_run_day`, and `max_running_days_per_week`
 
 ## State And Lifecycle Rules
 
@@ -137,7 +151,7 @@
 - authenticated users without `runner_profile` are routed into setup on `/`
 - authenticated users with a saved profile but no active `plan_cycle` now also stay honestly in setup until a canonical creation path succeeds
 - visible onboarding on `/` is now structured-first:
-  authenticated users without setup answer the bounded first-plan constructor for required profile basics, benchmark, fixed rest-day availability, execution preference, goal, conditional target/terrain context, strength/mobility support, and optional comment; the frontend calls `generateStructuredFirstPlanDraft` first, renders the non-mutating review returned by the backend, and calls `confirmStructuredFirstPlanDraft` only from the explicit `Yes, create plan` action after a ready draft
+  authenticated users without setup answer the bounded first-plan constructor for required profile basics, progressive training preferences, bounded fitness-level benchmark context, execution preference, goal, conditional target/terrain context, strength/mobility support, and optional comment; the frontend calls `generateStructuredFirstPlanDraft` first, keeps `correction_required` inline near the form, opens a `Review your setup` modal only for `draft_ready`, and calls `confirmStructuredFirstPlanDraft` only from the modal `Yes, create plan` action
 - structured constructor review-before-create is now the visible manual onboarding path:
   `generateStructuredFirstPlanDraft` validates the same structured setup contract, generates the same canonical `training-plan-v2` draft and runner-facing review data without writing profile, plan, planned-workout, workout-log, usage, or transcript/comment rows; `confirmStructuredFirstPlanDraft` accepts only a validated draft payload, blocks if an active plan already exists, revalidates the setup and structured authoring input, regenerates the canonical plan before persistence, and then creates the first active plan through the same sequential active-plan persistence seam
 - the same no-plan onboarding surface also exposes a compact Pro transcript-first `AI setup` assist:
@@ -152,10 +166,13 @@
   transcript review never mutates saved truth; only the explicit `confirmVoiceToPlanDraft` action can create the first active plan, and it rechecks `voice_to_plan`, blocks if an active plan already exists, rebuilds the canonical plan from validated structured authoring input, persists profile age/weight/height, preserves fixed rest-day invariant truth, and still does not persist the raw transcript
   this slice does not handle raw audio, does not persist the transcript as profile truth, does not count usage, and does not replace an existing active plan
 - the backend retains the legacy direct structured first-plan action as compatibility, but visible manual onboarding now uses review/confirm:
-  authenticated no-plan callers can submit the bounded constructor contract instead of a free-text prompt, the backend validates required profile basics, impossible running-day/rest-day combinations, supported goal distance, benchmark, execution preference, target-time, target-date, and terrain formats, translates the request into deterministic structured authoring input, and writes only `age`, `weight_kg`, and `height_cm` from the request into `runner_profiles` after explicit draft confirmation
+  authenticated no-plan callers can submit the bounded constructor contract instead of a free-text prompt, the backend validates required profile basics, impossible running-day/rest-day combinations, supported goal distance, benchmark or bounded fitness-level context, execution preference, target-time, target-date, and terrain formats, translates the request into deterministic structured authoring input, and writes only `age`, `weight_kg`, `height_cm`, and stable weekly training preferences from the request into `runner_profiles` after explicit draft confirmation
   benchmark, terrain focus, target-time/date details, and the optional comment remain generation/plan context rather than long-lived runner profile truth; omitted terrain defaults to `standard` for normal goals, `mountain_running` normalizes to `mountain`, and non-target-time target fields are ignored after valid parsing
   recent 5K time or pace is used only as generation context to derive broad pace ranges for generated warmups, easy/long/steady/tempo/interval work, recovery, cooldown, and hill-oriented segments; unknown benchmark keeps effort/cue fallbacks, and HR ranges are not invented without real HR-zone truth
-- the visible constructor now derives its hidden `runningDaysPerWeek` value conservatively from fixed rest-day availability, capped at four running days and never exceeding available weekdays, so the primary UI asks for fixed rest days without becoming a schedule editor
+- the visible constructor now starts from saved runner profile defaults when available:
+  age, weight, height, fixed rest days, default running-days/week, and preferred long-run day prefill from `runner_profiles`, remain editable in the constructor, and the confirmed first plan persists the edited values back to runner-level profile defaults without mutating any existing active plan
+- settings and structured onboarding share the same frontend primitives for those profile defaults:
+  `EditableValueChip` owns the compact age/height/weight add-edit-save interaction, and `TrainingPreferenceFields` owns the progressive Hito controls for explicit no/fixed rest days, required default running-days/week, optional preferred long-run day, and bounded fitness-level/custom-5K entry while leaving validation and persistence to backend-owned settings and first-plan actions
 - advanced JSON import remains available inside onboarding as a demoted fallback path for existing Hito plan files, migration, and testing
 - structured first-plan onboarding, advanced JSON import, and backend text compatibility authoring all create or update one `runner_profile` and one active `plan_cycle` through the same canonical persisted seam
 - canonical apply-time start normalization now lives in [src/lib/plan-apply-policy.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-apply-policy.ts):

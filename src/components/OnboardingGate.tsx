@@ -10,7 +10,6 @@ import {
   buildVoiceSupplementFromConstructorState,
   isStructuredConstructorReady,
   resolveTerrainFocus,
-  type BenchmarkKind,
   type GoalDistance,
   type GoalStyle,
   type StrengthPreference,
@@ -21,6 +20,7 @@ import {
 } from "@/components/onboarding/onboarding-form-model";
 import { type ImportedPlan, validateImportedPlanJson } from "@/lib/imported-plan";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
+import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
 import {
   completeOnboarding,
@@ -29,6 +29,7 @@ import {
   generateStructuredFirstPlanDraft,
   generateVoiceToPlanDraft,
   type StructuredFirstPlanDraftResult,
+  type UserSettingsSummary,
 } from "@/lib/training-api";
 
 type ConstructorStatus = "idle" | "reviewing" | "creating" | "finishing";
@@ -38,7 +39,7 @@ type SetupMode = "quick" | "talk";
 const VOICE_TO_PLAN_TOAST_ID = "onboarding-voice-to-plan";
 const STRUCTURED_REVIEW_TOAST_ID = "onboarding-structured-review";
 
-export function OnboardingGate() {
+export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSummary | null }) {
   const generateStructuredFirstPlanDraftFn = useServerFn(generateStructuredFirstPlanDraft);
   const confirmStructuredFirstPlanDraftFn = useServerFn(confirmStructuredFirstPlanDraft);
   const completeOnboardingFn = useServerFn(completeOnboarding);
@@ -48,13 +49,30 @@ export function OnboardingGate() {
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
   const voiceTranscriptRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const [age, setAge] = useState("");
-  const [weightKg, setWeightKg] = useState("");
-  const [heightCm, setHeightCm] = useState("");
-  const [benchmarkKind, setBenchmarkKind] = useState<BenchmarkKind>("unknown");
+  const [age, setAge] = useState(() => (defaults?.age != null ? String(defaults.age) : ""));
+  const [weightKg, setWeightKg] = useState(() =>
+    defaults?.weightKg != null ? String(defaults.weightKg) : "",
+  );
+  const [heightCm, setHeightCm] = useState(() =>
+    defaults?.heightCm != null ? String(defaults.heightCm) : "",
+  );
+  const [fitnessLevel, setFitnessLevel] = useState<RunnerFitnessLevel>("running_regularly");
   const [recent5kTime, setRecent5kTime] = useState("");
   const [recent5kPace, setRecent5kPace] = useState("");
-  const [fixedRestDays, setFixedRestDays] = useState<WeekdayName[]>([]);
+  const [fixedRestDays, setFixedRestDays] = useState<WeekdayName[]>(
+    () => defaults?.trainingPreferences?.blocked_days ?? [],
+  );
+  const [restDaysAnswered, setRestDaysAnswered] = useState(() =>
+    Boolean(defaults?.trainingPreferences),
+  );
+  const [maxRunningDaysPerWeek, setMaxRunningDaysPerWeek] = useState(() =>
+    defaults?.trainingPreferences?.max_running_days_per_week != null
+      ? String(defaults.trainingPreferences.max_running_days_per_week)
+      : "",
+  );
+  const [preferredLongRunDay, setPreferredLongRunDay] = useState<WeekdayName | "">(
+    () => defaults?.trainingPreferences?.preferred_long_run_day ?? "",
+  );
   const [goalDistance, setGoalDistance] = useState<GoalDistance>("build_consistency");
   const [goalStyle, setGoalStyle] = useState<GoalStyle>("balanced");
   const [targetTime, setTargetTime] = useState("");
@@ -90,10 +108,13 @@ export function OnboardingGate() {
     age,
     weightKg,
     heightCm,
-    benchmarkKind,
+    fitnessLevel,
     recent5kTime,
     recent5kPace,
     fixedRestDays,
+    restDaysAnswered,
+    maxRunningDaysPerWeek,
+    preferredLongRunDay,
     goalDistance,
     goalStyle,
     targetTime,
@@ -303,6 +324,9 @@ export function OnboardingGate() {
       if (!result.ok || result.status === "correction_required") {
         const message = structuredDraftResultMessage(result);
         setConstructorError(message);
+        window.requestAnimationFrame(() =>
+          structuredFormRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }),
+        );
         hitoToast.error({
           id: STRUCTURED_REVIEW_TOAST_ID,
           title: result.ok ? "Setup needs correction" : "Review failed",
@@ -490,10 +514,13 @@ export function OnboardingGate() {
             setAge,
             setWeightKg,
             setHeightCm,
-            setBenchmarkKind,
+            setFitnessLevel,
             setRecent5kTime,
             setRecent5kPace,
             setFixedRestDays,
+            setRestDaysAnswered,
+            setMaxRunningDaysPerWeek,
+            setPreferredLongRunDay,
             setGoalDistance,
             setGoalStyle,
             setTargetTime,

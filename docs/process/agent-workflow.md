@@ -14,5 +14,8 @@ This workflow keeps delivery aligned and reduces role overlap.
 ## Workflow Rules
 
 - Normative execution and handoff rules live in `AGENTS.md`.
+- All roles must follow the canonical Hito architecture approach in `AGENTS.md`: one pipeline,
+  backend-owned truth, deterministic product state before AI, explicit review for risky mutation,
+  and no parallel product systems for the same truth.
 - Use one primary role at a time unless the task is already split into clearly independent slices.
 - Route ambiguous or risky work to `Architect` first.

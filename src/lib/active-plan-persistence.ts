@@ -8,7 +8,7 @@ import {
 } from "@/lib/plan-apply-policy";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
 import type { StructuredFirstPlanProfilePatch } from "@/lib/structured-first-plan-onboarding";
-import type { Database } from "@/lib/supabase/database";
+import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { todayIso, type RunnerProfileSummary } from "@/lib/training";
 
@@ -267,6 +267,9 @@ async function upsertRunnerProfile(
             age: profilePatch.age,
             weight_kg: profilePatch.weightKg,
             height_cm: profilePatch.heightCm,
+            ...(profilePatch.trainingPreferences !== undefined
+              ? { training_preferences: profilePatch.trainingPreferences as Json }
+              : {}),
           }
         : {}),
       setup_state: "completed",

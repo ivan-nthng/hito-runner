@@ -58,7 +58,7 @@ export function resolveWeekdayRestInvariant({
   importedPlanPreferences,
   importedTrainingConstraints,
 }: ResolveWeekdayRestInvariantInput): WeekdayRestInvariant {
-  const runnerBlocked = extractBlockedWeekdaysFromObject(runnerPreferences);
+  const runnerBlocked = extractBlockedWeekdaysFromRunnerPreferences(runnerPreferences);
   if (runnerBlocked.length) {
     return { blockedWeekdays: runnerBlocked, source: "runner_profile" };
   }
@@ -327,6 +327,15 @@ function extractBlockedWeekdaysFromObject(value: unknown) {
   }
 
   return WEEKDAY_NAMES.filter((weekday) => !preferredTrainingDays.includes(weekday));
+}
+
+function extractBlockedWeekdaysFromRunnerPreferences(value: unknown) {
+  const directBlocked = extractBlockedWeekdaysFromObject(value);
+  if (directBlocked.length) {
+    return directBlocked;
+  }
+
+  return extractBlockedWeekdaysFromObject(asRecord(value)?.training_preferences);
 }
 
 function readWeekdayArray(value: unknown) {

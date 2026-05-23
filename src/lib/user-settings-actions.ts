@@ -5,8 +5,17 @@ import {
   getPersistedUserIdForAuthContext,
   requirePersistedUserIdForCurrentRequest,
 } from "@/lib/request-persisted-user";
+import {
+  normalizeRunnerTrainingPreferencesForSave,
+  parseStoredRunnerTrainingPreferences,
+  runnerTrainingPreferencesSaveInputSchema,
+  type RunnerTrainingPreferencesStorage,
+} from "@/lib/runner-training-preferences";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import type { Json } from "@/lib/supabase/database";
 import type { TrainingSnapshot } from "@/lib/training";
+
+export type RunnerTrainingPreferences = RunnerTrainingPreferencesStorage;
 
 export interface UserSettingsSummary {
   firstName: string | null;
@@ -17,6 +26,7 @@ export interface UserSettingsSummary {
   age: number | null;
   weightKg: number | null;
   heightCm: number | null;
+  trainingPreferences: RunnerTrainingPreferences | null;
 }
 
 type SettingsViewerSummary = {
@@ -37,6 +47,7 @@ const userSettingsInputSchema = z.object({
   age: z.number().int().min(0).max(120).nullable(),
   weightKg: z.number().min(0).max(500).nullable(),
   heightCm: z.number().min(0).max(300).nullable(),
+  trainingPreferences: runnerTrainingPreferencesSaveInputSchema.nullable().optional(),
 });
 
 type UserSettingsInput = z.output<typeof userSettingsInputSchema>;
@@ -87,6 +98,7 @@ export async function getUserSettingsForUserId(
     age: profile.age,
     weightKg: profile.weight_kg,
     heightCm: profile.height_cm,
+    trainingPreferences: parseStoredRunnerTrainingPreferences(profile.training_preferences),
   };
 }
 
@@ -102,16 +114,31 @@ export async function updateUserSettingsForUserId(
     throw new Error("Finish setup before editing user settings.");
   }
 
+  const trainingPreferences = normalizeTrainingPreferencesForStorage(data.trainingPreferences);
+  const updatePayload: {
+    first_name: string | null;
+    last_name: string | null;
+    display_name: string | null;
+    age: number | null;
+    weight_kg: number | null;
+    height_cm: number | null;
+    training_preferences?: Json | null;
+  } = {
+    first_name: data.firstName || null,
+    last_name: data.lastName || null,
+    display_name: data.displayName || null,
+    age: data.age,
+    weight_kg: data.weightKg,
+    height_cm: data.heightCm,
+  };
+
+  if (trainingPreferences !== undefined) {
+    updatePayload.training_preferences = trainingPreferences;
+  }
+
   const updatedProfile = await supabase
     .from("runner_profiles")
-    .update({
-      first_name: data.firstName || null,
-      last_name: data.lastName || null,
-      display_name: data.displayName || null,
-      age: data.age,
-      weight_kg: data.weightKg,
-      height_cm: data.heightCm,
-    })
+    .update(updatePayload)
     .eq("user_id", userId)
     .select("*")
     .single();
@@ -129,7 +156,24 @@ export async function updateUserSettingsForUserId(
     age: updatedProfile.data.age,
     weightKg: updatedProfile.data.weight_kg,
     heightCm: updatedProfile.data.height_cm,
+    trainingPreferences: parseStoredRunnerTrainingPreferences(
+      updatedProfile.data.training_preferences,
+    ),
   };
+}
+
+function normalizeTrainingPreferencesForStorage(
+  value: UserSettingsInput["trainingPreferences"],
+): Json | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  return normalizeRunnerTrainingPreferencesForSave(value) as unknown as Json;
 }
 
 async function getSettingsProfileRow(userId: string) {

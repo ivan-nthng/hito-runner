@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  chooseLongRunDay,
   FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES,
   FIRST_PLAN_GOAL_DISTANCE_VALUES,
   FIRST_PLAN_GOAL_STYLE_VALUES,
@@ -17,6 +16,16 @@ import {
   uniqueWeekdays,
 } from "@/lib/first-plan-authoring-utils";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
+import {
+  deriveAvailableTrainingWeekdays,
+  derivePreferredLongRunDayFallback,
+  FITNESS_LEVEL_VALUES,
+  mapRunnerTrainingPreferencesProductToStorage,
+  normalizeRunnerFitnessBenchmark,
+  runnerFitnessBenchmarkInputSchema,
+  type RunnerFitnessLevel,
+} from "@/lib/runner-training-preferences";
+import type { Json } from "@/lib/supabase/database";
 import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring";
 import { diffDaysIso, todayIso } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
@@ -77,12 +86,13 @@ const profileSchema = z
   })
   .strict();
 
-const benchmarkSchema = z.discriminatedUnion("kind", [
+const legacyBenchmarkSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("recent_5k_time"),
       recent5kTime: recent5kTimeSchema,
       recent5kPace: z.null().optional(),
+      fitnessLevel: z.literal("custom").optional(),
     })
     .strict(),
   z
@@ -90,6 +100,7 @@ const benchmarkSchema = z.discriminatedUnion("kind", [
       kind: z.literal("recent_5k_pace"),
       recent5kPace: recent5kPaceSchema,
       recent5kTime: z.null().optional(),
+      fitnessLevel: z.enum(FITNESS_LEVEL_VALUES).optional(),
     })
     .strict(),
   z
@@ -97,8 +108,13 @@ const benchmarkSchema = z.discriminatedUnion("kind", [
       kind: z.literal("unknown"),
       recent5kTime: z.null().optional(),
       recent5kPace: z.null().optional(),
+      fitnessLevel: z.enum(FITNESS_LEVEL_VALUES).optional(),
     })
     .strict(),
+]);
+const benchmarkSchema = z.union([
+  legacyBenchmarkSchema,
+  runnerFitnessBenchmarkInputSchema.transform((value) => normalizeRunnerFitnessBenchmark(value)),
 ]);
 
 const weekdaySchema = z.enum(WEEKDAY_NAMES);
@@ -106,18 +122,26 @@ const weekdaySchema = z.enum(WEEKDAY_NAMES);
 const availabilitySchema = z
   .object({
     runningDaysPerWeek: z.number().int().min(1).max(7),
-    fixedRestDays: z.array(weekdaySchema).max(7).default([]),
+    fixedRestDays: z
+      .array(weekdaySchema)
+      .max(6, "Leave at least one weekday available for running.")
+      .default([]),
+    preferredLongRunDay: weekdaySchema.optional().nullable(),
   })
   .strict()
   .superRefine((value, context) => {
-    const fixedRestDays = uniqueWeekdays(value.fixedRestDays);
-    const allowedDayCount = WEEKDAY_NAMES.length - fixedRestDays.length;
-
-    if (value.runningDaysPerWeek > allowedDayCount) {
+    try {
+      mapRunnerTrainingPreferencesProductToStorage({
+        fixedRestDays: value.fixedRestDays,
+        defaultRunningDaysPerWeek: value.runningDaysPerWeek,
+        preferredLongRunDay: value.preferredLongRunDay ?? null,
+      });
+    } catch (error) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["runningDaysPerWeek"],
-        message: "Running days per week must fit outside the fixed rest days.",
+        message:
+          error instanceof Error ? error.message : "Training preferences could not be validated.",
       });
     }
   });
@@ -191,6 +215,9 @@ export const structuredFirstPlanOnboardingInputSchema = z
 export type StructuredFirstPlanOnboardingInput = z.output<
   typeof structuredFirstPlanOnboardingInputSchema
 >;
+export type StructuredFirstPlanOnboardingRequestInput = z.input<
+  typeof structuredFirstPlanOnboardingInputSchema
+>;
 
 export type StructuredFirstPlanAuthoringInput = z.output<typeof structuredPlanAuthoringInputSchema>;
 
@@ -199,6 +226,7 @@ export interface StructuredFirstPlanProfilePatch {
   weightKg: number;
   heightCm: number;
   baselineNotes: string | null;
+  trainingPreferences?: Json;
 }
 
 export interface StructuredFirstPlanDraftReview {
@@ -246,8 +274,12 @@ export function parseStructuredFirstPlanOnboardingInput(value: unknown) {
 
 export function buildStructuredFirstPlanAuthoringInput(input: StructuredFirstPlanOnboardingInput) {
   const fixedRestDays = uniqueWeekdays(input.availability.fixedRestDays);
-  const allowedWeekdays = WEEKDAY_NAMES.filter((weekday) => !fixedRestDays.includes(weekday));
-  const preferredLongRunDay = chooseLongRunDay(allowedWeekdays);
+  const allowedWeekdays = deriveAvailableTrainingWeekdays(fixedRestDays);
+  const preferredLongRunDay =
+    input.availability.preferredLongRunDay &&
+    allowedWeekdays.includes(input.availability.preferredLongRunDay)
+      ? input.availability.preferredLongRunDay
+      : (derivePreferredLongRunDayFallback(fixedRestDays) ?? allowedWeekdays[0]!);
   const preferredRunningDays = choosePreferredRunningDays(
     allowedWeekdays,
     preferredLongRunDay,
@@ -311,11 +343,19 @@ export function buildStructuredFirstPlanAuthoringInput(input: StructuredFirstPla
 export function buildStructuredFirstPlanProfilePatch(
   input: StructuredFirstPlanOnboardingInput,
 ): StructuredFirstPlanProfilePatch {
+  const fixedRestDays = uniqueWeekdays(input.availability.fixedRestDays);
+  const trainingPreferences = mapRunnerTrainingPreferencesProductToStorage({
+    fixedRestDays,
+    defaultRunningDaysPerWeek: input.availability.runningDaysPerWeek,
+    preferredLongRunDay: input.availability.preferredLongRunDay ?? null,
+  });
+
   return {
     age: input.profile.age,
     weightKg: input.profile.weightKg,
     heightCm: input.profile.heightCm,
     baselineNotes: null,
+    trainingPreferences: trainingPreferences as unknown as Json,
   };
 }
 
@@ -392,6 +432,10 @@ export function buildStructuredFirstPlanDraftReview(
 }
 
 function formatBenchmarkReview(benchmark: StructuredFirstPlanOnboardingInput["benchmark"]) {
+  if ("fitnessLevel" in benchmark && benchmark.fitnessLevel !== "custom") {
+    return `Fitness level: ${formatFitnessLevel(benchmark.fitnessLevel)}. No recent 5K benchmark supplied.`;
+  }
+
   switch (benchmark.kind) {
     case "recent_5k_time":
       return `Recent 5K time: ${benchmark.recent5kTime}.`;
@@ -581,6 +625,21 @@ function defaultHorizonWeeks(
 function inferExperienceLevel(input: StructuredFirstPlanOnboardingInput) {
   if (input.benchmark.kind !== "unknown") {
     return input.availability.runningDaysPerWeek >= 5 ? "experienced_runner" : "consistent_runner";
+  }
+
+  if ("fitnessLevel" in input.benchmark) {
+    switch (input.benchmark.fitnessLevel) {
+      case "new_to_running":
+        return "new_runner";
+      case "beginner":
+        return "returning_runner";
+      case "running_regularly":
+        return "consistent_runner";
+      case "performance_focused":
+        return "experienced_runner";
+      case "custom":
+        break;
+    }
   }
 
   return input.availability.runningDaysPerWeek <= 2 ? "new_runner" : "returning_runner";
@@ -821,4 +880,17 @@ function formatPaceSecondsPerKm(secondsPerKm: number) {
   const seconds = roundedSeconds % 60;
 
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatFitnessLevel(fitnessLevel: Exclude<RunnerFitnessLevel, "custom">) {
+  switch (fitnessLevel) {
+    case "new_to_running":
+      return "new to running";
+    case "beginner":
+      return "beginner";
+    case "running_regularly":
+      return "running regularly";
+    case "performance_focused":
+      return "performance focused";
+  }
 }

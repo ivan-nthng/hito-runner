@@ -26,6 +26,14 @@ Active
   the linked project contains the base persisted schema, the current JSON week is imported as the active canonical plan, and saved-mode SSR now resolves `/progress` and `/workout/$date` from Supabase.
 - A practical tester-account lifecycle tool is now implemented:
   Backend can create a tester, reset that tester back to onboarding, optionally reseed plan data, and delete the tester through one canonical CLI path documented in `docs/process/test-user-lifecycle.md`.
+- The first local admin test-account backend contract is implemented:
+  a server-action-ready local/dev-only seam can list local bypass tester/admin entries from `.tanstack/hito-running-local-accounts.json`, return bounded admin view data including local test passwords only after local-runtime plus admin checks, mark protected admin accounts as non-deletable, and delete tester accounts by removing the local entry plus linked Supabase auth user when configured.
+- The first local admin Test accounts UI slice is implemented:
+  `/admin/analytics` now renders the local-only backend view with account username, email, password, role, display name, local/linked identity status, protected/deletable status, bounded unavailable/empty states, and exact-email confirmation before tester deletion.
+- The Phase 1 admin analytics backend loader is implemented:
+  `src/lib/admin-analytics.ts` exposes a server-action-ready view model over existing Supabase auth/profile/plan/workout/Garmin/AI/entitlement truth, with aggregate overview/funnel/feedback/AI counts plus per-user rows shaped on the server and no new telemetry, failure, issue, or production user-management tables.
+- The Phase 1 admin analytics UI is implemented:
+  `/admin/analytics` now renders Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs from backend-shaped view models, keeping the page standalone from the runner AppShell and avoiding client-side analytics authority beyond presentation formatting.
 - Phase 3 architecture cleanup is now implemented through one canonical persisted richer-plan contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
@@ -132,6 +140,15 @@ Active
   `deleteActivePlan` and `clearUpcomingSchedule` are top-level `training-api.ts` server-action wrappers again, resolving the current persisted user through the same request-auth seam as other working saved-mode mutations before delegating to `active-plan-lifecycle-actions.ts`.
 - The user-settings action extraction slice is now implemented:
   `src/lib/user-settings-actions.ts` owns `/settings` route data, bounded profile readback, and profile-settings save behavior, while `training-api.ts` binds the existing snapshot/viewer loaders and preserves the same public `getSettingsRouteData`, `saveUserSettings`, and `UserSettingsSummary` imports.
+- The runner training-preferences backend storage slice is now implemented:
+  the linked Supabase project and local database type now include `runner_profiles.training_preferences jsonb`; `user-settings-actions.ts` validates and persists bounded `blocked_days`, `preferred_long_run_day`, and `max_running_days_per_week` values without changing existing personal-data saves, and structured first-plan confirmation now stores the same stable weekly defaults alongside age, weight, and height.
+- The runner training-preferences shared contract slice is now implemented:
+  `src/lib/runner-training-preferences.ts` owns one pure Settings/structured-setup mapping between product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` and stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day`; zero fixed rest days is valid, seven fixed rest days is rejected, default running days must fit available weekdays, preferred long-run day cannot be blocked, and the generation/review long-run fallback is Sunday, then Saturday, then latest available weekday without persisting the fallback as an explicit runner choice.
+  The same module exposes backend-compatible fitness-level mapping where only `custom` plus a direct recent 5K time in the accepted range creates numeric 5K benchmark truth; non-custom levels remain non-numeric context so they cannot create fake pace or heart-rate targets.
+- The runner training-preferences frontend slice is now implemented:
+  `/settings` uses Hito tabs to separate `Personal data` from `Training preferences`, reuses the structured-onboarding editable value chip for age/height/weight, and uses the shared progressive training-preference controls for explicit no/fixed rest days, required default running-days/week, optional preferred long-run day, and bounded fitness-level/custom-5K entry. The settings save still persists only stable weekly defaults through the existing settings action, while no-plan Quick setup pre-fills profile basics plus saved training preferences and keeps those values editable before review/confirm.
+- The structured setup review modal slice is now implemented:
+  Quick setup’s `Review setup` action remains non-mutating; `draft_ready` opens a `Review your setup` modal with explicit cancel/close and `Yes, create plan` controls, while `correction_required` stays inline near the form and never creates profile, plan, workout, or log rows.
 - The workout-log save action extraction slice is now implemented:
   `src/lib/workout-log-actions.ts` owns manual workout-result validation and persistence for completed, partial, skipped, and workout-scoped body-note payloads, while `training-api.ts` keeps the same public `saveWorkoutLog` server-action wrapper used by `CompletionPanel`.
 - The auth/login action extraction slice is now implemented:

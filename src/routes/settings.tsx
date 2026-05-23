@@ -3,9 +3,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
+import { TrainingPreferenceFields } from "@/components/onboarding/TrainingPreferenceFields";
+import {
+  isRecent5kTimeInAcceptedRange,
+  type WeekdayName,
+} from "@/components/onboarding/onboarding-form-model";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { EditableValueChip } from "@/components/ui/editable-value-chip";
 import { Icon } from "@/components/ui/icon";
 import { APP_NAME } from "@/lib/app-config";
+import { type RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import {
   getSettingsRouteData,
   saveUserSettings,
@@ -33,7 +40,16 @@ type SettingsFormState = {
   age: string;
   weightKg: string;
   heightCm: string;
+  blockedDays: WeekdayName[];
+  restDaysAnswered: boolean;
+  preferredLongRunDay: WeekdayName | "";
+  maxRunningDaysPerWeek: string;
+  fitnessLevel: RunnerFitnessLevel;
+  recent5kTime: string;
 };
+
+type SettingsTab = "personal" | "training";
+type ProfileEditableKey = "age" | "heightCm" | "weightKg";
 
 function SettingsPage() {
   const { snapshot, viewer, settings } = Route.useLoaderData();
@@ -45,6 +61,8 @@ function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<SettingsFormState>(() => buildSettingsFormState(settings));
+  const [activeTab, setActiveTab] = useState<SettingsTab>("personal");
+  const [activeEditableKey, setActiveEditableKey] = useState<ProfileEditableKey | null>(null);
 
   useEffect(() => {
     setForm(buildSettingsFormState(settings));
@@ -60,6 +78,71 @@ function SettingsPage() {
       ),
     [settings?.displayName, settings?.firstName, settings?.lastName, viewer?.name],
   );
+
+  const savePersonalData = async () => {
+    setIsSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await saveUserSettingsFn({
+        data: buildPersonalDataPayload(form),
+      });
+      await router.invalidate();
+      setMessage("Personal data saved.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "User settings could not be saved.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveTrainingPreferences = async () => {
+    if (!form.restDaysAnswered) {
+      setError("Choose fixed rest days or No fixed rest days.");
+      setMessage(null);
+      return;
+    }
+
+    if (!form.maxRunningDaysPerWeek.trim()) {
+      setError("Choose default running days per week.");
+      setMessage(null);
+      return;
+    }
+
+    if (form.fitnessLevel === "custom" && !isRecent5kTimeInAcceptedRange(form.recent5kTime)) {
+      setError("Use a recent 5K time between 18:00 and 55:00.");
+      setMessage(null);
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await saveUserSettingsFn({
+        data: {
+          ...buildPersonalDataPayload(form),
+          trainingPreferences: {
+            blocked_days: form.blockedDays,
+            preferred_long_run_day: form.preferredLongRunDay || null,
+            max_running_days_per_week: parseIntegerInput(form.maxRunningDaysPerWeek),
+          },
+        },
+      });
+      await router.invalidate();
+      setMessage("Training preferences saved.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Training preferences could not be saved.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (snapshot.mode === "preview") {
     return (
@@ -115,8 +198,8 @@ function SettingsPage() {
           <p className="hito-label">User settings</p>
           <h1 className="hito-page-title">Profile details that follow your training.</h1>
           <p className="hito-page-copy">
-            Keep your identity, avatar, and body data in one place. Heart rate zones will live here
-            too once that profile slice lands.
+            Keep your personal data and future-plan training defaults in one place. Settings update
+            your runner profile, not the active plan already on your calendar.
           </p>
         </header>
 
@@ -136,193 +219,273 @@ function SettingsPage() {
           </p>
         </div>
 
-        <section className="grid gap-8 lg:grid-cols-[240px_1fr]">
-          <div className="space-y-4 border-t border-hairline pt-5">
-            <div className="flex items-center gap-3">
-              <Avatar className="hito-profile-avatar h-24 w-24">
+        <div className="hito-tabs hito-tabs-enclosed" role="tablist" aria-label="Settings section">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "personal"}
+            className="hito-tab"
+            data-active={activeTab === "personal"}
+            onClick={() => setActiveTab("personal")}
+          >
+            Personal data
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "training"}
+            className="hito-tab"
+            data-active={activeTab === "training"}
+            onClick={() => setActiveTab("training")}
+          >
+            Training preferences
+          </button>
+        </div>
+
+        {activeTab === "personal" ? (
+          <section className="grid gap-8 lg:grid-cols-[180px_1fr]" role="tabpanel">
+            <div className="space-y-3">
+              <Avatar className="hito-profile-avatar h-28 w-28">
                 {settings.avatarUrl ? (
                   <AvatarImage src={settings.avatarUrl} alt="Profile avatar" />
                 ) : null}
                 <AvatarFallback className="hito-profile-avatar-fallback">{initials}</AvatarFallback>
               </Avatar>
-              <div>
-                <p className="hito-label">Avatar</p>
-                <p className="hito-support-copy mt-2">
-                  Upload one square runner avatar. We keep only the processed `240x240` image.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-sm"
-              disabled={isUploadingAvatar}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Icon name="camera" size="sm" />
-              {isUploadingAvatar ? "Uploading..." : "Upload avatar"}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
+              <button
+                type="button"
+                className="hito-button hito-button-secondary hito-button-sm"
+                disabled={isUploadingAvatar}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Icon name="camera" size="sm" />
+                {isUploadingAvatar
+                  ? "Uploading..."
+                  : settings.avatarUrl
+                    ? "Edit avatar"
+                    : "Upload avatar"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
 
-                if (!file) {
-                  return;
-                }
-
-                setIsUploadingAvatar(true);
-                setError(null);
-                setMessage(null);
-
-                try {
-                  const processedFile = await buildAvatarUploadFile(file);
-                  const formData = new FormData();
-                  formData.set("file", processedFile);
-                  const response = await fetch("/api/profile-avatar/upload", {
-                    method: "POST",
-                    body: formData,
-                  });
-                  const payload = (await response.json()) as {
-                    ok: boolean;
-                    message?: string;
-                  };
-
-                  if (!response.ok || !payload.ok) {
-                    throw new Error(payload.message ?? "The avatar could not be uploaded.");
+                  if (!file) {
+                    return;
                   }
 
-                  await router.invalidate();
-                  setMessage("Avatar updated.");
-                } catch (uploadError) {
-                  setError(
-                    uploadError instanceof Error
-                      ? uploadError.message
-                      : "The avatar could not be uploaded.",
-                  );
-                } finally {
-                  event.target.value = "";
-                  setIsUploadingAvatar(false);
-                }
-              }}
-            />
-          </div>
+                  setIsUploadingAvatar(true);
+                  setError(null);
+                  setMessage(null);
 
-          <div className="space-y-8">
-            <section className="border-t border-hairline pt-5">
+                  try {
+                    const processedFile = await buildAvatarUploadFile(file);
+                    const formData = new FormData();
+                    formData.set("file", processedFile);
+                    const response = await fetch("/api/profile-avatar/upload", {
+                      method: "POST",
+                      body: formData,
+                    });
+                    const payload = (await response.json()) as {
+                      ok: boolean;
+                      message?: string;
+                    };
+
+                    if (!response.ok || !payload.ok) {
+                      throw new Error(payload.message ?? "The avatar could not be uploaded.");
+                    }
+
+                    await router.invalidate();
+                    setMessage("Avatar updated.");
+                  } catch (uploadError) {
+                    setError(
+                      uploadError instanceof Error
+                        ? uploadError.message
+                        : "The avatar could not be uploaded.",
+                    );
+                  } finally {
+                    event.target.value = "";
+                    setIsUploadingAvatar(false);
+                  }
+                }}
+              />
+            </div>
+
+            <div className="space-y-8">
+              <section className="border-t border-hairline pt-5">
+                <div className="flex items-center gap-2">
+                  <Icon name="user" size="sm" className="text-signal" />
+                  <h2 className="hito-section-title">Identity</h2>
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="First name"
+                    name="firstName"
+                    autoComplete="given-name"
+                    value={form.firstName}
+                    onChange={(value) => setForm((current) => ({ ...current, firstName: value }))}
+                  />
+                  <Field
+                    label="Last name"
+                    name="lastName"
+                    autoComplete="family-name"
+                    value={form.lastName}
+                    onChange={(value) => setForm((current) => ({ ...current, lastName: value }))}
+                  />
+                  <Field
+                    label="Display name"
+                    name="displayName"
+                    autoComplete="nickname"
+                    value={form.displayName}
+                    onChange={(value) => setForm((current) => ({ ...current, displayName: value }))}
+                  />
+                  <ReadOnlyField label="Email" value={settings.email || "No saved email"} />
+                </div>
+              </section>
+
+              <section className="border-t border-hairline pt-5">
+                <h2 className="hito-section-title">Body data</h2>
+                <p className="hito-support-copy mt-2">
+                  The same compact profile facts used during plan setup.
+                </p>
+                <div className="hito-editable-value-chip-group mt-4">
+                  <EditableValueChip
+                    fieldKey="age"
+                    label="Age"
+                    value={form.age}
+                    setValue={(value) => setForm((current) => ({ ...current, age: value }))}
+                    activeEditableKey={activeEditableKey}
+                    setActiveEditableKey={setActiveEditableKey}
+                    placeholder="34"
+                    min={13}
+                    max={100}
+                    step={1}
+                    inputMode="numeric"
+                  />
+                  <EditableValueChip
+                    fieldKey="heightCm"
+                    label="Height"
+                    value={form.heightCm}
+                    setValue={(value) => setForm((current) => ({ ...current, heightCm: value }))}
+                    activeEditableKey={activeEditableKey}
+                    setActiveEditableKey={setActiveEditableKey}
+                    placeholder="178"
+                    min={120}
+                    max={230}
+                    step={1}
+                    inputMode="numeric"
+                  />
+                  <EditableValueChip
+                    fieldKey="weightKg"
+                    label="Weight"
+                    value={form.weightKg}
+                    setValue={(value) => setForm((current) => ({ ...current, weightKg: value }))}
+                    activeEditableKey={activeEditableKey}
+                    setActiveEditableKey={setActiveEditableKey}
+                    placeholder="72"
+                    min={30}
+                    max={250}
+                    step={0.5}
+                    inputMode="decimal"
+                    unit="kg"
+                  />
+                </div>
+              </section>
+
+              <section className="border-t border-hairline pt-5">
+                <h2 className="hito-section-title">Heart rate zones</h2>
+                <p className="hito-support-copy mt-3">
+                  This is where your runner-level zones will live. Manual entry and FIT-based
+                  estimation are planned next.
+                </p>
+              </section>
+
+              <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  className="hito-button hito-button-primary hito-button-lg"
+                  onClick={() => {
+                    void savePersonalData();
+                  }}
+                >
+                  {isSaving ? "Saving..." : "Save personal data"}
+                </button>
+                <Link
+                  to="/"
+                  reloadDocument
+                  className="hito-button hito-button-ghost hito-button-lg"
+                >
+                  Back to calendar
+                  <Icon name="chevron-right" size="sm" />
+                </Link>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section className="grid gap-6 border-t border-hairline pt-5" role="tabpanel">
+            <div>
               <div className="flex items-center gap-2">
-                <Icon name="user" size="sm" className="text-signal" />
-                <h2 className="hito-section-title">Identity</h2>
+                <Icon name="calendar" size="sm" className="text-signal" />
+                <h2 className="hito-section-title">Training preferences</h2>
               </div>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <Field
-                  label="First name"
-                  name="firstName"
-                  autoComplete="given-name"
-                  value={form.firstName}
-                  onChange={(value) => setForm((current) => ({ ...current, firstName: value }))}
-                />
-                <Field
-                  label="Last name"
-                  name="lastName"
-                  autoComplete="family-name"
-                  value={form.lastName}
-                  onChange={(value) => setForm((current) => ({ ...current, lastName: value }))}
-                />
-                <Field
-                  label="Display name"
-                  name="displayName"
-                  autoComplete="nickname"
-                  value={form.displayName}
-                  onChange={(value) => setForm((current) => ({ ...current, displayName: value }))}
-                />
-                <ReadOnlyField label="Email" value={settings.email || "No saved email"} />
-              </div>
-            </section>
-
-            <section className="border-t border-hairline pt-5">
-              <h2 className="hito-section-title">Body data</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                <Field
-                  label="Age"
-                  name="age"
-                  value={form.age}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  onChange={(value) => setForm((current) => ({ ...current, age: value }))}
-                />
-                <Field
-                  label="Weight (kg)"
-                  name="weightKg"
-                  value={form.weightKg}
-                  inputMode="decimal"
-                  autoComplete="off"
-                  onChange={(value) => setForm((current) => ({ ...current, weightKg: value }))}
-                />
-                <Field
-                  label="Height (cm)"
-                  name="heightCm"
-                  value={form.heightCm}
-                  inputMode="decimal"
-                  autoComplete="off"
-                  onChange={(value) => setForm((current) => ({ ...current, heightCm: value }))}
-                />
-              </div>
-            </section>
-
-            <section className="border-t border-hairline pt-5">
-              <h2 className="hito-section-title">Heart rate zones</h2>
-              <p className="hito-support-copy mt-3">
-                This is where your runner-level zones will live. Manual entry and FIT-based
-                estimation are planned next.
+              <p className="hito-support-copy mt-3 max-w-2xl">
+                Defaults for new plans only. They prefill setup but never rewrite an existing active
+                schedule.
               </p>
-            </section>
+            </div>
+
+            <TrainingPreferenceFields
+              fixedRestDays={form.blockedDays}
+              onFixedRestDaysChange={(value) =>
+                setForm((current) => ({ ...current, blockedDays: value }))
+              }
+              restDaysAnswered={form.restDaysAnswered}
+              onRestDaysAnsweredChange={(value) =>
+                setForm((current) => ({ ...current, restDaysAnswered: value }))
+              }
+              maxRunningDaysPerWeek={form.maxRunningDaysPerWeek}
+              onMaxRunningDaysPerWeekChange={(value) =>
+                setForm((current) => ({ ...current, maxRunningDaysPerWeek: value }))
+              }
+              preferredLongRunDay={form.preferredLongRunDay}
+              onPreferredLongRunDayChange={(value) =>
+                setForm((current) => ({ ...current, preferredLongRunDay: value }))
+              }
+              showFitnessBenchmark
+              fitnessLevel={form.fitnessLevel}
+              onFitnessLevelChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  fitnessLevel: value,
+                  recent5kTime: value === "custom" ? current.recent5kTime : "",
+                }))
+              }
+              recent5kTime={form.recent5kTime}
+              onRecent5kTimeChange={(value) =>
+                setForm((current) => ({ ...current, recent5kTime: value }))
+              }
+              preferredLongRunMode="default-sunday"
+              fixedRestDaysHelper="Choose the weekdays Hito should keep clear when creating future plans."
+              preferredLongRunHelper="Rest days are unavailable here. Leave unselected to keep Sunday as the default."
+            />
 
             <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
               <button
                 type="button"
                 disabled={isSaving}
                 className="hito-button hito-button-primary hito-button-lg"
-                onClick={async () => {
-                  setIsSaving(true);
-                  setError(null);
-                  setMessage(null);
-
-                  try {
-                    await saveUserSettingsFn({
-                      data: {
-                        firstName: normalizeTextInput(form.firstName),
-                        lastName: normalizeTextInput(form.lastName),
-                        displayName: normalizeTextInput(form.displayName),
-                        age: parseIntegerInput(form.age),
-                        weightKg: parseDecimalInput(form.weightKg),
-                        heightCm: parseDecimalInput(form.heightCm),
-                      },
-                    });
-                    await router.invalidate();
-                    setMessage("User settings saved.");
-                  } catch (saveError) {
-                    setError(
-                      saveError instanceof Error
-                        ? saveError.message
-                        : "User settings could not be saved.",
-                    );
-                  } finally {
-                    setIsSaving(false);
-                  }
+                onClick={() => {
+                  void saveTrainingPreferences();
                 }}
               >
-                {isSaving ? "Saving..." : "Save settings"}
+                {isSaving ? "Saving..." : "Save training preferences"}
               </button>
-              <Link to="/" reloadDocument className="hito-button hito-button-ghost hito-button-lg">
-                Back to calendar
-                <Icon name="chevron-right" size="sm" />
-              </Link>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </div>
     </AppShell>
   );
@@ -384,6 +547,26 @@ function buildSettingsFormState(settings: UserSettingsSummary | null): SettingsF
     age: settings?.age != null ? String(settings.age) : "",
     weightKg: settings?.weightKg != null ? String(settings.weightKg) : "",
     heightCm: settings?.heightCm != null ? String(settings.heightCm) : "",
+    blockedDays: settings?.trainingPreferences?.blocked_days ?? [],
+    restDaysAnswered: Boolean(settings?.trainingPreferences),
+    preferredLongRunDay: settings?.trainingPreferences?.preferred_long_run_day ?? "",
+    maxRunningDaysPerWeek:
+      settings?.trainingPreferences?.max_running_days_per_week != null
+        ? String(settings.trainingPreferences.max_running_days_per_week)
+        : "",
+    fitnessLevel: "running_regularly",
+    recent5kTime: "",
+  };
+}
+
+function buildPersonalDataPayload(form: SettingsFormState) {
+  return {
+    firstName: normalizeTextInput(form.firstName),
+    lastName: normalizeTextInput(form.lastName),
+    displayName: normalizeTextInput(form.displayName),
+    age: parseIntegerInput(form.age),
+    weightKg: parseDecimalInput(form.weightKg),
+    heightCm: parseDecimalInput(form.heightCm),
   };
 }
 

@@ -8,13 +8,11 @@ import {
 import {
   activePlanRefreshApplyInputSchema,
   activePlanRefreshProposalInputSchema,
-  applyActivePlanRefreshProposalForCurrentRequest,
-  applyActivePlanRefreshProposalForUser as applyActivePlanRefreshProposalForUserWithSnapshot,
-  proposeActivePlanRefreshForCurrentRequest,
   type ActivePlanRefreshApplyPayload,
+  type ActivePlanRefreshProposalInput,
   type ApplyActivePlanRefreshProposalResult,
   type ProposeActivePlanRefreshResult,
-} from "@/lib/active-plan-refresh-actions";
+} from "@/lib/active-plan-refresh-contract";
 import {
   loadHomeRouteData,
   loadProgressRouteData,
@@ -80,7 +78,7 @@ export {
 export type {
   ApplyActivePlanRefreshProposalResult,
   ProposeActivePlanRefreshResult,
-} from "@/lib/active-plan-refresh-actions";
+} from "@/lib/active-plan-refresh-contract";
 
 export interface ViewerSummary {
   name: string | null;
@@ -156,13 +154,13 @@ export const clearUpcomingSchedule = createServerFn({ method: "POST" }).handler(
 export const proposeActivePlanRefresh = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => activePlanRefreshProposalInputSchema.parse(value))
   .handler(async ({ data }): Promise<ProposeActivePlanRefreshResult> => {
-    return proposeActivePlanRefreshForCurrentRequest(data);
+    return proposeActivePlanRefreshForCurrentRequestServer(data);
   });
 
 export const applyActivePlanRefreshProposal = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => activePlanRefreshApplyInputSchema.parse(value))
   .handler(async ({ data }): Promise<ApplyActivePlanRefreshProposalResult> => {
-    return applyActivePlanRefreshProposalForCurrentRequest(data.proposal, getPersistedSnapshot);
+    return applyActivePlanRefreshProposalForCurrentRequestServer(data.proposal);
   });
 
 export const saveWorkoutLog = createServerFn({ method: "POST" })
@@ -183,8 +181,43 @@ export async function applyActivePlanRefreshProposalForUser(
   userId: string,
   proposal: ActivePlanRefreshApplyPayload,
 ): Promise<ApplyActivePlanRefreshProposalResult> {
-  return applyActivePlanRefreshProposalForUserWithSnapshot(userId, proposal, getPersistedSnapshot);
+  return applyActivePlanRefreshProposalForUserServer({ userId, proposal });
 }
+
+const proposeActivePlanRefreshForCurrentRequestServer = createServerOnlyFn(
+  async (data: ActivePlanRefreshProposalInput): Promise<ProposeActivePlanRefreshResult> => {
+    const { proposeActivePlanRefreshForCurrentRequest } =
+      await import("@/lib/active-plan-refresh-actions");
+
+    return proposeActivePlanRefreshForCurrentRequest(data);
+  },
+);
+
+const applyActivePlanRefreshProposalForCurrentRequestServer = createServerOnlyFn(
+  async (
+    proposal: ActivePlanRefreshApplyPayload,
+  ): Promise<ApplyActivePlanRefreshProposalResult> => {
+    const { applyActivePlanRefreshProposalForCurrentRequest } =
+      await import("@/lib/active-plan-refresh-actions");
+
+    return applyActivePlanRefreshProposalForCurrentRequest(proposal, getPersistedSnapshot);
+  },
+);
+
+const applyActivePlanRefreshProposalForUserServer = createServerOnlyFn(
+  async ({
+    userId,
+    proposal,
+  }: {
+    userId: string;
+    proposal: ActivePlanRefreshApplyPayload;
+  }): Promise<ApplyActivePlanRefreshProposalResult> => {
+    const { applyActivePlanRefreshProposalForUser: applyWithSnapshot } =
+      await import("@/lib/active-plan-refresh-actions");
+
+    return applyWithSnapshot(userId, proposal, getPersistedSnapshot);
+  },
+);
 
 async function getSnapshotForRequest() {
   const auth = getRequestAuthContext();

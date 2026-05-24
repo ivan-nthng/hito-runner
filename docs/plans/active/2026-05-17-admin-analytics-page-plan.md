@@ -2,7 +2,7 @@
 
 ## Status
 
-Paused after Phase 1 - existing-truth analytics and local Test accounts complete
+Paused after Phase 1, local Test accounts, and dedicated local admin login flow complete
 
 ## Owner
 
@@ -10,11 +10,17 @@ Architect / Backend / Frontend / QA
 
 ## Last Updated
 
-2026-05-23
+2026-05-24
 
 ## Pause Note
 
 Phase 1 and Phase 1A are complete and QA-green. `/admin/analytics` now has backend-shaped existing-truth analytics, bounded admin tabs, local-only Test accounts management, admin gating, non-admin blocking, Safari coverage, and client/server boundary verification.
+
+The dedicated local admin login flow is also implemented. `/admin/login` remains local/dev-only, separate from normal product login, and does not change the production admin model.
+
+The local/dev admin fixture now has exactly one protected owner admin account. The legacy QA admin fixture has been removed from the local bypass accounts file and linked Supabase auth.
+
+The admin analytics backend now classifies users before aggregation: real-user product counts and the `Users` dataset exclude local bypass, metadata-marked test/admin, `@local.test`, and disposable-prefix accounts, and the excluded rows are returned separately for Test accounts / ops review.
 
 Further admin work should be demand-driven by concrete ops needs, recurring failures, or product-analysis gaps. Do not continue into dashboard polish, frontend-only metrics, `app_events`, `app_failures`, or `admin_issues` just because Phase 1 is complete.
 
@@ -75,6 +81,18 @@ Auth:
 - backend admin check before any admin data loads
 - do not hardcode credentials in tracked files
 - do not rely on loopback-only local bypass as the production admin model
+
+Implemented local/dev admin-login flow:
+
+- `/admin/login` renders a standalone `Hito Admin` sign-in page without runner AppShell chrome
+- `/admin/login` posts username/email plus password to `/api/admin/auth/login`
+- `/admin/analytics` admin-required sign-in actions link to `/admin/login?next=/admin/analytics`
+- backend verifies local/dev runtime before credential handling
+- backend requires exactly one configured account with `role: "admin"`
+- valid tester credentials return a bounded admin-required result and do not create a session
+- the existing local auth cookie is set only after admin role verification passes
+- `next` redirects are sanitized to same-origin `/admin/*` paths, with unsafe paths and `/admin/login` loops falling back to `/admin/analytics`
+- normal `/login`, Magic Link, product local-login, tester login, and production auth behavior stay unchanged
 
 ## Local Test Accounts Section
 
@@ -543,9 +561,13 @@ Implementation status:
 - Complete and QA-green as the Phase 1 milestone.
 - Backend loader contract slice implemented on 2026-05-23:
   `src/lib/admin-analytics.ts` exposes a server-action-ready Phase 1 analytics loader, and `src/lib/admin-analytics.server.ts` owns admin verification, existing Supabase truth aggregation, bounded accounts/activation, plan, workout, Garmin feedback, AI/entitlement, and per-user view-model shaping, plus sensitive payload exclusion.
+- Backend classification slice implemented on 2026-05-24:
+  `src/lib/admin-user-classification.ts` owns real/test/local/admin/suspected user classification, `src/lib/admin-analytics.server.ts` filters product analytics to real users only, returns excluded classified rows separately, and `src/lib/admin-local-test-accounts.server.ts` adds matching classification metadata to local Test accounts rows without changing delete behavior.
 - Frontend rendering slice implemented on 2026-05-23:
   `/admin/analytics` now renders Overview, Funnel & Usage, Feedback, AI & Entitlements, and Users tabs from the backend analytics view model while keeping local Test accounts as its own guarded tab.
-- Safari QA passed with `qa-local-admin@local.test`; normal tester access is blocked; public/client bundle scan found no sensitive admin analytics payload strings or server-only leaks.
+- Frontend operational table slice implemented on 2026-05-24:
+  `/admin/analytics` keeps the Users table scoped to backend-classified real users, moves local/test/admin/suspected rows into Test accounts, and adds Hito table controls with collapsed search, active-filter summaries, DS-owned sortable/non-sortable table-header states, wider true-table layouts, and contained horizontal scrolling without changing backend classification, analytics aggregation, admin auth, or tester deletion contracts.
+- Safari QA passed with a single protected local admin fixture; normal tester access is blocked; public/client bundle scan found no sensitive admin analytics payload strings or server-only leaks.
 
 Backend:
 
@@ -579,7 +601,7 @@ Implementation status:
   `src/lib/admin-local-test-accounts.ts` exposes server-action-ready list/delete seams, and `src/lib/admin-local-test-accounts.server.ts` owns the local-runtime/admin guard, local accounts-file read/write, protected-admin refusal, bounded view model, and Supabase auth-user deletion for local tester accounts.
 - Frontend rendering slice implemented on 2026-05-22:
   `/admin/analytics` now exposes the local-only `Test accounts` section, renders the backend-shaped account table and bounded unavailable/empty states, shows local bypass passwords only from that backend view model, and requires exact email confirmation before calling the server delete action for tester rows.
-- Safari QA passed for admin table render, protected admin row, tester deletion, exact email confirmation, non-admin gating, and client/server boundary. Preserve `qa-local-admin@local.test` as a future QA fixture.
+- Safari QA passed for admin table render, protected admin row, tester deletion, exact email confirmation, non-admin gating, and client/server boundary. Preserve exactly one protected local admin fixture for future QA.
 
 Scope:
 

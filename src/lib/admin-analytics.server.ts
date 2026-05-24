@@ -1,14 +1,20 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type {
+  AdminAnalyticsExcludedUserRow,
   AdminAnalyticsFailureReason,
   AdminAnalyticsKeyCount,
   AdminAnalyticsResult,
   AdminAnalyticsUserRow,
   AdminAnalyticsView,
 } from "@/lib/admin-analytics";
+import {
+  classifyAdminAnalyticsUser,
+  type AdminUserClassificationInfo,
+} from "@/lib/admin-user-classification";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import type { Database } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
@@ -69,6 +75,21 @@ interface AuthUserSummary {
   id: string;
   email: string | null;
   appMetadata: Record<string, unknown>;
+}
+
+interface LocalAccountSummary {
+  username: string;
+  email: string;
+  userId: string;
+  role: "admin" | "tester";
+  displayName: string;
+}
+
+interface ClassifiedUser {
+  userId: string;
+  authUser: AuthUserSummary | null;
+  localAccount: LocalAccountSummary | null;
+  classification: AdminUserClassificationInfo;
 }
 
 interface AdminAnalyticsDependencies {
@@ -163,12 +184,7 @@ async function buildAdminAnalyticsView(
     selectAllRows(supabase, "runner_capability_usage", "user_id, capability_key, used_count"),
   ]);
 
-  const profileUserIds = new Set(profiles.map((profile) => profile.user_id));
-  const activePlanUserIds = new Set(
-    (planCycles as PlanCycleRow[])
-      .filter((plan) => plan.status === "active")
-      .map((plan) => plan.user_id),
-  );
+  const localAccounts = await loadLocalAccounts(dependencies.accountsFilePath);
   const knownUserIds = buildKnownUserIds({
     authUsers: authUsers.users,
     profiles,
@@ -181,99 +197,150 @@ async function buildAdminAnalyticsView(
     capabilityUsage: capabilityUsage as CapabilityUsageRow[],
   });
 
-  const activePlans = (planCycles as PlanCycleRow[]).filter((plan) => plan.status === "active");
-  const archivedPlans = (planCycles as PlanCycleRow[]).filter((plan) => plan.status === "archived");
-  const workoutLogsByOutcome = countBy((workoutLogs as WorkoutLogRow[]).map((log) => log.outcome));
+  const classifiedUsers = buildClassifiedUsers({
+    knownUserIds,
+    authUsers: authUsers.users,
+    localAccounts,
+  });
+  const realUserIds = new Set(
+    classifiedUsers
+      .filter((user) => user.classification.classification === "real")
+      .map((user) => user.userId),
+  );
+  const realAuthUsers = authUsers.users.filter((user) => realUserIds.has(user.id));
+  const realProfiles = profiles.filter((profile) => realUserIds.has(profile.user_id));
+  const realPlanCycles = (planCycles as PlanCycleRow[]).filter((plan) =>
+    realUserIds.has(plan.user_id),
+  );
+  const realPlannedWorkouts = (plannedWorkouts as PlannedWorkoutRow[]).filter((workout) =>
+    realUserIds.has(workout.user_id),
+  );
+  const realWorkoutLogs = (workoutLogs as WorkoutLogRow[]).filter((log) =>
+    realUserIds.has(log.user_id),
+  );
+  const realResultAssets = (resultAssets as ResultAssetRow[]).filter((asset) =>
+    realUserIds.has(asset.user_id),
+  );
+  const realActualMetrics = (actualMetrics as ActualMetricsRow[]).filter((metrics) =>
+    realUserIds.has(metrics.user_id),
+  );
+  const realComparisons = (comparisons as ComparisonRow[]).filter((comparison) =>
+    realUserIds.has(comparison.user_id),
+  );
+  const realAiInsights = (aiInsights as AiInsightRow[]).filter((insight) =>
+    realUserIds.has(insight.user_id),
+  );
+  const realEntitlements = (entitlements as EntitlementRow[]).filter((row) =>
+    realUserIds.has(row.user_id),
+  );
+  const realCapabilityUsage = (capabilityUsage as CapabilityUsageRow[]).filter((row) =>
+    realUserIds.has(row.user_id),
+  );
+  const profileUserIds = new Set(realProfiles.map((profile) => profile.user_id));
+  const activePlanUserIds = new Set(
+    realPlanCycles.filter((plan) => plan.status === "active").map((plan) => plan.user_id),
+  );
+  const activePlans = realPlanCycles.filter((plan) => plan.status === "active");
+  const archivedPlans = realPlanCycles.filter((plan) => plan.status === "archived");
+  const workoutLogsByOutcome = countBy(realWorkoutLogs.map((log) => log.outcome));
   const completedLogs = workoutLogsByOutcome.find((entry) => entry.key === "completed")?.count ?? 0;
-  const plannedNonRestWorkouts = (plannedWorkouts as PlannedWorkoutRow[]).filter(
+  const plannedNonRestWorkouts = realPlannedWorkouts.filter(
     (workout) => workout.workout_type !== "rest",
   ).length;
-  const usersWithAnyLogs = new Set((workoutLogs as WorkoutLogRow[]).map((log) => log.user_id));
+  const usersWithAnyLogs = new Set(realWorkoutLogs.map((log) => log.user_id));
   const recentCutoff = getRecentCutoff(dependencies.now ?? new Date());
   const usersWithRecentLogs = new Set(
-    (workoutLogs as WorkoutLogRow[])
+    realWorkoutLogs
       .filter((log) => new Date(log.logged_at).getTime() >= recentCutoff.getTime())
       .map((log) => log.user_id),
   );
-  const assetsParsed = (resultAssets as ResultAssetRow[]).filter(
-    (asset) => asset.parse_status === "parsed",
-  ).length;
-  const assetsFailed = (resultAssets as ResultAssetRow[]).filter(
-    (asset) => asset.parse_status === "failed",
-  ).length;
+  const assetsParsed = realResultAssets.filter((asset) => asset.parse_status === "parsed").length;
+  const assetsFailed = realResultAssets.filter((asset) => asset.parse_status === "failed").length;
+  const excludedUserRows = buildExcludedUserRows({
+    users: classifiedUsers.filter((user) => user.classification.classification !== "real"),
+    profileUserIds: new Set(profiles.map((profile) => profile.user_id)),
+    activePlans: (planCycles as PlanCycleRow[]).filter((plan) => plan.status === "active"),
+    archivedPlans: (planCycles as PlanCycleRow[]).filter((plan) => plan.status === "archived"),
+    plannedWorkouts: plannedWorkouts as PlannedWorkoutRow[],
+    workoutLogs: workoutLogs as WorkoutLogRow[],
+    resultAssets: resultAssets as ResultAssetRow[],
+    aiInsights: aiInsights as AiInsightRow[],
+    entitlements: entitlements as EntitlementRow[],
+  });
 
   return {
     generatedAt: (dependencies.now ?? new Date()).toISOString(),
     authUsers: {
       status: authUsers.status,
-      total: authUsers.status === "available" ? authUsers.users.length : null,
+      total: authUsers.status === "available" ? realAuthUsers.length : null,
     },
     accountsActivation: {
-      totalAuthUsers: authUsers.status === "available" ? authUsers.users.length : null,
-      runnerProfiles: profiles.length,
+      totalAuthUsers: authUsers.status === "available" ? realAuthUsers.length : null,
+      runnerProfiles: realProfiles.length,
       usersWithProfile: profileUserIds.size,
       usersWithoutProfile:
         authUsers.status === "available"
-          ? Math.max(authUsers.users.length - profileUserIds.size, 0)
+          ? Math.max(realAuthUsers.length - profileUserIds.size, 0)
           : null,
       usersWithActivePlan: activePlanUserIds.size,
       usersWithoutActivePlan:
         authUsers.status === "available"
-          ? Math.max(authUsers.users.length - activePlanUserIds.size, 0)
+          ? Math.max(realAuthUsers.length - activePlanUserIds.size, 0)
           : Math.max(profileUserIds.size - activePlanUserIds.size, 0),
       setupToActivePlanRate: ratio(activePlanUserIds.size, profileUserIds.size),
     },
     plans: {
-      total: planCycles.length,
+      total: realPlanCycles.length,
       active: activePlans.length,
       archived: archivedPlans.length,
-      sourceKindCounts: countBy(
-        (planCycles as PlanCycleRow[]).map((plan) => plan.source_kind ?? "unknown"),
-      ),
-      schemaVersionCounts: countBy(
-        (planCycles as PlanCycleRow[]).map((plan) => plan.schema_version || "unknown"),
-      ),
+      sourceKindCounts: countBy(realPlanCycles.map((plan) => plan.source_kind ?? "unknown")),
+      schemaVersionCounts: countBy(realPlanCycles.map((plan) => plan.schema_version || "unknown")),
     },
     workoutUsage: {
-      totalPlannedWorkouts: plannedWorkouts.length,
+      totalPlannedWorkouts: realPlannedWorkouts.length,
       plannedNonRestWorkouts,
-      totalWorkoutLogs: workoutLogs.length,
+      totalWorkoutLogs: realWorkoutLogs.length,
       outcomeCounts: workoutLogsByOutcome,
       roughCompletionRate: ratio(completedLogs, plannedNonRestWorkouts),
       activePlanUsersWithoutLogs: countMissing(activePlanUserIds, usersWithAnyLogs),
       activePlanUsersWithoutRecentLogs30d: countMissing(activePlanUserIds, usersWithRecentLogs),
     },
     garminFeedback: {
-      resultAssets: resultAssets.length,
+      resultAssets: realResultAssets.length,
       assetsParsed,
       assetsFailed,
-      actualMetrics: actualMetrics.length,
-      comparisons: comparisons.length,
-      aiInsights: aiInsights.length,
+      actualMetrics: realActualMetrics.length,
+      comparisons: realComparisons.length,
+      aiInsights: realAiInsights.length,
       funnel: {
-        uploaded: resultAssets.length,
-        metricsReady: actualMetrics.length,
-        compared: comparisons.length,
-        aiReady: aiInsights.length,
+        uploaded: realResultAssets.length,
+        metricsReady: realActualMetrics.length,
+        compared: realComparisons.length,
+        aiReady: realAiInsights.length,
       },
     },
     aiEntitlements: {
-      entitlementRowsByTier: countBy((entitlements as EntitlementRow[]).map((row) => row.tier)),
-      entitlementRowsByStatus: countBy((entitlements as EntitlementRow[]).map((row) => row.status)),
-      capabilityUsage: buildCapabilityUsageCounts(capabilityUsage as CapabilityUsageRow[]),
-      workoutAiInsights: aiInsights.length,
+      entitlementRowsByTier: countBy(realEntitlements.map((row) => row.tier)),
+      entitlementRowsByStatus: countBy(realEntitlements.map((row) => row.status)),
+      capabilityUsage: buildCapabilityUsageCounts(realCapabilityUsage),
+      workoutAiInsights: realAiInsights.length,
+    },
+    excludedUsers: {
+      total: excludedUserRows.length,
+      classificationCounts: countBy(excludedUserRows.map((row) => row.classification)),
+      rows: excludedUserRows,
     },
     perUserRows: buildPerUserRows({
-      userIds: knownUserIds,
+      users: classifiedUsers.filter((user) => user.classification.classification === "real"),
       authUsers: authUsers.users,
       profileUserIds,
       activePlans,
       archivedPlans,
-      plannedWorkouts: plannedWorkouts as PlannedWorkoutRow[],
-      workoutLogs: workoutLogs as WorkoutLogRow[],
-      resultAssets: resultAssets as ResultAssetRow[],
-      aiInsights: aiInsights as AiInsightRow[],
-      entitlements: entitlements as EntitlementRow[],
+      plannedWorkouts: realPlannedWorkouts,
+      workoutLogs: realWorkoutLogs,
+      resultAssets: realResultAssets,
+      aiInsights: realAiInsights,
+      entitlements: realEntitlements,
     }),
   };
 }
@@ -434,8 +501,52 @@ function buildKnownUserIds({
   ).sort();
 }
 
+function buildClassifiedUsers({
+  knownUserIds,
+  authUsers,
+  localAccounts,
+}: {
+  knownUserIds: string[];
+  authUsers: AuthUserSummary[];
+  localAccounts: LocalAccountSummary[];
+}): ClassifiedUser[] {
+  const authByUserId = new Map(authUsers.map((user) => [user.id, user]));
+  const authByEmail = new Map(
+    authUsers.flatMap((user) => (user.email ? [[normalizeEmail(user.email), user]] : [])),
+  );
+  const localByUserId = new Map(localAccounts.map((account) => [account.userId, account]));
+  const localByEmail = new Map(localAccounts.map((account) => [account.email, account]));
+  const userIds = new Set(knownUserIds);
+
+  for (const account of localAccounts) {
+    userIds.add(authByEmail.get(account.email)?.id ?? account.userId);
+  }
+
+  return Array.from(userIds)
+    .sort()
+    .map((userId) => {
+      const authUser = authByUserId.get(userId) ?? null;
+      const localAccount =
+        localByUserId.get(userId) ??
+        (authUser?.email ? localByEmail.get(authUser.email) : null) ??
+        null;
+      const classification = classifyAdminAnalyticsUser({
+        email: authUser?.email ?? localAccount?.email ?? null,
+        appMetadata: authUser?.appMetadata,
+        localAccountRole: localAccount?.role ?? null,
+      });
+
+      return {
+        userId,
+        authUser,
+        localAccount,
+        classification,
+      };
+    });
+}
+
 function buildPerUserRows({
-  userIds,
+  users,
   authUsers,
   profileUserIds,
   activePlans,
@@ -446,7 +557,7 @@ function buildPerUserRows({
   aiInsights,
   entitlements,
 }: {
-  userIds: string[];
+  users: ClassifiedUser[];
   authUsers: AuthUserSummary[];
   profileUserIds: Set<string>;
   activePlans: PlanCycleRow[];
@@ -460,7 +571,8 @@ function buildPerUserRows({
   const authByUserId = new Map(authUsers.map((user) => [user.id, user]));
   const entitlementByUserId = new Map(entitlements.map((row) => [row.user_id, row]));
 
-  return userIds.map((userId) => {
+  return users.map((user) => {
+    const userId = user.userId;
     const userLogs = workoutLogs.filter((log) => log.user_id === userId);
     const entitlement = entitlementByUserId.get(userId) ?? null;
 
@@ -487,6 +599,80 @@ function buildPerUserRows({
             status: "effective",
             source: "missing_row_effective_pro",
           },
+      classification: "real",
+      classificationReason: user.classification.classificationReason,
+      classificationSource: user.classification.classificationSource,
+    };
+  });
+}
+
+function buildExcludedUserRows({
+  users,
+  profileUserIds,
+  activePlans,
+  archivedPlans,
+  plannedWorkouts,
+  workoutLogs,
+  resultAssets,
+  aiInsights,
+  entitlements,
+}: {
+  users: ClassifiedUser[];
+  profileUserIds: Set<string>;
+  activePlans: PlanCycleRow[];
+  archivedPlans: PlanCycleRow[];
+  plannedWorkouts: PlannedWorkoutRow[];
+  workoutLogs: WorkoutLogRow[];
+  resultAssets: ResultAssetRow[];
+  aiInsights: AiInsightRow[];
+  entitlements: EntitlementRow[];
+}): AdminAnalyticsExcludedUserRow[] {
+  const entitlementByUserId = new Map(entitlements.map((row) => [row.user_id, row]));
+
+  return users.map((user) => {
+    const userId = user.userId;
+    const userLogs = workoutLogs.filter((log) => log.user_id === userId);
+    const entitlement = entitlementByUserId.get(userId) ?? null;
+
+    return {
+      userId,
+      email: user.authUser?.email ?? user.localAccount?.email ?? null,
+      profilePresent: profileUserIds.has(userId),
+      activePlanPresent: activePlans.some((plan) => plan.user_id === userId),
+      activePlanCount: activePlans.filter((plan) => plan.user_id === userId).length,
+      archivedPlanCount: archivedPlans.filter((plan) => plan.user_id === userId).length,
+      plannedWorkoutCount: plannedWorkouts.filter((workout) => workout.user_id === userId).length,
+      workoutLogCount: userLogs.length,
+      lastWorkoutLogDate: latestDate(userLogs.map((log) => log.logged_at)),
+      garminEvidenceCount: resultAssets.filter((asset) => asset.user_id === userId).length,
+      aiInsightCount: aiInsights.filter((insight) => insight.user_id === userId).length,
+      entitlement: entitlement
+        ? {
+            tier: entitlement.tier,
+            status: entitlement.status,
+            source: "explicit",
+          }
+        : {
+            tier: "pro",
+            status: "effective",
+            source: "missing_row_effective_pro",
+          },
+      classification: user.classification
+        .classification as AdminAnalyticsExcludedUserRow["classification"],
+      classificationReason: user.classification.classificationReason,
+      classificationSource: user.classification.classificationSource,
+      localAccount: user.localAccount
+        ? {
+            username: user.localAccount.username,
+            email: user.localAccount.email,
+            role: user.localAccount.role,
+            displayName: user.localAccount.displayName,
+            userId: user.localAccount.userId,
+            protectedFromDeletion: user.localAccount.role === "admin",
+            deletable: user.localAccount.role !== "admin",
+            linkedSupabaseUserId: user.authUser?.id ?? null,
+          }
+        : null,
     };
   });
 }
@@ -513,7 +699,7 @@ function buildCapabilityUsageCounts(rows: CapabilityUsageRow[]) {
     .sort((left, right) => left.key.localeCompare(right.key));
 }
 
-async function loadLocalAccounts(accountsFilePath: string) {
+async function loadLocalAccounts(accountsFilePath: string): Promise<LocalAccountSummary[]> {
   try {
     const raw = await readFile(accountsFilePath, "utf8");
     const parsed = localAuthAccountsFileSchema.parse(JSON.parse(raw));
@@ -522,16 +708,36 @@ async function loadLocalAccounts(accountsFilePath: string) {
     return rawAccounts.map((account) => {
       const username = account.username.trim().toLowerCase();
       const email = (account.email ?? `${username}@local.test`).trim().toLowerCase();
+      const role = account.role ?? (username === "ivan" ? "admin" : "tester");
 
       return {
+        username,
         email,
-        userId: account.userId ?? "",
-        role: account.role ?? (username === "ivan" ? "admin" : "tester"),
+        userId: account.userId ?? deriveUserId(username),
+        role,
+        displayName: account.displayName?.trim() || humanizeUsername(username),
       };
     });
   } catch {
     return [];
   }
+}
+
+function deriveUserId(username: string) {
+  const hash = createHash("sha256").update(username).digest("hex");
+
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(
+    17,
+    20,
+  )}-${hash.slice(20, 32)}`;
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function humanizeUsername(username: string) {
+  return username.charAt(0).toUpperCase() + username.slice(1);
 }
 
 function isSupabaseAdminUser(user: AuthUserSummary) {

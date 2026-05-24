@@ -130,6 +130,33 @@ Default architectural bias:
 - bounded slices over broad rewrites
 - deletion and consolidation over abstraction
 
+## 2.7) Project Skills (Mandatory When Matching)
+
+Agents are roles. Skills are reusable procedures.
+
+- `agents/*.agent.md` defines role boundaries, ownership, and reporting expectations.
+- `skills/*/SKILL.md` defines repeatable Hito workflows that agents must use when the task matches.
+- Template-only skills live in `Template Skills/`; project-specific skills live in `skills/`.
+- Do not replace role files with skills. Use skills to keep repeated process details out of role files.
+
+Current project skills:
+
+- `skills/hito-architecture-audit/SKILL.md`
+  Use for architecture audits, cleanup checkpoints, hotspot selection, and product-track prioritization.
+- `skills/hito-plan-writing-and-closeout/SKILL.md`
+  Use for creating, updating, pausing, closing, or archiving plans.
+- `skills/hito-backend-supabase-contract/SKILL.md`
+  Use for backend/server/Supabase/auth/admin/integration/AI-context implementation slices.
+- `skills/hito-frontend-design-system/SKILL.md`
+  Use for frontend UI work that touches components, Hito DS, layout, dialogs, forms, typography, or route surfaces.
+- `skills/hito-qa-browser-regression/SKILL.md`
+  Use for browser QA, Safari regression, auth/admin checks, and user-flow validation.
+- `skills/hito-prompt-handoff/SKILL.md`
+  Use for next-role prompts, execution handoffs, QA prompts, and checkpoint continuity.
+
+If a task matches one of these skills, load the skill before doing substantial work and follow its workflow
+unless the user gives a stricter instruction.
+
 ## 3) Required Context And Source Hierarchy
 
 Read in this order for non-trivial work:

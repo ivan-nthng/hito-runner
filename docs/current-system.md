@@ -33,6 +33,12 @@
   exchanges the Supabase auth code into a cookie-backed session and now also accepts token-hash email callbacks for SSR-compatible Supabase passwordless flows
 - `src/routes/api.auth.local-login.tsx`
   validates the temporary local account credentials contract and sets the local auth cookie only on loopback local runtimes; deploy-like requests receive no production-facing local login path
+- `src/routes/api.admin.auth.login.tsx`
+  exposes the dedicated local admin login POST endpoint for `/admin/login`:
+  it accepts local admin credentials plus a sanitized admin-only `next`, refuses missing or multiple admin configuration and tester credentials with bounded admin-specific redirects, and does not change the normal product `/login` or `/api/auth/local-login` paths
+- `src/routes/admin.login.tsx`
+  renders the standalone local admin login page:
+  it reuses the product login visual language without runner AppShell chrome, brands the experience as `Hito Admin`, posts username/email plus password to the admin login endpoint, preserves sanitized admin-only `next` redirects, and keeps signup, Magic Link, and normal runner login paths out of the admin surface
 - `src/routes/api.auth.logout.tsx`
   clears the temporary local auth cookie and signs out Supabase sessions when present
 - `src/routes/workout.$date.tsx`
@@ -64,6 +70,9 @@
 - `src/lib/auth-actions.ts`
   owns the auth/login helper layer:
   login route data shaping, loopback local-login availability, safe Magic Link availability, Magic Link request validation and Supabase OTP request behavior, and `/api/auth/confirm` code or token-hash callback exchange now live there while `training-api.ts` keeps the public route-facing wrappers/import path stable
+- `src/lib/admin-auth-actions.ts`
+  owns the dedicated local admin-login contract for `/admin/login` UI:
+  it exposes the admin-only redirect sanitizer and route data contract, while `src/lib/admin-auth-actions.server.ts` verifies local/dev runtime, requires exactly one configured local admin account, rejects tester credentials without creating a session, and sets the existing local auth cookie only after the matched account has `role: "admin"`; the local bypass fixture now keeps one protected owner admin account and ordinary tester accounts are never accepted by `/admin/login`
 - `src/lib/first-plan-actions.ts`
   owns the first-plan server-action layer for the structured constructor and transcript-backed voice-to-plan path:
   `completeStructuredFirstPlanOnboarding`, `generateStructuredFirstPlanDraft`, `confirmStructuredFirstPlanDraft`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public imports through `training-api.ts`; the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
@@ -121,10 +130,13 @@
   it exposes server-action-ready list and delete seams for the `/admin/analytics` `Test accounts` section, while the server-only implementation reads `.tanstack/hito-running-local-accounts.json`, returns bounded local account view data only after local-runtime plus admin checks, marks protected admin accounts as non-deletable, and deletes only local tester accounts through the same local-file plus Supabase-auth-user safety semantics as the tester lifecycle script
 - `src/lib/admin-analytics.ts`
   owns the Phase 1 backend admin analytics contract:
-  it exposes a server-action-ready loader for `/admin/analytics` overview/funnel/integrations/AI/user sections, while the server-only implementation verifies admin access, reads only existing Supabase truth through the admin client, and returns bounded aggregate counts plus per-user rows without raw payloads, prompts, transcripts, FIT contents, body-note text, storage paths, service keys, tokens, or sessions
+  it exposes a server-action-ready loader for `/admin/analytics` overview/funnel/integrations/AI/user sections, while the server-only implementation verifies admin access, reads only existing Supabase truth through the admin client, classifies local/test/admin/suspected accounts before aggregation, returns real-user product counts plus real-user rows separately from excluded test/local/suspected rows, and avoids raw payloads, prompts, transcripts, FIT contents, body-note text, storage paths, service keys, tokens, or sessions
 - `src/routes/admin.analytics.tsx`
   owns the Phase 1 admin analytics UI plus the local-only Test accounts UI:
-  it renders backend-shaped Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs, formats server-provided counts and rows only for presentation, and leaves admin checks, account-file access, Supabase deletion, analytics aggregation, and all credential/sensitive-payload safety rules on server contracts
+  it renders backend-shaped Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs, keeps the Users table scoped to backend-classified real users, keeps local/test/admin/suspected rows in Test accounts, and uses Hito table controls with collapsed search, active-filter summary, DS-owned sortable/non-sortable table headers, header sort/filter menus, and contained horizontal scrolling while leaving admin checks, account-file access, Supabase deletion, analytics aggregation, and all credential/sensitive-payload safety rules on server contracts
+- `src/routes/hub.tsx`
+  owns the public standalone Hito destination launcher:
+  it renders a desert-background card grid for Hito Running, Admin analytics, Design system, and Changelog links without runner AppShell chrome, while the target routes continue to own normal user auth, admin auth, or public access behavior
 - `supabase/migrations/20260506025058_phase_2_phase_3_backend_foundation.sql`
   defines the minimum persisted schema and RLS posture for runner profiles, plan cycles, planned workouts, and workout logs
 - `supabase/migrations/20260508104250_phase_3_tighten_persisted_plan_semantics.sql`

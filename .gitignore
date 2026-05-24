@@ -16,6 +16,9 @@ dist-ssr
 .nitro
 *.local
 
+# Local legacy/quarantine artifacts that are not part of the app build.
+src/components/OnboardingGate 2.tsx
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

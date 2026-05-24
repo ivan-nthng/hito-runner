@@ -18,6 +18,8 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 
 ## Main User Surfaces
 
+- public destination hub `/hub`
+  is a standalone launcher, not a dashboard; it uses the Hito login/desert visual treatment and links to Hito Running, Admin analytics, the Design system, and the Changelog while leaving each destination route to enforce its own auth behavior
 - home `/`
   shows either:
   login-first unauthenticated entry
@@ -74,7 +76,9 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - a local-only admin `Test accounts` section now exists at `/admin/analytics`:
   local admins in local-auth bypass runtime can list tester/admin entries from the local accounts file, see only those local plaintext test passwords, inspect linked Supabase identity status, and delete tester accounts only after exact email confirmation while protected admin accounts remain blocked; this is not production credential or user management
 - `/admin/analytics` now renders Phase 1 internal analytics from the backend view model:
-  Overview, Funnel & Usage, Feedback, AI & Entitlements, and Users tabs summarize existing Supabase truth and per-user activity rows without adding telemetry tables, inventing charts, exposing sensitive raw payloads, or replacing the local-only Test accounts section
+  Overview, Funnel & Usage, Feedback, AI & Entitlements, and Users tabs summarize existing Supabase truth without adding telemetry tables, inventing charts, exposing sensitive raw payloads, or replacing the local-only Test accounts section; backend-owned classification now keeps local, admin, QA, disposable, and suspected test accounts out of real-user product counts and the Users table, while Test accounts shows those excluded rows in Hito table controls with collapsed search, active-filter summary, DS-owned sortable/non-sortable header states, header sort/filter menus, and contained horizontal scrolling
+- `/admin/login` now provides a dedicated local admin sign-in page:
+  local/dev admin login uses the separate admin endpoint, requires exactly one configured protected owner admin account, refuses valid tester credentials with an admin-specific error instead of creating a normal product session, redirects only to sanitized admin paths, and keeps normal `/login`, Magic Link, and product local-login behavior unchanged; `/admin/analytics` admin-required states now point to this admin login path
 - onboarding keeps the structured constructor as the reliable primary setup path while placing the compact Pro AI assist above it, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
 - `/settings` now separates `Personal data` from `Training preferences` with Hito tabs; personal age/height/weight use the same editable value chips as Quick setup, and training preferences use the same weekday choice rhythm as plan creation to save fixed rest days, default running-days/week, and preferred long-run day as future-plan defaults only, with backend validation preventing impossible rest-day and long-run combinations
 - the backend-owned training-preference contract now uses one mapping between runner-facing names and storage truth:

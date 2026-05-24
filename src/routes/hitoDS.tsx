@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { APP_NAME } from "@/lib/app-config";
+import { HitoLogo } from "@/components/ui/hito-logo";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconName } from "@/components/ui/icon";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
@@ -23,11 +24,13 @@ export const Route = createFileRoute("/hitoDS")({
 
 const SECTIONS = [
   { id: "overview", label: "Overview" },
+  { id: "brand", label: "Brand" },
   { id: "foundations", label: "Foundations" },
   { id: "typography", label: "Typography" },
   { id: "icons", label: "Icons" },
   { id: "buttons", label: "Buttons" },
   { id: "tabs", label: "Tabs" },
+  { id: "data-table", label: "Tables" },
   { id: "inputs", label: "Inputs" },
   { id: "selection-controls", label: "Selection" },
   { id: "surfaces", label: "Composition" },
@@ -410,6 +413,58 @@ function HitoDesignSystemPage() {
                 body="Reserve framed surfaces for actual component specimens, payload-like examples, or shells whose border is part of the contract."
               />
             </div>
+
+            <section id="brand" className="ds-section">
+              <SectionIntro
+                label="Brand"
+                title="The Hito wordmark is a primitive, not an icon."
+                body="Use the HitoLogo primitive for true brand placements. It inherits currentColor, sizes through logo CSS variables, and keeps product variants like Admin or DS as separate text."
+              />
+
+              <div className="grid gap-5">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <LogoSpecimen label="Default">
+                    <HitoLogo decorative />
+                  </LogoSpecimen>
+                  <LogoSpecimen label="Compact">
+                    <HitoLogo decorative className="[--hito-logo-height:1.05rem]" />
+                  </LogoSpecimen>
+                  <LogoSpecimen label="Hero">
+                    <HitoLogo decorative className="[--hito-logo-height:3rem]" />
+                  </LogoSpecimen>
+                  <LogoSpecimen
+                    label="Light background"
+                    className="bg-[var(--sand-100)] text-[var(--stone-950)]"
+                  >
+                    <HitoLogo decorative className="[--hito-logo-height:1.7rem]" />
+                  </LogoSpecimen>
+                  <LogoSpecimen
+                    label="Dark background"
+                    className="bg-[var(--stone-950)] text-[var(--sand-100)]"
+                  >
+                    <HitoLogo decorative className="[--hito-logo-height:1.7rem]" />
+                  </LogoSpecimen>
+                </div>
+
+                <div className="hito-reference-list">
+                  <ReferenceListRow
+                    label="Use"
+                    title="Brand identity only"
+                    body="Use HitoLogo for linked shell brands, auth hero branding, and public brand moments. Do not add it to the generic Icon registry."
+                  />
+                  <ReferenceListRow
+                    label="Color"
+                    title="Logo color comes from currentColor"
+                    body="Set tone on the parent or through className. Avoid hardcoded fills and do not add a decorative signal dot by default."
+                  />
+                  <ReferenceListRow
+                    label="Variants"
+                    title="Keep product labels separate"
+                    body="Admin, DS, and other product qualifiers should be rendered as adjacent text, not baked into the SVG."
+                  />
+                </div>
+              </div>
+            </section>
 
             <section id="foundations" className="ds-section">
               <SectionIntro
@@ -891,6 +946,130 @@ function HitoDesignSystemPage() {
                     </div>
                   </div>
                 </article>
+              </div>
+            </section>
+
+            <section id="data-table" className="ds-section">
+              <SectionIntro
+                label="Data table"
+                title="Header controls keep sorting and filtering in context."
+                body="Operational tables use one Hito header typography for sortable and non-sortable columns. Sort/filter state belongs in the header control, while static headers stay visually aligned without becoming clickable."
+              />
+
+              <div className="grid gap-5">
+                <div className="hito-data-table-scroll">
+                  <table className="hito-data-table min-w-[760px]">
+                    <caption className="sr-only">Hito data-table header state examples.</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+                          <button
+                            type="button"
+                            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
+                          >
+                            Default
+                            <Icon
+                              aria-hidden="true"
+                              name="chevron-down"
+                              size="xs"
+                              className="hito-data-table-sort-indicator"
+                            />
+                          </button>
+                        </th>
+                        <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+                          <button
+                            type="button"
+                            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
+                            data-demo-state="hover"
+                          >
+                            Hover
+                            <Icon
+                              aria-hidden="true"
+                              name="chevron-down"
+                              size="xs"
+                              className="hito-data-table-sort-indicator"
+                            />
+                          </button>
+                        </th>
+                        <th
+                          scope="col"
+                          aria-sort="descending"
+                          className="whitespace-nowrap px-2 py-2 font-medium"
+                        >
+                          <button
+                            type="button"
+                            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
+                            data-active="true"
+                          >
+                            Active sort
+                            <Icon
+                              aria-hidden="true"
+                              name="chevron-down"
+                              size="xs"
+                              className="hito-data-table-sort-indicator"
+                              data-active="true"
+                            />
+                          </button>
+                        </th>
+                        <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+                          <button
+                            type="button"
+                            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
+                            data-active="true"
+                          >
+                            Filtered
+                            <span className="hito-data-table-filter-dot" />
+                            <Icon
+                              aria-hidden="true"
+                              name="chevron-down"
+                              size="xs"
+                              className="hito-data-table-sort-indicator"
+                            />
+                          </button>
+                        </th>
+                        <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+                          <span
+                            className="hito-data-table-header hito-data-table-header-static"
+                            data-disabled="true"
+                          >
+                            Non-sortable
+                          </span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="hito-data-table-cell hito-data-table-cell-start">
+                          Header menu
+                        </td>
+                        <td className="hito-data-table-cell">Subtle wash</td>
+                        <td className="hito-data-table-cell">Arrow active</td>
+                        <td className="hito-data-table-cell">Circular filter dot</td>
+                        <td className="hito-data-table-cell hito-data-table-cell-end">
+                          Same label style
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="hito-reference-list">
+                  <ReferenceListRow
+                    label="Sortable"
+                    title="Button inside th"
+                    body="Sortable columns use a header button, aria-sort on the th when active, and a chevron affordance that stays secondary until sorted."
+                  />
+                  <ReferenceListRow
+                    label="Filter"
+                    title="Round state indicator"
+                    body="Filtered columns show a small circular signal dot in the header control. Avoid square badges or route-local header indicators."
+                  />
+                  <ReferenceListRow
+                    label="Static"
+                    title="Same type, no affordance"
+                    body="Non-sortable columns use the same header typography through hito-data-table-header, but they do not show arrows, menus, hover wash, or click behavior."
+                  />
+                </div>
               </div>
             </section>
 
@@ -2190,6 +2369,23 @@ function ReferenceListRow({ label, title, body }: { label: string; title: string
         <p className="hito-list-row-copy">{body}</p>
       </div>
     </div>
+  );
+}
+
+function LogoSpecimen({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <article className={cn("hito-surface-flat grid min-h-36 content-between gap-5 p-5", className)}>
+      <p className="hito-label">{label}</p>
+      <div className="flex items-center">{children}</div>
+    </article>
   );
 }
 

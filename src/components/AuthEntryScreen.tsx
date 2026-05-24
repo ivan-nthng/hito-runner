@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
+import { HitoLogo } from "@/components/ui/hito-logo";
 import { Icon } from "@/components/ui/icon";
 import { requestMagicLink } from "@/lib/training-api";
 
@@ -61,13 +62,8 @@ export function AuthEntryScreen({
       <div className="auth-hero-content mx-auto flex min-h-screen max-w-5xl items-center px-6 py-12 lg:px-10">
         <section className="grid w-full gap-12 lg:grid-cols-[0.9fr_0.85fr]">
           <div className="flex flex-col justify-center gap-8">
-            <div className="flex items-center gap-4">
-              <div className="hito-surface-flat flex h-12 w-12 items-center justify-center">
-                <div className="auth-hero-signal-dot" />
-              </div>
-              <div className="font-display text-5xl leading-none tracking-tight lg:text-7xl">
-                Hito.
-              </div>
+            <div className="flex items-center">
+              <HitoLogo className="[--hito-logo-height:2.35rem] lg:[--hito-logo-height:3.25rem]" />
             </div>
             <div className="space-y-4">
               <p className="max-w-sm text-lg text-foreground/92">Your running plan, kept simple.</p>

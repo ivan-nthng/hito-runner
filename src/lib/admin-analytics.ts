@@ -1,4 +1,8 @@
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
+import type {
+  AdminUserClassification,
+  AdminUserClassificationSource,
+} from "@/lib/admin-user-classification";
 
 export type AdminAnalyticsFailureReason =
   | "authentication_required"
@@ -63,6 +67,11 @@ export interface AdminAnalyticsView {
     capabilityUsage: Array<AdminAnalyticsKeyCount & { usersWithUsage: number }>;
     workoutAiInsights: number;
   };
+  excludedUsers: {
+    total: number;
+    classificationCounts: AdminAnalyticsKeyCount[];
+    rows: AdminAnalyticsExcludedUserRow[];
+  };
   perUserRows: AdminAnalyticsUserRow[];
 }
 
@@ -83,6 +92,26 @@ export interface AdminAnalyticsUserRow {
     status: string;
     source: "explicit" | "missing_row_effective_pro";
   };
+  classification: "real";
+  classificationReason: string;
+  classificationSource: AdminUserClassificationSource;
+}
+
+export interface AdminAnalyticsExcludedUserRow extends Omit<
+  AdminAnalyticsUserRow,
+  "classification"
+> {
+  classification: Exclude<AdminUserClassification, "real">;
+  localAccount: {
+    username: string;
+    email: string;
+    role: "admin" | "tester";
+    displayName: string;
+    userId: string;
+    protectedFromDeletion: boolean;
+    deletable: boolean;
+    linkedSupabaseUserId: string | null;
+  } | null;
 }
 
 export type AdminAnalyticsResult =

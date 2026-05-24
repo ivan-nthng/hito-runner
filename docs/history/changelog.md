@@ -2,8 +2,18 @@
 
 Completed implementation history only.
 
+## 2026-05-24
+
+- Added the public `/hub` destination launcher: a standalone Hito-logo desert-background card grid links to Hito Running, Admin analytics, the Design system, and the Changelog while leaving each destination route to own its existing user/admin/public access behavior.
+- Normalized Hito brand and admin table-header treatment: logo placements now use the smaller standalone SVG wordmark without decorative signal-dot boxes, and `/admin/analytics` table headers now share DS-owned sortable/non-sortable typography and rounded active sort/filter indicators.
+- Refined `/admin/analytics` operational tables: Users now shows only backend-classified real Hito users with collapsed search, active-filter summaries, header sort/filter menus, and contained horizontal scrolling, while Test accounts shows local/test/admin/suspected rows separately with classification/status columns and preserves protected-admin and tester-delete safety.
+- Split admin analytics users by backend-owned account classification: `/admin/analytics` now keeps real product users and real-user aggregate counts separate from local, admin, metadata-marked test, `@local.test`, and disposable-prefix accounts, while preserving the local Test accounts delete contract.
+- Replaced the legacy local QA admin fixture with a single protected owner admin account in the local bypass accounts file, removed the old linked Supabase auth user, and kept `/admin/login` limited to that configured admin role while normal tester/product login remains unchanged.
+
 ## 2026-05-23
 
+- Added the dedicated local admin login UI: `/admin/login` now renders a standalone `Hito Admin` username/email plus password form backed by `/api/admin/auth/login`, keeps signup and Magic Link out of the admin surface, preserves sanitized admin redirects, and routes `/admin/analytics` admin-required sign-in actions to the admin login path.
+- Added a dedicated local admin login backend contract: `/api/admin/auth/login` verifies exactly one configured local admin account for `/admin/login`, rejects tester credentials without setting the local auth cookie, sanitizes admin-only `next` redirects, and leaves the normal product `/login` plus `/api/auth/local-login` paths unchanged.
 - Wired the Phase 1 admin analytics UI to the backend view model: `/admin/analytics` now renders Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and local Test accounts tabs from server-shaped data without adding client-side aggregation, telemetry tables, raw sensitive payloads, or runner AppShell chrome.
 - Added the Phase 1 admin analytics backend loader: `src/lib/admin-analytics.ts` exposes a server-action-ready admin view model over existing Supabase auth, profile, plan, planned workout, workout log, Garmin feedback, AI insight, entitlement, and capability-usage truth, with aggregate counts and per-user rows shaped on the server without adding telemetry tables or exposing raw sensitive payloads.
 

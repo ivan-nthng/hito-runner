@@ -4,6 +4,7 @@ import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
 import { UploadJsonDialog } from "@/components/UploadJsonDialog";
 import { PlanManagementDialog } from "@/components/PlanManagementDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { HitoLogo } from "@/components/ui/hito-logo";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import {
   DropdownMenu,
@@ -14,7 +15,6 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { APP_NAME } from "@/lib/app-config";
 import {
   WEEK_STATUS_META,
   formatDate,
@@ -76,9 +76,8 @@ export function AppShell({
     <div className="min-h-screen flex bg-background text-foreground canvas-grain">
       <aside className="hidden md:sticky md:top-0 md:flex md:h-screen w-[240px] shrink-0 self-start flex-col border-r border-hairline bg-sidebar/60 backdrop-blur">
         <div className="px-6 pt-7 pb-10">
-          <Link to="/" reloadDocument={useFreshHomeRequest} className="flex items-baseline gap-2">
-            <span className="font-display text-2xl tracking-tight">{APP_NAME.toLowerCase()}</span>
-            <span className="h-1.5 w-1.5 rounded-full bg-signal" />
+          <Link to="/" reloadDocument={useFreshHomeRequest} aria-label="Hito home">
+            <HitoLogo className="[--hito-logo-height:1.45rem]" />
           </Link>
           <p className="hito-micro-label mt-1">{modeLabel}</p>
         </div>
@@ -212,7 +211,14 @@ export function AppShell({
       <main className="flex-1 min-w-0 flex flex-col">
         <header className="sticky top-0 z-30 border-b border-hairline bg-background/70 backdrop-blur-xl">
           <div className="flex items-center gap-6 px-6 lg:px-10 h-14">
-            <div className="md:hidden font-display text-xl">{APP_NAME.toLowerCase()}</div>
+            <Link
+              to="/"
+              reloadDocument={useFreshHomeRequest}
+              aria-label="Hito home"
+              className="md:hidden"
+            >
+              <HitoLogo className="[--hito-logo-height:1.15rem]" />
+            </Link>
             <div className="hidden md:flex items-baseline gap-3">
               <span className="hito-micro-label">Today</span>
               <span className="hito-technical-mono">

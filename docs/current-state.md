@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-22
+2026-05-24
 
 ## Where We Are Now
 
@@ -31,9 +31,14 @@ Active
 - The first local admin Test accounts UI slice is implemented:
   `/admin/analytics` now renders the local-only backend view with account username, email, password, role, display name, local/linked identity status, protected/deletable status, bounded unavailable/empty states, and exact-email confirmation before tester deletion.
 - The Phase 1 admin analytics backend loader is implemented:
-  `src/lib/admin-analytics.ts` exposes a server-action-ready view model over existing Supabase auth/profile/plan/workout/Garmin/AI/entitlement truth, with aggregate overview/funnel/feedback/AI counts plus per-user rows shaped on the server and no new telemetry, failure, issue, or production user-management tables.
+  `src/lib/admin-analytics.ts` exposes a server-action-ready view model over existing Supabase auth/profile/plan/workout/Garmin/AI/entitlement truth, with aggregate overview/funnel/feedback/AI counts plus real-user rows shaped on the server and no new telemetry, failure, issue, or production user-management tables; local, admin, metadata-marked test, `@local.test`, and disposable-prefix accounts are classified out of real-user product analytics and returned as excluded ops rows.
 - The Phase 1 admin analytics UI is implemented:
-  `/admin/analytics` now renders Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs from backend-shaped view models, keeping the page standalone from the runner AppShell and avoiding client-side analytics authority beyond presentation formatting.
+  `/admin/analytics` now renders Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs from backend-shaped view models, keeping the page standalone from the runner AppShell and avoiding client-side analytics authority beyond presentation formatting; the Users table shows only backend-classified real users, while Test accounts shows local/test/admin/suspected rows with contained horizontal tables, collapsed search, active-filter summaries, and DS-owned sortable/non-sortable header sort/filter states.
+- The dedicated local admin login flow is implemented:
+  `/admin/login` renders a standalone `Hito Admin` sign-in page that posts username/email plus password to `/api/admin/auth/login`, sanitizes admin-only `next` targets back to `/admin/analytics` when unsafe, rejects tester credentials with bounded admin-specific copy, and keeps `/login` plus `/api/auth/local-login` unchanged; `/admin/analytics` admin-required states now link to this admin login path.
+- The local/dev admin fixture is now a single protected owner admin account in `.tanstack/hito-running-local-accounts.json`; the legacy QA admin fixture has been removed from the local bypass file and linked auth user, while tester accounts remain separate and are still rejected by `/admin/login`.
+- The public Hito destination hub is implemented:
+  `/hub` renders a standalone desert-background launcher with the Hito logo and full-card links to Hito Running, Admin analytics, Design system, and Changelog; the launcher itself is public and does not own any destination auth behavior.
 - Phase 3 architecture cleanup is now implemented through one canonical persisted richer-plan contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.

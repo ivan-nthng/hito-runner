@@ -10,6 +10,7 @@ import type {
   DeleteAdminLocalTestAccountInput,
   DeleteAdminLocalTestAccountResult,
 } from "@/lib/admin-local-test-accounts";
+import { classifyAdminAnalyticsUser } from "@/lib/admin-user-classification";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database";
@@ -237,6 +238,10 @@ async function buildAccountView(
 ): Promise<AdminLocalTestAccountView> {
   const linkedSupabaseUser = await resolveLinkedSupabaseUser(account.email, supabaseAdmin);
   const protectedFromDeletion = account.role === "admin";
+  const classification = classifyAdminAnalyticsUser({
+    email: account.email,
+    localAccountRole: account.role,
+  });
 
   return {
     username: account.username,
@@ -249,6 +254,9 @@ async function buildAccountView(
     protectedFromDeletion,
     deletable: !protectedFromDeletion,
     linkedSupabaseUser,
+    classification: classification.classification === "local_admin" ? "local_admin" : "local_test",
+    classificationReason: classification.classificationReason,
+    classificationSource: classification.classificationSource,
   };
 }
 

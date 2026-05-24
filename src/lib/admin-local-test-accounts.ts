@@ -1,5 +1,9 @@
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type {
+  AdminUserClassification,
+  AdminUserClassificationSource,
+} from "@/lib/admin-user-classification";
 
 export type AdminLocalTestAccountRole = "admin" | "tester";
 
@@ -23,6 +27,9 @@ export interface AdminLocalTestAccountView {
     status: AdminLocalTestAccountLinkStatus;
     userId: string | null;
   };
+  classification: Extract<AdminUserClassification, "local_test" | "local_admin">;
+  classificationReason: string;
+  classificationSource: AdminUserClassificationSource;
 }
 
 export type AdminLocalTestAccountsFailureReason =

@@ -13,11 +13,13 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
+import { Route as HubRouteImport } from './routes/hub'
 import { Route as HitoDSRouteImport } from './routes/hitoDS'
 import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
 import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
@@ -26,6 +28,7 @@ import { Route as ApiPlanExportRouteImport } from './routes/api.plan.export'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api.auth.logout'
 import { Route as ApiAuthLocalLoginRouteImport } from './routes/api.auth.local-login'
 import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
+import { Route as ApiAdminAuthLoginRouteImport } from './routes/api.admin.auth.login'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -45,6 +48,11 @@ const LoginRoute = LoginRouteImport.update({
 const IntegrationsRoute = IntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HubRoute = HubRouteImport.update({
+  id: '/hub',
+  path: '/hub',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HitoDSRoute = HitoDSRouteImport.update({
@@ -70,6 +78,11 @@ const IndexRoute = IndexRouteImport.update({
 const WorkoutDateRoute = WorkoutDateRouteImport.update({
   id: '/workout/$date',
   path: '/workout/$date',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
@@ -112,17 +125,24 @@ const ApiAuthConfirmRoute = ApiAuthConfirmRouteImport.update({
   path: '/api/auth/confirm',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminAuthLoginRoute = ApiAdminAuthLoginRouteImport.update({
+  id: '/api/admin/auth/login',
+  path: '/api/admin/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/body': typeof BodyRoute
   '/changelog': typeof ChangelogRoute
   '/hitoDS': typeof HitoDSRoute
+  '/hub': typeof HubRoute
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/login': typeof AdminLoginRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -131,17 +151,20 @@ export interface FileRoutesByFullPath {
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
+  '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/body': typeof BodyRoute
   '/changelog': typeof ChangelogRoute
   '/hitoDS': typeof HitoDSRoute
+  '/hub': typeof HubRoute
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/login': typeof AdminLoginRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -150,6 +173,7 @@ export interface FileRoutesByTo {
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
+  '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -157,11 +181,13 @@ export interface FileRoutesById {
   '/body': typeof BodyRoute
   '/changelog': typeof ChangelogRoute
   '/hitoDS': typeof HitoDSRoute
+  '/hub': typeof HubRoute
   '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/login': typeof AdminLoginRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -170,6 +196,7 @@ export interface FileRoutesById {
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
+  '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -178,11 +205,13 @@ export interface FileRouteTypes {
     | '/body'
     | '/changelog'
     | '/hitoDS'
+    | '/hub'
     | '/integrations'
     | '/login'
     | '/progress'
     | '/settings'
     | '/admin/analytics'
+    | '/admin/login'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -191,17 +220,20 @@ export interface FileRouteTypes {
     | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
+    | '/api/admin/auth/login'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/body'
     | '/changelog'
     | '/hitoDS'
+    | '/hub'
     | '/integrations'
     | '/login'
     | '/progress'
     | '/settings'
     | '/admin/analytics'
+    | '/admin/login'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -210,17 +242,20 @@ export interface FileRouteTypes {
     | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
+    | '/api/admin/auth/login'
   id:
     | '__root__'
     | '/'
     | '/body'
     | '/changelog'
     | '/hitoDS'
+    | '/hub'
     | '/integrations'
     | '/login'
     | '/progress'
     | '/settings'
     | '/admin/analytics'
+    | '/admin/login'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -229,6 +264,7 @@ export interface FileRouteTypes {
     | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
+    | '/api/admin/auth/login'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -236,11 +272,13 @@ export interface RootRouteChildren {
   BodyRoute: typeof BodyRoute
   ChangelogRoute: typeof ChangelogRoute
   HitoDSRoute: typeof HitoDSRoute
+  HubRoute: typeof HubRoute
   IntegrationsRoute: typeof IntegrationsRoute
   LoginRoute: typeof LoginRoute
   ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminLoginRoute: typeof AdminLoginRoute
   WorkoutDateRoute: typeof WorkoutDateRoute
   ApiAuthConfirmRoute: typeof ApiAuthConfirmRoute
   ApiAuthLocalLoginRoute: typeof ApiAuthLocalLoginRoute
@@ -249,6 +287,7 @@ export interface RootRouteChildren {
   ApiProfileAvatarUploadRoute: typeof ApiProfileAvatarUploadRoute
   ApiWorkoutResultRemoveRoute: typeof ApiWorkoutResultRemoveRoute
   ApiWorkoutResultUploadRoute: typeof ApiWorkoutResultUploadRoute
+  ApiAdminAuthLoginRoute: typeof ApiAdminAuthLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -279,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/integrations'
       preLoaderRoute: typeof IntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hub': {
+      id: '/hub'
+      path: '/hub'
+      fullPath: '/hub'
+      preLoaderRoute: typeof HubRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hitoDS': {
@@ -314,6 +360,13 @@ declare module '@tanstack/react-router' {
       path: '/workout/$date'
       fullPath: '/workout/$date'
       preLoaderRoute: typeof WorkoutDateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/analytics': {
@@ -372,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthConfirmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/auth/login': {
+      id: '/api/admin/auth/login'
+      path: '/api/admin/auth/login'
+      fullPath: '/api/admin/auth/login'
+      preLoaderRoute: typeof ApiAdminAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -380,11 +440,13 @@ const rootRouteChildren: RootRouteChildren = {
   BodyRoute: BodyRoute,
   ChangelogRoute: ChangelogRoute,
   HitoDSRoute: HitoDSRoute,
+  HubRoute: HubRoute,
   IntegrationsRoute: IntegrationsRoute,
   LoginRoute: LoginRoute,
   ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminLoginRoute: AdminLoginRoute,
   WorkoutDateRoute: WorkoutDateRoute,
   ApiAuthConfirmRoute: ApiAuthConfirmRoute,
   ApiAuthLocalLoginRoute: ApiAuthLocalLoginRoute,
@@ -393,6 +455,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfileAvatarUploadRoute: ApiProfileAvatarUploadRoute,
   ApiWorkoutResultRemoveRoute: ApiWorkoutResultRemoveRoute,
   ApiWorkoutResultUploadRoute: ApiWorkoutResultUploadRoute,
+  ApiAdminAuthLoginRoute: ApiAdminAuthLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

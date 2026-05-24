@@ -1,8 +1,8 @@
+import type { CSSProperties } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { TYPE_META, weeklyMileage, statsTotals } from "@/lib/training";
-import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
 import { getProgressRouteData } from "@/lib/training-api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -124,7 +124,7 @@ function Progress() {
 
         <section>
           <SectionHeader title="Weekly volume" subtitle="Planned vs actual" />
-          <div className="border-t border-hairline pt-5">
+          <div className="hito-chart-section">
             {shouldShowWeeklyVolumeChart ? (
               <>
                 <div className="flex h-36 items-end gap-1.5">
@@ -135,20 +135,19 @@ function Progress() {
                         key={week.weekStart}
                         className="group relative flex flex-1 flex-col items-center justify-end gap-1"
                       >
-                        <div className="hito-caption absolute -top-6 font-mono-num opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="hito-chart-note hito-chart-hover-note absolute -top-6">
                           {week.km.toFixed(0)}km
                         </div>
                         <div className="flex h-full w-full items-end gap-px">
                           <div
-                            className={cn(
-                              "flex-1 rounded-sm transition-all",
-                              isPast ? "bg-signal/80" : "bg-foreground/10",
-                            )}
+                            className="hito-comparison-bar flex-1"
+                            data-tone={isPast ? "actual" : "future"}
                             style={{ height: `${(week.km / maxKm) * 100}%` }}
                             title={`Actual ${week.km.toFixed(1)}km`}
                           />
                           <div
-                            className="flex-1 rounded-sm bg-foreground/15"
+                            className="hito-comparison-bar flex-1"
+                            data-tone="planned"
                             style={{
                               height: `${(week.planned / maxKm) * 100}%`,
                             }}
@@ -160,12 +159,12 @@ function Progress() {
                   })}
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-4">
-                  <span className="hito-caption font-mono-num">Wk 1</span>
+                  <span className="hito-chart-note">Wk 1</span>
                   <div className="hito-legend justify-center">
                     <LegendItem tone="actual" label="Actual" />
                     <LegendItem tone="planned" label="Planned" />
                   </div>
-                  <span className="hito-caption font-mono-num">Wk {weeks.length}</span>
+                  <span className="hito-chart-note">Wk {weeks.length}</span>
                 </div>
               </>
             ) : (
@@ -180,7 +179,7 @@ function Progress() {
 
         <section>
           <SectionHeader title="Recent consistency" subtitle="Last 12 workouts" />
-          <div className="border-t border-hairline pt-5">
+          <div className="hito-chart-section">
             {recentTypes.length > 0 ? (
               <>
                 <div className="flex gap-1.5">
@@ -189,20 +188,18 @@ function Progress() {
                     return (
                       <div key={workout.date} className="group flex-1">
                         <div
-                          className="h-16 origin-bottom rounded-md transition-transform group-hover:scale-y-105"
-                          style={{
-                            background:
-                              workout.status === "completed"
-                                ? meta.color
-                                : workout.status === "partial"
-                                  ? "color-mix(in oklch, var(--warn) 60%, transparent)"
-                                  : workout.status === "skipped"
-                                    ? "color-mix(in oklch, var(--destructive) 30%, transparent)"
-                                    : "var(--hairline)",
-                            opacity: workout.status === "skipped" ? 0.5 : 1,
-                          }}
+                          className="hito-comparison-bar h-16 origin-bottom"
+                          data-interactive="true"
+                          data-status={workout.status}
+                          style={
+                            workout.status === "completed"
+                              ? ({
+                                  "--hito-comparison-bar-color": meta.color,
+                                } as CSSProperties)
+                              : undefined
+                          }
                         />
-                        <div className="hito-caption mt-2 text-center font-mono-num">
+                        <div className="hito-chart-note mt-2 text-center">
                           {workout.date.slice(5)}
                         </div>
                       </div>

@@ -1,0 +1,97 @@
+---
+name: hito-running-coach-audit
+description: Use when reviewing Hito training-plan quality, running doctrine, workout diversity, progression, recovery, race specificity, terrain/hill logic, metric-target realism, or sports-safety guardrails.
+---
+
+# Hito Running Coach Audit
+
+## Purpose
+
+Verify that Hito's generated running plans and recommendations are credible, safe, and specific enough for the runner's context.
+
+## Required Reading
+
+For Hito plan-quality work, read:
+
+1. `docs/current-product.md`
+2. `docs/current-system.md`
+3. `docs/current-state.md`
+4. relevant plan-authoring or training-plan active plan
+5. relevant generated plan fixture, prompt output, or product surface
+
+## Review Checklist
+
+Evaluate whether the plan has:
+
+- clear easy / recovery / steady / tempo / interval / hill / long-run intent
+- realistic weekly progression
+- appropriate cutback/recovery weeks
+- long-run progression that fits the goal
+- race-specific work where relevant
+- terrain/elevation specificity when the goal requires it
+- enough variation without random novelty
+- conservative load for the runner's age, benchmark, availability, and goal date
+- fixed rest-day respect
+- no fake precision for pace or HR
+- clear runner-facing guidance without medical claims
+
+## Runner Inputs To Check
+
+- age, height, weight
+- current fitness level or benchmark
+- recent 5K time only when trustworthy
+- running days per week
+- fixed rest days
+- preferred long-run day
+- goal distance
+- goal style
+- target date/time pressure
+- terrain/mountain-running context
+- pain/body-note caution
+- watch/pace/HR availability
+
+## Safety Rules
+
+- Do not diagnose injuries.
+- Do not prescribe treatment or rehab.
+- Flag aggressive load increases, inadequate recovery, and unsupported intensity.
+- Recommend medical/professional help language only when the product needs a safety disclaimer.
+- Keep guidance conservative when data is missing.
+- If exact pace or HR truth is missing, use effort-language instead of fake precision.
+
+## Research Rules
+
+Browse or otherwise verify sources when:
+
+- training doctrine is uncertain
+- injury/health risk is involved
+- the product is encoding a new coaching rule
+- a claim depends on current best practice
+
+Prefer:
+
+- established coaching bodies
+- sports medicine sources
+- exercise-science sources
+- reputable race/training education materials
+- medically reviewed sources for health risk
+
+Avoid:
+
+- influencer-only advice
+- unsafe challenge plans
+- anecdotal forum claims as rule sources
+- overfitting Hito behavior to one commercial app
+
+## Output
+
+1. Task
+2. Stage
+3. Current training quality
+4. Findings
+5. Safety concerns
+6. Recommended coaching changes
+7. Product rules to encode
+8. What not to change
+9. Next recommended role
+10. Blockers

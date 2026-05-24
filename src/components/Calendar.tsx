@@ -8,7 +8,6 @@ import {
   displayTargetEntries,
   feedbackMarkerMeta,
   formatDistanceKm,
-  TYPE_META,
   workoutDuration,
   workoutDistanceKm,
   workoutTypeMeta,
@@ -79,18 +78,22 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hito-tab-list">
+          <div className="hito-choice-toggle-group" aria-label="Calendar view">
             <button
+              type="button"
               onClick={() => setView("month")}
-              data-active={view === "month"}
-              className={cn("hito-tab", view !== "month" && "text-muted-foreground")}
+              data-selected={view === "month"}
+              aria-pressed={view === "month"}
+              className="hito-choice-toggle hito-choice-toggle-sm"
             >
               Month
             </button>
             <button
+              type="button"
               onClick={() => setView("week")}
-              data-active={view === "week"}
-              className={cn("hito-tab", view !== "week" && "text-muted-foreground")}
+              data-selected={view === "week"}
+              aria-pressed={view === "week"}
+              className="hito-choice-toggle hito-choice-toggle-sm"
             >
               Week
             </button>
@@ -117,20 +120,6 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
             <Icon name="chevron-right" size="sm" />
           </button>
         </div>
-      </div>
-
-      <div className="hito-legend mb-4">
-        {(["easy", "long_run", "quality", "rest"] as const).map((type) => (
-          <div key={type} className="hito-legend-item">
-            <span
-              className="hito-legend-swatch rounded-full"
-              style={{
-                background: `var(--${type === "long_run" ? "long" : type === "quality" ? "quality" : type === "rest" ? "rest" : "easy"})`,
-              }}
-            />
-            <span>{TYPE_META[type].short}</span>
-          </div>
-        ))}
       </div>
 
       {view === "month" ? (

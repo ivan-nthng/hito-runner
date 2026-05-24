@@ -179,10 +179,7 @@ function YearSection({
       className="grid gap-6 md:grid-cols-[4.5rem_minmax(0,1fr)] md:gap-6 lg:grid-cols-[5.25rem_minmax(0,1fr)] lg:gap-8"
     >
       <div className="md:relative">
-        <h2
-          id={labelId}
-          className="font-serif text-[clamp(1.45rem,2vw,1.9rem)] leading-[1.05] tracking-[-0.035em] text-foreground/78 md:sticky md:top-8"
-        >
+        <h2 id={labelId} className="hito-timeline-year md:sticky md:top-8">
           {year}
         </h2>
       </div>
@@ -207,10 +204,7 @@ function MonthSection({
       className="grid gap-4 md:grid-cols-[4.75rem_minmax(0,1fr)] md:gap-5 lg:grid-cols-[5.25rem_minmax(0,1fr)] lg:gap-6"
     >
       <div className="md:relative">
-        <h3
-          id={labelId}
-          className="font-serif text-[clamp(1.45rem,2vw,1.9rem)] leading-[1.05] tracking-[-0.035em] text-foreground md:sticky md:top-8"
-        >
+        <h3 id={labelId} className="hito-timeline-month md:sticky md:top-8">
           {month.label}
         </h3>
       </div>
@@ -230,7 +224,7 @@ function DaySection({ day }: { day: ChangelogDay }) {
         id={`changelog-${day.date}`}
         dateTime={day.date}
         aria-label={formatFullDate(day.date)}
-        className="font-serif text-[clamp(1.45rem,2vw,1.9rem)] leading-[1.05] tracking-[-0.035em] text-foreground sm:sticky sm:top-8 sm:self-start"
+        className="hito-timeline-day sm:sticky sm:top-8 sm:self-start"
       >
         {formatDayLabel(day.date)}
       </time>
@@ -258,7 +252,7 @@ function HighlightDaySection({ day }: { day: ChangelogHighlightDay }) {
         id={`changelog-highlights-${day.date}`}
         dateTime={day.date}
         aria-label={formatFullDate(day.date)}
-        className="font-serif text-[clamp(1.45rem,2vw,1.9rem)] leading-[1.05] tracking-[-0.035em] text-foreground sm:sticky sm:top-8 sm:self-start"
+        className="hito-timeline-day sm:sticky sm:top-8 sm:self-start"
       >
         {formatDayLabel(day.date)}
       </time>
@@ -283,28 +277,22 @@ function ChangelogEntry({
 
   return (
     <article
-      className={
-        isMilestone
-          ? "rounded-2xl bg-signal/[0.085] px-4 py-4 shadow-[0_18px_70px_color-mix(in_oklch,var(--color-signal)_9%,transparent)] sm:px-5"
-          : "rounded-2xl bg-foreground/[0.035] px-4 py-4 sm:px-5"
-      }
+      className="hito-editorial-backdrop hito-timeline-entry"
       data-entry-kind={presentation.kind}
+      data-tone={isMilestone ? "signal" : "neutral"}
     >
       <div className="flex gap-3">
         <span
           aria-hidden="true"
-          className={
-            isMilestone
-              ? "mt-[0.45rem] h-2.5 w-2.5 shrink-0 rounded-full bg-signal shadow-[0_0_24px_color-mix(in_oklch,var(--color-signal)_65%,transparent)]"
-              : "mt-[0.5rem] h-2 w-2 shrink-0 rounded-full bg-foreground/24"
-          }
+          className="hito-timeline-entry-dot"
+          data-tone={isMilestone ? "signal" : "neutral"}
         />
         <div className="min-w-0">
           {presentation.title ? (
             <h3
               className={
                 isMilestone
-                  ? "hito-panel-title text-[1.15rem] text-foreground"
+                  ? "hito-panel-title text-foreground"
                   : "hito-body-small font-medium text-foreground/86"
               }
             >
@@ -329,34 +317,25 @@ function ChangelogEntry({
 function HighlightEntry({ highlight }: { highlight: ChangelogHighlight }) {
   return (
     <article
-      className={
-        highlight.isFallback
-          ? "rounded-2xl bg-foreground/[0.026] px-4 py-4 sm:px-5"
-          : "rounded-2xl bg-signal/[0.07] px-4 py-4 shadow-[0_18px_70px_color-mix(in_oklch,var(--color-signal)_7%,transparent)] sm:px-5"
-      }
+      className="hito-editorial-backdrop hito-timeline-entry"
       data-highlight-kind={highlight.badge.toLowerCase().replaceAll(" ", "-")}
+      data-tone={highlight.isFallback ? "quiet" : "highlight"}
     >
       <div className="flex gap-3">
         <span
           aria-hidden="true"
-          className={
-            highlight.isFallback
-              ? "mt-[0.5rem] h-2 w-2 shrink-0 rounded-full bg-foreground/20"
-              : "mt-[0.45rem] h-2.5 w-2.5 shrink-0 rounded-full bg-signal shadow-[0_0_24px_color-mix(in_oklch,var(--color-signal)_55%,transparent)]"
-          }
+          className="hito-timeline-entry-dot"
+          data-tone={highlight.isFallback ? "quiet" : "highlight"}
         />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span
-              className={
-                highlight.isFallback
-                  ? "hito-status whitespace-nowrap bg-foreground/[0.05] text-muted-foreground"
-                  : "hito-status whitespace-nowrap bg-signal/[0.13] text-signal"
-              }
+              className="hito-highlight-tag"
+              data-tone={highlight.isFallback ? "neutral" : "signal"}
             >
               {highlight.badge}
             </span>
-            <h3 className="hito-panel-title text-[1.1rem] text-foreground">{highlight.title}</h3>
+            <h3 className="hito-panel-title text-foreground">{highlight.title}</h3>
           </div>
           <p className="hito-body-small mt-2 leading-relaxed text-muted-foreground">
             <InlineMarkdown text={highlight.body} />
@@ -369,7 +348,7 @@ function HighlightEntry({ highlight }: { highlight: ChangelogHighlight }) {
 
 function EmptyChangelogState() {
   return (
-    <section className="rounded-2xl bg-foreground/[0.035] px-5 py-6">
+    <section className="hito-editorial-backdrop hito-timeline-entry" data-tone="neutral">
       <h2 className="hito-panel-title">No shipped changes yet</h2>
       <p className="hito-body-small mt-2 text-muted-foreground">
         This page will fill up once dated product updates start shipping.
@@ -385,10 +364,7 @@ function InlineMarkdown({ text }: { text: string }) {
     <>
       {parts.map((part, index) =>
         part.startsWith("`") && part.endsWith("`") ? (
-          <code
-            key={index}
-            className="rounded bg-foreground/[0.07] px-1.5 py-0.5 font-mono text-[0.9em] text-foreground"
-          >
+          <code key={index} className="hito-inline-code">
             {part.slice(1, -1)}
           </code>
         ) : (

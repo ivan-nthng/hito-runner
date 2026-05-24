@@ -58,7 +58,7 @@ export function AuthEntryScreen({
   return (
     <div className="auth-hero min-h-screen bg-background text-foreground">
       <img src={loginDesertHorizon} alt="" aria-hidden="true" className="auth-hero-image" />
-      <div className="auth-hero-overlay" aria-hidden="true" />
+      <div className="hito-auth-photo-overlay" aria-hidden="true" />
       <div className="auth-hero-content mx-auto flex min-h-screen max-w-5xl items-center px-6 py-12 lg:px-10">
         <section className="grid w-full gap-12 lg:grid-cols-[0.9fr_0.85fr]">
           <div className="flex flex-col justify-center gap-8">
@@ -73,7 +73,7 @@ export function AuthEntryScreen({
             </div>
           </div>
 
-          <div className="auth-hero-card hito-surface-flat p-5 lg:p-6">
+          <div className="hito-auth-alpha-surface hito-surface-flat p-5 lg:p-6">
             {localBypassEnabled ? (
               <div className="hito-tabs hito-tabs-simple">
                 {(

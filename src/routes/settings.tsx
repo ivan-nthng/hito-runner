@@ -244,8 +244,8 @@ function SettingsPage() {
 
         {activeTab === "personal" ? (
           <section className="grid gap-8 lg:grid-cols-[180px_1fr]" role="tabpanel">
-            <div className="space-y-3">
-              <Avatar className="hito-profile-avatar h-28 w-28">
+            <div className="hito-avatar-stack">
+              <Avatar className="hito-avatar-tile hito-profile-avatar h-28 w-28">
                 {settings.avatarUrl ? (
                   <AvatarImage src={settings.avatarUrl} alt="Profile avatar" />
                 ) : null}
@@ -253,16 +253,12 @@ function SettingsPage() {
               </Avatar>
               <button
                 type="button"
-                className="hito-button hito-button-secondary hito-button-sm"
+                className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
                 disabled={isUploadingAvatar}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Icon name="camera" size="sm" />
-                {isUploadingAvatar
-                  ? "Uploading..."
-                  : settings.avatarUrl
-                    ? "Edit avatar"
-                    : "Upload avatar"}
+                <Icon name={settings.avatarUrl ? "edit" : "camera"} size="sm" />
+                {isUploadingAvatar ? "Uploading..." : settings.avatarUrl ? "Edit" : "Upload"}
               </button>
               <input
                 ref={fileInputRef}

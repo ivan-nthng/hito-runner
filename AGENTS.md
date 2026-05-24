@@ -153,6 +153,8 @@ Current project skills:
   Use for browser QA, Safari regression, auth/admin checks, and user-flow validation.
 - `skills/hito-prompt-handoff/SKILL.md`
   Use for next-role prompts, execution handoffs, QA prompts, and checkpoint continuity.
+- `skills/hito-running-coach-audit/SKILL.md`
+  Use for training-plan quality, running doctrine, workout diversity, progression, recovery, terrain/hill logic, metric-target realism, and sports-safety guardrail reviews.
 
 If a task matches one of these skills, load the skill before doing substantial work and follow its workflow
 unless the user gives a stricter instruction.

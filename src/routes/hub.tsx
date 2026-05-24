@@ -70,7 +70,7 @@ function HubPage() {
   return (
     <main className="auth-hero min-h-screen bg-background text-foreground">
       <img src={loginDesertHorizon} alt="" aria-hidden="true" className="auth-hero-image" />
-      <div className="auth-hero-overlay" aria-hidden="true" />
+      <div className="hito-auth-photo-overlay" aria-hidden="true" />
       <div className="auth-hero-content mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-5 py-10 sm:px-8 lg:px-10">
         <header className="mx-auto grid max-w-2xl justify-items-center text-center">
           <HitoLogo className="[--hito-logo-height:1.65rem]" />
@@ -97,7 +97,7 @@ function HubPage() {
 
 function HubDestinationCard({ destination }: { destination: HubDestination }) {
   return (
-    <Link to={destination.to} className="hito-launcher-card">
+    <Link to={destination.to} className="hito-launch-surface">
       <span className="hito-launcher-card-icon" aria-hidden="true">
         <Icon name={destination.icon} size="md" />
       </span>

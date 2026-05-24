@@ -73,7 +73,7 @@ export function AppShell({
   const useFreshHomeRequest = shellSnapshot.mode !== "preview";
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground canvas-grain">
+    <div className="min-h-screen flex bg-background text-foreground hito-canvas-atmosphere">
       <aside className="hidden md:sticky md:top-0 md:flex md:h-screen w-[240px] shrink-0 self-start flex-col border-r border-hairline bg-sidebar/60 backdrop-blur">
         <div className="px-6 pt-7 pb-10">
           <Link to="/" reloadDocument={useFreshHomeRequest} aria-label="Hito home">

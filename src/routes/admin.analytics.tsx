@@ -159,7 +159,7 @@ function AdminAnalyticsPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
   return (
-    <main className="min-h-screen bg-background text-foreground canvas-grain">
+    <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
       <div className="min-h-screen md:flex">
         <aside className="hidden w-[240px] shrink-0 border-r border-hairline bg-sidebar/60 backdrop-blur md:sticky md:top-0 md:flex md:h-screen md:self-start md:flex-col">
           <div className="px-6 pb-10 pt-7">

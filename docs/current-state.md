@@ -39,6 +39,12 @@ Active
 - The local/dev admin fixture is now a single protected owner admin account in `.tanstack/hito-running-local-accounts.json`; the legacy QA admin fixture has been removed from the local bypass file and linked auth user, while tester accounts remain separate and are still rejected by `/admin/login`.
 - The public Hito destination hub is implemented:
   `/hub` renders a standalone desert-background launcher with the Hito logo and full-card links to Hito Running, Admin analytics, Design system, and Changelog; the launcher itself is public and does not own any destination auth behavior.
+- The first full DS coverage rollout slice is implemented:
+  `/changelog` keeps its public editorial timeline design and behavior, but its date typography, title-adjacent text highlight/backdrop treatment, timeline entry cards, glow dots, and inline code chips now use canonical Hito DS classes documented in `/hitoDS#editorial-patterns`.
+- The shared interaction wrapper DS rollout slice is implemented:
+  Radix/shadcn-derived dialog, sheet, dropdown menu, select, progress, card, and sidebar wrappers now default to Hito DS chrome while preserving existing exports, semantics, keyboard behavior, and product call sites; `/hitoDS#shared-wrappers` documents the wrapper boundary.
+- The progress visualization chrome DS rollout slice is implemented:
+  `/progress` keeps the same loader data, aggregate calculations, weekly-volume geometry, and recent-consistency geometry, but its chart section dividers, compact notes, planned/actual fills, and result-status fills now use Hito DS classes documented in `/hitoDS#analytics`.
 - Phase 3 architecture cleanup is now implemented through one canonical persisted richer-plan contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
@@ -328,7 +334,7 @@ Active
 - The Phase 4 frontend cleanup slice has been superseded by the structured first-plan constructor:
   visible no-plan and shell surfaces present structured plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
 - The first Hito design-system implementation slices are now implemented:
-  shared low-card CSS primitives exist for core surfaces, tiered buttons, tiered inputs, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact summary metrics, compact chart legends, compact tooltip shells, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell navigation rows, shell profile triggers, shell dropdown rows, disclosure, and setup/empty/error state surfaces; auth, structured onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, route-level state surfaces, progress summary surfaces, body severity micro-UI, preserved integration utility rows, calendar and workout-structure tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now use those primitives; `/hitoDS` provides an internal simplified product-language reference with dedicated design-system navigation instead of runner-facing shell chrome; and chart bars, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional visualization geometry exceptions.
+  shared low-card CSS primitives exist for core surfaces, tiered buttons, tiered inputs, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact summary metrics, compact chart legends, compact chart notes, comparison-bar chrome, compact tooltip shells, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell navigation rows, shell profile triggers, shell dropdown rows, disclosure, and setup/empty/error state surfaces; auth, structured onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, route-level state surfaces, progress summary surfaces, body severity micro-UI, preserved integration utility rows, calendar and workout-structure tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now use those primitives; `/hitoDS` provides an internal simplified product-language reference with dedicated design-system navigation instead of runner-facing shell chrome; and chart heights/widths, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are documented as intentional visualization geometry exceptions.
 - The full Hito design-system normalization track is now effectively complete from the visible product perspective:
   final Safari QA found no obvious stray custom UI drift in the tested runner-facing scope, `/hitoDS` is the accepted internal reference baseline, and only documented visualization geometry exceptions remain outside the shared Hito component families.
 - The remaining first-pass v2 rendering-truth gaps are now fixed:
@@ -344,7 +350,7 @@ Active
 ## Current Active Stream
 
 Post-normalization stabilization:
-the visible interface is now treated as owned by shared Hito DS primitives and documented shell families, while remaining non-DS geometry stays intentionally constrained to charts, interval widths, SVG silhouettes, and marker coordinates.
+the visible interface is now treated as owned by shared Hito DS primitives, documented shell families, bounded gradient/overlay roles, and compact progress visualization chrome, while remaining non-DS geometry stays intentionally constrained to chart heights/widths, plotted lines, interval widths, SVG silhouettes, and marker coordinates.
 
 ## Next Recommended Steps
 

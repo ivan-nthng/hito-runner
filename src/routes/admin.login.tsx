@@ -38,18 +38,13 @@ function AdminLoginPage() {
   return (
     <main className="auth-hero min-h-screen bg-background text-foreground">
       <img src={loginDesertHorizon} alt="" aria-hidden="true" className="auth-hero-image" />
-      <div className="auth-hero-overlay" aria-hidden="true" />
+      <div className="hito-auth-photo-overlay" aria-hidden="true" />
       <div className="auth-hero-content mx-auto flex min-h-screen max-w-5xl items-center px-6 py-12 lg:px-10">
         <section className="grid w-full gap-12 lg:grid-cols-[0.9fr_0.85fr]">
           <div className="flex flex-col justify-center gap-8">
-            <div>
-              <p className="hito-label text-muted-foreground">Local operations</p>
-              <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-2">
-                <HitoLogo className="[--hito-logo-height:2.35rem] lg:[--hito-logo-height:3.25rem]" />
-                <span className="font-display text-4xl leading-none tracking-tight lg:text-5xl">
-                  Admin
-                </span>
-              </div>
+            <div className="grid justify-items-start gap-3">
+              <HitoLogo className="[--hito-logo-height:2.35rem] lg:[--hito-logo-height:3.25rem]" />
+              <p className="hito-label text-muted-foreground">Admin</p>
             </div>
             <div className="space-y-4">
               <p className="max-w-sm text-lg text-foreground/92">
@@ -62,13 +57,10 @@ function AdminLoginPage() {
             </div>
           </div>
 
-          <div className="auth-hero-card hito-surface-flat p-5 lg:p-6">
+          <div className="hito-auth-alpha-surface hito-surface-flat p-5 lg:p-6">
             <div>
-              <p className="hito-label">Admin sign in</p>
-              <h1 className="hito-modal-title mt-3">Open admin analytics.</h1>
-              <p className="hito-body mt-3 text-muted-foreground">
-                Use the configured local admin username or email.
-              </p>
+              <h1 className="hito-modal-title">Admin sign-in</h1>
+              <p className="hito-body mt-3 text-muted-foreground">Open admin analytics</p>
             </div>
 
             <form method="post" action={formAction} className="mt-6 grid gap-5">

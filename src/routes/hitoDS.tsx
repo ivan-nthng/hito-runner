@@ -2,9 +2,46 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { APP_NAME } from "@/lib/app-config";
+import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { HitoLogo } from "@/components/ui/hito-logo";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconName } from "@/components/ui/icon";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import { cn } from "@/lib/utils";
@@ -25,12 +62,15 @@ export const Route = createFileRoute("/hitoDS")({
 const SECTIONS = [
   { id: "overview", label: "Overview" },
   { id: "brand", label: "Brand" },
+  { id: "editorial-patterns", label: "Editorial" },
+  { id: "gradient-overlays", label: "Gradients" },
   { id: "foundations", label: "Foundations" },
   { id: "typography", label: "Typography" },
   { id: "icons", label: "Icons" },
   { id: "buttons", label: "Buttons" },
   { id: "tabs", label: "Tabs" },
   { id: "data-table", label: "Tables" },
+  { id: "shared-wrappers", label: "Wrappers" },
   { id: "inputs", label: "Inputs" },
   { id: "selection-controls", label: "Selection" },
   { id: "surfaces", label: "Composition" },
@@ -359,7 +399,7 @@ function HitoDesignSystemPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground canvas-grain">
+    <div className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
       <div className="grid min-h-screen lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="border-r border-hairline bg-sidebar/70 px-5 py-6 backdrop-blur lg:sticky lg:top-0 lg:h-screen">
           <div>
@@ -461,6 +501,211 @@ function HitoDesignSystemPage() {
                     label="Variants"
                     title="Keep product labels separate"
                     body="Admin, DS, and other product qualifiers should be rendered as adjacent text, not baked into the SVG."
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section id="editorial-patterns" className="ds-section">
+              <SectionIntro
+                label="Editorial patterns"
+                title="Changelog rhythm, promoted into the system."
+                body="These classes preserve the current public changelog look: compact serif date rails, warm text highlights with backdrop, text with editorial backdrop, glowing timeline dots, and calm inline code chips."
+              />
+
+              <div className="grid gap-8">
+                <div className="grid gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
+                  <div className="grid gap-4 rounded-2xl bg-foreground/[0.025] p-5">
+                    <div className="grid grid-cols-[4.75rem_3.25rem_minmax(0,1fr)] items-baseline gap-4">
+                      <span className="hito-timeline-year">2026</span>
+                      <span className="hito-timeline-month">May</span>
+                      <span className="hito-timeline-day">24</span>
+                    </div>
+                    <p className="hito-body-small text-muted-foreground">
+                      Use year, month, and day roles for sticky editorial timeline rails. Layout and
+                      sticky scope stay with the route.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4">
+                    <article
+                      className="hito-editorial-backdrop hito-timeline-entry"
+                      data-tone="highlight"
+                    >
+                      <div className="flex gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="hito-timeline-entry-dot"
+                          data-tone="highlight"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="hito-highlight-tag" data-tone="signal">
+                              New
+                            </span>
+                            <h3 className="hito-panel-title text-foreground">
+                              Editorial timeline family
+                            </h3>
+                          </div>
+                          <p className="hito-body-small mt-2 leading-relaxed text-muted-foreground">
+                            Timeline entries use a calm backdrop and preserve technical chips like{" "}
+                            <code className="hito-inline-code">hito-inline-code</code> inside
+                            readable release copy.
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article
+                      className="hito-editorial-backdrop hito-timeline-entry"
+                      data-tone="quiet"
+                    >
+                      <div className="flex gap-3">
+                        <span
+                          aria-hidden="true"
+                          className="hito-timeline-entry-dot"
+                          data-tone="quiet"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="hito-highlight-tag" data-tone="neutral">
+                              Cleanup
+                            </span>
+                            <h3 className="hito-panel-title text-foreground">Behind the scenes</h3>
+                          </div>
+                          <p className="hito-body-small mt-2 leading-relaxed text-muted-foreground">
+                            Quiet entries stay legible without turning editorial history into card
+                            soup.
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                <div className="hito-reference-list">
+                  <ReferenceListRow
+                    label="Use"
+                    title="Release history and public editorial chronology"
+                    body="Use these primitives for changelog-style history, milestone readbacks, and route-level editorial timelines."
+                  />
+                  <ReferenceListRow
+                    label="Do not"
+                    title="Do not replace product status pills"
+                    body="Highlight tags are title-adjacent text highlights, not pills. Operational state still belongs to status pills and state surfaces."
+                  />
+                  <ReferenceListRow
+                    label="Scope"
+                    title="Keep grid and sticky mechanics local"
+                    body="The DS owns typography, backdrop, dots, tags, and inline code. Each route owns its own timeline grid, sticky rail scope, and content ordering."
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section id="gradient-overlays" className="ds-section">
+              <SectionIntro
+                label="Gradient and overlay rules"
+                title="Atmosphere is allowed only when it has a job."
+                body="Hito keeps one small gradient and alpha-overlay family for canvas depth, photo readability, launch surfaces, state washes, and editorial signal washes. Ordinary controls stay flat and semantic."
+              />
+
+              <div className="grid gap-8">
+                <div className="grid gap-5 xl:grid-cols-2">
+                  <article className="hito-canvas-atmosphere rounded-2xl border border-hairline bg-background p-5">
+                    <p className="hito-label hito-label-signal">Canvas atmosphere</p>
+                    <h3 className="hito-panel-title mt-3">Route-level depth only.</h3>
+                    <p className="hito-body-small mt-3 text-muted-foreground">
+                      Use <code className="hito-inline-code">hito-canvas-atmosphere</code> for large
+                      app canvases and internal reference pages, not nested cards.
+                    </p>
+                  </article>
+
+                  <article className="auth-hero min-h-[14rem] overflow-hidden rounded-2xl border border-hairline">
+                    <img
+                      src={loginDesertHorizon}
+                      alt=""
+                      aria-hidden="true"
+                      className="auth-hero-image"
+                    />
+                    <div className="hito-auth-photo-overlay" aria-hidden="true" />
+                    <div className="auth-hero-content flex min-h-[14rem] items-end p-5">
+                      <div>
+                        <p className="hito-label hito-label-signal">Auth/photo overlay</p>
+                        <h3 className="hito-panel-title mt-3">Readable copy over atmosphere.</h3>
+                        <p className="hito-body-small mt-3 max-w-sm text-muted-foreground">
+                          Use <code className="hito-inline-code">hito-auth-photo-overlay</code> only
+                          where imagery needs a controlled readability layer.
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article className="hito-launch-surface">
+                    <span className="hito-launcher-card-icon" aria-hidden="true">
+                      <Icon name="sparkles" size="md" />
+                    </span>
+                    <div>
+                      <p className="hito-label hito-label-signal">Elevated launch surface</p>
+                      <h3 className="hito-panel-title mt-3">Destination-scale entry cards.</h3>
+                      <p className="hito-body-small mt-3 text-muted-foreground">
+                        Launcher cards can use alpha elevation and signal icon wash. Standard cards,
+                        menus, and table cells should not inherit this treatment.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article className="hito-surface-wash" data-tone="signal">
+                    <p className="hito-label hito-label-signal">State-surface wash</p>
+                    <h3 className="hito-panel-title mt-3">Setup, empty, or bounded state.</h3>
+                    <p className="hito-body-small mt-3 text-muted-foreground">
+                      Use <code className="hito-inline-code">hito-surface-wash</code> when the whole
+                      surface is communicating a state, not for ordinary content cards.
+                    </p>
+                  </article>
+
+                  <article className="hito-editorial-signal-wash hito-timeline-entry">
+                    <p className="hito-label hito-label-signal">Editorial signal wash</p>
+                    <h3 className="hito-panel-title mt-3">
+                      Changelog-style emphasis without pills.
+                    </h3>
+                    <p className="hito-body-small mt-3 text-muted-foreground">
+                      Editorial signal wash is for release-history and prose emphasis, alongside
+                      text highlights such as{" "}
+                      <span className="hito-highlight-tag" data-tone="signal">
+                        New
+                      </span>
+                      , not operational status.
+                    </p>
+                  </article>
+
+                  <article className="hito-auth-alpha-surface hito-surface-flat rounded-2xl border border-hairline p-5">
+                    <p className="hito-label">Alpha overlay surface</p>
+                    <h3 className="hito-panel-title mt-3">
+                      Translucent only in atmospheric shells.
+                    </h3>
+                    <p className="hito-body-small mt-3 text-muted-foreground">
+                      Alpha surfaces belong on auth/photo or launcher canvases. Use standard solid
+                      Hito surfaces for normal forms, menus, inputs, and tables.
+                    </p>
+                  </article>
+                </div>
+
+                <div className="hito-reference-list">
+                  <ReferenceListRow
+                    label="Allowed"
+                    title="Five roles only"
+                    body="Canvas atmosphere, auth/photo overlay, elevated launch surface, state-surface wash, and editorial signal wash are the allowed gradient/overlay roles."
+                  />
+                  <ReferenceListRow
+                    label="Not default"
+                    title="Do not gradient ordinary controls"
+                    body="Buttons, standard inputs, normal cards, menus, table cells, and shell navigation rows stay semantic and low-chrome unless a future DS slice proves a repeated need."
+                  />
+                  <ReferenceListRow
+                    label="Alpha"
+                    title="Use alpha for atmosphere, not data truth"
+                    body="Alpha overlays are for readability over imagery or editorial atmosphere. Product truth should still be expressed with text, markers, state surfaces, and explicit labels."
                   />
                 </div>
               </div>
@@ -865,8 +1110,8 @@ function HitoDesignSystemPage() {
                   <div className="min-w-0">
                     <p className="hito-label">Enclosed</p>
                     <p className="hito-caption mt-2 max-w-xl">
-                      Rounded bounded container, active soft fill, no underline. Use for stronger
-                      local mode switches without nesting a card inside a card.
+                      Rounded inset rail, darker backing surface, active soft fill, no underline.
+                      Use for stronger local mode switches without nesting a card inside a card.
                     </p>
                   </div>
                   <div className="min-w-0 overflow-x-auto pb-1">
@@ -1068,6 +1313,165 @@ function HitoDesignSystemPage() {
                     label="Static"
                     title="Same type, no affordance"
                     body="Non-sortable columns use the same header typography through hito-data-table-header, but they do not show arrows, menus, hover wash, or click behavior."
+                  />
+                </div>
+              </div>
+            </section>
+
+            <section id="shared-wrappers" className="ds-section">
+              <SectionIntro
+                label="Shared interaction wrappers"
+                title="Radix behavior, Hito defaults."
+                body="The shared ui wrappers keep their existing exports and accessibility semantics, but their default chrome now starts from Hito tokens instead of generic shadcn styling."
+              />
+
+              <div className="grid gap-6">
+                <div className="grid gap-5 xl:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Low-card wrapper</CardTitle>
+                      <CardDescription>
+                        Card defaults stay calm: hairline, low surface, Hito title/body roles.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Progress value={64} aria-label="Shared wrapper progress example" />
+                      <p className="hito-caption mt-3">
+                        Progress uses muted track plus signal fill without becoming a chart system.
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Select and menu chrome</CardTitle>
+                      <CardDescription>
+                        Select and dropdown content share the Hito menu surface and row rhythm.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 sm:grid-cols-2">
+                      <Select defaultValue="easy">
+                        <SelectTrigger aria-label="Workout type">
+                          <SelectValue placeholder="Workout type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="easy">Easy run</SelectItem>
+                          <SelectItem value="long">Long run</SelectItem>
+                          <SelectItem value="quality">Quality</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="hito-button hito-button-secondary hito-button-md">
+                            Open menu
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuLabel>Plan actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>
+                            Download JSON
+                            <DropdownMenuShortcut>Utility</DropdownMenuShortcut>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>Open settings</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Dialog and sheet surfaces</CardTitle>
+                      <CardDescription>
+                        Dialog and sheet wrappers inherit Hito overlay, elevated surface, title,
+                        description, close, and footer defaults.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-wrap gap-3">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button className="hito-button hito-button-primary hito-button-md">
+                            Open dialog
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Shared dialog</DialogTitle>
+                            <DialogDescription>
+                              The primitive owns calm default chrome. Product dialogs can still opt
+                              into their stable bounded anatomy.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter>
+                            <DialogClose className="hito-button hito-button-secondary hito-button-md">
+                              Close
+                            </DialogClose>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Sheet>
+                        <SheetTrigger asChild>
+                          <button className="hito-button hito-button-secondary hito-button-md">
+                            Open sheet
+                          </button>
+                        </SheetTrigger>
+                        <SheetContent>
+                          <SheetHeader>
+                            <SheetTitle>Shared sheet</SheetTitle>
+                            <SheetDescription>
+                              Sheets use the same Hito overlay and elevated surface language without
+                              becoming another product shell.
+                            </SheetDescription>
+                          </SheetHeader>
+                        </SheetContent>
+                      </Sheet>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Sidebar ownership</CardTitle>
+                      <CardDescription>
+                        Sidebar wrappers keep layout behavior, while rows inherit Hito shell/menu
+                        text and low-chrome active states.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="hito-ui-sidebar-panel rounded-xl border p-3">
+                        <div className="grid gap-1">
+                          <div
+                            className="hito-ui-sidebar-row rounded-md px-2 py-2"
+                            data-active="true"
+                          >
+                            Overview
+                          </div>
+                          <div className="hito-ui-sidebar-row rounded-md px-2 py-2">Feedback</div>
+                          <div className="hito-ui-sidebar-row rounded-md px-2 py-2">
+                            Test accounts
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="hito-reference-list">
+                  <ReferenceListRow
+                    label="Behavior"
+                    title="Semantics stay with Radix"
+                    body="Dialog, sheet, dropdown, select, progress, card, and sidebar exports remain stable. Keyboard, focus, portal, and controlled/uncontrolled behavior are unchanged."
+                  />
+                  <ReferenceListRow
+                    label="Defaults"
+                    title="Hito starts the visual contract"
+                    body="Wrapper defaults now use Hito surfaces, menu rows, field focus, signal progress, and calm overlay tokens before product-specific classes are added."
+                  />
+                  <ReferenceListRow
+                    label="Boundary"
+                    title="No decorative gradients for controls"
+                    body="These wrappers are ordinary interaction primitives. They should not inherit launcher/editorial gradient rules by default."
                   />
                 </div>
               </div>
@@ -1304,153 +1708,219 @@ function HitoDesignSystemPage() {
 
                   <div className="border-t border-hairline pt-5">
                     <div className="mb-4">
-                      <p className="hito-label">Editable value chip</p>
+                      <p className="hito-label">Avatar tile action</p>
                       <p className="hito-caption mt-2 max-w-2xl">
-                        Compact scalar facts use editable value chips, not full form cards or normal
-                        text rows. Use for profile or settings values such as age, height, or
-                        weight; avoid for long text and multi-step choices.
+                        Settings avatar controls use one rectangular tile and a same-width action.
+                        Keep copy short: Upload for empty avatars, Edit when an image exists.
                       </p>
                     </div>
-                    <div className="hito-reference-list">
+                    <div className="hito-reference-list mb-5">
                       <article className="hito-reference-row">
                         <div>
-                          <p className="hito-list-row-title">Empty chip</p>
+                          <p className="hito-list-row-title">Empty avatar</p>
                           <p className="hito-caption mt-2">
-                            Borderless by default, with a clear hover/focus backdrop.
+                            The action spans the tile width and keeps the camera affordance.
                           </p>
                         </div>
-                        <div className="hito-editable-value-chip-group">
+                        <div className="hito-avatar-stack">
+                          <span className="hito-avatar-tile hito-profile-avatar h-28 w-28">
+                            <span className="hito-profile-avatar-fallback">IR</span>
+                          </span>
                           <button
                             type="button"
-                            className="hito-editable-value-chip"
-                            data-state="empty"
+                            className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
                           >
-                            <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
-                            <span className="hito-editable-value-chip-content">Age</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="hito-editable-value-chip"
-                            data-state="empty"
-                          >
-                            <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
-                            <span className="hito-editable-value-chip-content">Height</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="hito-editable-value-chip"
-                            data-state="empty"
-                          >
-                            <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
-                            <span className="hito-editable-value-chip-content">Weight</span>
+                            <Icon name="camera" size="sm" />
+                            Upload
                           </button>
                         </div>
                       </article>
                       <article className="hito-reference-row">
                         <div>
-                          <p className="hito-list-row-title">Editing chip</p>
+                          <p className="hito-list-row-title">Existing avatar</p>
                           <p className="hito-caption mt-2">
-                            The input is wider than the chip, stays the same height, and focuses in
-                            place. Click-away discards unsaved text; only check commits.
+                            Edit is a separate product label, not hidden inside avatar hover chrome.
                           </p>
                         </div>
-                        <div className="hito-editable-value-chip-frame" data-state="editing">
-                          <div className="hito-editable-value-chip-input-shell">
-                            <input
-                              id="ds-editable-weight"
-                              value="72"
-                              readOnly
-                              className="hito-editable-value-chip-input"
-                              aria-label="Weight"
-                            />
+                        <div className="hito-avatar-stack">
+                          <span className="hito-avatar-tile hito-profile-avatar h-28 w-28">
+                            <span className="grid h-full w-full place-items-center bg-[var(--stone-800)] text-signal">
+                              <Icon name="user" size="lg" />
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
+                          >
+                            <Icon name="edit" size="sm" />
+                            Edit
+                          </button>
+                        </div>
+                      </article>
+                    </div>
+
+                    <div className="border-t border-hairline pt-5">
+                      <div className="mb-4">
+                        <p className="hito-label">Editable value chip</p>
+                        <p className="hito-caption mt-2 max-w-2xl">
+                          Compact scalar facts use editable value chips, not full form cards or
+                          normal text rows. Use for profile or settings values such as age, height,
+                          or weight; avoid for long text and multi-step choices.
+                        </p>
+                      </div>
+                      <div className="hito-reference-list">
+                        <article className="hito-reference-row">
+                          <div>
+                            <p className="hito-list-row-title">Empty chip</p>
+                            <p className="hito-caption mt-2">
+                              Borderless by default, with a clear hover/focus backdrop.
+                            </p>
+                          </div>
+                          <div className="hito-editable-value-chip-group">
                             <button
                               type="button"
-                              className="hito-editable-value-chip-clear"
-                              aria-label="Clear weight"
+                              className="hito-editable-value-chip"
+                              data-state="empty"
                             >
-                              <Icon name="close" size="xs" />
+                              <Icon
+                                name="plus"
+                                size="sm"
+                                className="hito-editable-value-chip-icon"
+                              />
+                              <span className="hito-editable-value-chip-content">Age</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="hito-editable-value-chip"
+                              data-state="empty"
+                            >
+                              <Icon
+                                name="plus"
+                                size="sm"
+                                className="hito-editable-value-chip-icon"
+                              />
+                              <span className="hito-editable-value-chip-content">Height</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="hito-editable-value-chip"
+                              data-state="empty"
+                            >
+                              <Icon
+                                name="plus"
+                                size="sm"
+                                className="hito-editable-value-chip-icon"
+                              />
+                              <span className="hito-editable-value-chip-content">Weight</span>
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            className="hito-editable-value-chip-action"
-                            data-action="save"
-                            aria-label="Save weight"
-                          >
-                            <Icon name="check" size="sm" />
-                          </button>
-                        </div>
-                      </article>
-                      <article className="hito-reference-row">
-                        <div>
-                          <p className="hito-list-row-title">Invalid or empty edit</p>
-                          <p className="hito-caption mt-2">
-                            Until the value is valid, the external control stays as dismiss/cancel
-                            and does not save profile truth.
-                          </p>
-                        </div>
-                        <div className="hito-editable-value-chip-frame" data-state="editing">
-                          <div className="hito-editable-value-chip-input-shell">
-                            <input
-                              id="ds-editable-empty-age"
-                              value=""
-                              readOnly
-                              className="hito-editable-value-chip-input"
-                              aria-label="Age"
-                              placeholder="34"
-                            />
+                        </article>
+                        <article className="hito-reference-row">
+                          <div>
+                            <p className="hito-list-row-title">Editing chip</p>
+                            <p className="hito-caption mt-2">
+                              The input is wider than the chip, stays the same height, and focuses
+                              in place. Click-away discards unsaved text; only check commits.
+                            </p>
                           </div>
-                          <button
-                            type="button"
-                            className="hito-editable-value-chip-action"
-                            data-action="cancel"
-                            aria-label="Cancel age edit"
-                          >
-                            <Icon name="close" size="sm" />
-                          </button>
-                        </div>
-                      </article>
-                      <article className="hito-reference-row">
-                        <div>
-                          <p className="hito-list-row-title">Saved chip</p>
-                          <p className="hito-caption mt-2">
-                            Compact uppercase label plus value. Pencil stays subtle and appears on
-                            hover/focus.
-                          </p>
-                        </div>
-                        <div className="hito-editable-value-chip-group">
-                          <button
-                            type="button"
-                            className="hito-editable-value-chip"
-                            data-state="saved"
-                          >
-                            <span className="hito-editable-value-chip-content">
-                              <span className="hito-editable-value-chip-label">Age</span>
-                              <span className="hito-editable-value-chip-text">36</span>
-                            </span>
-                            <Icon
-                              name="edit"
-                              size="sm"
-                              className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            className="hito-editable-value-chip"
-                            data-state="saved"
-                          >
-                            <span className="hito-editable-value-chip-content">
-                              <span className="hito-editable-value-chip-label">Weight</span>
-                              <span className="hito-editable-value-chip-text">72 kg</span>
-                            </span>
-                            <Icon
-                              name="edit"
-                              size="sm"
-                              className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
-                            />
-                          </button>
-                        </div>
-                      </article>
+                          <div className="hito-editable-value-chip-frame" data-state="editing">
+                            <div className="hito-editable-value-chip-input-shell">
+                              <input
+                                id="ds-editable-weight"
+                                value="72"
+                                readOnly
+                                className="hito-editable-value-chip-input"
+                                aria-label="Weight"
+                              />
+                              <button
+                                type="button"
+                                className="hito-editable-value-chip-clear"
+                                aria-label="Clear weight"
+                              >
+                                <Icon name="close" size="xs" />
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              className="hito-editable-value-chip-action"
+                              data-action="save"
+                              aria-label="Save weight"
+                            >
+                              <Icon name="check" size="sm" />
+                            </button>
+                          </div>
+                        </article>
+                        <article className="hito-reference-row">
+                          <div>
+                            <p className="hito-list-row-title">Invalid or empty edit</p>
+                            <p className="hito-caption mt-2">
+                              Until the value is valid, the external control stays as dismiss/cancel
+                              and does not save profile truth.
+                            </p>
+                          </div>
+                          <div className="hito-editable-value-chip-frame" data-state="editing">
+                            <div className="hito-editable-value-chip-input-shell">
+                              <input
+                                id="ds-editable-empty-age"
+                                value=""
+                                readOnly
+                                className="hito-editable-value-chip-input"
+                                aria-label="Age"
+                                placeholder="34"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className="hito-editable-value-chip-action"
+                              data-action="cancel"
+                              aria-label="Cancel age edit"
+                            >
+                              <Icon name="close" size="sm" />
+                            </button>
+                          </div>
+                        </article>
+                        <article className="hito-reference-row">
+                          <div>
+                            <p className="hito-list-row-title">Saved chip</p>
+                            <p className="hito-caption mt-2">
+                              Compact uppercase label plus value. Pencil stays subtle and appears on
+                              hover/focus.
+                            </p>
+                          </div>
+                          <div className="hito-editable-value-chip-group">
+                            <button
+                              type="button"
+                              className="hito-editable-value-chip"
+                              data-state="saved"
+                            >
+                              <span className="hito-editable-value-chip-content">
+                                <span className="hito-editable-value-chip-label">Age</span>
+                                <span className="hito-editable-value-chip-text">36</span>
+                              </span>
+                              <Icon
+                                name="edit"
+                                size="sm"
+                                className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              className="hito-editable-value-chip"
+                              data-state="saved"
+                            >
+                              <span className="hito-editable-value-chip-content">
+                                <span className="hito-editable-value-chip-label">Weight</span>
+                                <span className="hito-editable-value-chip-text">72 kg</span>
+                              </span>
+                              <Icon
+                                name="edit"
+                                size="sm"
+                                className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
+                              />
+                            </button>
+                          </div>
+                        </article>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2202,14 +2672,69 @@ function HitoDesignSystemPage() {
                   <LegendDemoItem tone="completed" label="Done" />
                 </div>
               </div>
+              <div className="hito-chart-section mt-5">
+                <p className="hito-label">Visualization chrome</p>
+                <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div>
+                    <p className="hito-list-row-title">Planned vs actual bars</p>
+                    <p className="hito-list-row-copy mt-1">
+                      DS owns the fill tones and compact notes. Height and scale remain local chart
+                      geometry.
+                    </p>
+                    <div className="mt-4 flex h-24 items-end gap-2" aria-hidden="true">
+                      {[0.72, 0.58, 0.88, 0.46].map((height, index) => (
+                        <div key={height} className="flex flex-1 items-end gap-px">
+                          <span
+                            className="hito-comparison-bar flex-1"
+                            data-tone="actual"
+                            style={{ height: `${height * 100}%` }}
+                          />
+                          <span
+                            className="hito-comparison-bar flex-1"
+                            data-tone={index === 3 ? "future" : "planned"}
+                            style={{ height: `${Math.max(0.3, height - 0.12) * 100}%` }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex justify-between">
+                      <span className="hito-chart-note">Wk 1</span>
+                      <span className="hito-chart-note">Wk 4</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="hito-list-row-title">Result status strip</p>
+                    <p className="hito-list-row-copy mt-1">
+                      Status fills use the same completed, partial, skipped tone rules as legends.
+                    </p>
+                    <div className="mt-4 flex gap-2" aria-hidden="true">
+                      <span
+                        className="hito-comparison-bar h-16 flex-1"
+                        data-status="completed"
+                        style={{ "--hito-comparison-bar-color": "var(--easy)" } as CSSProperties}
+                      />
+                      <span className="hito-comparison-bar h-16 flex-1" data-status="partial" />
+                      <span className="hito-comparison-bar h-16 flex-1" data-status="skipped" />
+                      <span className="hito-comparison-bar h-16 flex-1" data-status="planned" />
+                    </div>
+                    <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                      {["Done", "Partial", "Skipped", "Quiet"].map((label) => (
+                        <span key={label} className="hito-chart-note">
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="hito-row-group mt-5">
                 <div className="hito-list-row items-start">
                   <div>
                     <p className="hito-label">Allowed geometry exceptions</p>
                     <p className="hito-list-row-copy">
-                      Bars, plotted lines, interval block widths, SVG silhouettes, and marker
-                      coordinates remain visualization geometry. Their labels, captions, legends,
-                      rows, and tooltips use Hito primitives.
+                      Bar height/width, plotted lines, interval block widths, SVG silhouettes, and
+                      marker coordinates remain visualization geometry. Bar chrome, labels,
+                      captions, legends, rows, and tooltips use Hito primitives.
                     </p>
                   </div>
                   <span className="hito-caption">Exception</span>

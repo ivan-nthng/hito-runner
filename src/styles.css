@@ -388,14 +388,22 @@
     vector-effect: non-scaling-stroke;
   }
 
-  .hito-logo {
+  .hito-logo,
+  .hito-logo-mark {
     --hito-logo-height: 1.6rem;
-    --hito-logo-width: calc(var(--hito-logo-height) * 1.95);
     display: inline-block;
     width: var(--hito-logo-width);
     height: var(--hito-logo-height);
     flex: 0 0 auto;
     color: currentColor;
+  }
+
+  .hito-logo {
+    --hito-logo-width: calc(var(--hito-logo-height) * 2.05);
+  }
+
+  .hito-logo-mark {
+    --hito-logo-width: calc(var(--hito-logo-height) * 1.0167);
   }
 
   .hito-surface {
@@ -449,6 +457,176 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 0.75rem;
+  }
+
+  .hito-specimen {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .hito-specimen-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .hito-specimen-grid {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .hito-specimen-preview,
+  .hito-specimen-controls,
+  .hito-specimen-contract {
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-background) 42%, transparent);
+  }
+
+  .hito-specimen-preview {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+    min-width: 0;
+    padding: 1.25rem;
+  }
+
+  .hito-specimen-controls {
+    align-self: start;
+    overflow: hidden;
+  }
+
+  .hito-specimen-contract {
+    overflow: hidden;
+  }
+
+  .hito-specimen-contract-row {
+    display: grid;
+    gap: 0.35rem;
+    border-top: 1px solid var(--color-hairline);
+    padding: 0.875rem 1rem;
+  }
+
+  .hito-specimen-contract-row:first-child {
+    border-top: 0;
+  }
+
+  .hito-specimen-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .hito-specimen-link {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--color-hairline);
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--color-foreground) 5%, transparent);
+    padding: 0.3rem 0.55rem;
+    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .hito-specimen-link:hover,
+  .hito-specimen-link:focus-visible {
+    border-color: color-mix(in oklch, var(--color-signal) 34%, transparent);
+    background: color-mix(in oklch, var(--color-signal) 10%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-specimen-link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
+  }
+
+  @media (min-width: 1024px) {
+    .hito-specimen-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+      align-items: start;
+    }
+  }
+
+  .hito-ds-sidebar-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    border-radius: var(--radius-md);
+    padding: 0.5rem 0.75rem;
+    color: color-mix(in oklch, var(--color-sidebar-foreground) 68%, transparent);
+    transition:
+      background-color 180ms ease,
+      color 180ms ease,
+      transform 180ms ease;
+  }
+
+  .hito-ds-sidebar-link:hover,
+  .hito-ds-sidebar-link:focus-visible,
+  .hito-ds-sidebar-link[data-active="true"] {
+    background: color-mix(in oklch, var(--color-sidebar-foreground) 8%, transparent);
+    color: var(--color-sidebar-foreground);
+  }
+
+  .hito-ds-sidebar-link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 20%, transparent);
+  }
+
+  .hito-ds-sidebar-link[data-active="true"] {
+    transform: translateX(0.125rem);
+  }
+
+  .hito-ds-sidebar-link-marker {
+    width: 0.375rem;
+    height: 0.375rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--color-sidebar-foreground) 18%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-signal) 0%, transparent);
+    transition:
+      background-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
+  }
+
+  .hito-ds-sidebar-link[data-active="true"] .hito-ds-sidebar-link-marker {
+    background: var(--color-signal);
+    box-shadow: 0 0 0 0.25rem color-mix(in oklch, var(--color-signal) 14%, transparent);
+    transform: scale(1.08);
+  }
+
+  .hito-ds-sidebar-child-link {
+    display: flex;
+    border-radius: var(--radius-md);
+    padding: 0.35rem 0.75rem 0.35rem 1.5rem;
+    color: color-mix(in oklch, var(--color-sidebar-foreground) 58%, transparent);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .hito-ds-sidebar-child-link:hover,
+  .hito-ds-sidebar-child-link:focus-visible,
+  .hito-ds-sidebar-child-link[data-active="true"] {
+    background: color-mix(in oklch, var(--color-sidebar-foreground) 6%, transparent);
+    color: var(--color-sidebar-foreground);
+  }
+
+  .hito-ds-sidebar-child-link[data-active="true"] {
+    transform: translateX(0.125rem);
   }
 
   .hito-ui-overlay {
@@ -739,6 +917,103 @@
     color: var(--color-muted-foreground);
   }
 
+  .hito-window {
+    display: grid;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-background) 94%, transparent);
+    color: var(--color-foreground);
+    box-shadow:
+      0 28px 86px color-mix(in oklch, black 40%, transparent),
+      inset 0 1px 0 color-mix(in oklch, var(--color-foreground) 7%, transparent);
+    backdrop-filter: blur(18px);
+  }
+
+  .hito-window-content-fit {
+    grid-template-rows: auto auto auto;
+  }
+
+  .hito-window-scroll-fill {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .hito-window-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid var(--color-hairline);
+    text-align: left;
+  }
+
+  .hito-window-header-compact {
+    padding: 1rem 1.25rem;
+  }
+
+  .hito-window-header-large {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .hito-window-close {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    color: var(--color-muted-foreground);
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .hito-window-close:hover {
+    border-color: var(--color-hairline);
+    background: color-mix(in oklch, var(--color-foreground) 6%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-window-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 20%, transparent);
+  }
+
+  .hito-window-body {
+    min-height: 0;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .hito-window-body-scroll {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .hito-window-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-hairline);
+    padding: 1rem 1.5rem;
+  }
+
+  .hito-window-footer-actions {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+
+  .hito-window-footer-note {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--color-muted-foreground);
+  }
+
   @media (min-width: 640px) {
     .hito-product-dialog-footer-row {
       flex-direction: row;
@@ -748,6 +1023,21 @@
 
     .hito-product-dialog-footer-row[data-align="split"] {
       justify-content: space-between;
+    }
+
+    .hito-window-footer {
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .hito-window-footer[data-variant="note-actions"] {
+      justify-content: space-between;
+    }
+
+    .hito-window-footer-actions {
+      flex-direction: row;
+      justify-content: flex-end;
     }
   }
 
@@ -1785,7 +2075,8 @@
       box-shadow 160ms ease;
   }
 
-  .hito-button:hover {
+  .hito-button:hover,
+  .hito-button[data-demo-state="hover"] {
     transform: translateY(-1px);
   }
 
@@ -1793,7 +2084,8 @@
     transform: translateY(0);
   }
 
-  .hito-button:focus-visible {
+  .hito-button:focus-visible,
+  .hito-button[data-demo-state="focus"] {
     outline: none;
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 24%, transparent);
   }
@@ -2224,7 +2516,7 @@
   }
 
   .hito-checkbox {
-    border-radius: calc(var(--radius-sm) + 1px);
+    border-radius: 0.25rem;
   }
 
   .hito-radio {
@@ -2238,11 +2530,19 @@
     margin-top: 0.0625rem;
   }
 
+  .hito-checkbox-sm {
+    border-radius: 0.25rem;
+  }
+
   .hito-checkbox-md,
   .hito-radio-md {
     width: 1.25rem;
     height: 1.25rem;
     margin-top: 0.125rem;
+  }
+
+  .hito-checkbox-md {
+    border-radius: 0.3125rem;
   }
 
   .hito-checkbox:hover:not(:disabled),
@@ -2402,14 +2702,51 @@
       opacity 160ms ease;
   }
 
+  .hito-choice-toggle-xs {
+    min-height: 1.75rem;
+    border-radius: var(--radius-sm);
+    padding: 0 0.5rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.01em;
+  }
+
   .hito-choice-toggle-sm {
     min-height: 2rem;
+    border-radius: var(--radius-md);
     padding: 0 0.75rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.01em;
   }
 
   .hito-choice-toggle-md {
     min-height: 2.5rem;
+    border-radius: var(--radius-md);
+    padding: 0 0.875rem;
+    font-size: 0.875rem;
+  }
+
+  .hito-choice-toggle-lg {
+    min-height: 2.75rem;
+    border-radius: var(--radius-md);
     padding: 0 1rem;
+    font-size: 0.875rem;
+  }
+
+  .hito-choice-toggle-xl {
+    min-height: 3.25rem;
+    border-radius: var(--radius-md);
+    padding: 0 1.25rem;
+    font-size: 0.9375rem;
+  }
+
+  .hito-choice-toggle-accent {
+    min-height: 4rem;
+    align-items: flex-start;
+    border-radius: var(--radius-xl);
+    padding: 1rem 1.125rem;
+    font-size: 0.9375rem;
+    line-height: 1.25;
+    white-space: normal;
   }
 
   .hito-choice-toggle:hover,
@@ -3256,6 +3593,10 @@
 
   .hito-status-marker[data-tone="success"] {
     color: var(--color-success);
+  }
+
+  .hito-status-marker[data-tone="signal"] {
+    color: var(--color-signal);
   }
 
   .hito-status-marker[data-tone="warning"] {

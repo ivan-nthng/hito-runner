@@ -11,23 +11,30 @@ Verify Hito behavior with real browser evidence and honest coverage.
 
 ## Browser Policy
 
-- Prefer the built-in app/browser testing environment when it can cover the task.
-- QA browser verification must use Computer Use in Safari when Safari QA is required.
-- Reuse the existing Safari session when practical.
-- Prefer navigating the current tab or opening a new tab, not opening new browser windows.
+- Use the built-in Codex app/browser testing environment first whenever it can cover the task.
+- Treat Safari as a fallback path unless the task explicitly requires Safari-specific verification.
+- Use Computer Use with Safari only when Safari QA is required or the built-in browser cannot cover the task.
+- Reuse the existing Safari session whenever practical.
+- Prefer navigating the current Safari tab; if a separate state is needed, open a new tab in the same Safari window.
+- Do not open multiple Safari windows for QA.
+- Opening a new Safari window is prohibited unless the test explicitly requires multiple windows; if used, state why in the QA report.
 - Do not use private/incognito windows unless a clean unauthenticated session is required.
 - Preserve useful logged-in Safari sessions.
 - Chrome is only a last-resort fallback; report why Safari was blocked.
+- Every QA report must include a `Browser Path Preflight` line that states whether the built-in Codex app/browser was used first. If it was not used first, the report must give the concrete reason.
+- If Safari is used, the report must state whether Safari was required by the task or used because the built-in browser was blocked.
+- A report that skips the built-in browser without explanation, uses Safari first without justification, or opens extra Safari windows without a stated test requirement is invalid and must be redone.
 
 ## Workflow
 
 1. Read the active plan, implementation summary, and QA expectations.
-2. Identify the smallest end-to-end scope that proves the change.
-3. Test admin/auth blocking separately from happy path when relevant.
-4. Verify data outcomes for any mutation.
-5. Source-verify any branch that cannot be safely exercised.
-6. Report exact failures with repro steps.
-7. End with a verdict.
+2. Write the browser path preflight before opening or navigating any external browser.
+3. Identify the smallest end-to-end scope that proves the change.
+4. Test admin/auth blocking separately from happy path when relevant.
+5. Verify data outcomes for any mutation.
+6. Source-verify any branch that cannot be safely exercised.
+7. Report exact failures with repro steps.
+8. End with a verdict.
 
 ## Hito-Specific Checks
 
@@ -41,11 +48,12 @@ Verify Hito behavior with real browser evidence and honest coverage.
 
 1. Task
 2. Stage
-3. Scope tested
-4. Results
-5. Issues found
-6. Coverage gaps
-7. Verdict
+3. Browser Path Preflight
+4. Scope tested
+5. Results
+6. Issues found
+7. Coverage gaps
+8. Verdict
 
 Verdict must be exactly:
 

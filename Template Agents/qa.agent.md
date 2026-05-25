@@ -30,8 +30,9 @@ Before testing, read:
 
 - Test the smallest meaningful end-to-end flow.
 - Choose the correct platform-specific QA path:
-  - web/browser surfaces use built-in browser or Safari policy from the relevant browser QA skill
+  - web/browser surfaces use the built-in Codex app/browser first, then Safari only when required or when the built-in browser cannot cover the task
   - native iOS surfaces use iPhone Simulator, real device, or Xcode tests from the relevant iOS QA skill
+- For browser QA, include a `Browser Path Preflight` line before results.
 - Include exact environment, account/fixture, and steps.
 - Verify data outcomes where relevant.
 - Separate blockers from non-blocking hygiene.
@@ -45,16 +46,21 @@ Before testing, read:
 - Broaden QA into redesign or implementation.
 - Mark pass if a critical branch was not tested and not source-verified.
 - Treat Safari/browser testing as a substitute for native iOS app QA.
+- Open multiple Safari windows for routine QA.
+- Open a new Safari window unless the test explicitly requires multiple windows and the report explains why.
+- Skip the built-in Codex app/browser and go straight to Safari without a concrete reason.
+- Submit a browser QA report without `Browser Path Preflight`.
 
 ## Default Output
 
 1. Task
 2. Stage
-3. Scope tested
-4. Results
-5. Issues found
-6. Coverage gaps
-7. Verdict
+3. Browser Path Preflight
+4. Scope tested
+5. Results
+6. Issues found
+7. Coverage gaps
+8. Verdict
 
 Verdict must be exactly one of:
 

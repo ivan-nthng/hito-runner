@@ -222,14 +222,21 @@ Completion gate:
 
 ## 6.5) QA Browser Policy
 
-- Prefer the built-in app/browser testing environment for browser verification whenever it can cover the task.
-- QA browser verification must use Computer Use in Safari.
-- When Safari is required, reuse the existing Safari session when practical.
-- Do not open many Safari windows for QA. Prefer navigating the current tab or opening a small number of new tabs.
+- QA must use the built-in Codex app/browser testing environment first whenever it can cover the task.
+- Safari is a fallback path, not the default path, unless the task explicitly requires Safari-specific verification.
+- When Safari is required, use Computer Use with Safari and reuse the existing Safari session whenever practical.
+- Do not open multiple Safari windows for QA.
+- Prefer navigating the current Safari tab; if a separate state is needed, open a new tab in the same Safari window.
+- Opening a new Safari window is prohibited unless the test explicitly requires multiple windows; if used, state why in the QA report.
 - Do not use private/incognito windows for routine QA unless the test specifically requires a clean unauthenticated session.
 - Preserve useful logged-in Safari sessions when possible so repeat QA passes do not require unnecessary username/password entry.
 - Chrome must not be used for QA browser testing except as a last-resort fallback when Safari is genuinely blocked.
 - Any Chrome fallback must be stated explicitly in the QA report with the reason Safari could not be used.
+- Every QA browser report must include a `Browser Path Preflight` line stating:
+  - whether the built-in Codex app/browser was used first
+  - if not, the concrete reason it could not cover the task
+  - whether Safari was used as fallback or because Safari-specific verification was explicitly required
+- A QA browser report that skips this preflight, uses Safari first without justification, or opens extra Safari windows without a stated test requirement is invalid and must be redone.
 
 ## 7) Handoff Footer (Conditional)
 

@@ -23,7 +23,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { HitoLogo } from "@/components/ui/hito-logo";
+import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconName } from "@/components/ui/icon";
 import { Progress } from "@/components/ui/progress";
@@ -59,29 +59,62 @@ export const Route = createFileRoute("/hitoDS")({
   component: HitoDesignSystemPage,
 });
 
-const SECTIONS = [
-  { id: "overview", label: "Overview" },
-  { id: "brand", label: "Brand" },
-  { id: "editorial-patterns", label: "Editorial" },
-  { id: "gradient-overlays", label: "Gradients" },
-  { id: "foundations", label: "Foundations" },
-  { id: "typography", label: "Typography" },
-  { id: "icons", label: "Icons" },
-  { id: "buttons", label: "Buttons" },
-  { id: "tabs", label: "Tabs" },
-  { id: "data-table", label: "Tables" },
-  { id: "shared-wrappers", label: "Wrappers" },
-  { id: "inputs", label: "Inputs" },
-  { id: "selection-controls", label: "Selection" },
-  { id: "surfaces", label: "Composition" },
-  { id: "modals", label: "Modals" },
-  { id: "async-actions", label: "Async toasts" },
-  { id: "states", label: "States" },
-  { id: "analytics", label: "Summary truth" },
-  { id: "rows", label: "Rows & disclosure" },
-  { id: "shell", label: "Shell nav" },
-  { id: "dropdowns", label: "Dropdowns" },
+const NAV_GROUPS = [
+  {
+    id: "overview-group",
+    label: "Overview",
+    sections: [{ id: "overview", label: "Start here" }],
+  },
+  {
+    id: "foundations-group",
+    label: "Foundations",
+    sections: [
+      { id: "brand", label: "Brand" },
+      { id: "foundations", label: "Tokens" },
+      { id: "typography", label: "Typography" },
+      { id: "gradient-overlays", label: "Gradients" },
+      { id: "icons", label: "Icons" },
+    ],
+  },
+  {
+    id: "components-group",
+    label: "Components",
+    sections: [
+      { id: "buttons", label: "Buttons" },
+      { id: "inputs", label: "Inputs" },
+      { id: "tabs", label: "Tabs" },
+      { id: "status", label: "Status" },
+      { id: "selection-controls", label: "Selection" },
+      { id: "modals", label: "Modals" },
+      { id: "dropdowns", label: "Dropdowns" },
+      { id: "shared-wrappers", label: "Wrappers" },
+    ],
+  },
+  {
+    id: "patterns-group",
+    label: "Patterns",
+    sections: [
+      { id: "editorial-patterns", label: "Editorial" },
+      { id: "data-table", label: "Tables" },
+      { id: "surfaces", label: "Composition" },
+      { id: "async-actions", label: "Async toasts" },
+      { id: "states", label: "States" },
+      { id: "analytics", label: "Summary truth" },
+      { id: "rows", label: "Rows" },
+      { id: "shell", label: "Shell nav" },
+    ],
+  },
+  {
+    id: "backlog-group",
+    label: "Backlog",
+    sections: [{ id: "backlog", label: "Known gaps" }],
+  },
 ] as const;
+
+const SECTIONS = NAV_GROUPS.flatMap((group) => group.sections);
+
+type NavGroupId = (typeof NAV_GROUPS)[number]["id"];
+type SectionId = (typeof SECTIONS)[number]["id"];
 
 const BUTTON_VARIANTS = ["primary", "secondary", "outlined", "ghost"] as const;
 const BUTTON_TONES = ["default", "success", "error"] as const;
@@ -90,6 +123,14 @@ const INPUT_VARIANTS = ["primary", "secondary"] as const;
 const FIELD_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
 const INPUT_STATES = ["default", "hover", "focus", "disabled", "readonly"] as const;
 const INPUT_FEEDBACK = ["neutral", "error", "success"] as const;
+const CHOICE_TOGGLE_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
+const SELECTION_CONTROL_KINDS = ["checkbox", "radio", "toggle"] as const;
+const SELECTION_BINARY_SIZES = ["sm", "md"] as const;
+const MODAL_BODY_MODES = ["content-fit", "scroll-fill"] as const;
+const MODAL_HEADER_MODES = ["compact", "large"] as const;
+const MODAL_FOOTER_MODES = ["none", "actions", "note-actions"] as const;
+const TAB_STYLES = ["simple", "enclosed"] as const;
+const STATUS_TONES = ["neutral", "signal", "success", "warning", "destructive"] as const;
 const STATUS_MARKER_EXAMPLES = [
   { label: "Completed", tone: "success", icon: "check" },
   { label: "Partial", tone: "warning", icon: "minus" },
@@ -204,6 +245,14 @@ type ButtonSize = (typeof BUTTON_SIZES)[number];
 type InputVariant = (typeof INPUT_VARIANTS)[number];
 type InputState = (typeof INPUT_STATES)[number];
 type InputFeedback = (typeof INPUT_FEEDBACK)[number];
+type ChoiceToggleSize = (typeof CHOICE_TOGGLE_SIZES)[number];
+type SelectionControlKind = (typeof SELECTION_CONTROL_KINDS)[number];
+type SelectionBinarySize = (typeof SELECTION_BINARY_SIZES)[number];
+type ModalBodyMode = (typeof MODAL_BODY_MODES)[number];
+type ModalHeaderMode = (typeof MODAL_HEADER_MODES)[number];
+type ModalFooterMode = (typeof MODAL_FOOTER_MODES)[number];
+type TabStyle = (typeof TAB_STYLES)[number];
+type StatusTone = (typeof STATUS_TONES)[number];
 type AsyncToastDemoState = "info" | "working" | "success" | "error";
 
 const HITO_DS_TOAST_ID = "hito-ds-async-action-toast";
@@ -337,25 +386,104 @@ const TYPOGRAPHY_ROLES = [
 ] as const;
 
 function HitoDesignSystemPage() {
+  const [activeSectionId, setActiveSectionId] = useState<SectionId>("overview");
   const [variant, setVariant] = useState<ButtonVariant>("primary");
   const [buttonTone, setButtonTone] = useState<ButtonTone>("default");
   const [size, setSize] = useState<ButtonSize>("lg");
   const [leftIcon, setLeftIcon] = useState(true);
   const [rightIcon, setRightIcon] = useState(true);
   const [disabled, setDisabled] = useState(false);
+  const [buttonLoading, setButtonLoading] = useState(false);
   const [inputVariant, setInputVariant] = useState<InputVariant>("primary");
   const [inputSize, setInputSize] = useState<ButtonSize>("md");
   const [inputLeftIcon, setInputLeftIcon] = useState(true);
   const [inputRightIcon, setInputRightIcon] = useState(false);
   const [inputState, setInputState] = useState<InputState>("default");
   const [inputFeedback, setInputFeedback] = useState<InputFeedback>("neutral");
+  const [tabStyle, setTabStyle] = useState<TabStyle>("enclosed");
+  const [tabIcon, setTabIcon] = useState(true);
+  const [tabBadge, setTabBadge] = useState(true);
+  const [tabDot, setTabDot] = useState(true);
+  const [tabDisabled, setTabDisabled] = useState(true);
+  const [statusTone, setStatusTone] = useState<StatusTone>("signal");
+  const [statusIcon, setStatusIcon] = useState(true);
+  const [statusLongLabel, setStatusLongLabel] = useState(false);
+  const [selectionKind, setSelectionKind] = useState<SelectionControlKind>("toggle");
+  const [selectionSize, setSelectionSize] = useState<ChoiceToggleSize>("md");
+  const [selectionSelected, setSelectionSelected] = useState(true);
+  const [selectionDisabled, setSelectionDisabled] = useState(false);
+  const [selectionInvalid, setSelectionInvalid] = useState(false);
+  const [selectionFocusDemo, setSelectionFocusDemo] = useState(false);
+  const [selectionAccentMode, setSelectionAccentMode] = useState(false);
+  const [modalBodyMode, setModalBodyMode] = useState<ModalBodyMode>("content-fit");
+  const [modalHeaderMode, setModalHeaderMode] = useState<ModalHeaderMode>("compact");
+  const [modalFooterMode, setModalFooterMode] = useState<ModalFooterMode>("actions");
+  const [modalStatusPill, setModalStatusPill] = useState(true);
+  const [modalDestructive, setModalDestructive] = useState(false);
+  const [modalLongContent, setModalLongContent] = useState(false);
+  const [dataTableSortable, setDataTableSortable] = useState(true);
+  const [dataTableActiveSort, setDataTableActiveSort] = useState(true);
+  const [dataTableFiltered, setDataTableFiltered] = useState(true);
+  const [dataTableStaticMode, setDataTableStaticMode] = useState(false);
+  const [dataTableUtilityRow, setDataTableUtilityRow] = useState(true);
   const [toastDemoState, setToastDemoState] = useState<AsyncToastDemoState>("working");
   const toastDemoTimerRef = useRef<number | null>(null);
+  const activeNavGroup = getNavGroupForSection(activeSectionId);
 
   useEffect(() => {
     return () => {
       clearToastDemoTimer(toastDemoTimerRef);
       hitoToast.dismiss(HITO_DS_TOAST_ID);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const sectionIds = new Set<SectionId>(SECTIONS.map((section) => section.id));
+    const getHashSection = (): SectionId | null => {
+      const hash = window.location.hash.replace("#", "");
+      return sectionIds.has(hash as SectionId) ? (hash as SectionId) : null;
+    };
+    const updateFromHash = () => {
+      const hashSection = getHashSection();
+      if (hashSection) {
+        setActiveSectionId(hashSection);
+      }
+    };
+
+    updateFromHash();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+        if (visibleEntry?.target.id && sectionIds.has(visibleEntry.target.id as SectionId)) {
+          setActiveSectionId(visibleEntry.target.id as SectionId);
+        }
+      },
+      {
+        rootMargin: "-18% 0px -64% 0px",
+        threshold: [0.1, 0.35, 0.6],
+      },
+    );
+
+    SECTIONS.forEach((section) => {
+      const sectionNode = document.getElementById(section.id);
+      if (sectionNode) {
+        observer.observe(sectionNode);
+      }
+    });
+
+    window.addEventListener("hashchange", updateFromHash);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("hashchange", updateFromHash);
     };
   }, []);
 
@@ -407,16 +535,40 @@ function HitoDesignSystemPage() {
             <p className="hito-label mt-2">Component system</p>
           </div>
 
-          <nav className="mt-10 grid gap-1">
-            {SECTIONS.map((section) => (
-              <a
-                key={section.id}
-                href={`#${section.id}`}
-                className="hito-nav-text rounded-md px-3 py-2 transition-colors hover:bg-accent/45 hover:text-foreground"
-              >
-                {section.label}
-              </a>
-            ))}
+          <nav className="mt-10 grid gap-4" aria-label="Hito DS sections">
+            <div className="grid gap-1">
+              {NAV_GROUPS.map((group) => {
+                const firstSection = group.sections[0];
+                const active = activeNavGroup.id === group.id;
+                return (
+                  <a
+                    key={group.id}
+                    href={`#${firstSection.id}`}
+                    data-active={active}
+                    className="hito-ds-sidebar-link hito-nav-text"
+                  >
+                    <span className="hito-ds-sidebar-link-marker" aria-hidden="true" />
+                    {group.label}
+                  </a>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-hairline pt-3">
+              <p className="hito-micro-label mb-2">{activeNavGroup.label}</p>
+              <div className="grid gap-1">
+                {activeNavGroup.sections.map((section) => (
+                  <a
+                    key={section.id}
+                    href={`#${section.id}`}
+                    data-active={activeSectionId === section.id}
+                    className="hito-ds-sidebar-child-link"
+                  >
+                    {section.label}
+                  </a>
+                ))}
+              </div>
+            </div>
           </nav>
 
           <div className="mt-10 border-t border-hairline pt-5">
@@ -454,11 +606,37 @@ function HitoDesignSystemPage() {
               />
             </div>
 
+            <div className="hito-reference-note mt-6">
+              <p className="hito-label hito-label-signal">How to use this workbench</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <ReferenceListRow
+                  label="Foundations"
+                  title="Start here for tokens"
+                  body="Use this group when a surface needs color, type, spacing, radius, logo, icon, or overlay guidance."
+                />
+                <ReferenceListRow
+                  label="Components"
+                  title="Start here for primitives"
+                  body="Use the preview + controls + contract specimens to inspect allowed component variants and states."
+                />
+                <ReferenceListRow
+                  label="Patterns"
+                  title="Start here for composed UI"
+                  body="Use this group for editorial timelines, tables, shell nav, async states, analytics summaries, and disclosure rows."
+                />
+                <ReferenceListRow
+                  label="Backlog"
+                  title="Check what is intentionally local"
+                  body="Use this group when a product surface looks custom and you need to know whether it is a DS gap or a route-owned exception."
+                />
+              </div>
+            </div>
+
             <section id="brand" className="ds-section">
               <SectionIntro
                 label="Brand"
-                title="The Hito wordmark is a primitive, not an icon."
-                body="Use the HitoLogo primitive for true brand placements. It inherits currentColor, sizes through logo CSS variables, and keeps product variants like Admin or DS as separate text."
+                title="The Hito wordmark and mark are primitives, not icons."
+                body="Use HitoLogo for true wordmark placements and HitoLogoMark for compact brand marks. Both inherit currentColor, size through logo CSS variables, and keep product variants like Admin or DS as separate text."
               />
 
               <div className="grid gap-5">
@@ -472,6 +650,12 @@ function HitoDesignSystemPage() {
                   <LogoSpecimen label="Hero">
                     <HitoLogo decorative className="[--hito-logo-height:3rem]" />
                   </LogoSpecimen>
+                  <LogoSpecimen label="Short mark">
+                    <HitoLogoMark decorative className="[--hito-logo-height:2.4rem]" />
+                  </LogoSpecimen>
+                  <LogoSpecimen label="Compact mark">
+                    <HitoLogoMark decorative className="[--hito-logo-height:1.35rem]" />
+                  </LogoSpecimen>
                   <LogoSpecimen
                     label="Light background"
                     className="bg-[var(--sand-100)] text-[var(--stone-950)]"
@@ -484,13 +668,19 @@ function HitoDesignSystemPage() {
                   >
                     <HitoLogo decorative className="[--hito-logo-height:1.7rem]" />
                   </LogoSpecimen>
+                  <LogoSpecimen
+                    label="Favicon surface"
+                    className="bg-[linear-gradient(135deg,#3a3732_0%,#15130f_52%,#030303_100%)] text-[var(--sand-100)]"
+                  >
+                    <HitoLogoMark decorative className="[--hito-logo-height:2.25rem]" />
+                  </LogoSpecimen>
                 </div>
 
                 <div className="hito-reference-list">
                   <ReferenceListRow
                     label="Use"
                     title="Brand identity only"
-                    body="Use HitoLogo for linked shell brands, auth hero branding, and public brand moments. Do not add it to the generic Icon registry."
+                    body="Use HitoLogo for linked shell brands, auth hero branding, and public brand moments. Use HitoLogoMark for compact brand marks and favicon artwork. Do not add either to the generic Icon registry."
                   />
                   <ReferenceListRow
                     label="Color"
@@ -930,15 +1120,43 @@ function HitoDesignSystemPage() {
               </div>
             </section>
 
-            <section id="buttons" className="ds-section">
-              <SectionIntro
-                label="Buttons"
-                title="Variants, sizes, icons, disabled state."
-                body="Use the builder to check CTA hierarchy and icon rhythm across the canonical button system."
-              />
-
-              <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-                <div className="hito-row-group self-start">
+            <SpecimenSection
+              id="buttons"
+              label="Buttons"
+              title="Variants, sizes, icons, disabled state."
+              body="Use the builder to check CTA hierarchy and icon rhythm across the canonical button system."
+              preview={
+                <>
+                  <p className="hito-label">Current button</p>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <DemoButton
+                      variant={variant}
+                      tone={buttonTone}
+                      size={size}
+                      leftIcon={leftIcon}
+                      rightIcon={rightIcon}
+                      disabled={disabled || buttonLoading}
+                      loading={buttonLoading}
+                    />
+                    <span className="hito-caption">
+                      {variant} / {buttonTone} / {size} /{" "}
+                      {buttonLoading ? "loading" : disabled ? "disabled" : "enabled"}
+                    </span>
+                  </div>
+                  <div className="border-t border-hairline pt-5">
+                    <p className="hito-label">Required states</p>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <DemoButton variant={variant} tone={buttonTone} size="sm" />
+                      <DemoButton variant={variant} tone={buttonTone} size="sm" demoState="hover" />
+                      <DemoButton variant={variant} tone={buttonTone} size="sm" demoState="focus" />
+                      <DemoButton variant={variant} tone={buttonTone} size="sm" disabled />
+                      <DemoButton variant={variant} tone={buttonTone} size="sm" loading disabled />
+                    </div>
+                  </div>
+                </>
+              }
+              controls={
+                <div className="hito-row-group border-0">
                   <ToggleRow
                     label="Left icon"
                     active={leftIcon}
@@ -954,136 +1172,106 @@ function HitoDesignSystemPage() {
                     active={disabled}
                     onToggle={() => setDisabled((v) => !v)}
                   />
+                  <ToggleRow
+                    label="Loading"
+                    active={buttonLoading}
+                    onToggle={() => setButtonLoading((v) => !v)}
+                  />
                   <div className="hito-list-row items-start">
-                    <div className="w-full">
-                      <p className="hito-label">Variant</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {BUTTON_VARIANTS.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => setVariant(item)}
-                            data-active={variant === item}
-                            className="hito-tab capitalize"
-                          >
-                            {item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    <ChoiceSelector
+                      label="Variant"
+                      value={variant}
+                      options={BUTTON_VARIANTS}
+                      onChange={setVariant}
+                    />
                   </div>
                   <div className="hito-list-row items-start">
-                    <div className="w-full">
-                      <p className="hito-label">Tone</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {BUTTON_TONES.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => setButtonTone(item)}
-                            data-active={buttonTone === item}
-                            className="hito-tab capitalize"
-                          >
-                            {item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    <ChoiceSelector
+                      label="Tone"
+                      value={buttonTone}
+                      options={BUTTON_TONES}
+                      onChange={setButtonTone}
+                    />
                   </div>
                   <div className="hito-list-row items-start">
-                    <div className="w-full">
-                      <p className="hito-label">Size</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {BUTTON_SIZES.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => setSize(item)}
-                            data-active={size === item}
-                            className="hito-tab uppercase"
-                          >
-                            {item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    <ChoiceSelector
+                      label="Size"
+                      value={size}
+                      options={BUTTON_SIZES}
+                      onChange={setSize}
+                      textTransform="uppercase"
+                    />
                   </div>
                 </div>
-
-                <div className="hito-surface-flat p-5">
-                  <p className="hito-label">Current button</p>
-                  <div className="mt-5 flex flex-wrap items-center gap-4">
-                    <DemoButton
-                      variant={variant}
-                      tone={buttonTone}
-                      size={size}
-                      leftIcon={leftIcon}
-                      rightIcon={rightIcon}
-                      disabled={disabled}
+              }
+              contract={[
+                {
+                  label: "Use for",
+                  body: "Primary actions, secondary actions, utility actions, and bounded destructive confirmations.",
+                },
+                {
+                  label: "Do not use for",
+                  body: "Navigation tabs, selectable values, status labels, or passive metadata.",
+                },
+                {
+                  label: "Variants",
+                  body: "Primary, secondary, outlined, ghost; tones are default, success, and error.",
+                },
+                {
+                  label: "States",
+                  body: "Default, hover, focus-visible, disabled, and loading are inspectable in the preview.",
+                },
+                {
+                  label: "Used in",
+                  body: (
+                    <ProductLinks
+                      links={[
+                        { href: "/login", label: "/login" },
+                        { href: "/settings", label: "/settings" },
+                        { href: "/admin/analytics", label: "/admin/analytics" },
+                        { href: "/hitoDS", label: "/hitoDS" },
+                      ]}
                     />
-                    <span className="hito-caption">
-                      {variant} / {buttonTone} / {size} / {disabled ? "disabled" : "enabled"}
-                    </span>
-                  </div>
-                  <div className="mt-6 border-t border-hairline pt-5">
-                    <p className="hito-label">Hierarchy × tone</p>
-                    <div className="mt-4 grid gap-3">
-                      {BUTTON_TONES.map((tone) => (
-                        <div key={tone} className="flex flex-wrap items-center gap-3">
-                          <span className="hito-micro-label w-16">{tone}</span>
-                          {BUTTON_VARIANTS.map((item) => (
-                            <DemoButton
-                              key={`${tone}-${item}`}
-                              variant={item}
-                              tone={tone}
-                              size="sm"
-                              leftIcon={false}
-                              rightIcon={false}
-                              disabled={false}
-                            />
-                          ))}
-                        </div>
+                  ),
+                },
+              ]}
+            >
+              <div className="mt-6 border-t border-hairline pt-5">
+                <p className="hito-label">Hierarchy × tone</p>
+                <div className="mt-4 grid gap-3">
+                  {BUTTON_TONES.map((tone) => (
+                    <div key={tone} className="flex flex-wrap items-center gap-3">
+                      <span className="hito-micro-label w-16">{tone}</span>
+                      {BUTTON_VARIANTS.map((item) => (
+                        <DemoButton key={`${tone}-${item}`} variant={item} tone={tone} size="sm" />
                       ))}
                     </div>
-                    <p className="hito-caption mt-3 max-w-2xl">
-                      Default primary stays signal/orange. Secondary stays soft and borderless.
-                      Outlined stays border-led. Success and error are semantic tones, not separate
-                      button families.
-                    </p>
-                  </div>
+                  ))}
                 </div>
-              </div>
-
-              <div className="mt-6 border-t border-hairline pt-5">
-                <p className="hito-caption max-w-2xl">
-                  The interactive builder is the source of truth for button variants. Avoid
-                  repeating every size and variant as a permanent production reference unless a
-                  route needs that exact QA matrix.
+                <p className="hito-caption mt-3 max-w-2xl">
+                  Default primary stays signal/orange. Secondary stays soft and borderless. Outlined
+                  stays border-led. Success and error are semantic tones, not separate button
+                  families.
                 </p>
               </div>
-            </section>
+            </SpecimenSection>
 
-            <section id="tabs" className="ds-section">
-              <SectionIntro
-                label="Tabs"
-                title="Simple and enclosed mode switches."
-                body="Tabs organize nearby views without becoming another card system. Use simple tabs for calm page-level switches and enclosed tabs when a local control cluster needs a stronger boundary."
-              />
-
-              <div className="hito-reference-list">
-                <article className="hito-reference-row">
-                  <div className="min-w-0">
-                    <p className="hito-label">Simple</p>
-                    <p className="hito-caption mt-2 max-w-xl">
-                      Transparent list, active underline, no filled active background. Best for
-                      setup modes and calm page sections.
-                    </p>
-                  </div>
+            <SpecimenSection
+              id="tabs"
+              label="Tabs"
+              title="Simple and enclosed mode switches."
+              body="Tabs organize nearby views without becoming another card system. Use simple tabs for calm page-level switches and enclosed tabs when a local control cluster needs a stronger boundary."
+              preview={
+                <>
+                  <p className="hito-label">Current tabs</p>
                   <div className="min-w-0 overflow-x-auto pb-1">
                     <div
-                      className="hito-tabs hito-tabs-simple"
+                      className={cn(
+                        "hito-tabs",
+                        tabStyle === "simple" ? "hito-tabs-simple" : "hito-tabs-enclosed",
+                      )}
                       role="tablist"
-                      aria-label="Simple tab example"
+                      aria-label="Configurable tab example"
                     >
                       <button
                         type="button"
@@ -1091,70 +1279,33 @@ function HitoDesignSystemPage() {
                         data-active="true"
                         aria-selected="true"
                       >
-                        Quick setup
-                      </button>
-                      <button type="button" className="hito-tab" aria-selected="false">
-                        <span>Talk it through</span>
-                        <span className="hito-tab-badge" data-variant="text">
-                          Pro
-                        </span>
-                      </button>
-                      <button type="button" className="hito-tab" disabled aria-selected="false">
-                        Archived
-                      </button>
-                    </div>
-                  </div>
-                </article>
-
-                <article className="hito-reference-row">
-                  <div className="min-w-0">
-                    <p className="hito-label">Enclosed</p>
-                    <p className="hito-caption mt-2 max-w-xl">
-                      Rounded inset rail, darker backing surface, active soft fill, no underline.
-                      Use for stronger local mode switches without nesting a card inside a card.
-                    </p>
-                  </div>
-                  <div className="min-w-0 overflow-x-auto pb-1">
-                    <div
-                      className="hito-tabs hito-tabs-enclosed"
-                      role="tablist"
-                      aria-label="Enclosed tab example"
-                    >
-                      <button
-                        type="button"
-                        className="hito-tab"
-                        data-active="true"
-                        aria-selected="true"
-                      >
-                        <Icon name="calendar" size="sm" className="hito-tab-icon" />
+                        {tabIcon && <Icon name="calendar" size="sm" className="hito-tab-icon" />}
                         Plan
                       </button>
                       <button type="button" className="hito-tab" aria-selected="false">
-                        <Icon name="progress" size="sm" className="hito-tab-icon" />
+                        {tabIcon && <Icon name="progress" size="sm" className="hito-tab-icon" />}
                         Progress
-                        <span className="hito-tab-badge" data-variant="count">
-                          3
-                        </span>
+                        {tabBadge && (
+                          <span className="hito-tab-badge" data-variant="count">
+                            3
+                          </span>
+                        )}
                       </button>
                       <button type="button" className="hito-tab" aria-selected="false">
                         Updates
-                        <span className="hito-tab-dot" aria-hidden="true" />
+                        {tabDot && <span className="hito-tab-dot" aria-hidden="true" />}
                       </button>
+                      {tabDisabled && (
+                        <button type="button" className="hito-tab" disabled aria-selected="false">
+                          Archived
+                        </button>
+                      )}
                     </div>
                   </div>
-                </article>
-
-                <article className="hito-reference-row">
-                  <div className="min-w-0">
-                    <p className="hito-label">States</p>
-                    <p className="hito-caption mt-2 max-w-xl">
-                      Hover and focus-visible stay distinct from the active underline. Badges are
-                      supporting metadata, not tab labels.
-                    </p>
-                  </div>
-                  <div className="min-w-0 overflow-x-auto pb-1">
+                  <div className="border-t border-hairline pt-5">
+                    <p className="hito-label">Required states</p>
                     <div
-                      className="hito-tabs hito-tabs-simple"
+                      className="hito-tabs hito-tabs-simple mt-4"
                       role="tablist"
                       aria-label="Tab states example"
                     >
@@ -1190,133 +1341,140 @@ function HitoDesignSystemPage() {
                       </button>
                     </div>
                   </div>
-                </article>
-              </div>
-            </section>
-
-            <section id="data-table" className="ds-section">
-              <SectionIntro
-                label="Data table"
-                title="Header controls keep sorting and filtering in context."
-                body="Operational tables use one Hito header typography for sortable and non-sortable columns. Sort/filter state belongs in the header control, while static headers stay visually aligned without becoming clickable."
-              />
-
-              <div className="grid gap-5">
-                <div className="hito-data-table-scroll">
-                  <table className="hito-data-table min-w-[760px]">
-                    <caption className="sr-only">Hito data-table header state examples.</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
-                          <button
-                            type="button"
-                            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
-                          >
-                            Default
-                            <Icon
-                              aria-hidden="true"
-                              name="chevron-down"
-                              size="xs"
-                              className="hito-data-table-sort-indicator"
-                            />
-                          </button>
-                        </th>
-                        <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
-                          <button
-                            type="button"
-                            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
-                            data-demo-state="hover"
-                          >
-                            Hover
-                            <Icon
-                              aria-hidden="true"
-                              name="chevron-down"
-                              size="xs"
-                              className="hito-data-table-sort-indicator"
-                            />
-                          </button>
-                        </th>
-                        <th
-                          scope="col"
-                          aria-sort="descending"
-                          className="whitespace-nowrap px-2 py-2 font-medium"
-                        >
-                          <button
-                            type="button"
-                            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
-                            data-active="true"
-                          >
-                            Active sort
-                            <Icon
-                              aria-hidden="true"
-                              name="chevron-down"
-                              size="xs"
-                              className="hito-data-table-sort-indicator"
-                              data-active="true"
-                            />
-                          </button>
-                        </th>
-                        <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
-                          <button
-                            type="button"
-                            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
-                            data-active="true"
-                          >
-                            Filtered
-                            <span className="hito-data-table-filter-dot" />
-                            <Icon
-                              aria-hidden="true"
-                              name="chevron-down"
-                              size="xs"
-                              className="hito-data-table-sort-indicator"
-                            />
-                          </button>
-                        </th>
-                        <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
-                          <span
-                            className="hito-data-table-header hito-data-table-header-static"
-                            data-disabled="true"
-                          >
-                            Non-sortable
-                          </span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="hito-data-table-cell hito-data-table-cell-start">
-                          Header menu
-                        </td>
-                        <td className="hito-data-table-cell">Subtle wash</td>
-                        <td className="hito-data-table-cell">Arrow active</td>
-                        <td className="hito-data-table-cell">Circular filter dot</td>
-                        <td className="hito-data-table-cell hito-data-table-cell-end">
-                          Same label style
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="hito-reference-list">
-                  <ReferenceListRow
-                    label="Sortable"
-                    title="Button inside th"
-                    body="Sortable columns use a header button, aria-sort on the th when active, and a chevron affordance that stays secondary until sorted."
+                </>
+              }
+              controls={
+                <div className="hito-row-group border-0">
+                  <div className="hito-list-row items-start">
+                    <ChoiceSelector
+                      label="Visual style"
+                      value={tabStyle}
+                      options={TAB_STYLES}
+                      onChange={setTabStyle}
+                    />
+                  </div>
+                  <ToggleRow
+                    label="With icon"
+                    active={tabIcon}
+                    onToggle={() => setTabIcon((v) => !v)}
                   />
-                  <ReferenceListRow
-                    label="Filter"
-                    title="Round state indicator"
-                    body="Filtered columns show a small circular signal dot in the header control. Avoid square badges or route-local header indicators."
+                  <ToggleRow
+                    label="With badge"
+                    active={tabBadge}
+                    onToggle={() => setTabBadge((v) => !v)}
                   />
-                  <ReferenceListRow
-                    label="Static"
-                    title="Same type, no affordance"
-                    body="Non-sortable columns use the same header typography through hito-data-table-header, but they do not show arrows, menus, hover wash, or click behavior."
+                  <ToggleRow
+                    label="With dot"
+                    active={tabDot}
+                    onToggle={() => setTabDot((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Disabled tab"
+                    active={tabDisabled}
+                    onToggle={() => setTabDisabled((v) => !v)}
                   />
                 </div>
-              </div>
-            </section>
+              }
+              contract={[
+                {
+                  label: "Use for",
+                  body: "Navigation between sibling panels, setup modes, and route-local views.",
+                },
+                {
+                  label: "Do not use for",
+                  body: "Choosing values like size, tone, weekday, or variant; use choice toggles for those.",
+                },
+                { label: "Variants", body: "Simple underline tabs and enclosed inset tabs." },
+                { label: "States", body: "Active, inactive, hover, focus-visible, and disabled." },
+                {
+                  label: "Used in",
+                  body: (
+                    <ProductLinks
+                      links={[
+                        { href: "/settings", label: "/settings" },
+                        { href: "/changelog", label: "/changelog" },
+                        { href: "/admin/analytics", label: "/admin/analytics" },
+                      ]}
+                    />
+                  ),
+                },
+              ]}
+            />
+
+            <SpecimenSection
+              id="data-table"
+              label="Data table"
+              title="Header controls keep sorting and filtering in context."
+              body="Operational tables use one Hito header typography for sortable and non-sortable columns. Sort/filter state belongs in the header control, while static headers stay visually aligned without becoming clickable."
+              status="Pattern"
+              preview={
+                <DataTableSpecimenPreview
+                  sortable={dataTableSortable}
+                  activeSort={dataTableActiveSort}
+                  filtered={dataTableFiltered}
+                  staticMode={dataTableStaticMode}
+                  showUtilityRow={dataTableUtilityRow}
+                />
+              }
+              controls={
+                <div className="grid gap-4 p-4">
+                  <ToggleRow
+                    label="Sortable preview column"
+                    active={dataTableSortable}
+                    onToggle={() => setDataTableSortable((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Active sort"
+                    active={dataTableActiveSort}
+                    onToggle={() => setDataTableActiveSort((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Filtered"
+                    active={dataTableFiltered}
+                    onToggle={() => setDataTableFiltered((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Static mode"
+                    active={dataTableStaticMode}
+                    onToggle={() => setDataTableStaticMode((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Utility/search row"
+                    active={dataTableUtilityRow}
+                    onToggle={() => setDataTableUtilityRow((v) => !v)}
+                  />
+                </div>
+              }
+              contract={[
+                {
+                  label: "Use for",
+                  body: "Operational data where sorting, filtering, scanning, and horizontal overflow containment matter.",
+                },
+                {
+                  label: "Do not use for",
+                  body: "Marketing cards, metric summaries, form layouts, or route-local lists that do not need table semantics.",
+                },
+                {
+                  label: "Variants",
+                  body: "Sortable header buttons, filtered header indicators, static headers, compact utility rows, and contained scroll regions.",
+                },
+                {
+                  label: "States",
+                  body: "Default, hover/demo hover, active sort with aria-sort, filtered signal dot, focus-visible, and non-interactive static.",
+                },
+                {
+                  label: "Used in",
+                  body: (
+                    <ProductLinks
+                      links={[
+                        { href: "/admin/analytics", label: "/admin/analytics" },
+                        { href: "/hitoDS", label: "/hitoDS" },
+                      ]}
+                    />
+                  ),
+                },
+              ]}
+            />
 
             <section id="shared-wrappers" className="ds-section">
               <SectionIntro
@@ -1484,638 +1642,834 @@ function HitoDesignSystemPage() {
                 body="Text fields and buttons share size tiers. Primary fields keep the canonical bordered form behavior; secondary fields use a lower-chrome tinted surface."
               />
 
-              <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-                <div className="hito-row-group self-start">
-                  <ToggleRow
-                    label="Left icon"
-                    active={inputLeftIcon}
-                    onToggle={() => setInputLeftIcon((v) => !v)}
-                  />
-                  <ToggleRow
-                    label="Right icon"
-                    active={inputRightIcon}
-                    onToggle={() => setInputRightIcon((v) => !v)}
-                  />
-                  <div className="hito-list-row items-start">
-                    <div className="w-full">
-                      <p className="hito-label">Variant</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {INPUT_VARIANTS.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => setInputVariant(item)}
-                            data-active={inputVariant === item}
-                            className="hito-tab capitalize"
-                          >
-                            {item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="hito-list-row items-start">
-                    <div className="w-full">
-                      <p className="hito-label">State</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {INPUT_STATES.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => setInputState(item)}
-                            data-active={inputState === item}
-                            className="hito-tab capitalize"
-                          >
-                            {item === "focus" ? "Active" : item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="hito-list-row items-start">
-                    <div className="w-full">
-                      <p className="hito-label">Feedback</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {INPUT_FEEDBACK.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => setInputFeedback(item)}
-                            data-active={inputFeedback === item}
-                            className="hito-tab capitalize"
-                          >
-                            {item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="hito-list-row items-start">
-                    <div className="w-full">
-                      <p className="hito-label">Size</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {FIELD_SIZES.map((item) => (
-                          <button
-                            key={item}
-                            type="button"
-                            onClick={() => setInputSize(item)}
-                            data-active={inputSize === item}
-                            className="hito-tab uppercase"
-                          >
-                            {item}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-5">
-                  <div className="hito-surface-flat p-5">
-                    <p className="hito-label">Current input</p>
-                    <div className="mt-5 grid gap-4">
-                      <DemoInput
-                        variant={inputVariant}
-                        size={inputSize}
-                        leftIcon={inputLeftIcon}
-                        rightIcon={inputRightIcon}
-                        state={inputState}
-                        feedback={inputFeedback}
-                        placeholder={`${inputVariant} ${inputSize} field`}
+              <div className="hito-specimen">
+                <div className="hito-specimen-grid">
+                  <div className="hito-specimen-controls lg:order-2">
+                    <ToggleRow
+                      label="Left icon"
+                      active={inputLeftIcon}
+                      onToggle={() => setInputLeftIcon((v) => !v)}
+                    />
+                    <ToggleRow
+                      label="Right icon"
+                      active={inputRightIcon}
+                      onToggle={() => setInputRightIcon((v) => !v)}
+                    />
+                    <div className="hito-list-row items-start">
+                      <ChoiceSelector
+                        label="Variant"
+                        value={inputVariant}
+                        options={INPUT_VARIANTS}
+                        onChange={setInputVariant}
                       />
-                      <span
-                        className={
-                          inputFeedback === "error"
-                            ? "hito-field-error"
-                            : inputFeedback === "success"
-                              ? "hito-field-success"
-                              : "hito-field-helper"
-                        }
-                      >
-                        {inputFeedback === "error"
-                          ? "Choose a valid value before continuing."
-                          : inputFeedback === "success"
-                            ? "This value is ready."
-                            : "Helper text stays quiet unless validation needs attention."}
-                      </span>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <DemoButton
-                          variant={inputVariant === "primary" ? "primary" : "secondary"}
+                    </div>
+                    <div className="hito-list-row items-start">
+                      <ChoiceSelector
+                        label="State"
+                        value={inputState}
+                        options={INPUT_STATES}
+                        onChange={setInputState}
+                        getLabel={(item) => (item === "focus" ? "Active" : item)}
+                      />
+                    </div>
+                    <div className="hito-list-row items-start">
+                      <ChoiceSelector
+                        label="Feedback"
+                        value={inputFeedback}
+                        options={INPUT_FEEDBACK}
+                        onChange={setInputFeedback}
+                      />
+                    </div>
+                    <div className="hito-list-row items-start">
+                      <ChoiceSelector
+                        label="Size"
+                        value={inputSize}
+                        options={FIELD_SIZES}
+                        onChange={setInputSize}
+                        textTransform="uppercase"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="hito-specimen-preview lg:order-1">
+                    <div className="hito-surface-flat p-5">
+                      <p className="hito-label">Current input</p>
+                      <div className="mt-5 grid gap-4">
+                        <DemoInput
+                          variant={inputVariant}
                           size={inputSize}
                           leftIcon={inputLeftIcon}
                           rightIcon={inputRightIcon}
-                          disabled={inputState === "disabled"}
+                          state={inputState}
+                          feedback={inputFeedback}
+                          placeholder={`${inputVariant} ${inputSize} field`}
                         />
-                        <span className="hito-caption">
-                          Same {inputSize.toUpperCase()} height and XS radius rhythm.
+                        <span
+                          className={
+                            inputFeedback === "error"
+                              ? "hito-field-error"
+                              : inputFeedback === "success"
+                                ? "hito-field-success"
+                                : "hito-field-helper"
+                          }
+                        >
+                          {inputFeedback === "error"
+                            ? "Choose a valid value before continuing."
+                            : inputFeedback === "success"
+                              ? "This value is ready."
+                              : "Helper text stays quiet unless validation needs attention."}
                         </span>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <DemoButton
+                            variant={inputVariant === "primary" ? "primary" : "secondary"}
+                            size={inputSize}
+                            leftIcon={inputLeftIcon}
+                            rightIcon={inputRightIcon}
+                            disabled={inputState === "disabled"}
+                          />
+                          <span className="hito-caption">
+                            Same {inputSize.toUpperCase()} height and XS radius rhythm.
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="hito-reference-list">
-                    {INPUT_STATES.map((state) => (
-                      <article key={state} className="hito-reference-row">
-                        <div>
-                          <p className="hito-label">{state === "focus" ? "Active" : state}</p>
-                          <p className="hito-caption mt-2">
-                            {state === "default"
-                              ? "Default field state."
-                              : state === "hover"
-                                ? "Reference hover treatment."
-                                : state === "focus"
-                                  ? "Active or focus-visible treatment."
-                                  : state === "readonly"
-                                    ? "Read-only truth with field rhythm."
-                                    : "Unavailable but still aligned."}
-                          </p>
-                        </div>
-                        <DemoInput
-                          variant={inputVariant}
-                          size="sm"
-                          leftIcon={inputLeftIcon}
-                          rightIcon={inputRightIcon}
-                          state={state}
-                          feedback={inputFeedback}
-                          placeholder={`${state} input`}
-                        />
-                      </article>
-                    ))}
-                  </div>
-
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <label className="grid gap-2">
-                      <span className="hito-label">Primary field</span>
-                      <DemoInput
-                        variant="primary"
-                        size="md"
-                        leftIcon
-                        rightIcon={false}
-                        placeholder="Bordered default"
-                      />
-                      <span className="hito-field-helper">
-                        Canonical default for forms and persisted settings.
-                      </span>
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="hito-label">Secondary field</span>
-                      <DemoInput
-                        variant="secondary"
-                        size="md"
-                        leftIcon
-                        rightIcon={false}
-                        placeholder="Subtle utility field"
-                      />
-                      <span className="hito-field-helper">
-                        Lower-chrome tint without a strong border.
-                      </span>
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="hito-label">Error feedback</span>
-                      <DemoInput
-                        variant="primary"
-                        size="md"
-                        leftIcon
-                        rightIcon
-                        feedback="error"
-                        placeholder="Missing start date"
-                      />
-                      <span className="hito-field-error">
-                        Choose a start date before importing.
-                      </span>
-                    </label>
-                    <label className="grid gap-2">
-                      <span className="hito-label">Success feedback</span>
-                      <DemoInput
-                        variant="secondary"
-                        size="md"
-                        leftIcon
-                        rightIcon
-                        feedback="success"
-                        placeholder="runner@example.com"
-                      />
-                      <span className="hito-field-success">Saved profile value is valid.</span>
-                    </label>
-                    <label className="grid gap-2 lg:col-span-2">
-                      <span className="hito-label">Textarea</span>
-                      <textarea
-                        rows={5}
-                        className="hito-field hito-field-primary hito-textarea-md resize-none"
-                        placeholder="Describe goal, constraints, recent results, or JSON notes."
-                      />
-                    </label>
-                  </div>
-
-                  <div className="border-t border-hairline pt-5">
-                    <div className="mb-4">
-                      <p className="hito-label">Avatar tile action</p>
-                      <p className="hito-caption mt-2 max-w-2xl">
-                        Settings avatar controls use one rectangular tile and a same-width action.
-                        Keep copy short: Upload for empty avatars, Edit when an image exists.
-                      </p>
+                    <div className="hito-reference-list">
+                      {INPUT_STATES.map((state) => (
+                        <article key={state} className="hito-reference-row">
+                          <div>
+                            <p className="hito-label">{state === "focus" ? "Active" : state}</p>
+                            <p className="hito-caption mt-2">
+                              {state === "default"
+                                ? "Default field state."
+                                : state === "hover"
+                                  ? "Reference hover treatment."
+                                  : state === "focus"
+                                    ? "Active or focus-visible treatment."
+                                    : state === "readonly"
+                                      ? "Read-only truth with field rhythm."
+                                      : "Unavailable but still aligned."}
+                            </p>
+                          </div>
+                          <DemoInput
+                            variant={inputVariant}
+                            size="sm"
+                            leftIcon={inputLeftIcon}
+                            rightIcon={inputRightIcon}
+                            state={state}
+                            feedback={inputFeedback}
+                            placeholder={`${state} input`}
+                          />
+                        </article>
+                      ))}
                     </div>
-                    <div className="hito-reference-list mb-5">
-                      <article className="hito-reference-row">
-                        <div>
-                          <p className="hito-list-row-title">Empty avatar</p>
-                          <p className="hito-caption mt-2">
-                            The action spans the tile width and keeps the camera affordance.
-                          </p>
-                        </div>
-                        <div className="hito-avatar-stack">
-                          <span className="hito-avatar-tile hito-profile-avatar h-28 w-28">
-                            <span className="hito-profile-avatar-fallback">IR</span>
-                          </span>
-                          <button
-                            type="button"
-                            className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
-                          >
-                            <Icon name="camera" size="sm" />
-                            Upload
-                          </button>
-                        </div>
-                      </article>
-                      <article className="hito-reference-row">
-                        <div>
-                          <p className="hito-list-row-title">Existing avatar</p>
-                          <p className="hito-caption mt-2">
-                            Edit is a separate product label, not hidden inside avatar hover chrome.
-                          </p>
-                        </div>
-                        <div className="hito-avatar-stack">
-                          <span className="hito-avatar-tile hito-profile-avatar h-28 w-28">
-                            <span className="grid h-full w-full place-items-center bg-[var(--stone-800)] text-signal">
-                              <Icon name="user" size="lg" />
-                            </span>
-                          </span>
-                          <button
-                            type="button"
-                            className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
-                          >
-                            <Icon name="edit" size="sm" />
-                            Edit
-                          </button>
-                        </div>
-                      </article>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <label className="grid gap-2">
+                        <span className="hito-label">Primary field</span>
+                        <DemoInput
+                          variant="primary"
+                          size="md"
+                          leftIcon
+                          rightIcon={false}
+                          placeholder="Bordered default"
+                        />
+                        <span className="hito-field-helper">
+                          Canonical default for forms and persisted settings.
+                        </span>
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="hito-label">Secondary field</span>
+                        <DemoInput
+                          variant="secondary"
+                          size="md"
+                          leftIcon
+                          rightIcon={false}
+                          placeholder="Subtle utility field"
+                        />
+                        <span className="hito-field-helper">
+                          Lower-chrome tint without a strong border.
+                        </span>
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="hito-label">Error feedback</span>
+                        <DemoInput
+                          variant="primary"
+                          size="md"
+                          leftIcon
+                          rightIcon
+                          feedback="error"
+                          placeholder="Missing start date"
+                        />
+                        <span className="hito-field-error">
+                          Choose a start date before importing.
+                        </span>
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="hito-label">Success feedback</span>
+                        <DemoInput
+                          variant="secondary"
+                          size="md"
+                          leftIcon
+                          rightIcon
+                          feedback="success"
+                          placeholder="runner@example.com"
+                        />
+                        <span className="hito-field-success">Saved profile value is valid.</span>
+                      </label>
+                      <label className="grid gap-2 lg:col-span-2">
+                        <span className="hito-label">Textarea</span>
+                        <textarea
+                          rows={5}
+                          className="hito-field hito-field-primary hito-textarea-md resize-none"
+                          placeholder="Describe goal, constraints, recent results, or JSON notes."
+                        />
+                      </label>
                     </div>
 
                     <div className="border-t border-hairline pt-5">
                       <div className="mb-4">
-                        <p className="hito-label">Editable value chip</p>
+                        <p className="hito-label">Avatar tile action</p>
                         <p className="hito-caption mt-2 max-w-2xl">
-                          Compact scalar facts use editable value chips, not full form cards or
-                          normal text rows. Use for profile or settings values such as age, height,
-                          or weight; avoid for long text and multi-step choices.
+                          Settings avatar controls use one rectangular tile and a same-width action.
+                          Keep copy short: Upload for empty avatars, Edit when an image exists.
                         </p>
                       </div>
-                      <div className="hito-reference-list">
+                      <div className="hito-reference-list mb-5">
                         <article className="hito-reference-row">
                           <div>
-                            <p className="hito-list-row-title">Empty chip</p>
+                            <p className="hito-list-row-title">Empty avatar</p>
                             <p className="hito-caption mt-2">
-                              Borderless by default, with a clear hover/focus backdrop.
+                              The action spans the tile width and keeps the camera affordance.
                             </p>
                           </div>
-                          <div className="hito-editable-value-chip-group">
+                          <div className="hito-avatar-stack">
+                            <span className="hito-avatar-tile hito-profile-avatar h-28 w-28">
+                              <span className="hito-profile-avatar-fallback">IR</span>
+                            </span>
                             <button
                               type="button"
-                              className="hito-editable-value-chip"
-                              data-state="empty"
+                              className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
                             >
-                              <Icon
-                                name="plus"
-                                size="sm"
-                                className="hito-editable-value-chip-icon"
-                              />
-                              <span className="hito-editable-value-chip-content">Age</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="hito-editable-value-chip"
-                              data-state="empty"
-                            >
-                              <Icon
-                                name="plus"
-                                size="sm"
-                                className="hito-editable-value-chip-icon"
-                              />
-                              <span className="hito-editable-value-chip-content">Height</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="hito-editable-value-chip"
-                              data-state="empty"
-                            >
-                              <Icon
-                                name="plus"
-                                size="sm"
-                                className="hito-editable-value-chip-icon"
-                              />
-                              <span className="hito-editable-value-chip-content">Weight</span>
+                              <Icon name="camera" size="sm" />
+                              Upload
                             </button>
                           </div>
                         </article>
                         <article className="hito-reference-row">
                           <div>
-                            <p className="hito-list-row-title">Editing chip</p>
+                            <p className="hito-list-row-title">Existing avatar</p>
                             <p className="hito-caption mt-2">
-                              The input is wider than the chip, stays the same height, and focuses
-                              in place. Click-away discards unsaved text; only check commits.
+                              Edit is a separate product label, not hidden inside avatar hover
+                              chrome.
                             </p>
                           </div>
-                          <div className="hito-editable-value-chip-frame" data-state="editing">
-                            <div className="hito-editable-value-chip-input-shell">
-                              <input
-                                id="ds-editable-weight"
-                                value="72"
-                                readOnly
-                                className="hito-editable-value-chip-input"
-                                aria-label="Weight"
-                              />
-                              <button
-                                type="button"
-                                className="hito-editable-value-chip-clear"
-                                aria-label="Clear weight"
-                              >
-                                <Icon name="close" size="xs" />
-                              </button>
-                            </div>
-                            <button
-                              type="button"
-                              className="hito-editable-value-chip-action"
-                              data-action="save"
-                              aria-label="Save weight"
-                            >
-                              <Icon name="check" size="sm" />
-                            </button>
-                          </div>
-                        </article>
-                        <article className="hito-reference-row">
-                          <div>
-                            <p className="hito-list-row-title">Invalid or empty edit</p>
-                            <p className="hito-caption mt-2">
-                              Until the value is valid, the external control stays as dismiss/cancel
-                              and does not save profile truth.
-                            </p>
-                          </div>
-                          <div className="hito-editable-value-chip-frame" data-state="editing">
-                            <div className="hito-editable-value-chip-input-shell">
-                              <input
-                                id="ds-editable-empty-age"
-                                value=""
-                                readOnly
-                                className="hito-editable-value-chip-input"
-                                aria-label="Age"
-                                placeholder="34"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              className="hito-editable-value-chip-action"
-                              data-action="cancel"
-                              aria-label="Cancel age edit"
-                            >
-                              <Icon name="close" size="sm" />
-                            </button>
-                          </div>
-                        </article>
-                        <article className="hito-reference-row">
-                          <div>
-                            <p className="hito-list-row-title">Saved chip</p>
-                            <p className="hito-caption mt-2">
-                              Compact uppercase label plus value. Pencil stays subtle and appears on
-                              hover/focus.
-                            </p>
-                          </div>
-                          <div className="hito-editable-value-chip-group">
-                            <button
-                              type="button"
-                              className="hito-editable-value-chip"
-                              data-state="saved"
-                            >
-                              <span className="hito-editable-value-chip-content">
-                                <span className="hito-editable-value-chip-label">Age</span>
-                                <span className="hito-editable-value-chip-text">36</span>
+                          <div className="hito-avatar-stack">
+                            <span className="hito-avatar-tile hito-profile-avatar h-28 w-28">
+                              <span className="grid h-full w-full place-items-center bg-[var(--stone-800)] text-signal">
+                                <Icon name="user" size="lg" />
                               </span>
-                              <Icon
-                                name="edit"
-                                size="sm"
-                                className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
-                              />
-                            </button>
+                            </span>
                             <button
                               type="button"
-                              className="hito-editable-value-chip"
-                              data-state="saved"
+                              className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
                             >
-                              <span className="hito-editable-value-chip-content">
-                                <span className="hito-editable-value-chip-label">Weight</span>
-                                <span className="hito-editable-value-chip-text">72 kg</span>
-                              </span>
-                              <Icon
-                                name="edit"
-                                size="sm"
-                                className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
-                              />
+                              <Icon name="edit" size="sm" />
+                              Edit
                             </button>
                           </div>
                         </article>
                       </div>
+
+                      <div className="border-t border-hairline pt-5">
+                        <div className="mb-4">
+                          <p className="hito-label">Editable value chip</p>
+                          <p className="hito-caption mt-2 max-w-2xl">
+                            Compact scalar facts use editable value chips, not full form cards or
+                            normal text rows. Use for profile or settings values such as age,
+                            height, or weight; avoid for long text and multi-step choices.
+                          </p>
+                        </div>
+                        <div className="hito-reference-list">
+                          <article className="hito-reference-row">
+                            <div>
+                              <p className="hito-list-row-title">Empty chip</p>
+                              <p className="hito-caption mt-2">
+                                Borderless by default, with a clear hover/focus backdrop.
+                              </p>
+                            </div>
+                            <div className="hito-editable-value-chip-group">
+                              <button
+                                type="button"
+                                className="hito-editable-value-chip"
+                                data-state="empty"
+                              >
+                                <Icon
+                                  name="plus"
+                                  size="sm"
+                                  className="hito-editable-value-chip-icon"
+                                />
+                                <span className="hito-editable-value-chip-content">Age</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="hito-editable-value-chip"
+                                data-state="empty"
+                              >
+                                <Icon
+                                  name="plus"
+                                  size="sm"
+                                  className="hito-editable-value-chip-icon"
+                                />
+                                <span className="hito-editable-value-chip-content">Height</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="hito-editable-value-chip"
+                                data-state="empty"
+                              >
+                                <Icon
+                                  name="plus"
+                                  size="sm"
+                                  className="hito-editable-value-chip-icon"
+                                />
+                                <span className="hito-editable-value-chip-content">Weight</span>
+                              </button>
+                            </div>
+                          </article>
+                          <article className="hito-reference-row">
+                            <div>
+                              <p className="hito-list-row-title">Editing chip</p>
+                              <p className="hito-caption mt-2">
+                                The input is wider than the chip, stays the same height, and focuses
+                                in place. Click-away discards unsaved text; only check commits.
+                              </p>
+                            </div>
+                            <div className="hito-editable-value-chip-frame" data-state="editing">
+                              <div className="hito-editable-value-chip-input-shell">
+                                <input
+                                  id="ds-editable-weight"
+                                  value="72"
+                                  readOnly
+                                  className="hito-editable-value-chip-input"
+                                  aria-label="Weight"
+                                />
+                                <button
+                                  type="button"
+                                  className="hito-editable-value-chip-clear"
+                                  aria-label="Clear weight"
+                                >
+                                  <Icon name="close" size="xs" />
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                className="hito-editable-value-chip-action"
+                                data-action="save"
+                                aria-label="Save weight"
+                              >
+                                <Icon name="check" size="sm" />
+                              </button>
+                            </div>
+                          </article>
+                          <article className="hito-reference-row">
+                            <div>
+                              <p className="hito-list-row-title">Invalid or empty edit</p>
+                              <p className="hito-caption mt-2">
+                                Until the value is valid, the external control stays as
+                                dismiss/cancel and does not save profile truth.
+                              </p>
+                            </div>
+                            <div className="hito-editable-value-chip-frame" data-state="editing">
+                              <div className="hito-editable-value-chip-input-shell">
+                                <input
+                                  id="ds-editable-empty-age"
+                                  value=""
+                                  readOnly
+                                  className="hito-editable-value-chip-input"
+                                  aria-label="Age"
+                                  placeholder="34"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className="hito-editable-value-chip-action"
+                                data-action="cancel"
+                                aria-label="Cancel age edit"
+                              >
+                                <Icon name="close" size="sm" />
+                              </button>
+                            </div>
+                          </article>
+                          <article className="hito-reference-row">
+                            <div>
+                              <p className="hito-list-row-title">Saved chip</p>
+                              <p className="hito-caption mt-2">
+                                Compact uppercase label plus value. Pencil stays subtle and appears
+                                on hover/focus.
+                              </p>
+                            </div>
+                            <div className="hito-editable-value-chip-group">
+                              <button
+                                type="button"
+                                className="hito-editable-value-chip"
+                                data-state="saved"
+                              >
+                                <span className="hito-editable-value-chip-content">
+                                  <span className="hito-editable-value-chip-label">Age</span>
+                                  <span className="hito-editable-value-chip-text">36</span>
+                                </span>
+                                <Icon
+                                  name="edit"
+                                  size="sm"
+                                  className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                className="hito-editable-value-chip"
+                                data-state="saved"
+                              >
+                                <span className="hito-editable-value-chip-content">
+                                  <span className="hito-editable-value-chip-label">Weight</span>
+                                  <span className="hito-editable-value-chip-text">72 kg</span>
+                                </span>
+                                <Icon
+                                  name="edit"
+                                  size="sm"
+                                  className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
+                                />
+                              </button>
+                            </div>
+                          </article>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                </div>
+                <div className="hito-specimen-contract">
+                  <div className="hito-specimen-contract-row">
+                    <p className="hito-micro-label">Use for</p>
+                    <p className="hito-list-row-copy">
+                      Persisted settings, import forms, auth fields, search, and bounded text input.
+                    </p>
+                  </div>
+                  <div className="hito-specimen-contract-row">
+                    <p className="hito-micro-label">Do not use for</p>
+                    <p className="hito-list-row-copy">
+                      Status truth, selectable chips, tab navigation, or long prose display.
+                    </p>
+                  </div>
+                  <div className="hito-specimen-contract-row">
+                    <p className="hito-micro-label">Variants</p>
+                    <p className="hito-list-row-copy">
+                      Primary, secondary, textarea, icon-leading, icon-trailing, and editable value
+                      chip companion patterns.
+                    </p>
+                  </div>
+                  <div className="hito-specimen-contract-row">
+                    <p className="hito-micro-label">States</p>
+                    <p className="hito-list-row-copy">
+                      Default, hover, focus-visible, invalid, success, disabled, and readonly.
+                    </p>
+                  </div>
+                  <div className="hito-specimen-contract-row">
+                    <p className="hito-micro-label">Used in</p>
+                    <ProductLinks
+                      links={[
+                        { href: "/login", label: "/login" },
+                        { href: "/settings", label: "/settings" },
+                        { href: "/admin/login", label: "/admin/login" },
+                        { href: "/hitoDS", label: "/hitoDS" },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
             </section>
 
-            <section id="selection-controls" className="ds-section">
-              <SectionIntro
-                label="Selection controls"
-                title="Signal-selected, never browser-native."
-                body="Checkboxes, radios, and toggle radios share Hito focus, disabled, invalid, and signal-selected states. Destructive confirmation uses warning copy and destructive buttons; the selected checkbox itself stays signal."
-              />
+            <SpecimenSection
+              id="status"
+              label="Status"
+              title="Short truth labels and compact markers."
+              body="Status pills and markers identify product state. They stay concise, semantic, and separate from headings, buttons, or editorial tags."
+              preview={
+                <>
+                  <p className="hito-label">Current status</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span
+                      className="hito-status-pill"
+                      data-tone={statusTone === "neutral" ? undefined : statusTone}
+                      data-icon={statusIcon ? undefined : "false"}
+                    >
+                      {statusLongLabel ? "Feedback ready for review" : statusTone}
+                    </span>
+                    <span
+                      className="hito-status-marker"
+                      data-tone={statusTone === "neutral" ? "muted" : statusTone}
+                      aria-label={`${statusTone} marker`}
+                    >
+                      <Icon
+                        name={
+                          statusTone === "destructive"
+                            ? "close"
+                            : statusTone === "warning"
+                              ? "warning"
+                              : statusTone === "success"
+                                ? "check"
+                                : "minus"
+                        }
+                        size="xs"
+                        strokeWidth={2.2}
+                      />
+                    </span>
+                  </div>
+                  <div className="border-t border-hairline pt-5">
+                    <p className="hito-label">Tone set</p>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      {STATUS_TONES.map((tone) => (
+                        <span
+                          key={tone}
+                          className="hito-status-pill"
+                          data-tone={tone === "neutral" ? undefined : tone}
+                        >
+                          {tone}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              }
+              controls={
+                <div className="hito-row-group border-0">
+                  <div className="hito-list-row items-start">
+                    <ChoiceSelector
+                      label="Tone"
+                      value={statusTone}
+                      options={STATUS_TONES}
+                      onChange={setStatusTone}
+                    />
+                  </div>
+                  <ToggleRow
+                    label="Icon dot"
+                    active={statusIcon}
+                    onToggle={() => setStatusIcon((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Long label"
+                    active={statusLongLabel}
+                    onToggle={() => setStatusLongLabel((v) => !v)}
+                  />
+                </div>
+              }
+              contract={[
+                {
+                  label: "Use for",
+                  body: "Short state identifiers such as active plan, pro feature, saved, warning, and feedback-ready states.",
+                },
+                {
+                  label: "Do not use for",
+                  body: "Clickable actions, marketing badges, changelog editorial highlights, or long explanations.",
+                },
+                {
+                  label: "Variants",
+                  body: "Pill and marker forms; tones are neutral, signal, success, warning, and destructive.",
+                },
+                {
+                  label: "States",
+                  body: "Status is display-only. Tone, optional icon dot, and concise label are the meaningful states.",
+                },
+                {
+                  label: "Used in",
+                  body: (
+                    <ProductLinks
+                      links={[
+                        { href: "/", label: "/" },
+                        { href: "/settings", label: "/settings" },
+                        { href: "/workout/2026-05-24", label: "/workout/$date" },
+                        { href: "/admin/analytics", label: "/admin/analytics" },
+                      ]}
+                    />
+                  ),
+                },
+              ]}
+            />
 
-              <div className="hito-reference-list">
-                <article className="hito-reference-row">
-                  <div>
-                    <p className="hito-label">Checkbox</p>
-                    <p className="hito-caption mt-2 max-w-xl">
-                      Use when a choice can be independently on or off. Labels are the hit target:
-                      SM rows are at least 32px high and MD rows are at least 40px high.
-                    </p>
+            <SpecimenSection
+              id="selection-controls"
+              label="Selection controls"
+              title="Signal-selected, never browser-native."
+              body="Checkboxes, radios, and toggle radios share Hito focus, disabled, invalid, and signal-selected states. Destructive confirmation uses warning copy and destructive buttons; the selected checkbox itself stays signal."
+              preview={
+                <>
+                  <p className="hito-label">Current selection control</p>
+                  <SelectionControlPreview
+                    kind={selectionKind}
+                    size={selectionSize}
+                    selected={selectionSelected}
+                    disabled={selectionDisabled}
+                    invalid={selectionInvalid}
+                    focusDemo={selectionFocusDemo}
+                    accentMode={selectionAccentMode}
+                  />
+                  <div className="border-t border-hairline pt-5">
+                    <p className="hito-label">Required states</p>
+                    <div className="mt-4 grid gap-3">
+                      <label className="hito-control-label hito-control-label-sm">
+                        <input type="checkbox" className="hito-checkbox hito-checkbox-sm" />
+                        <span>Default checkbox</span>
+                      </label>
+                      <label className="hito-control-label hito-control-label-sm">
+                        <input
+                          type="checkbox"
+                          className="hito-checkbox hito-checkbox-sm"
+                          defaultChecked
+                          data-state="checked"
+                        />
+                        <span>Signal-selected checkbox</span>
+                      </label>
+                      <label className="hito-control-label hito-control-label-sm">
+                        <input
+                          type="radio"
+                          className="hito-radio hito-radio-sm"
+                          data-demo-state="focus"
+                        />
+                        <span>Focus-visible radio</span>
+                      </label>
+                      <div className="hito-choice-toggle-group">
+                        <button
+                          type="button"
+                          className="hito-choice-toggle hito-choice-toggle-sm"
+                          data-demo-state="focus"
+                        >
+                          Focus
+                        </button>
+                        <button
+                          type="button"
+                          className="hito-choice-toggle hito-choice-toggle-sm"
+                          aria-invalid="true"
+                        >
+                          Invalid
+                        </button>
+                        <button
+                          type="button"
+                          className="hito-choice-toggle hito-choice-toggle-sm"
+                          disabled
+                        >
+                          Disabled
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid gap-3">
-                    <label className="hito-control-label hito-control-label-sm">
-                      <input type="checkbox" className="hito-checkbox hito-checkbox-sm" />
-                      <span>SM checkbox</span>
-                    </label>
-                    <label className="hito-control-label hito-control-label-sm">
-                      <input
-                        type="checkbox"
-                        className="hito-checkbox hito-checkbox-sm"
-                        defaultChecked
-                        data-state="checked"
-                      />
-                      <span>SM checked uses signal</span>
-                    </label>
-                    <label className="hito-control-label hito-control-label-md">
-                      <input
-                        type="checkbox"
-                        className="hito-checkbox hito-checkbox-md"
-                        defaultChecked
-                        data-state="checked"
-                      />
-                      <span>MD checkbox with larger hit target</span>
-                    </label>
+                </>
+              }
+              controls={
+                <div className="hito-row-group border-0">
+                  <div className="hito-list-row items-start">
+                    <ChoiceSelector
+                      label="Control kind"
+                      value={selectionKind}
+                      options={SELECTION_CONTROL_KINDS}
+                      onChange={(nextKind) => {
+                        setSelectionKind(nextKind);
+                        if (nextKind !== "toggle" && !isBinarySelectionSize(selectionSize)) {
+                          setSelectionSize("md");
+                        }
+                      }}
+                      getLabel={getSelectionKindLabel}
+                    />
                   </div>
-                </article>
+                  <div className="hito-list-row items-start">
+                    <ChoiceSelector
+                      label="Size"
+                      value={selectionSize}
+                      options={
+                        selectionKind === "toggle" ? CHOICE_TOGGLE_SIZES : SELECTION_BINARY_SIZES
+                      }
+                      onChange={setSelectionSize}
+                      textTransform="uppercase"
+                    />
+                  </div>
+                  {selectionKind === "toggle" && (
+                    <ToggleRow
+                      label="Accent display mode"
+                      active={selectionAccentMode}
+                      onToggle={() => setSelectionAccentMode((v) => !v)}
+                    />
+                  )}
+                  <ToggleRow
+                    label="Selected"
+                    active={selectionSelected}
+                    onToggle={() => setSelectionSelected((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Disabled"
+                    active={selectionDisabled}
+                    onToggle={() => setSelectionDisabled((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Invalid"
+                    active={selectionInvalid}
+                    onToggle={() => setSelectionInvalid((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Focus demo"
+                    active={selectionFocusDemo}
+                    onToggle={() => setSelectionFocusDemo((v) => !v)}
+                  />
+                </div>
+              }
+              contract={[
+                {
+                  label: "Use for",
+                  body: "Checkboxes for independent on/off choices, radios for one-of-many choices, and choice toggles for compact selectable values.",
+                },
+                {
+                  label: "Do not use for",
+                  body: "Navigation between panels, decorative tags, status pills, or destructive meaning. Destructive context belongs to warning copy and the final destructive button.",
+                },
+                {
+                  label: "Variants",
+                  body: "Checkbox sm/md, radio sm/md, functional choice-toggle xs/sm/md/lg/xl, plus separate accent/display choice for large planning moments.",
+                },
+                {
+                  label: "States",
+                  body: "Default, selected, hover, focus-visible, disabled, invalid, disabled selected, and destructive-confirmation context.",
+                },
+                {
+                  label: "Used in",
+                  body: (
+                    <ProductLinks
+                      links={[
+                        { href: "/", label: "Calendar" },
+                        { href: "/settings", label: "/settings" },
+                        { href: "/hitoDS#inputs", label: "DS builders" },
+                      ]}
+                    />
+                  ),
+                },
+              ]}
+            >
+              <div className="mt-6 grid gap-5">
+                <div className="hito-reference-list">
+                  <ReferenceListRow
+                    label="Checkbox"
+                    title="Independent choice"
+                    body="Use when a choice can be independently on or off. Labels are the hit target: SM rows are at least 32px high and MD rows are at least 40px high. Checkbox boxes stay square; only radios are circular."
+                  />
+                  <ReferenceListRow
+                    label="Radio"
+                    title="One from a small set"
+                    body="Use when one option must be selected from a small set. Keep labels plain and keep focus-visible distinct from the selected dot."
+                  />
+                  <ReferenceListRow
+                    label="Toggle radio"
+                    title="Selectable values"
+                    body="Functional sizes match the button/input scale for normal controls. Decorative plan-builder choices use the separate accent size, not xl."
+                  />
+                </div>
 
-                <article className="hito-reference-row">
-                  <div>
-                    <p className="hito-label">Radio</p>
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)]">
+                  <article className="hito-surface-flat p-5">
+                    <p className="hito-label">Functional toggle scale</p>
                     <p className="hito-caption mt-2 max-w-xl">
-                      Use when one option must be selected from a small set. Keep labels plain and
-                      keep focus-visible distinct from the selected dot.
+                      The mixed-size row aligns to each control height instead of stretching every
+                      item to the tallest toggle.
                     </p>
-                  </div>
-                  <div className="grid gap-3" role="radiogroup" aria-label="Radio example">
-                    <label className="hito-control-label hito-control-label-sm">
-                      <input
-                        type="radio"
-                        name="ds-radio-sm"
-                        className="hito-radio hito-radio-sm"
-                        defaultChecked
-                      />
-                      <span>SM selected</span>
-                    </label>
-                    <label className="hito-control-label hito-control-label-sm">
-                      <input type="radio" name="ds-radio-sm" className="hito-radio hito-radio-sm" />
-                      <span>SM default</span>
-                    </label>
-                    <label className="hito-control-label hito-control-label-md">
-                      <input
-                        type="radio"
-                        name="ds-radio-md"
-                        className="hito-radio hito-radio-md"
-                        defaultChecked
-                      />
-                      <span>MD selected</span>
-                    </label>
-                  </div>
-                </article>
-
-                <article className="hito-reference-row">
-                  <div>
-                    <p className="hito-label">Toggle radio</p>
-                    <p className="hito-caption mt-2 max-w-xl">
-                      Use for compact segmented option groups where the option surface is the label.
-                      Do not convert ordinary chips or buttons unless the interaction is truly a
-                      single-choice radio decision.
-                    </p>
-                  </div>
-                  <div className="grid gap-4">
                     <div
-                      className="hito-choice-toggle-group"
+                      className="hito-choice-toggle-group mt-4 items-center"
                       role="radiogroup"
-                      aria-label="Small toggle radio example"
+                      aria-label="Toggle radio size scale"
+                    >
+                      {CHOICE_TOGGLE_SIZES.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className={cn(
+                            "hito-choice-toggle uppercase",
+                            `hito-choice-toggle-${item}`,
+                          )}
+                          role="radio"
+                          aria-checked={item === "md"}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-5 grid gap-2">
+                      {CHOICE_TOGGLE_SIZES.map((item) => (
+                        <div key={item} className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            className={cn(
+                              "hito-button hito-button-secondary uppercase",
+                              `hito-button-${item}`,
+                            )}
+                          >
+                            {item}
+                          </button>
+                          <input
+                            readOnly
+                            value={item}
+                            aria-label={`${item} field alignment`}
+                            className={cn(
+                              "hito-field hito-field-secondary uppercase max-w-24",
+                              `hito-field-${item}`,
+                            )}
+                          />
+                          <button
+                            type="button"
+                            className={cn(
+                              "hito-choice-toggle uppercase",
+                              `hito-choice-toggle-${item}`,
+                            )}
+                            data-selected={item === "md"}
+                          >
+                            {item}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+
+                  <article className="hito-surface-flat p-5">
+                    <p className="hito-label">Accent / display choice</p>
+                    <p className="hito-caption mt-2">
+                      Accent is not part of the functional size ladder. Use it only when the choice
+                      is a large visual planning moment, such as race distance or goal direction.
+                    </p>
+                    <div
+                      className="hito-choice-toggle-group mt-4"
+                      role="radiogroup"
+                      aria-label="Accent toggle radio example"
                     >
                       <button
                         type="button"
-                        className="hito-choice-toggle hito-choice-toggle-sm"
+                        className="hito-choice-toggle hito-choice-toggle-accent"
                         role="radio"
                         aria-checked="true"
                       >
-                        Easy
+                        <span>
+                          <span className="block">Half marathon</span>
+                          <span className="mt-1 block text-current/70">Goal distance choice</span>
+                        </span>
                       </button>
                       <button
                         type="button"
-                        className="hito-choice-toggle hito-choice-toggle-sm"
+                        className="hito-choice-toggle hito-choice-toggle-accent"
                         role="radio"
                         aria-checked="false"
                       >
-                        Balanced
-                      </button>
-                      <button
-                        type="button"
-                        className="hito-choice-toggle hito-choice-toggle-sm"
-                        role="radio"
-                        aria-checked="false"
-                      >
-                        Ambitious
+                        <span>
+                          <span className="block">Build consistency</span>
+                          <span className="mt-1 block text-current/70">
+                            Large onboarding choice
+                          </span>
+                        </span>
                       </button>
                     </div>
-                    <div
-                      className="hito-choice-toggle-group"
-                      role="radiogroup"
-                      aria-label="Medium toggle radio example"
-                    >
-                      <button
-                        type="button"
-                        className="hito-choice-toggle hito-choice-toggle-md"
-                        role="radio"
-                        aria-checked="false"
-                      >
-                        Short
-                      </button>
-                      <button
-                        type="button"
-                        className="hito-choice-toggle hito-choice-toggle-md"
-                        role="radio"
-                        aria-checked="true"
-                      >
-                        Marathon
-                      </button>
-                    </div>
-                  </div>
-                </article>
-
-                <article className="hito-reference-row">
-                  <div>
-                    <p className="hito-label">Disabled and invalid</p>
-                    <p className="hito-caption mt-2 max-w-xl">
-                      Disabled lowers contrast. Invalid uses the error ring, but selected state
-                      still does not become destructive red.
-                    </p>
-                  </div>
-                  <div className="grid gap-3">
-                    <label className="hito-control-label hito-control-label-sm">
-                      <input
-                        type="checkbox"
-                        className="hito-checkbox hito-checkbox-sm"
-                        defaultChecked
-                        data-state="checked"
-                        disabled
-                      />
-                      <span>Disabled checked</span>
-                    </label>
-                    <label className="hito-control-label hito-control-label-sm">
-                      <input
-                        type="radio"
-                        name="ds-radio-invalid"
-                        className="hito-radio hito-radio-sm"
-                        aria-invalid="true"
-                      />
-                      <span>Invalid radio</span>
-                    </label>
-                    <div className="hito-choice-toggle-group">
-                      <button
-                        type="button"
-                        className="hito-choice-toggle hito-choice-toggle-sm"
-                        role="radio"
-                        aria-checked="true"
-                        aria-invalid="true"
-                      >
-                        Invalid selected
-                      </button>
-                      <button
-                        type="button"
-                        className="hito-choice-toggle hito-choice-toggle-sm"
-                        disabled
-                      >
-                        Disabled
-                      </button>
-                    </div>
-                  </div>
-                </article>
+                  </article>
+                </div>
 
                 <article className="hito-reference-row">
                   <div>
@@ -2152,7 +2506,7 @@ function HitoDesignSystemPage() {
                   </div>
                 </article>
               </div>
-            </section>
+            </SpecimenSection>
 
             <section id="surfaces" className="ds-section">
               <SectionIntro
@@ -2194,15 +2548,100 @@ function HitoDesignSystemPage() {
               </div>
             </section>
 
-            <section id="modals" className="ds-section">
-              <SectionIntro
-                label="Modals"
-                title="Bounded panel, explicit body mode, reachable footer."
-                body="Product dialogs share one stable overlay and panel recipe, then choose the body mode that matches the task. Short content fits naturally; tall workflows scroll internally."
-              />
-
-              <div className="grid gap-5">
-                <div className="hito-row-group">
+            <SpecimenSection
+              id="modals"
+              label="Modals"
+              title="Bounded panel, explicit body mode, reachable footer."
+              body="Product dialogs share one stable overlay and panel recipe, then choose the body mode that matches the task. Short content fits naturally; tall workflows scroll internally."
+              preview={
+                <ModalWindowPreview
+                  bodyMode={modalBodyMode}
+                  headerMode={modalHeaderMode}
+                  footerMode={modalFooterMode}
+                  showStatusPill={modalStatusPill}
+                  destructive={modalDestructive}
+                  longContent={modalLongContent}
+                />
+              }
+              controls={
+                <div className="hito-row-group border-0">
+                  <div className="hito-list-row items-start">
+                    <ChoiceSelector
+                      label="Body mode"
+                      value={modalBodyMode}
+                      options={MODAL_BODY_MODES}
+                      onChange={setModalBodyMode}
+                      textTransform="none"
+                    />
+                  </div>
+                  <div className="hito-list-row items-start">
+                    <ChoiceSelector
+                      label="Header mode"
+                      value={modalHeaderMode}
+                      options={MODAL_HEADER_MODES}
+                      onChange={setModalHeaderMode}
+                    />
+                  </div>
+                  <div className="hito-list-row items-start">
+                    <ChoiceSelector
+                      label="Footer mode"
+                      value={modalFooterMode}
+                      options={MODAL_FOOTER_MODES}
+                      onChange={setModalFooterMode}
+                      textTransform="none"
+                    />
+                  </div>
+                  <ToggleRow
+                    label="Status pill"
+                    active={modalStatusPill}
+                    onToggle={() => setModalStatusPill((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Destructive scenario"
+                    active={modalDestructive}
+                    onToggle={() => setModalDestructive((v) => !v)}
+                  />
+                  <ToggleRow
+                    label="Long content"
+                    active={modalLongContent}
+                    onToggle={() => setModalLongContent((v) => !v)}
+                  />
+                </div>
+              }
+              contract={[
+                {
+                  label: "Use for",
+                  body: "Bounded tasks, review-before-apply flows, imports, body notes, active-plan management, and source-backed read-only explanations.",
+                },
+                {
+                  label: "Do not use for",
+                  body: "Global navigation, passive page sections, dashboard cards, or silent mutations. Use inline state when the task does not need interruption.",
+                },
+                {
+                  label: "Variants",
+                  body: "Body modes are content-fit and scroll-fill. Headers are compact or large. Footers can be none, actions, or note-actions.",
+                },
+                {
+                  label: "States",
+                  body: "Open overlay/content boundaries stay explicit for Safari stability; destructive scenarios are copy and button tone, not a separate window style.",
+                },
+                {
+                  label: "Used in",
+                  body: (
+                    <ProductLinks
+                      links={[
+                        { href: "/", label: "Open plan" },
+                        { href: "/settings", label: "Import plan" },
+                        { href: "/workout/2026-05-18", label: "Body notes" },
+                        { href: "/admin/login", label: "/admin/login" },
+                      ]}
+                    />
+                  ),
+                },
+              ]}
+            >
+              <div className="mt-6 grid gap-5">
+                <div className="hito-reference-list">
                   <ReferenceListRow
                     label="Body mode"
                     title="content-fit"
@@ -2220,157 +2659,34 @@ function HitoDesignSystemPage() {
                   />
                 </div>
 
-                <div className="grid items-start gap-5 xl:grid-cols-2">
-                  <article className="hito-product-dialog hito-product-dialog-content-fit max-w-xl border border-hairline bg-background/95">
-                    <header className="hito-product-dialog-header">
-                      <p className="hito-label hito-label-signal">Content-fit body</p>
-                      <h3 className="hito-modal-title mt-2">Short task modal</h3>
-                      <p className="hito-body mt-2 max-w-lg">
-                        Use this for compact workflows or reference examples. There is no dead zone
-                        between content and footer.
-                      </p>
-                    </header>
-                    <div className="hito-product-dialog-body-content-fit">
-                      <div className="hito-row-group">
-                        <div className="hito-list-row items-start">
-                          <div>
-                            <p className="hito-list-row-title">Natural body height</p>
-                            <p className="hito-list-row-copy">
-                              The middle region wraps the actual content instead of filling a tall
-                              empty track.
-                            </p>
-                          </div>
-                          <span className="hito-status-pill" data-tone="success">
-                            Fit
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <footer className="hito-product-dialog-footer">
-                      <div className="hito-product-dialog-footer-row">
-                        <button
-                          type="button"
-                          className="hito-button hito-button-secondary hito-button-md"
-                        >
-                          Close
-                        </button>
-                        <button
-                          type="button"
-                          className="hito-button hito-button-primary hito-button-md"
-                        >
-                          Continue
-                        </button>
-                      </div>
-                    </footer>
-                  </article>
-
-                  <article className="hito-product-dialog hito-product-dialog-scroll-fill h-[min(34rem,calc(100dvh-2rem))] max-w-xl border border-hairline bg-background/95">
-                    <header className="hito-product-dialog-header">
-                      <div className="hito-product-dialog-header-row">
-                        <div>
-                          <p className="hito-label hito-label-signal">Scroll-fill body</p>
-                          <h3 className="hito-modal-title mt-2">Tall workflow modal</h3>
-                          <p className="hito-body mt-2 max-w-lg">
-                            Use this for `Open plan`, body notes, and import states where content
-                            can exceed the viewport.
-                          </p>
-                        </div>
-                        <span className="hito-status-pill mt-1" data-tone="signal">
-                          Stable
-                        </span>
-                      </div>
-                    </header>
-                    <div className="hito-product-dialog-body-scroll-fill">
-                      <div className="grid gap-3">
-                        {[
-                          "Active object summary",
-                          "Validation or proposal review",
-                          "Form controls",
-                          "Expert disclosure",
-                          "Destructive exception",
-                          "Preserved-history note",
-                          "Secondary utility action",
-                          "Backend-owned status copy",
-                          "Long-form runner explanation",
-                          "Final review reminder",
-                        ].map((label) => (
-                          <div
-                            key={label}
-                            className="hito-list-row rounded-xl border border-hairline"
-                          >
-                            <div>
-                              <p className="hito-list-row-title">{label}</p>
-                              <p className="hito-list-row-copy">
-                                This row belongs inside the scrollable middle, not between body and
-                                footer.
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <footer className="hito-product-dialog-footer">
-                      <div className="hito-product-dialog-footer-row" data-align="split">
-                        <p className="hito-product-dialog-footer-note">
-                          Footer note stays short and tied to save/apply.
-                        </p>
-                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                          <button
-                            type="button"
-                            className="hito-button hito-button-secondary hito-button-md"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            className="hito-button hito-button-primary hito-button-md"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                    </footer>
-                  </article>
-                </div>
-
                 <div className="grid gap-5 lg:grid-cols-2">
                   <div className="hito-row-group">
                     <ReferenceListRow
                       label="Header"
-                      title="Simple task header"
-                      body="Title plus short description. Current fit: Import plan and Body notes."
+                      title="Compact or large"
+                      body="Compact fits short tasks. Large can carry one label, status pill, or short description for lifecycle-heavy dialogs."
                     />
                     <ReferenceListRow
                       label="Header"
-                      title="Labeled or metadata header"
-                      body="One label, status pill, or compact utility action may orient the task without becoming a dashboard."
-                    />
-                    <ReferenceListRow
-                      label="Header"
-                      title="Complex lifecycle header"
-                      body="Reserved for Open plan, where the dialog owns a current active-plan lifecycle object."
+                      title="Close stays on the right"
+                      body="The close affordance remains reachable and separate from primary task completion."
                     />
                   </div>
                   <div className="hito-row-group">
                     <ReferenceListRow
                       label="Footer"
-                      title="Cancel + primary"
-                      body="Default focused workflow footer. Primary action stays on the visual right."
+                      title="No footer, actions, or note + actions"
+                      body="Read-only windows can omit the footer. Focused workflows use cancel + primary. One short note may explain save/apply context."
                     />
                     <ReferenceListRow
-                      label="Footer"
-                      title="Note + actions"
-                      body="Use one short tertiary note when save/apply needs bounded context, as in Body notes."
-                    />
-                    <ReferenceListRow
-                      label="Footer"
-                      title="Proposal pair"
-                      body="Keep current plan and Apply update are explicit task-completion choices, never silent mutation."
+                      label="Mutation"
+                      title="Explicit task completion"
+                      body="Keep current plan and Apply update are explicit choices, never silent mutation."
                     />
                   </div>
                 </div>
               </div>
-            </section>
+            </SpecimenSection>
 
             <section id="async-actions" className="ds-section">
               <SectionIntro
@@ -2857,6 +3173,36 @@ function HitoDesignSystemPage() {
                 </div>
               </div>
             </section>
+
+            <section id="backlog" className="ds-section">
+              <SectionIntro
+                label="Backlog"
+                title="Known DS exceptions and rollout gaps."
+                body="This section keeps the workbench honest: these areas are intentionally route-owned or waiting for a later bounded DS cleanup slice."
+              />
+              <div className="hito-reference-list">
+                <ReferenceListRow
+                  label="Local"
+                  title="Chart geometry remains route-owned"
+                  body="Bar heights, widths, axis density, and visualization coordinates stay with the product route unless a repeated visualization primitive emerges."
+                />
+                <ReferenceListRow
+                  label="Local"
+                  title="Timeline grid and sticky scope remain route-owned"
+                  body="The DS owns editorial timeline typography, backdrop, dots, and inline code; changelog grouping, rail layout, and sticky boundaries stay with `/changelog`."
+                />
+                <ReferenceListRow
+                  label="In rollout"
+                  title="More interactive explorers can follow"
+                  body="Select, dropdown/menu, data-table toolbar, async toast lifecycle, and shell rows are candidates for later standardized specimens."
+                />
+                <ReferenceListRow
+                  label="Temporary"
+                  title="Compatibility wrappers stay small"
+                  body="Radix/shadcn wrapper exports remain stable while their default visuals continue moving under Hito DS ownership."
+                />
+              </div>
+            </section>
           </div>
         </main>
       </div>
@@ -3118,6 +3464,525 @@ function LegendDemoItem({
   );
 }
 
+function getNavGroupForSection(sectionId: SectionId) {
+  return (
+    NAV_GROUPS.find((group) => group.sections.some((section) => section.id === sectionId)) ??
+    NAV_GROUPS[0]
+  );
+}
+
+function SpecimenSection({
+  id,
+  label,
+  title,
+  body,
+  status = "Core",
+  preview,
+  controls,
+  contract,
+  children,
+}: {
+  id: string;
+  label: string;
+  title: string;
+  body: string;
+  status?: "Core" | "Pattern" | "Exception" | "Legacy" | "In rollout";
+  preview: ReactNode;
+  controls: ReactNode;
+  contract: Array<{ label: string; body: ReactNode }>;
+  children?: ReactNode;
+}) {
+  return (
+    <section id={id} className="ds-section">
+      <div className="hito-specimen-header">
+        <SectionIntro label={label} title={title} body={body} />
+        <span className="hito-status-pill" data-tone="signal">
+          {status}
+        </span>
+      </div>
+      <div className="hito-specimen">
+        <div className="hito-specimen-grid">
+          <article className="hito-specimen-preview">{preview}</article>
+          <aside className="hito-specimen-controls" aria-label={`${title} controls`}>
+            {controls}
+          </aside>
+        </div>
+        <div className="hito-specimen-contract">
+          {contract.map((row) => (
+            <div key={row.label} className="hito-specimen-contract-row">
+              <p className="hito-micro-label">{row.label}</p>
+              <div className="hito-list-row-copy">{row.body}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ProductLinks({ links }: { links: Array<{ href: string; label: string }> }) {
+  return (
+    <span className="hito-specimen-links">
+      {links.map((link) => (
+        <a key={link.href} href={link.href} className="hito-specimen-link">
+          {link.label}
+        </a>
+      ))}
+    </span>
+  );
+}
+
+function DataTableSpecimenPreview({
+  sortable,
+  activeSort,
+  filtered,
+  staticMode,
+  showUtilityRow,
+}: {
+  sortable: boolean;
+  activeSort: boolean;
+  filtered: boolean;
+  staticMode: boolean;
+  showUtilityRow: boolean;
+}) {
+  const previewIsStatic = staticMode || !sortable;
+
+  return (
+    <div className="grid gap-4">
+      {showUtilityRow && (
+        <div className="hito-data-table-utility-row">
+          <label className="hito-field hito-field-sm hito-data-table-search">
+            <Icon name="search" size="xs" className="text-muted-foreground" />
+            <input
+              aria-label="Search data table specimen"
+              className="hito-data-table-search-input"
+              readOnly
+              value="runner@hito.test"
+            />
+            <button
+              type="button"
+              className="hito-button hito-button-ghost hito-button-xs hito-data-table-search-clear"
+              aria-label="Clear search"
+            >
+              <Icon name="close" size="xs" />
+            </button>
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-sm hito-data-table-filter-summary"
+            >
+              Filters · {filtered ? "1" : "0"}
+            </button>
+            <span className="hito-caption">3 rows</span>
+          </div>
+        </div>
+      )}
+
+      <div className="hito-data-table-scroll">
+        <table className="hito-data-table min-w-[860px]">
+          <caption className="sr-only">Hito data-table specimen preview.</caption>
+          <thead>
+            <tr>
+              <th
+                scope="col"
+                aria-sort={!previewIsStatic && activeSort ? "descending" : undefined}
+                className="whitespace-nowrap px-2 py-2 font-medium"
+              >
+                {previewIsStatic ? (
+                  <DataTableStaticHeader label="Preview column" />
+                ) : (
+                  <DataTableHeaderButton
+                    label="Preview column"
+                    active={activeSort}
+                    filtered={filtered}
+                  />
+                )}
+              </th>
+              <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+                <DataTableHeaderButton label="Hover state" hover />
+              </th>
+              <th
+                scope="col"
+                aria-sort="descending"
+                className="whitespace-nowrap px-2 py-2 font-medium"
+              >
+                <DataTableHeaderButton label="Active sort" active />
+              </th>
+              <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+                <DataTableHeaderButton label="Filtered" filtered />
+              </th>
+              <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+                <DataTableStaticHeader label="Static header" />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="hito-data-table-cell hito-data-table-cell-start">
+                {previewIsStatic ? "Non-interactive label" : "Header menu affordance"}
+              </td>
+              <td className="hito-data-table-cell">Subtle Hito wash</td>
+              <td className="hito-data-table-cell">Signal arrow active</td>
+              <td className="hito-data-table-cell">Circular filter dot</td>
+              <td className="hito-data-table-cell hito-data-table-cell-end">
+                Same typography, no click
+              </td>
+            </tr>
+            <tr>
+              <td className="hito-data-table-cell hito-data-table-cell-start">
+                <code className="hito-technical-mono hito-data-table-code">
+                  qa-runner@hito.test
+                </code>
+              </td>
+              <td className="hito-data-table-cell">Keyboard reachable</td>
+              <td className="hito-data-table-cell">aria-sort on th</td>
+              <td className="hito-data-table-cell">Filter stays contextual</td>
+              <td className="hito-data-table-cell hito-data-table-cell-end">Password</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p className="hito-caption">
+        The scroll container owns horizontal overflow; the page canvas should not.
+      </p>
+    </div>
+  );
+}
+
+function DataTableHeaderButton({
+  label,
+  active = false,
+  filtered = false,
+  hover = false,
+}: {
+  label: string;
+  active?: boolean;
+  filtered?: boolean;
+  hover?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
+      data-active={active || filtered ? "true" : undefined}
+      data-demo-state={hover ? "hover" : undefined}
+      aria-label={`Sort and filter ${label}`}
+    >
+      {label}
+      {filtered ? <span className="hito-data-table-filter-dot" /> : null}
+      <Icon
+        aria-hidden="true"
+        name="chevron-down"
+        size="xs"
+        className="hito-data-table-sort-indicator"
+        data-active={active ? "true" : undefined}
+      />
+    </button>
+  );
+}
+
+function DataTableStaticHeader({ label }: { label: string }) {
+  return (
+    <span className="hito-data-table-header hito-data-table-header-static" data-disabled="true">
+      {label}
+    </span>
+  );
+}
+
+function ModalWindowPreview({
+  bodyMode,
+  headerMode,
+  footerMode,
+  showStatusPill,
+  destructive,
+  longContent,
+}: {
+  bodyMode: ModalBodyMode;
+  headerMode: ModalHeaderMode;
+  footerMode: ModalFooterMode;
+  showStatusPill: boolean;
+  destructive: boolean;
+  longContent: boolean;
+}) {
+  const rows = longContent
+    ? [
+        "Active object summary",
+        "Validation or proposal review",
+        "Form controls",
+        "Expert disclosure",
+        "Destructive exception",
+        "Preserved-history note",
+        "Secondary utility action",
+        "Backend-owned status copy",
+        "Long-form runner explanation",
+        "Final review reminder",
+      ]
+    : ["Active object summary", "Validation or proposal review", "Primary task content"];
+  const title = destructive
+    ? "Archive active plan?"
+    : bodyMode === "scroll-fill"
+      ? "Tall workflow modal"
+      : "Short task modal";
+  const description = destructive
+    ? "Destructive meaning lives in the copy and final action, not in the window chrome."
+    : bodyMode === "scroll-fill"
+      ? "Use this when content can exceed the viewport but the footer must remain reachable."
+      : "Use this when content can fit naturally without manufacturing empty height.";
+
+  return (
+    <article
+      className={cn(
+        "hito-window max-w-xl",
+        bodyMode === "scroll-fill"
+          ? "hito-window-scroll-fill h-[min(32rem,calc(100dvh-4rem))]"
+          : "hito-window-content-fit",
+      )}
+    >
+      <header
+        className={cn(
+          "hito-window-header",
+          headerMode === "large" ? "hito-window-header-large" : "hito-window-header-compact",
+        )}
+      >
+        <div>
+          <p className="hito-label hito-label-signal">
+            {headerMode === "large" ? "Large header + close" : "Compact header + close"}
+          </p>
+          <h3 className="hito-modal-title mt-2">{title}</h3>
+          {headerMode === "large" && <p className="hito-body mt-2 max-w-lg">{description}</p>}
+          {showStatusPill && (
+            <span
+              className="hito-status-pill mt-3"
+              data-tone={destructive ? "destructive" : "signal"}
+            >
+              {destructive ? "Destructive" : bodyMode}
+            </span>
+          )}
+        </div>
+        <button type="button" className="hito-window-close" aria-label="Close modal">
+          <Icon name="close" size="sm" />
+        </button>
+      </header>
+      <div
+        className={cn("hito-window-body", bodyMode === "scroll-fill" && "hito-window-body-scroll")}
+      >
+        <div className="grid gap-3">
+          {destructive && (
+            <div className="flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-3">
+              <Icon name="warning" size="sm" className="mt-1 text-destructive" />
+              <p className="hito-field-helper">
+                This action changes an active object. The final button carries destructive tone.
+              </p>
+            </div>
+          )}
+          {rows.map((label) => (
+            <div key={label} className="hito-list-row rounded-xl border border-hairline">
+              <div>
+                <p className="hito-list-row-title">{label}</p>
+                <p className="hito-list-row-copy">
+                  This row belongs inside the modal body. Scroll-fill keeps this middle region
+                  bounded when content grows.
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {footerMode !== "none" && (
+        <footer className="hito-window-footer" data-variant={footerMode}>
+          {footerMode === "note-actions" && (
+            <div className="hito-window-footer-note">
+              <p>Footer note stays short and tied to save/apply.</p>
+            </div>
+          )}
+          <div className="hito-window-footer-actions">
+            <button type="button" className="hito-button hito-button-secondary hito-button-md">
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "hito-button hito-button-md",
+                destructive ? "hito-button-outlined" : "hito-button-primary",
+              )}
+              data-tone={destructive ? "error" : undefined}
+            >
+              {destructive ? "Archive" : "Continue"}
+            </button>
+          </div>
+        </footer>
+      )}
+    </article>
+  );
+}
+
+function ChoiceSelector<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  size = "sm",
+  getLabel,
+  textTransform = "capitalize",
+}: {
+  label: string;
+  value: T;
+  options: readonly T[];
+  onChange: (value: T) => void;
+  size?: (typeof CHOICE_TOGGLE_SIZES)[number];
+  getLabel?: (value: T) => string;
+  textTransform?: "capitalize" | "uppercase" | "none";
+}) {
+  return (
+    <div className="w-full">
+      <p className="hito-label">{label}</p>
+      <div className="hito-choice-toggle-group mt-3" role="radiogroup" aria-label={label}>
+        {options.map((item) => {
+          const selected = value === item;
+          return (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onChange(item)}
+              data-selected={selected}
+              aria-checked={selected}
+              className={cn(
+                "hito-choice-toggle",
+                `hito-choice-toggle-${size}`,
+                textTransform === "capitalize" && "capitalize",
+                textTransform === "uppercase" && "uppercase",
+              )}
+              role="radio"
+            >
+              {getLabel ? getLabel(item) : item}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function getSelectionKindLabel(kind: SelectionControlKind) {
+  if (kind === "toggle") {
+    return "Toggle";
+  }
+
+  return kind;
+}
+
+function isBinarySelectionSize(size: ChoiceToggleSize): size is SelectionBinarySize {
+  return size === "sm" || size === "md";
+}
+
+function SelectionControlPreview({
+  kind,
+  size,
+  selected,
+  disabled,
+  invalid,
+  focusDemo,
+  accentMode,
+}: {
+  kind: SelectionControlKind;
+  size: ChoiceToggleSize;
+  selected: boolean;
+  disabled: boolean;
+  invalid: boolean;
+  focusDemo: boolean;
+  accentMode: boolean;
+}) {
+  const binarySize = isBinarySelectionSize(size) ? size : "md";
+
+  if (kind === "toggle") {
+    return (
+      <div className="grid gap-3">
+        <div
+          className="hito-choice-toggle-group"
+          role="radiogroup"
+          aria-label="Selection control preview"
+        >
+          <button
+            type="button"
+            className={cn(
+              "hito-choice-toggle",
+              accentMode ? "hito-choice-toggle-accent" : `hito-choice-toggle-${size}`,
+            )}
+            data-selected={selected}
+            data-demo-state={focusDemo ? "focus" : undefined}
+            aria-checked={selected}
+            aria-disabled={disabled || undefined}
+            aria-invalid={invalid || undefined}
+            disabled={disabled}
+            role="radio"
+          >
+            {accentMode ? (
+              <span>
+                <span className="block">Goal distance</span>
+                <span className="mt-1 block text-current/70">Accent display choice</span>
+              </span>
+            ) : (
+              "Preview choice"
+            )}
+          </button>
+          {!accentMode && (
+            <button
+              type="button"
+              className={cn("hito-choice-toggle", `hito-choice-toggle-${size}`)}
+              aria-checked="false"
+              role="radio"
+            >
+              Other choice
+            </button>
+          )}
+        </div>
+        <p className="hito-caption">
+          {accentMode
+            ? "Accent is reserved for large visual choice moments."
+            : `${size.toUpperCase()} toggle matches the functional button/input scale.`}
+        </p>
+      </div>
+    );
+  }
+
+  const inputClassName = cn(
+    kind === "checkbox" ? "hito-checkbox" : "hito-radio",
+    kind === "checkbox" ? `hito-checkbox-${binarySize}` : `hito-radio-${binarySize}`,
+  );
+
+  return (
+    <div className="grid gap-3">
+      <label
+        className={cn("hito-control-label", `hito-control-label-${binarySize}`)}
+        aria-disabled={disabled || undefined}
+      >
+        <input
+          type={kind}
+          name={`selection-preview-${kind}`}
+          className={inputClassName}
+          checked={selected}
+          readOnly
+          disabled={disabled}
+          aria-invalid={invalid || undefined}
+          data-state={selected ? "checked" : undefined}
+          data-demo-state={focusDemo ? "focus" : undefined}
+        />
+        <span>
+          {kind === "checkbox" ? "Preview checkbox" : "Preview radio"} · {binarySize.toUpperCase()}
+        </span>
+      </label>
+      <p className="hito-caption">
+        {kind === "checkbox"
+          ? "Checkboxes are square and support independent on/off choices."
+          : "Radios stay circular and represent one-of-many selection."}
+      </p>
+    </div>
+  );
+}
+
 function ToggleRow({
   label,
   active,
@@ -3233,6 +4098,8 @@ function DemoButton({
   leftIcon,
   rightIcon,
   disabled = false,
+  loading = false,
+  demoState,
 }: {
   variant: ButtonVariant;
   tone?: ButtonTone;
@@ -3240,6 +4107,8 @@ function DemoButton({
   leftIcon?: boolean;
   rightIcon?: boolean;
   disabled?: boolean;
+  loading?: boolean;
+  demoState?: "hover" | "focus";
 }) {
   return (
     <button
@@ -3251,10 +4120,15 @@ function DemoButton({
         `hito-button-${size}`,
       )}
       data-tone={tone === "default" ? undefined : tone}
+      data-demo-state={demoState}
     >
-      {leftIcon && <Icon name="circle" size="xs" />}
-      {variant}
-      {rightIcon && <Icon name="arrow-right" size="xs" />}
+      {loading ? (
+        <Icon name="loader" size="xs" className="animate-spin" />
+      ) : (
+        leftIcon && <Icon name="circle" size="xs" />
+      )}
+      {loading ? "Loading" : variant}
+      {!loading && rightIcon && <Icon name="arrow-right" size="xs" />}
     </button>
   );
 }

@@ -4,6 +4,9 @@ Completed implementation history only.
 
 ## 2026-05-24
 
+- Corrected Hito choice-toggle sizing: functional `xs/sm/md/lg/xl` toggles now align to the button/input size scale, while large decorative plan-builder choices have a separate `hito-choice-toggle-accent` recipe documented in `/hitoDS#selection-controls`.
+- Simplified the `/hitoDS` reference workbench: sidebar navigation now groups content under Overview, Foundations, Components, Patterns, and Backlog, while Buttons, Inputs, Tabs, and Status expose a consistent preview, controls, contract, and product-usage link structure.
+- Tightened `/hitoDS` interaction primitives: sidebar section links now show the active hash/scroll section, modal examples use a rounded Hito window anatomy, demo value pickers use choice toggles instead of tabs, choice toggles cover the full size scale, and checkbox controls read square while keeping signal-selected states.
 - Refined two Hito DS visual recipes: settings avatar actions now use a same-width Upload/Edit action pattern tied to the rectangular avatar tile, and enclosed tab rails now use a darker inset shared DS treatment.
 - Promoted `/progress` visualization chrome into Hito DS: weekly planned-vs-actual bar fills, recent-consistency status fills, chart section dividers, and compact chart notes now use shared DS classes documented in `/hitoDS#analytics` while chart heights, widths, and aggregate calculations remain route-owned geometry.
 - Aligned shared Radix/shadcn-derived UI wrappers with Hito DS defaults: dialog, sheet, dropdown menu, select, progress, card, and sidebar wrappers now start from Hito overlay, surface, menu, field, signal-progress, and low-card recipes while preserving existing exports and behavior; `/hitoDS#shared-wrappers` documents the boundary.

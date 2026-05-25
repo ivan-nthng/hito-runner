@@ -30,6 +30,23 @@ The admin analytics backend now classifies users before aggregation: real-user p
 
 Further admin work should be demand-driven by concrete ops needs, recurring failures, or product-analysis gaps. Do not continue into dashboard polish, frontend-only metrics, `app_events`, `app_failures`, or `admin_issues` just because Phase 1 is complete.
 
+## Active Inventory Note
+
+Kept active during the 2026-05-25 inventory cleanup because Phase 2 event/failure instrumentation and Phase 3 internal issue backlog remain future roadmap inside this same admin/ops plan.
+
+No immediate admin implementation slice is recommended.
+
+## Checklist
+
+- [x] Complete Phase 1A local Test accounts backend contract.
+- [x] Complete Phase 1A local Test accounts UI.
+- [x] Complete Phase 1 backend analytics loader from existing Supabase truth.
+- [x] Complete Phase 1 admin analytics UI tabs.
+- [x] Complete dedicated owner admin login flow.
+- [ ] Phase 2 event/failure instrumentation, only when concrete ops failures justify it.
+- [ ] Phase 3 internal issue backlog, only when recurring failures need triage inside Hito.
+- [ ] Deployed URL smoke after real env setup for `HITO_ADMIN_PASSWORD_HASH` and `HITO_ADMIN_SESSION_SECRET`.
+
 ## Context
 
 Hito already has enough backend-owned truth to make an internal admin surface useful. The first draft admin plan focused on top-level counts. That remains a good Phase 1, but it is too narrow for the next product need.

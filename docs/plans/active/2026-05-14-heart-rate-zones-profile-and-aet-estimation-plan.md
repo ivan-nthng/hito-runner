@@ -2,15 +2,25 @@
 
 ## Status
 
-Draft
+Paused / backlog
 
 ## Owner
 
-Architect
+Architect / Backend
 
 ## Last Updated
 
-2026-05-14
+2026-05-25
+
+## Active Inventory Note
+
+Kept active during the 2026-05-25 inventory cleanup because Hito still does not have runner-level HR-zone truth.
+
+This is not the next committed implementation slice. Treat it as a paused future physiology plan until PRODUCT/ARCHITECT explicitly prioritizes HR-zone work.
+
+## Next Action
+
+When prioritized, ARCHITECT should first reduce this broad plan into one backend-owned Phase 1 slice for runner-level manual zone storage and readback before guided-test estimation or active-plan reapplication.
 
 ## Context
 

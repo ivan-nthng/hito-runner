@@ -2,7 +2,7 @@
 
 ## Status
 
-Active
+Active / needs backend implementation
 
 ## Owner
 
@@ -10,7 +10,13 @@ Architect / Backend
 
 ## Last Updated
 
-2026-05-21
+2026-05-25
+
+## Active Inventory Note
+
+Kept active during the 2026-05-25 inventory cleanup because Polar automatic sync is still a concrete future integration plan and is not yet implemented.
+
+This remains the highest-signal integration plan in `docs/plans/active/`.
 
 ## Context
 
@@ -701,6 +707,19 @@ Regression QA:
 - Existing Feedback readback shows Polar-backed truth without a separate Polar UI.
 - Duplicate sessions do not duplicate feedback.
 - Existing Garmin upload/remove behavior does not regress.
+
+## Checklist
+
+- [ ] Add provider connection and raw provider payload storage.
+- [ ] Add Polar OAuth connect/callback and encrypted token storage.
+- [ ] Add Polar v4 client and token refresh.
+- [ ] Add scheduled recent-window sync plus manual `Sync now` fallback.
+- [ ] Persist raw Polar training-session payload before normalization.
+- [ ] Normalize running sessions into existing workout actual truth.
+- [ ] Match conservatively to planned workouts.
+- [ ] Reuse existing deterministic comparison and optional AI insight.
+- [ ] Expose minimal frontend connection/sync status after backend truth is stable.
+- [ ] QA Garmin upload/remove regression.
 
 ## Next Recommended Role
 

@@ -1,14 +1,20 @@
 Status
 
-Proposed
+Paused / backlog - implementation-ready
 
 Owner
 
-ARCHITECT
+ARCHITECT / BACKEND
 
 Last Updated
 
-2026-05-15
+2026-05-25
+
+Active Inventory Note
+
+Kept active during the 2026-05-25 inventory cleanup because JSON and Markdown export are shipped, while PDF export remains a discrete future slice.
+
+This should not be started by inertia. Pick it only when PRODUCT chooses plan-export PDF as the next product move.
 
 Context
 
@@ -177,6 +183,15 @@ Explicitly wait:
 - comparison/report PDFs
 - embedded Garmin or feedback data
 - custom theming or branded cover pages
+
+Checklist
+
+- [ ] Add one backend PDF projection from the existing active-plan export payload.
+- [ ] Keep active-plan-only export scope.
+- [ ] Reuse the authenticated attachment download path.
+- [ ] Add one `Export as PDF` menu item in `Open plan`.
+- [ ] Omit unsupported distance, pace, HR, and guidance fields without placeholders.
+- [ ] QA PDF download, file type, content shape, and JSON/Markdown regression.
 
 What We Refuse To Turn Into A Print Dashboard
 

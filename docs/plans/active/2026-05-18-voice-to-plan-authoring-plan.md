@@ -2,15 +2,25 @@
 
 ## Status
 
-Active - backend transcript review verdict, explicit first-plan confirm seam, and compact Pro transcript-text frontend assist implemented; raw audio capture and transcription transport remain later
+Paused after transcript-text v1; raw audio capture and transcription transport remain backlog
 
 ## Owner
 
-Backend / Frontend
+Backend / Frontend / QA
 
 ## Last Updated
 
-2026-05-18
+2026-05-25
+
+## Active Inventory Note
+
+Kept active during the 2026-05-25 inventory cleanup because the transcript-text review/confirm path is implemented, but the original voice/audio transport scope remains intentionally unfinished.
+
+Do not continue this by inertia. Start only when PRODUCT chooses real audio dictation as the next slice.
+
+## Next Action
+
+When prioritized, BACKEND should create the bounded raw-audio transport slice: accepted formats, size/duration limits, entitlement-before-transcription, one OpenAI transcription call, transcript normalization, and transcript-ready response before the existing draft/review path.
 
 ## Context
 

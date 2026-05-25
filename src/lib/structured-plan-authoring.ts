@@ -1939,11 +1939,21 @@ function buildEasyCue(normalized: NormalizedStructuredInput) {
 }
 
 function getRecent5kPaceSecondsPerKm(normalized: NormalizedStructuredInput) {
-  if (normalized.currentLevel.recent5kPaceSecondsPerKm) {
-    return normalized.currentLevel.recent5kPaceSecondsPerKm;
+  return getRecent5kPaceSecondsPerKmFromCurrentLevel(normalized.currentLevel);
+}
+
+function hasUsableRecent5kBenchmark(normalized: StructuredPlanAuthoringInput) {
+  return Boolean(getRecent5kPaceSecondsPerKmFromCurrentLevel(normalized.currentLevel));
+}
+
+function getRecent5kPaceSecondsPerKmFromCurrentLevel(
+  currentLevel: StructuredPlanAuthoringInput["currentLevel"],
+) {
+  if (currentLevel.recent5kPaceSecondsPerKm) {
+    return currentLevel.recent5kPaceSecondsPerKm;
   }
 
-  const recent5k = normalized.currentLevel.recentRaceResults.find((result) =>
+  const recent5k = currentLevel.recentRaceResults.find((result) =>
     /^5\s*k(m)?$/i.test(result.distance.trim()),
   );
   const resultSeconds = recent5k ? parseDurationSeconds(recent5k.resultTime) : null;
@@ -2261,6 +2271,10 @@ function isHighAmbitionPlan(normalized: NormalizedStructuredInput) {
 }
 
 function shouldAvoidQuality(normalized: StructuredPlanAuthoringInput) {
+  if (shouldCapBuildConsistencyQuality(normalized)) {
+    return true;
+  }
+
   if (normalized.runnerProfile.baselineSessionsPerWeek < 3) {
     return true;
   }
@@ -2284,6 +2298,31 @@ function shouldAvoidQuality(normalized: StructuredPlanAuthoringInput) {
     ...normalized.constraints.injuryConstraints,
     ...normalized.constraints.hardConstraints,
   ].some((value) => /avoid speed|no speed|avoid intensity|no intensity|injury/i.test(value));
+}
+
+function shouldCapBuildConsistencyQuality(normalized: StructuredPlanAuthoringInput) {
+  if (normalized.goal.goalType !== "build_consistency") {
+    return false;
+  }
+
+  if (normalized.runnerProfile.experienceLevel === "new_runner") {
+    return true;
+  }
+
+  if (
+    normalized.runnerProfile.baselineSessionsPerWeek <= 3 ||
+    normalized.availability.maxRunningDaysPerWeek <= 3
+  ) {
+    return true;
+  }
+
+  return !hasUsableRecent5kBenchmark(normalized) && !hasTargetTimePressure(normalized);
+}
+
+function hasTargetTimePressure(normalized: StructuredPlanAuthoringInput) {
+  return normalized.constraints.hardConstraints.some((constraint) =>
+    /target time/i.test(constraint),
+  );
 }
 
 function buildRestGuidance(normalized: StructuredPlanAuthoringInput) {

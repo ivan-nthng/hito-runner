@@ -2,15 +2,28 @@
 
 Completed implementation history only.
 
+## Highlight naming policy
+
+The public `/changelog` Highlights view is generated from the dated entries below. Use stable product-category language so repeated infrastructure work does not crowd out runner-facing changes:
+
+- `Run Creation Engine` for plan-authoring doctrine, workout diversity, metric-target rules, terrain logic, and coaching-quality corrections.
+- `Plan Refresh Safety` for proposal/apply, reviewed-draft, stale-proposal, protected-history, and explicit-confirm behavior.
+- `Calendar & Workout Identity` for visible workout labels, glyphs, calendar semantics, and compact workout identity rendering.
+- `Hito DS Iteration` for design-system refinements after the initial foundation. Do not call every DS pass "new"; version-like DS labels are docs-only and should wait for a real release bundle.
+- `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
+- `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
+
 ## 2026-05-25
 
-- Added the shared internal workbench responsive shell: `/hitoDS` and `/admin/analytics` now use common DS sidebar, sticky topbar, current-location, quick-link rail, and summary-grid classes so desktop keeps left navigation while tablet/mobile use contained top navigation and tables keep local horizontal scrolling.
+- Tightened beginner build-consistency doctrine: product `beginner` now maps to backend `new_runner`, and beginner or otherwise low-support build-consistency plans stay in easy/steady/long/cutback identities instead of tempo, interval, or race-like tune-up work.
+- Refined the Hito DS workbench responsive shell: `/hitoDS` and `/admin/analytics` now use common DS sidebar, sticky topbar, current-location, quick-link rail, and summary-grid classes so desktop keeps left navigation while tablet/mobile use contained top navigation and tables keep local horizontal scrolling.
 - Fixed runner-facing workout identity mapping: richer `sourceWorkoutType` values such as distance/time intervals, 5K/10K repeats, threshold/tempo durability, progression runs, race/tune-up work, and mountain/ultra endurance sessions now resolve through one visible identity so labels and glyphs agree instead of collapsing to generic `Quality`.
 - Added deployed-safe dedicated admin login: `/admin/login` now verifies the owner admin through server-only password-hash/session-secret env outside local fixtures, issues an admin-route-only signed cookie, keeps tester/product accounts out of admin access, and preserves local protected-fixture behavior for loopback QA without documenting or bundling plaintext credentials.
 - Sharpened deterministic goal-family workout identity: 5K plans can use safe strides or short sharpening reps, 10K plans use rhythm intervals, half marathon plans use threshold durability, marathon plans use controlled steady specificity and familiar fueling/time-on-feet cues, and ultra plans stay durability-oriented without road-race sharpening.
 - Added mountain/trail doctrine v2 to deterministic plan authoring and refresh drafts: mountain contexts now include technical trail caution, controlled descents/downhill durability, hike-run or power-hike allowance, mountain long-run time-on-feet cues, and taper terrain-stress reduction without exact elevation prescriptions.
 - Added long-distance honesty assumptions across structured setup, Dictate-to-Plan, text authoring instructions, and active-plan refresh draft metadata: low-support marathon, ultra, and mountain contexts now surface conservative, finish-oriented, or durability-limited language without changing load progression, pace gating, or HR suppression.
 - Fixed structured plan taper/phase consistency: long-run taper reductions now use the same `Taper` phase boundary as workout labeling, peak long-run durability load occurs before taper starts, taper long runs get reduced taper identity/guidance, and deterministic doctrine fixtures cover marathon, ultra, short-goal, broader-taper, and refresh-draft cases.
+- Added the canonical plan creation QA matrix: `docs/process/hito-plan-creation-qa-matrix.md` now defines high-risk structured, voice, text, import, refresh, workout-identity, glyph, metric-gating, and coaching-quality scenarios for future regression passes.
 
 ## 2026-05-24
 

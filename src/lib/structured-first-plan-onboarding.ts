@@ -273,7 +273,10 @@ export function parseStructuredFirstPlanOnboardingInput(value: unknown) {
   return result.data;
 }
 
-export function buildStructuredFirstPlanAuthoringInput(input: StructuredFirstPlanOnboardingInput) {
+export function buildStructuredFirstPlanAuthoringInput(
+  rawInput: StructuredFirstPlanOnboardingInput | StructuredFirstPlanOnboardingRequestInput,
+) {
+  const input = structuredFirstPlanOnboardingInputSchema.parse(rawInput);
   const fixedRestDays = uniqueWeekdays(input.availability.fixedRestDays);
   const allowedWeekdays = deriveAvailableTrainingWeekdays(fixedRestDays);
   const preferredLongRunDay =
@@ -554,6 +557,10 @@ function buildStructuredActivityMix(
 }
 
 function buildQualityRhythm(authoringInput: StructuredFirstPlanAuthoringInput) {
+  if (shouldReviewAvoidRegularQuality(authoringInput)) {
+    return "No regular quality day; runs stay mostly easy.";
+  }
+
   const nonLongRunDays = authoringInput.availability.preferredRunningDays.filter(
     (weekday) => weekday !== authoringInput.availability.preferredLongRunDay,
   );
@@ -564,6 +571,74 @@ function buildQualityRhythm(authoringInput: StructuredFirstPlanAuthoringInput) {
   }
 
   return `Quality work is planned around ${qualityDay}, with cutback weeks simplified.`;
+}
+
+function shouldReviewAvoidRegularQuality(authoringInput: StructuredFirstPlanAuthoringInput) {
+  if (authoringInput.availability.maxRunningDaysPerWeek < 3) {
+    return true;
+  }
+
+  if (shouldUseConservativeConsistencyReview(authoringInput)) {
+    return true;
+  }
+
+  if (
+    authoringInput.runnerProfile.experienceLevel === "new_runner" &&
+    !hasReviewUsableBenchmark(authoringInput)
+  ) {
+    return true;
+  }
+
+  if (
+    authoringInput.runnerProfile.age &&
+    authoringInput.runnerProfile.age >= 65 &&
+    !hasReviewUsableBenchmark(authoringInput)
+  ) {
+    return true;
+  }
+
+  return [
+    ...authoringInput.constraints.injuryConstraints,
+    ...authoringInput.constraints.hardConstraints,
+  ].some((constraint) =>
+    /avoid speed|no speed|avoid intensity|no intensity|injury/i.test(constraint),
+  );
+}
+
+function shouldUseConservativeConsistencyReview(authoringInput: StructuredFirstPlanAuthoringInput) {
+  if (authoringInput.goal.goalType !== "build_consistency") {
+    return false;
+  }
+
+  if (authoringInput.runnerProfile.experienceLevel === "new_runner") {
+    return true;
+  }
+
+  if (authoringInput.availability.maxRunningDaysPerWeek <= 3) {
+    return true;
+  }
+
+  return !hasReviewUsableBenchmark(authoringInput) && !hasReviewTargetTimePressure(authoringInput);
+}
+
+function hasReviewUsableBenchmark(authoringInput: StructuredFirstPlanAuthoringInput) {
+  if (authoringInput.currentLevel.recent5kPaceSecondsPerKm) {
+    return true;
+  }
+
+  return authoringInput.currentLevel.recentRaceResults.some((result) => {
+    if (!/^5\s*k(m)?$/i.test(result.distance.trim())) {
+      return false;
+    }
+
+    return parseDurationSeconds(result.resultTime) != null;
+  });
+}
+
+function hasReviewTargetTimePressure(authoringInput: StructuredFirstPlanAuthoringInput) {
+  return authoringInput.constraints.hardConstraints.some((constraint) =>
+    /target time/i.test(constraint),
+  );
 }
 
 function buildMetricPolicyReview(input: StructuredFirstPlanOnboardingInput) {
@@ -783,7 +858,7 @@ function inferExperienceLevel(input: StructuredFirstPlanOnboardingInput) {
       case "new_to_running":
         return "new_runner";
       case "beginner":
-        return "returning_runner";
+        return "new_runner";
       case "running_regularly":
         return "consistent_runner";
       case "performance_focused":

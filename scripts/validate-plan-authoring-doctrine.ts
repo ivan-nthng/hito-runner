@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   buildStructuredFirstPlanAuthoringInput,
   buildStructuredFirstPlanDraftReview,
+  parseStructuredFirstPlanOnboardingInput,
   type StructuredFirstPlanOnboardingRequestInput,
 } from "../src/lib/structured-first-plan-onboarding";
 import {
@@ -52,9 +53,11 @@ function buildRequest(
 }
 
 function buildPlan(input: StructuredFirstPlanOnboardingRequestInput) {
-  const authoringInput = buildStructuredFirstPlanAuthoringInput(input);
+  const parsedInput = parseStructuredFirstPlanOnboardingInput(input);
+  const authoringInput = buildStructuredFirstPlanAuthoringInput(parsedInput);
 
   return {
+    input: parsedInput,
     authoringInput,
     plan: buildStructuredAuthoringPlan(authoringInput),
   };
@@ -209,9 +212,9 @@ function assertTaperReducesLongRun(plan: TrainingPlanV2) {
 }
 
 function structuredReviewAssumptions(input: StructuredFirstPlanOnboardingRequestInput) {
-  const { authoringInput, plan } = buildPlan(input);
+  const { input: parsedInput, authoringInput, plan } = buildPlan(input);
 
-  return buildStructuredFirstPlanDraftReview(input, plan, authoringInput).assumptions;
+  return buildStructuredFirstPlanDraftReview(parsedInput, plan, authoringInput).assumptions;
 }
 
 function hasLongDistanceHonesty(assumptions: string[]) {
@@ -529,6 +532,101 @@ function assertGoalFamilyWorkoutIdentity() {
   );
 }
 
+function assertBeginnerBuildConsistencyQualityCap() {
+  const beginnerRequest = buildRequest("build_consistency", {
+    benchmark: { fitnessLevel: "beginner" },
+    availability: {
+      runningDaysPerWeek: 3,
+      fixedRestDays: [...fixedRestDays],
+      preferredLongRunDay: "Saturday",
+    },
+    execution: { watchAccess: "none", guidancePreference: "effort" },
+  });
+  const { input, authoringInput, plan } = buildPlan(beginnerRequest);
+  const review = buildStructuredFirstPlanDraftReview(input, plan, authoringInput);
+  const sourceTypes = sourceWorkoutTypes(plan);
+  const forbiddenQualityTypes = [
+    "controlled_tempo_session",
+    "time_intervals",
+    "distance_intervals",
+    "5k_sharpening_repeats",
+    "10k_rhythm_intervals",
+    "half_marathon_threshold_durability",
+    "marathon_steady_specificity",
+    "taper_tuneup_run",
+  ];
+  const allowedConsistencyTypes = new Set([
+    "easy_aerobic_run",
+    "steady_aerobic_run",
+    "long_aerobic_run",
+    "cutback_aerobic_run",
+    "cutback_long_run",
+    "taper_long_run",
+    "aerobic_strides",
+    "progression_run",
+  ]);
+
+  assert.equal(
+    authoringInput.runnerProfile.experienceLevel,
+    "new_runner",
+    "product beginner fitness level should map to backend new_runner",
+  );
+  assert.ok(
+    review.runnerUnderstanding.benchmark.includes("beginner"),
+    "review should show the runner-facing beginner label",
+  );
+  assert.equal(
+    review.runnerUnderstanding.benchmark.includes("returning_runner"),
+    false,
+    "review should not expose internal returning-runner wording for beginner fitness level",
+  );
+  assert.equal(
+    review.planShape.qualityRhythm,
+    "No regular quality day; runs stay mostly easy.",
+    "beginner consistency review should not promise a regular quality day",
+  );
+  assert.equal(
+    forbiddenQualityTypes.some((identity) => sourceTypes.has(identity)),
+    false,
+    "beginner low-support build-consistency plan should not emit tempo, interval, or race-like identities",
+  );
+  assert.deepEqual(
+    [...sourceTypes].filter((identity) => !allowedConsistencyTypes.has(identity)),
+    [],
+    "beginner build-consistency plan should stay within easy/steady/long/cutback identities",
+  );
+  assert.equal(
+    hasTargetKey(plan, "pace_min_per_km_range"),
+    false,
+    "beginner consistency plan without watch/benchmark support should not emit pace targets",
+  );
+  assert.equal(
+    hasTargetKey(plan, "hr_bpm_range"),
+    false,
+    "beginner consistency plan should not emit HR targets without HR-zone truth",
+  );
+
+  const weakSupportConsistency = buildPlan(
+    buildRequest("build_consistency", {
+      benchmark: { kind: "unknown" },
+      availability: {
+        runningDaysPerWeek: 4,
+        fixedRestDays: [...fixedRestDays],
+        preferredLongRunDay: "Saturday",
+      },
+      execution: { watchAccess: "none", guidancePreference: "effort" },
+    }),
+  ).plan;
+
+  assert.equal(
+    forbiddenQualityTypes.some((identity) =>
+      sourceWorkoutTypes(weakSupportConsistency).has(identity),
+    ),
+    false,
+    "build-consistency plans with no usable benchmark and no target-time pressure should stay conservative",
+  );
+}
+
 function assertMetricTargetPolicy() {
   const supportedPace = buildPlan(buildRequest("10k")).plan;
 
@@ -670,6 +768,7 @@ assertMountainTrailDoctrine(
   "ultra with mountain terrain",
 );
 assertGoalFamilyWorkoutIdentity();
+assertBeginnerBuildConsistencyQualityCap();
 assertMetricTargetPolicy();
 
 {

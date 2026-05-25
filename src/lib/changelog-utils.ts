@@ -46,6 +46,11 @@ export interface ChangelogHighlightMonth {
 }
 
 export type HighlightCategory =
+  | "run_creation_engine"
+  | "plan_refresh_safety"
+  | "admin_ops"
+  | "calendar_workout_identity"
+  | "qa_reliability"
   | "voice"
   | "onboarding"
   | "entitlement"
@@ -191,7 +196,7 @@ function getHighlightBadge(entry: string): HighlightBadge | null {
     return "Cleanup";
   }
 
-  if (/^(improved|updated|refined|normalized|reworked|tightened|hardened|aligned)\b/i.test(entry)) {
+  if (/^(improved|updated|upgraded|refined|normalized|reworked|tightened|hardened|aligned)\b/i.test(entry)) {
     return "Improved";
   }
 
@@ -239,12 +244,77 @@ function getDesignSystemSurfaceCount(normalizedEntry: string) {
 function getHighlightCategory(entry: string): HighlightCategory | null {
   const normalized = entry.toLowerCase();
   const actionMatches =
-    /^(added|created|implemented|introduced|shipped|launched|fixed|resolved|corrected|prevented|repaired|improved|updated|refined|normalized|reworked|tightened|hardened|aligned|simplified|replaced|polished)\b/i.test(
+    /^(added|created|implemented|introduced|shipped|launched|fixed|resolved|corrected|prevented|repaired|improved|updated|upgraded|refined|normalized|reworked|tightened|hardened|aligned|simplified|replaced|polished)\b/i.test(
       entry,
     );
 
   if (!actionMatches && !isMilestoneEntry(entry)) {
     return null;
+  }
+
+  if (
+    normalized.includes("active-plan refresh/apply safety") ||
+    normalized.includes("exact signed non-mutating future draft") ||
+    normalized.includes("exact non-mutating future schedule draft") ||
+    normalized.includes("proposal-time draft") ||
+    normalized.includes("apply update") ||
+    normalized.includes("reviewed draft")
+  ) {
+    return "plan_refresh_safety";
+  }
+
+  if (
+    normalized.includes("running-plan authoring doctrine") ||
+    normalized.includes("plan-authoring metric-mode") ||
+    normalized.includes("structured plan generator doctrine") ||
+    normalized.includes("beginner build-consistency doctrine") ||
+    normalized.includes("goal-family workout identity") ||
+    normalized.includes("mountain/trail doctrine") ||
+    normalized.includes("long-distance honesty") ||
+    normalized.includes("taper/phase consistency") ||
+    normalized.includes("taper/phase") ||
+    normalized.includes("metric-mode resolver")
+  ) {
+    return "run_creation_engine";
+  }
+
+  if (
+    normalized.includes("workout identity mapping") ||
+    normalized.includes("sourceworkouttype") ||
+    normalized.includes("labels and glyphs") ||
+    normalized.includes("workout-type glyph") ||
+    normalized.includes("calendar-cell semantics") ||
+    normalized.includes("visible identity")
+  ) {
+    return "calendar_workout_identity";
+  }
+
+  if (
+    normalized.includes("qa matrix") ||
+    normalized.includes("fixture matrix") ||
+    normalized.includes("proof pass") ||
+    normalized.includes("qa-green") ||
+    normalized.includes("safari qa passed")
+  ) {
+    return "qa_reliability";
+  }
+
+  if (
+    hasDesignSystemSignal(normalized) &&
+    (normalized.includes("workbench") || getDesignSystemSurfaceCount(normalized) > 1)
+  ) {
+    return "design_system";
+  }
+
+  if (
+    normalized.includes("/admin/analytics") ||
+    normalized.includes("/admin/login") ||
+    normalized.includes("admin analytics") ||
+    normalized.includes("admin login") ||
+    normalized.includes("test accounts") ||
+    normalized.includes("owner admin")
+  ) {
+    return "admin_ops";
   }
 
   if (normalized.includes("voice") || normalized.includes("dictate")) {
@@ -353,6 +423,16 @@ function getHighlightCategory(entry: string): HighlightCategory | null {
 
 function getHighlightTitle(entry: string) {
   switch (getHighlightCategory(entry)) {
+    case "run_creation_engine":
+      return "Run Creation Engine";
+    case "plan_refresh_safety":
+      return "Plan Refresh Safety";
+    case "admin_ops":
+      return "Admin & Ops";
+    case "calendar_workout_identity":
+      return "Calendar & Workout Identity";
+    case "qa_reliability":
+      return "QA / Reliability";
     case "voice":
       return "Dictate-to-Plan";
     case "onboarding":
@@ -366,7 +446,7 @@ function getHighlightTitle(entry: string) {
     case "calendar":
       return "Home & calendar";
     case "design_system":
-      return "Design system";
+      return "Hito DS Iteration";
     case "plan_management":
       return "Plan management";
     case "imports":
@@ -388,6 +468,16 @@ function getHighlightTitle(entry: string) {
 
 function getHighlightBody(entry: string) {
   switch (getHighlightCategory(entry)) {
+    case "run_creation_engine":
+      return "Plan creation and refresh use stronger backend coaching doctrine, clearer workout identity, and safer metric rules.";
+    case "plan_refresh_safety":
+      return "Plan updates stay review-first: Hito shows the proposed future schedule and applies only the reviewed draft after explicit confirmation.";
+    case "admin_ops":
+      return "Internal admin access and analytics are safer, more bounded, and easier to operate.";
+    case "calendar_workout_identity":
+      return "Calendar labels and glyphs better match the actual workout semantics instead of collapsing everything into a generic quality label.";
+    case "qa_reliability":
+      return "High-risk product flows have clearer regression coverage and fixture checks.";
     case "voice":
       return "You can describe your running in natural language, review what Hito understood, and create a plan only after confirmation.";
     case "onboarding":
@@ -401,7 +491,7 @@ function getHighlightBody(entry: string) {
     case "calendar":
       return "Home and calendar are clearer, calmer, and easier to scan.";
     case "design_system":
-      return "Shared interface patterns were cleaned up so the product feels more consistent and easier to read.";
+      return "Hito DS keeps converging existing surfaces onto shared tokens, primitives, and documented UI recipes.";
     case "plan_management":
       return "Creating, replacing, clearing, and updating plans is clearer and safer.";
     case "imports":
@@ -512,12 +602,19 @@ export function getEntryPresentation(entry: string): ChangelogEntryPresentation 
 
 function isMilestoneEntry(entry: string) {
   const normalized = entry.toLowerCase();
-  const actionMatches = /^(added|created|implemented|introduced|shipped|launched)\b/i.test(entry);
+  const actionMatches = /^(added|created|implemented|introduced|shipped|launched|upgraded)\b/i.test(
+    entry,
+  );
   const featureMatches = [
     "onboarding",
     "voice",
     "entitlement",
     "garmin",
+    "admin",
+    "doctrine",
+    "glyph",
+    "identity",
+    "qa",
     "design-system",
     "design system",
     "icon system",
@@ -552,6 +649,7 @@ function getMilestoneTitle(entry: string) {
   if (
     normalized.includes("design-system") ||
     normalized.includes("design system") ||
+    normalized.includes("hito ds") ||
     normalized.includes("icon system") ||
     normalized.includes("typography") ||
     normalized.includes("button") ||
@@ -559,7 +657,23 @@ function getMilestoneTitle(entry: string) {
     normalized.includes("toast") ||
     normalized.includes("modal")
   ) {
-    return "Design system update";
+    return "Hito DS iteration";
+  }
+
+  if (normalized.includes("doctrine") || normalized.includes("goal-family")) {
+    return "Run Creation Engine";
+  }
+
+  if (normalized.includes("admin")) {
+    return "Admin & Ops";
+  }
+
+  if (normalized.includes("glyph") || normalized.includes("identity")) {
+    return "Calendar & Workout Identity";
+  }
+
+  if (normalized.includes("qa")) {
+    return "QA / Reliability";
   }
 
   if (normalized.includes("calendar")) {

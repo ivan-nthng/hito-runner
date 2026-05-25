@@ -9,6 +9,14 @@ description: Use for Hito QA browser validation, Safari regression testing, auth
 
 Verify Hito behavior with real browser evidence and honest coverage.
 
+## QA Documentation Authority
+
+- QA may create and edit QA-owned documentation artifacts when the task is about test coverage, validation, or regression evidence.
+- Allowed QA artifacts include scenario matrices, test plans, browser regression checklists, proof-pass notes, validation reports, and coverage-gap records.
+- Keep QA-owned docs in `docs/process/`, `docs/tasks/qa/`, a plan's QA section, or another clearly QA-scoped docs location.
+- Do not edit product code, migrations, implementation plans, product briefs, design specs, or role instructions through this skill unless ARCHITECT explicitly assigns that docs-maintenance task.
+- QA docs must describe implemented behavior, expected validation, and coverage gaps; they must not invent new product requirements.
+
 ## Browser Policy
 
 - Use the built-in Codex app/browser testing environment first whenever it can cover the task.

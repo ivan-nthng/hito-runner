@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
+import type { ActivePlanRefreshDraft } from "@/lib/active-plan-refresh-draft";
 import type { ActivePlanRefreshProposal } from "@/lib/plan-refresh-proposal";
 import type { TrainingSnapshot } from "@/lib/training";
 
@@ -44,6 +45,7 @@ export const activePlanRefreshApplyInputSchema = z.object({
         doesNotMutatePlan: z.literal(true),
       }),
       recommendedAuthoringPrompt: z.string().trim().min(20).max(1600),
+      refreshDraft: z.custom<ActivePlanRefreshDraft>().optional(),
     }),
   }),
 });

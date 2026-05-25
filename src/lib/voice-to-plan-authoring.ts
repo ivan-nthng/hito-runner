@@ -18,6 +18,8 @@ import {
   guidancePreferenceToPreferredEffortLanguage,
   isWeekdayName,
   normalizeFirstPlanExecutionMode,
+  parseDurationSeconds,
+  parsePaceSecondsPerKm,
   pickEvenly,
   uniqueWeekdays,
   type FirstPlanGuidancePreference,
@@ -30,11 +32,13 @@ import {
   type GeneratedPlanResult,
 } from "@/lib/openai-plan-authoring";
 import { importedPlanSchema, type TrainingPlanV2 } from "@/lib/imported-plan";
+import { buildLongDistanceHonestyAssumptions } from "@/lib/running-plan-honesty";
 import type { StructuredFirstPlanProfilePatch } from "@/lib/structured-first-plan-onboarding";
 import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "@/lib/structured-plan-authoring";
+import { diffDaysIso } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
 
 const MAX_TRANSCRIPT_LENGTH = 4000;
@@ -735,6 +739,8 @@ function repairVoiceCurrentLevel(value: unknown, supplement: VoiceToPlanSuppleme
   const currentLevel = readObject(value);
 
   if (supplement.recent5kTime) {
+    const recent5kPaceSecondsPerKm = parseDurationSeconds(supplement.recent5kTime)! / 5;
+
     return {
       ...(currentLevel ?? {}),
       recentResultSummary: `Recent 5K time: ${supplement.recent5kTime}.`,
@@ -745,13 +751,19 @@ function repairVoiceCurrentLevel(value: unknown, supplement: VoiceToPlanSuppleme
           resultDate: null,
         },
       ],
+      recent5kPaceSecondsPerKm,
+      currentEasyPaceRange: readString(currentLevel?.currentEasyPaceRange) ?? null,
     };
   }
 
   if (supplement.recent5kPace) {
+    const recent5kPaceSecondsPerKm = parsePaceSecondsPerKm(supplement.recent5kPace)!;
+
     return {
       ...(currentLevel ?? {}),
       recentResultSummary: `Recent 5K pace: ${supplement.recent5kPace}.`,
+      recent5kPaceSecondsPerKm,
+      currentEasyPaceRange: readString(currentLevel?.currentEasyPaceRange) ?? null,
     };
   }
 
@@ -826,7 +838,7 @@ function repairVoicePreferences(value: unknown, supplement: VoiceToPlanSupplemen
 
   return {
     ...(preferences ?? {}),
-    ...(terrainFocus ? { terrainFocus } : {}),
+    terrainFocus: terrainFocus ?? readTerrainFocus(preferences?.terrainFocus) ?? "standard",
     ...(supplement.strengthPreference
       ? {
           strengthOrMobilityInterest:
@@ -946,12 +958,24 @@ function buildActivityMix(authoringInput: VoiceToPlanAuthoringInput) {
     mix.push("one controlled quality workout when appropriate");
   }
 
+  if (authoringInput.goal.goalType === "5k") {
+    mix.push("safe short-rep sharpening when supported");
+  } else if (authoringInput.goal.goalType === "10k") {
+    mix.push("rhythm-focused sustained quality");
+  } else if (authoringInput.goal.goalType === "half_marathon") {
+    mix.push("threshold and steady durability");
+  } else if (authoringInput.goal.goalType === "marathon") {
+    mix.push("marathon steady-specificity and long-run durability");
+  } else if (authoringInput.goal.goalType === "ultra_marathon") {
+    mix.push("ultra time-on-feet durability");
+  }
+
   if (authoringInput.preferences.terrainFocus === "rolling") {
     mix.push("occasional rolling-terrain guidance");
   }
 
   if (authoringInput.preferences.terrainFocus === "mountain") {
-    mix.push("hill or mountain-oriented preparation");
+    mix.push("mountain terrain skills, controlled descents, and time-on-feet guidance");
   }
 
   if (
@@ -976,6 +1000,25 @@ function buildReviewAssumptions(
     assumptions.push(buildGoalStyleMismatchAssumption(requestedGoalStyle, reviewedGoalStyle));
   }
 
+  const targetTimeHonesty = buildVoiceTargetTimeHonestyAssumption(request, authoringInput);
+
+  if (targetTimeHonesty) {
+    assumptions.push(targetTimeHonesty);
+  }
+
+  assumptions.push(
+    ...buildLongDistanceHonestyAssumptions({
+      goalType: authoringInput.goal.goalType,
+      runningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+      horizonWeeks: deriveVoiceReviewHorizonWeeks(authoringInput),
+      hasUsableBenchmark: Boolean(authoringInput.currentLevel.recent5kPaceSecondsPerKm),
+      targetTimeIntent: hasVoiceTargetTimeIntent(request, authoringInput),
+      baselineLongRunKm: authoringInput.runnerProfile.baselineLongRunKm,
+      currentLoadKnown: Boolean(authoringInput.currentLevel.recent5kPaceSecondsPerKm),
+      age: authoringInput.runnerProfile.age,
+    }),
+  );
+
   if (!request.supplement.terrainFocus && authoringInput.preferences.terrainFocus === "standard") {
     assumptions.push(
       "Terrain was treated as standard because no hill or mountain focus was supplied.",
@@ -991,6 +1034,105 @@ function buildReviewAssumptions(
   }
 
   return assumptions;
+}
+
+function deriveVoiceReviewHorizonWeeks(authoringInput: VoiceToPlanAuthoringInput) {
+  if (authoringInput.schedule.preparationHorizonWeeks) {
+    return authoringInput.schedule.preparationHorizonWeeks;
+  }
+
+  if (!authoringInput.schedule.targetDate) {
+    return null;
+  }
+
+  return Math.max(
+    1,
+    Math.ceil(
+      (diffDaysIso(authoringInput.schedule.targetDate, authoringInput.schedule.startDate) + 1) / 7,
+    ),
+  );
+}
+
+function buildVoiceTargetTimeHonestyAssumption(
+  request: ParsedVoiceToPlanDraftRequest,
+  authoringInput: VoiceToPlanAuthoringInput,
+) {
+  const hasTargetTimeIntent = hasVoiceTargetTimeIntent(request, authoringInput);
+
+  if (!hasTargetTimeIntent) {
+    return null;
+  }
+
+  const hasBenchmark = Boolean(authoringInput.currentLevel.recent5kPaceSecondsPerKm);
+
+  if (!hasBenchmark) {
+    return "Target-time intent is noted, but without a recent 5K benchmark this draft stays effort-based and does not promise target-specific paces.";
+  }
+
+  if (request.supplement.targetTime && request.supplement.goalDistance) {
+    const targetSeconds = parseDurationSeconds(request.supplement.targetTime);
+    const goalDistanceKm = voiceGoalDistanceKmForTargetTime(request.supplement.goalDistance);
+    const benchmarkPaceSeconds = authoringInput.currentLevel.recent5kPaceSecondsPerKm;
+
+    if (targetSeconds && goalDistanceKm && benchmarkPaceSeconds) {
+      const targetPaceSecondsPerKm = targetSeconds / goalDistanceKm;
+      const minimumSupportBuffer = voiceMinimumTargetSupportBufferSeconds(
+        request.supplement.goalDistance,
+      );
+
+      if (targetPaceSecondsPerKm < benchmarkPaceSeconds + minimumSupportBuffer) {
+        return "The target time looks aggressive against the supplied 5K benchmark, so Hito keeps the plan conservative and treats the target as motivation rather than a guarantee.";
+      }
+    }
+  }
+
+  return null;
+}
+
+function hasVoiceTargetTimeIntent(
+  request: ParsedVoiceToPlanDraftRequest,
+  authoringInput: VoiceToPlanAuthoringInput,
+) {
+  return (
+    request.supplement.goalStyle === "target_time" ||
+    /\btarget(?:\s|-)?time\b/i.test(authoringInput.goal.goalLabel) ||
+    authoringInput.constraints.hardConstraints.some((constraint) => /target time/i.test(constraint))
+  );
+}
+
+function voiceGoalDistanceKmForTargetTime(goalDistance: VoiceGoalDistance) {
+  switch (goalDistance) {
+    case "5k":
+      return 5;
+    case "10k":
+      return 10;
+    case "half_marathon":
+      return 21.1;
+    case "marathon":
+      return 42.2;
+    case "ultra_marathon":
+      return 50;
+    case "build_consistency":
+    case "mountain_running":
+      return null;
+  }
+}
+
+function voiceMinimumTargetSupportBufferSeconds(goalDistance: VoiceGoalDistance) {
+  switch (goalDistance) {
+    case "10k":
+      return 10;
+    case "half_marathon":
+      return 25;
+    case "marathon":
+      return 45;
+    case "ultra_marathon":
+      return 60;
+    case "5k":
+    case "build_consistency":
+    case "mountain_running":
+      return 0;
+  }
 }
 
 function inferReviewedGoalStyle(
@@ -1445,6 +1587,12 @@ function normalizeSupplementTerrainFocus(supplement: VoiceToPlanSupplement) {
   }
 
   return supplement.terrainFocus ?? null;
+}
+
+function readTerrainFocus(value: unknown) {
+  return typeof value === "string" && terrainFocusSchema.safeParse(value).success
+    ? (value as z.infer<typeof terrainFocusSchema>)
+    : null;
 }
 
 function readObject(value: unknown) {

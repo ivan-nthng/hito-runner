@@ -253,6 +253,8 @@ type ModalHeaderMode = (typeof MODAL_HEADER_MODES)[number];
 type ModalFooterMode = (typeof MODAL_FOOTER_MODES)[number];
 type TabStyle = (typeof TAB_STYLES)[number];
 type StatusTone = (typeof STATUS_TONES)[number];
+type SpecimenStatus = "Core" | "Pattern" | "Exception" | "Legacy" | "In rollout";
+type SpecimenStatusTone = "signal" | "neutral" | "warning" | "destructive" | "rollout";
 type AsyncToastDemoState = "info" | "working" | "success" | "error";
 
 const HITO_DS_TOAST_ID = "hito-ds-async-action-toast";
@@ -429,6 +431,8 @@ function HitoDesignSystemPage() {
   const [toastDemoState, setToastDemoState] = useState<AsyncToastDemoState>("working");
   const toastDemoTimerRef = useRef<number | null>(null);
   const activeNavGroup = getNavGroupForSection(activeSectionId);
+  const activeSection =
+    SECTIONS.find((section) => section.id === activeSectionId) ?? activeNavGroup.sections[0];
 
   useEffect(() => {
     return () => {
@@ -528,8 +532,8 @@ function HitoDesignSystemPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
-      <div className="grid min-h-screen lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="border-r border-hairline bg-sidebar/70 px-5 py-6 backdrop-blur lg:sticky lg:top-0 lg:h-screen">
+      <div className="hito-workbench-shell">
+        <aside className="hito-workbench-sidebar px-5 py-6">
           <div>
             <div className="hito-panel-title">hito ds</div>
             <p className="hito-label mt-2">Component system</p>
@@ -579,8 +583,37 @@ function HitoDesignSystemPage() {
           </div>
         </aside>
 
-        <main className="px-6 py-8 lg:px-10 lg:py-10">
-          <div className="mx-auto max-w-6xl">
+        <main className="hito-workbench-main">
+          <div className="hito-workbench-topbar lg:hidden">
+            <div className="flex items-center justify-between gap-4 px-5 py-4">
+              <div className="hito-workbench-location">
+                <span className="hito-workbench-location-title">Hito DS</span>
+                <span className="hito-workbench-location-meta">
+                  <span>{activeNavGroup.label}</span>
+                  <span aria-hidden="true">/</span>
+                  <span>{activeSection.label}</span>
+                </span>
+              </div>
+              <HitoLogoMark decorative className="text-foreground [--hito-logo-height:1.65rem]" />
+            </div>
+            <nav className="hito-workbench-section-rail" aria-label="Hito DS quick links">
+              <div className="hito-workbench-quick-links">
+                {activeNavGroup.sections.map((section) => (
+                  <a
+                    key={section.id}
+                    href={`#${section.id}`}
+                    className="hito-workbench-quick-link"
+                    data-active={activeSectionId === section.id ? "true" : undefined}
+                    aria-current={activeSectionId === section.id ? "location" : undefined}
+                  >
+                    {section.label}
+                  </a>
+                ))}
+              </div>
+            </nav>
+          </div>
+
+          <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10 lg:py-10">
             <header id="overview" className="hito-page-header border-t border-hairline pt-8">
               <p className="hito-label hito-label-signal">Hito design system</p>
               <h1 className="hito-page-title">Simplified product language.</h1>
@@ -3194,7 +3227,7 @@ function HitoDesignSystemPage() {
                 <ReferenceListRow
                   label="In rollout"
                   title="More interactive explorers can follow"
-                  body="Select, dropdown/menu, data-table toolbar, async toast lifecycle, and shell rows are candidates for later standardized specimens."
+                  body="Select, dropdown/menu, async toast lifecycle, shell rows, and deeper pattern references can become standardized specimens only when a concrete QA or product-consumer need appears."
                 />
                 <ReferenceListRow
                   label="Temporary"
@@ -3486,17 +3519,19 @@ function SpecimenSection({
   label: string;
   title: string;
   body: string;
-  status?: "Core" | "Pattern" | "Exception" | "Legacy" | "In rollout";
+  status?: SpecimenStatus;
   preview: ReactNode;
   controls: ReactNode;
   contract: Array<{ label: string; body: ReactNode }>;
   children?: ReactNode;
 }) {
+  const statusTone = getSpecimenStatusTone(status);
+
   return (
     <section id={id} className="ds-section">
       <div className="hito-specimen-header">
         <SectionIntro label={label} title={title} body={body} />
-        <span className="hito-status-pill" data-tone="signal">
+        <span className="hito-status-pill" data-tone={statusTone}>
           {status}
         </span>
       </div>
@@ -3519,6 +3554,21 @@ function SpecimenSection({
       {children}
     </section>
   );
+}
+
+function getSpecimenStatusTone(status: SpecimenStatus): SpecimenStatusTone {
+  switch (status) {
+    case "Core":
+      return "signal";
+    case "Pattern":
+      return "neutral";
+    case "Exception":
+      return "warning";
+    case "Legacy":
+      return "destructive";
+    case "In rollout":
+      return "rollout";
+  }
 }
 
 function ProductLinks({ links }: { links: Array<{ href: string; label: string }> }) {

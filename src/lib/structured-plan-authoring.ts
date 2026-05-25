@@ -203,6 +203,28 @@ interface StructuredMetricMode {
   recent5kPaceSecondsPerKm: number | null;
 }
 
+type TrainingPhase = "Base" | "Build" | "Specific" | "Taper";
+
+interface LongRunGoalPolicy {
+  floorKm: number;
+  peakKm: number;
+  ceilingKm: number;
+}
+
+const longRunGoalPolicies: Record<
+  StructuredPlanAuthoringInput["goal"]["goalType"],
+  LongRunGoalPolicy
+> = {
+  build_consistency: { floorKm: 5, peakKm: 10, ceilingKm: 12 },
+  distance_build: { floorKm: 7, peakKm: 15, ceilingKm: 18 },
+  "5k": { floorKm: 6, peakKm: 12, ceilingKm: 14 },
+  "10k": { floorKm: 8, peakKm: 16, ceilingKm: 18 },
+  half_marathon: { floorKm: 10, peakKm: 20, ceilingKm: 22 },
+  marathon: { floorKm: 12, peakKm: 30, ceilingKm: 32 },
+  ultra_marathon: { floorKm: 14, peakKm: 34, ceilingKm: 38 },
+  mountain_running: { floorKm: 10, peakKm: 26, ceilingKm: 30 },
+};
+
 export function buildStructuredAuthoringPlan(input: StructuredPlanAuthoringInput): TrainingPlanV2 {
   const normalized = normalizeStructuredPlanAuthoringInput(input);
   const workouts = buildGeneratedWorkouts(normalized);
@@ -437,6 +459,7 @@ function buildEasyWorkout({
   normalized,
 }: BuildWorkoutContext) {
   const easyDurationMin = deriveEasyDurationMin(normalized, weekNumber);
+  const technicalTrailExposure = isMountainSpecificPlan(normalized) && phase === "Base";
 
   return {
     workout_id: workoutId,
@@ -445,17 +468,21 @@ function buildEasyWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "easy" as const,
-    source_workout_type: "easy_aerobic_run",
-    title: "Easy aerobic run",
-    summary: `${easyDurationMin} min comfortable aerobic running.`,
+    source_workout_type: technicalTrailExposure ? "technical_trail_easy" : "easy_aerobic_run",
+    title: technicalTrailExposure ? "Technical trail easy run" : "Easy aerobic run",
+    summary: technicalTrailExposure
+      ? `${easyDurationMin} min easy running with low-risk trail or uneven-ground awareness.`
+      : `${easyDurationMin} min comfortable aerobic running.`,
     planned_rpe: 4,
     segments: [
       {
         segment_id: `${workoutId}_seg_1`,
         sequence: 1,
         segment_type: "main" as const,
-        label: "Easy aerobic running",
-        guidance: "Stay relaxed and conversational.",
+        label: technicalTrailExposure ? "Easy trail awareness" : "Easy aerobic running",
+        guidance: technicalTrailExposure
+          ? "Choose forgiving terrain if available. Keep the effort conversational, watch footing, and avoid risky technical sections."
+          : "Stay relaxed and conversational.",
         prescription: {
           mode: "time" as const,
           duration_min: easyDurationMin,
@@ -520,12 +547,18 @@ function buildLongRunWorkout({
   const distanceKm = deriveLongRunDistanceKm(normalized, weekNumber);
   const durationMin = deriveLongRunDurationMin(normalized, weekNumber, distanceKm);
   const cutback = isCutbackWeek(weekNumber, normalized);
-  const hasSteadyFinish = shouldAddLongRunSteadyFinish(normalized, weekNumber);
+  const taper = phase === "Taper";
+  const mountainSpecific = isMountainSpecificPlan(normalized);
+  const hasSteadyFinish = !mountainSpecific && shouldAddLongRunSteadyFinish(normalized, weekNumber);
   const title = cutback
     ? "Cutback long run"
-    : hasSteadyFinish
-      ? "Long run with steady finish"
-      : "Long aerobic run";
+    : taper
+      ? "Taper long run"
+      : mountainSpecific
+        ? "Mountain long run time-on-feet"
+        : hasSteadyFinish
+          ? "Long run with steady finish"
+          : "Long aerobic run";
 
   return {
     workout_id: workoutId,
@@ -536,11 +569,22 @@ function buildLongRunWorkout({
     workout_type: "long_run" as const,
     source_workout_type: cutback
       ? "cutback_long_run"
-      : hasSteadyFinish
-        ? "long_run_with_steady_finish"
-        : "long_aerobic_run",
+      : taper
+        ? "taper_long_run"
+        : mountainSpecific
+          ? "mountain_long_run_time_on_feet"
+          : hasSteadyFinish
+            ? "long_run_with_steady_finish"
+            : "long_aerobic_run",
     title,
-    summary: buildLongRunSummary(normalized, distanceKm, durationMin, cutback, hasSteadyFinish),
+    summary: buildLongRunSummary(
+      normalized,
+      distanceKm,
+      durationMin,
+      cutback,
+      taper,
+      hasSteadyFinish,
+    ),
     planned_rpe: 5,
     segments: buildLongRunSegments({
       workoutId,
@@ -548,6 +592,7 @@ function buildLongRunWorkout({
       distanceKm,
       durationMin,
       cutback,
+      taper,
       hasSteadyFinish,
     }),
   };
@@ -558,6 +603,7 @@ function buildLongRunSummary(
   distanceKm: number,
   durationMin: number,
   cutback: boolean,
+  taper: boolean,
   hasSteadyFinish: boolean,
 ) {
   const loadLabel = normalized.runnerProfile.baselineLongRunKm
@@ -566,6 +612,14 @@ function buildLongRunSummary(
 
   if (cutback) {
     return `${loadLabel} lower-load long run to absorb the block.`;
+  }
+
+  if (taper) {
+    return `${loadLabel} reduced long run to freshen up before the goal.`;
+  }
+
+  if (isMountainSpecificPlan(normalized)) {
+    return `${loadLabel} mountain time-on-feet run with controlled climbing, careful descents, and hike/run allowed on steep sections.`;
   }
 
   if (hasSteadyFinish) {
@@ -581,6 +635,7 @@ function buildLongRunSegments({
   distanceKm,
   durationMin,
   cutback,
+  taper,
   hasSteadyFinish,
 }: {
   workoutId: string;
@@ -588,6 +643,7 @@ function buildLongRunSegments({
   distanceKm: number;
   durationMin: number;
   cutback: boolean;
+  taper: boolean;
   hasSteadyFinish: boolean;
 }) {
   if (!hasSteadyFinish) {
@@ -596,8 +652,14 @@ function buildLongRunSegments({
         segment_id: `${workoutId}_seg_1`,
         sequence: 1,
         segment_type: "main" as const,
-        label: cutback ? "Cutback long aerobic running" : "Long aerobic running",
-        guidance: buildLongRunGuidance(normalized, cutback),
+        label: cutback
+          ? "Cutback long aerobic running"
+          : taper
+            ? "Reduced taper long running"
+            : isMountainSpecificPlan(normalized)
+              ? "Mountain time-on-feet running"
+              : "Long aerobic running",
+        guidance: buildLongRunGuidance(normalized, cutback, taper),
         prescription: normalized.runnerProfile.baselineLongRunKm
           ? {
               mode: "distance" as const,
@@ -625,7 +687,7 @@ function buildLongRunSegments({
         sequence: 1,
         segment_type: "main" as const,
         label: "Easy long-run base",
-        guidance: buildLongRunGuidance(normalized, false),
+        guidance: buildLongRunGuidance(normalized, false, false),
         prescription: {
           mode: "distance" as const,
           distance_km: baseDistanceKm,
@@ -658,7 +720,7 @@ function buildLongRunSegments({
       sequence: 1,
       segment_type: "main" as const,
       label: "Easy long-run base",
-      guidance: buildLongRunGuidance(normalized, false),
+      guidance: buildLongRunGuidance(normalized, false, false),
       prescription: {
         mode: "time" as const,
         duration_min: baseDurationMin,
@@ -694,16 +756,54 @@ function buildQualityWorkout({
     return buildCutbackAerobicWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
   }
 
-  const workoutPattern = weekNumber % 3;
-
-  if (normalized.preferences.terrainFocus === "mountain") {
-    return workoutPattern === 1
-      ? buildHillRepeatsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized })
-      : buildClimbingSteadyWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+  if (isMountainSpecificPlan(normalized)) {
+    return buildMountainQualityWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
   }
+
+  if (phase === "Taper") {
+    return buildTaperTuneupWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+  }
+
+  if (phase === "Base") {
+    if (shouldUseBaseStrides(normalized)) {
+      return buildAerobicStridesWorkout({
+        workoutId,
+        date,
+        weekday,
+        weekNumber,
+        phase,
+        normalized,
+      });
+    }
+
+    if (normalized.preferences.terrainFocus === "rolling" && weekNumber % 2 === 0) {
+      return buildRollingHillsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+    }
+
+    return buildSteadyWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+  }
+
+  const goalFamilyWorkout = buildGoalFamilyQualityWorkout({
+    workoutId,
+    date,
+    weekday,
+    weekNumber,
+    phase,
+    normalized,
+  });
+
+  if (goalFamilyWorkout) {
+    return goalFamilyWorkout;
+  }
+
+  const workoutPattern = weekNumber % 3;
 
   if (normalized.preferences.terrainFocus === "rolling" && workoutPattern === 2) {
     return buildRollingHillsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+  }
+
+  if (phase === "Specific" && shouldUseProgressionSpecificity(normalized, weekNumber)) {
+    return buildProgressionWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
   }
 
   if (workoutPattern === 1) {
@@ -722,6 +822,55 @@ function buildQualityWorkout({
   }
 
   return buildTimeIntervalsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+}
+
+function buildGoalFamilyQualityWorkout(context: BuildWorkoutContext) {
+  const { normalized } = context;
+
+  switch (normalized.goal.goalType) {
+    case "5k":
+      return isLimitedSharpeningSupport(normalized)
+        ? buildAerobicStridesWorkout(context)
+        : buildFiveKSharpeningWorkout(context);
+    case "10k":
+      return isLimitedSharpeningSupport(normalized)
+        ? buildTempoWorkout(context)
+        : buildTenKRhythmWorkout(context);
+    case "half_marathon":
+      return buildHalfMarathonThresholdWorkout(context);
+    case "marathon":
+      return buildMarathonSteadySpecificityWorkout(context);
+    case "ultra_marathon":
+      return buildUltraDurabilityWorkout(context);
+    default:
+      return null;
+  }
+}
+
+function buildMountainQualityWorkout(context: BuildWorkoutContext) {
+  if (context.phase === "Taper") {
+    return buildTaperTuneupWorkout(context);
+  }
+
+  const pattern = context.weekNumber % 4;
+
+  if (context.phase === "Base") {
+    return pattern === 0
+      ? buildRollingHillsWorkout(context)
+      : buildTechnicalTrailEasyWorkout(context);
+  }
+
+  if (context.phase === "Build") {
+    if (pattern === 0) return buildControlledDownhillDurabilityWorkout(context);
+    if (pattern === 1) return buildHillRepeatsWorkout(context);
+    if (pattern === 2) return buildRollingHillsWorkout(context);
+    return buildClimbingSteadyWorkout(context);
+  }
+
+  if (pattern === 0) return buildHikeRunEnduranceWorkout(context);
+  if (pattern === 1) return buildControlledDownhillDurabilityWorkout(context);
+  if (pattern === 2) return buildClimbingSteadyWorkout(context);
+  return buildHillRepeatsWorkout(context);
 }
 
 function buildCutbackAerobicWorkout({
@@ -758,6 +907,568 @@ function buildCutbackAerobicWorkout({
           duration_min: durationMin,
         },
         target: buildEasyTarget(normalized),
+      },
+    ],
+  };
+}
+
+function buildTaperTuneupWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const durationMin = Math.max(25, deriveEasyDurationMin(normalized, weekNumber) - 5);
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const mountainSpecific = isMountainSpecificPlan(normalized);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "easy" as const,
+    source_workout_type: "taper_tuneup_run",
+    title: mountainSpecific ? "Mountain taper tune-up run" : "Taper tune-up run",
+    summary: mountainSpecific
+      ? `${durationMin} min easy tune-up that reduces terrain stress and keeps descents gentle.`
+      : `${durationMin} min easy run with a short controlled lift to stay sharp.`,
+    planned_rpe: 4,
+    segments: [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Easy taper running",
+        guidance: mountainSpecific
+          ? "Stay fresh. Use smooth, low-risk terrain and avoid hard climbing or technical descent stress."
+          : "Stay fresh. Add only a short controlled lift if the legs feel good.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: durationMin,
+        },
+        target: {
+          intensity: "easy_with_short_lift",
+          ...(paceTargets?.easy ? { pace_min_per_km_range: paceTargets.easy } : {}),
+          cue: mountainSpecific
+            ? "Light and relaxed; preserve freshness over terrain specificity."
+            : "Light, relaxed, and never forced.",
+        },
+      },
+    ],
+  };
+}
+
+function buildProgressionWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const durationMin = deriveEasyDurationMin(normalized, weekNumber) + 5;
+  const steadyFinishDurationMin = Math.min(20, Math.max(10, roundToFive(durationMin * 0.3)));
+  const baseDurationMin = Math.max(20, durationMin - steadyFinishDurationMin);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "progression" as const,
+    source_workout_type: "progression_run",
+    title: "Progression run",
+    summary: `${durationMin} min starting easy and finishing controlled steady.`,
+    planned_rpe: 6,
+    segments: [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Easy opening",
+        guidance: "Start deliberately comfortable and keep the first part patient.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: baseDurationMin,
+        },
+        duration_min: baseDurationMin,
+        target: buildEasyTarget(normalized),
+      },
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "main" as const,
+        label: "Controlled progression finish",
+        guidance: "Lift toward steady effort without turning it into a race.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: steadyFinishDurationMin,
+        },
+        duration_min: steadyFinishDurationMin,
+        target: buildSteadyFinishTarget(normalized),
+      },
+    ],
+  };
+}
+
+function buildAerobicStridesWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const easyDurationMin = Math.max(25, deriveEasyDurationMin(normalized, weekNumber) - 5);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "easy" as const,
+    source_workout_type: "aerobic_strides",
+    title: "Easy run with relaxed strides",
+    summary: `${easyDurationMin} min easy running with short relaxed strides for safe leg speed.`,
+    planned_rpe: 5,
+    segments: [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Easy aerobic running",
+        guidance: "Keep the run conversational before the strides.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: easyDurationMin,
+        },
+        target: buildEasyTarget(normalized),
+      },
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "interval_block" as const,
+        label: "Relaxed strides",
+        guidance:
+          "Run quick but smooth for a few short strides. Stop while they still feel relaxed.",
+        prescription: {
+          mode: "repeats" as const,
+          repeat_count: isLimitedSharpeningSupport(normalized) ? 4 : 6,
+          repeat_unit: {
+            mode: "time" as const,
+            duration_min: 0.5,
+          },
+          recovery_unit: {
+            mode: "time" as const,
+            duration_min: 1.5,
+          },
+        },
+        target: {
+          intensity: "relaxed_strides",
+          cue: "Fast-feeling, light, and never sprinting.",
+        },
+        recovery_target: buildRepeatRecoveryTarget(normalized),
+      },
+    ],
+  };
+}
+
+function buildFiveKSharpeningWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const repeatCount = Math.min(10, 5 + Math.floor((weekNumber - 1) / 3));
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "quality" as const,
+    source_workout_type: "5k_sharpening_repeats",
+    title: "5K sharpening repeats",
+    summary: `${repeatCount} short controlled reps for 5K rhythm without sprinting.`,
+    planned_rpe: 7,
+    segments: [
+      buildWarmupSegment(workoutId, 1, 12, normalized),
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "interval_block" as const,
+        label: `${repeatCount} short 5K-rhythm reps`,
+        guidance:
+          "Keep the reps quick and coordinated. The goal is rhythm and repeatability, not an all-out finish.",
+        prescription: {
+          mode: "repeats" as const,
+          repeat_count: repeatCount,
+          repeat_unit: {
+            mode: "distance" as const,
+            distance_km: 0.2,
+          },
+          recovery_unit: {
+            mode: "time" as const,
+            duration_min: 2,
+          },
+        },
+        target: {
+          intensity: "5k_sharpening",
+          ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
+          cue: "Controlled faster running; smooth, repeatable, and never sprinting.",
+        },
+        recovery_target: buildRepeatRecoveryTarget(normalized),
+      },
+      buildCooldownSegment(workoutId, 3, 10, normalized),
+    ],
+  };
+}
+
+function buildTenKRhythmWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const repeatCount = Math.min(6, 3 + Math.floor((weekNumber - 1) / 4));
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "quality" as const,
+    source_workout_type: "10k_rhythm_intervals",
+    title: "10K rhythm intervals",
+    summary: `${repeatCount} controlled rhythm reps for sustained 10K-style quality.`,
+    planned_rpe: 7,
+    segments: [
+      buildWarmupSegment(workoutId, 1, 12, normalized),
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "interval_block" as const,
+        label: `${repeatCount} rhythm reps`,
+        guidance:
+          "Settle into a strong but controlled rhythm. Each rep should feel sustainable enough to repeat.",
+        prescription: {
+          mode: "repeats" as const,
+          repeat_count: repeatCount,
+          repeat_unit: {
+            mode: "time" as const,
+            duration_min: 4,
+          },
+          recovery_unit: {
+            mode: "time" as const,
+            duration_min: 2,
+          },
+        },
+        target: {
+          intensity: "10k_rhythm",
+          ...(paceTargets?.tempo ? { pace_min_per_km_range: paceTargets.tempo } : {}),
+          cue: "Rhythmic sustained quality, controlled rather than forced.",
+        },
+        recovery_target: buildRepeatRecoveryTarget(normalized),
+      },
+      buildCooldownSegment(workoutId, 3, 10, normalized),
+    ],
+  };
+}
+
+function buildHalfMarathonThresholdWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const repeatCount = phase === "Specific" ? 3 : 2;
+  const blockDurationMin = Math.min(12, 8 + Math.floor((weekNumber - 1) / 5) * 2);
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "tempo" as const,
+    source_workout_type: "half_marathon_threshold_durability",
+    title: "Half marathon threshold durability",
+    summary: `${repeatCount} controlled threshold blocks to build sustained aerobic strength.`,
+    planned_rpe: 7,
+    segments: [
+      buildWarmupSegment(workoutId, 1, 12, normalized),
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "interval_block" as const,
+        label: `${repeatCount} threshold blocks`,
+        guidance:
+          "Stay comfortably hard and even. This should build steady durability, not leave you depleted.",
+        prescription: {
+          mode: "repeats" as const,
+          repeat_count: repeatCount,
+          repeat_unit: {
+            mode: "time" as const,
+            duration_min: blockDurationMin,
+          },
+          recovery_unit: {
+            mode: "time" as const,
+            duration_min: 3,
+          },
+        },
+        target: {
+          intensity: "threshold_steady",
+          ...(paceTargets?.tempo ? { pace_min_per_km_range: paceTargets.tempo } : {}),
+          cue: "Sustained and controlled, with enough restraint to finish strong.",
+        },
+        recovery_target: buildRepeatRecoveryTarget(normalized),
+      },
+      buildCooldownSegment(workoutId, 3, 10, normalized),
+    ],
+  };
+}
+
+function buildMarathonSteadySpecificityWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const steadyDurationMin = Math.min(45, 22 + Math.floor((weekNumber - 1) / 3) * 4);
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "steady_or_easy" as const,
+    source_workout_type: "marathon_steady_specificity",
+    title: "Marathon steady specificity",
+    summary: `${steadyDurationMin} min controlled steady running for marathon-specific durability.`,
+    planned_rpe: 6,
+    segments: [
+      buildWarmupSegment(workoutId, 1, 12, normalized),
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "main" as const,
+        label: "Controlled marathon-steady running",
+        guidance:
+          "Hold a sustainable steady rhythm. If you already use a fueling routine, keep it familiar and simple on longer steady days.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: steadyDurationMin,
+        },
+        duration_min: steadyDurationMin,
+        target: {
+          intensity: "marathon_steady",
+          ...(paceTargets?.steady ? { pace_min_per_km_range: paceTargets.steady } : {}),
+          cue: "Steady, patient, and controlled; never a time trial.",
+        },
+      },
+      buildCooldownSegment(workoutId, 3, 10, normalized),
+    ],
+  };
+}
+
+function buildUltraDurabilityWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const durationMin = Math.max(50, deriveEasyDurationMin(normalized, weekNumber) + 15);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "steady_or_easy" as const,
+    source_workout_type: "ultra_time_on_feet_durability",
+    title: "Ultra time-on-feet durability",
+    summary: `${durationMin} min aerobic durability session with patient effort and hike/run allowance.`,
+    planned_rpe: 5,
+    segments: [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Ultra durability running",
+        guidance:
+          "Keep the full session aerobic. Use short hike breaks on steeper terrain or fatigue, and protect the next day's recovery.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: durationMin,
+        },
+        target: {
+          intensity: "easy_time_on_feet",
+          cue: "Durability and patience matter more than road-race speed.",
+        },
+      },
+    ],
+  };
+}
+
+function buildTechnicalTrailEasyWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const durationMin = deriveEasyDurationMin(normalized, weekNumber);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "easy" as const,
+    source_workout_type: "technical_trail_easy",
+    title: "Technical trail easy run",
+    summary: `${durationMin} min easy trail exposure with cautious footing and no risky terrain requirement.`,
+    planned_rpe: 4,
+    segments: [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Low-risk trail exposure",
+        guidance:
+          "Use forgiving trail or uneven ground if available. Keep effort easy, shorten stride, and skip technical sections that feel risky.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: durationMin,
+        },
+        target: {
+          ...buildEasyTarget(normalized),
+          cue: "Easy effort with relaxed footing awareness; no exact elevation target.",
+        },
+      },
+    ],
+  };
+}
+
+function buildControlledDownhillDurabilityWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const repeatCount = Math.min(8, 4 + Math.floor((weekNumber - 1) / 4));
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "quality" as const,
+    source_workout_type: "controlled_downhill_durability",
+    title: "Controlled downhill durability",
+    summary: `${repeatCount} short controlled descents for careful downhill durability, with easy recovery.`,
+    planned_rpe: 6,
+    segments: [
+      buildWarmupSegment(workoutId, 1, 12, normalized),
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "interval_block" as const,
+        label: `${repeatCount} controlled descents`,
+        guidance:
+          "Use a gentle grade only. Descend smoothly under control, keep steps quick, and stop the descent work if footing is uncertain.",
+        prescription: {
+          mode: "repeats" as const,
+          repeat_count: repeatCount,
+          repeat_unit: {
+            mode: "time" as const,
+            duration_min: 1,
+          },
+          recovery_unit: {
+            mode: "time" as const,
+            duration_min: 2,
+          },
+        },
+        target: {
+          intensity: "controlled_downhill_durability",
+          cue: "Controlled descent skill and eccentric durability; never reckless downhill racing.",
+        },
+        recovery_target: {
+          intensity: "very_easy_recovery",
+          hint: "Walk or jog easily on flat or uphill ground before the next descent.",
+        },
+      },
+      buildCooldownSegment(workoutId, 3, 10, normalized),
+    ],
+  };
+}
+
+function buildHikeRunEnduranceWorkout({
+  workoutId,
+  date,
+  weekday,
+  weekNumber,
+  phase,
+  normalized,
+}: BuildWorkoutContext) {
+  const durationMin = Math.max(45, deriveEasyDurationMin(normalized, weekNumber) + 20);
+
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: weekNumber,
+    phase,
+    workout_type: "steady_or_easy" as const,
+    source_workout_type: "hike_run_endurance",
+    title: "Hike-run endurance",
+    summary: `${durationMin} min time-on-feet session using easy running plus power-hike breaks on steeper climbs.`,
+    planned_rpe: 5,
+    segments: [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: "Mountain hike-run endurance",
+        guidance:
+          "Keep the whole session aerobic. Power-hike steep climbs, run gentle terrain easily, and descend with control rather than speed.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: durationMin,
+        },
+        target: {
+          intensity: "easy_time_on_feet",
+          cue: "Time on feet matters more than pace; use effort control on climbs and descents.",
+        },
       },
     ],
   };
@@ -1148,8 +1859,28 @@ function buildLongRunTarget(normalized: NormalizedStructuredInput) {
   return {
     intensity: "easy_aerobic",
     ...(paceTargets?.longRun ? { pace_min_per_km_range: paceTargets.longRun } : {}),
-    cue: "Comfortable enough to keep the full run controlled.",
+    cue: buildLongRunCue(normalized),
   };
+}
+
+function buildLongRunCue(normalized: NormalizedStructuredInput) {
+  if (isMountainSpecificPlan(normalized)) {
+    return "Time-on-feet effort: climb patiently, power-hike steep sections, and descend under control.";
+  }
+
+  if (normalized.goal.goalType === "marathon") {
+    return "Comfortable marathon durability: patient rhythm, familiar fueling routine if used, and no forced finish.";
+  }
+
+  if (normalized.goal.goalType === "ultra_marathon") {
+    return "Patient time-on-feet durability; short hike breaks are allowed when they protect the full session.";
+  }
+
+  if (normalized.goal.goalType === "half_marathon") {
+    return "Controlled endurance with enough restraint to finish steady.";
+  }
+
+  return "Comfortable enough to keep the full run controlled.";
 }
 
 function buildSteadyFinishTarget(normalized: NormalizedStructuredInput) {
@@ -1260,13 +1991,37 @@ function parseDurationSeconds(value: string) {
   return hours! * 3600 + minutes * 60 + seconds;
 }
 
-function buildLongRunGuidance(normalized: NormalizedStructuredInput, cutback: boolean) {
+function buildLongRunGuidance(
+  normalized: NormalizedStructuredInput,
+  cutback: boolean,
+  taper: boolean,
+) {
   if (cutback) {
-    return "Keep this deliberately comfortable and shorter than the surrounding long runs.";
+    return isMountainSpecificPlan(normalized)
+      ? "Keep this deliberately comfortable and choose lower-stress terrain than the surrounding mountain long runs."
+      : "Keep this deliberately comfortable and shorter than the surrounding long runs.";
   }
 
-  if (normalized.preferences.terrainFocus === "mountain") {
-    return "Keep the effort comfortable and include hills or rolling terrain when available; no exact elevation target.";
+  if (taper) {
+    return isMountainSpecificPlan(normalized)
+      ? "Keep this reduced and confidence-building; avoid technical descent stress and finish fresher than you started."
+      : "Keep this reduced and confidence-building; finish fresher than you started.";
+  }
+
+  if (isMountainSpecificPlan(normalized)) {
+    return "Use time on feet as the anchor. Run gentle terrain easily, power-hike steeper climbs, descend smoothly under control, and avoid exact elevation targets.";
+  }
+
+  if (normalized.goal.goalType === "marathon") {
+    return "Keep the effort patient and steady. Use longer runs for time-on-feet durability and a familiar fueling routine if you already have one.";
+  }
+
+  if (normalized.goal.goalType === "ultra_marathon") {
+    return "Use time on feet as the anchor. Keep the session aerobic, add short hike breaks when useful, and protect recovery for the next run.";
+  }
+
+  if (normalized.goal.goalType === "half_marathon") {
+    return "Keep this comfortable but purposeful so it builds steady durability without becoming a race effort.";
   }
 
   if (normalized.preferences.terrainFocus === "rolling") {
@@ -1280,9 +2035,45 @@ function isCutbackWeek(weekNumber: number, normalized: NormalizedStructuredInput
   return weekNumber > 1 && weekNumber < normalized.schedule.horizonWeeks && weekNumber % 4 === 0;
 }
 
+function isMountainSpecificPlan(normalized: NormalizedStructuredInput) {
+  return (
+    normalized.goal.goalType === "mountain_running" ||
+    normalized.preferences.terrainFocus === "mountain"
+  );
+}
+
+function shouldUseProgressionSpecificity(
+  normalized: NormalizedStructuredInput,
+  weekNumber: number,
+) {
+  if (weekNumber <= Math.ceil(normalized.schedule.horizonWeeks * 0.55)) return false;
+
+  return (
+    normalized.preferences.preferredWorkoutMix === "long_run_focus" ||
+    ["half_marathon", "marathon", "ultra_marathon"].includes(normalized.goal.goalType)
+  );
+}
+
+function shouldUseBaseStrides(normalized: NormalizedStructuredInput) {
+  if (normalized.preferences.preferredWorkoutMix === "easy_heavy") {
+    return false;
+  }
+
+  return ["5k", "10k"].includes(normalized.goal.goalType);
+}
+
+function isLimitedSharpeningSupport(normalized: NormalizedStructuredInput) {
+  if (normalized.runnerProfile.baselineSessionsPerWeek <= 3) return true;
+  if (normalized.runnerProfile.experienceLevel === "new_runner") return true;
+  if (normalized.runnerProfile.age && normalized.runnerProfile.age >= 60) return true;
+
+  return !getRecent5kPaceSecondsPerKm(normalized);
+}
+
 function shouldAddLongRunSteadyFinish(normalized: NormalizedStructuredInput, weekNumber: number) {
   if (isCutbackWeek(weekNumber, normalized)) return false;
-  if (weekNumber <= Math.ceil(normalized.schedule.horizonWeeks * 0.45)) return false;
+  if (weekNumber <= Math.ceil(normalized.schedule.horizonWeeks * 0.5)) return false;
+  if (phaseForWeek(weekNumber, normalized.schedule.horizonWeeks) === "Taper") return false;
   if (normalized.runnerProfile.baselineSessionsPerWeek < 4) return false;
   if (normalized.preferences.preferredWorkoutMix === "easy_heavy") return false;
 
@@ -1298,21 +2089,118 @@ function deriveEasyDurationMin(normalized: NormalizedStructuredInput, weekNumber
   const base =
     normalized.runnerProfile.baselineLongRunDurationMin ??
     normalized.runnerProfile.baselineLongRunKm! * 6;
-  const progression = Math.min(20, Math.floor((weekNumber - 1) / 3) * 5);
-  return roundToFive(Math.max(25, base * 0.55 + progression));
+  const ageAdjustment = normalized.runnerProfile.age && normalized.runnerProfile.age >= 60 ? -5 : 0;
+  const frequencyAdjustment =
+    normalized.runnerProfile.baselineSessionsPerWeek >= 5
+      ? 5
+      : normalized.runnerProfile.baselineSessionsPerWeek <= 2
+        ? -5
+        : 0;
+  const progression = Math.min(18, Math.floor((weekNumber - 1) / 3) * 4);
+
+  return roundToFive(Math.max(25, base * 0.52 + progression + ageAdjustment + frequencyAdjustment));
 }
 
 function deriveLongRunDistanceKm(normalized: NormalizedStructuredInput, weekNumber: number) {
-  const base =
+  const policy = longRunGoalPolicies[normalized.goal.goalType];
+  const baseline =
     normalized.runnerProfile.baselineLongRunKm ??
     Number(((normalized.runnerProfile.baselineLongRunDurationMin ?? 60) / 7).toFixed(1));
-  const mixBonus = normalized.preferences.preferredWorkoutMix === "long_run_focus" ? 1 : 0;
-  const progression = Math.floor((weekNumber - 1) / 2) * 0.8;
-  const downWeekAdjustment = weekNumber % 4 === 0 ? -1 : 0;
-  const taperAdjustment = weekNumber === normalized.schedule.horizonWeeks ? -1 : 0;
-  return Number(
-    Math.max(6, base + progression + mixBonus + downWeekAdjustment + taperAdjustment).toFixed(1),
+  const startDistance = Math.max(policy.floorKm, Math.min(baseline, policy.peakKm * 0.72));
+  const peakDistance = deriveLongRunPeakDistanceKm(normalized, policy, startDistance);
+  const taperStartWeek = firstTaperWeek(normalized.schedule.horizonWeeks);
+  const progressionEndWeek = Math.max(1, taperStartWeek - 1);
+
+  if (weekNumber >= taperStartWeek) {
+    return deriveTaperLongRunDistanceKm({
+      normalized,
+      policy,
+      startDistance,
+      peakDistance,
+      taperStartWeek,
+      weekNumber,
+      progressionEndWeek,
+    });
+  }
+
+  return deriveProgressiveLongRunDistanceKm({
+    normalized,
+    policy,
+    startDistance,
+    peakDistance,
+    progressionEndWeek,
+    weekNumber,
+  });
+}
+
+function deriveProgressiveLongRunDistanceKm({
+  normalized,
+  policy,
+  startDistance,
+  peakDistance,
+  progressionEndWeek,
+  weekNumber,
+}: {
+  normalized: NormalizedStructuredInput;
+  policy: LongRunGoalPolicy;
+  startDistance: number;
+  peakDistance: number;
+  progressionEndWeek: number;
+  weekNumber: number;
+}) {
+  const progressRatio =
+    progressionEndWeek <= 1 ? 1 : Math.min(1, (weekNumber - 1) / (progressionEndWeek - 1));
+  const progressionCurve = Math.pow(progressRatio, 0.85);
+  const rawDistance = startDistance + (peakDistance - startDistance) * progressionCurve;
+  const cutbackDistance = isCutbackWeek(weekNumber, normalized)
+    ? Math.max(policy.floorKm, rawDistance * 0.82)
+    : rawDistance;
+
+  return Number(Math.min(policy.ceilingKm, cutbackDistance).toFixed(1));
+}
+
+function deriveTaperLongRunDistanceKm({
+  normalized,
+  policy,
+  startDistance,
+  peakDistance,
+  taperStartWeek,
+  weekNumber,
+  progressionEndWeek,
+}: {
+  normalized: NormalizedStructuredInput;
+  policy: LongRunGoalPolicy;
+  startDistance: number;
+  peakDistance: number;
+  taperStartWeek: number;
+  weekNumber: number;
+  progressionEndWeek: number;
+}) {
+  const preTaperDistances = Array.from({ length: Math.max(1, taperStartWeek - 1) }, (_, index) =>
+    deriveProgressiveLongRunDistanceKm({
+      normalized,
+      policy,
+      startDistance,
+      peakDistance,
+      progressionEndWeek,
+      weekNumber: index + 1,
+    }),
   );
+  const preTaperPeakDistance = Math.max(...preTaperDistances);
+  const taperWeekCount = normalized.schedule.horizonWeeks - taperStartWeek + 1;
+  const taperProgress =
+    taperWeekCount <= 1 ? 1 : (weekNumber - taperStartWeek) / (taperWeekCount - 1);
+  const firstTaperFactor = taperWeekCount <= 1 ? 0.65 : 0.76;
+  const finalTaperFactor = 0.55;
+  const taperFactor =
+    firstTaperFactor + (finalTaperFactor - firstTaperFactor) * Math.min(1, taperProgress);
+  const taperDistance = Math.max(policy.floorKm, preTaperPeakDistance * taperFactor);
+  const reductionCap = Math.max(
+    policy.floorKm,
+    preTaperPeakDistance - Math.max(1, preTaperPeakDistance * 0.08),
+  );
+
+  return Number(Math.min(policy.ceilingKm, taperDistance, reductionCap).toFixed(1));
 }
 
 function deriveLongRunDurationMin(
@@ -1321,24 +2209,77 @@ function deriveLongRunDurationMin(
   distanceKm: number,
 ) {
   if (normalized.runnerProfile.baselineLongRunDurationMin) {
-    const progression = Math.floor((weekNumber - 1) / 2) * 5;
-    const downWeekAdjustment = weekNumber % 4 === 0 ? -10 : 0;
-    const taperAdjustment = weekNumber === normalized.schedule.horizonWeeks ? -10 : 0;
-    return roundToFive(
-      Math.max(
-        40,
-        normalized.runnerProfile.baselineLongRunDurationMin +
-          progression +
-          downWeekAdjustment +
-          taperAdjustment,
-      ),
-    );
+    return roundToFive(Math.max(40, distanceKm * 6.8));
   }
 
   return roundToFive(distanceKm * 6.5);
 }
 
+function deriveLongRunPeakDistanceKm(
+  normalized: NormalizedStructuredInput,
+  policy: LongRunGoalPolicy,
+  startDistance: number,
+) {
+  const frequency = normalized.runnerProfile.baselineSessionsPerWeek;
+  const age = normalized.runnerProfile.age ?? null;
+  const hasBenchmark = Boolean(getRecent5kPaceSecondsPerKm(normalized));
+  const highAmbition = isHighAmbitionPlan(normalized);
+  const shortHorizonPenalty =
+    normalized.schedule.horizonWeeks < 10
+      ? 4
+      : normalized.schedule.horizonWeeks < 14 &&
+          ["marathon", "ultra_marathon"].includes(normalized.goal.goalType)
+        ? 2
+        : 0;
+  const frequencyAdjustment = frequency >= 5 ? 2 : frequency <= 3 ? -4 : 0;
+  const experienceAdjustment =
+    normalized.runnerProfile.experienceLevel === "experienced_runner"
+      ? 1.5
+      : normalized.runnerProfile.experienceLevel === "new_runner"
+        ? -3
+        : 0;
+  const ageAdjustment = age && age >= 65 ? -4 : age && age >= 55 ? -2 : 0;
+  const ambitionAdjustment = highAmbition && hasBenchmark && frequency >= 4 ? 1.5 : 0;
+  const unsupportedTargetAdjustment = highAmbition && !hasBenchmark ? -1.5 : 0;
+  const peak =
+    policy.peakKm +
+    frequencyAdjustment +
+    experienceAdjustment +
+    ageAdjustment +
+    ambitionAdjustment +
+    unsupportedTargetAdjustment -
+    shortHorizonPenalty;
+
+  return Math.min(policy.ceilingKm, Math.max(startDistance + 2, peak));
+}
+
+function isHighAmbitionPlan(normalized: NormalizedStructuredInput) {
+  return (
+    normalized.preferences.preferredWorkoutMix === "long_run_focus" ||
+    normalized.constraints.hardConstraints.some((constraint) => /target time/i.test(constraint))
+  );
+}
+
 function shouldAvoidQuality(normalized: StructuredPlanAuthoringInput) {
+  if (normalized.runnerProfile.baselineSessionsPerWeek < 3) {
+    return true;
+  }
+
+  if (
+    normalized.runnerProfile.experienceLevel === "new_runner" &&
+    !normalized.currentLevel.recent5kPaceSecondsPerKm
+  ) {
+    return true;
+  }
+
+  if (
+    normalized.runnerProfile.age &&
+    normalized.runnerProfile.age >= 65 &&
+    !normalized.currentLevel.recent5kPaceSecondsPerKm
+  ) {
+    return true;
+  }
+
   return [
     ...normalized.constraints.injuryConstraints,
     ...normalized.constraints.hardConstraints,
@@ -1366,22 +2307,40 @@ function buildPreferenceNotes(normalized: StructuredPlanAuthoringInput) {
   return notes.join(" · ") || null;
 }
 
-function phaseForWeek(weekNumber: number, horizonWeeks: number) {
+function phaseForWeek(weekNumber: number, horizonWeeks: number): TrainingPhase {
+  if (horizonWeeks <= 1) {
+    return "Base";
+  }
+
   if (horizonWeeks <= 2) {
-    return weekNumber === horizonWeeks ? "Peak" : "Base";
+    return weekNumber === horizonWeeks ? "Taper" : "Base";
   }
 
   const progress = weekNumber / horizonWeeks;
 
-  if (progress <= 0.5) {
+  if (progress <= 0.3) {
     return "Base";
   }
 
-  if (progress <= 0.85) {
+  if (progress <= 0.65) {
     return "Build";
   }
 
-  return "Peak";
+  if (progress <= 0.88) {
+    return "Specific";
+  }
+
+  return "Taper";
+}
+
+function firstTaperWeek(horizonWeeks: number) {
+  for (let week = 1; week <= horizonWeeks; week += 1) {
+    if (phaseForWeek(week, horizonWeeks) === "Taper") {
+      return week;
+    }
+  }
+
+  return horizonWeeks + 1;
 }
 
 function compareWeekdays(
@@ -1414,6 +2373,6 @@ interface BuildWorkoutContext {
   date: string;
   weekday: (typeof weekdayValues)[number];
   weekNumber: number;
-  phase: string;
+  phase: TrainingPhase;
   normalized: NormalizedStructuredInput;
 }

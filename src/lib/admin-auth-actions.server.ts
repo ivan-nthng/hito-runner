@@ -1,3 +1,8 @@
+import "@tanstack/react-start/server-only";
+
+import { pbkdf2 as pbkdf2Callback, createHmac, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+import { parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
 import {
   ADMIN_LOGIN_PATH,
   adminLoginInputSchema,
@@ -11,11 +16,27 @@ import {
   verifyLocalAuthCredentials,
   type LocalAuthAccountConfig,
 } from "@/lib/local-auth";
-import { isDevOnlyLocalAuthRuntime } from "@/lib/supabase/env";
+import { isDevOnlyLocalAuthRuntime, serverEnv } from "@/lib/supabase/env";
+
+const ADMIN_USERNAME = "admin";
+const ADMIN_SESSION_COOKIE = "hito_admin_session";
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
+const ADMIN_SESSION_USER_ID = "hito-admin";
+const MIN_PASSWORD_HASH_ITERATIONS = 100_000;
+const MAX_PASSWORD_HASH_ITERATIONS = 1_000_000;
+const pbkdf2 = promisify(pbkdf2Callback);
 
 type AdminLoginVerificationResult =
   | (Extract<AdminLoginResult, { ok: true }> & {
-      account: LocalAuthAccountConfig;
+      session:
+        | {
+            kind: "local";
+            account: LocalAuthAccountConfig;
+          }
+        | {
+            kind: "deployed";
+            username: typeof ADMIN_USERNAME;
+          };
     })
   | Extract<AdminLoginResult, { ok: false }>;
 
@@ -35,11 +56,26 @@ export interface AdminLoginDependencies {
         reason: "unavailable" | "invalid";
       }
   >;
+  deployedAdmin: DeployedAdminConfig;
 }
 
-export async function loginLocalAdminForRequest(request: Request): Promise<Response> {
+export interface DeployedAdminConfig {
+  username: typeof ADMIN_USERNAME;
+  passwordHash: string | null;
+  sessionSecret: string | null;
+}
+
+export interface AdminAuthSession {
+  userId: string;
+  email: null;
+  username: typeof ADMIN_USERNAME;
+}
+
+export async function loginAdminForRequest(request: Request): Promise<Response> {
   return handleAdminLoginRequestForDependencies(request, await buildCurrentDependencies(request));
 }
+
+export const loginLocalAdminForRequest = loginAdminForRequest;
 
 export async function handleAdminLoginRequestForDependencies(
   request: Request,
@@ -50,7 +86,12 @@ export async function handleAdminLoginRequestForDependencies(
   const responseHeaders = new Headers();
 
   if (result.ok) {
-    await appendLocalAuthSessionCookie(responseHeaders, request, result.account);
+    if (result.session.kind === "local") {
+      await appendLocalAuthSessionCookie(responseHeaders, request, result.session.account);
+    } else {
+      appendAdminAuthSessionCookie(responseHeaders, request, result.session.username, dependencies);
+    }
+
     responseHeaders.set("location", new URL(result.redirectTo, request.url).toString());
 
     return new Response(null, {
@@ -89,50 +130,74 @@ export async function verifyAdminLoginForDependencies(
   if (!parsed.success) {
     return failure(
       "invalid_credentials",
-      "Enter the local admin username or email and password.",
+      "Enter the admin username or email and password.",
       redirectTo,
     );
   }
 
-  if (!dependencies.isLocalRuntime) {
+  if (dependencies.isLocalRuntime) {
+    const localResult = await verifyLocalFixtureAdminLogin(parsed.data, dependencies, redirectTo);
+
+    if (localResult) {
+      return localResult;
+    }
+  }
+
+  const deployedConfig = validateDeployedAdminConfig(dependencies.deployedAdmin);
+
+  if (!deployedConfig.ok) {
     return failure(
-      "local_admin_login_unavailable",
-      "Local admin login is available only in the local auth bypass runtime.",
+      "admin_config_invalid",
+      "Admin login is not configured for this runtime.",
       redirectTo,
     );
   }
 
+  const deployedCredentials = await verifyDeployedAdminCredentials(
+    parsed.data.identifier,
+    parsed.data.password,
+    deployedConfig.config,
+  );
+
+  if (!deployedCredentials.ok) {
+    return failure("invalid_credentials", "The admin credentials were not recognized.", redirectTo);
+  }
+
+  return {
+    ok: true,
+    redirectTo,
+    session: {
+      kind: "deployed",
+      username: ADMIN_USERNAME,
+    },
+  };
+}
+
+async function verifyLocalFixtureAdminLogin(
+  data: AdminLoginInput,
+  dependencies: AdminLoginDependencies,
+  redirectTo: string,
+): Promise<AdminLoginVerificationResult | null> {
   const adminAccounts = dependencies.accounts.filter((account) => account.role === "admin");
 
   if (adminAccounts.length !== 1) {
     return failure(
       "admin_config_invalid",
-      "Local admin login requires exactly one configured admin account.",
+      "Admin login requires exactly one configured local admin account.",
       redirectTo,
     );
   }
 
-  const credentials = await dependencies.verifyCredentials(
-    parsed.data.identifier,
-    parsed.data.password,
-  );
+  const credentials = await dependencies.verifyCredentials(data.identifier, data.password);
 
   if (!credentials.ok) {
-    return failure(
-      credentials.reason === "unavailable"
-        ? "local_admin_login_unavailable"
-        : "invalid_credentials",
-      credentials.reason === "unavailable"
-        ? "Local admin login is unavailable in this runtime."
-        : "The local admin credentials were not recognized.",
-      redirectTo,
-    );
+    return null;
   }
 
   if (credentials.account.role !== "admin") {
     return failure(
       "admin_required",
-      "Those credentials are valid for a local tester, not for admin access.",
+      "Those credentials are valid for a tester, not for admin access.",
       redirectTo,
     );
   }
@@ -140,7 +205,10 @@ export async function verifyAdminLoginForDependencies(
   return {
     ok: true,
     redirectTo,
-    account: credentials.account,
+    session: {
+      kind: "local",
+      account: credentials.account,
+    },
   };
 }
 
@@ -150,7 +218,270 @@ async function buildCurrentDependencies(request: Request): Promise<AdminLoginDep
     accounts: await getLocalAuthAccounts(),
     verifyCredentials: (identifier, password) =>
       verifyLocalAuthCredentials(identifier, password, request.url),
+    deployedAdmin: readDeployedAdminConfigFromEnv(),
   };
+}
+
+export async function resolveAdminAuthSession(request: Request): Promise<AdminAuthSession | null> {
+  if (!isAdminRequestPath(request.url)) {
+    return null;
+  }
+
+  const config = validateDeployedAdminConfig({
+    username: ADMIN_USERNAME,
+    passwordHash: readServerEnv("HITO_ADMIN_PASSWORD_HASH"),
+    sessionSecret: readServerEnv("HITO_ADMIN_SESSION_SECRET"),
+  });
+
+  if (!config.ok) {
+    return null;
+  }
+
+  const cookies = parseCookieHeader(request.headers.get("cookie") ?? "");
+  const sessionCookie = cookies.find((cookie) => cookie.name === ADMIN_SESSION_COOKIE);
+
+  if (!sessionCookie?.value) {
+    return null;
+  }
+
+  const payload = verifyAdminSessionToken(sessionCookie.value, config.config.sessionSecret);
+
+  if (!payload || payload.sub !== ADMIN_USERNAME) {
+    return null;
+  }
+
+  return {
+    userId: ADMIN_SESSION_USER_ID,
+    email: null,
+    username: ADMIN_USERNAME,
+  };
+}
+
+function appendAdminAuthSessionCookie(
+  headers: Headers,
+  request: Request,
+  username: typeof ADMIN_USERNAME,
+  dependencies: Pick<AdminLoginDependencies, "deployedAdmin">,
+) {
+  const config = validateDeployedAdminConfig(dependencies.deployedAdmin);
+
+  if (!config.ok) {
+    return;
+  }
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const expiresAt = issuedAt + ADMIN_SESSION_MAX_AGE_SECONDS;
+
+  headers.append(
+    "set-cookie",
+    serializeCookieHeader(
+      ADMIN_SESSION_COOKIE,
+      signAdminSessionToken(
+        {
+          v: 1,
+          sub: username,
+          iat: issuedAt,
+          exp: expiresAt,
+        },
+        config.config.sessionSecret,
+      ),
+      {
+        httpOnly: true,
+        maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
+        path: "/",
+        sameSite: "lax",
+        secure: new URL(request.url).protocol === "https:",
+      },
+    ),
+  );
+}
+
+function validateDeployedAdminConfig(config: DeployedAdminConfig):
+  | {
+      ok: true;
+      config: Required<DeployedAdminConfig>;
+    }
+  | {
+      ok: false;
+    } {
+  if (
+    config.username !== ADMIN_USERNAME ||
+    !config.passwordHash ||
+    !config.sessionSecret ||
+    config.sessionSecret.length < 32 ||
+    !isSupportedPasswordHash(config.passwordHash)
+  ) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    config: {
+      username: ADMIN_USERNAME,
+      passwordHash: config.passwordHash,
+      sessionSecret: config.sessionSecret,
+    },
+  };
+}
+
+function readDeployedAdminConfigFromEnv(): DeployedAdminConfig {
+  return {
+    username: ADMIN_USERNAME,
+    passwordHash: readServerEnv("HITO_ADMIN_PASSWORD_HASH"),
+    sessionSecret: readServerEnv("HITO_ADMIN_SESSION_SECRET"),
+  };
+}
+
+function readServerEnv(name: string): string | null {
+  const value = process.env[name];
+
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  return value.trim();
+}
+
+async function verifyDeployedAdminCredentials(
+  identifier: string,
+  password: string,
+  config: Required<DeployedAdminConfig>,
+) {
+  if (identifier.trim().toLowerCase() !== config.username) {
+    return { ok: false as const };
+  }
+
+  return {
+    ok: await verifyPasswordHash(password, config.passwordHash),
+  };
+}
+
+function isSupportedPasswordHash(value: string) {
+  const parts = value.split("$");
+
+  if (parts.length !== 4 || parts[0] !== "pbkdf2_sha256") {
+    return false;
+  }
+
+  const iterations = Number(parts[1]);
+
+  return (
+    Number.isInteger(iterations) &&
+    iterations >= MIN_PASSWORD_HASH_ITERATIONS &&
+    iterations <= MAX_PASSWORD_HASH_ITERATIONS &&
+    Boolean(decodeBase64Url(parts[2] ?? "")) &&
+    Boolean(decodeBase64Url(parts[3] ?? ""))
+  );
+}
+
+async function verifyPasswordHash(password: string, encodedHash: string) {
+  const parts = encodedHash.split("$");
+
+  if (parts.length !== 4 || parts[0] !== "pbkdf2_sha256") {
+    return false;
+  }
+
+  const iterations = Number(parts[1]);
+  const salt = decodeBase64Url(parts[2] ?? "");
+  const expectedHash = decodeBase64Url(parts[3] ?? "");
+
+  if (
+    !Number.isInteger(iterations) ||
+    iterations < MIN_PASSWORD_HASH_ITERATIONS ||
+    iterations > MAX_PASSWORD_HASH_ITERATIONS ||
+    !salt ||
+    !expectedHash
+  ) {
+    return false;
+  }
+
+  const actualHash = await pbkdf2(password, salt, iterations, expectedHash.length, "sha256");
+
+  return safeEqual(actualHash, expectedHash);
+}
+
+interface AdminSessionPayload {
+  v: 1;
+  sub: typeof ADMIN_USERNAME;
+  iat: number;
+  exp: number;
+}
+
+function signAdminSessionToken(payload: AdminSessionPayload, secret: string) {
+  const encodedPayload = toBase64Url(Buffer.from(JSON.stringify(payload), "utf8"));
+  const signature = signAdminSessionPayload(encodedPayload, secret);
+
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifyAdminSessionToken(value: string, secret: string): AdminSessionPayload | null {
+  const [encodedPayload, signature] = value.split(".");
+
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  if (
+    !safeEqual(Buffer.from(signature), Buffer.from(signAdminSessionPayload(encodedPayload, secret)))
+  ) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as {
+      v?: unknown;
+      sub?: unknown;
+      iat?: unknown;
+      exp?: unknown;
+    };
+
+    if (
+      payload.v !== 1 ||
+      payload.sub !== ADMIN_USERNAME ||
+      typeof payload.iat !== "number" ||
+      typeof payload.exp !== "number" ||
+      payload.exp <= Math.floor(Date.now() / 1000)
+    ) {
+      return null;
+    }
+
+    return payload as AdminSessionPayload;
+  } catch {
+    return null;
+  }
+}
+
+function signAdminSessionPayload(encodedPayload: string, secret: string) {
+  return toBase64Url(createHmac("sha256", secret).update(encodedPayload).digest());
+}
+
+function isAdminRequestPath(requestUrl: string) {
+  try {
+    const pathname = new URL(requestUrl).pathname;
+    return pathname.startsWith("/admin/") || pathname.startsWith("/api/admin/");
+  } catch {
+    return false;
+  }
+}
+
+function decodeBase64Url(value: string) {
+  try {
+    return Buffer.from(value, "base64url");
+  } catch {
+    return null;
+  }
+}
+
+function toBase64Url(bytes: Uint8Array) {
+  return Buffer.from(bytes).toString("base64url");
+}
+
+function safeEqual(left: Uint8Array, right: Uint8Array) {
+  if (left.byteLength !== right.byteLength) {
+    return false;
+  }
+
+  return timingSafeEqual(left, right);
 }
 
 async function parseAdminLoginRequest(request: Request): Promise<AdminLoginInput> {

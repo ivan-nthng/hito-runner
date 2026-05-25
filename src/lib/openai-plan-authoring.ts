@@ -130,6 +130,14 @@ function buildSystemPrompt() {
     "If the user does not specify exact availability, default to Tuesday, Thursday, and Sunday running with Sunday as the long run day.",
     "If the user does not specify a target date or duration, default to 8 preparation weeks.",
     "If the user does not specify baseline long run distance, use 8 km unless the user clearly indicates less readiness; if distance is unknown but time is implied, use 60 minutes.",
+    "If the user does not specify target execution mode, default to effort guidance and unknown watch/app access.",
+    "Goal types may include build_consistency, distance_build, 5k, 10k, half_marathon, marathon, ultra_marathon, or mountain_running.",
+    "Terrain focus must be standard, rolling, or mountain. Mountain running should use mountain terrain context.",
+    "Target-time goals need honesty: if benchmark support is weak, keep the generated plan effort-based and conservative rather than promising race-specific pace precision.",
+    "Marathon, ultra, and mountain goals with low frequency, weak benchmark support, unknown current load, or short timelines must be described as conservative, finish-oriented, or durability-limited instead of full race-specific preparation.",
+    "Marathon, ultra, and mountain goals need credible long-run progression, cutbacks, tapering, and phase-specific workouts.",
+    "Goal-family identity matters: 5K can use safe short-rep sharpening or strides, 10K can use rhythm or sustained quality, half marathon can use threshold or steady durability, marathon can use controlled steady/marathon-effort specificity and long-run durability, and ultra should stay durability/time-on-feet oriented rather than road-race sharpening.",
+    "Mountain or trail plans need mountain-specific doctrine: progressive hill exposure, controlled descents/downhill durability, hike-run or power-hike allowance, time-on-feet guidance, cautious technical-terrain language, and no exact elevation-gain targets unless trusted route/elevation truth exists.",
     "Use exact weekday names: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.",
     "Keep notes concise and use them only for real constraints, assumptions, or preferences.",
     "Never invent auth, user ids, logs, completion markers, or post-workout results.",
@@ -178,7 +186,7 @@ function safeParseJson(raw: string) {
   }
 }
 
-const structuredAuthoringOpenAiSchema = {
+export const structuredAuthoringOpenAiSchema = {
   type: "object",
   additionalProperties: false,
   required: [
@@ -189,6 +197,7 @@ const structuredAuthoringOpenAiSchema = {
     "availability",
     "constraints",
     "preferences",
+    "execution",
   ],
   properties: {
     goal: {
@@ -198,7 +207,16 @@ const structuredAuthoringOpenAiSchema = {
       properties: {
         goalType: {
           type: "string",
-          enum: ["build_consistency", "distance_build", "5k", "10k", "half_marathon", "marathon"],
+          enum: [
+            "build_consistency",
+            "distance_build",
+            "5k",
+            "10k",
+            "half_marathon",
+            "marathon",
+            "ultra_marathon",
+            "mountain_running",
+          ],
         },
         goalLabel: { type: "string" },
         targetEventName: { type: ["string", "null"] },
@@ -248,6 +266,7 @@ const structuredAuthoringOpenAiSchema = {
       required: [
         "recentResultSummary",
         "recentRaceResults",
+        "recent5kPaceSecondsPerKm",
         "currentEasyPaceRange",
         "currentTrainingLoadSummary",
       ],
@@ -266,6 +285,7 @@ const structuredAuthoringOpenAiSchema = {
             },
           },
         },
+        recent5kPaceSecondsPerKm: { type: ["number", "null"] },
         currentEasyPaceRange: { type: ["string", "null"] },
         currentTrainingLoadSummary: { type: ["string", "null"] },
       },
@@ -312,11 +332,21 @@ const structuredAuthoringOpenAiSchema = {
     preferences: {
       type: "object",
       additionalProperties: false,
-      required: ["preferredWorkoutMix", "strengthOrMobilityInterest", "indoorTreadmillOk", "notes"],
+      required: [
+        "preferredWorkoutMix",
+        "terrainFocus",
+        "strengthOrMobilityInterest",
+        "indoorTreadmillOk",
+        "notes",
+      ],
       properties: {
         preferredWorkoutMix: {
           type: ["string", "null"],
           enum: ["balanced", "easy_heavy", "quality_light", "long_run_focus", null],
+        },
+        terrainFocus: {
+          type: "string",
+          enum: ["standard", "rolling", "mountain"],
         },
         strengthOrMobilityInterest: {
           type: ["string", "null"],
@@ -324,6 +354,21 @@ const structuredAuthoringOpenAiSchema = {
         },
         indoorTreadmillOk: { type: "boolean" },
         notes: { type: ["string", "null"] },
+      },
+    },
+    execution: {
+      type: "object",
+      additionalProperties: false,
+      required: ["watchAccess", "guidancePreference"],
+      properties: {
+        watchAccess: {
+          type: "string",
+          enum: ["none", "watch_or_app", "unknown"],
+        },
+        guidancePreference: {
+          type: "string",
+          enum: ["effort", "pace", "heart_rate", "mixed"],
+        },
       },
     },
   },

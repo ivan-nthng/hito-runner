@@ -27,6 +27,10 @@ export async function getPersistedUserIdForAuthContext(auth: RequestAuthContext)
 }
 
 async function getPersistedUserIdForAuth(auth: ReturnType<typeof requireAuthenticatedUser>) {
+  if (auth.provider === "admin") {
+    return null;
+  }
+
   if (auth.provider !== "local") {
     return auth.userId;
   }

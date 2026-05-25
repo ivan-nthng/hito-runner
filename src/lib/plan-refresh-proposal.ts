@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import { z } from "zod";
 import { serverEnv } from "@/lib/supabase/env";
+import type { ActivePlanRefreshDraft } from "@/lib/active-plan-refresh-draft";
 import type { RunnerCoachContext } from "@/lib/runner-coach-context";
 import { formatWeekdayList, weekdayRestInvariantToSignature } from "@/lib/weekday-rest-invariants";
 
@@ -62,6 +63,7 @@ export interface ActivePlanRefreshProposal {
       doesNotMutatePlan: true;
     };
     recommendedAuthoringPrompt: string;
+    refreshDraft?: ActivePlanRefreshDraft;
   };
 }
 
@@ -269,6 +271,11 @@ function buildSystemPrompt() {
     "Keep deterministic comparison facts primary. Use body notes only as cautious discomfort context.",
     "Do not diagnose injury, prescribe treatment, or make medical claims.",
     "Be conservative. Prefer fewer, clearer adjustments over rewriting everything.",
+    "For marathon, ultra, and mountain goals, preserve credible long-run progression, cutback or taper intent, and terrain specificity when proposing changes.",
+    "For marathon, ultra, and mountain refreshes with low frequency, weak recent load, short timelines, or no benchmark support, label the proposal conservative, finish-oriented, or durability-limited rather than implying a full race-specific rebuild.",
+    "For 5K, 10K, half marathon, marathon, and ultra refreshes, prefer future changes that preserve goal-family identity: safe short-rep sharpening for 5K, rhythm/sustained quality for 10K, threshold/steady durability for half marathon, controlled steady specificity for marathon, and time-on-feet durability for ultra.",
+    "For mountain or trail refreshes, prefer future changes that add controlled descents, hike-run or power-hike allowance, time-on-feet framing, and technical-terrain caution without exact elevation targets.",
+    "For target-time or ambitious requests, say plainly when the evidence supports only effort-based guidance or a conservative adjustment.",
     "Write complete plain-English sentences. Do not use bare abbreviations like HR; write heart rate if needed.",
     "The recommendedAuthoringPrompt is for a later deterministic plan-authoring step; it must not include past-date changes.",
   ].join("\n");

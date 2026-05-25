@@ -1,3 +1,10 @@
+import { randomUUID } from "node:crypto";
+import {
+  buildExactActivePlanRefreshDraft,
+  mutableWorkoutGuardsStillOpen,
+  parseActivePlanRefreshDraftPayload,
+  type RefreshEvidenceSets,
+} from "@/lib/active-plan-refresh-draft";
 import {
   createAssignedPlanFromImportedSeed,
   getExistingPlanContext,
@@ -17,10 +24,6 @@ import {
   type ImportedPlanSeed,
   type ImportedWorkoutSeed,
 } from "@/lib/imported-plan";
-import {
-  generateCanonicalPlanFromText,
-  type GeneratedPlanResult,
-} from "@/lib/openai-plan-authoring";
 import { type ActivePlanRefreshFingerprint } from "@/lib/plan-refresh-proposal";
 import type {
   ActivePlanRefreshApplyPayload,
@@ -42,11 +45,8 @@ import {
   type TrainingSnapshot,
 } from "@/lib/training";
 import {
-  describeWeekdayRestInvariant,
   mergeWeekdayRestInvariantIntoPlanPreferences,
   validateWorkoutsAgainstWeekdayRestInvariant,
-  WEEKDAY_NAMES,
-  type WeekdayName,
   type WeekdayRestInvariant,
 } from "@/lib/weekday-rest-invariants";
 
@@ -62,25 +62,6 @@ export type {
 } from "@/lib/active-plan-refresh-contract";
 
 type PersistedSnapshotLoader = (userId: string) => Promise<TrainingSnapshot>;
-
-const refreshApplyGoalTypes = [
-  "build_consistency",
-  "distance_build",
-  "5k",
-  "10k",
-  "half_marathon",
-  "marathon",
-] as const;
-type RefreshApplyGoalType = (typeof refreshApplyGoalTypes)[number];
-const refreshApplyExperienceLevels = [
-  "new_runner",
-  "returning_runner",
-  "consistent_runner",
-  "experienced_runner",
-] as const;
-type RefreshApplyExperienceLevel = (typeof refreshApplyExperienceLevels)[number];
-const refreshApplyEffortLanguages = ["pace", "heart_rate", "rpe", "mixed"] as const;
-type RefreshApplyEffortLanguage = (typeof refreshApplyEffortLanguages)[number];
 
 export async function proposeActivePlanRefreshForCurrentRequest(
   data: ActivePlanRefreshProposalInput,
@@ -115,6 +96,33 @@ export async function proposeActivePlanRefreshForUser(
     context,
     runnerPrompt: data.runnerPrompt,
   });
+  const planContext = await getExistingPlanContext(userId);
+
+  if (!context.activePlan || !planContext.activePlan) {
+    throw new Error("An active plan is required before Hito can prepare a plan update draft.");
+  }
+
+  const evidenceSets = await fetchRefreshEvidenceSets(
+    userId,
+    planContext.existingWorkouts.workouts.map((workout) => workout.id),
+    planContext.existingWorkouts.logsByWorkoutId,
+  );
+  const refreshDraft = buildExactActivePlanRefreshDraft({
+    context,
+    currentPlan: planContext.activePlan,
+    existingWorkouts: planContext.existingWorkouts,
+    proposalOutput: proposal.output,
+    fingerprint: proposal.output.applyContext.fingerprint,
+    weekdayRestInvariant: context.weekdayRestInvariant,
+    evidenceSets,
+  });
+  const proposalWithDraft = {
+    ...proposal,
+    output: {
+      ...proposal.output,
+      refreshDraft,
+    },
+  };
 
   await recordRunnerCapabilityUsage({
     userId,
@@ -123,7 +131,7 @@ export async function proposeActivePlanRefreshForUser(
 
   return {
     ok: true,
-    proposal,
+    proposal: proposalWithDraft,
   };
 }
 
@@ -162,34 +170,39 @@ export async function applyActivePlanRefreshProposalForUser(
     return staleActivePlanRefreshResult();
   }
 
-  let refreshTimeline: RefreshApplyTimeline;
+  const parsedDraft = parseActivePlanRefreshDraftPayload(proposal.output.refreshDraft);
 
-  try {
-    refreshTimeline = buildRefreshApplyTimeline(currentContext);
-  } catch {
+  if (!parsedDraft.ok) {
     return blockedActivePlanRefreshApplyResult();
   }
 
-  const generatedPlanResult = await generateRefreshApplyPlan(proposal, {
-    context: currentContext,
-    timeline: refreshTimeline,
-    weekdayRestInvariant: currentContext.weekdayRestInvariant,
-  });
-
-  if (!generatedPlanResult.ok) {
-    return blockedActivePlanRefreshApplyResult();
+  if (
+    !sameActivePlanRefreshFingerprint(parsedDraft.draft.proposalFingerprint, currentFingerprint)
+  ) {
+    return staleActivePlanRefreshResult();
   }
 
-  const refreshedSeed = buildImportedPlanSeed(generatedPlanResult.generatedPlan.canonicalPlan);
+  const refreshedSeed = buildImportedPlanSeed(parsedDraft.draft.canonicalPlan);
   const planContext = await getExistingPlanContext(userId);
 
   if (!planContext.activePlan || planContext.activePlan.id !== currentFingerprint.activePlanId) {
     return staleActivePlanRefreshResult();
   }
 
+  const evidenceSets = await fetchRefreshEvidenceSets(
+    userId,
+    planContext.existingWorkouts.workouts.map((workout) => workout.id),
+    planContext.existingWorkouts.logsByWorkoutId,
+  );
+
+  if (!mutableWorkoutGuardsStillOpen(parsedDraft.draft, evidenceSets)) {
+    return staleActivePlanRefreshResult();
+  }
+
   const preparedRefresh = prepareActivePlanRefreshReplacementSafely({
     currentPlan: planContext.activePlan,
     existingWorkouts: planContext.existingWorkouts,
+    evidenceSets,
     generatedSeed: refreshedSeed,
     proposal,
     fingerprint: currentFingerprint,
@@ -204,6 +217,7 @@ export async function applyActivePlanRefreshProposalForUser(
     userId,
     preparedRefresh.value.importedSeed,
     preparedRefresh.value.copiedLogs,
+    preparedRefresh.value.copiedEvidenceWorkouts,
     planContext.activePlan,
   );
 
@@ -264,352 +278,6 @@ function sortJsonValue(value: unknown): unknown {
   return value;
 }
 
-interface RefreshApplyTimeline {
-  startDate: string;
-  targetDate: string | null;
-  preparationHorizonWeeks: number;
-  sourceTargetDate: string | null;
-}
-
-function buildRefreshApplyTimeline(context: RunnerCoachContext): RefreshApplyTimeline {
-  const startDate = context.refreshBoundary.firstMutableDate;
-
-  if (!startDate) {
-    throw new Error("There is no remaining active schedule to update.");
-  }
-
-  const remainingEndDate = context.refreshBoundary.lastMutableDate ?? startDate;
-  const sourceTargetDate = context.activePlan?.targetDate ?? null;
-  const targetDate =
-    sourceTargetDate && diffDaysIso(sourceTargetDate, startDate) >= 6 ? sourceTargetDate : null;
-  const horizonEndDate = targetDate ?? remainingEndDate;
-  const preparationHorizonWeeks = Math.max(
-    1,
-    Math.ceil((diffDaysIso(horizonEndDate, startDate) + 1) / 7),
-  );
-
-  return {
-    startDate,
-    targetDate,
-    preparationHorizonWeeks,
-    sourceTargetDate,
-  };
-}
-
-async function generateRefreshApplyPlan(
-  proposal: ActivePlanRefreshApplyPayload,
-  {
-    context,
-    timeline,
-    weekdayRestInvariant,
-  }: {
-    context: RunnerCoachContext;
-    timeline: RefreshApplyTimeline;
-    weekdayRestInvariant: WeekdayRestInvariant;
-  },
-): Promise<{ ok: true; generatedPlan: GeneratedPlanResult } | { ok: false }> {
-  try {
-    const generatedPlan = await generateCanonicalPlanFromText(
-      buildRefreshApplyAuthoringPrompt(proposal, weekdayRestInvariant, timeline),
-      {
-        repairAuthoringInput: (value) =>
-          repairRefreshApplyAuthoringInput(value, {
-            context,
-            timeline,
-            weekdayRestInvariant,
-          }),
-        validationErrorPrefix: "Refresh apply authoring input failed validation",
-      },
-    );
-
-    return { ok: true, generatedPlan };
-  } catch {
-    return { ok: false };
-  }
-}
-
-function repairRefreshApplyAuthoringInput(
-  value: unknown,
-  {
-    context,
-    timeline,
-    weekdayRestInvariant,
-  }: {
-    context: RunnerCoachContext;
-    timeline: RefreshApplyTimeline;
-    weekdayRestInvariant: WeekdayRestInvariant;
-  },
-) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return value;
-  }
-
-  const record = value as Record<string, unknown>;
-  const schedule =
-    record.schedule && typeof record.schedule === "object" && !Array.isArray(record.schedule)
-      ? (record.schedule as Record<string, unknown>)
-      : {};
-
-  return {
-    ...record,
-    goal: repairRefreshApplyGoal(record.goal, context),
-    schedule: {
-      ...schedule,
-      startDate: timeline.startDate,
-      targetDate: timeline.targetDate,
-      preparationHorizonWeeks: timeline.preparationHorizonWeeks,
-    },
-    runnerProfile: repairRefreshApplyRunnerProfile(record.runnerProfile, context),
-    availability: repairRefreshApplyAvailability(
-      record.availability,
-      weekdayRestInvariant,
-      context,
-    ),
-  };
-}
-
-function repairRefreshApplyGoal(value: unknown, context: RunnerCoachContext) {
-  const goal = readObjectRecord(value);
-
-  if (!goal) {
-    return value;
-  }
-
-  return {
-    ...goal,
-    goalType: normalizeRefreshApplyGoalType(goal.goalType, context),
-    goalLabel:
-      readTrimmedString(goal.goalLabel) ??
-      context.runner.goalLabel ??
-      context.activePlan?.goalSummary ??
-      context.activePlan?.title ??
-      "Updated running plan",
-    targetEventName: readNullableTrimmedString(goal.targetEventName),
-  };
-}
-
-function normalizeRefreshApplyGoalType(
-  value: unknown,
-  context: RunnerCoachContext,
-): RefreshApplyGoalType {
-  const directGoalType = normalizeGoalTypeCandidate(readTrimmedString(value));
-
-  if (isRefreshApplyGoalType(directGoalType)) {
-    return directGoalType;
-  }
-
-  for (const candidate of [
-    context.activePlan?.goalSummary,
-    context.runner.goalLabel,
-    context.activePlan?.title,
-    context.runner.goalType,
-  ]) {
-    const inferredGoalType = inferRefreshApplyGoalType(candidate);
-
-    if (inferredGoalType) {
-      return inferredGoalType;
-    }
-  }
-
-  return context.runner.goalType === "build_consistency" ? "build_consistency" : "distance_build";
-}
-
-function inferRefreshApplyGoalType(value: unknown): RefreshApplyGoalType | null {
-  const text = readTrimmedString(value)?.toLowerCase() ?? "";
-
-  if (!text) return null;
-  if (/\bhalf[\s_-]*marathon\b/.test(text)) return "half_marathon";
-  if (/\bmarathon\b/.test(text)) return "marathon";
-  if (/\b10[\s_-]*k\b/.test(text)) return "10k";
-  if (/\b5[\s_-]*k\b/.test(text)) return "5k";
-  if (/consistency|consistent/.test(text)) return "build_consistency";
-  if (/distance|base|build/.test(text)) return "distance_build";
-
-  return null;
-}
-
-function normalizeGoalTypeCandidate(value: string | null): string | null {
-  return value?.toLowerCase().replace(/[\s-]+/g, "_") ?? null;
-}
-
-function repairRefreshApplyRunnerProfile(value: unknown, context: RunnerCoachContext) {
-  const runnerProfile = readObjectRecord(value);
-
-  if (!runnerProfile) {
-    return value;
-  }
-
-  const modelBaselineDurationMin = readIntegerInRange(
-    runnerProfile.baselineLongRunDurationMin,
-    20,
-    300,
-  );
-  const fallbackBaselineLongRunKm =
-    readNumberInRange(context.runner.baselineLongRunKm, 0.1, 80) ??
-    deriveRefreshApplyBaselineLongRunKm(context);
-  const modelBaselineLongRunKm = readNumberInRange(runnerProfile.baselineLongRunKm, 0.1, 80);
-
-  return {
-    ...runnerProfile,
-    experienceLevel: readRefreshApplyExperienceLevel(runnerProfile.experienceLevel),
-    baselineSessionsPerWeek:
-      readIntegerInRange(runnerProfile.baselineSessionsPerWeek, 1, 7) ??
-      readIntegerInRange(context.runner.baselineSessionsPerWeek, 1, 7) ??
-      3,
-    baselineLongRunKm:
-      modelBaselineLongRunKm ??
-      (modelBaselineDurationMin == null ? fallbackBaselineLongRunKm : null),
-    baselineLongRunDurationMin: modelBaselineDurationMin,
-    age: readIntegerInRange(runnerProfile.age, 13, 100),
-    recentInjuryRecoveryContext: readNullableTrimmedString(
-      runnerProfile.recentInjuryRecoveryContext,
-    ),
-    preferredEffortLanguage: readRefreshApplyEffortLanguage(runnerProfile.preferredEffortLanguage),
-  };
-}
-
-function deriveRefreshApplyBaselineLongRunKm(context: RunnerCoachContext) {
-  const plannedDistances = context.remainingActiveSchedule
-    .map((workout) => workout.plannedDistanceKm)
-    .filter((value): value is number => typeof value === "number" && value > 0);
-
-  if (plannedDistances.length > 0) {
-    return Math.min(80, Math.max(...plannedDistances));
-  }
-
-  return 8;
-}
-
-function repairRefreshApplyAvailability(
-  value: unknown,
-  weekdayRestInvariant: WeekdayRestInvariant,
-  context: RunnerCoachContext,
-) {
-  const availability = readObjectRecord(value);
-
-  if (!availability) {
-    return value;
-  }
-
-  const blockedWeekdays = uniqueWeekdayNames(weekdayRestInvariant.blockedWeekdays);
-  const modelUnavailableDays = readWeekdayNames(availability.unavailableDays);
-  const unavailableDays = uniqueWeekdayNames([...modelUnavailableDays, ...blockedWeekdays]);
-  const allowedWeekdays = WEEKDAY_NAMES.filter((weekday) => !unavailableDays.includes(weekday));
-
-  if (!allowedWeekdays.length) return value;
-
-  const requestedMaxRunningDays =
-    typeof availability.maxRunningDaysPerWeek === "number" &&
-    Number.isInteger(availability.maxRunningDaysPerWeek)
-      ? availability.maxRunningDaysPerWeek
-      : allowedWeekdays.length;
-  const maxRunningDaysPerWeek = Math.min(
-    Math.max(1, requestedMaxRunningDays),
-    allowedWeekdays.length,
-  );
-  const modelPreferredDays = readWeekdayNames(availability.preferredRunningDays).filter((weekday) =>
-    allowedWeekdays.includes(weekday),
-  );
-  const contextPreferredDays = deriveRefreshApplyPreferredWeekdays(context, allowedWeekdays);
-  const preferredRunningDays = (
-    modelPreferredDays.length
-      ? modelPreferredDays
-      : contextPreferredDays.length
-        ? contextPreferredDays
-        : allowedWeekdays
-  ).slice(0, maxRunningDaysPerWeek);
-  const modelLongRunDay = readWeekdayName(availability.preferredLongRunDay);
-  const preferredLongRunDay =
-    modelLongRunDay && preferredRunningDays.includes(modelLongRunDay)
-      ? modelLongRunDay
-      : (preferredRunningDays.at(-1) ?? null);
-
-  return {
-    ...availability,
-    preferredRunningDays,
-    unavailableDays,
-    maxRunningDaysPerWeek: preferredRunningDays.length,
-    allowBackToBackDays:
-      typeof availability.allowBackToBackDays === "boolean"
-        ? availability.allowBackToBackDays
-        : false,
-    preferredLongRunDay,
-  };
-}
-
-function deriveRefreshApplyPreferredWeekdays(
-  context: RunnerCoachContext,
-  allowedWeekdays: WeekdayName[],
-) {
-  return uniqueWeekdayNames(
-    context.remainingActiveSchedule
-      .filter((workout) => workout.workoutType !== "rest")
-      .map((workout) => weekdayLong(workout.date)),
-  ).filter((weekday) => allowedWeekdays.includes(weekday));
-}
-
-function readWeekdayNames(value: unknown): WeekdayName[] {
-  return uniqueWeekdayNames(Array.isArray(value) ? value : []);
-}
-
-function readWeekdayName(value: unknown): WeekdayName | null {
-  return typeof value === "string" && isWeekdayName(value) ? value : null;
-}
-
-function uniqueWeekdayNames(values: readonly unknown[]): WeekdayName[] {
-  const weekdays = values.filter(isWeekdayName);
-
-  return WEEKDAY_NAMES.filter((weekday) => weekdays.includes(weekday));
-}
-
-function isWeekdayName(value: unknown): value is WeekdayName {
-  return typeof value === "string" && WEEKDAY_NAMES.includes(value as WeekdayName);
-}
-
-function readObjectRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function readTrimmedString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function readNullableTrimmedString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function readNumberInRange(value: unknown, min: number, max: number) {
-  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
-    ? value
-    : null;
-}
-
-function readIntegerInRange(value: unknown, min: number, max: number) {
-  return typeof value === "number" && Number.isInteger(value) && value >= min && value <= max
-    ? value
-    : null;
-}
-
-function readRefreshApplyExperienceLevel(value: unknown): RefreshApplyExperienceLevel {
-  return typeof value === "string" &&
-    refreshApplyExperienceLevels.includes(value as RefreshApplyExperienceLevel)
-    ? (value as RefreshApplyExperienceLevel)
-    : "consistent_runner";
-}
-
-function readRefreshApplyEffortLanguage(value: unknown): RefreshApplyEffortLanguage | null {
-  return typeof value === "string" &&
-    refreshApplyEffortLanguages.includes(value as RefreshApplyEffortLanguage)
-    ? (value as RefreshApplyEffortLanguage)
-    : "rpe";
-}
-
-function isRefreshApplyGoalType(value: unknown): value is RefreshApplyGoalType {
-  return typeof value === "string" && refreshApplyGoalTypes.includes(value as RefreshApplyGoalType);
-}
-
 function prepareActivePlanRefreshReplacementSafely(
   input: Parameters<typeof prepareActivePlanRefreshReplacement>[0],
 ) {
@@ -620,37 +288,10 @@ function prepareActivePlanRefreshReplacementSafely(
   }
 }
 
-function buildRefreshApplyAuthoringPrompt(
-  proposal: ActivePlanRefreshApplyPayload,
-  weekdayRestInvariant: WeekdayRestInvariant,
-  timeline: RefreshApplyTimeline,
-) {
-  return [
-    "Apply the approved Hito Running active-plan refresh proposal.",
-    "Generate a canonical replacement plan for the remaining active schedule only.",
-    "Past workouts and logged history are fixed and must not be rewritten.",
-    "Keep the same runner goal unless the proposal explicitly says otherwise.",
-    `Use schedule.startDate exactly ${timeline.startDate}.`,
-    timeline.targetDate
-      ? `Use schedule.targetDate exactly ${timeline.targetDate}.`
-      : `Set schedule.targetDate to null because the original target date ${timeline.sourceTargetDate ?? "is unavailable"} is not valid for this refresh start.`,
-    `Use schedule.preparationHorizonWeeks exactly ${timeline.preparationHorizonWeeks}.`,
-    describeWeekdayRestInvariant(weekdayRestInvariant),
-    weekdayRestInvariant.blockedWeekdays.length
-      ? "Set availability.unavailableDays to the fixed rest days and do not include those days in availability.preferredRunningDays or availability.preferredLongRunDay."
-      : "No fixed weekday rest-day constraint is currently available.",
-    "Approved runner-facing summary:",
-    proposal.output.review.summary,
-    "Approved runner-facing changes:",
-    ...proposal.output.review.proposedChanges.map((change) => `- ${change}`),
-    "Bounded authoring instruction:",
-    proposal.output.recommendedAuthoringPrompt,
-  ].join("\n");
-}
-
 function prepareActivePlanRefreshReplacement({
   currentPlan,
   existingWorkouts,
+  evidenceSets,
   generatedSeed,
   proposal,
   fingerprint,
@@ -658,6 +299,7 @@ function prepareActivePlanRefreshReplacement({
 }: {
   currentPlan: PersistedPlanCycleRow;
   existingWorkouts: ExistingPlanContext["existingWorkouts"];
+  evidenceSets: RefreshEvidenceSets;
   generatedSeed: ImportedPlanSeed;
   proposal: ActivePlanRefreshApplyPayload;
   fingerprint: ActivePlanRefreshFingerprint;
@@ -671,7 +313,9 @@ function prepareActivePlanRefreshReplacement({
 
   const fixedRows = existingWorkouts.workouts.filter(
     (workout) =>
-      workout.workout_date < firstMutableDate || existingWorkouts.logsByWorkoutId.has(workout.id),
+      workout.workout_date < firstMutableDate ||
+      evidenceSets.loggedWorkoutIds.has(workout.id) ||
+      evidenceSets.evidenceWorkoutIds.has(workout.id),
   );
   const fixedDates = new Set(fixedRows.map((workout) => workout.workout_date));
   const shiftedGeneratedSeed = shiftImportedSeedToStartDate(generatedSeed, firstMutableDate);
@@ -698,7 +342,7 @@ function prepareActivePlanRefreshReplacement({
   const copiedLogs = fixedRows.flatMap((workout) => {
     const log = existingWorkouts.logsByWorkoutId.get(workout.id);
 
-    return log ? [{ log, workoutDate: workout.workout_date }] : [];
+    return log ? [{ log, sourceWorkoutId: workout.id, workoutDate: workout.workout_date }] : [];
   });
 
   return {
@@ -720,6 +364,9 @@ function prepareActivePlanRefreshReplacement({
       workouts: combinedWorkouts,
     },
     copiedLogs,
+    copiedEvidenceWorkouts: fixedRows
+      .filter((workout) => evidenceSets.evidenceWorkoutIds.has(workout.id))
+      .map((workout) => ({ sourceWorkoutId: workout.id, workoutDate: workout.workout_date })),
     fixedWorkoutCount: fixedRows.length,
     refreshedWorkoutCount: refreshedWorkouts.length,
   };
@@ -818,16 +465,314 @@ function buildRefreshPlanPreferences(
       source_active_plan_updated_at: fingerprint.activePlanUpdatedAt,
       first_mutable_date: fingerprint.firstMutableDate,
       last_mutable_date: fingerprint.lastMutableDate,
+      draft_checksum: proposal.output.refreshDraft?.checksum ?? null,
+      draft_generated_at: proposal.output.refreshDraft?.generatedAt ?? null,
+      draft_source_assumption:
+        proposal.output.refreshDraft?.authoringSnapshot.sourceAssumption ?? null,
+      draft_metric_policy:
+        proposal.output.refreshDraft?.authoringSnapshot.metricPolicySummary ?? null,
+      affected_date_range: proposal.output.refreshDraft?.reviewMetadata.affectedDateRange ?? null,
+      regenerated_workout_count:
+        proposal.output.refreshDraft?.reviewMetadata.regeneratedWorkoutCount ?? null,
+      preserved_workout_count:
+        proposal.output.refreshDraft?.reviewMetadata.preservedWorkoutCount ?? null,
+      long_run_peak_before_km:
+        proposal.output.refreshDraft?.reviewMetadata.longRunPeakBeforeKm ?? null,
+      long_run_peak_after_km:
+        proposal.output.refreshDraft?.reviewMetadata.longRunPeakAfterKm ?? null,
+      target_time_honesty_assumptions:
+        proposal.output.refreshDraft?.reviewMetadata.targetTimeHonestyAssumptions ?? [],
+      long_distance_honesty_assumptions:
+        proposal.output.refreshDraft?.reviewMetadata.longDistanceHonestyAssumptions ?? [],
       review_summary: proposal.output.review.summary,
       proposed_changes: proposal.output.review.proposedChanges,
     },
   } as Json;
 }
 
+async function fetchRefreshEvidenceSets(
+  userId: string,
+  workoutIds: string[],
+  logsByWorkoutId: Map<string, PersistedWorkoutLogRow>,
+): Promise<RefreshEvidenceSets> {
+  if (!workoutIds.length) {
+    return {
+      loggedWorkoutIds: new Set(logsByWorkoutId.keys()),
+      evidenceWorkoutIds: new Set(),
+    };
+  }
+
+  const supabase = createAdminSupabaseClient();
+  const [assetsResult, actualMetricsResult, comparisonsResult, insightsResult] = await Promise.all([
+    supabase
+      .from("workout_result_assets")
+      .select("planned_workout_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", workoutIds),
+    supabase
+      .from("workout_actual_metrics")
+      .select("planned_workout_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", workoutIds),
+    supabase
+      .from("workout_comparisons")
+      .select("planned_workout_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", workoutIds),
+    supabase
+      .from("workout_ai_insights")
+      .select("planned_workout_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", workoutIds),
+  ]);
+
+  if (assetsResult.error) throw new Error(assetsResult.error.message);
+  if (actualMetricsResult.error) throw new Error(actualMetricsResult.error.message);
+  if (comparisonsResult.error) throw new Error(comparisonsResult.error.message);
+  if (insightsResult.error) throw new Error(insightsResult.error.message);
+
+  return {
+    loggedWorkoutIds: new Set(logsByWorkoutId.keys()),
+    evidenceWorkoutIds: new Set([
+      ...(assetsResult.data ?? []).map((row) => row.planned_workout_id),
+      ...(actualMetricsResult.data ?? []).map((row) => row.planned_workout_id),
+      ...(comparisonsResult.data ?? []).map((row) => row.planned_workout_id),
+      ...(insightsResult.data ?? []).map((row) => row.planned_workout_id),
+    ]),
+  };
+}
+
+type AppliedEvidenceRelink =
+  | {
+      table: "workout_result_assets";
+      id: string;
+      plannedWorkoutId: string;
+      workoutLogId: string | null;
+    }
+  | {
+      table: "workout_actual_metrics";
+      id: string;
+      plannedWorkoutId: string;
+      workoutLogId: string | null;
+    }
+  | {
+      table: "workout_comparisons";
+      id: string;
+      plannedWorkoutId: string;
+    }
+  | {
+      table: "workout_ai_insights";
+      id: string;
+      plannedWorkoutId: string;
+    };
+
+async function relinkRefreshEvidenceRows({
+  userId,
+  sourceWorkoutIds,
+  nextWorkoutIdBySourceWorkoutId,
+  nextLogIdBySourceLogId,
+}: {
+  userId: string;
+  sourceWorkoutIds: string[];
+  nextWorkoutIdBySourceWorkoutId: Map<string, string>;
+  nextLogIdBySourceLogId: Map<string, string>;
+}): Promise<() => Promise<void>> {
+  if (!sourceWorkoutIds.length) {
+    return async () => {};
+  }
+
+  const supabase = createAdminSupabaseClient();
+  const [assetsResult, actualMetricsResult, comparisonsResult, insightsResult] = await Promise.all([
+    supabase
+      .from("workout_result_assets")
+      .select("id, planned_workout_id, workout_log_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", sourceWorkoutIds),
+    supabase
+      .from("workout_actual_metrics")
+      .select("id, planned_workout_id, workout_log_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", sourceWorkoutIds),
+    supabase
+      .from("workout_comparisons")
+      .select("id, planned_workout_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", sourceWorkoutIds),
+    supabase
+      .from("workout_ai_insights")
+      .select("id, planned_workout_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", sourceWorkoutIds),
+  ]);
+
+  if (assetsResult.error) {
+    throw new Error(assetsResult.error.message);
+  }
+  if (actualMetricsResult.error) {
+    throw new Error(actualMetricsResult.error.message);
+  }
+  if (comparisonsResult.error) {
+    throw new Error(comparisonsResult.error.message);
+  }
+  if (insightsResult.error) {
+    throw new Error(insightsResult.error.message);
+  }
+
+  const appliedRelinks: AppliedEvidenceRelink[] = [];
+
+  try {
+    for (const asset of assetsResult.data ?? []) {
+      const nextWorkoutId = nextWorkoutIdBySourceWorkoutId.get(asset.planned_workout_id);
+
+      if (!nextWorkoutId) continue;
+
+      const update = await supabase
+        .from("workout_result_assets")
+        .update({
+          planned_workout_id: nextWorkoutId,
+          workout_log_id: asset.workout_log_id
+            ? (nextLogIdBySourceLogId.get(asset.workout_log_id) ?? null)
+            : null,
+        })
+        .eq("id", asset.id)
+        .eq("user_id", userId);
+
+      if (update.error) throw new Error(update.error.message);
+
+      appliedRelinks.push({
+        table: "workout_result_assets",
+        id: asset.id,
+        plannedWorkoutId: asset.planned_workout_id,
+        workoutLogId: asset.workout_log_id,
+      });
+    }
+
+    for (const metrics of actualMetricsResult.data ?? []) {
+      const nextWorkoutId = nextWorkoutIdBySourceWorkoutId.get(metrics.planned_workout_id);
+
+      if (!nextWorkoutId) continue;
+
+      const update = await supabase
+        .from("workout_actual_metrics")
+        .update({
+          planned_workout_id: nextWorkoutId,
+          workout_log_id: metrics.workout_log_id
+            ? (nextLogIdBySourceLogId.get(metrics.workout_log_id) ?? null)
+            : null,
+        })
+        .eq("id", metrics.id)
+        .eq("user_id", userId);
+
+      if (update.error) throw new Error(update.error.message);
+
+      appliedRelinks.push({
+        table: "workout_actual_metrics",
+        id: metrics.id,
+        plannedWorkoutId: metrics.planned_workout_id,
+        workoutLogId: metrics.workout_log_id,
+      });
+    }
+
+    for (const comparison of comparisonsResult.data ?? []) {
+      const nextWorkoutId = nextWorkoutIdBySourceWorkoutId.get(comparison.planned_workout_id);
+
+      if (!nextWorkoutId) continue;
+
+      const update = await supabase
+        .from("workout_comparisons")
+        .update({ planned_workout_id: nextWorkoutId })
+        .eq("id", comparison.id)
+        .eq("user_id", userId);
+
+      if (update.error) throw new Error(update.error.message);
+
+      appliedRelinks.push({
+        table: "workout_comparisons",
+        id: comparison.id,
+        plannedWorkoutId: comparison.planned_workout_id,
+      });
+    }
+
+    for (const insight of insightsResult.data ?? []) {
+      const nextWorkoutId = nextWorkoutIdBySourceWorkoutId.get(insight.planned_workout_id);
+
+      if (!nextWorkoutId) continue;
+
+      const update = await supabase
+        .from("workout_ai_insights")
+        .update({ planned_workout_id: nextWorkoutId })
+        .eq("id", insight.id)
+        .eq("user_id", userId);
+
+      if (update.error) throw new Error(update.error.message);
+
+      appliedRelinks.push({
+        table: "workout_ai_insights",
+        id: insight.id,
+        plannedWorkoutId: insight.planned_workout_id,
+      });
+    }
+  } catch (error) {
+    await rollbackEvidenceRelinks(appliedRelinks);
+    throw error;
+  }
+
+  return () => rollbackEvidenceRelinks(appliedRelinks);
+}
+
+async function rollbackEvidenceRelinks(appliedRelinks: AppliedEvidenceRelink[]) {
+  if (!appliedRelinks.length) return;
+
+  const supabase = createAdminSupabaseClient();
+
+  for (const relink of appliedRelinks.slice().reverse()) {
+    if (relink.table === "workout_result_assets") {
+      const rollback = await supabase
+        .from("workout_result_assets")
+        .update({
+          planned_workout_id: relink.plannedWorkoutId,
+          workout_log_id: relink.workoutLogId,
+        })
+        .eq("id", relink.id);
+
+      if (rollback.error) throw new Error(rollback.error.message);
+    } else if (relink.table === "workout_actual_metrics") {
+      const rollback = await supabase
+        .from("workout_actual_metrics")
+        .update({
+          planned_workout_id: relink.plannedWorkoutId,
+          workout_log_id: relink.workoutLogId,
+        })
+        .eq("id", relink.id);
+
+      if (rollback.error) throw new Error(rollback.error.message);
+    } else if (relink.table === "workout_comparisons") {
+      const rollback = await supabase
+        .from("workout_comparisons")
+        .update({ planned_workout_id: relink.plannedWorkoutId })
+        .eq("id", relink.id);
+
+      if (rollback.error) throw new Error(rollback.error.message);
+    } else {
+      const rollback = await supabase
+        .from("workout_ai_insights")
+        .update({ planned_workout_id: relink.plannedWorkoutId })
+        .eq("id", relink.id);
+
+      if (rollback.error) throw new Error(rollback.error.message);
+    }
+  }
+}
+
 async function replaceActivePlanWithRefreshSeed(
   userId: string,
   importedSeed: ImportedPlanSeed,
-  copiedLogs: Array<{ log: PersistedWorkoutLogRow; workoutDate: string }>,
+  copiedLogs: Array<{
+    log: PersistedWorkoutLogRow;
+    sourceWorkoutId: string;
+    workoutDate: string;
+  }>,
+  copiedEvidenceWorkouts: Array<{ sourceWorkoutId: string; workoutDate: string }>,
   activePlan: PersistedPlanCycleRow,
 ) {
   const supabase = createAdminSupabaseClient();
@@ -835,9 +780,19 @@ async function replaceActivePlanWithRefreshSeed(
   const insertedWorkoutsByDate = new Map(
     insertedPlan.workouts.map((workout) => [workout.workout_date, workout]),
   );
+  const insertedWorkoutIdBySourceId = new Map<string, string>();
+  const copiedLogIdBySourceLogId = new Map<string, string>();
+
+  for (const copiedLog of copiedLogs) {
+    const nextWorkout = insertedWorkoutsByDate.get(copiedLog.workoutDate);
+
+    if (nextWorkout) {
+      insertedWorkoutIdBySourceId.set(copiedLog.sourceWorkoutId, nextWorkout.id);
+    }
+  }
 
   if (copiedLogs.length > 0) {
-    const copiedLogRows = copiedLogs.map(({ log, workoutDate }) => {
+    const copiedLogRows = copiedLogs.map(({ log, sourceWorkoutId, workoutDate }) => {
       const nextWorkout = insertedWorkoutsByDate.get(workoutDate);
 
       if (!nextWorkout) {
@@ -846,7 +801,12 @@ async function replaceActivePlanWithRefreshSeed(
         );
       }
 
+      const copiedLogId = randomUUID();
+      copiedLogIdBySourceLogId.set(log.id, copiedLogId);
+      insertedWorkoutIdBySourceId.set(sourceWorkoutId, nextWorkout.id);
+
       return {
+        id: copiedLogId,
         planned_workout_id: nextWorkout.id,
         user_id: userId,
         outcome: log.outcome,
@@ -869,6 +829,25 @@ async function replaceActivePlanWithRefreshSeed(
     }
   }
 
+  if (copiedEvidenceWorkouts.length > 0) {
+    for (const { sourceWorkoutId, workoutDate } of copiedEvidenceWorkouts) {
+      if (!insertedWorkoutIdBySourceId.has(sourceWorkoutId)) {
+        const nextWorkout = insertedWorkoutsByDate.get(workoutDate);
+
+        if (nextWorkout) {
+          insertedWorkoutIdBySourceId.set(sourceWorkoutId, nextWorkout.id);
+        }
+      }
+
+      if (!insertedWorkoutIdBySourceId.has(sourceWorkoutId)) {
+        await rollbackInsertedPlan(insertedPlan.planCycle.id);
+        throw new Error(
+          `Plan refresh lost the inserted evidence-backed workout for ${workoutDate}. Current plan is unchanged.`,
+        );
+      }
+    }
+  }
+
   const archiveExisting = await supabase
     .from("plan_cycles")
     .update({ status: "archived" })
@@ -883,22 +862,55 @@ async function replaceActivePlanWithRefreshSeed(
     throw new Error(archiveExisting.error.message);
   }
 
-  const activateInserted = await supabase
-    .from("plan_cycles")
-    .update({ status: "active" })
-    .eq("id", insertedPlan.planCycle.id)
-    .eq("status", "archived")
-    .select("id")
-    .single();
+  let rollbackRelinkedEvidence: (() => Promise<void>) | null = null;
 
-  if (activateInserted.error) {
-    await supabase.from("plan_cycles").update({ status: "active" }).eq("id", activePlan.id);
-    await rollbackInsertedPlan(insertedPlan.planCycle.id);
-    throw new Error(activateInserted.error.message);
+  try {
+    if (copiedEvidenceWorkouts.length > 0) {
+      rollbackRelinkedEvidence = await relinkRefreshEvidenceRows({
+        userId,
+        sourceWorkoutIds: copiedEvidenceWorkouts.map((workout) => workout.sourceWorkoutId),
+        nextWorkoutIdBySourceWorkoutId: insertedWorkoutIdBySourceId,
+        nextLogIdBySourceLogId: copiedLogIdBySourceLogId,
+      });
+    }
+
+    const activateInserted = await supabase
+      .from("plan_cycles")
+      .update({ status: "active" })
+      .eq("id", insertedPlan.planCycle.id)
+      .eq("status", "archived")
+      .select("id")
+      .single();
+
+    if (activateInserted.error) {
+      throw new Error(activateInserted.error.message);
+    }
+
+    return {
+      archivedPlanId: archiveExisting.data.id,
+      activePlanId: activateInserted.data.id,
+    };
+  } catch (error) {
+    let relinkRollbackError: unknown = null;
+
+    if (rollbackRelinkedEvidence) {
+      try {
+        await rollbackRelinkedEvidence();
+      } catch (rollbackError) {
+        relinkRollbackError = rollbackError;
+      }
+    }
+
+    await supabase
+      .from("plan_cycles")
+      .update({ status: "active" })
+      .eq("id", activePlan.id)
+      .eq("user_id", userId);
+
+    if (!relinkRollbackError) {
+      await rollbackInsertedPlan(insertedPlan.planCycle.id);
+    }
+
+    throw relinkRollbackError ?? error;
   }
-
-  return {
-    archivedPlanId: archiveExisting.data.id,
-    activePlanId: activateInserted.data.id,
-  };
 }

@@ -25,6 +25,7 @@ import {
   runnerFitnessBenchmarkInputSchema,
   type RunnerFitnessLevel,
 } from "@/lib/runner-training-preferences";
+import { buildLongDistanceHonestyAssumptions } from "@/lib/running-plan-honesty";
 import type { Json } from "@/lib/supabase/database";
 import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring";
 import { diffDaysIso, todayIso } from "@/lib/training";
@@ -487,17 +488,51 @@ function buildStructuredActivityMix(
   if (
     sourceTypes.has("controlled_tempo_session") ||
     sourceTypes.has("distance_intervals") ||
-    sourceTypes.has("time_intervals")
+    sourceTypes.has("time_intervals") ||
+    sourceTypes.has("5k_sharpening_repeats") ||
+    sourceTypes.has("10k_rhythm_intervals") ||
+    sourceTypes.has("half_marathon_threshold_durability") ||
+    sourceTypes.has("marathon_steady_specificity")
   ) {
     mix.push("controlled quality work");
+  }
+
+  if (sourceTypes.has("aerobic_strides") || sourceTypes.has("5k_sharpening_repeats")) {
+    mix.push("safe short-rep sharpening");
+  }
+
+  if (sourceTypes.has("10k_rhythm_intervals")) {
+    mix.push("10K rhythm and sustained quality");
+  }
+
+  if (sourceTypes.has("half_marathon_threshold_durability")) {
+    mix.push("half-marathon threshold durability");
+  }
+
+  if (sourceTypes.has("marathon_steady_specificity")) {
+    mix.push("marathon steady-specificity");
+  }
+
+  if (sourceTypes.has("ultra_time_on_feet_durability")) {
+    mix.push("ultra time-on-feet durability");
   }
 
   if (
     sourceTypes.has("rolling_hills_session") ||
     sourceTypes.has("uphill_repeats") ||
-    sourceTypes.has("climbing_steady_run")
+    sourceTypes.has("climbing_steady_run") ||
+    sourceTypes.has("controlled_downhill_durability") ||
+    sourceTypes.has("technical_trail_easy")
   ) {
     mix.push("hill-oriented preparation");
+  }
+
+  if (
+    sourceTypes.has("controlled_downhill_durability") ||
+    sourceTypes.has("hike_run_endurance") ||
+    sourceTypes.has("mountain_long_run_time_on_feet")
+  ) {
+    mix.push("mountain-specific time-on-feet and controlled terrain skills");
   }
 
   if (sourceTypes.has("cutback_aerobic_run") || sourceTypes.has("cutback_long_run")) {
@@ -567,6 +602,25 @@ function buildStructuredReviewAssumptions(
     );
   }
 
+  const targetTimeHonesty = buildTargetTimeHonestyAssumption(input);
+
+  if (targetTimeHonesty) {
+    assumptions.push(targetTimeHonesty);
+  }
+
+  assumptions.push(
+    ...buildLongDistanceHonestyAssumptions({
+      goalType: authoringInput.goal.goalType,
+      runningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+      horizonWeeks: deriveStructuredReviewHorizonWeeks(authoringInput),
+      hasUsableBenchmark: input.benchmark.kind !== "unknown",
+      targetTimeIntent: input.goal.goalStyle === "target_time",
+      baselineLongRunKm: authoringInput.runnerProfile.baselineLongRunKm,
+      currentLoadKnown: input.benchmark.kind !== "unknown",
+      age: authoringInput.runnerProfile.age,
+    }),
+  );
+
   if (!input.goal.targetDate && !authoringInput.schedule.targetDate) {
     assumptions.push("Timeline uses Hito's default horizon for this goal instead of a race date.");
   }
@@ -582,6 +636,103 @@ function buildStructuredReviewAssumptions(
   }
 
   return assumptions;
+}
+
+function deriveStructuredReviewHorizonWeeks(authoringInput: StructuredFirstPlanAuthoringInput) {
+  if (authoringInput.schedule.preparationHorizonWeeks) {
+    return authoringInput.schedule.preparationHorizonWeeks;
+  }
+
+  if (!authoringInput.schedule.targetDate) {
+    return null;
+  }
+
+  return Math.max(
+    1,
+    Math.ceil(
+      (diffDaysIso(authoringInput.schedule.targetDate, authoringInput.schedule.startDate) + 1) / 7,
+    ),
+  );
+}
+
+function buildTargetTimeHonestyAssumption(input: StructuredFirstPlanOnboardingInput) {
+  if (input.goal.goalStyle !== "target_time" || !input.goal.targetTime) {
+    return null;
+  }
+
+  if (input.benchmark.kind === "unknown") {
+    return "Target-time intent is noted, but without a recent 5K benchmark this draft stays effort-based and does not promise target-specific paces.";
+  }
+
+  const targetSeconds = parseDurationSeconds(input.goal.targetTime);
+  const goalDistanceKm = goalDistanceKmForTargetTime(input.goal.goalDistance);
+  const benchmarkPaceSeconds = benchmarkPaceSecondsPerKm(input.benchmark);
+
+  if (!targetSeconds || !goalDistanceKm || !benchmarkPaceSeconds) {
+    return null;
+  }
+
+  const targetPaceSecondsPerKm = targetSeconds / goalDistanceKm;
+  const minimumSupportBuffer = minimumTargetSupportBufferSeconds(input.goal.goalDistance);
+
+  if (targetPaceSecondsPerKm < benchmarkPaceSeconds + minimumSupportBuffer) {
+    return "The target time looks aggressive against the supplied 5K benchmark, so Hito keeps the plan conservative and treats the target as motivation rather than a guarantee.";
+  }
+
+  return null;
+}
+
+function benchmarkPaceSecondsPerKm(benchmark: StructuredFirstPlanOnboardingInput["benchmark"]) {
+  if (benchmark.kind === "recent_5k_time") {
+    const seconds = parseDurationSeconds(benchmark.recent5kTime);
+
+    return seconds ? seconds / 5 : null;
+  }
+
+  if (benchmark.kind === "recent_5k_pace") {
+    return parsePaceSecondsPerKm(benchmark.recent5kPace);
+  }
+
+  return null;
+}
+
+function goalDistanceKmForTargetTime(
+  goalDistance: StructuredFirstPlanOnboardingInput["goal"]["goalDistance"],
+) {
+  switch (goalDistance) {
+    case "5k":
+      return 5;
+    case "10k":
+      return 10;
+    case "half_marathon":
+      return 21.1;
+    case "marathon":
+      return 42.2;
+    case "ultra_marathon":
+      return 50;
+    case "build_consistency":
+    case "mountain_running":
+      return null;
+  }
+}
+
+function minimumTargetSupportBufferSeconds(
+  goalDistance: StructuredFirstPlanOnboardingInput["goal"]["goalDistance"],
+) {
+  switch (goalDistance) {
+    case "10k":
+      return 10;
+    case "half_marathon":
+      return 25;
+    case "marathon":
+      return 45;
+    case "ultra_marathon":
+      return 60;
+    case "5k":
+    case "build_consistency":
+    case "mountain_running":
+      return 0;
+  }
 }
 
 function formatStructuredFirstPlanOnboardingError(error: z.ZodError) {
@@ -768,7 +919,7 @@ function buildPlanNotes(input: StructuredFirstPlanOnboardingInput) {
 
   if (input.goal.goalDistance === "mountain_running") {
     notes.push(
-      "Goal context: mountain running. Treat mountain terrain as required generation context while avoiding route matching or exact elevation targets.",
+      "Goal context: mountain running. Treat mountain terrain as required generation context with controlled descents, hike/run allowance, time-on-feet framing, and technical-terrain caution while avoiding route matching or exact elevation targets.",
     );
   }
 
@@ -780,7 +931,7 @@ function buildPlanNotes(input: StructuredFirstPlanOnboardingInput) {
 
   if (terrainFocus === "mountain") {
     notes.push(
-      "Terrain focus: mountain. Include intentional hill preparation such as uphill intervals, hill repeats, climbing-focused steady work, or hilly long-run guidance without exact elevation targets.",
+      "Terrain focus: mountain. Include progressive hill exposure, controlled descending, climbing-focused steady work, and hilly long-run guidance without exact elevation targets.",
     );
   }
 

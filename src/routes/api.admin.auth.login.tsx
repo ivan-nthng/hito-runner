@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { loginLocalAdminForRequest } from "@/lib/admin-auth-actions.server";
+import { loginAdminForRequest } from "@/lib/admin-auth-actions.server";
 
 export const Route = createFileRoute("/api/admin/auth/login")({
   server: {
     handlers: {
-      POST: ({ request }) => loginLocalAdminForRequest(request),
+      POST: ({ request }) => loginAdminForRequest(request),
     },
   },
   component: () => null,

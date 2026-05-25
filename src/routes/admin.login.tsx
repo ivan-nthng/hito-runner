@@ -22,7 +22,7 @@ export const Route = createFileRoute("/admin/login")({
       { title: `Admin login — ${APP_NAME}` },
       {
         name: "description",
-        content: "Sign in to the local Hito admin operations surface.",
+        content: "Sign in to the Hito admin operations surface.",
       },
     ],
   }),
@@ -51,7 +51,7 @@ function AdminLoginPage() {
                 Sign in to view internal analytics and local test-account tools.
               </p>
               <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Admin access is separate from runner login and is limited to the configured local
+                Admin access is separate from runner login and is limited to the configured owner
                 admin account.
               </p>
             </div>
@@ -143,9 +143,9 @@ function adminLoginStatusMessage(status: AdminLoginStatus) {
     case "admin_required":
       return "Those credentials are valid for a tester, not for admin access.";
     case "local_admin_login_unavailable":
-      return "Local admin login is not available in this runtime.";
+      return "Admin login is not available in this runtime.";
     case "admin_config_invalid":
-      return "Local admin login is not configured correctly.";
+      return "Admin login is not configured for this runtime.";
     default:
       return null;
   }

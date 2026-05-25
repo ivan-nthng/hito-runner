@@ -353,6 +353,10 @@ async function requireAdminAccess(
     return failure("authentication_required", "Sign in as an admin to view analytics.");
   }
 
+  if (dependencies.auth.provider === "admin") {
+    return { ok: true };
+  }
+
   if (dependencies.auth.provider === "local") {
     return requireLocalAdminAccess(dependencies);
   }

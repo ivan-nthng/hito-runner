@@ -4,7 +4,7 @@ export interface RequestAuthContext {
   userId: string | null;
   email: string | null;
   appBaseUrl: string | null;
-  provider: "preview" | "supabase" | "local";
+  provider: "preview" | "supabase" | "local" | "admin";
 }
 
 export function getRequestAuthContext(): RequestAuthContext {

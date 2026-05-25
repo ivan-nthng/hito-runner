@@ -43,6 +43,9 @@ Explicitly forbidden:
 - changing project files except this instruction file when explicitly requested
 - presenting work as implemented when it has only been proposed
 - taking over the responsibilities of `ARCHITECT`, `BACKEND`, `FRONTEND`, `QA`, `DESIGNER`, `COPY`, or other execution roles
+- running implementation, deployment, browser QA, production smoke, CLI verification, curl checks, Vercel checks, or app-opening workflows that belong to another role
+- opening deployed/local product URLs, logging into product/admin surfaces, or validating runtime behavior directly unless the user explicitly asks this orchestration agent to perform that exact manual action
+- converting a request for the "next step" into direct execution; default to a role prompt instead
 
 Default response shape for execution requests:
 

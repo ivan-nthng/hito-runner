@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-24
+2026-05-25
 
 ## Where We Are Now
 
@@ -34,8 +34,8 @@ Active
   `src/lib/admin-analytics.ts` exposes a server-action-ready view model over existing Supabase auth/profile/plan/workout/Garmin/AI/entitlement truth, with aggregate overview/funnel/feedback/AI counts plus real-user rows shaped on the server and no new telemetry, failure, issue, or production user-management tables; local, admin, metadata-marked test, `@local.test`, and disposable-prefix accounts are classified out of real-user product analytics and returned as excluded ops rows.
 - The Phase 1 admin analytics UI is implemented:
   `/admin/analytics` now renders Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs from backend-shaped view models, keeping the page standalone from the runner AppShell and avoiding client-side analytics authority beyond presentation formatting; the Users table shows only backend-classified real users, while Test accounts shows local/test/admin/suspected rows with contained horizontal tables, collapsed search, active-filter summaries, and DS-owned sortable/non-sortable header sort/filter states.
-- The dedicated local admin login flow is implemented:
-  `/admin/login` renders a standalone `Hito Admin` sign-in page that posts username/email plus password to `/api/admin/auth/login`, sanitizes admin-only `next` targets back to `/admin/analytics` when unsafe, rejects tester credentials with bounded admin-specific copy, and keeps `/login` plus `/api/auth/local-login` unchanged; `/admin/analytics` admin-required states now link to this admin login path.
+- The dedicated owner admin login flow is implemented:
+  `/admin/login` renders a standalone `Hito Admin` sign-in page that posts username plus password to `/api/admin/auth/login`, sanitizes admin-only `next` targets back to `/admin/analytics` when unsafe, uses the local protected fixture only on loopback local runtimes, uses server-only deployed password-hash/session-secret configuration outside local fixtures, rejects tester/product credentials with bounded admin-specific copy, and keeps `/login` plus `/api/auth/local-login` unchanged; `/admin/analytics` admin-required states now link to this admin login path.
 - The local/dev admin fixture is now a single protected owner admin account in `.tanstack/hito-running-local-accounts.json`; the legacy QA admin fixture has been removed from the local bypass file and linked auth user, while tester accounts remain separate and are still rejected by `/admin/login`.
 - The public Hito destination hub is implemented:
   `/hub` renders a standalone desert-background launcher with the Hito logo and full-card links to Hito Running, Admin analytics, Design system, and Changelog; the launcher itself is public and does not own any destination auth behavior.
@@ -45,6 +45,8 @@ Active
   Radix/shadcn-derived dialog, sheet, dropdown menu, select, progress, card, and sidebar wrappers now default to Hito DS chrome while preserving existing exports, semantics, keyboard behavior, and product call sites; `/hitoDS#shared-wrappers` documents the wrapper boundary.
 - The progress visualization chrome DS rollout slice is implemented:
   `/progress` keeps the same loader data, aggregate calculations, weekly-volume geometry, and recent-consistency geometry, but its chart section dividers, compact notes, planned/actual fills, and result-status fills now use Hito DS classes documented in `/hitoDS#analytics`.
+- The internal workbench responsive shell is implemented:
+  `/hitoDS` and `/admin/analytics` now share Hito DS workbench shell, sidebar, sticky topbar, current-location, quick-link rail, and summary-grid classes so desktop keeps the left navigation while tablet/mobile switch to contained top navigation without page-level table or rail overflow.
 - Phase 3 architecture cleanup is now implemented through one canonical persisted richer-plan contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.
@@ -69,8 +71,8 @@ Active
   successful plan creation now automatically opens a fresh saved-mode home request instead of leaving users stuck in the setup pending state.
 - The structured first-plan onboarding frontend slice is now implemented:
   the normal no-plan setup surface collects required age/weight/height, a bounded 5K benchmark or unknown state, fixed rest days through a compact weekday selector, compact execution preference, goal distance/style with ultra marathon and mountain running options, target time/date only for target-time goals, terrain only for marathon/ultra while mountain running implies mountain context, strength/mobility preference, and one optional `Comment`, then calls `generateStructuredFirstPlanDraft`; the review action stays in a sticky footer and remains disabled until required answers are complete, ready drafts show backend-owned runner/profile, goal, availability/rest-day, horizon, workout-mix, metric-policy, assumption, and safety copy, and only the explicit `Yes, create plan` action calls `confirmStructuredFirstPlanDraft`.
-- The plan-authoring quality backend refinement is now implemented through slice 3:
-  structured authoring accepts generation-only execution mode, uses a metric-mode resolver so numeric pace targets require watch/app pace preference plus usable recent 5K truth, keeps HR numeric targets disabled without real HR-zone truth, and now emits exact generated workout identity plus cutback/long-run steady-finish structure inside valid `training-plan-v2` workout data.
+- The plan-authoring quality backend refinement has been hardened beyond the original slice 3:
+  structured authoring accepts generation-only execution mode, uses a metric-mode resolver so numeric pace targets require watch/app pace preference plus usable recent 5K truth, keeps HR numeric targets disabled without real HR-zone truth, emits exact generated workout identity plus cutback/long-run steady-finish structure inside valid `training-plan-v2` workout data, and now adds goal-family long-run floors/peaks/ceilings, taper reductions aligned to the `Taper` phase boundary, Base/Build/Specific/Taper workout selection, runner-fit safety adjustments, target-time honesty assumptions for weak or aggressive benchmark support, long-distance review assumptions for low-support marathon/ultra/mountain contexts, mountain/trail-specific technical terrain/controlled descent/hike-run/time-on-feet doctrine without exact elevation prescriptions, and sharper 5K/10K/half/marathon/ultra workout identities without changing hard-day frequency.
 - The structured review-before-create backend slice is now implemented:
   `generateStructuredFirstPlanDraft` produces a non-mutating structured setup review and canonical draft plan without creating profile, plan, workout, log, usage, or raw transient rows, while `confirmStructuredFirstPlanDraft` revalidates the draft, blocks if an active plan already exists, and creates the first active plan only after explicit confirmation.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
@@ -167,7 +169,7 @@ Active
 - The route-data loader extraction slice is now implemented:
   `src/lib/route-data-actions.ts` owns home, shell, workout-detail, and progress route data shaping behind injected snapshot/viewer/feedback loaders, while `training-api.ts` keeps the same public `getHomeRouteData`, `getShellRouteData`, `getWorkoutRouteData`, and `getProgressRouteData` server-function wrappers.
 - The active-plan refresh action extraction slice is now implemented:
-  `src/lib/active-plan-refresh-actions.ts` owns refresh proposal entitlement/usage behavior, stale fingerprint checks, refresh-apply authoring repair, weekday rest-day validation, and archive/replace persistence for approved updates, while `training-api.ts` keeps the same public `proposeActivePlanRefresh`, `applyActivePlanRefreshProposal`, and `applyActivePlanRefreshProposalForUser` compatibility names.
+  `src/lib/active-plan-refresh-actions.ts` owns refresh proposal entitlement/usage behavior, exact proposal-time draft attachment, stale fingerprint/checksum checks, weekday rest-day validation, mutable-workout guard checks, and archive/replace persistence for approved updates, while `training-api.ts` keeps the same public `proposeActivePlanRefresh`, `applyActivePlanRefreshProposal`, and `applyActivePlanRefreshProposalForUser` compatibility names.
 - The plan-replacement action extraction slice is now implemented:
   `src/lib/plan-replacement-actions.ts` owns advanced JSON/imported-plan replacement and saved-mode text replacement action behavior, while `training-api.ts` keeps the same public `completeOnboarding`, `completeTextOnboarding`, and `persistImportedPlanForCurrentRequest` compatibility names.
 - The Dictate-to-Plan review assumption clarity follow-up is now implemented:
@@ -245,7 +247,7 @@ Active
 - The first semantic button tone slice is now implemented:
   Hito buttons now compose default, success, and error tones with primary, secondary, outlined, and ghost hierarchy classes; destructive product actions in onboarding, JSON import, and `Open plan` use the canonical error tone instead of local red override classes, and AppShell’s repeated tiny uppercase chrome labels use the shared `hito-micro-label` role.
 - The active-plan refresh apply hardening slice is now implemented:
-  refresh apply now derives one schedule authority from the current remaining active schedule, preserves the original target date only when it is still valid at least seven days after the refresh start, repairs generated schedule, goal, runner-baseline, and fixed-rest-day availability before canonical validation, clamps replacement workouts to the original remaining-schedule window, and returns a bounded blocked result instead of leaking low-level authoring validation text.
+  refresh proposal generation now derives one schedule authority from the current remaining active schedule, preserves the original target date only when it is still valid at least seven days after the refresh start, resolves stored or reconstructed authoring truth, builds and signs the exact future draft before review, clamps replacement workouts to the original remaining-schedule window, and returns bounded stale/blocked results instead of leaking low-level authoring validation text.
 - The active-plan refresh proposal-output hygiene pass is now implemented:
   the backend now returns a dedicated review-safe proposal shape without raw workout ids or internal prompt field names, rejects malformed fragments such as dangling clauses or bare abbreviations, guarantees fixed-truth review content, and keeps targeted count consistent with the proposed changes shown in the review so review copy no longer mislabels targeted changes as the whole remaining plan.
 - The first explicit active-plan refresh apply backend foundation is now implemented:

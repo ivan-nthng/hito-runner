@@ -2,7 +2,7 @@
 
 ## Status
 
-Paused after Phase 1, local Test accounts, and dedicated local admin login flow complete
+Paused after Phase 1, local Test accounts, and dedicated owner admin login flow complete
 
 ## Owner
 
@@ -10,13 +10,19 @@ Architect / Backend / Frontend / QA
 
 ## Last Updated
 
-2026-05-24
+2026-05-25
 
 ## Pause Note
 
 Phase 1 and Phase 1A are complete and QA-green. `/admin/analytics` now has backend-shaped existing-truth analytics, bounded admin tabs, local-only Test accounts management, admin gating, non-admin blocking, Safari coverage, and client/server boundary verification.
 
-The dedicated local admin login flow is also implemented. `/admin/login` remains local/dev-only, separate from normal product login, and does not change the production admin model.
+The dedicated owner admin login flow is also implemented. `/admin/login` remains separate from normal product login, uses the protected local fixture only on loopback local runtimes, and uses server-only deployed password-hash/session-secret configuration outside local fixtures.
+
+Operational follow-up for real deployment is non-blocking and remains outside product code closeout:
+
+- configure `HITO_ADMIN_PASSWORD_HASH` in the real deployed environment
+- configure `HITO_ADMIN_SESSION_SECRET` in the real deployed environment
+- repeat a deployed URL smoke test after those env values are set
 
 The local/dev admin fixture now has exactly one protected owner admin account. The legacy QA admin fixture has been removed from the local bypass accounts file and linked Supabase auth.
 
@@ -82,15 +88,17 @@ Auth:
 - do not hardcode credentials in tracked files
 - do not rely on loopback-only local bypass as the production admin model
 
-Implemented local/dev admin-login flow:
+Implemented admin-login flow:
 
 - `/admin/login` renders a standalone `Hito Admin` sign-in page without runner AppShell chrome
 - `/admin/login` posts username/email plus password to `/api/admin/auth/login`
 - `/admin/analytics` admin-required sign-in actions link to `/admin/login?next=/admin/analytics`
-- backend verifies local/dev runtime before credential handling
-- backend requires exactly one configured account with `role: "admin"`
+- backend verifies local/dev fixture credentials only on loopback local runtimes
+- backend verifies deployed admin credentials from server-only password-hash/session-secret env outside local fixtures
+- deployed admin username is the single owner-admin username and is not backed by a normal runner account
+- local/dev fixture login requires exactly one configured account with `role: "admin"`
 - valid tester credentials return a bounded admin-required result and do not create a session
-- the existing local auth cookie is set only after admin role verification passes
+- the existing local auth cookie is set only after local admin role verification passes, while deployed admin login sets a signed admin-only cookie
 - `next` redirects are sanitized to same-origin `/admin/*` paths, with unsafe paths and `/admin/login` loops falling back to `/admin/analytics`
 - normal `/login`, Magic Link, product local-login, tester login, and production auth behavior stay unchanged
 

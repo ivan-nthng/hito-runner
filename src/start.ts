@@ -1,4 +1,5 @@
 import { createMiddleware, createStart } from "@tanstack/react-start";
+import { resolveAdminAuthSession } from "@/lib/admin-auth-actions.server";
 import { resolveLocalAuthSession } from "@/lib/local-auth";
 import { resolveRuntimeAppBaseUrl } from "@/lib/supabase/env";
 import { createRequestSupabaseClient, mergeResponseHeaders } from "@/lib/supabase/server";
@@ -6,6 +7,21 @@ import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
 
 const authMiddleware = createMiddleware().server(async ({ next, request }) => {
   const appBaseUrl = resolveRuntimeAppBaseUrl({ requestUrl: request.url });
+  const adminSession = await resolveAdminAuthSession(request);
+
+  if (adminSession) {
+    return next({
+      context: {
+        auth: {
+          userId: adminSession.userId,
+          email: adminSession.email,
+          appBaseUrl,
+          provider: "admin",
+        },
+      },
+    });
+  }
+
   const localSession = await resolveLocalAuthSession(request);
 
   if (localSession) {

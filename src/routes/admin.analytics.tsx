@@ -157,11 +157,13 @@ const initialDeleteState: DeleteState = {
 function AdminAnalyticsPage() {
   const { analyticsResult, testAccountsResult } = Route.useLoaderData();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const activeSection =
+    ADMIN_SECTIONS.find((section) => section.key === activeTab) ?? ADMIN_SECTIONS[0];
 
   return (
     <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
-      <div className="min-h-screen md:flex">
-        <aside className="hidden w-[240px] shrink-0 border-r border-hairline bg-sidebar/60 backdrop-blur md:sticky md:top-0 md:flex md:h-screen md:self-start md:flex-col">
+      <div className="hito-workbench-shell [--hito-workbench-sidebar-width:240px]">
+        <aside className="hito-workbench-sidebar">
           <div className="px-6 pb-10 pt-7">
             <Link to="/" className="flex items-end gap-2">
               <HitoLogo decorative className="[--hito-logo-height:1.35rem]" />
@@ -189,11 +191,18 @@ function AdminAnalyticsPage() {
           </div>
         </aside>
 
-        <section className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-hairline bg-background/70 backdrop-blur-xl">
+        <section className="hito-workbench-main">
+          <header className="hito-workbench-topbar">
             <div className="flex flex-col gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
               <div className="min-w-0">
-                <p className="hito-micro-label md:hidden">Hito admin</p>
+                <div className="hito-workbench-location lg:hidden">
+                  <span className="hito-workbench-location-title">Admin analytics</span>
+                  <span className="hito-workbench-location-meta">
+                    <span>Analytics sections</span>
+                    <span aria-hidden="true">/</span>
+                    <span>{activeSection.label}</span>
+                  </span>
+                </div>
                 <h1 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
                   Admin analytics
                 </h1>
@@ -209,11 +218,10 @@ function AdminAnalyticsPage() {
                 Back to Hito
               </Link>
             </div>
+            <AdminSectionNav activeTab={activeTab} onChange={setActiveTab} variant="mobile" />
           </header>
 
           <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
-            <AdminSectionNav activeTab={activeTab} onChange={setActiveTab} variant="mobile" />
-
             <div>
               {activeTab === "test-accounts" ? (
                 <TestAccountsCard
@@ -231,7 +239,7 @@ function AdminAnalyticsPage() {
   );
 }
 
-async function loadAdminAnalyticsRouteData({ location }: { location: { href: string } }) {
+async function loadAdminAnalyticsRouteData() {
   const [analyticsResult, testAccountsResult] = await Promise.all([
     getAdminAnalytics(),
     getAdminLocalTestAccounts(),
@@ -245,7 +253,7 @@ async function loadAdminAnalyticsRouteData({ location }: { location: { href: str
     throw redirect({
       to: "/admin/login",
       search: {
-        next: location.href,
+        next: "/admin/analytics",
       },
     });
   }
@@ -266,30 +274,31 @@ function AdminSectionNav({
 
   return (
     <div
-      className={
-        isSidebar ? "hito-shell-nav px-3" : "hito-tabs hito-tabs-simple overflow-x-auto md:hidden"
-      }
+      className={isSidebar ? "hito-shell-nav px-3" : "hito-workbench-section-rail lg:hidden"}
       role="tablist"
       aria-orientation={isSidebar ? "vertical" : "horizontal"}
       aria-label="Admin analytics sections"
     >
-      {ADMIN_SECTIONS.map((tab) => (
-        <button
-          key={tab.key}
-          type="button"
-          role="tab"
-          aria-selected={activeTab === tab.key}
-          className={
-            isSidebar ? "hito-shell-nav-row w-full text-left" : "hito-tab whitespace-nowrap"
-          }
-          data-active={activeTab === tab.key ? "true" : undefined}
-          onClick={() => onChange(tab.key)}
-        >
-          {isSidebar ? <Icon name={tab.icon} className="hito-shell-nav-icon" /> : null}
-          {tab.label}
-          {isSidebar && activeTab === tab.key ? <span className="hito-shell-nav-dot" /> : null}
-        </button>
-      ))}
+      <div className={isSidebar ? "grid gap-0.5" : "hito-workbench-quick-links"}>
+        {ADMIN_SECTIONS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            className={
+              isSidebar ? "hito-shell-nav-row w-full text-left" : "hito-workbench-quick-link"
+            }
+            data-active={activeTab === tab.key ? "true" : undefined}
+            aria-current={!isSidebar && activeTab === tab.key ? "location" : undefined}
+            onClick={() => onChange(tab.key)}
+          >
+            {isSidebar ? <Icon name={tab.icon} className="hito-shell-nav-icon" /> : null}
+            {tab.label}
+            {isSidebar && activeTab === tab.key ? <span className="hito-shell-nav-dot" /> : null}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -860,7 +869,7 @@ function AnalyticsPanel({
 }
 
 function MetricGrid({ children }: { children: ReactNode }) {
-  return <div className="hito-analytics-grid">{children}</div>;
+  return <div className="hito-workbench-summary-grid">{children}</div>;
 }
 
 function MetricCard({

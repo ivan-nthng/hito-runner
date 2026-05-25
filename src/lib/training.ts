@@ -3,6 +3,16 @@ import type { BodyNote } from "@/lib/body-notes";
 import type { WorkoutFeedbackMarkerSummary } from "@/lib/workout-result-import/types";
 
 export type WorkoutType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
+export type VisibleWorkoutType =
+  | "easy"
+  | "recovery"
+  | "long"
+  | "tempo"
+  | "intervals"
+  | "progression"
+  | "race"
+  | "quality"
+  | "rest";
 export type Status = "completed" | "partial" | "skipped" | "today" | "upcoming" | "rest";
 export type WeekStatus = "on_track" | "partially_off_track" | "needs_reset";
 export type TrainingMode = "preview" | "onboarding" | "authenticated";
@@ -199,6 +209,78 @@ export const TYPE_META: Record<
   },
 };
 
+const VISIBLE_TYPE_META: Record<
+  VisibleWorkoutType,
+  { label: string; short: string; color: string; ring: string }
+> = {
+  easy: {
+    ...TYPE_META.easy,
+    label: "Easy run",
+    short: "Easy",
+  },
+  recovery: {
+    ...TYPE_META.easy,
+    label: "Recovery",
+    short: "Recovery",
+  },
+  long: {
+    ...TYPE_META.long_run,
+    label: "Long run",
+    short: "Long",
+  },
+  tempo: {
+    ...TYPE_META.quality,
+    label: "Tempo",
+    short: "Tempo",
+  },
+  intervals: {
+    ...TYPE_META.quality,
+    label: "Intervals",
+    short: "Intervals",
+  },
+  progression: {
+    ...TYPE_META.quality,
+    label: "Progression",
+    short: "Progression",
+  },
+  race: {
+    ...TYPE_META.quality,
+    label: "Race pace",
+    short: "Race",
+  },
+  quality: TYPE_META.quality,
+  rest: TYPE_META.rest,
+};
+
+const SOURCE_WORKOUT_VISIBLE_TYPE: Record<string, VisibleWorkoutType> = {
+  recovery: "recovery",
+  intervals: "intervals",
+  distance_intervals: "intervals",
+  time_intervals: "intervals",
+  "5k_sharpening_repeats": "intervals",
+  "10k_rhythm_intervals": "intervals",
+  uphill_repeats: "intervals",
+  tempo: "tempo",
+  controlled_tempo_session: "tempo",
+  half_marathon_threshold_durability: "tempo",
+  marathon_steady_specificity: "tempo",
+  progression: "progression",
+  progression_run: "progression",
+  race: "race",
+  race_pace: "race",
+  tune_up: "race",
+  tuneup: "race",
+  race_tune_up: "race",
+  ultra_time_on_feet_durability: "long",
+  hike_run_endurance: "long",
+  mountain_long_run_time_on_feet: "long",
+  technical_trail_easy: "easy",
+  controlled_downhill_durability: "quality",
+  rolling_hills_session: "quality",
+  climbing_steady_run: "quality",
+  aerobic_strides: "quality",
+};
+
 export function workoutTypeMeta(
   workout: Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType">,
 ): {
@@ -208,70 +290,117 @@ export function workoutTypeMeta(
   ring: string;
 } {
   const base = TYPE_META[workout.type];
-  const sourceType = workout.sourceWorkoutType?.trim().toLowerCase() ?? null;
+  const visibleType = resolveWorkoutVisibleType(workout);
 
-  if (workout.type !== "quality") {
-    if (workout.type === "easy" && sourceType === "recovery") {
-      return {
-        ...base,
-        label: "Recovery",
-        short: "Recovery",
-      };
-    }
-
+  if (!visibleType) {
     return base;
   }
 
-  if (sourceType === "intervals") {
-    return {
-      ...base,
-      label: "Intervals",
-      short: "Intervals",
-    };
+  return VISIBLE_TYPE_META[visibleType];
+}
+
+export function resolveWorkoutVisibleType(
+  workout: Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType">,
+): VisibleWorkoutType | null {
+  if (workout.type === "rest") {
+    return "rest";
   }
 
-  if (sourceType === "progression") {
-    return {
-      ...base,
-      label: "Progression",
-      short: "Progression",
-    };
+  const sourceType = normalizeWorkoutSourceType(workout.sourceWorkoutType);
+  const sourceVisibleType = sourceType ? resolveVisibleTypeFromSource(sourceType) : null;
+
+  if (sourceVisibleType) {
+    return sourceVisibleType;
   }
 
-  if (sourceType === "race") {
-    return {
-      ...base,
-      label: "Race pace",
-      short: "Race",
-    };
+  if (workout.type === "long_run") {
+    return "long";
   }
 
-  if (sourceType === "tempo") {
-    return {
-      ...base,
-      label: "Tempo",
-      short: "Tempo",
-    };
+  if (workout.type === "easy" || workout.type === "steady_or_easy") {
+    return "easy";
+  }
+
+  return resolveVisibleTypeFromWorkoutStructure(workout);
+}
+
+function normalizeWorkoutSourceType(value: string | null | undefined) {
+  const normalized = value?.trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.replace(/[\s-]+/g, "_").replace(/_+/g, "_");
+}
+
+function resolveVisibleTypeFromSource(sourceType: string): VisibleWorkoutType | null {
+  const exactMatch = SOURCE_WORKOUT_VISIBLE_TYPE[sourceType];
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  if (/race_(pace|specific)|(?:^|_)tune_?up(?:_|$)/.test(sourceType)) {
+    return "race";
+  }
+
+  if (/progression/.test(sourceType)) {
+    return "progression";
+  }
+
+  if (/tempo|threshold/.test(sourceType)) {
+    return "tempo";
+  }
+
+  if (/interval|repeat/.test(sourceType)) {
+    return "intervals";
+  }
+
+  if (/long_run|time_on_feet|endurance/.test(sourceType)) {
+    return "long";
+  }
+
+  if (/recovery/.test(sourceType)) {
+    return "recovery";
+  }
+
+  if (/easy/.test(sourceType)) {
+    return "easy";
+  }
+
+  return null;
+}
+
+function resolveVisibleTypeFromWorkoutStructure(
+  workout: Pick<Workout, "title" | "steps">,
+): VisibleWorkoutType {
+  if (/\bprogression\b/i.test(workout.title)) {
+    return "progression";
+  }
+
+  if (/\b(intervals?|repeats?|reps)\b/i.test(workout.title)) {
+    return "intervals";
+  }
+
+  if (/\b(race\s*pace|tune\s*up|tune-up)\b/i.test(workout.title)) {
+    return "race";
   }
 
   const hasTempoIdentity =
-    /tempo/i.test(workout.title) ||
+    /\b(tempo|threshold)\b/i.test(workout.title) ||
     workout.steps.some(
       (step) =>
         step.type === "tempo" ||
         step.segment_type === "tempo_block" ||
-        /tempo/i.test(step.label ?? ""),
+        /\b(tempo|threshold)\b/i.test(step.label ?? ""),
     );
 
-  if (!hasTempoIdentity) {
-    return base;
+  if (hasTempoIdentity) {
+    return "tempo";
   }
 
-  return {
-    ...base,
-    label: "Tempo",
-    short: "Tempo",
-  };
+  return "quality";
 }
 
 export const WEEK_STATUS_META: Record<WeekStatus, { label: string; helper: string }> = {

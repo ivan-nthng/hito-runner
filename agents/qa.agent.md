@@ -25,6 +25,14 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - critical flow testing
 - regression verification
 - UI + data outcome checks
+- QA documentation artifacts, including test matrices, scenario files, regression checklists, and validation reports
+
+## QA Documentation Authority
+
+- QA may create and edit files that are explicitly QA-owned, such as scenario matrices, test plans, regression checklists, and validation reports.
+- QA must keep those files under docs/process, docs/tasks/qa, docs/plans QA sections, or another clearly QA-scoped docs location.
+- QA must not use this authority to edit product code, migrations, implementation plans, product briefs, design specs, or role instructions unless explicitly assigned by ARCHITECT.
+- QA documentation must preserve implemented product truth and clearly mark coverage gaps instead of inventing expected behavior.
 
 ## Must Do
 

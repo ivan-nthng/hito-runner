@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildStructuredFirstPlanAuthoringInput,
   buildStructuredFirstPlanDraftReview,
@@ -9,18 +10,59 @@ import {
   buildExactActivePlanRefreshDraft,
   mutableWorkoutGuardsStillOpen,
   parseActivePlanRefreshDraftPayload,
+  rebuildActivePlanRefreshDraftWithRichWorkoutDraft,
 } from "../src/lib/active-plan-refresh-draft";
 import type {
   PersistedPlanCycleRow,
   PersistedPlannedWorkoutRow,
 } from "../src/lib/active-plan-persistence";
-import { structuredAuthoringOpenAiSchema } from "../src/lib/openai-plan-authoring";
-import { buildActivePlanRefreshFingerprint } from "../src/lib/plan-refresh-proposal";
+import {
+  generateCanonicalPlanFromText,
+  generateRichWorkoutDraftForCanonicalPlan,
+  buildRichDraftFallbackReason,
+  structuredAuthoringOpenAiSchema,
+} from "../src/lib/openai-plan-authoring";
+import {
+  buildPlanScopedStructuredAuthoringMetadata,
+  mergePlanPersistenceMetadata,
+} from "../src/lib/plan-authoring-snapshot";
+import {
+  buildPersistedWorkoutInsertRows,
+  persistedWorkoutRowToImportedSeed,
+} from "../src/lib/persisted-plan-replacement";
+import {
+  activePlanExportToTrainingPlanV2,
+  buildActivePlanExportPayload,
+  renderPlanExportMarkdown,
+} from "../src/lib/plan-export";
+import {
+  canonicalFamilyToLegacyWorkoutType,
+  resolveCanonicalWorkoutModel,
+  type CalendarIconKey,
+  type CanonicalWorkoutFamily,
+  type CanonicalWorkoutIdentity,
+} from "../src/lib/rich-workout-model";
+import {
+  RICH_WORKOUT_DRAFT_SCHEMA_VERSION,
+  buildDeterministicRichWorkoutFallbackMetadata,
+  normalizeRichWorkoutDraftToTrainingPlan,
+} from "../src/lib/rich-workout-draft-authoring";
+import {
+  buildActivePlanRefreshFingerprint,
+  buildDeterministicActivePlanRefreshProposal,
+  generateActivePlanRefreshProposal,
+} from "../src/lib/plan-refresh-proposal";
 import type { RunnerCoachContext } from "../src/lib/runner-coach-context";
 import { buildStructuredAuthoringPlan } from "../src/lib/structured-plan-authoring";
-import { addDaysIso, weekdayLong } from "../src/lib/training";
+import { addDaysIso, deriveWorkoutRichModel, weekdayLong } from "../src/lib/training";
 import { parseVoiceToPlanConfirmRequest } from "../src/lib/voice-to-plan-authoring";
-import type { TrainingPlanV2 } from "../src/lib/imported-plan";
+import { serverEnv } from "../src/lib/supabase/env";
+import {
+  buildImportedPlanSeed,
+  importedPlanSchema,
+  type ImportedPlanSeed,
+  type TrainingPlanV2,
+} from "../src/lib/imported-plan";
 
 type SegmentRecord = Record<string, unknown>;
 
@@ -83,6 +125,12 @@ function nonRestWorkouts(plan: TrainingPlanV2) {
   return plan.planned_workouts.filter((workout) => workout.workout_type !== "rest");
 }
 
+function planWithoutGeneratedTimestamp(plan: TrainingPlanV2) {
+  const { created_at: _createdAt, ...stablePlan } = plan;
+
+  return stablePlan;
+}
+
 function longRunDistances(plan: TrainingPlanV2) {
   return plan.planned_workouts
     .filter((workout) => workout.workout_type === "long_run")
@@ -120,6 +168,41 @@ function hasTargetKey(plan: TrainingPlanV2, key: string) {
 
     return Boolean(target?.[key] || recoveryTarget?.[key]);
   });
+}
+
+function targetKeys(segment: SegmentRecord) {
+  const target = segment.target as Record<string, unknown> | undefined;
+
+  return target ? Object.keys(target).filter((key) => target[key] != null) : [];
+}
+
+function supportWorkoutSample(plan: TrainingPlanV2, sourceWorkoutType: string) {
+  return plan.planned_workouts.find((workout) => workout.source_workout_type === sourceWorkoutType);
+}
+
+function assertSupportRunRichness(plan: TrainingPlanV2, label: string) {
+  for (const sourceWorkoutType of ["easy_aerobic_run", "steady_aerobic_run", "long_aerobic_run"]) {
+    const workout = supportWorkoutSample(plan, sourceWorkoutType);
+
+    assert.ok(workout, `${label}: expected ${sourceWorkoutType} support workout`);
+    assert.ok(
+      workout.segments.length > 1,
+      `${label}: ${sourceWorkoutType} should have opener/main/finish structure`,
+    );
+
+    for (const segment of workout.segments as SegmentRecord[]) {
+      assert.ok(
+        typeof segment.guidance === "string" && segment.guidance.trim().length > 0,
+        `${label}: ${sourceWorkoutType} segment should include guidance`,
+      );
+      assert.ok(
+        targetKeys(segment).includes("cue") ||
+          targetKeys(segment).includes("hint") ||
+          targetKeys(segment).includes("intensity"),
+        `${label}: ${sourceWorkoutType} segment should include target cue, hint, or intensity`,
+      );
+    }
+  }
 }
 
 function assertFixedRestDays(plan: TrainingPlanV2) {
@@ -281,6 +364,1260 @@ function sourceWorkoutTypesByPhase(plan: TrainingPlanV2) {
   }
 
   return identitiesByPhase;
+}
+
+function assertRichWorkoutContract(plan: TrainingPlanV2, label: string) {
+  for (const workout of plan.planned_workouts) {
+    assert.ok(workout.workout_family, `${label}: workout_family should be present`);
+    assert.ok(workout.workout_identity, `${label}: workout_identity should be present`);
+    assert.ok(workout.calendar_icon_key, `${label}: calendar_icon_key should be present`);
+    assert.ok(workout.metric_mode, `${label}: metric_mode should be present`);
+
+    const resolved = resolveCanonicalWorkoutModel({
+      workoutType: workout.workout_type,
+      sourceWorkoutType: workout.source_workout_type ?? null,
+      workoutFamily: workout.workout_family,
+      workoutIdentity: workout.workout_identity,
+      calendarIconKey: workout.calendar_icon_key,
+      metricMode: workout.metric_mode,
+      title: workout.title,
+      steps: workout.segments as SegmentRecord[],
+    });
+
+    assert.equal(
+      workout.workout_family,
+      resolved.workoutFamily,
+      `${label}: workout_family should match backend compatibility mapping`,
+    );
+    assert.equal(
+      workout.workout_identity,
+      resolved.workoutIdentity,
+      `${label}: workout_identity should match backend compatibility mapping`,
+    );
+    assert.equal(
+      workout.calendar_icon_key,
+      resolved.calendarIconKey,
+      `${label}: calendar_icon_key should match backend compatibility mapping`,
+    );
+    if (hasTargetKey({ ...plan, planned_workouts: [workout] }, "pace_min_per_km_range")) {
+      assert.equal(
+        workout.metric_mode.pace_targets_allowed,
+        true,
+        `${label}: emitted pace targets require pace-enabled metric mode`,
+      );
+    }
+    if (hasTargetKey({ ...plan, planned_workouts: [workout] }, "hr_bpm_range")) {
+      assert.equal(
+        workout.metric_mode.hr_targets_allowed,
+        true,
+        `${label}: emitted HR targets require HR-enabled metric mode`,
+      );
+    }
+  }
+}
+
+function assertRichAiDraftNormalizer() {
+  const paceEnabledPlan = buildPlan(buildRequest("10k")).plan;
+  const effortOnlyPlan = buildPlan(
+    buildRequest("half_marathon", {
+      benchmark: { kind: "unknown" },
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: "2026-08-30",
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+  ).plan;
+
+  const normalizedValid = normalizeRichWorkoutDraftToTrainingPlan({
+    canonicalPlan: paceEnabledPlan,
+    draft: buildAiLikeRichWorkoutDraft(paceEnabledPlan),
+  });
+
+  assert.equal(normalizedValid.ok, true, "valid AI-like rich draft should normalize");
+
+  if (normalizedValid.ok) {
+    assert.equal(
+      normalizedValid.metadata.status,
+      "rich_draft_applied",
+      "valid rich draft should report applied metadata",
+    );
+    assertRichWorkoutContract(normalizedValid.canonicalPlan, "normalized AI-like rich draft");
+
+    for (const workout of nonRestWorkouts(normalizedValid.canonicalPlan)) {
+      const segmentTypes = workout.segments.map((segment) => segment.segment_type);
+      assert.ok(
+        segmentTypes.includes("warmup"),
+        "normalized non-rest rich draft should include warmup",
+      );
+      assert.ok(
+        segmentTypes.some((segmentType) =>
+          ["main", "tempo_block", "interval_block", "strides"].includes(segmentType),
+        ),
+        "normalized non-rest rich draft should include main-equivalent work",
+      );
+      assert.ok(
+        segmentTypes.includes("cooldown"),
+        "normalized non-rest rich draft should include cooldown",
+      );
+    }
+  }
+
+  const fakeHrNormalized = normalizeRichWorkoutDraftToTrainingPlan({
+    canonicalPlan: effortOnlyPlan,
+    draft: buildAiLikeRichWorkoutDraft(effortOnlyPlan, { includeFakeHr: true }),
+  });
+
+  assert.equal(
+    fakeHrNormalized.ok,
+    true,
+    "fake HR draft should strip unsafe HR instead of failing",
+  );
+
+  if (fakeHrNormalized.ok) {
+    assert.equal(
+      hasTargetKey(fakeHrNormalized.canonicalPlan, "hr_bpm_range"),
+      false,
+      "AI rich draft normalization must strip fake HR targets without HR-zone truth",
+    );
+    assert.equal(
+      hasTargetKey(fakeHrNormalized.canonicalPlan, "pace_min_per_km_range"),
+      false,
+      "AI rich draft normalization must not invent pace targets without benchmark support",
+    );
+  }
+
+  const malformedDraft = buildAiLikeRichWorkoutDraft(effortOnlyPlan);
+  const firstRunningWorkout = malformedDraft.workouts.find(
+    (workout) => workout.workoutFamily !== "rest",
+  );
+
+  assert.ok(firstRunningWorkout, "malformed rich draft fixture needs one running workout");
+  firstRunningWorkout!.segments = firstRunningWorkout!.segments.filter(
+    (segment) => segment.segmentType === "main",
+  );
+
+  const malformedResult = normalizeRichWorkoutDraftToTrainingPlan({
+    canonicalPlan: effortOnlyPlan,
+    draft: malformedDraft,
+  });
+
+  assert.equal(
+    malformedResult.ok,
+    false,
+    "single-segment non-rest rich draft should fail normalization and trigger fallback",
+  );
+
+  if (!malformedResult.ok) {
+    assert.equal(
+      malformedResult.fallback.status,
+      "deterministic_fallback",
+      "malformed rich draft should expose deterministic fallback metadata",
+    );
+    assert.ok(
+      malformedResult.fallback.reviewAssumptions.some((assumption) =>
+        /deterministic structured generator/i.test(assumption),
+      ),
+      "malformed rich draft fallback should be detectable in assumptions",
+    );
+  }
+}
+
+async function assertTextAuthoringRichDraftOptInContract() {
+  const { authoringInput } = buildPlan(buildRequest("10k"));
+  const deterministicPlan = buildStructuredAuthoringPlan(authoringInput);
+  const originalFetch = globalThis.fetch;
+  const originalOpenAiApiKey = serverEnv.openAiApiKey;
+  const originalOpenAiPlanModel = serverEnv.openAiPlanModel;
+  let richDraftMode: "valid" | "malformed" = "valid";
+  let requestedSchemas: string[] = [];
+
+  serverEnv.openAiApiKey = "test-openai-key";
+  serverEnv.openAiPlanModel = "test-openai-model";
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body ?? "{}")) as {
+      text?: { format?: { name?: string } };
+    };
+    const schemaName = body.text?.format?.name ?? "unknown";
+    requestedSchemas.push(schemaName);
+
+    if (schemaName === "structured_plan_authoring_input") {
+      return openAiFixtureResponse(`structured-${requestedSchemas.length}`, authoringInput);
+    }
+
+    if (schemaName === "rich_workout_draft") {
+      const draft = buildAiLikeRichWorkoutDraft(deterministicPlan);
+
+      if (richDraftMode === "malformed") {
+        const firstRunningWorkout = draft.workouts.find(
+          (workout) => workout.workoutFamily !== "rest",
+        );
+
+        assert.ok(firstRunningWorkout, "rich draft opt-in fixture needs one running workout");
+        firstRunningWorkout!.segments = firstRunningWorkout!.segments.filter(
+          (segment) => segment.segmentType === "main",
+        );
+      }
+
+      return openAiFixtureResponse(`rich-${requestedSchemas.length}`, draft);
+    }
+
+    return new Response(
+      JSON.stringify({
+        error: { message: `Unexpected schema request: ${schemaName}` },
+      }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    );
+  }) as typeof fetch;
+
+  try {
+    const defaultResult = await generateCanonicalPlanFromText(
+      "Create a 10K plan with normal structure.",
+    );
+
+    assert.deepEqual(
+      requestedSchemas,
+      ["structured_plan_authoring_input"],
+      "generateCanonicalPlanFromText should not request rich drafts by default",
+    );
+    assert.equal(
+      defaultResult.richDraftMetadata.status,
+      "not_requested",
+      "default text authoring helper result should report rich draft as not requested",
+    );
+    assert.deepEqual(
+      planWithoutGeneratedTimestamp(defaultResult.canonicalPlan),
+      planWithoutGeneratedTimestamp(deterministicPlan),
+      "default text authoring helper result should remain deterministic",
+    );
+
+    requestedSchemas = [];
+    richDraftMode = "valid";
+    const richResult = await generateCanonicalPlanFromText(
+      "Create a 10K plan with rich workout structure.",
+      { enableRichWorkoutDraft: true },
+    );
+
+    assert.deepEqual(
+      requestedSchemas,
+      ["structured_plan_authoring_input", "rich_workout_draft"],
+      "opted-in text authoring should request the rich workout draft schema",
+    );
+    assert.equal(
+      richResult.richDraftMetadata.status,
+      "rich_draft_applied",
+      "valid opted-in rich draft should be applied",
+    );
+    assert.ok(
+      richResult.canonicalPlan.planned_workouts.some((workout) =>
+        /^Coach-shaped /.test(workout.title),
+      ),
+      "opted-in rich draft should affect normalized canonical workout structure",
+    );
+
+    requestedSchemas = [];
+    richDraftMode = "malformed";
+    const fallbackResult = await generateCanonicalPlanFromText(
+      "Create a 10K plan with malformed rich workout structure.",
+      { enableRichWorkoutDraft: true },
+    );
+
+    assert.deepEqual(
+      requestedSchemas,
+      ["structured_plan_authoring_input", "rich_workout_draft"],
+      "malformed opted-in text authoring should still request the rich draft schema",
+    );
+    assert.equal(
+      fallbackResult.richDraftMetadata.status,
+      "deterministic_fallback",
+      "malformed opted-in rich draft should fall back detectably",
+    );
+    assert.deepEqual(
+      planWithoutGeneratedTimestamp(fallbackResult.canonicalPlan),
+      planWithoutGeneratedTimestamp(deterministicPlan),
+      "malformed opted-in rich draft should keep deterministic canonical plan truth",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    serverEnv.openAiApiKey = originalOpenAiApiKey;
+    serverEnv.openAiPlanModel = originalOpenAiPlanModel;
+  }
+}
+
+function assertActivePlanRefreshRichDraftContract() {
+  const context = buildRefreshFixtureContext();
+  const currentPlan = buildRefreshFixturePlanRow(context);
+  const existingWorkouts = {
+    workouts: context.remainingActiveSchedule.map((workout, index) =>
+      buildRefreshFixtureWorkoutRow(context, workout, index),
+    ),
+    logsByWorkoutId: new Map(),
+  };
+  const proposalOutput = {
+    applyContext: { generatedAt: context.generatedAt },
+    review: {
+      summary:
+        "Refresh the remaining marathon block with richer workout structure while keeping protected history fixed.",
+      proposedChanges: [
+        "Improve future mutable workouts with richer warmup, main, and cooldown guidance.",
+      ],
+    },
+    recommendedAuthoringPrompt:
+      "Refresh this as a marathon plan with credible long-run progression, fixed rest days, and no fake HR or pace targets.",
+  };
+  const deterministicDraft = buildExactActivePlanRefreshDraft({
+    context,
+    currentPlan,
+    existingWorkouts,
+    proposalOutput,
+    fingerprint: buildActivePlanRefreshFingerprint(context),
+    weekdayRestInvariant: context.weekdayRestInvariant,
+    evidenceSets: { loggedWorkoutIds: new Set(), evidenceWorkoutIds: new Set() },
+  });
+
+  assert.equal(
+    deterministicDraft.richWorkoutDraftMetadata.status,
+    "not_requested",
+    "deterministic refresh draft should report rich draft as not requested by default",
+  );
+
+  const normalizedRichDraft = normalizeRichWorkoutDraftToTrainingPlan({
+    canonicalPlan: deterministicDraft.canonicalPlan,
+    draft: buildAiLikeRichWorkoutDraft(deterministicDraft.canonicalPlan),
+  });
+
+  assert.equal(
+    normalizedRichDraft.ok,
+    true,
+    "refresh rich draft fixture should normalize against the deterministic refreshed schedule",
+  );
+
+  if (normalizedRichDraft.ok) {
+    const richRefreshDraft = rebuildActivePlanRefreshDraftWithRichWorkoutDraft({
+      draft: deterministicDraft,
+      canonicalPlan: normalizedRichDraft.canonicalPlan,
+      metadata: normalizedRichDraft.metadata,
+    });
+    const parsedRichDraft = parseActivePlanRefreshDraftPayload(richRefreshDraft);
+
+    assert.equal(parsedRichDraft.ok, true, "rich refresh draft checksum should verify");
+    assert.equal(
+      richRefreshDraft.richWorkoutDraftMetadata.status,
+      "rich_draft_applied",
+      "valid refresh rich draft should expose applied metadata",
+    );
+    assert.ok(
+      richRefreshDraft.canonicalPlan.planned_workouts.some((workout) =>
+        /^Coach-shaped /.test(workout.title),
+      ),
+      "refresh rich draft should persist the normalized rich canonical plan into the reviewed draft",
+    );
+    assertRichWorkoutContract(richRefreshDraft.canonicalPlan, "rich active-plan refresh draft");
+    assertFixedRestDays(richRefreshDraft.canonicalPlan);
+    assert.equal(
+      hasTargetKey(richRefreshDraft.canonicalPlan, "hr_bpm_range"),
+      false,
+      "refresh rich draft must not emit HR targets without HR-zone truth",
+    );
+    assert.equal(
+      mutableWorkoutGuardsStillOpen(richRefreshDraft, {
+        loggedWorkoutIds: new Set([richRefreshDraft.mutableWorkoutGuards[0]!.workoutId]),
+        evidenceWorkoutIds: new Set(),
+      }),
+      false,
+      "rich refresh draft must preserve protected mutable guard stale-blocking",
+    );
+  }
+
+  const malformedDraft = buildAiLikeRichWorkoutDraft(deterministicDraft.canonicalPlan);
+  const firstRunningWorkout = malformedDraft.workouts.find(
+    (workout) => workout.workoutFamily !== "rest",
+  );
+
+  assert.ok(firstRunningWorkout, "refresh malformed rich draft fixture needs one running workout");
+  firstRunningWorkout!.segments = firstRunningWorkout!.segments.filter(
+    (segment) => segment.segmentType === "main",
+  );
+
+  const malformedResult = normalizeRichWorkoutDraftToTrainingPlan({
+    canonicalPlan: deterministicDraft.canonicalPlan,
+    draft: malformedDraft,
+  });
+
+  assert.equal(
+    malformedResult.ok,
+    false,
+    "malformed refresh rich draft should fail normalization before review",
+  );
+
+  if (!malformedResult.ok) {
+    const fallbackRefreshDraft = rebuildActivePlanRefreshDraftWithRichWorkoutDraft({
+      draft: deterministicDraft,
+      canonicalPlan: deterministicDraft.canonicalPlan,
+      metadata: buildDeterministicRichWorkoutFallbackMetadata(malformedResult.reason),
+    });
+    const parsedFallbackDraft = parseActivePlanRefreshDraftPayload(fallbackRefreshDraft);
+
+    assert.equal(parsedFallbackDraft.ok, true, "fallback refresh draft checksum should verify");
+    assert.equal(
+      fallbackRefreshDraft.richWorkoutDraftMetadata.status,
+      "deterministic_fallback",
+      "malformed refresh rich draft should fall back detectably",
+    );
+    assert.deepEqual(
+      planWithoutGeneratedTimestamp(fallbackRefreshDraft.canonicalPlan),
+      planWithoutGeneratedTimestamp(deterministicDraft.canonicalPlan),
+      "malformed refresh rich draft fallback should keep deterministic canonical plan truth",
+    );
+  }
+}
+
+function assertActivePlanRefreshApplyDoesNotGenerate() {
+  const source = readFileSync("src/lib/active-plan-refresh-actions.ts", "utf8");
+  const applyStart = source.indexOf("export async function applyActivePlanRefreshProposalForUser");
+  const applyEnd = source.indexOf("function staleActivePlanRefreshResult", applyStart);
+  const applySection = source.slice(applyStart, applyEnd);
+
+  assert.ok(applyStart >= 0 && applyEnd > applyStart, "apply function source should be readable");
+  assert.doesNotMatch(
+    applySection,
+    /generateRichWorkoutDraftForCanonicalPlan|generateActivePlanRefreshProposal|openai-plan-authoring/,
+    "active-plan refresh apply must not call OpenAI, regenerate, or reinterpret the reviewed draft",
+  );
+}
+
+async function assertActivePlanRefreshTimeoutFallbackContract() {
+  const context = buildRefreshFixtureContext();
+  const currentPlan = buildRefreshFixturePlanRow(context);
+  const existingWorkouts = {
+    workouts: context.remainingActiveSchedule.map((workout, index) =>
+      buildRefreshFixtureWorkoutRow(context, workout, index),
+    ),
+    logsByWorkoutId: new Map(),
+  };
+  const runnerPrompt = "Refresh the future plan with richer workouts but keep protected history.";
+  const originalFetch = globalThis.fetch;
+  const originalOpenAiApiKey = serverEnv.openAiApiKey;
+  const originalOpenAiPlanModel = serverEnv.openAiPlanModel;
+
+  serverEnv.openAiApiKey = "test-openai-key";
+  serverEnv.openAiPlanModel = "test-openai-model";
+  globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      const rejectAsAbort = () => {
+        const error = new Error("The mocked OpenAI request was aborted.");
+        error.name = "AbortError";
+        reject(error);
+      };
+
+      if (init?.signal?.aborted) {
+        rejectAsAbort();
+        return;
+      }
+
+      init?.signal?.addEventListener("abort", rejectAsAbort, { once: true });
+    })) as typeof fetch;
+
+  try {
+    let proposalTimedOut = false;
+    const proposal = await generateActivePlanRefreshProposal({
+      context,
+      runnerPrompt,
+      timeoutMs: 5,
+    }).catch((error: unknown) => {
+      assert.equal(
+        error instanceof Error && error.name === "AbortError",
+        true,
+        "mocked proposal timeout should surface as an abort",
+      );
+      proposalTimedOut = true;
+
+      return buildDeterministicActivePlanRefreshProposal({
+        context,
+        runnerPrompt,
+        fallbackReason: "refresh_proposal_timed_out",
+      });
+    });
+
+    assert.equal(
+      proposalTimedOut,
+      true,
+      "refresh proposal timeout fixture should exercise deterministic proposal fallback",
+    );
+    assert.equal(
+      proposal.model,
+      "deterministic_refresh_fallback",
+      "timed-out refresh proposal should return deterministic fallback proposal metadata",
+    );
+
+    const deterministicDraft = buildExactActivePlanRefreshDraft({
+      context,
+      currentPlan,
+      existingWorkouts,
+      proposalOutput: proposal.output,
+      fingerprint: proposal.output.applyContext.fingerprint,
+      weekdayRestInvariant: context.weekdayRestInvariant,
+      evidenceSets: { loggedWorkoutIds: new Set(), evidenceWorkoutIds: new Set() },
+    });
+    const proposalFallbackDraft = rebuildActivePlanRefreshDraftWithRichWorkoutDraft({
+      draft: deterministicDraft,
+      canonicalPlan: deterministicDraft.canonicalPlan,
+      metadata: buildDeterministicRichWorkoutFallbackMetadata("refresh_proposal_timed_out"),
+    });
+
+    assert.equal(
+      parseActivePlanRefreshDraftPayload(proposalFallbackDraft).ok,
+      true,
+      "timed-out proposal fallback refresh draft checksum should verify",
+    );
+    assert.equal(
+      proposalFallbackDraft.richWorkoutDraftMetadata.status,
+      "deterministic_fallback",
+      "timed-out proposal should still return bounded rich draft fallback metadata",
+    );
+    assert.equal(
+      proposalFallbackDraft.richWorkoutDraftMetadata.fallbackReason,
+      "refresh_proposal_timed_out",
+      "timed-out proposal fallback metadata should explain that the proposal step timed out",
+    );
+
+    const richTimeoutDraft = await generateRichWorkoutDraftForCanonicalPlan({
+      authoringText: runnerPrompt,
+      authoringInput: deterministicDraft.authoringSnapshot.authoringInput,
+      deterministicPlan: deterministicDraft.canonicalPlan,
+      timeoutMs: 5,
+    }).catch((error: unknown) =>
+      rebuildActivePlanRefreshDraftWithRichWorkoutDraft({
+        draft: deterministicDraft,
+        canonicalPlan: deterministicDraft.canonicalPlan,
+        metadata: buildDeterministicRichWorkoutFallbackMetadata(
+          buildRichDraftFallbackReason(error),
+        ),
+      }),
+    );
+
+    assert.equal(
+      richTimeoutDraft.richWorkoutDraftMetadata.status,
+      "deterministic_fallback",
+      "timed-out rich draft should fall back to deterministic refresh draft metadata",
+    );
+    assert.equal(
+      richTimeoutDraft.richWorkoutDraftMetadata.fallbackReason,
+      "rich_draft_timed_out",
+      "timed-out rich draft fallback metadata should use the bounded timeout reason",
+    );
+    assert.deepEqual(
+      planWithoutGeneratedTimestamp(richTimeoutDraft.canonicalPlan),
+      planWithoutGeneratedTimestamp(deterministicDraft.canonicalPlan),
+      "timed-out rich draft should keep deterministic canonical refresh truth",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    serverEnv.openAiApiKey = originalOpenAiApiKey;
+    serverEnv.openAiPlanModel = originalOpenAiPlanModel;
+  }
+}
+
+function openAiFixtureResponse(responseId: string, payload: unknown) {
+  return new Response(
+    JSON.stringify({
+      id: responseId,
+      output_text: JSON.stringify(payload),
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
+function buildAiLikeRichWorkoutDraft(
+  plan: TrainingPlanV2,
+  options: { includeFakeHr?: boolean } = {},
+) {
+  return {
+    schemaVersion: RICH_WORKOUT_DRAFT_SCHEMA_VERSION,
+    assumptions: ["Rich draft kept Hito's deterministic rest days and metric safety gates."],
+    workouts: plan.planned_workouts.map((workout) => {
+      if (workout.workout_type === "rest") {
+        return {
+          workoutId: workout.workout_id,
+          date: workout.date,
+          workoutFamily: "rest",
+          workoutIdentity: "rest_and_recovery",
+          calendarIconKey: "rest",
+          title: workout.title,
+          summary: workout.summary,
+          goalContext: toDraftGoalContext(workout),
+          metricMode: toDraftMetricMode(workout),
+          segments: [
+            {
+              segmentId: `${workout.workout_id}_draft_rest`,
+              segmentType: "rest",
+              label: "Rest",
+              sequence: 1,
+              prescription: emptyDraftPrescription("none"),
+              guidance: "No running scheduled.",
+              target: emptyDraftTarget(),
+            },
+          ],
+        };
+      }
+
+      return {
+        workoutId: workout.workout_id,
+        date: workout.date,
+        workoutFamily: workout.workout_family ?? "easy",
+        workoutIdentity: workout.workout_identity ?? "easy_aerobic_run",
+        calendarIconKey: workout.calendar_icon_key ?? "easy",
+        title: `Coach-shaped ${workout.title}`,
+        summary: `Richer ${workout.summary}`,
+        goalContext: toDraftGoalContext(workout),
+        metricMode: toDraftMetricMode(workout),
+        segments: [
+          buildDraftSegment(workout, "warmup", 1, "Warm up", 8, options),
+          buildDraftSegment(workout, "main", 2, "Purposeful main set", 24, options),
+          buildDraftSegment(workout, "cooldown", 3, "Cool down", 6, options),
+        ],
+      };
+    }),
+  };
+}
+
+function buildDraftSegment(
+  workout: TrainingPlanV2["planned_workouts"][number],
+  segmentType: "warmup" | "main" | "cooldown",
+  sequence: number,
+  label: string,
+  durationMin: number,
+  options: { includeFakeHr?: boolean },
+) {
+  return {
+    segmentId: `${workout.workout_id}_draft_${sequence}`,
+    segmentType,
+    label,
+    sequence,
+    prescription: {
+      mode: "time",
+      durationMin,
+      distanceKm: null,
+      repeatCount: null,
+      repeatUnit: null,
+      recoveryUnit: null,
+    },
+    guidance: `${label} with clear effort control and no invented metrics.`,
+    target: {
+      ...emptyDraftTarget(),
+      intensity: segmentType === "main" ? "controlled_effort" : "easy",
+      cue: segmentType === "main" ? "Stay smooth and purposeful." : "Keep it relaxed.",
+      hint:
+        segmentType === "cooldown"
+          ? "Finish able to speak comfortably."
+          : "Let effort guide the segment.",
+      hrBpmRange: options.includeFakeHr ? "150-160" : null,
+      hrBpm: options.includeFakeHr ? "155" : null,
+      paceMinPerKmRange: options.includeFakeHr ? "4:45-5:00" : null,
+    },
+  };
+}
+
+function toDraftGoalContext(workout: TrainingPlanV2["planned_workouts"][number]) {
+  return {
+    goalType: workout.goal_context?.goal_type ?? "build_consistency",
+    goalStyle: workout.goal_context?.goal_style ?? null,
+    terrainFocus: workout.goal_context?.terrain_focus ?? "standard",
+    targetDate: workout.goal_context?.target_date ?? null,
+    targetTime: workout.goal_context?.target_time ?? null,
+  };
+}
+
+function toDraftMetricMode(workout: TrainingPlanV2["planned_workouts"][number]) {
+  return {
+    guidance: workout.metric_mode?.guidance ?? "effort",
+    paceTargetsAllowed: workout.metric_mode?.pace_targets_allowed ?? false,
+    hrTargetsAllowed: workout.metric_mode?.hr_targets_allowed ?? false,
+    reason: workout.metric_mode?.reason ?? "Fixture metric mode mirrors deterministic truth.",
+  };
+}
+
+function emptyDraftPrescription(mode: "none") {
+  return {
+    mode,
+    durationMin: null,
+    distanceKm: null,
+    repeatCount: null,
+    repeatUnit: null,
+    recoveryUnit: null,
+  };
+}
+
+function emptyDraftTarget() {
+  return {
+    intensity: null,
+    rpe: null,
+    cue: null,
+    hint: null,
+    paceMinPerKmRange: null,
+    pace: null,
+    hrBpmRange: null,
+    hrBpm: null,
+  };
+}
+
+function assertRichIdentityMapping(
+  sourceWorkoutType: string | null,
+  workoutType: TrainingPlanV2["planned_workouts"][number]["workout_type"],
+  expected: {
+    identity: CanonicalWorkoutIdentity;
+    family: CanonicalWorkoutFamily;
+    icon: CalendarIconKey;
+    legacyWorkoutType?: ReturnType<typeof canonicalFamilyToLegacyWorkoutType>;
+  },
+) {
+  const resolved = resolveCanonicalWorkoutModel({
+    workoutType,
+    sourceWorkoutType,
+    title: sourceWorkoutType ?? workoutType,
+    steps: [],
+  });
+
+  assert.equal(
+    resolved.workoutIdentity,
+    expected.identity,
+    `${sourceWorkoutType ?? workoutType} should map to canonical workout identity`,
+  );
+  assert.equal(
+    resolved.workoutFamily,
+    expected.family,
+    `${sourceWorkoutType ?? workoutType} should map to canonical workout family`,
+  );
+  assert.equal(
+    resolved.calendarIconKey,
+    expected.icon,
+    `${sourceWorkoutType ?? workoutType} should map to canonical calendar icon`,
+  );
+  assert.equal(
+    canonicalFamilyToLegacyWorkoutType(resolved.workoutFamily, resolved.workoutIdentity),
+    expected.legacyWorkoutType ??
+      (workoutType === "tempo" ||
+      workoutType === "intervals" ||
+      workoutType === "progression" ||
+      workoutType === "race" ||
+      workoutType === "quality"
+        ? "quality"
+        : workoutType === "recovery"
+          ? "easy"
+          : workoutType),
+    `${sourceWorkoutType ?? workoutType} should map back to the expected legacy workout type`,
+  );
+}
+
+function assertLegacyCompactOnlyInference(
+  title: string,
+  expected: {
+    identity: CanonicalWorkoutIdentity;
+    family: CanonicalWorkoutFamily;
+    icon: CalendarIconKey;
+  },
+  steps: SegmentRecord[] = [],
+) {
+  const resolved = resolveCanonicalWorkoutModel({
+    workoutType: "quality",
+    sourceWorkoutType: null,
+    title,
+    steps,
+  });
+
+  assert.equal(
+    resolved.workoutIdentity,
+    expected.identity,
+    `compact-only title "${title}" should infer useful workout identity`,
+  );
+  assert.equal(
+    resolved.workoutFamily,
+    expected.family,
+    `compact-only title "${title}" should infer useful workout family`,
+  );
+  assert.equal(
+    resolved.calendarIconKey,
+    expected.icon,
+    `compact-only title "${title}" should infer useful calendar icon`,
+  );
+}
+
+function assertRichCompatibilityMapping() {
+  assertRichIdentityMapping("easy_aerobic_run", "easy", {
+    identity: "easy_aerobic_run",
+    family: "easy",
+    icon: "easy",
+  });
+  assertRichIdentityMapping("steady_aerobic_run", "steady_or_easy", {
+    identity: "steady_aerobic_run",
+    family: "steady",
+    icon: "steady",
+  });
+  assertRichIdentityMapping("aerobic_strides", "easy", {
+    identity: "easy_run_with_strides",
+    family: "easy",
+    icon: "easy",
+  });
+  assertRichIdentityMapping("5k_sharpening_repeats", "quality", {
+    identity: "5k_sharpening_repeats",
+    family: "intervals",
+    icon: "intervals",
+  });
+  assertRichIdentityMapping("10k_rhythm_intervals", "quality", {
+    identity: "10k_rhythm_intervals",
+    family: "intervals",
+    icon: "intervals",
+  });
+  assertRichIdentityMapping("half_marathon_threshold_durability", "tempo", {
+    identity: "half_marathon_threshold_durability",
+    family: "tempo",
+    icon: "tempo",
+  });
+  assertRichIdentityMapping("marathon_steady_specificity", "steady_or_easy", {
+    identity: "marathon_steady_specificity",
+    family: "steady",
+    icon: "steady",
+  });
+  assertRichIdentityMapping("ultra_time_on_feet_durability", "steady_or_easy", {
+    identity: "ultra_time_on_feet_durability",
+    family: "long",
+    icon: "long",
+    legacyWorkoutType: "long_run",
+  });
+  assertRichIdentityMapping("controlled_downhill_durability", "quality", {
+    identity: "controlled_downhill_durability",
+    family: "hills",
+    icon: "hills",
+  });
+  assertRichIdentityMapping("hike_run_endurance", "steady_or_easy", {
+    identity: "hike_run_endurance",
+    family: "trail",
+    icon: "trail",
+    legacyWorkoutType: "long_run",
+  });
+  assertRichIdentityMapping("mountain_long_run_time_on_feet", "long_run", {
+    identity: "mountain_long_run_time_on_feet",
+    family: "trail",
+    icon: "trail",
+  });
+  assertRichIdentityMapping("rest_and_recovery", "rest", {
+    identity: "rest_and_recovery",
+    family: "rest",
+    icon: "rest",
+  });
+  assertRichIdentityMapping(null, "quality", {
+    identity: "quality_session",
+    family: "intervals",
+    icon: "intervals",
+  });
+  assertLegacyCompactOnlyInference("Controlled tempo session", {
+    identity: "controlled_tempo_session",
+    family: "tempo",
+    icon: "tempo",
+  });
+  assertLegacyCompactOnlyInference("Distance intervals", {
+    identity: "distance_intervals",
+    family: "intervals",
+    icon: "intervals",
+  });
+  assertLegacyCompactOnlyInference("Time intervals", {
+    identity: "time_intervals",
+    family: "intervals",
+    icon: "intervals",
+  });
+  assertLegacyCompactOnlyInference("Progression run", {
+    identity: "progression_run",
+    family: "progression",
+    icon: "progression",
+  });
+  assertLegacyCompactOnlyInference("Race pace tune-up", {
+    identity: "taper_tuneup_run",
+    family: "race",
+    icon: "race",
+  });
+  assertLegacyCompactOnlyInference("Rolling hills session", {
+    identity: "rolling_hills_session",
+    family: "hills",
+    icon: "hills",
+  });
+  assertLegacyCompactOnlyInference("Uphill repeats", {
+    identity: "uphill_repeats",
+    family: "hills",
+    icon: "hills",
+  });
+  assertLegacyCompactOnlyInference("Quality session", {
+    identity: "quality_session",
+    family: "intervals",
+    icon: "intervals",
+  });
+  assertLegacyCompactOnlyInference(
+    "Quality session",
+    {
+      identity: "controlled_tempo_session",
+      family: "tempo",
+      icon: "tempo",
+    },
+    [
+      {
+        type: "run",
+        segment_type: "tempo_block",
+        label: "Controlled tempo block",
+        target: { intensity: "tempo" },
+      },
+    ],
+  );
+
+  const restMetricMode = resolveCanonicalWorkoutModel({
+    workoutType: "rest",
+    sourceWorkoutType: null,
+    title: "Rest day",
+    steps: [],
+  }).metricMode;
+
+  assert.equal(
+    restMetricMode.reason,
+    "Rest day has no execution metric targets.",
+    "rest metric mode should not imply effort execution cues",
+  );
+}
+
+function assertRichPersistenceReadback() {
+  const plan = buildPlan(buildRequest("half_marathon")).plan;
+  const seed = buildImportedPlanSeed(plan);
+  const insertRows = buildPersistedWorkoutInsertRows(
+    "00000000-0000-4000-8000-000000000901",
+    "00000000-0000-4000-8000-000000000902",
+    seed.workouts,
+  );
+  const thresholdRow = insertRows.find(
+    (row) => row.workout_identity === "half_marathon_threshold_durability",
+  );
+
+  assert.ok(thresholdRow, "persisted insert rows should carry rich threshold identity");
+  assert.equal(
+    thresholdRow.workout_family,
+    "tempo",
+    "persisted insert rows should carry rich workout family",
+  );
+  assert.equal(
+    thresholdRow.calendar_icon_key,
+    "tempo",
+    "persisted insert rows should carry calendar icon key",
+  );
+  assert.equal(
+    typeof thresholdRow.goal_context,
+    "object",
+    "persisted insert rows should carry bounded goal context json",
+  );
+  assert.equal(
+    typeof thresholdRow.metric_mode,
+    "object",
+    "persisted insert rows should carry metric mode json",
+  );
+
+  const reloaded = deriveWorkoutRichModel({
+    type: thresholdRow.workout_type,
+    sourceWorkoutType: thresholdRow.source_workout_type,
+    workoutFamily: thresholdRow.workout_family,
+    workoutIdentity: thresholdRow.workout_identity,
+    calendarIconKey: thresholdRow.calendar_icon_key,
+    goalContext: thresholdRow.goal_context,
+    metricMode: thresholdRow.metric_mode,
+    title: thresholdRow.title,
+    steps: thresholdRow.steps as SegmentRecord[],
+  });
+
+  assert.equal(
+    reloaded.workoutIdentity,
+    "half_marathon_threshold_durability",
+    "saved workout readback should prefer stored rich identity",
+  );
+  assert.equal(reloaded.workoutFamily, "tempo", "saved workout readback should keep rich family");
+  assert.equal(
+    reloaded.goalContext?.goalType,
+    "half_marathon",
+    "saved workout readback should expose stored goal context",
+  );
+
+  const persistedRow: PersistedPlannedWorkoutRow = {
+    id: "00000000-0000-4000-8000-000000000903",
+    created_at: "2026-05-01T00:00:00.000Z",
+    ...thresholdRow,
+    source_workout_type: "quality",
+  };
+  const carriedForward = persistedWorkoutRowToImportedSeed(persistedRow, {
+    fallbackSourceWorkoutIdPrefix: "fixed",
+  });
+
+  assert.equal(
+    carriedForward.workoutIdentity,
+    "half_marathon_threshold_durability",
+    "carry-forward should preserve stored rich identity even when legacy source type is generic",
+  );
+  assert.equal(
+    carriedForward.workoutFamily,
+    "tempo",
+    "carry-forward should preserve stored rich family for fixed/protected workouts",
+  );
+  assert.equal(
+    carriedForward.goalContext?.goalType,
+    "half_marathon",
+    "carry-forward should preserve stored rich goal context",
+  );
+  assert.equal(
+    carriedForward.metricMode.guidance,
+    reloaded.metricMode.guidance,
+    "carry-forward should preserve stored metric-mode semantics",
+  );
+
+  const oldCompact = deriveWorkoutRichModel({
+    type: "quality",
+    sourceWorkoutType: null,
+    title: "Controlled tempo session",
+    steps: [],
+  });
+
+  assert.equal(
+    oldCompact.workoutIdentity,
+    "controlled_tempo_session",
+    "old compact-only rows should still use title fallback when rich fields are absent",
+  );
+}
+
+function persistedPlanRowForSeed(seed: ImportedPlanSeed): PersistedPlanCycleRow {
+  return {
+    id: "00000000-0000-4000-8000-000000000910",
+    user_id: "00000000-0000-4000-8000-000000000911",
+    status: "active",
+    title: seed.title,
+    goal_summary: seed.goalSummary,
+    source_template: seed.sourceTemplate,
+    schema_version: seed.schemaVersion,
+    source_kind: seed.sourceKind,
+    start_date: seed.startDate,
+    end_date: seed.endDate,
+    target_date: seed.targetDate,
+    goal_metadata: seed.goalMetadata,
+    plan_preferences: seed.planPreferences,
+    created_at: "2026-05-01T00:00:00.000Z",
+    updated_at: "2026-05-01T00:00:00.000Z",
+  };
+}
+
+function persistedWorkoutRowsForSeed(seed: ImportedPlanSeed): PersistedPlannedWorkoutRow[] {
+  return buildPersistedWorkoutInsertRows(
+    "00000000-0000-4000-8000-000000000910",
+    "00000000-0000-4000-8000-000000000911",
+    seed.workouts,
+  ).map((row, index) => ({
+    id: `00000000-0000-4000-8000-${(920 + index).toString().padStart(12, "0")}`,
+    created_at: "2026-05-01T00:00:00.000Z",
+    ...row,
+  }));
+}
+
+function assertRichImportExportRoundtrip() {
+  const plan = buildPlan(buildRequest("half_marathon")).plan;
+  const seed = buildImportedPlanSeed(plan);
+  const persistedRows = persistedWorkoutRowsForSeed(seed);
+  const exportPayload = buildActivePlanExportPayload({
+    planCycle: persistedPlanRowForSeed(seed),
+    workouts: persistedRows,
+    exportedAt: "2026-05-25T12:00:00.000Z",
+  });
+  const exportedPlan = activePlanExportToTrainingPlanV2(exportPayload);
+  const parsedExport = importedPlanSchema.parse(exportedPlan);
+  const roundtripSeed = buildImportedPlanSeed(parsedExport);
+  const roundtripRows = buildPersistedWorkoutInsertRows(
+    "00000000-0000-4000-8000-000000000930",
+    "00000000-0000-4000-8000-000000000931",
+    roundtripSeed.workouts,
+  );
+  const nonRestExports = parsedExport.planned_workouts.filter(
+    (workout) => workout.workout_type !== "rest",
+  );
+
+  assert.ok(nonRestExports.length > 0, "rich export fixture should include non-rest workouts");
+
+  for (const workout of nonRestExports) {
+    assert.ok(workout.source_workout_type, "rich JSON export should preserve source_workout_type");
+    assert.ok(workout.workout_family, "rich JSON export should include workout_family");
+    assert.ok(workout.workout_identity, "rich JSON export should include workout_identity");
+    assert.ok(workout.calendar_icon_key, "rich JSON export should include calendar_icon_key");
+    assert.ok(workout.goal_context, "rich JSON export should include bounded goal_context");
+    assert.ok(workout.metric_mode, "rich JSON export should include metric_mode");
+  }
+
+  assert.ok(
+    roundtripRows.every((row) => row.workout_family && row.workout_identity),
+    "re-imported rich export should persist rich fields into planned_workouts rows",
+  );
+
+  const markdown = renderPlanExportMarkdown(exportPayload);
+  assert.match(
+    markdown,
+    /Focus: Tempo · Half Marathon Threshold Durability|Focus: Intervals ·/,
+    "Markdown export should mention exact rich focus without replacing segment detail",
+  );
+
+  const template = JSON.parse(
+    readFileSync("public/templates/hito-training-plan-v2-template.json", "utf8"),
+  );
+  const parsedTemplate = importedPlanSchema.parse(template);
+  assert.ok(
+    parsedTemplate.planned_workouts.every(
+      (workout) =>
+        workout.workout_family &&
+        workout.workout_identity &&
+        workout.calendar_icon_key &&
+        workout.metric_mode,
+    ),
+    "template JSON should validate with rich workout fields",
+  );
+
+  const compactOnlyPlan = importedPlanSchema.parse({
+    schema_version: "training-plan-v2",
+    plan_name: "Compact legacy v2 plan",
+    generated_for: "Fixture runner",
+    start_date: "2026-05-25",
+    planned_workouts: [
+      {
+        workout_id: "compact-tempo-1",
+        date: "2026-05-25",
+        weekday: "Monday",
+        week_number: 1,
+        phase: "Base",
+        workout_type: "quality",
+        title: "Controlled tempo session",
+        summary: "Compact-only old row without rich fields.",
+        segments: [
+          {
+            segment_type: "main",
+            duration_min: 30,
+            target: { intensity: "tempo", cue: "Controlled and repeatable" },
+          },
+        ],
+      },
+    ],
+  });
+  const compactSeed = buildImportedPlanSeed(compactOnlyPlan);
+
+  assert.equal(
+    compactSeed.workouts[0]?.workoutIdentity,
+    "controlled_tempo_session",
+    "older compact-only training-plan-v2 imports should derive rich identity from fallback semantics",
+  );
+  assert.equal(
+    compactSeed.workouts[0]?.workoutFamily,
+    "tempo",
+    "older compact-only training-plan-v2 imports should derive rich family from fallback semantics",
+  );
+}
+
+function assertRichSavedModeQaFixture() {
+  const fixture = importedPlanSchema.parse(
+    JSON.parse(readFileSync("scripts/fixtures/rich-workout-saved-mode-fixture.json", "utf8")),
+  );
+  const expectedRichRows = [
+    ["qa-rich-steady-001", "steady", "steady_aerobic_run", "steady"],
+    ["qa-rich-hills-001", "hills", "rolling_hills_session", "hills"],
+    ["qa-rich-trail-001", "trail", "technical_trail_easy", "trail"],
+  ] as const;
+
+  assert.equal(
+    fixture.source_kind,
+    "qa_rich_workout_fixture",
+    "saved-mode QA fixture should be clearly marked test-only",
+  );
+  assert.equal(
+    fixture.planned_workouts.length,
+    4,
+    "saved-mode QA fixture should keep a small, exact browser-QA surface",
+  );
+
+  for (const [workoutId, family, identity, icon] of expectedRichRows) {
+    const workout = fixture.planned_workouts.find((entry) => entry.workout_id === workoutId);
+
+    assert.ok(workout, `saved-mode QA fixture should include ${workoutId}`);
+    assert.equal(workout.workout_family, family, `${workoutId} should store workout_family`);
+    assert.equal(workout.workout_identity, identity, `${workoutId} should store workout_identity`);
+    assert.equal(workout.calendar_icon_key, icon, `${workoutId} should store calendar_icon_key`);
+    assert.ok(workout.goal_context, `${workoutId} should store bounded goal_context`);
+    assert.ok(workout.metric_mode, `${workoutId} should store metric_mode`);
+    assert.equal(
+      workout.metric_mode?.pace_targets_allowed,
+      false,
+      `${workoutId} should not store fixture pace targets`,
+    );
+    assert.equal(
+      workout.metric_mode?.hr_targets_allowed,
+      false,
+      `${workoutId} should not store fixture HR targets`,
+    );
+  }
+
+  const compactFallback = fixture.planned_workouts.find(
+    (entry) => entry.workout_id === "qa-legacy-compact-tempo-001",
+  );
+
+  assert.ok(compactFallback, "saved-mode QA fixture should include a compact fallback row");
+  assert.equal(
+    compactFallback.source_workout_type,
+    undefined,
+    "compact fallback row should omit source_workout_type",
+  );
+  assert.equal(
+    compactFallback.workout_family,
+    undefined,
+    "compact fallback row should omit stored rich family",
+  );
+  assert.equal(
+    compactFallback.workout_identity,
+    undefined,
+    "compact fallback row should omit stored rich identity",
+  );
+
+  const seed = buildImportedPlanSeed(fixture);
+  const compactSeed = seed.workouts.find(
+    (workout) => workout.sourceWorkoutId === "qa-legacy-compact-tempo-001",
+  );
+
+  assert.ok(compactSeed, "compact fallback row should normalize into a seed workout");
+  const fallbackReadback = deriveWorkoutRichModel({
+    type: compactSeed.workoutType,
+    sourceWorkoutType: null,
+    title: compactSeed.title,
+    steps: compactSeed.steps,
+  });
+
+  assert.equal(
+    fallbackReadback.workoutIdentity,
+    "controlled_tempo_session",
+    "compact fixture row should still derive tempo identity from title/steps when stored rich truth is absent",
+  );
+  assert.equal(
+    fallbackReadback.workoutFamily,
+    "tempo",
+    "compact fixture row should still derive tempo family from title/steps when stored rich truth is absent",
+  );
+
+  for (const workout of fixture.planned_workouts) {
+    for (const segment of workout.segments as SegmentRecord[]) {
+      const target = segment.target as Record<string, unknown> | undefined;
+      assert.ok(
+        typeof segment.guidance === "string" ||
+          typeof target?.cue === "string" ||
+          typeof target?.hint === "string",
+        `${workout.workout_id}: every fixture segment should carry backend guidance/cue/hint`,
+      );
+    }
+  }
+
+  const fixtureText = JSON.stringify(fixture);
+  assert.doesNotMatch(fixtureText, /hr_bpm|pace_min_per_km|pace_range_min_km|cadence_spm_range/);
 }
 
 function planSearchText(plan: TrainingPlanV2) {
@@ -770,6 +2107,109 @@ assertMountainTrailDoctrine(
 assertGoalFamilyWorkoutIdentity();
 assertBeginnerBuildConsistencyQualityCap();
 assertMetricTargetPolicy();
+assertRichCompatibilityMapping();
+assertRichPersistenceReadback();
+assertRichImportExportRoundtrip();
+assertRichSavedModeQaFixture();
+assertRichAiDraftNormalizer();
+await assertTextAuthoringRichDraftOptInContract();
+assertActivePlanRefreshRichDraftContract();
+assertActivePlanRefreshApplyDoesNotGenerate();
+await assertActivePlanRefreshTimeoutFallbackContract();
+assertRichWorkoutContract(buildPlan(buildRequest("5k")).plan, "5K rich contract");
+assertRichWorkoutContract(buildPlan(buildRequest("half_marathon")).plan, "half rich contract");
+assertRichWorkoutContract(
+  buildPlan(buildRequest("mountain_running")).plan,
+  "mountain rich contract",
+);
+
+{
+  const request = buildRequest("half_marathon", {
+    benchmark: { kind: "unknown" },
+    goal: {
+      goalDistance: "half_marathon",
+      goalStyle: "target_time",
+      terrainFocus: "standard",
+      targetTime: "2:00:00",
+      targetDate: "2026-08-30",
+    },
+    execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+  });
+  const { input, authoringInput, plan } = buildPlan(request);
+  const review = buildStructuredFirstPlanDraftReview(input, plan, authoringInput);
+  const persistenceMetadata = buildPlanScopedStructuredAuthoringMetadata({
+    source: "structured_first_plan",
+    authoringInput,
+    goalStyle: input.goal.goalStyle,
+    targetTime: input.goal.targetTime,
+    metricPolicySummary: review.planShape.metricPolicy,
+    reviewAssumptions: review.assumptions,
+  });
+  const goalMetadata = persistenceMetadata.goalMetadata as Record<string, unknown>;
+  const planPreferences = persistenceMetadata.planPreferences as Record<string, unknown>;
+  const storedAuthoringInput = planPreferences.structured_authoring_input as Record<
+    string,
+    unknown
+  >;
+
+  assert.equal(
+    goalMetadata.goal_style,
+    "target_time",
+    "structured target-time plans should persist goal style as plan metadata",
+  );
+  assert.equal(
+    goalMetadata.target_time,
+    "2:00:00",
+    "structured target-time plans should persist target time as bounded plan metadata",
+  );
+  assert.equal(
+    plan.target_date,
+    "2026-08-30",
+    "structured target-time plans should persist target date in canonical plan metadata",
+  );
+  assert.deepEqual(
+    (storedAuthoringInput.goal as Record<string, unknown>).goalStyle,
+    "target_time",
+    "structured authoring snapshot should preserve goal style for refresh",
+  );
+  assert.equal(
+    hasTargetKey(plan, "pace_min_per_km_range"),
+    false,
+    "target-time half marathon without benchmark must stay effort-only even with watch/app mixed guidance",
+  );
+  assert.equal(
+    hasTargetKey(plan, "hr_bpm_range"),
+    false,
+    "target-time half marathon without HR-zone truth must not emit HR targets",
+  );
+  assert.ok(
+    sourceWorkoutTypes(plan).has("half_marathon_threshold_durability"),
+    "target-time half marathon should still include half-marathon threshold durability structure",
+  );
+  assertSupportRunRichness(plan, "target-time half marathon without benchmark");
+}
+
+{
+  const plan = buildPlan(
+    buildRequest("half_marathon", {
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: null,
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "pace" },
+    }),
+  ).plan;
+
+  assert.equal(
+    hasTargetKey(plan, "pace_min_per_km_range"),
+    true,
+    "target-time half marathon with recent 5K and watch/app pace guidance should keep pace targets",
+  );
+  assertSupportRunRichness(plan, "target-time half marathon with benchmark");
+}
 
 {
   const request = buildRequest("marathon", {
@@ -944,6 +2384,11 @@ assert.ok(
     draft.authoringSnapshot.sourceAssumption,
     "refresh draft review metadata should mirror the authoring source assumption",
   );
+  assert.equal(
+    draft.authoringSnapshot.source,
+    "reconstructed_active_plan",
+    "legacy plans without stored authoring truth should use reconstructed refresh fallback",
+  );
   assert.ok(
     draft.reviewMetadata.longDistanceHonestyAssumptions.some((assumption) =>
       /durability|conservative|finish-oriented/i.test(assumption),
@@ -994,6 +2439,96 @@ assert.ok(
     }),
     false,
     "a formerly mutable evidence-backed workout should stale-block apply",
+  );
+}
+
+{
+  const context = buildRefreshFixtureContext();
+  const stored = buildPlan(
+    buildRequest("half_marathon", {
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: "2026-08-23",
+      },
+      availability: {
+        runningDaysPerWeek: 5,
+        fixedRestDays: [...fixedRestDays],
+        preferredLongRunDay: "Saturday",
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "pace" },
+    }),
+  );
+  const storedMetadata = buildPlanScopedStructuredAuthoringMetadata({
+    source: "structured_first_plan",
+    authoringInput: stored.authoringInput,
+    goalStyle: "target_time",
+    targetTime: "2:00:00",
+  });
+  const currentPlan = {
+    ...buildRefreshFixturePlanRow(context),
+    goal_metadata: mergePlanPersistenceMetadata(
+      buildRefreshFixturePlanRow(context).goal_metadata,
+      storedMetadata.goalMetadata,
+    ),
+    plan_preferences: mergePlanPersistenceMetadata(
+      buildRefreshFixturePlanRow(context).plan_preferences,
+      storedMetadata.planPreferences,
+    ),
+  };
+  const existingWorkouts = {
+    workouts: context.remainingActiveSchedule.map((workout, index) =>
+      buildRefreshFixtureWorkoutRow(context, workout, index),
+    ),
+    logsByWorkoutId: new Map(),
+  };
+  const draft = buildExactActivePlanRefreshDraft({
+    context,
+    currentPlan,
+    existingWorkouts,
+    proposalOutput: {
+      applyContext: { generatedAt: context.generatedAt },
+      review: {
+        summary:
+          "Refresh the remaining half-marathon target-time block while preserving saved setup truth.",
+        proposedChanges: [
+          "Use the saved benchmark and execution mode rather than reconstructing from generic plan text.",
+        ],
+      },
+      recommendedAuthoringPrompt:
+        "Refresh this half-marathon target-time plan using the saved structured authoring truth.",
+    },
+    fingerprint: buildActivePlanRefreshFingerprint(context),
+    weekdayRestInvariant: context.weekdayRestInvariant,
+    evidenceSets: { loggedWorkoutIds: new Set(), evidenceWorkoutIds: new Set() },
+  });
+
+  assert.equal(
+    draft.authoringSnapshot.source,
+    "stored_authoring_input",
+    "refresh should prefer stored structured authoring truth when available",
+  );
+  assert.equal(
+    draft.authoringSnapshot.authoringInput.goal.goalType,
+    "half_marathon",
+    "stored authoring truth should preserve the original goal family during refresh",
+  );
+  assert.equal(
+    draft.authoringSnapshot.authoringInput.goal.goalStyle,
+    "target_time",
+    "stored authoring truth should preserve target-time style during refresh",
+  );
+  assert.equal(
+    draft.authoringSnapshot.authoringInput.execution.guidancePreference,
+    "pace",
+    "stored authoring truth should preserve execution-mode guidance preference",
+  );
+  assert.equal(
+    hasTargetKey(draft.canonicalPlan, "pace_min_per_km_range"),
+    true,
+    "stored benchmark plus watch/app pace truth should survive into refresh draft pace targets",
   );
 }
 
@@ -1131,6 +2666,20 @@ assert.ok(
     parsedVoiceConfirm.ok,
     true,
     "voice confirm should accept expanded structured goal contract",
+  );
+
+  if (parsedVoiceConfirm.ok) {
+    assert.deepEqual(
+      planWithoutGeneratedTimestamp(parsedVoiceConfirm.canonicalPlan),
+      planWithoutGeneratedTimestamp(buildStructuredAuthoringPlan(authoringInput)),
+      "voice confirm should rebuild deterministic canonical plan truth from authoring input",
+    );
+  }
+
+  assert.match(
+    readFileSync("src/lib/voice-to-plan-authoring.ts", "utf8"),
+    /enableRichWorkoutDraft:\s*false/,
+    "voice draft generation should explicitly keep rich workout drafts disabled for Slice 4A",
   );
 }
 
@@ -1325,6 +2874,11 @@ function buildRefreshFixtureWorkoutRow(
     workout_type: workout.workoutType,
     source_workout_id: `old-${index}`,
     source_workout_type: workout.workoutType,
+    workout_family: null,
+    workout_identity: null,
+    calendar_icon_key: null,
+    goal_context: null,
+    metric_mode: null,
     title: workout.title,
     notes: workout.notes,
     planned_rpe: workout.workoutType === "rest" ? null : 4,

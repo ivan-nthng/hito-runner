@@ -1,0 +1,315 @@
+{
+  "schema_version": "training-plan-v2",
+  "plan_id": "qa-rich-workout-saved-mode-fixture",
+  "plan_name": "QA Rich Workout Saved-Mode Fixture",
+  "source_kind": "qa_rich_workout_fixture",
+  "created_at": "2026-05-25T12:00:00.000Z",
+  "generated_for": "Rich Workout QA",
+  "goal": {
+    "goal_type": "half_marathon",
+    "goal_label": "Saved-mode rich workout QA fixture",
+    "target_event": {
+      "label": "Fixture half marathon",
+      "date": "2026-06-21"
+    }
+  },
+  "runner_profile": {
+    "experience_level": "regular_runner",
+    "baseline_sessions_per_week": 4,
+    "baseline_long_run_km": 12,
+    "primary_goal": "Browser QA for stored rich workout identity fields",
+    "recent_result_summary": "Fixture intentionally uses effort-only targets; no HR or pace truth is stored."
+  },
+  "start_date": "2026-05-25",
+  "target_date": "2026-06-21",
+  "plan_preferences": {
+    "blocked_days": ["Friday", "Sunday"],
+    "preferred_running_days": ["Monday", "Tuesday", "Wednesday", "Thursday"],
+    "max_running_days_per_week": 4,
+    "preferred_long_run_day": "Thursday",
+    "terrain_focus": "mountain",
+    "notes": "Disposable local QA fixture for saved-mode rich workout readback."
+  },
+  "planned_workouts": [
+    {
+      "workout_id": "qa-rich-steady-001",
+      "date": "2026-05-25",
+      "weekday": "Monday",
+      "week_number": 1,
+      "phase": "Base",
+      "workout_type": "steady_or_easy",
+      "source_workout_type": "steady_aerobic_run",
+      "workout_family": "steady",
+      "workout_identity": "steady_aerobic_run",
+      "calendar_icon_key": "steady",
+      "goal_context": {
+        "goal_type": "half_marathon",
+        "goal_style": "balanced",
+        "terrain_focus": "standard",
+        "target_date": "2026-06-21"
+      },
+      "metric_mode": {
+        "guidance": "effort",
+        "pace_targets_allowed": false,
+        "hr_targets_allowed": false,
+        "reason": "Fixture stores effort-only guidance so QA can confirm no fake pace or HR targets appear."
+      },
+      "title": "Steady aerobic run",
+      "summary": "Stored rich steady family and exact identity for calendar/detail readback.",
+      "planned_rpe": 4,
+      "estimated_fatigue": "low",
+      "recovery_priority": "normal",
+      "segments": [
+        {
+          "segment_id": "steady-warmup",
+          "segment_type": "warmup",
+          "label": "Warm up easy",
+          "sequence": 1,
+          "duration_min": 8,
+          "guidance": "Start relaxed and let breathing settle before the steady block.",
+          "target": {
+            "intensity": "easy",
+            "cue": "Keep this conversational.",
+            "hint": "If legs feel heavy, extend this warmup and shorten the main block."
+          }
+        },
+        {
+          "segment_id": "steady-main",
+          "segment_type": "main",
+          "label": "Controlled steady block",
+          "sequence": 2,
+          "duration_min": 28,
+          "guidance": "Hold a smooth steady rhythm that is clearly firmer than easy but never pressing.",
+          "target": {
+            "intensity": "steady effort",
+            "cue": "Breathing is controlled; you could speak in short phrases.",
+            "hint": "Back off if this starts feeling like tempo."
+          }
+        },
+        {
+          "segment_id": "steady-cooldown",
+          "segment_type": "cooldown",
+          "label": "Cool down",
+          "sequence": 3,
+          "duration_min": 7,
+          "guidance": "Ease down until breathing is calm again.",
+          "target": {
+            "intensity": "easy",
+            "cue": "Finish fresher than you started.",
+            "hint": "Jog or walk the final minutes if needed."
+          }
+        }
+      ]
+    },
+    {
+      "workout_id": "qa-rich-hills-001",
+      "date": "2026-05-26",
+      "weekday": "Tuesday",
+      "week_number": 1,
+      "phase": "Build",
+      "workout_type": "quality",
+      "source_workout_type": "rolling_hills_session",
+      "workout_family": "hills",
+      "workout_identity": "rolling_hills_session",
+      "calendar_icon_key": "hills",
+      "goal_context": {
+        "goal_type": "half_marathon",
+        "goal_style": "balanced",
+        "terrain_focus": "rolling",
+        "target_date": "2026-06-21"
+      },
+      "metric_mode": {
+        "guidance": "effort",
+        "pace_targets_allowed": false,
+        "hr_targets_allowed": false,
+        "reason": "Hill fixture uses effort and form cues only; terrain makes pace misleading."
+      },
+      "title": "Rolling hills session",
+      "summary": "Stored rich hills family and rolling-hills identity for glyph and detail QA.",
+      "planned_rpe": 6,
+      "estimated_fatigue": "moderate",
+      "recovery_priority": "normal",
+      "segments": [
+        {
+          "segment_id": "hills-warmup",
+          "segment_type": "warmup",
+          "label": "Warm up on flat or gentle terrain",
+          "sequence": 1,
+          "duration_min": 10,
+          "guidance": "Keep the warmup easy before touching the hills.",
+          "target": {
+            "intensity": "easy",
+            "cue": "Loose shoulders, quick light steps.",
+            "hint": "Skip the harder block if the warmup never feels smooth."
+          }
+        },
+        {
+          "segment_id": "hills-main",
+          "segment_type": "interval_block",
+          "label": "Six controlled hill efforts",
+          "sequence": 2,
+          "guidance": "Run the uphill with controlled power and jog or walk the recovery back down.",
+          "prescription": {
+            "mode": "repeats",
+            "repeat_count": 6,
+            "repeat_unit": {
+              "mode": "time",
+              "duration_min": 1
+            },
+            "recovery_unit": {
+              "mode": "time",
+              "duration_min": 2
+            }
+          },
+          "target": {
+            "intensity": "controlled hill effort",
+            "cue": "Drive tall, stay repeatable, avoid sprinting.",
+            "hint": "The last repeat should look like the first."
+          },
+          "recovery_target": {
+            "intensity": "very easy",
+            "cue": "Recover fully before the next climb.",
+            "hint": "Walk the steepest downhill if footing is uncertain."
+          }
+        },
+        {
+          "segment_id": "hills-cooldown",
+          "segment_type": "cooldown",
+          "label": "Cool down easy",
+          "sequence": 3,
+          "duration_min": 10,
+          "guidance": "Bring the effort back down before stopping.",
+          "target": {
+            "intensity": "easy",
+            "cue": "Let stride length shorten naturally.",
+            "hint": "Stay relaxed on descents."
+          }
+        }
+      ]
+    },
+    {
+      "workout_id": "qa-rich-trail-001",
+      "date": "2026-05-27",
+      "weekday": "Wednesday",
+      "week_number": 1,
+      "phase": "Specific",
+      "workout_type": "easy",
+      "source_workout_type": "technical_trail_easy",
+      "workout_family": "trail",
+      "workout_identity": "technical_trail_easy",
+      "calendar_icon_key": "trail",
+      "goal_context": {
+        "goal_type": "mountain_running",
+        "goal_style": "relaxed",
+        "terrain_focus": "mountain",
+        "target_date": "2026-06-21"
+      },
+      "metric_mode": {
+        "guidance": "effort",
+        "pace_targets_allowed": false,
+        "hr_targets_allowed": false,
+        "reason": "Trail fixture uses terrain-aware effort cues without exact elevation, pace, or HR targets."
+      },
+      "title": "Technical trail easy run",
+      "summary": "Stored rich trail family and technical trail identity for saved-mode readback QA.",
+      "planned_rpe": 3,
+      "estimated_fatigue": "low",
+      "recovery_priority": "normal",
+      "segments": [
+        {
+          "segment_id": "trail-warmup",
+          "segment_type": "warmup",
+          "label": "Easy trail warmup",
+          "sequence": 1,
+          "duration_min": 8,
+          "guidance": "Start on the easiest footing available and settle into the surface.",
+          "target": {
+            "intensity": "easy",
+            "cue": "Short steps and relaxed eyes scanning ahead.",
+            "hint": "Keep effort easy even if the terrain changes."
+          }
+        },
+        {
+          "segment_id": "trail-main",
+          "segment_type": "main",
+          "label": "Terrain-aware easy running",
+          "sequence": 2,
+          "duration_min": 34,
+          "guidance": "Use gentle trail exposure; slow down on technical footing and keep climbs controlled.",
+          "target": {
+            "intensity": "easy trail effort",
+            "cue": "Let pace float with terrain; protect smooth form.",
+            "hint": "Walk brief steep or uncertain sections rather than forcing rhythm."
+          }
+        },
+        {
+          "segment_id": "trail-cooldown",
+          "segment_type": "cooldown",
+          "label": "Cool down off the trail",
+          "sequence": 3,
+          "duration_min": 8,
+          "guidance": "Finish with calm breathing and careful footing.",
+          "target": {
+            "intensity": "easy",
+            "cue": "No chasing pace on the way home.",
+            "hint": "Stop early if footing feels risky."
+          }
+        }
+      ]
+    },
+    {
+      "workout_id": "qa-legacy-compact-tempo-001",
+      "date": "2026-05-28",
+      "weekday": "Thursday",
+      "week_number": 1,
+      "phase": "Build",
+      "workout_type": "quality",
+      "title": "Controlled tempo session",
+      "summary": "Intentional compact-only row: no stored rich fields or source identity, so old-plan fallback can be verified safely.",
+      "planned_rpe": 6,
+      "estimated_fatigue": "moderate",
+      "recovery_priority": "normal",
+      "segments": [
+        {
+          "segment_id": "legacy-tempo-warmup",
+          "segment_type": "warmup",
+          "label": "Warm up",
+          "sequence": 1,
+          "duration_min": 10,
+          "guidance": "Begin easy and smooth before the tempo work.",
+          "target": {
+            "intensity": "easy",
+            "cue": "Relax into the first ten minutes.",
+            "hint": "The warmup should feel ordinary, not urgent."
+          }
+        },
+        {
+          "segment_id": "legacy-tempo-main",
+          "segment_type": "tempo_block",
+          "label": "Controlled tempo",
+          "sequence": 2,
+          "duration_min": 18,
+          "guidance": "Run a comfortably hard block that stays controlled from start to finish.",
+          "target": {
+            "intensity": "tempo effort",
+            "cue": "Strong but repeatable; do not race the block.",
+            "hint": "If breathing gets ragged, ease back immediately."
+          }
+        },
+        {
+          "segment_id": "legacy-tempo-cooldown",
+          "segment_type": "cooldown",
+          "label": "Cool down",
+          "sequence": 3,
+          "duration_min": 10,
+          "guidance": "Jog easy until the effort feels fully downshifted.",
+          "target": {
+            "intensity": "easy",
+            "cue": "Finish relaxed.",
+            "hint": "Walking is fine if the tempo block accumulated more fatigue than expected."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -411,7 +411,12 @@ async function importPlanForUser(userId, email, planPath) {
     phase: workout.phase,
     workout_type: workout.workoutType,
     source_workout_id: workout.sourceWorkoutId,
-    source_workout_type: workout.sourceWorkoutType,
+    source_workout_type: workout.sourceWorkoutType ?? null,
+    workout_family: workout.workoutFamily ?? null,
+    workout_identity: workout.workoutIdentity ?? null,
+    calendar_icon_key: workout.calendarIconKey ?? null,
+    goal_context: workout.goalContext ?? null,
+    metric_mode: workout.metricMode ?? null,
     title: workout.title,
     notes: workout.notes,
     planned_rpe: workout.plannedRpe,
@@ -428,12 +433,33 @@ async function importPlanForUser(userId, email, planPath) {
 
   const verifyPlan = await supabase
     .from("planned_workouts")
-    .select("id", { count: "exact", head: true })
-    .eq("plan_cycle_id", planInsert.data.id);
+    .select(
+      "id, workout_date, title, source_workout_type, workout_family, workout_identity, calendar_icon_key, goal_context, metric_mode",
+      { count: "exact" },
+    )
+    .eq("plan_cycle_id", planInsert.data.id)
+    .order("workout_date", { ascending: true })
+    .order("display_order", { ascending: true });
 
   if (verifyPlan.error) {
     throw new Error(verifyPlan.error.message);
   }
+
+  const richWorkoutCount = verifyPlan.data.filter(
+    (workout) =>
+      workout.workout_family &&
+      workout.workout_identity &&
+      workout.calendar_icon_key &&
+      workout.goal_context &&
+      workout.metric_mode,
+  ).length;
+  const compactFallbackCount = verifyPlan.data.filter(
+    (workout) =>
+      !workout.source_workout_type &&
+      !workout.workout_family &&
+      !workout.workout_identity &&
+      !workout.calendar_icon_key,
+  ).length;
 
   return {
     planPath: path.resolve(process.cwd(), planPath),
@@ -442,6 +468,18 @@ async function importPlanForUser(userId, email, planPath) {
     startDate: planInsert.data.start_date,
     endDate: planInsert.data.end_date,
     workoutCount: verifyPlan.count ?? 0,
+    richWorkoutCount,
+    compactFallbackCount,
+    previewWorkouts: verifyPlan.data.map((workout) => ({
+      date: workout.workout_date,
+      title: workout.title,
+      sourceWorkoutType: workout.source_workout_type,
+      workoutFamily: workout.workout_family,
+      workoutIdentity: workout.workout_identity,
+      calendarIconKey: workout.calendar_icon_key,
+      hasGoalContext: Boolean(workout.goal_context),
+      hasMetricMode: Boolean(workout.metric_mode),
+    })),
   };
 }
 

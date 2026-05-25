@@ -21,6 +21,7 @@ import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "@/lib/structured-plan-authoring";
+import { buildPlanScopedStructuredAuthoringMetadata } from "@/lib/plan-authoring-snapshot";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
@@ -218,6 +219,12 @@ export const confirmVoiceToPlanDraft = createServerFn({ method: "POST" })
         null,
         null,
         parsed.profilePatch,
+        buildPlanScopedStructuredAuthoringMetadata({
+          source: "voice_to_plan",
+          authoringInput: parsed.authoringInput,
+          goalStyle: parsed.request.supplement.goalStyle ?? null,
+          targetTime: parsed.request.supplement.targetTime ?? null,
+        }),
       );
 
       if (!applyResult.ok) {
@@ -340,12 +347,28 @@ export async function confirmStructuredFirstPlanDraftForUser(
     }
 
     const profilePatch = buildStructuredFirstPlanProfilePatch(parsed.request.draft.input);
+    const review = buildStructuredFirstPlanDraftReview(
+      parsed.request.draft.input,
+      generatedPlan,
+      rebuiltAuthoringInput,
+    );
     const applyResult = await applyImportedPlanForUser(
       userId,
       generatedPlan,
       null,
       null,
       profilePatch,
+      buildPlanScopedStructuredAuthoringMetadata({
+        source: "structured_first_plan",
+        authoringInput: rebuiltAuthoringInput,
+        goalStyle: parsed.request.draft.input.goal.goalStyle,
+        targetTime:
+          parsed.request.draft.input.goal.goalStyle === "target_time"
+            ? (parsed.request.draft.input.goal.targetTime ?? null)
+            : null,
+        metricPolicySummary: review.planShape.metricPolicy,
+        reviewAssumptions: review.assumptions,
+      }),
     );
 
     if (!applyResult.ok) {
@@ -388,12 +411,21 @@ export async function completeStructuredFirstPlanOnboardingForUser(
     const authoringInput = buildStructuredFirstPlanAuthoringInput(input);
     const generatedPlan = buildStructuredAuthoringPlan(authoringInput);
     const profilePatch = buildStructuredFirstPlanProfilePatch(input);
+    const review = buildStructuredFirstPlanDraftReview(input, generatedPlan, authoringInput);
     const applyResult = await applyImportedPlanForUser(
       userId,
       generatedPlan,
       null,
       null,
       profilePatch,
+      buildPlanScopedStructuredAuthoringMetadata({
+        source: "structured_first_plan",
+        authoringInput,
+        goalStyle: input.goal.goalStyle,
+        targetTime: input.goal.goalStyle === "target_time" ? (input.goal.targetTime ?? null) : null,
+        metricPolicySummary: review.planShape.metricPolicy,
+        reviewAssumptions: review.assumptions,
+      }),
     );
     const generationContext = buildStructuredFirstPlanResultContext(input);
 

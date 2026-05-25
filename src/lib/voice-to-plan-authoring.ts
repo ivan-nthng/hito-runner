@@ -359,6 +359,7 @@ export async function generateVoiceToPlanDraftForUser({
     const generatedPlan = await generatePlanFromText(
       buildVoiceAuthoringPrompt(parsedRequest.request),
       {
+        enableRichWorkoutDraft: false,
         repairAuthoringInput: (value) => repairVoiceAuthoringInput(value, parsedRequest.request),
         validationErrorPrefix: "Voice-to-plan authoring input failed validation",
       },

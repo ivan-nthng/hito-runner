@@ -106,6 +106,9 @@ function WorkoutPage() {
   const targetMetricKeys = new Set(["intensity", "hr_bpm_range", "pace_min_per_km_range", "pace"]);
   const primaryTargetMetrics = targetEntries.filter((entry) => targetMetricKeys.has(entry.key));
   const targetSupportEntries = targetEntries.filter((entry) => !targetMetricKeys.has(entry.key));
+  const identityRows = workoutIdentityRows(workout, meta.label);
+  const goalRows = workoutGoalRows(workout);
+  const metricRows = workoutMetricRows(workout);
   const phase = `${workout.phase} · week ${workout.week}`;
   const heroMetrics = isRestDay
     ? []
@@ -153,8 +156,8 @@ function WorkoutPage() {
               <h1 className="mt-3 max-w-2xl text-balance font-display text-4xl leading-[1.05] lg:text-5xl">
                 {isRestDay ? "Rest day" : workout.title}
               </h1>
-              {objectiveFor(workout.type) && (
-                <p className="hito-support-copy mt-4 max-w-xl">{objectiveFor(workout.type)}</p>
+              {!isRestDay && workout.notes?.trim() && (
+                <p className="hito-support-copy mt-4 max-w-xl">{workout.notes.trim()}</p>
               )}
             </div>
 
@@ -239,6 +242,16 @@ function WorkoutPage() {
                 </SidebarSection>
               )}
 
+              {!isRestDay && (
+                <SidebarSection title="Workout identity">
+                  <div className="space-y-3">
+                    {identityRows.map((row) => (
+                      <ReadbackRow key={row.label} label={row.label} value={row.value} />
+                    ))}
+                  </div>
+                </SidebarSection>
+              )}
+
               {!isRestDay && primaryTarget && (
                 <SidebarSection title="Workout targets" tone="signal" titleVariant="strong">
                   <div className="space-y-3">
@@ -270,11 +283,29 @@ function WorkoutPage() {
                 </SidebarSection>
               )}
 
-              {(!isRestDay || restAssignment) && (
-                <SidebarSection title={isRestDay ? "Assignment" : "Workout note"} muted>
-                  <p className="text-xs leading-relaxed text-foreground/80">
-                    {isRestDay ? restAssignment : coachNoteFor(workout.type)}
-                  </p>
+              {!isRestDay && metricRows.length > 0 && (
+                <SidebarSection title="Metric mode" muted>
+                  <div className="space-y-3">
+                    {metricRows.map((row) => (
+                      <ReadbackRow key={row.label} label={row.label} value={row.value} />
+                    ))}
+                  </div>
+                </SidebarSection>
+              )}
+
+              {!isRestDay && goalRows.length > 0 && (
+                <SidebarSection title="Goal context" muted>
+                  <div className="space-y-3">
+                    {goalRows.map((row) => (
+                      <ReadbackRow key={row.label} label={row.label} value={row.value} />
+                    ))}
+                  </div>
+                </SidebarSection>
+              )}
+
+              {isRestDay && restAssignment && (
+                <SidebarSection title="Assignment" muted>
+                  <p className="text-xs leading-relaxed text-foreground/80">{restAssignment}</p>
                 </SidebarSection>
               )}
 
@@ -405,6 +436,7 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
 
 function Overview({ workout }: { workout: Workout }) {
   const restAssignment = restAssignmentFor(workout);
+  const segmentReadbacks = segmentGuidanceReadbacks(workout);
 
   if (workout.type === "rest") {
     return (
@@ -442,47 +474,36 @@ function Overview({ workout }: { workout: Workout }) {
       <IntervalsViz workout={workout} />
 
       <div>
-        <h3 className="hito-label">Execution cues</h3>
-        <ul className="mt-4 space-y-2 text-sm text-foreground/85">
-          <li className="flex gap-3">
-            <span className="text-muted-foreground">·</span> Start the first 10 minutes deliberately
-            easy. Allow heart rate to rise gradually.
-          </li>
-          <li className="flex gap-3">
-            <span className="text-muted-foreground">·</span> If HR drifts above zone, slow down or
-            take a walk break.
-          </li>
-          <li className="flex gap-3">
-            <span className="text-muted-foreground">·</span> Aim for relaxed shoulders, light
-            landing, cadence ~175.
-          </li>
-          <li className="flex gap-3">
-            <span className="text-muted-foreground">·</span> Hydrate every 25 min if temperature
-            exceeds 20°C.
-          </li>
-        </ul>
-      </div>
-
-      <div>
-        <h3 className="hito-label">Fueling & recovery</h3>
-        <div className="hito-row-group mt-4 sm:grid sm:grid-cols-3">
-          {[
-            { t: "Pre", v: "Light carb 60 min prior" },
-            {
-              t: "During",
-              v: workout.type === "long_run" ? "Gel at 45 min" : "Water only",
-            },
-            { t: "After", v: "Protein + carb within 45 min" },
-          ].map((item) => (
-            <div
-              key={item.t}
-              className="border-t border-hairline px-4 py-4 first:border-t-0 sm:border-t-0 sm:border-l sm:first:border-l-0"
-            >
-              <div className="hito-micro-label">{item.t}</div>
-              <div className="hito-body-small mt-1 text-foreground/90">{item.v}</div>
-            </div>
-          ))}
-        </div>
+        <h3 className="hito-label">Segment guidance</h3>
+        {segmentReadbacks.length > 0 ? (
+          <ol className="hito-row-group mt-4">
+            {segmentReadbacks.map((segment) => (
+              <li key={segment.key} className="hito-list-row items-start gap-4">
+                <span className="hito-caption w-6 shrink-0 text-right font-mono-num">
+                  {String(segment.index).padStart(2, "0")}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="hito-list-row-title">{segment.label}</div>
+                  <div className="mt-2 space-y-2">
+                    {segment.entries.map((entry) => (
+                      <div key={`${segment.key}-${entry.label}`}>
+                        <p className="hito-section-subtitle">{entry.label}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-foreground/85">
+                          {entry.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="hito-support-copy mt-4 max-w-xl">
+            No extra execution notes were provided for this workout. Follow the listed structure and
+            any targets shown above.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -559,6 +580,17 @@ function SidebarSection({
   );
 }
 
+function ReadbackRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-1">
+      <span className="hito-section-subtitle">{label}</span>
+      <span className="max-w-[12rem] text-right text-xs leading-relaxed text-foreground/85">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function NavCard({
   direction,
   date,
@@ -601,30 +633,6 @@ function NavCard({
   );
 }
 
-function objectiveFor(type: string) {
-  switch (type) {
-    case "easy":
-    case "steady_or_easy":
-      return "Easy aerobic work. Keep it conversational and steady.";
-    case "long_run":
-      return "Long aerobic work. Start easy and let the run settle.";
-    case "quality":
-      return "Controlled quality work. Keep form ahead of pace.";
-    case "rest":
-      return "";
-    default:
-      return "";
-  }
-}
-
-function coachNoteFor(type: string) {
-  if (type === "long_run")
-    return "Treat the first third as warmup. If the wind picks up, shelter on the return leg. Stop at 20 min for a sip of water.";
-  if (type === "quality")
-    return "Warmup until breathing is open. Each rep should feel slightly faster than threshold. Walk the recoveries if needed.";
-  return "Eyes soft, jaw loose. Cadence ~175. If anything sharp shows up, end the run early — no quality lost.";
-}
-
 function loadFor(workout: Workout) {
   const duration = workoutDuration(workout);
   const multiplier: Record<string, number> = {
@@ -635,6 +643,141 @@ function loadFor(workout: Workout) {
     rest: 0,
   };
   return Math.min(95, Math.round(duration * (multiplier[workout.type] ?? 1) * 0.6)).toString();
+}
+
+function workoutIdentityRows(
+  workout: Workout,
+  familyLabel: string,
+): Array<{ label: string; value: string }> {
+  return [
+    { label: "Family", value: familyLabel },
+    { label: "Identity", value: humanizeSnakeCase(workout.workoutIdentity) },
+    { label: "Calendar icon", value: humanizeSnakeCase(workout.calendarIconKey) },
+  ];
+}
+
+function workoutGoalRows(workout: Workout): Array<{ label: string; value: string }> {
+  const goal = workout.goalContext;
+
+  if (!goal) {
+    return [];
+  }
+
+  return [
+    goal.goalType ? { label: "Goal", value: humanizeSnakeCase(goal.goalType) } : null,
+    goal.goalStyle ? { label: "Style", value: humanizeSnakeCase(goal.goalStyle) } : null,
+    goal.terrainFocus ? { label: "Terrain", value: humanizeSnakeCase(goal.terrainFocus) } : null,
+    goal.targetDate ? { label: "Target date", value: goal.targetDate } : null,
+    goal.targetTime ? { label: "Target time", value: goal.targetTime } : null,
+  ].filter((row): row is { label: string; value: string } => row != null);
+}
+
+function workoutMetricRows(workout: Workout): Array<{ label: string; value: string }> {
+  const metricMode = workout.metricMode;
+
+  if (!metricMode) {
+    return [];
+  }
+
+  return [
+    { label: "Guidance", value: humanizeSnakeCase(metricMode.guidance) },
+    { label: "Pace targets", value: metricMode.paceTargetsAllowed ? "Allowed" : "Not provided" },
+    {
+      label: "HR targets",
+      value: metricMode.hrTargetsAllowed ? "Allowed" : "Not provided",
+    },
+    metricMode.reason ? { label: "Reason", value: metricMode.reason } : null,
+  ].filter((row): row is { label: string; value: string } => row != null);
+}
+
+type SegmentGuidanceReadback = {
+  key: string;
+  index: number;
+  label: string;
+  entries: Array<{ label: string; value: string }>;
+};
+
+function segmentGuidanceReadbacks(workout: Workout): SegmentGuidanceReadback[] {
+  const readbacks = workout.steps.flatMap((step, stepIndex) =>
+    segmentGuidanceReadbacksForStep(step, `${stepIndex}`, stepIndex + 1),
+  );
+
+  return readbacks.map((readback, index) => ({ ...readback, index: index + 1 }));
+}
+
+function segmentGuidanceReadbacksForStep(
+  step: Workout["steps"][number],
+  key: string,
+  displayIndex: number,
+): SegmentGuidanceReadback[] {
+  if (step.repeats && step.work) {
+    const parent = buildSegmentGuidanceReadback(step, key, displayIndex);
+    const children = [
+      buildSegmentGuidanceReadback(step.work, `${key}-work`, displayIndex),
+      step.recovery
+        ? buildSegmentGuidanceReadback(step.recovery, `${key}-recovery`, displayIndex)
+        : null,
+    ].filter((item): item is SegmentGuidanceReadback => item != null);
+
+    return [parent, ...children].filter((item): item is SegmentGuidanceReadback => item != null);
+  }
+
+  const readback = buildSegmentGuidanceReadback(step, key, displayIndex);
+
+  return readback ? [readback] : [];
+}
+
+function buildSegmentGuidanceReadback(
+  step: Workout["steps"][number],
+  key: string,
+  displayIndex: number,
+): SegmentGuidanceReadback | null {
+  const entries = [
+    readGuidanceEntry("Guidance", step.guidance),
+    readGuidanceEntry("Cue", step.target?.cue),
+    readGuidanceEntry("Hint", step.target?.hint),
+  ].filter((entry): entry is { label: string; value: string } => entry != null);
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return {
+    key,
+    index: displayIndex,
+    label: step.label?.trim() || humanizeSnakeCase(step.segment_type || step.type || "Segment"),
+    entries,
+  };
+}
+
+function readGuidanceEntry(label: string, value: unknown) {
+  const normalized = readGuidanceText(value);
+
+  return normalized ? { label, value: normalized } : null;
+}
+
+function readGuidanceText(value: unknown): string | null {
+  if (typeof value === "string" || typeof value === "number") {
+    const normalized = String(value).trim();
+
+    return normalized || null;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const nested = (value as { guidance?: unknown }).guidance;
+
+  return typeof nested === "string" && nested.trim() ? nested.trim() : null;
+}
+
+function humanizeSnakeCase(value: string) {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function restAssignmentFor(workout: Workout) {

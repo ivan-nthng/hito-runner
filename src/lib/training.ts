@@ -1,18 +1,20 @@
 import planJson from "@/data/training-plan.json";
 import type { BodyNote } from "@/lib/body-notes";
+import {
+  normalizeCanonicalGoalContext,
+  normalizeCalendarIconKey,
+  normalizeWorkoutFamily,
+  resolveCanonicalWorkoutModel,
+  type CalendarIconKey,
+  type CanonicalGoalContext,
+  type CanonicalMetricMode,
+  type CanonicalWorkoutFamily,
+  type CanonicalWorkoutIdentity,
+} from "@/lib/rich-workout-model";
 import type { WorkoutFeedbackMarkerSummary } from "@/lib/workout-result-import/types";
 
 export type WorkoutType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
-export type VisibleWorkoutType =
-  | "easy"
-  | "recovery"
-  | "long"
-  | "tempo"
-  | "intervals"
-  | "progression"
-  | "race"
-  | "quality"
-  | "rest";
+export type VisibleWorkoutType = CanonicalWorkoutFamily | "quality";
 export type Status = "completed" | "partial" | "skipped" | "today" | "upcoming" | "rest";
 export type WeekStatus = "on_track" | "partially_off_track" | "needs_reset";
 export type TrainingMode = "preview" | "onboarding" | "authenticated";
@@ -94,6 +96,11 @@ export interface Workout {
   phase: string;
   type: WorkoutType;
   sourceWorkoutType?: string | null;
+  workoutFamily: CanonicalWorkoutFamily;
+  workoutIdentity: CanonicalWorkoutIdentity;
+  calendarIconKey: CalendarIconKey;
+  goalContext: CanonicalGoalContext | null;
+  metricMode: CanonicalMetricMode;
   title: string;
   notes: string | null;
   steps: Step[];
@@ -223,6 +230,11 @@ const VISIBLE_TYPE_META: Record<
     label: "Recovery",
     short: "Recovery",
   },
+  steady: {
+    ...TYPE_META.steady_or_easy,
+    label: "Steady",
+    short: "Steady",
+  },
   long: {
     ...TYPE_META.long_run,
     label: "Long run",
@@ -248,6 +260,16 @@ const VISIBLE_TYPE_META: Record<
     label: "Race pace",
     short: "Race",
   },
+  hills: {
+    ...TYPE_META.quality,
+    label: "Hills",
+    short: "Hills",
+  },
+  trail: {
+    ...TYPE_META.long_run,
+    label: "Trail",
+    short: "Trail",
+  },
   quality: TYPE_META.quality,
   rest: TYPE_META.rest,
 };
@@ -259,11 +281,11 @@ const SOURCE_WORKOUT_VISIBLE_TYPE: Record<string, VisibleWorkoutType> = {
   time_intervals: "intervals",
   "5k_sharpening_repeats": "intervals",
   "10k_rhythm_intervals": "intervals",
-  uphill_repeats: "intervals",
+  uphill_repeats: "hills",
   tempo: "tempo",
   controlled_tempo_session: "tempo",
   half_marathon_threshold_durability: "tempo",
-  marathon_steady_specificity: "tempo",
+  marathon_steady_specificity: "steady",
   progression: "progression",
   progression_run: "progression",
   race: "race",
@@ -272,18 +294,20 @@ const SOURCE_WORKOUT_VISIBLE_TYPE: Record<string, VisibleWorkoutType> = {
   tuneup: "race",
   race_tune_up: "race",
   ultra_time_on_feet_durability: "long",
-  hike_run_endurance: "long",
-  mountain_long_run_time_on_feet: "long",
-  technical_trail_easy: "easy",
-  controlled_downhill_durability: "quality",
-  rolling_hills_session: "quality",
-  climbing_steady_run: "quality",
-  aerobic_strides: "quality",
+  hike_run_endurance: "trail",
+  mountain_long_run_time_on_feet: "trail",
+  technical_trail_easy: "trail",
+  controlled_downhill_durability: "hills",
+  rolling_hills_session: "hills",
+  climbing_steady_run: "hills",
+  aerobic_strides: "easy",
+  quality_session: "quality",
 };
 
-export function workoutTypeMeta(
-  workout: Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType">,
-): {
+type WorkoutVisibleInput = Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType"> &
+  Partial<Pick<Workout, "workoutFamily" | "calendarIconKey">>;
+
+export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   label: string;
   short: string;
   color: string;
@@ -299,9 +323,13 @@ export function workoutTypeMeta(
   return VISIBLE_TYPE_META[visibleType];
 }
 
-export function resolveWorkoutVisibleType(
-  workout: Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType">,
-): VisibleWorkoutType | null {
+export function resolveWorkoutVisibleType(workout: WorkoutVisibleInput): VisibleWorkoutType | null {
+  const richVisibleType = resolveVisibleTypeFromRichFields(workout);
+
+  if (richVisibleType) {
+    return richVisibleType;
+  }
+
   if (workout.type === "rest") {
     return "rest";
   }
@@ -322,6 +350,16 @@ export function resolveWorkoutVisibleType(
   }
 
   return resolveVisibleTypeFromWorkoutStructure(workout);
+}
+
+function resolveVisibleTypeFromRichFields(
+  workout: Partial<Pick<Workout, "workoutFamily" | "calendarIconKey">>,
+): CanonicalWorkoutFamily | null {
+  return (
+    normalizeCalendarIconKey(workout.calendarIconKey) ??
+    normalizeWorkoutFamily(workout.workoutFamily) ??
+    null
+  );
 }
 
 function normalizeWorkoutSourceType(value: string | null | undefined) {
@@ -351,6 +389,14 @@ function resolveVisibleTypeFromSource(sourceType: string): VisibleWorkoutType | 
 
   if (/tempo|threshold/.test(sourceType)) {
     return "tempo";
+  }
+
+  if (/hill|climb|uphill|downhill|rolling/.test(sourceType)) {
+    return "hills";
+  }
+
+  if (/trail|mountain|hike_run/.test(sourceType)) {
+    return "trail";
   }
 
   if (/interval|repeat/.test(sourceType)) {
@@ -443,20 +489,31 @@ export function feedbackMarkerMeta(marker: WorkoutFeedbackMarkerSummary | null) 
 
 export function getPreviewSnapshot(): TrainingSnapshot {
   const currentDate = todayIso();
-  const workouts = previewPlan.schedule.map((workout) => ({
-    id: workout.id,
-    date: workout.date,
-    weekday: workout.weekday,
-    week: workout.week,
-    phase: workout.phase,
-    type: workout.type,
-    title: workout.title,
-    notes: workout.notes ?? null,
-    steps: normalizeExecutableStepInstructions(workout.steps),
-    feedbackMarker: null,
-    log: null,
-    status: inferWorkoutStatus(workout.type, workout.date, currentDate, null),
-  }));
+  const workouts = previewPlan.schedule.map((workout) => {
+    const steps = normalizeExecutableStepInstructions(workout.steps);
+    const richWorkout = deriveWorkoutRichModel({
+      type: workout.type,
+      sourceWorkoutType: null,
+      title: workout.title,
+      steps,
+    });
+
+    return {
+      id: workout.id,
+      date: workout.date,
+      weekday: workout.weekday,
+      week: workout.week,
+      phase: workout.phase,
+      type: workout.type,
+      ...richWorkout,
+      title: workout.title,
+      notes: workout.notes ?? null,
+      steps,
+      feedbackMarker: null,
+      log: null,
+      status: inferWorkoutStatus(workout.type, workout.date, currentDate, null),
+    };
+  });
 
   return {
     mode: "preview",
@@ -514,6 +571,12 @@ export function weekOf(workouts: Workout[], date: string): Workout[] {
       week: 0,
       phase: "Recovery",
       type: "rest",
+      ...deriveWorkoutRichModel({
+        type: "rest",
+        sourceWorkoutType: "rest_and_recovery",
+        title: "Rest",
+        steps: [],
+      }),
       title: "Rest",
       notes: null,
       steps: [],
@@ -524,6 +587,50 @@ export function weekOf(workouts: Workout[], date: string): Workout[] {
   }
 
   return out;
+}
+
+export function deriveWorkoutRichModel({
+  type,
+  sourceWorkoutType,
+  workoutFamily,
+  workoutIdentity,
+  calendarIconKey,
+  goalContext,
+  metricMode,
+  title,
+  steps,
+}: {
+  type: WorkoutType;
+  sourceWorkoutType?: string | null;
+  workoutFamily?: string | null;
+  workoutIdentity?: string | null;
+  calendarIconKey?: string | null;
+  goalContext?: unknown;
+  metricMode?: unknown;
+  title: string;
+  steps: Step[];
+}): Pick<
+  Workout,
+  "workoutFamily" | "workoutIdentity" | "calendarIconKey" | "goalContext" | "metricMode"
+> {
+  const richWorkout = resolveCanonicalWorkoutModel({
+    workoutType: type,
+    sourceWorkoutType,
+    workoutFamily,
+    workoutIdentity,
+    calendarIconKey,
+    metricMode,
+    title,
+    steps,
+  });
+
+  return {
+    workoutFamily: richWorkout.workoutFamily,
+    workoutIdentity: richWorkout.workoutIdentity,
+    calendarIconKey: richWorkout.calendarIconKey,
+    goalContext: normalizeCanonicalGoalContext(goalContext),
+    metricMode: richWorkout.metricMode,
+  };
 }
 
 export function deriveWeekStatus(workouts: Workout[], currentDate: string): WeekStatus {

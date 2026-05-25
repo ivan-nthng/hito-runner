@@ -473,7 +473,7 @@ function DayCell({
 
 function calendarWorkoutIdentity(workout: Workout): CalendarWorkoutIdentity {
   const meta = workoutTypeMeta(workout);
-  const label = meta.short === "Steady" ? "Easy" : meta.short;
+  const label = meta.short;
 
   if (workout.type === "rest") {
     return {

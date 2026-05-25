@@ -4,6 +4,19 @@ import {
   stepPlannedDistanceKm,
   stepPlannedDurationMin,
 } from "@/lib/training";
+import {
+  CALENDAR_ICON_KEY_VALUES,
+  CANONICAL_METRIC_GUIDANCE_VALUES,
+  CANONICAL_WORKOUT_FAMILY_VALUES,
+  CANONICAL_WORKOUT_IDENTITY_VALUES,
+  resolveCanonicalWorkoutModel,
+  toCanonicalMetricModeJson,
+  type CalendarIconKey,
+  type CanonicalGoalContext,
+  type CanonicalMetricModeJson,
+  type CanonicalWorkoutFamily,
+  type CanonicalWorkoutIdentity,
+} from "@/lib/rich-workout-model";
 import type {
   RunnerProfileSummary,
   Step,
@@ -136,6 +149,29 @@ const v2GoalSchema = z
       })
       .strict()
       .optional(),
+  })
+  .strict();
+
+const v2WorkoutGoalContextSchema = z
+  .object({
+    goal_type: z.string().trim().min(1),
+    goal_style: z.string().trim().min(1).optional().nullable(),
+    terrain_focus: z.enum(["standard", "rolling", "mountain"]).optional().nullable(),
+    target_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .nullable(),
+    target_time: z.string().trim().min(1).max(32).optional().nullable(),
+  })
+  .strict();
+
+const v2WorkoutMetricModeSchema = z
+  .object({
+    guidance: z.enum(CANONICAL_METRIC_GUIDANCE_VALUES),
+    pace_targets_allowed: z.boolean(),
+    hr_targets_allowed: z.boolean(),
+    reason: z.string().trim().min(1).max(200),
   })
   .strict();
 
@@ -388,6 +424,11 @@ const v2WorkoutSchema = z
     user_feedback_placeholder: placeholderEnvelopeSchema.optional(),
     pain_tracking_placeholder: placeholderEnvelopeSchema.optional(),
     segments: z.array(v2SegmentSchema).min(1),
+    workout_family: z.enum(CANONICAL_WORKOUT_FAMILY_VALUES).optional(),
+    workout_identity: z.enum(CANONICAL_WORKOUT_IDENTITY_VALUES).optional(),
+    calendar_icon_key: z.enum(CALENDAR_ICON_KEY_VALUES).optional(),
+    goal_context: v2WorkoutGoalContextSchema.optional(),
+    metric_mode: v2WorkoutMetricModeSchema.optional(),
     source_workout_type: z.string().trim().min(1).optional(),
     workout_type: z.enum([
       "easy",
@@ -446,6 +487,11 @@ export interface ImportedWorkoutSeed {
   workoutType: WorkoutType;
   sourceWorkoutId: string;
   sourceWorkoutType: string;
+  workoutFamily: CanonicalWorkoutFamily;
+  workoutIdentity: CanonicalWorkoutIdentity;
+  calendarIconKey: CalendarIconKey;
+  goalContext: CanonicalGoalContext | null;
+  metricMode: CanonicalMetricModeJson;
   title: string;
   notes: string | null;
   plannedRpe: number | null;
@@ -526,22 +572,42 @@ function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
         left.week_number - right.week_number ||
         left.title.localeCompare(right.title),
     )
-    .map((entry, index) => ({
-      workoutDate: entry.date,
-      weekday: entry.weekday,
-      weekNumber: entry.week_number,
-      phase: entry.phase,
-      workoutType: normalizeV2WorkoutType(entry.workout_type),
-      sourceWorkoutId: entry.workout_id,
-      sourceWorkoutType: entry.source_workout_type ?? entry.workout_type,
-      title: entry.title,
-      notes: buildV2Notes(entry),
-      plannedRpe: entry.planned_rpe ?? null,
-      estimatedFatigue: entry.estimated_fatigue ?? null,
-      recoveryPriority: entry.recovery_priority ?? null,
-      steps: normalizeV2Segments(entry.segments),
-      displayOrder: index,
-    }));
+    .map((entry, index) => {
+      const steps = normalizeV2Segments(entry.segments);
+      const richWorkout = resolveCanonicalWorkoutModel({
+        workoutType: entry.workout_type,
+        sourceWorkoutType: entry.source_workout_type,
+        workoutFamily: entry.workout_family,
+        workoutIdentity: entry.workout_identity,
+        calendarIconKey: entry.calendar_icon_key,
+        metricMode: entry.metric_mode ?? null,
+        title: entry.title,
+        steps,
+      });
+
+      return {
+        workoutDate: entry.date,
+        weekday: entry.weekday,
+        weekNumber: entry.week_number,
+        phase: entry.phase,
+        workoutType: normalizeV2WorkoutType(entry.workout_type),
+        sourceWorkoutId: entry.workout_id,
+        sourceWorkoutType:
+          entry.source_workout_type ?? entry.workout_identity ?? entry.workout_type,
+        workoutFamily: richWorkout.workoutFamily,
+        workoutIdentity: richWorkout.workoutIdentity,
+        calendarIconKey: richWorkout.calendarIconKey,
+        goalContext: normalizeWorkoutGoalContext(entry.goal_context),
+        metricMode: toCanonicalMetricModeJson(richWorkout.metricMode),
+        title: entry.title,
+        notes: buildV2Notes(entry),
+        plannedRpe: entry.planned_rpe ?? null,
+        estimatedFatigue: entry.estimated_fatigue ?? null,
+        recoveryPriority: entry.recovery_priority ?? null,
+        steps,
+        displayOrder: index,
+      };
+    });
 
   const profile = buildImportedProfile(plan.plan_name, plan.generated_for, workouts, plan);
 
@@ -612,6 +678,22 @@ function deriveBaselineSessionsPerWeek(workouts: ImportedWorkoutSeed[]) {
   }
 
   return Math.min(7, Math.max(0, ...Array.from(countsByWeek.values())));
+}
+
+function normalizeWorkoutGoalContext(
+  value: TrainingPlanV2["planned_workouts"][number]["goal_context"] | undefined,
+): CanonicalGoalContext | null {
+  if (!value) {
+    return null;
+  }
+
+  return {
+    goalType: value.goal_type,
+    goalStyle: value.goal_style ?? null,
+    terrainFocus: value.terrain_focus ?? null,
+    targetDate: value.target_date ?? null,
+    targetTime: value.target_time ?? null,
+  };
 }
 
 function inferGoalType(planName: string): RunnerProfileSummary["goalType"] {

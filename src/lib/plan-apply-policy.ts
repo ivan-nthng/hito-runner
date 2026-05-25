@@ -3,9 +3,11 @@ import {
   buildImportedPlanSeed,
   importedPlanSchema,
   type ImportedPlanSeed,
-  type ImportedWorkoutSeed,
 } from "@/lib/imported-plan";
-import { buildImportedLogCarryForwardPlan } from "@/lib/persisted-plan-replacement";
+import {
+  buildImportedLogCarryForwardPlan,
+  persistedWorkoutRowToImportedSeed as persistedWorkoutRowToImportedSeedBase,
+} from "@/lib/persisted-plan-replacement";
 import { todayIso, weekdayLong, type WorkoutType } from "@/lib/training";
 import type { Database } from "@/lib/supabase/database";
 import {
@@ -237,7 +239,7 @@ function preserveExistingStartDateAndIgnoreIncomingFirstDay(
   }
 
   const workouts = [
-    persistedWorkoutRowToImportedSeed(preservedStartDateWorkout, 0),
+    persistedWorkoutRowToPreservedImportedSeed(preservedStartDateWorkout, 0),
     ...droppedSeed.workouts.map((workout, index) => ({
       ...workout,
       displayOrder: index + 1,
@@ -252,28 +254,15 @@ function preserveExistingStartDateAndIgnoreIncomingFirstDay(
   };
 }
 
-function persistedWorkoutRowToImportedSeed(
+function persistedWorkoutRowToPreservedImportedSeed(
   workout: PersistedPlannedWorkoutRow,
   displayOrder: number,
-): ImportedWorkoutSeed {
-  return {
-    workoutDate: workout.workout_date,
-    weekday: workout.weekday,
-    weekNumber: workout.week_number,
-    phase: workout.phase,
-    workoutType: workout.workout_type,
-    sourceWorkoutId: workout.source_workout_id ?? `preserved-${workout.id}`,
-    sourceWorkoutType: workout.source_workout_type ?? workout.workout_type,
-    title: workout.title,
-    notes: workout.notes ?? null,
-    plannedRpe: workout.planned_rpe ?? null,
-    estimatedFatigue: workout.estimated_fatigue ?? null,
-    recoveryPriority: workout.recovery_priority ?? null,
-    steps: ((workout.steps as ImportedWorkoutSeed["steps"] | null) ?? []).map((step) => ({
-      ...step,
-    })),
+) {
+  return persistedWorkoutRowToImportedSeedBase(workout, {
     displayOrder,
-  };
+    fallbackSourceWorkoutIdPrefix: "preserved",
+    normalizeSteps: false,
+  });
 }
 
 function hasStartDateWorkoutConflict(

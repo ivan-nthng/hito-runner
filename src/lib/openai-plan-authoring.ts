@@ -2,6 +2,14 @@ import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "@/lib/structured-plan-authoring";
+import type { TrainingPlanV2 } from "@/lib/imported-plan";
+import {
+  buildDeterministicRichWorkoutFallbackMetadata,
+  buildRichWorkoutDraftNotRequestedMetadata,
+  normalizeRichWorkoutDraftToTrainingPlan,
+  richWorkoutDraftOpenAiSchema,
+  type RichWorkoutDraftMetadata,
+} from "@/lib/rich-workout-draft-authoring";
 import { serverEnv } from "@/lib/supabase/env";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -21,11 +29,21 @@ export interface GeneratedPlanResult {
   canonicalPlan: ReturnType<typeof buildStructuredAuthoringPlan>;
   model: string;
   responseId: string | null;
+  richDraftMetadata: RichWorkoutDraftMetadata;
+  richDraftResponseId: string | null;
 }
 
 export interface GenerateCanonicalPlanFromTextOptions {
+  enableRichWorkoutDraft?: boolean;
   repairAuthoringInput?: (value: unknown) => unknown;
   validationErrorPrefix?: string;
+}
+
+export interface GenerateRichWorkoutDraftForCanonicalPlanOptions {
+  authoringText: string;
+  authoringInput: ReturnType<typeof structuredPlanAuthoringInputSchema.parse>;
+  deterministicPlan: TrainingPlanV2;
+  timeoutMs?: number;
 }
 
 export async function generateCanonicalPlanFromText(
@@ -110,12 +128,158 @@ export async function generateCanonicalPlanFromText(
     );
   }
 
-  const canonicalPlan = buildStructuredAuthoringPlan(parsedAuthoringInput.data);
+  const deterministicPlan = buildStructuredAuthoringPlan(parsedAuthoringInput.data);
+  const richDraftResult = options.enableRichWorkoutDraft
+    ? await generateRichWorkoutDraftForCanonicalPlan({
+        authoringText,
+        authoringInput: parsedAuthoringInput.data,
+        deterministicPlan,
+      }).catch((error: unknown) => ({
+        canonicalPlan: deterministicPlan,
+        metadata: buildDeterministicRichWorkoutFallbackMetadata(
+          buildRichDraftFallbackReason(error),
+        ),
+        responseId: null,
+      }))
+    : {
+        canonicalPlan: deterministicPlan,
+        metadata: buildRichWorkoutDraftNotRequestedMetadata(),
+        responseId: null,
+      };
 
   return {
     authoringInput: parsedAuthoringInput.data,
-    canonicalPlan,
+    canonicalPlan: richDraftResult.canonicalPlan,
     model,
+    responseId: body.id ?? null,
+    richDraftMetadata: richDraftResult.metadata,
+    richDraftResponseId: richDraftResult.responseId,
+  };
+}
+
+export async function generateRichWorkoutDraftForCanonicalPlan({
+  authoringText,
+  authoringInput,
+  deterministicPlan,
+  timeoutMs,
+}: GenerateRichWorkoutDraftForCanonicalPlanOptions) {
+  const apiKey = serverEnv.openAiApiKey;
+
+  if (!apiKey) {
+    throw new RichDraftFallbackError("rich_draft_unavailable", [
+      "OpenAI rich workout drafting is not configured.",
+    ]);
+  }
+
+  return generateRichWorkoutDraftPlan({
+    apiKey,
+    model: serverEnv.openAiPlanModel ?? DEFAULT_OPENAI_PLAN_MODEL,
+    authoringText,
+    authoringInput,
+    deterministicPlan,
+    timeoutMs,
+  });
+}
+
+async function generateRichWorkoutDraftPlan({
+  apiKey,
+  model,
+  authoringText,
+  authoringInput,
+  deterministicPlan,
+  timeoutMs,
+}: {
+  apiKey: string;
+  model: string;
+  authoringText: string;
+  authoringInput: ReturnType<typeof structuredPlanAuthoringInputSchema.parse>;
+  deterministicPlan: TrainingPlanV2;
+  timeoutMs?: number;
+}) {
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => {
+        controller.abort();
+      }, timeoutMs)
+    : null;
+
+  const requestBody = JSON.stringify({
+    model,
+    input: [
+      {
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: buildRichWorkoutDraftSystemPrompt(),
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: buildRichWorkoutDraftUserPrompt({
+              authoringText,
+              authoringInput,
+              deterministicPlan,
+            }),
+          },
+        ],
+      },
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "rich_workout_draft",
+        strict: true,
+        schema: richWorkoutDraftOpenAiSchema,
+      },
+    },
+  });
+
+  const response = await fetch(OPENAI_RESPONSES_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: requestBody,
+    signal: controller?.signal,
+  }).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  });
+
+  const body = (await response.json()) as OpenAiResponseEnvelope;
+
+  if (!response.ok) {
+    throw new RichDraftFallbackError("rich_draft_request_failed", [extractOpenAiError(body)]);
+  }
+
+  const rawOutput = extractStructuredOutputText(body);
+  const parsedOutput = safeParseJson(rawOutput);
+
+  if (!parsedOutput) {
+    throw new RichDraftFallbackError("rich_draft_non_json_output", [
+      "OpenAI returned a non-JSON rich workout draft payload.",
+    ]);
+  }
+
+  const normalized = normalizeRichWorkoutDraftToTrainingPlan({
+    canonicalPlan: deterministicPlan,
+    draft: parsedOutput,
+  });
+
+  if (!normalized.ok) {
+    throw new RichDraftFallbackError(normalized.reason, normalized.issues);
+  }
+
+  return {
+    canonicalPlan: normalized.canonicalPlan,
+    metadata: normalized.metadata,
     responseId: body.id ?? null,
   };
 }
@@ -154,6 +318,93 @@ function buildUserPrompt(authoringText: string) {
   ].join("\n\n");
 }
 
+function buildRichWorkoutDraftSystemPrompt() {
+  return [
+    "You draft rich workout structure for a canonical Hito Running training-plan-v2 skeleton.",
+    "Return only the rich workout draft JSON object requested by the schema.",
+    "The backend will validate and normalize your output; your draft is never persisted directly.",
+    "Keep the exact workoutId, date, and rest/running-day boundary from the skeleton.",
+    "Every non-rest workout must include warmup, main-equivalent work, and cooldown segments.",
+    "Rest days must stay sparse and must not become running workouts.",
+    "Use only backend taxonomy values provided by the schema for workoutFamily, workoutIdentity, and calendarIconKey.",
+    "Use effort, purpose, cue, and hint language to make support runs feel coach-authored.",
+    "Do not invent numeric heart-rate targets. Set hrBpmRange and hrBpm to null.",
+    "Do not invent numeric pace targets. Set paceMinPerKmRange and pace to null; the backend preserves allowed deterministic pace truth separately.",
+    "If metricMode says pace or HR is not allowed, keep target wording effort-based.",
+    "Do not change fixed rest days, target dates, event truth, runner profile truth, logs, or completion state.",
+    "Keep assumptions short, runner-facing, and bounded.",
+  ].join("\n");
+}
+
+function buildRichWorkoutDraftUserPrompt({
+  authoringText,
+  authoringInput,
+  deterministicPlan,
+}: {
+  authoringText: string;
+  authoringInput: ReturnType<typeof structuredPlanAuthoringInputSchema.parse>;
+  deterministicPlan: TrainingPlanV2;
+}) {
+  return [
+    `Today is ${new Date().toISOString().slice(0, 10)}.`,
+    "Draft richer workout structure for this already-validated structured authoring input.",
+    "Use the deterministic skeleton as hard truth. Do not add, remove, move, or reorder workouts.",
+    "For short recovery runs under 35 minutes, keep structure simple only if the skeleton is already simple.",
+    "For normal non-rest workouts, include distinct warmup/main/cooldown segments with useful guidance.",
+    "",
+    "Original runner text:",
+    authoringText.trim(),
+    "",
+    "Validated structured authoring input:",
+    JSON.stringify(authoringInput),
+    "",
+    "Deterministic canonical skeleton:",
+    JSON.stringify(buildCanonicalWorkoutDraftSkeleton(deterministicPlan)),
+  ].join("\n");
+}
+
+function buildCanonicalWorkoutDraftSkeleton(plan: TrainingPlanV2) {
+  return {
+    schemaVersion: plan.schema_version,
+    planName: plan.plan_name,
+    sourceKind: plan.source_kind ?? null,
+    goal: plan.goal ?? null,
+    startDate: plan.start_date,
+    targetDate: plan.target_date ?? null,
+    planPreferences: plan.plan_preferences ?? null,
+    workouts: plan.planned_workouts.map((workout) => ({
+      workoutId: workout.workout_id,
+      date: workout.date,
+      weekday: workout.weekday,
+      weekNumber: workout.week_number,
+      phase: workout.phase,
+      workoutType: workout.workout_type,
+      sourceWorkoutType: workout.source_workout_type ?? null,
+      workoutFamily: workout.workout_family ?? null,
+      workoutIdentity: workout.workout_identity ?? null,
+      calendarIconKey: workout.calendar_icon_key ?? null,
+      title: workout.title,
+      summary: workout.summary,
+      goalContext: workout.goal_context ?? null,
+      metricMode: workout.metric_mode ?? null,
+      segments: workout.segments.map((segment) => ({
+        segmentType: segment.segment_type,
+        label: segment.label ?? null,
+        prescription: segment.prescription ?? null,
+        guidance: segment.guidance ?? null,
+        target: {
+          intensity: segment.target?.intensity ?? null,
+          rpe: segment.target?.rpe ?? null,
+          cue: segment.target?.cue ?? null,
+          hint: segment.target?.hint ?? null,
+          paceTargetPresent: Boolean(segment.target?.pace_min_per_km_range),
+          hrTargetPresent: Boolean(segment.target?.hr_bpm_range || segment.target?.hr_bpm),
+        },
+      })),
+    })),
+  };
+}
+
 function extractStructuredOutputText(response: OpenAiResponseEnvelope) {
   if (typeof response.output_text === "string" && response.output_text.trim()) {
     return response.output_text.trim();
@@ -183,6 +434,27 @@ function safeParseJson(raw: string) {
     return JSON.parse(raw) as unknown;
   } catch {
     return null;
+  }
+}
+
+export function buildRichDraftFallbackReason(error: unknown) {
+  if (error instanceof RichDraftFallbackError) {
+    return error.reason;
+  }
+
+  if (error instanceof Error && error.name === "AbortError") {
+    return "rich_draft_timed_out";
+  }
+
+  return "rich_draft_unavailable";
+}
+
+class RichDraftFallbackError extends Error {
+  constructor(
+    readonly reason: string,
+    readonly issues: string[],
+  ) {
+    super(`${reason}: ${issues.slice(0, 3).join(" | ")}`);
   }
 }
 

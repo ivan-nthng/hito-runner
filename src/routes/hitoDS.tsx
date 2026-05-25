@@ -151,11 +151,14 @@ const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
 }> = [
   { label: "Easy", glyph: "easy", family: "easy", color: "var(--easy)" },
   { label: "Recovery", glyph: "recovery", family: "easy", color: "var(--easy)" },
+  { label: "Steady", glyph: "steady", family: "easy", color: "var(--easy)" },
   { label: "Long", glyph: "long", family: "long", color: "var(--long)" },
   { label: "Tempo", glyph: "tempo", family: "quality", color: "var(--quality)" },
   { label: "Intervals", glyph: "intervals", family: "quality", color: "var(--quality)" },
   { label: "Progression", glyph: "progression", family: "quality", color: "var(--quality)" },
   { label: "Race", glyph: "race", family: "quality", color: "var(--quality)" },
+  { label: "Hills", glyph: "hills", family: "quality", color: "var(--quality)" },
+  { label: "Trail", glyph: "trail", family: "long", color: "var(--long)" },
   { label: "Quality", glyph: "quality", family: "quality", color: "var(--quality)" },
   { label: "Rest", glyph: "rest", family: "rest", color: "var(--rest)" },
 ] as const;

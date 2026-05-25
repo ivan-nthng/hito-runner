@@ -3,6 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 import { buildImportedPlanSeed } from "./lib/imported-plan-seed.mjs";
 import { generateCanonicalPlanFromText } from "./lib/openai-plan-authoring.mjs";
 
+// Legacy MJS ops path kept for historical fallback only.
+// The canonical Slice 4B validation path is scripts/author-plan-from-text.ts.
+
 const options = parseArgs(process.argv.slice(2));
 const email = normalizeEmail(requireOption(options.email, "--email"));
 const authoringText = await readAuthoringText(options);
@@ -85,7 +88,12 @@ const workouts = importedSeed.workouts.map((workout) => ({
   phase: workout.phase,
   workout_type: workout.workoutType,
   source_workout_id: workout.sourceWorkoutId,
-  source_workout_type: workout.sourceWorkoutType,
+  source_workout_type: workout.sourceWorkoutType ?? null,
+  workout_family: workout.workoutFamily ?? null,
+  workout_identity: workout.workoutIdentity ?? null,
+  calendar_icon_key: workout.calendarIconKey ?? null,
+  goal_context: workout.goalContext ?? null,
+  metric_mode: workout.metricMode ?? null,
   title: workout.title,
   notes: workout.notes,
   planned_rpe: workout.plannedRpe,

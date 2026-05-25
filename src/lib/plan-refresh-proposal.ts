@@ -166,9 +166,11 @@ export function buildActivePlanRefreshPromptPayload(
 export async function generateActivePlanRefreshProposal({
   context,
   runnerPrompt,
+  timeoutMs,
 }: {
   context: RunnerCoachContext;
   runnerPrompt: string;
+  timeoutMs?: number;
 }): Promise<ActivePlanRefreshProposal> {
   if (!context.activePlan) {
     throw new Error("An active plan is required before requesting a refresh proposal.");
@@ -186,6 +188,12 @@ export async function generateActivePlanRefreshProposal({
 
   const model = serverEnv.openAiPlanModel ?? DEFAULT_OPENAI_REFRESH_MODEL;
   const promptPayload = buildActivePlanRefreshPromptPayload(context, runnerPrompt);
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => {
+        controller.abort();
+      }, timeoutMs)
+    : null;
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
     headers: {
@@ -223,6 +231,11 @@ export async function generateActivePlanRefreshProposal({
         },
       },
     }),
+    signal: controller?.signal,
+  }).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   });
 
   const body = (await response.json()) as OpenAiResponseEnvelope;
@@ -256,6 +269,81 @@ export async function generateActivePlanRefreshProposal({
     responseId: body.id ?? null,
     output: buildReviewSafeActivePlanRefreshOutput(context, parsedProposal.data),
   };
+}
+
+export function buildDeterministicActivePlanRefreshProposal({
+  context,
+  runnerPrompt,
+  fallbackReason,
+}: {
+  context: RunnerCoachContext;
+  runnerPrompt: string;
+  fallbackReason: "refresh_proposal_timed_out";
+}): ActivePlanRefreshProposal {
+  if (!context.activePlan) {
+    throw new Error("An active plan is required before requesting a refresh proposal.");
+  }
+
+  if (!context.remainingActiveSchedule.length) {
+    throw new Error("There is no remaining active schedule to refresh.");
+  }
+
+  const targetWorkoutRefs = context.remainingActiveSchedule.map((_, index) =>
+    workoutRefForIndex(index),
+  );
+  const timeoutRationale =
+    "The live AI proposal step did not finish in time, so Hito prepared a deterministic review instead.";
+
+  return {
+    model: "deterministic_refresh_fallback",
+    responseId: null,
+    output: buildReviewSafeActivePlanRefreshOutput(context, {
+      proposalStatus: "proposal_only",
+      summary:
+        "This deterministic proposal reviews the remaining active schedule and keeps the refresh bounded to future workouts.",
+      rationale: [timeoutRationale, fallbackProposalRationale(context)],
+      proposedChanges: [
+        "Regenerate the still-mutable upcoming workouts from the current plan truth while keeping protected history fixed.",
+      ],
+      keepAsIs: [],
+      remainingScheduleScope: {
+        scope: "remaining_active_schedule_only",
+        startDate: context.refreshBoundary.firstMutableDate,
+        endDate: context.refreshBoundary.lastMutableDate,
+        targetWorkoutRefs,
+      },
+      safety: {
+        requiresExplicitApply: true,
+        preservesPastAndLoggedHistory: true,
+        doesNotMutatePlan: true,
+      },
+      recommendedAuthoringPrompt: buildDeterministicRefreshAuthoringPrompt(context, runnerPrompt),
+    }),
+  };
+}
+
+function buildDeterministicRefreshAuthoringPrompt(
+  context: RunnerCoachContext,
+  runnerPrompt: string,
+) {
+  const fixedRestDays = context.weekdayRestInvariant.blockedWeekdays.length
+    ? ` Keep fixed rest days off: ${formatWeekdayList(context.weekdayRestInvariant.blockedWeekdays)}.`
+    : "";
+  const goalLabel =
+    context.runner.goalLabel ??
+    context.activePlan?.goalSummary ??
+    context.activePlan?.title ??
+    "the active plan";
+
+  return [
+    `Refresh the remaining active schedule for ${goalLabel}.`,
+    "Use current saved plan truth, recent training context, and deterministic Hito plan doctrine.",
+    "Regenerate only still-mutable future workouts; preserve past, logged, Garmin/evidence-backed, comparison, AI-insight, and body-note history.",
+    fixedRestDays.trim(),
+    `Runner request: ${runnerPrompt.trim()}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function buildSystemPrompt() {

@@ -64,10 +64,13 @@ export type Database = {
       };
       planned_workouts: {
         Row: {
+          calendar_icon_key: string | null;
           created_at: string;
           display_order: number;
           estimated_fatigue: string | null;
+          goal_context: Json | null;
           id: string;
+          metric_mode: Json | null;
           notes: string | null;
           phase: string;
           plan_cycle_id: string;
@@ -81,13 +84,18 @@ export type Database = {
           week_number: number;
           weekday: string;
           workout_date: string;
+          workout_family: string | null;
+          workout_identity: string | null;
           workout_type: Database["public"]["Enums"]["workout_type"];
         };
         Insert: {
+          calendar_icon_key?: string | null;
           created_at?: string;
           display_order: number;
           estimated_fatigue?: string | null;
+          goal_context?: Json | null;
           id?: string;
+          metric_mode?: Json | null;
           notes?: string | null;
           phase: string;
           plan_cycle_id: string;
@@ -101,13 +109,18 @@ export type Database = {
           week_number: number;
           weekday: string;
           workout_date: string;
+          workout_family?: string | null;
+          workout_identity?: string | null;
           workout_type: Database["public"]["Enums"]["workout_type"];
         };
         Update: {
+          calendar_icon_key?: string | null;
           created_at?: string;
           display_order?: number;
           estimated_fatigue?: string | null;
+          goal_context?: Json | null;
           id?: string;
+          metric_mode?: Json | null;
           notes?: string | null;
           phase?: string;
           plan_cycle_id?: string;
@@ -121,6 +134,8 @@ export type Database = {
           week_number?: number;
           weekday?: string;
           workout_date?: string;
+          workout_family?: string | null;
+          workout_identity?: string | null;
           workout_type?: Database["public"]["Enums"]["workout_type"];
         };
         Relationships: [

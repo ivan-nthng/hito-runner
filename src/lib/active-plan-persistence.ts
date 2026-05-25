@@ -6,6 +6,10 @@ import {
   type PlanApplyResult,
   type PreparedPlanApplySuccess,
 } from "@/lib/plan-apply-policy";
+import {
+  mergePlanPersistenceMetadata,
+  type AdditionalPlanPersistenceMetadata,
+} from "@/lib/plan-authoring-snapshot";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
 import type { StructuredFirstPlanProfilePatch } from "@/lib/structured-first-plan-onboarding";
 import type { Database, Json } from "@/lib/supabase/database";
@@ -36,6 +40,7 @@ export async function applyImportedPlanForUser(
   firstDayResolution: FirstDayResolution | null,
   requestedStartDate: string | null = null,
   profilePatch: StructuredFirstPlanProfilePatch | null = null,
+  planMetadata: AdditionalPlanPersistenceMetadata | null = null,
 ): Promise<PlanApplyResult> {
   const preparedApply = await prepareImportedPlanApply(
     userId,
@@ -49,7 +54,12 @@ export async function applyImportedPlanForUser(
   }
 
   await upsertRunnerProfile(userId, preparedApply.importedSeed.profile, profilePatch);
-  await replaceActivePlanWithImportedInput(userId, preparedApply, preparedApply.planContext);
+  await replaceActivePlanWithImportedInput(
+    userId,
+    preparedApply,
+    preparedApply.planContext,
+    planMetadata,
+  );
 
   return preparedApply.result;
 }
@@ -76,6 +86,7 @@ export async function createAssignedPlanFromImportedSeed(
   userId: string,
   importedSeed: ImportedPlanSeed,
   status: PersistedPlanCycleRow["status"] = "active",
+  planMetadata: AdditionalPlanPersistenceMetadata | null = null,
 ) {
   const supabase = createAdminSupabaseClient();
   const planInsert = await supabase
@@ -91,8 +102,14 @@ export async function createAssignedPlanFromImportedSeed(
       start_date: importedSeed.startDate,
       end_date: importedSeed.endDate,
       target_date: importedSeed.targetDate,
-      goal_metadata: importedSeed.goalMetadata,
-      plan_preferences: importedSeed.planPreferences,
+      goal_metadata: mergePlanPersistenceMetadata(
+        importedSeed.goalMetadata,
+        planMetadata?.goalMetadata,
+      ),
+      plan_preferences: mergePlanPersistenceMetadata(
+        importedSeed.planPreferences,
+        planMetadata?.planPreferences,
+      ),
     })
     .select("*")
     .single();
@@ -120,6 +137,7 @@ async function replaceActivePlanWithImportedInput(
   userId: string,
   preparedApply: PreparedPlanApplySuccess,
   planContext: ExistingPlanContext,
+  planMetadata: AdditionalPlanPersistenceMetadata | null = null,
 ) {
   const supabase = createAdminSupabaseClient();
   const { importedSeed, preservationPlan } = preparedApply;
@@ -127,6 +145,7 @@ async function replaceActivePlanWithImportedInput(
     userId,
     importedSeed,
     planContext.activePlan ? "archived" : "active",
+    planMetadata,
   );
   const insertedWorkoutsByDate = new Map(
     insertedPlan.workouts.map((workout) => [workout.workout_date, workout]),

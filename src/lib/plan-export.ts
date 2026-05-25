@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/supabase/database";
 import {
   displayTargetEntries,
+  deriveWorkoutRichModel,
   formatDate,
   formatDistanceKm,
   formatDurationMin,
@@ -13,6 +14,13 @@ import {
   type StepTarget,
   type WorkoutType,
 } from "@/lib/training";
+import type {
+  CalendarIconKey,
+  CanonicalGoalContext,
+  CanonicalMetricMode,
+  CanonicalWorkoutFamily,
+  CanonicalWorkoutIdentity,
+} from "@/lib/rich-workout-model";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -48,6 +56,11 @@ export interface ActivePlanExportWorkout {
   phase: string;
   workoutType: WorkoutType;
   sourceWorkoutType: string | null;
+  workoutFamily: CanonicalWorkoutFamily;
+  workoutIdentity: CanonicalWorkoutIdentity;
+  calendarIconKey: CalendarIconKey;
+  goalContext: CanonicalGoalContext | null;
+  metricMode: CanonicalMetricMode;
   title: string;
   notes: string | null;
   steps: Step[];
@@ -165,6 +178,12 @@ export function renderPlanExportMarkdown(payload: ActivePlanExportPayload) {
     lines.push(`### ${formatDate(workout.date)} - ${workout.title}`);
     lines.push(`- Type: ${humanizeWorkoutType(workout.sourceWorkoutType ?? workout.workoutType)}`);
 
+    if (workout.workoutType !== "rest") {
+      lines.push(
+        `- Focus: ${humanizeWorkoutType(workout.workoutFamily)} · ${humanizeWorkoutType(workout.workoutIdentity)}`,
+      );
+    }
+
     const metrics = formatWorkoutMetrics(workout);
     if (metrics) {
       lines.push(`- Plan: ${metrics}`);
@@ -216,7 +235,13 @@ export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayloa
       weekday: workout.weekday,
       week_number: workout.weekNumber,
       phase: workout.phase,
-      workout_type: toExportWorkoutType(workout.sourceWorkoutType ?? workout.workoutType),
+      workout_type: toExportWorkoutType(workout.workoutType),
+      source_workout_type: workout.sourceWorkoutType ?? workout.workoutIdentity,
+      workout_family: workout.workoutFamily,
+      workout_identity: workout.workoutIdentity,
+      calendar_icon_key: workout.calendarIconKey,
+      ...(workout.goalContext ? { goal_context: toExportGoalContext(workout.goalContext) } : {}),
+      metric_mode: toExportMetricMode(workout.metricMode),
       title: workout.title,
       summary: buildWorkoutSummary(workout),
       segments: workoutToTrainingPlanV2Segments(workout),
@@ -247,6 +272,17 @@ function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanE
     type: row.workout_type,
   };
   const primaryTarget = primaryWorkoutTarget(workout);
+  const richWorkout = deriveWorkoutRichModel({
+    type: row.workout_type,
+    sourceWorkoutType: row.source_workout_type,
+    workoutFamily: row.workout_family,
+    workoutIdentity: row.workout_identity,
+    calendarIconKey: row.calendar_icon_key,
+    goalContext: row.goal_context,
+    metricMode: row.metric_mode,
+    title: row.title,
+    steps,
+  });
 
   return {
     workoutId: row.source_workout_id ?? row.id,
@@ -256,6 +292,11 @@ function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanE
     phase: row.phase,
     workoutType: row.workout_type,
     sourceWorkoutType: row.source_workout_type,
+    workoutFamily: richWorkout.workoutFamily,
+    workoutIdentity: richWorkout.workoutIdentity,
+    calendarIconKey: richWorkout.calendarIconKey,
+    goalContext: richWorkout.goalContext,
+    metricMode: richWorkout.metricMode,
     title: row.title,
     notes: row.notes,
     steps,
@@ -263,6 +304,25 @@ function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanE
     displayDurationMin: row.workout_type === "rest" ? null : workoutDuration(workout),
     primaryTarget: displayTargetEntries(primaryTarget),
     primaryGuidance: findPrimaryGuidance(steps),
+  };
+}
+
+function toExportGoalContext(goalContext: CanonicalGoalContext) {
+  return {
+    goal_type: goalContext.goalType,
+    ...(goalContext.goalStyle ? { goal_style: goalContext.goalStyle } : {}),
+    ...(goalContext.terrainFocus ? { terrain_focus: goalContext.terrainFocus } : {}),
+    ...(goalContext.targetDate ? { target_date: goalContext.targetDate } : {}),
+    ...(goalContext.targetTime ? { target_time: goalContext.targetTime } : {}),
+  };
+}
+
+function toExportMetricMode(metricMode: CanonicalMetricMode) {
+  return {
+    guidance: metricMode.guidance,
+    pace_targets_allowed: metricMode.paceTargetsAllowed,
+    hr_targets_allowed: metricMode.hrTargetsAllowed,
+    reason: metricMode.reason,
   };
 }
 

@@ -45,6 +45,13 @@ export function WorkoutGlyph({
           />
         </svg>
       );
+    case "steady":
+      return (
+        <svg {...sharedProps}>
+          <path d="M2.2 7.4h7.6" stroke="currentColor" strokeLinecap="round" strokeWidth="1.25" />
+          <path d="M3 4.6h6" stroke="currentColor" strokeLinecap="round" strokeWidth="1.25" />
+        </svg>
+      );
     case "long":
       return (
         <svg {...sharedProps}>
@@ -100,6 +107,29 @@ export function WorkoutGlyph({
             stroke="currentColor"
             strokeLinecap="round"
             strokeLinejoin="round"
+            strokeWidth="1.2"
+          />
+        </svg>
+      );
+    case "hills":
+      return (
+        <svg {...sharedProps}>
+          <path
+            d="M1.8 8.5 4.3 4l1.8 2.7 1.5-2.2 2.6 4"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.25"
+          />
+        </svg>
+      );
+    case "trail":
+      return (
+        <svg {...sharedProps}>
+          <path
+            d="M2.1 8.6c1.8-2.1 6.1.5 7.8-2.1M2.8 5.2c1.1-1.2 2.7-1.5 4.2-1"
+            stroke="currentColor"
+            strokeLinecap="round"
             strokeWidth="1.2"
           />
         </svg>

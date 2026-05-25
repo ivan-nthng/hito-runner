@@ -17,6 +17,14 @@
       "Use ISO dates in YYYY-MM-DD format.",
       "Use canonical training-plan-v2 field names whenever a canonical form exists."
     ],
+    "rich_workout_rules": [
+      "Prefer explicit workout_family, workout_identity, calendar_icon_key, goal_context, and metric_mode on every workout.",
+      "workout_family and calendar_icon_key must use one of: rest, recovery, easy, steady, long, tempo, intervals, progression, race, hills, trail.",
+      "workout_identity must use a supported Hito identity such as easy_aerobic_run, recovery_jog, steady_aerobic_run, long_aerobic_run, half_marathon_threshold_durability, distance_intervals, uphill_repeats, technical_trail_easy, or mountain_long_run_time_on_feet.",
+      "Keep legacy workout_type and source_workout_type for compatibility; source_workout_type should usually mirror workout_identity.",
+      "goal_context should be bounded plan-scoped context only, not raw comments, transcripts, prompts, or private notes.",
+      "metric_mode should describe whether this workout is effort, pace, heart_rate, or mixed guided and why numeric targets are or are not allowed."
+    ],
     "segment_rules": [
       "Every workout must have a non-empty segments array.",
       "Use segment_type values already supported by Hito: warmup, main, cooldown, recovery, rest, mobility, mobility_optional, strength, activation, drills, strides, recovery_jog, fueling, tempo_block, interval_block.",
@@ -28,8 +36,9 @@
     ],
     "target_rules": [
       "Target is for user-facing training cues only.",
-      "Prefer canonical keys like hr_bpm_range and pace_min_per_km_range.",
-      "You may include intensity, rpe, cadence_spm_range, cue, and hint.",
+      "Prefer canonical keys like intensity, rpe, cue, and hint when benchmark or HR-zone truth is absent.",
+      "Use pace_min_per_km_range only when watch/app execution and usable benchmark truth exist.",
+      "Use hr_bpm_range only when real runner HR-zone/profile truth exists.",
       "If extra structured target metadata is helpful, put it under target.extra as scalar key/value pairs only.",
       "Do not place nested objects or arrays inside target.extra."
     ],
@@ -51,18 +60,22 @@
     "do_not_invent": [
       "Legacy week_1_preview arrays",
       "Unsupported workout_type values",
+      "Unsupported workout_family values",
+      "Unsupported workout_identity values",
+      "Unsupported calendar_icon_key values",
       "Unsupported segment_type values",
       "Nested runtime objects outside the accepted compatibility placeholders",
       "Database ids for persisted rows",
-      "Fields not defined by the canonical contract unless they are clearly ignored compatibility placeholders"
+      "Fields not defined by the canonical contract unless they are clearly ignored compatibility placeholders",
+      "Numeric pace or heart-rate targets without the required runner truth"
     ]
   },
   "plan_name": "Half Marathon Plan",
   "generated_for": "Runner Name",
   "start_date": "2026-05-05",
-  "source_kind": "ml_generated_template_v1",
+  "source_kind": "ml_generated_template_v2",
   "goal": {
-    "goal_type": "race",
+    "goal_type": "half_marathon",
     "goal_label": "Finish a half marathon feeling controlled",
     "target_event": {
       "label": "Target half marathon",
@@ -91,7 +104,23 @@
       "week_number": 1,
       "phase": "Base",
       "workout_type": "easy",
-      "title": "Easy Run",
+      "source_workout_type": "easy_aerobic_run",
+      "workout_family": "easy",
+      "workout_identity": "easy_aerobic_run",
+      "calendar_icon_key": "easy",
+      "goal_context": {
+        "goal_type": "half_marathon",
+        "goal_style": "relaxed",
+        "terrain_focus": "standard",
+        "target_date": "2026-08-30"
+      },
+      "metric_mode": {
+        "guidance": "effort",
+        "pace_targets_allowed": false,
+        "hr_targets_allowed": false,
+        "reason": "Template uses effort cues; add pace only with watch/app plus usable benchmark truth."
+      },
+      "title": "Easy aerobic run",
       "summary": "50 min easy with calm aerobic control",
       "planned_rpe": 4,
       "estimated_fatigue": "low",
@@ -101,7 +130,7 @@
           "segment_type": "warmup",
           "duration_min": 10,
           "target": {
-            "intensity": "easy",
+            "intensity": "very easy",
             "hint": "Settle in gradually"
           }
         },
@@ -109,9 +138,8 @@
           "segment_type": "main",
           "duration_min": 35,
           "target": {
-            "hr_bpm_range": "135-145",
-            "pace_min_per_km_range": "6:50-7:30",
-            "intensity": "easy"
+            "intensity": "easy",
+            "cue": "Keep the talk test comfortable"
           }
         },
         {
@@ -130,7 +158,23 @@
       "week_number": 1,
       "phase": "Base",
       "workout_type": "rest",
-      "title": "Rest Day",
+      "source_workout_type": "rest_and_recovery",
+      "workout_family": "rest",
+      "workout_identity": "rest_and_recovery",
+      "calendar_icon_key": "rest",
+      "goal_context": {
+        "goal_type": "half_marathon",
+        "goal_style": "relaxed",
+        "terrain_focus": "standard",
+        "target_date": "2026-08-30"
+      },
+      "metric_mode": {
+        "guidance": "effort",
+        "pace_targets_allowed": false,
+        "hr_targets_allowed": false,
+        "reason": "Rest day has no execution metric targets."
+      },
+      "title": "Rest day",
       "summary": "Recovery and optional mobility",
       "segments": [
         {
@@ -142,14 +186,30 @@
       ]
     },
     {
-      "workout_id": "template-2026-05-08-intervals",
+      "workout_id": "template-2026-05-08-threshold",
       "date": "2026-05-08",
       "weekday": "Friday",
       "week_number": 1,
       "phase": "Base",
-      "workout_type": "intervals",
-      "title": "Intervals",
-      "summary": "6 x 400m with controlled fast running",
+      "workout_type": "tempo",
+      "source_workout_type": "half_marathon_threshold_durability",
+      "workout_family": "tempo",
+      "workout_identity": "half_marathon_threshold_durability",
+      "calendar_icon_key": "tempo",
+      "goal_context": {
+        "goal_type": "half_marathon",
+        "goal_style": "relaxed",
+        "terrain_focus": "standard",
+        "target_date": "2026-08-30"
+      },
+      "metric_mode": {
+        "guidance": "effort",
+        "pace_targets_allowed": false,
+        "hr_targets_allowed": false,
+        "reason": "Template quality work uses effort cues until benchmark or HR-zone truth exists."
+      },
+      "title": "Half marathon threshold durability",
+      "summary": "Controlled threshold touch without racing the workout",
       "planned_rpe": 7,
       "estimated_fatigue": "medium_high",
       "recovery_priority": "high",
@@ -163,13 +223,13 @@
           }
         },
         {
-          "segment_type": "interval_block",
-          "repeat_count": 6,
-          "work_distance_km": 0.4,
-          "recovery_duration_min": 2,
+          "segment_type": "tempo_block",
+          "repeat_count": 2,
+          "work_duration_min": 8,
+          "recovery_duration_min": 3,
           "target": {
-            "intensity": "5k effort",
-            "hint": "Stay smooth and tall"
+            "intensity": "controlled threshold",
+            "cue": "Strong but repeatable; do not sprint the final minutes"
           }
         },
         {
@@ -189,8 +249,24 @@
       "week_number": 1,
       "phase": "Base",
       "workout_type": "long_run",
-      "title": "Long Run",
-      "summary": "60 min easy aerobic build",
+      "source_workout_type": "long_aerobic_run",
+      "workout_family": "long",
+      "workout_identity": "long_aerobic_run",
+      "calendar_icon_key": "long",
+      "goal_context": {
+        "goal_type": "half_marathon",
+        "goal_style": "relaxed",
+        "terrain_focus": "standard",
+        "target_date": "2026-08-30"
+      },
+      "metric_mode": {
+        "guidance": "effort",
+        "pace_targets_allowed": false,
+        "hr_targets_allowed": false,
+        "reason": "Template long run uses effort cues; numeric targets require runner-specific truth."
+      },
+      "title": "Long aerobic run",
+      "summary": "60 min easy aerobic durability",
       "planned_rpe": 5,
       "estimated_fatigue": "moderate",
       "recovery_priority": "high",
@@ -200,15 +276,15 @@
           "duration_min": 10,
           "target": {
             "intensity": "easy",
-            "hint": "Let heart rate rise slowly"
+            "hint": "Let breathing settle slowly"
           }
         },
         {
           "segment_type": "main",
           "duration_min": 45,
           "target": {
-            "intensity": "easy",
-            "hr_bpm_range": "135-145"
+            "intensity": "easy endurance",
+            "cue": "Stay patient; this is durability, not a test"
           }
         },
         {

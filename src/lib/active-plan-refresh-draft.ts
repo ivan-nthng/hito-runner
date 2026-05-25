@@ -19,6 +19,10 @@ import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "@/lib/structured-plan-authoring";
+import {
+  buildRichWorkoutDraftNotRequestedMetadata,
+  type RichWorkoutDraftMetadata,
+} from "@/lib/rich-workout-draft-authoring";
 import { diffDaysIso, weekdayLong, workoutDistanceKm } from "@/lib/training";
 import {
   validateWorkoutsAgainstWeekdayRestInvariant,
@@ -61,6 +65,7 @@ export interface ActivePlanRefreshDraft {
   proposalFingerprint: ActivePlanRefreshFingerprint;
   authoringSnapshot: RefreshAuthoringSnapshot;
   canonicalPlan: TrainingPlanV2;
+  richWorkoutDraftMetadata: RichWorkoutDraftMetadata;
   reviewMetadata: {
     affectedDateRange: {
       startDate: string;
@@ -168,6 +173,7 @@ export function buildExactActivePlanRefreshDraft({
     proposalFingerprint: fingerprint,
     authoringSnapshot,
     canonicalPlan,
+    richWorkoutDraftMetadata: buildRichWorkoutDraftNotRequestedMetadata(),
     reviewMetadata: {
       affectedDateRange: {
         startDate: timeline.startDate,
@@ -202,6 +208,28 @@ export function buildExactActivePlanRefreshDraft({
   return {
     ...draftWithoutChecksum,
     checksum: signActivePlanRefreshDraft(draftWithoutChecksum),
+  };
+}
+
+export function rebuildActivePlanRefreshDraftWithRichWorkoutDraft({
+  draft,
+  canonicalPlan,
+  metadata,
+}: {
+  draft: ActivePlanRefreshDraft;
+  canonicalPlan: TrainingPlanV2;
+  metadata: RichWorkoutDraftMetadata;
+}): ActivePlanRefreshDraft {
+  const refreshedDraft = {
+    ...draft,
+    checksum: "",
+    canonicalPlan,
+    richWorkoutDraftMetadata: metadata,
+  };
+
+  return {
+    ...refreshedDraft,
+    checksum: signActivePlanRefreshDraft(refreshedDraft),
   };
 }
 
@@ -435,6 +463,12 @@ function normalizeRefreshGoal(
       context.runner.goalLabel ??
       currentPlan.goal_summary ??
       currentPlan.title,
+    goalStyle:
+      normalizeGoalStyle(value?.goalStyle) ??
+      normalizeGoalStyle(readJsonString(currentPlan.goal_metadata, "goal_style")),
+    targetTime:
+      sanitizeString(value?.targetTime, 32) ??
+      readJsonString(currentPlan.goal_metadata, "target_time"),
     targetEventName:
       sanitizeString(value?.targetEventName, 160) ?? readTargetEventName(currentPlan.goal_metadata),
   };
@@ -606,6 +640,8 @@ function readStoredAuthoringInput(value: unknown): StructuredAuthoringInput | nu
     record?.authoring_input,
     record?.structured_authoring_input,
     record?.source_authoring_input,
+    asRecord(record?.structured_authoring_snapshot)?.authoring_input,
+    asRecord(record?.plan_scoped_authoring_snapshot)?.authoring_input,
     asRecord(record?.active_plan_refresh)?.authoring_input,
   ];
 
@@ -704,6 +740,10 @@ function refreshImpliesTargetPressure(
   currentPlan: PersistedPlanCycleRow,
   context: RunnerCoachContext,
 ) {
+  if (input.goal.goalStyle === "target_time" || input.goal.targetTime) {
+    return true;
+  }
+
   const text = [
     input.goal.goalLabel,
     input.goal.targetEventName,
@@ -849,6 +889,15 @@ function normalizeTerrainFocus(value: unknown): StructuredTerrainFocus | null {
 
 function normalizeStrengthPreference(value: unknown) {
   return value === "none" || value === "mobility" || value === "strength" || value === "both"
+    ? value
+    : null;
+}
+
+function normalizeGoalStyle(value: unknown) {
+  return value === "relaxed" ||
+    value === "balanced" ||
+    value === "ambitious" ||
+    value === "target_time"
     ? value
     : null;
 }
@@ -1032,6 +1081,14 @@ const activePlanRefreshDraftPayloadSchema = z.object({
     longDistanceHonestyAssumptions: z.array(z.string().trim().min(1).max(400)).max(4),
   }),
   canonicalPlan: z.unknown(),
+  richWorkoutDraftMetadata: z
+    .object({
+      status: z.enum(["not_requested", "rich_draft_applied", "deterministic_fallback"]),
+      source: z.enum(["openai_rich_workout_draft", "deterministic_structured_generator"]),
+      fallbackReason: z.string().trim().min(1).max(120).nullable(),
+      reviewAssumptions: z.array(z.string().trim().min(1).max(280)).max(8),
+    })
+    .default(buildRichWorkoutDraftNotRequestedMetadata()),
   reviewMetadata: z.object({
     affectedDateRange: z.object({
       startDate: z

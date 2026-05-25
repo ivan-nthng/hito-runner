@@ -375,3 +375,36 @@ When this matrix is first exercised, start with:
 - Glyph and icon audit
 
 Browser QA must use the built-in Codex app/browser first whenever it can cover the task. Safari is fallback unless Safari-specific verification is required or the built-in browser is blocked.
+
+## Disposable Saved-Mode Rich Workout Fixture
+
+Use this local/test-only fixture when QA needs to browser-verify stored rich workout fields without waiting for OpenAI rich drafting.
+
+Fixture account:
+
+- Username: `qa-rich-workout`
+- Email: `qa-rich-workout@local.test`
+- Password: `qa-rich-workout-pass-20260525`
+- Display name: `Rich Workout QA`
+
+Seed/reset command:
+
+```bash
+npm run test-user -- create --username qa-rich-workout --email qa-rich-workout@local.test --password qa-rich-workout-pass-20260525 --display-name "Rich Workout QA" --plan scripts/fixtures/rich-workout-saved-mode-fixture.json
+```
+
+Cleanup command:
+
+```bash
+npm run test-user -- delete --email qa-rich-workout@local.test --confirm-email qa-rich-workout@local.test
+```
+
+Expected fixture content:
+
+- Exactly one active saved-mode plan titled `QA Rich Workout Saved-Mode Fixture`.
+- Stored rich workout rows for `steady_aerobic_run`, `rolling_hills_session`, and `technical_trail_easy`.
+- One compact-only `Controlled tempo session` row with no stored rich/source fields so old-plan fallback remains checkable.
+- Segment guidance/cue/hint exists on every fixture segment.
+- No stored pace, HR, cadence, fueling, transcript, prompt, or production auth truth.
+
+Browser verification should use the built-in Codex browser first, then Safari only if the built-in browser cannot cover the flow. Verify calendar labels/glyphs for Steady, Hills, and Trail come from stored rich fields, workout detail shows exact identity plus backend segment guidance, and cleanup/reset restores the disposable account safely.

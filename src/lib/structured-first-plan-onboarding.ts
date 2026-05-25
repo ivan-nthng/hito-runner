@@ -298,6 +298,8 @@ export function buildStructuredFirstPlanAuthoringInput(
     goal: {
       goalType: input.goal.goalDistance,
       goalLabel: buildGoalLabel(input.goal),
+      goalStyle: input.goal.goalStyle,
+      targetTime: input.goal.goalStyle === "target_time" ? (input.goal.targetTime ?? null) : null,
       targetEventName:
         input.goal.goalDistance === "build_consistency"
           ? null

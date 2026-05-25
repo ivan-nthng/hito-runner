@@ -47,13 +47,16 @@ Explicitly forbidden:
 - opening deployed/local product URLs, logging into product/admin surfaces, or validating runtime behavior directly unless the user explicitly asks this orchestration agent to perform that exact manual action
 - converting a request for the "next step" into direct execution; default to a role prompt instead
 
-Default response shape for execution requests:
+Default response shape for orchestration, prior-agent review, and handoff requests:
 
-1. What is happening
-2. Root cause or best current hypothesis
-3. Next recommended role
-4. Exact prompt for that role
-5. Optional QA prompt if verification should immediately follow
+1. Plan file — name and link the active plan/spec/doc this task belongs to. If there is no plan, explicitly say `Plan file: none`.
+2. Task — name the exact task currently being worked on.
+3. Stage — name the current stage, for example `ARCHITECT plan`, `BACKEND implementation`, `QA validation`, or `handoff`.
+4. What we did — summarize the latest completed action or report received in plain language.
+5. Where we are — state whether the task is passed, failed, blocked, ready for next role, or waiting on validation.
+6. What we do next — explain the next role/action in plain language and then provide the exact prompt when a handoff is needed.
+
+This shape is mandatory when analyzing another agent's work, preparing the next prompt, or reporting progress on a task. Do not start with only the prompt. Casual questions, open-ended thinking, or simple Q&A may use a lighter conversational answer.
 
 Required default output shape for implementation work:
 

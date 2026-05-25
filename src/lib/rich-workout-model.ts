@@ -1,0 +1,610 @@
+export const CANONICAL_WORKOUT_FAMILY_VALUES = [
+  "rest",
+  "recovery",
+  "easy",
+  "steady",
+  "long",
+  "tempo",
+  "intervals",
+  "progression",
+  "race",
+  "hills",
+  "trail",
+] as const;
+
+export type CanonicalWorkoutFamily = (typeof CANONICAL_WORKOUT_FAMILY_VALUES)[number];
+
+export const CANONICAL_WORKOUT_IDENTITY_VALUES = [
+  "rest_and_recovery",
+  "easy_aerobic_run",
+  "recovery_jog",
+  "steady_aerobic_run",
+  "cutback_aerobic_run",
+  "easy_run_with_strides",
+  "long_aerobic_run",
+  "long_run_with_steady_finish",
+  "cutback_long_run",
+  "taper_long_run",
+  "controlled_tempo_session",
+  "half_marathon_threshold_durability",
+  "marathon_steady_specificity",
+  "distance_intervals",
+  "time_intervals",
+  "5k_sharpening_repeats",
+  "10k_rhythm_intervals",
+  "progression_run",
+  "race_pace_session",
+  "taper_tuneup_run",
+  "uphill_repeats",
+  "rolling_hills_session",
+  "technical_trail_easy",
+  "controlled_downhill_durability",
+  "hike_run_endurance",
+  "mountain_long_run_time_on_feet",
+  "ultra_time_on_feet_durability",
+  "climbing_steady_run",
+  "quality_session",
+] as const;
+
+export type CanonicalWorkoutIdentity = (typeof CANONICAL_WORKOUT_IDENTITY_VALUES)[number];
+
+export const CALENDAR_ICON_KEY_VALUES = CANONICAL_WORKOUT_FAMILY_VALUES;
+
+export type CalendarIconKey = (typeof CALENDAR_ICON_KEY_VALUES)[number];
+
+export const CANONICAL_METRIC_GUIDANCE_VALUES = ["effort", "pace", "heart_rate", "mixed"] as const;
+
+export type CanonicalMetricGuidance = (typeof CANONICAL_METRIC_GUIDANCE_VALUES)[number];
+
+export type LegacyWorkoutType =
+  | "easy"
+  | "steady_or_easy"
+  | "rest"
+  | "long_run"
+  | "quality"
+  | "tempo"
+  | "intervals"
+  | "progression"
+  | "race"
+  | "recovery";
+
+export interface CanonicalGoalContext {
+  goalType: string;
+  goalStyle?: string | null;
+  terrainFocus?: "standard" | "rolling" | "mountain" | null;
+  targetDate?: string | null;
+  targetTime?: string | null;
+}
+
+export interface CanonicalMetricMode {
+  guidance: CanonicalMetricGuidance;
+  paceTargetsAllowed: boolean;
+  hrTargetsAllowed: boolean;
+  reason: string;
+}
+
+export interface CanonicalMetricModeJson {
+  guidance: CanonicalMetricGuidance;
+  pace_targets_allowed: boolean;
+  hr_targets_allowed: boolean;
+  reason: string;
+}
+
+export interface CanonicalWorkoutModel {
+  workoutFamily: CanonicalWorkoutFamily;
+  workoutIdentity: CanonicalWorkoutIdentity;
+  calendarIconKey: CalendarIconKey;
+  metricMode: CanonicalMetricMode;
+}
+
+export interface CanonicalWorkoutResolutionInput {
+  workoutType: LegacyWorkoutType;
+  sourceWorkoutType?: string | null;
+  workoutFamily?: string | null;
+  workoutIdentity?: string | null;
+  calendarIconKey?: string | null;
+  metricMode?: CanonicalMetricMode | CanonicalMetricModeJson | null;
+  title?: string | null;
+  steps?: WorkoutSegmentLike[] | null;
+}
+
+export interface WorkoutSegmentLike {
+  type?: string | null;
+  segment_type?: string | null;
+  label?: string | null;
+  target?: Record<string, unknown> | null;
+  recovery_target?: Record<string, unknown> | null;
+  work?: WorkoutSegmentLike | null;
+  recovery?: WorkoutSegmentLike | null;
+}
+
+const FAMILY_VALUES = new Set<string>(CANONICAL_WORKOUT_FAMILY_VALUES);
+const IDENTITY_VALUES = new Set<string>(CANONICAL_WORKOUT_IDENTITY_VALUES);
+const ICON_VALUES = new Set<string>(CALENDAR_ICON_KEY_VALUES);
+const GUIDANCE_VALUES = new Set<string>(CANONICAL_METRIC_GUIDANCE_VALUES);
+
+const identityFamilyMap: Record<CanonicalWorkoutIdentity, CanonicalWorkoutFamily> = {
+  rest_and_recovery: "rest",
+  easy_aerobic_run: "easy",
+  recovery_jog: "recovery",
+  steady_aerobic_run: "steady",
+  cutback_aerobic_run: "easy",
+  easy_run_with_strides: "easy",
+  long_aerobic_run: "long",
+  long_run_with_steady_finish: "long",
+  cutback_long_run: "long",
+  taper_long_run: "long",
+  controlled_tempo_session: "tempo",
+  half_marathon_threshold_durability: "tempo",
+  marathon_steady_specificity: "steady",
+  distance_intervals: "intervals",
+  time_intervals: "intervals",
+  "5k_sharpening_repeats": "intervals",
+  "10k_rhythm_intervals": "intervals",
+  progression_run: "progression",
+  race_pace_session: "race",
+  taper_tuneup_run: "race",
+  uphill_repeats: "hills",
+  rolling_hills_session: "hills",
+  technical_trail_easy: "trail",
+  controlled_downhill_durability: "hills",
+  hike_run_endurance: "trail",
+  mountain_long_run_time_on_feet: "trail",
+  ultra_time_on_feet_durability: "long",
+  climbing_steady_run: "hills",
+  quality_session: "intervals",
+};
+
+const sourceIdentityAliases: Record<string, CanonicalWorkoutIdentity> = {
+  rest: "rest_and_recovery",
+  rest_and_recovery: "rest_and_recovery",
+  recovery: "recovery_jog",
+  recovery_jog: "recovery_jog",
+  easy: "easy_aerobic_run",
+  easy_aerobic_run: "easy_aerobic_run",
+  steady: "steady_aerobic_run",
+  steady_or_easy: "steady_aerobic_run",
+  steady_aerobic_run: "steady_aerobic_run",
+  cutback: "cutback_aerobic_run",
+  cutback_aerobic_run: "cutback_aerobic_run",
+  strides: "easy_run_with_strides",
+  aerobic_strides: "easy_run_with_strides",
+  easy_run_with_strides: "easy_run_with_strides",
+  long: "long_aerobic_run",
+  long_run: "long_aerobic_run",
+  long_aerobic_run: "long_aerobic_run",
+  long_run_with_steady_finish: "long_run_with_steady_finish",
+  cutback_long_run: "cutback_long_run",
+  taper_long_run: "taper_long_run",
+  tempo: "controlled_tempo_session",
+  controlled_tempo_session: "controlled_tempo_session",
+  threshold: "half_marathon_threshold_durability",
+  half_marathon_threshold_durability: "half_marathon_threshold_durability",
+  marathon_steady_specificity: "marathon_steady_specificity",
+  intervals: "distance_intervals",
+  distance_intervals: "distance_intervals",
+  time_intervals: "time_intervals",
+  "5k_sharpening_repeats": "5k_sharpening_repeats",
+  "10k_rhythm_intervals": "10k_rhythm_intervals",
+  progression: "progression_run",
+  progression_run: "progression_run",
+  race: "race_pace_session",
+  race_pace: "race_pace_session",
+  race_pace_session: "race_pace_session",
+  tune_up: "taper_tuneup_run",
+  tuneup: "taper_tuneup_run",
+  race_tune_up: "taper_tuneup_run",
+  taper_tuneup_run: "taper_tuneup_run",
+  uphill_repeats: "uphill_repeats",
+  rolling_hills_session: "rolling_hills_session",
+  technical_trail_easy: "technical_trail_easy",
+  controlled_downhill_durability: "controlled_downhill_durability",
+  hike_run_endurance: "hike_run_endurance",
+  mountain_long_run_time_on_feet: "mountain_long_run_time_on_feet",
+  ultra_time_on_feet_durability: "ultra_time_on_feet_durability",
+  climbing_steady_run: "climbing_steady_run",
+  quality: "quality_session",
+  quality_session: "quality_session",
+};
+
+export function resolveCanonicalWorkoutModel(
+  input: CanonicalWorkoutResolutionInput,
+): CanonicalWorkoutModel {
+  const explicitIdentity = normalizeWorkoutIdentity(input.workoutIdentity);
+  const sourceIdentity = normalizeWorkoutIdentity(input.sourceWorkoutType);
+  const identity =
+    explicitIdentity ??
+    sourceIdentity ??
+    inferWorkoutIdentity(input.workoutType, input.title, input.steps ?? []);
+  const explicitFamily = normalizeWorkoutFamily(input.workoutFamily);
+  const workoutFamily =
+    explicitIdentity || sourceIdentity
+      ? identityFamilyMap[identity]
+      : (explicitFamily ?? identityFamilyMap[identity]);
+  const calendarIconKey = normalizeCalendarIconKey(input.calendarIconKey) ?? workoutFamily;
+  const metricMode =
+    workoutFamily === "rest"
+      ? buildRestMetricMode()
+      : (normalizeCanonicalMetricMode(input.metricMode) ??
+        deriveCanonicalMetricMode(input.steps ?? []));
+
+  return {
+    workoutFamily,
+    workoutIdentity: identity,
+    calendarIconKey,
+    metricMode,
+  };
+}
+
+export function normalizeWorkoutFamily(value: unknown): CanonicalWorkoutFamily | null {
+  const token = normalizeToken(value);
+
+  return token && FAMILY_VALUES.has(token) ? (token as CanonicalWorkoutFamily) : null;
+}
+
+export function normalizeWorkoutIdentity(value: unknown): CanonicalWorkoutIdentity | null {
+  const token = normalizeToken(value);
+
+  if (!token) {
+    return null;
+  }
+
+  if (IDENTITY_VALUES.has(token)) {
+    return token as CanonicalWorkoutIdentity;
+  }
+
+  return sourceIdentityAliases[token] ?? null;
+}
+
+export function normalizeCalendarIconKey(value: unknown): CalendarIconKey | null {
+  const token = normalizeToken(value);
+
+  return token && ICON_VALUES.has(token) ? (token as CalendarIconKey) : null;
+}
+
+export function normalizeCanonicalMetricMode(value: unknown): CanonicalMetricMode | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const guidance = normalizeMetricGuidance(record.guidance);
+
+  if (!guidance) {
+    return null;
+  }
+
+  const paceTargetsAllowed = readBoolean(record.paceTargetsAllowed, record.pace_targets_allowed);
+  const hrTargetsAllowed = readBoolean(record.hrTargetsAllowed, record.hr_targets_allowed);
+  const reason = typeof record.reason === "string" ? record.reason.trim().slice(0, 200) : "";
+
+  return {
+    guidance,
+    paceTargetsAllowed,
+    hrTargetsAllowed,
+    reason: reason || "Metric mode was provided by backend-compatible workout truth.",
+  };
+}
+
+export function toCanonicalMetricModeJson(
+  metricMode: CanonicalMetricMode,
+): CanonicalMetricModeJson {
+  return {
+    guidance: metricMode.guidance,
+    pace_targets_allowed: metricMode.paceTargetsAllowed,
+    hr_targets_allowed: metricMode.hrTargetsAllowed,
+    reason: metricMode.reason,
+  };
+}
+
+export function normalizeCanonicalGoalContext(value: unknown): CanonicalGoalContext | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const goalType = readString(record.goalType, record.goal_type);
+
+  if (!goalType) {
+    return null;
+  }
+
+  return {
+    goalType,
+    goalStyle: readString(record.goalStyle, record.goal_style),
+    terrainFocus: normalizeTerrainFocus(record.terrainFocus ?? record.terrain_focus),
+    targetDate: readString(record.targetDate, record.target_date),
+    targetTime: readString(record.targetTime, record.target_time),
+  };
+}
+
+export function canonicalFamilyToLegacyWorkoutType(
+  family: CanonicalWorkoutFamily,
+  identity?: CanonicalWorkoutIdentity | null,
+): Extract<LegacyWorkoutType, "easy" | "steady_or_easy" | "rest" | "long_run" | "quality"> {
+  switch (family) {
+    case "rest":
+      return "rest";
+    case "recovery":
+    case "easy":
+      return "easy";
+    case "steady":
+      return "steady_or_easy";
+    case "long":
+      return "long_run";
+    case "trail":
+      if (identity === "technical_trail_easy") return "easy";
+      if (identity === "hike_run_endurance" || identity === "mountain_long_run_time_on_feet") {
+        return "long_run";
+      }
+      return "quality";
+    case "tempo":
+    case "intervals":
+    case "progression":
+    case "race":
+    case "hills":
+      return "quality";
+    default:
+      return "quality";
+  }
+}
+
+export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): CanonicalMetricMode {
+  const hasPace = segments.some((segment) =>
+    segmentContainsTargetKeys(segment, ["pace_min_per_km_range", "pace_range_min_km", "pace"]),
+  );
+  const hasHr = segments.some((segment) =>
+    segmentContainsTargetKeys(segment, ["hr_bpm_range", "hr_bpm"]),
+  );
+
+  if (hasPace && hasHr) {
+    return {
+      guidance: "mixed",
+      paceTargetsAllowed: true,
+      hrTargetsAllowed: true,
+      reason: "Workout includes explicit pace and heart-rate targets.",
+    };
+  }
+
+  if (hasPace) {
+    return {
+      guidance: "pace",
+      paceTargetsAllowed: true,
+      hrTargetsAllowed: false,
+      reason: "Workout includes explicit pace targets.",
+    };
+  }
+
+  if (hasHr) {
+    return {
+      guidance: "heart_rate",
+      paceTargetsAllowed: false,
+      hrTargetsAllowed: true,
+      reason: "Workout includes explicit heart-rate targets.",
+    };
+  }
+
+  return {
+    guidance: "effort",
+    paceTargetsAllowed: false,
+    hrTargetsAllowed: false,
+    reason: "No numeric pace or heart-rate targets are present; use effort cues.",
+  };
+}
+
+function inferWorkoutIdentity(
+  workoutType: LegacyWorkoutType,
+  title: string | null | undefined,
+  steps: WorkoutSegmentLike[],
+): CanonicalWorkoutIdentity {
+  if (workoutType === "rest") {
+    return "rest_and_recovery";
+  }
+
+  const titleText = title?.trim() ?? "";
+  const semanticText = buildLegacySemanticText(titleText, steps);
+
+  if (/\btaper\b/i.test(semanticText) && /\blong\b/i.test(semanticText)) return "taper_long_run";
+  if (/\btaper\b|tune[-_\s]?up\b/i.test(semanticText)) return "taper_tuneup_run";
+  if (/\bcutback\b/i.test(semanticText) && /\blong\b/i.test(semanticText)) {
+    return "cutback_long_run";
+  }
+  if (/\bcutback\b/i.test(semanticText)) return "cutback_aerobic_run";
+  if (/\bsteady\s+finish\b/i.test(semanticText)) return "long_run_with_steady_finish";
+  if (/\btechnical\b.*\btrail\b|\btrail\b.*\bawareness\b/i.test(semanticText)) {
+    return "technical_trail_easy";
+  }
+  if (/\bdownhill\b|\bdescent\b|\beccentric\b/i.test(semanticText)) {
+    return "controlled_downhill_durability";
+  }
+  if (/\bhike[-_\s]?run\b|\bpower[-_\s]?hike\b/i.test(semanticText)) {
+    return "hike_run_endurance";
+  }
+  if (
+    /\bmountain\b.*\btime[-_\s]?on[-_\s]?feet\b|\btime[-_\s]?on[-_\s]?feet\b.*\bmountain\b/i.test(
+      semanticText,
+    )
+  ) {
+    return "mountain_long_run_time_on_feet";
+  }
+  if (
+    /\bultra\b.*\btime[-_\s]?on[-_\s]?feet\b|\btime[-_\s]?on[-_\s]?feet\b.*\bdurability\b/i.test(
+      semanticText,
+    )
+  ) {
+    return "ultra_time_on_feet_durability";
+  }
+  if (/\brolling\b.*\bhills?\b|\bhills?\b.*\brolling\b/i.test(semanticText)) {
+    return "rolling_hills_session";
+  }
+  if (/\bclimb(?:ing)?\b.*\bsteady\b|\bsteady\b.*\bclimb(?:ing)?\b/i.test(semanticText)) {
+    return "climbing_steady_run";
+  }
+  if (/\buphill\b|\bhill\s+repeats?\b|\bhill\s+work\b/i.test(semanticText)) {
+    return "uphill_repeats";
+  }
+  if (/\bdistance\s+intervals?\b|\bintervals?\b.*\bdistance\b/i.test(semanticText)) {
+    return "distance_intervals";
+  }
+  if (/\btime\s+intervals?\b|\bintervals?\b.*\btime\b/i.test(semanticText)) {
+    return "time_intervals";
+  }
+  if (/\b5k\b/i.test(semanticText)) return "5k_sharpening_repeats";
+  if (/\b10k\b/i.test(semanticText)) return "10k_rhythm_intervals";
+  if (/\bthreshold\b|\bhalf[-_\s]?marathon\b/i.test(semanticText)) {
+    return "half_marathon_threshold_durability";
+  }
+  if (/\btempo\b/i.test(semanticText)) return "controlled_tempo_session";
+  if (/\bmarathon\b/i.test(semanticText) && /\bsteady|specific/i.test(semanticText)) {
+    return "marathon_steady_specificity";
+  }
+  if (/\bprogression\b/i.test(semanticText)) return "progression_run";
+  if (/\brace\s+pace\b|\brace[-_\s]?specific\b|\btune[-_\s]?up\b/i.test(semanticText)) {
+    return "race_pace_session";
+  }
+  if (/\btrail\b|\bmountain\b/i.test(semanticText)) return "technical_trail_easy";
+
+  switch (workoutType) {
+    case "recovery":
+      return "recovery_jog";
+    case "steady_or_easy":
+      return "steady_aerobic_run";
+    case "long_run":
+      return "long_aerobic_run";
+    case "tempo":
+      return "controlled_tempo_session";
+    case "intervals":
+      return "distance_intervals";
+    case "progression":
+      return "progression_run";
+    case "race":
+      return "race_pace_session";
+    case "quality":
+      return "quality_session";
+    case "easy":
+    default:
+      return "easy_aerobic_run";
+  }
+}
+
+function buildRestMetricMode(): CanonicalMetricMode {
+  return {
+    guidance: "effort",
+    paceTargetsAllowed: false,
+    hrTargetsAllowed: false,
+    reason: "Rest day has no execution metric targets.",
+  };
+}
+
+function buildLegacySemanticText(title: string, steps: WorkoutSegmentLike[]) {
+  return [title, ...steps.flatMap((step) => collectSegmentSemanticText(step))]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function collectSegmentSemanticText(step: WorkoutSegmentLike): string[] {
+  const entries = [step.type, step.segment_type, step.label];
+
+  if (step.target) {
+    entries.push(readTargetText(step.target, "intensity"));
+    entries.push(readTargetText(step.target, "cue"));
+    entries.push(readTargetText(step.target, "hint"));
+  }
+
+  if (step.recovery_target) {
+    entries.push(readTargetText(step.recovery_target, "intensity"));
+    entries.push(readTargetText(step.recovery_target, "cue"));
+    entries.push(readTargetText(step.recovery_target, "hint"));
+  }
+
+  if (step.work) {
+    entries.push(...collectSegmentSemanticText(step.work));
+  }
+
+  if (step.recovery) {
+    entries.push(...collectSegmentSemanticText(step.recovery));
+  }
+
+  return entries.filter((entry): entry is string => Boolean(entry?.trim()));
+}
+
+function readTargetText(target: Record<string, unknown>, key: string) {
+  const value = target[key];
+
+  return typeof value === "string" ? value : null;
+}
+
+function normalizeTerrainFocus(value: unknown): CanonicalGoalContext["terrainFocus"] {
+  const token = normalizeToken(value);
+
+  if (token === "standard" || token === "rolling" || token === "mountain") {
+    return token;
+  }
+
+  return null;
+}
+
+function readString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const trimmed = value.trim();
+
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
+function normalizeMetricGuidance(value: unknown): CanonicalMetricGuidance | null {
+  const token = normalizeToken(value);
+
+  return token && GUIDANCE_VALUES.has(token) ? (token as CanonicalMetricGuidance) : null;
+}
+
+function segmentContainsTargetKeys(segment: WorkoutSegmentLike, keys: string[]): boolean {
+  const targets = [
+    segment.target,
+    segment.recovery_target,
+    segment.work?.target,
+    segment.recovery?.target,
+  ];
+
+  if (
+    targets.some((target) =>
+      keys.some((key) => {
+        const value = target?.[key];
+
+        return typeof value === "string" && value.trim().length > 0;
+      }),
+    )
+  ) {
+    return true;
+  }
+
+  return [segment.work, segment.recovery].some(
+    (child) => child != null && segmentContainsTargetKeys(child, keys),
+  );
+}
+
+function readBoolean(...values: unknown[]) {
+  return values.some((value) => value === true);
+}
+
+function normalizeToken(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const token = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/_+/g, "_");
+
+  return token || null;
+}

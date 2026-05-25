@@ -15,7 +15,7 @@
     "serve:local": "node --env-file=.env.local .output/server/index.mjs --host 127.0.0.1 --port 3000",
     "import:current-plan": "node --env-file=.env.local ./scripts/import-current-plan.mjs /Users/ivan/Downloads/ivan_complete_half_marathon_plan.json",
     "author-structured-plan": "node --env-file=.env.local ./scripts/author-structured-plan.mjs",
-    "author-plan-from-text": "node --env-file=.env.local ./scripts/author-plan-from-text.mjs",
+    "author-plan-from-text": "node --env-file=.env.local --import tsx ./scripts/author-plan-from-text.ts",
     "test-user": "node --env-file=.env.local ./scripts/test-user.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."

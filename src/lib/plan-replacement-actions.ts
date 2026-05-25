@@ -3,6 +3,7 @@ import { z } from "zod";
 import { applyImportedPlanForUser } from "@/lib/active-plan-persistence";
 import { importedPlanSchema } from "@/lib/imported-plan";
 import { generateCanonicalPlanFromText } from "@/lib/openai-plan-authoring";
+import { buildPlanScopedStructuredAuthoringMetadata } from "@/lib/plan-authoring-snapshot";
 import { type FirstDayResolution, type PlanApplyResult } from "@/lib/plan-apply-policy";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import { requireAuthenticatedUser } from "@/lib/backend/auth";
@@ -39,10 +40,18 @@ export const completeOnboarding = createServerFn({ method: "POST" })
 export const completeTextOnboarding = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => textAuthoringInputSchema.parse(value))
   .handler(async ({ data }) => {
-    const generatedPlan = await generateCanonicalPlanFromText(data.authoringText);
+    const generatedPlan = await generateCanonicalPlanFromText(data.authoringText, {
+      enableRichWorkoutDraft: true,
+    });
     const applyResult = await persistImportedPlanForCurrentRequest(
       generatedPlan.canonicalPlan,
       data.firstDayResolution ?? null,
+      null,
+      buildPlanScopedStructuredAuthoringMetadata({
+        source: "text_authoring",
+        authoringInput: generatedPlan.authoringInput,
+        reviewAssumptions: generatedPlan.richDraftMetadata.reviewAssumptions,
+      }),
     );
 
     return applyResult.ok
@@ -53,6 +62,9 @@ export const completeTextOnboarding = createServerFn({ method: "POST" })
           workoutCount: generatedPlan.canonicalPlan.planned_workouts.length,
           model: generatedPlan.model,
           responseId: generatedPlan.responseId,
+          richDraftStatus: generatedPlan.richDraftMetadata.status,
+          richDraftFallbackReason: generatedPlan.richDraftMetadata.fallbackReason,
+          richDraftResponseId: generatedPlan.richDraftResponseId,
         }
       : {
           ...applyResult,
@@ -61,6 +73,9 @@ export const completeTextOnboarding = createServerFn({ method: "POST" })
           workoutCount: generatedPlan.canonicalPlan.planned_workouts.length,
           model: generatedPlan.model,
           responseId: generatedPlan.responseId,
+          richDraftStatus: generatedPlan.richDraftMetadata.status,
+          richDraftFallbackReason: generatedPlan.richDraftMetadata.fallbackReason,
+          richDraftResponseId: generatedPlan.richDraftResponseId,
           importedPlan: generatedPlan.canonicalPlan,
         };
   });
@@ -69,6 +84,7 @@ export async function persistImportedPlanForCurrentRequest(
   importedPlan: ImportedPlanInput,
   firstDayResolution: FirstDayResolution | null,
   requestedStartDate: string | null = null,
+  planMetadata: Parameters<typeof applyImportedPlanForUser>[5] = null,
 ): Promise<PlanApplyResult> {
   const auth = requireAuthenticatedUser();
   const persistedUserId = await getPersistedUserIdForAuthContext(auth);
@@ -82,5 +98,7 @@ export async function persistImportedPlanForCurrentRequest(
     importedPlan,
     firstDayResolution,
     requestedStartDate,
+    null,
+    planMetadata,
   );
 }

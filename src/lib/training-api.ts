@@ -33,6 +33,7 @@ import {
 import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import {
   deriveWeekStatus,
+  deriveWorkoutRichModel,
   getPreviewSnapshot,
   inferWorkoutStatus,
   normalizeExecutableStepInstructions,
@@ -366,6 +367,7 @@ function dbWorkoutToView(
   feedbackMarker: Workout["feedbackMarker"],
 ): Workout {
   const mappedLog = log ? logRowToView(log) : null;
+  const steps = normalizeExecutableStepInstructions((workout.steps as Step[] | null) ?? []);
 
   return {
     id: workout.id,
@@ -375,9 +377,20 @@ function dbWorkoutToView(
     phase: workout.phase,
     type: workout.workout_type,
     sourceWorkoutType: workout.source_workout_type,
+    ...deriveWorkoutRichModel({
+      type: workout.workout_type,
+      sourceWorkoutType: workout.source_workout_type,
+      workoutFamily: workout.workout_family,
+      workoutIdentity: workout.workout_identity,
+      calendarIconKey: workout.calendar_icon_key,
+      goalContext: workout.goal_context,
+      metricMode: workout.metric_mode,
+      title: workout.title,
+      steps,
+    }),
     title: workout.title,
     notes: workout.notes,
-    steps: normalizeExecutableStepInstructions((workout.steps as Step[] | null) ?? []),
+    steps,
     feedbackMarker,
     log: mappedLog,
     status: inferWorkoutStatus(workout.workout_type, workout.workout_date, currentDate, mappedLog),

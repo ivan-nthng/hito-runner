@@ -3,6 +3,8 @@ import {
   buildExactActivePlanRefreshDraft,
   mutableWorkoutGuardsStillOpen,
   parseActivePlanRefreshDraftPayload,
+  rebuildActivePlanRefreshDraftWithRichWorkoutDraft,
+  type ActivePlanRefreshDraft,
   type RefreshEvidenceSets,
 } from "@/lib/active-plan-refresh-draft";
 import {
@@ -23,8 +25,17 @@ import {
   buildImportedPlanSeed,
   type ImportedPlanSeed,
   type ImportedWorkoutSeed,
+  type TrainingPlanV2,
 } from "@/lib/imported-plan";
-import { type ActivePlanRefreshFingerprint } from "@/lib/plan-refresh-proposal";
+import {
+  buildPlanScopedStructuredAuthoringMetadata,
+  mergePlanPersistenceMetadata,
+} from "@/lib/plan-authoring-snapshot";
+import { persistedWorkoutRowToImportedSeed } from "@/lib/persisted-plan-replacement";
+import type {
+  ActivePlanRefreshFingerprint,
+  ActivePlanRefreshProposal,
+} from "@/lib/plan-refresh-proposal";
 import type {
   ActivePlanRefreshApplyPayload,
   ActivePlanRefreshProposalInput,
@@ -33,17 +44,11 @@ import type {
 } from "@/lib/active-plan-refresh-contract";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import type { RunnerCoachContext } from "@/lib/runner-coach-context";
+import { buildDeterministicRichWorkoutFallbackMetadata } from "@/lib/rich-workout-draft-authoring";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { requireAuthenticatedUser } from "@/lib/backend/auth";
-import {
-  addDaysIso,
-  diffDaysIso,
-  normalizeExecutableStepInstructions,
-  weekdayLong,
-  type Step,
-  type TrainingSnapshot,
-} from "@/lib/training";
+import { addDaysIso, diffDaysIso, weekdayLong, type TrainingSnapshot } from "@/lib/training";
 import {
   mergeWeekdayRestInvariantIntoPlanPreferences,
   validateWorkoutsAgainstWeekdayRestInvariant,
@@ -62,6 +67,8 @@ export type {
 } from "@/lib/active-plan-refresh-contract";
 
 type PersistedSnapshotLoader = (userId: string) => Promise<TrainingSnapshot>;
+const REFRESH_PROPOSAL_OPENAI_TIMEOUT_MS = 45_000;
+const REFRESH_RICH_WORKOUT_DRAFT_TIMEOUT_MS = 45_000;
 
 export async function proposeActivePlanRefreshForCurrentRequest(
   data: ActivePlanRefreshProposalInput,
@@ -90,12 +97,12 @@ export async function proposeActivePlanRefreshForUser(
   }
 
   const { buildRunnerCoachContext } = await import("@/lib/runner-coach-context");
-  const { generateActivePlanRefreshProposal } = await import("@/lib/plan-refresh-proposal");
   const context = await buildRunnerCoachContext({ userId });
-  const proposal = await generateActivePlanRefreshProposal({
+  const proposalResult = await buildBoundedActivePlanRefreshProposal({
     context,
     runnerPrompt: data.runnerPrompt,
   });
+  const proposal = proposalResult.proposal;
   const planContext = await getExistingPlanContext(userId);
 
   if (!context.activePlan || !planContext.activePlan) {
@@ -107,7 +114,7 @@ export async function proposeActivePlanRefreshForUser(
     planContext.existingWorkouts.workouts.map((workout) => workout.id),
     planContext.existingWorkouts.logsByWorkoutId,
   );
-  const refreshDraft = buildExactActivePlanRefreshDraft({
+  const deterministicRefreshDraft = buildExactActivePlanRefreshDraft({
     context,
     currentPlan: planContext.activePlan,
     existingWorkouts: planContext.existingWorkouts,
@@ -116,6 +123,17 @@ export async function proposeActivePlanRefreshForUser(
     weekdayRestInvariant: context.weekdayRestInvariant,
     evidenceSets,
   });
+  const refreshDraft = proposalResult.fallbackReason
+    ? rebuildActivePlanRefreshDraftWithRichWorkoutDraft({
+        draft: deterministicRefreshDraft,
+        canonicalPlan: deterministicRefreshDraft.canonicalPlan,
+        metadata: buildDeterministicRichWorkoutFallbackMetadata(proposalResult.fallbackReason),
+      })
+    : await buildRichActivePlanRefreshDraft({
+        deterministicDraft: deterministicRefreshDraft,
+        proposalOutput: proposal.output,
+        runnerPrompt: data.runnerPrompt,
+      });
   const proposalWithDraft = {
     ...proposal,
     output: {
@@ -133,6 +151,161 @@ export async function proposeActivePlanRefreshForUser(
     ok: true,
     proposal: proposalWithDraft,
   };
+}
+
+async function buildBoundedActivePlanRefreshProposal({
+  context,
+  runnerPrompt,
+}: {
+  context: RunnerCoachContext;
+  runnerPrompt: string;
+}): Promise<{
+  proposal: ActivePlanRefreshProposal;
+  fallbackReason: "refresh_proposal_timed_out" | null;
+}> {
+  const { buildDeterministicActivePlanRefreshProposal, generateActivePlanRefreshProposal } =
+    await import("@/lib/plan-refresh-proposal");
+
+  try {
+    return {
+      proposal: await withBoundedTimeout(
+        generateActivePlanRefreshProposal({
+          context,
+          runnerPrompt,
+          timeoutMs: REFRESH_PROPOSAL_OPENAI_TIMEOUT_MS,
+        }),
+        REFRESH_PROPOSAL_OPENAI_TIMEOUT_MS,
+      ),
+      fallbackReason: null,
+    };
+  } catch (error) {
+    if (!isTimeoutLikeError(error)) {
+      throw error;
+    }
+
+    const fallbackReason = "refresh_proposal_timed_out" as const;
+
+    return {
+      proposal: buildDeterministicActivePlanRefreshProposal({
+        context,
+        runnerPrompt,
+        fallbackReason,
+      }),
+      fallbackReason,
+    };
+  }
+}
+
+async function buildRichActivePlanRefreshDraft({
+  deterministicDraft,
+  proposalOutput,
+  runnerPrompt,
+}: {
+  deterministicDraft: ActivePlanRefreshDraft;
+  proposalOutput: {
+    review: { summary: string; proposedChanges: string[] };
+    recommendedAuthoringPrompt: string;
+  };
+  runnerPrompt: string;
+}) {
+  const { buildRichDraftFallbackReason, generateRichWorkoutDraftForCanonicalPlan } =
+    await import("@/lib/openai-plan-authoring");
+
+  return withBoundedTimeout(
+    generateRichWorkoutDraftForCanonicalPlan({
+      authoringText: buildRefreshRichWorkoutDraftPrompt({
+        deterministicPlan: deterministicDraft.canonicalPlan,
+        proposalOutput,
+        runnerPrompt,
+      }),
+      authoringInput: deterministicDraft.authoringSnapshot.authoringInput,
+      deterministicPlan: deterministicDraft.canonicalPlan,
+      timeoutMs: REFRESH_RICH_WORKOUT_DRAFT_TIMEOUT_MS,
+    }),
+    REFRESH_RICH_WORKOUT_DRAFT_TIMEOUT_MS,
+  )
+    .then((richDraftResult) =>
+      rebuildActivePlanRefreshDraftWithRichWorkoutDraft({
+        draft: deterministicDraft,
+        canonicalPlan: richDraftResult.canonicalPlan,
+        metadata: richDraftResult.metadata,
+      }),
+    )
+    .catch((error: unknown) =>
+      rebuildActivePlanRefreshDraftWithRichWorkoutDraft({
+        draft: deterministicDraft,
+        canonicalPlan: deterministicDraft.canonicalPlan,
+        metadata: buildDeterministicRichWorkoutFallbackMetadata(
+          error instanceof BoundedRefreshTimeoutError
+            ? "rich_draft_timed_out"
+            : buildRichDraftFallbackReason(error),
+        ),
+      }),
+    );
+}
+
+function withBoundedTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new BoundedRefreshTimeoutError());
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  });
+}
+
+class BoundedRefreshTimeoutError extends Error {
+  constructor() {
+    super("Refresh OpenAI step timed out.");
+    this.name = "BoundedRefreshTimeoutError";
+  }
+}
+
+function isTimeoutLikeError(error: unknown) {
+  return (
+    error instanceof BoundedRefreshTimeoutError ||
+    (error instanceof Error &&
+      (error.name === "AbortError" || /timed?\s*out|timeout|aborted/i.test(error.message)))
+  );
+}
+
+function buildRefreshRichWorkoutDraftPrompt({
+  deterministicPlan,
+  proposalOutput,
+  runnerPrompt,
+}: {
+  deterministicPlan: TrainingPlanV2;
+  proposalOutput: {
+    review: { summary: string; proposedChanges: string[] };
+    recommendedAuthoringPrompt: string;
+  };
+  runnerPrompt: string;
+}) {
+  const dateRange = `${deterministicPlan.start_date} to ${deterministicPlan.end_date}`;
+
+  return [
+    "Active-plan refresh rich workout draft.",
+    `Mutable refreshed schedule date range: ${dateRange}.`,
+    "Protected past, logged, Garmin/evidence-backed, comparison, AI-insight, and body-note history is not included in this draft and must stay unchanged.",
+    "Do not add, remove, move, reorder, or reinterpret workouts. Only enrich the provided deterministic refreshed schedule.",
+    "",
+    "Runner refresh request:",
+    runnerPrompt.trim(),
+    "",
+    "Reviewed proposal summary:",
+    proposalOutput.review.summary,
+    "",
+    "Reviewed proposed changes:",
+    proposalOutput.review.proposedChanges.map((change) => `- ${change}`).join("\n"),
+    "",
+    "Recommended bounded authoring prompt:",
+    proposalOutput.recommendedAuthoringPrompt,
+  ].join("\n");
 }
 
 export async function applyActivePlanRefreshProposalForCurrentRequest(
@@ -344,6 +517,19 @@ function prepareActivePlanRefreshReplacement({
 
     return log ? [{ log, sourceWorkoutId: workout.id, workoutDate: workout.workout_date }] : [];
   });
+  const draftAuthoringMetadata = proposal.output.refreshDraft
+    ? buildPlanScopedStructuredAuthoringMetadata({
+        source: "active_plan_refresh",
+        authoringInput: proposal.output.refreshDraft.authoringSnapshot.authoringInput,
+        goalStyle: proposal.output.refreshDraft.authoringSnapshot.authoringInput.goal.goalStyle,
+        targetTime: proposal.output.refreshDraft.authoringSnapshot.authoringInput.goal.targetTime,
+        metricPolicySummary: proposal.output.refreshDraft.authoringSnapshot.metricPolicySummary,
+        reviewAssumptions: [
+          ...proposal.output.refreshDraft.reviewMetadata.targetTimeHonestyAssumptions,
+          ...proposal.output.refreshDraft.reviewMetadata.longDistanceHonestyAssumptions,
+        ],
+      })
+    : null;
 
   return {
     importedSeed: {
@@ -354,12 +540,16 @@ function prepareActivePlanRefreshReplacement({
       startDate: combinedWorkouts[0]!.workoutDate,
       endDate: combinedWorkouts.at(-1)!.workoutDate,
       targetDate: currentPlan.target_date,
-      goalMetadata: currentPlan.goal_metadata,
+      goalMetadata: mergePlanPersistenceMetadata(
+        currentPlan.goal_metadata,
+        draftAuthoringMetadata?.goalMetadata,
+      ),
       planPreferences: buildRefreshPlanPreferences(
         generatedSeed.planPreferences,
         proposal,
         fingerprint,
         weekdayRestInvariant,
+        draftAuthoringMetadata?.planPreferences,
       ),
       workouts: combinedWorkouts,
     },
@@ -419,22 +609,9 @@ function normalizeRefreshReplacementWorkouts(workouts: ImportedWorkoutSeed[]) {
 function persistedWorkoutRowToRefreshSeed(
   workout: PersistedPlannedWorkoutRow,
 ): ImportedWorkoutSeed {
-  return {
-    workoutDate: workout.workout_date,
-    weekday: workout.weekday,
-    weekNumber: workout.week_number,
-    phase: workout.phase,
-    workoutType: workout.workout_type,
-    sourceWorkoutId: workout.source_workout_id ?? `fixed-${workout.id}`,
-    sourceWorkoutType: workout.source_workout_type ?? workout.workout_type,
-    title: workout.title,
-    notes: workout.notes ?? null,
-    plannedRpe: workout.planned_rpe ?? null,
-    estimatedFatigue: workout.estimated_fatigue ?? null,
-    recoveryPriority: workout.recovery_priority ?? null,
-    steps: normalizeExecutableStepInstructions((workout.steps as Step[] | null) ?? []),
-    displayOrder: workout.display_order,
-  };
+  return persistedWorkoutRowToImportedSeed(workout, {
+    fallbackSourceWorkoutIdPrefix: "fixed",
+  });
 }
 
 function buildRefreshPlanPreferences(
@@ -442,6 +619,7 @@ function buildRefreshPlanPreferences(
   proposal: ActivePlanRefreshApplyPayload,
   fingerprint: ActivePlanRefreshFingerprint,
   weekdayRestInvariant: WeekdayRestInvariant,
+  authoringPlanPreferences: Json | null | undefined = null,
 ): Json {
   const invariantAwarePreferences = mergeWeekdayRestInvariantIntoPlanPreferences(
     planPreferences,
@@ -453,9 +631,16 @@ function buildRefreshPlanPreferences(
     !Array.isArray(invariantAwarePreferences)
       ? invariantAwarePreferences
       : {};
+  const authoringBase =
+    authoringPlanPreferences &&
+    typeof authoringPlanPreferences === "object" &&
+    !Array.isArray(authoringPlanPreferences)
+      ? authoringPlanPreferences
+      : {};
 
   return {
     ...base,
+    ...authoringBase,
     active_plan_refresh: {
       applied_at: new Date().toISOString(),
       proposal_generated_at: proposal.output.applyContext.generatedAt,
@@ -467,6 +652,15 @@ function buildRefreshPlanPreferences(
       last_mutable_date: fingerprint.lastMutableDate,
       draft_checksum: proposal.output.refreshDraft?.checksum ?? null,
       draft_generated_at: proposal.output.refreshDraft?.generatedAt ?? null,
+      rich_draft_status:
+        proposal.output.refreshDraft?.richWorkoutDraftMetadata.status ?? "not_requested",
+      rich_draft_source:
+        proposal.output.refreshDraft?.richWorkoutDraftMetadata.source ??
+        "deterministic_structured_generator",
+      rich_draft_fallback_reason:
+        proposal.output.refreshDraft?.richWorkoutDraftMetadata.fallbackReason ?? null,
+      rich_draft_review_assumptions:
+        proposal.output.refreshDraft?.richWorkoutDraftMetadata.reviewAssumptions ?? [],
       draft_source_assumption:
         proposal.output.refreshDraft?.authoringSnapshot.sourceAssumption ?? null,
       draft_metric_policy:

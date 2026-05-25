@@ -7,8 +7,14 @@ import {
 import {
   DEFAULT_FIRST_PLAN_EXECUTION_MODE,
   FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES,
+  FIRST_PLAN_GOAL_STYLE_VALUES,
   FIRST_PLAN_WATCH_ACCESS_VALUES,
 } from "@/lib/first-plan-authoring-utils";
+import {
+  resolveCanonicalWorkoutModel,
+  toCanonicalMetricModeJson,
+  type LegacyWorkoutType,
+} from "@/lib/rich-workout-model";
 import { addDaysIso, diffDaysIso, todayIso } from "@/lib/training";
 
 const weekdayValues = [
@@ -61,6 +67,8 @@ export const structuredPlanAuthoringInputSchema = z
         "mountain_running",
       ]),
       goalLabel: z.string().trim().min(1).max(160),
+      goalStyle: z.enum(FIRST_PLAN_GOAL_STYLE_VALUES).optional().nullable(),
+      targetTime: z.string().trim().min(1).max(32).optional().nullable(),
       targetEventName: z.string().trim().max(160).optional().nullable(),
     }),
     schedule: z.object({
@@ -416,7 +424,64 @@ function buildGeneratedWorkouts(normalized: NormalizedStructuredInput) {
     workouts.push(buildEasyWorkout({ workoutId, date, weekday, weekNumber, phase, normalized }));
   }
 
-  return workouts;
+  return workouts.map((workout) => attachCanonicalWorkoutFields(workout, normalized));
+}
+
+function attachCanonicalWorkoutFields<
+  T extends {
+    workout_type: LegacyWorkoutType;
+    source_workout_type?: string;
+    title: string;
+    segments: Array<{
+      segment_type?: string;
+      label?: string;
+      target?: Record<string, unknown>;
+      recovery_target?: Record<string, unknown>;
+    }>;
+  },
+>(workout: T, normalized: NormalizedStructuredInput) {
+  const richWorkout = resolveCanonicalWorkoutModel({
+    workoutType: workout.workout_type,
+    sourceWorkoutType: workout.source_workout_type,
+    title: workout.title,
+    steps: workout.segments,
+    metricMode: buildGeneratedWorkoutMetricMode(normalized),
+  });
+
+  return {
+    ...workout,
+    workout_family: richWorkout.workoutFamily,
+    workout_identity: richWorkout.workoutIdentity,
+    calendar_icon_key: richWorkout.calendarIconKey,
+    goal_context: buildGeneratedWorkoutGoalContext(normalized),
+    metric_mode: toCanonicalMetricModeJson(richWorkout.metricMode),
+  };
+}
+
+function buildGeneratedWorkoutGoalContext(normalized: NormalizedStructuredInput) {
+  return {
+    goal_type: normalized.goal.goalType,
+    ...(normalized.goal.goalStyle ? { goal_style: normalized.goal.goalStyle } : {}),
+    terrain_focus: normalized.preferences.terrainFocus,
+    ...(normalized.schedule.targetDate ? { target_date: normalized.schedule.targetDate } : {}),
+    ...(normalized.goal.targetTime ? { target_time: normalized.goal.targetTime } : {}),
+  };
+}
+
+function buildGeneratedWorkoutMetricMode(normalized: NormalizedStructuredInput) {
+  const metricMode = resolveStructuredMetricMode(normalized);
+  const guidance = normalized.execution.guidancePreference;
+
+  return {
+    guidance: guidance === "heart_rate" ? "heart_rate" : guidance,
+    paceTargetsAllowed: metricMode.paceTargetsAllowed,
+    hrTargetsAllowed: metricMode.heartRateTargetsAllowed,
+    reason: metricMode.paceTargetsAllowed
+      ? "Watch/app pace guidance and recent 5K benchmark truth allow broad pace targets."
+      : metricMode.heartRateTargetsAllowed
+        ? "Heart-rate targets are allowed from runner HR-zone truth."
+        : "Metric resolver keeps this workout effort-guided without numeric pace or HR targets.",
+  };
 }
 
 function buildRestWorkout({
@@ -474,22 +539,12 @@ function buildEasyWorkout({
       ? `${easyDurationMin} min easy running with low-risk trail or uneven-ground awareness.`
       : `${easyDurationMin} min comfortable aerobic running.`,
     planned_rpe: 4,
-    segments: [
-      {
-        segment_id: `${workoutId}_seg_1`,
-        sequence: 1,
-        segment_type: "main" as const,
-        label: technicalTrailExposure ? "Easy trail awareness" : "Easy aerobic running",
-        guidance: technicalTrailExposure
-          ? "Choose forgiving terrain if available. Keep the effort conversational, watch footing, and avoid risky technical sections."
-          : "Stay relaxed and conversational.",
-        prescription: {
-          mode: "time" as const,
-          duration_min: easyDurationMin,
-        },
-        target: buildEasyTarget(normalized),
-      },
-    ],
+    segments: buildEasyRunSegments({
+      workoutId,
+      durationMin: easyDurationMin,
+      normalized,
+      technicalTrailExposure,
+    }),
   };
 }
 
@@ -515,7 +570,111 @@ function buildSteadyWorkout({
     title: "Steady aerobic run",
     summary: `${steadyDurationMin} min steady aerobic support run.`,
     planned_rpe: 5,
-    segments: [
+    segments: buildSteadyRunSegments({ workoutId, durationMin: steadyDurationMin, normalized }),
+  };
+}
+
+function buildEasyRunSegments({
+  workoutId,
+  durationMin,
+  normalized,
+  technicalTrailExposure,
+}: {
+  workoutId: string;
+  durationMin: number;
+  normalized: NormalizedStructuredInput;
+  technicalTrailExposure: boolean;
+}) {
+  if (durationMin < 35) {
+    return [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "main" as const,
+        label: technicalTrailExposure ? "Easy trail awareness" : "Easy aerobic running",
+        guidance: technicalTrailExposure
+          ? "Choose forgiving terrain if available. Keep the effort conversational, watch footing, and avoid risky technical sections."
+          : "Stay relaxed and conversational.",
+        prescription: {
+          mode: "time" as const,
+          duration_min: durationMin,
+        },
+        target: buildEasyTarget(normalized),
+      },
+    ];
+  }
+
+  const openerMin = durationMin >= 45 ? 10 : 8;
+  const finishMin = 5;
+  const mainMin = durationMin - openerMin - finishMin;
+
+  return [
+    {
+      segment_id: `${workoutId}_seg_1`,
+      sequence: 1,
+      segment_type: "warmup" as const,
+      label: technicalTrailExposure ? "Gentle trail opening" : "Easy opening rhythm",
+      guidance: technicalTrailExposure
+        ? "Start on forgiving terrain if available; keep attention on relaxed footing."
+        : "Start softer than planned and let breathing settle.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: openerMin,
+      },
+      duration_min: openerMin,
+      target: buildEasyTarget(normalized),
+    },
+    {
+      segment_id: `${workoutId}_seg_2`,
+      sequence: 2,
+      segment_type: "main" as const,
+      label: technicalTrailExposure
+        ? "Conversational trail running"
+        : "Conversational aerobic running",
+      guidance: technicalTrailExposure
+        ? "Keep the trail exposure low-risk and controlled; avoid chasing pace on uneven ground."
+        : "Hold a relaxed, repeatable aerobic rhythm.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: mainMin,
+      },
+      duration_min: mainMin,
+      target: buildEasyTarget(normalized),
+    },
+    {
+      segment_id: `${workoutId}_seg_3`,
+      sequence: 3,
+      segment_type: "cooldown" as const,
+      label: "Relaxed finish check-in",
+      guidance: "Finish smooth and easy; you should feel like you could keep going.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: finishMin,
+      },
+      duration_min: finishMin,
+      target: buildEasyTarget(normalized),
+    },
+  ];
+}
+
+function buildSteadyRunSegments({
+  workoutId,
+  durationMin,
+  normalized,
+}: {
+  workoutId: string;
+  durationMin: number;
+  normalized: NormalizedStructuredInput;
+}) {
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const steadyTarget = {
+    intensity: "steady_aerobic",
+    ...(paceTargets?.steady ? { pace_min_per_km_range: paceTargets.steady } : {}),
+    cue: "Controlled breathing, still sustainable.",
+  };
+
+  if (durationMin < 35) {
+    return [
       {
         segment_id: `${workoutId}_seg_1`,
         sequence: 1,
@@ -524,16 +683,58 @@ function buildSteadyWorkout({
         guidance: "Keep the effort controlled, not race-like.",
         prescription: {
           mode: "time" as const,
-          duration_min: steadyDurationMin,
+          duration_min: durationMin,
         },
-        target: {
-          intensity: "steady_aerobic",
-          ...(paceTargets?.steady ? { pace_min_per_km_range: paceTargets.steady } : {}),
-          cue: "Controlled breathing, still sustainable.",
-        },
+        target: steadyTarget,
       },
-    ],
-  };
+    ];
+  }
+
+  const openerMin = 10;
+  const finishMin = 5;
+  const mainMin = durationMin - openerMin - finishMin;
+
+  return [
+    {
+      segment_id: `${workoutId}_seg_1`,
+      sequence: 1,
+      segment_type: "warmup" as const,
+      label: "Controlled aerobic opener",
+      guidance: "Begin easy before settling into steady work.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: openerMin,
+      },
+      duration_min: openerMin,
+      target: buildEasyTarget(normalized),
+    },
+    {
+      segment_id: `${workoutId}_seg_2`,
+      sequence: 2,
+      segment_type: "main" as const,
+      label: "Steady aerobic body",
+      guidance: "Settle into a purposeful but repeatable aerobic rhythm.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: mainMin,
+      },
+      duration_min: mainMin,
+      target: steadyTarget,
+    },
+    {
+      segment_id: `${workoutId}_seg_3`,
+      sequence: 3,
+      segment_type: "cooldown" as const,
+      label: "Smooth controlled finish",
+      guidance: "Ease out of the steady effort and finish relaxed.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: finishMin,
+      },
+      duration_min: finishMin,
+      target: buildEasyTarget(normalized),
+    },
+  ];
 }
 
 function buildLongRunWorkout({
@@ -647,6 +848,19 @@ function buildLongRunSegments({
   hasSteadyFinish: boolean;
 }) {
   if (!hasSteadyFinish) {
+    const splitLongRun = buildLongAerobicSupportSegments({
+      workoutId,
+      normalized,
+      distanceKm,
+      durationMin,
+      cutback,
+      taper,
+    });
+
+    if (splitLongRun) {
+      return splitLongRun;
+    }
+
     return [
       {
         segment_id: `${workoutId}_seg_1`,
@@ -740,6 +954,138 @@ function buildLongRunSegments({
       },
       duration_min: steadyFinishDurationMin,
       target: buildSteadyFinishTarget(normalized),
+    },
+  ];
+}
+
+function buildLongAerobicSupportSegments({
+  workoutId,
+  normalized,
+  distanceKm,
+  durationMin,
+  cutback,
+  taper,
+}: {
+  workoutId: string;
+  normalized: NormalizedStructuredInput;
+  distanceKm: number;
+  durationMin: number;
+  cutback: boolean;
+  taper: boolean;
+}) {
+  if (cutback || taper) {
+    return null;
+  }
+
+  if (normalized.runnerProfile.baselineLongRunKm) {
+    if (distanceKm < 8) {
+      return null;
+    }
+
+    const openingDistanceKm = roundToTenth(Math.max(1.5, distanceKm * 0.18));
+    const finishDistanceKm = roundToTenth(Math.max(1, distanceKm * 0.12));
+    const mainDistanceKm = roundToTenth(
+      Math.max(2, distanceKm - openingDistanceKm - finishDistanceKm),
+    );
+
+    return [
+      {
+        segment_id: `${workoutId}_seg_1`,
+        sequence: 1,
+        segment_type: "warmup" as const,
+        label: "Patient long-run opening",
+        guidance: "Start deliberately easier than the rest of the run.",
+        prescription: {
+          mode: "distance" as const,
+          distance_km: openingDistanceKm,
+        },
+        distance_km: openingDistanceKm,
+        target: buildLongRunTarget(normalized),
+      },
+      {
+        segment_id: `${workoutId}_seg_2`,
+        sequence: 2,
+        segment_type: "main" as const,
+        label: isMountainSpecificPlan(normalized)
+          ? "Mountain time-on-feet body"
+          : "Long aerobic body",
+        guidance: buildLongRunGuidance(normalized, false, false),
+        prescription: {
+          mode: "distance" as const,
+          distance_km: mainDistanceKm,
+        },
+        distance_km: mainDistanceKm,
+        target: buildLongRunTarget(normalized),
+      },
+      {
+        segment_id: `${workoutId}_seg_3`,
+        sequence: 3,
+        segment_type: "cooldown" as const,
+        label: "Patient finish",
+        guidance: isMountainSpecificPlan(normalized)
+          ? "Finish with controlled descents and hike breaks if they protect the full session."
+          : "Keep form tall and finish controlled rather than fast.",
+        prescription: {
+          mode: "distance" as const,
+          distance_km: finishDistanceKm,
+        },
+        distance_km: finishDistanceKm,
+        target: buildLongRunTarget(normalized),
+      },
+    ];
+  }
+
+  if (durationMin < 50) {
+    return null;
+  }
+
+  const openingMin = 10;
+  const finishMin = 10;
+  const mainMin = durationMin - openingMin - finishMin;
+
+  return [
+    {
+      segment_id: `${workoutId}_seg_1`,
+      sequence: 1,
+      segment_type: "warmup" as const,
+      label: "Patient long-run opening",
+      guidance: "Start deliberately easier than the rest of the run.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: openingMin,
+      },
+      duration_min: openingMin,
+      target: buildLongRunTarget(normalized),
+    },
+    {
+      segment_id: `${workoutId}_seg_2`,
+      sequence: 2,
+      segment_type: "main" as const,
+      label: isMountainSpecificPlan(normalized)
+        ? "Mountain time-on-feet body"
+        : "Long aerobic body",
+      guidance: buildLongRunGuidance(normalized, false, false),
+      prescription: {
+        mode: "time" as const,
+        duration_min: mainMin,
+      },
+      duration_min: mainMin,
+      target: buildLongRunTarget(normalized),
+    },
+    {
+      segment_id: `${workoutId}_seg_3`,
+      sequence: 3,
+      segment_type: "cooldown" as const,
+      label: "Patient finish",
+      guidance: isMountainSpecificPlan(normalized)
+        ? "Finish with controlled descents and hike breaks if they protect the full session."
+        : "Keep form tall and finish controlled rather than fast.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: finishMin,
+      },
+      duration_min: finishMin,
+      target: buildLongRunTarget(normalized),
     },
   ];
 }
@@ -2265,6 +2611,9 @@ function deriveLongRunPeakDistanceKm(
 
 function isHighAmbitionPlan(normalized: NormalizedStructuredInput) {
   return (
+    normalized.goal.goalStyle === "ambitious" ||
+    normalized.goal.goalStyle === "target_time" ||
+    Boolean(normalized.goal.targetTime) ||
     normalized.preferences.preferredWorkoutMix === "long_run_focus" ||
     normalized.constraints.hardConstraints.some((constraint) => /target time/i.test(constraint))
   );
@@ -2320,6 +2669,10 @@ function shouldCapBuildConsistencyQuality(normalized: StructuredPlanAuthoringInp
 }
 
 function hasTargetTimePressure(normalized: StructuredPlanAuthoringInput) {
+  if (normalized.goal.goalStyle === "target_time" || normalized.goal.targetTime) {
+    return true;
+  }
+
   return normalized.constraints.hardConstraints.some((constraint) =>
     /target time/i.test(constraint),
   );
@@ -2398,6 +2751,10 @@ function isoWeekday(isoDate: string): (typeof weekdayValues)[number] {
 
 function roundToFive(value: number) {
   return Math.round(value / 5) * 5;
+}
+
+function roundToTenth(value: number) {
+  return Math.round(value * 10) / 10;
 }
 
 function slugify(value: string) {

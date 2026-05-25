@@ -1,4 +1,5 @@
 import type { ImportedPlanSeed, ImportedWorkoutSeed } from "@/lib/imported-plan";
+import { resolveCanonicalWorkoutModel, toCanonicalMetricModeJson } from "@/lib/rich-workout-model";
 import { addDaysIso, diffDaysIso, weekdayLong } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
 
@@ -272,6 +273,12 @@ function buildInsertedRestWorkout(
 ): ImportedWorkoutSeed {
   const weekday = weekdayLong(workoutDate);
   const sourceWorkout = importedSeed.workouts[displayOrder] ?? importedSeed.workouts[0];
+  const richWorkout = resolveCanonicalWorkoutModel({
+    workoutType: "rest",
+    sourceWorkoutType: "rest_and_recovery",
+    title: "Rest day",
+    steps: [],
+  });
 
   return {
     workoutDate,
@@ -281,6 +288,11 @@ function buildInsertedRestWorkout(
     workoutType: "rest",
     sourceWorkoutId: `fixed-rest-${workoutDate}`,
     sourceWorkoutType: "rest",
+    workoutFamily: richWorkout.workoutFamily,
+    workoutIdentity: richWorkout.workoutIdentity,
+    calendarIconKey: richWorkout.calendarIconKey,
+    goalContext: null,
+    metricMode: toCanonicalMetricModeJson(richWorkout.metricMode),
     title: "Rest day",
     notes: "Fixed weekday rest day.",
     plannedRpe: null,

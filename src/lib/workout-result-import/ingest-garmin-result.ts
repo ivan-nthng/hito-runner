@@ -4,6 +4,7 @@ import type { Database } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   deriveWeekStatus,
+  deriveWorkoutRichModel,
   inferWorkoutStatus,
   weekOf,
   workoutDistanceKm,
@@ -51,6 +52,11 @@ type OwnedPlannedWorkoutRow = Pick<
   | "phase"
   | "workout_type"
   | "source_workout_type"
+  | "workout_family"
+  | "workout_identity"
+  | "calendar_icon_key"
+  | "goal_context"
+  | "metric_mode"
   | "title"
   | "notes"
   | "steps"
@@ -356,7 +362,7 @@ async function getOwnedPlannedWorkout(userId: string, plannedWorkoutId: string) 
   const result = await supabase
     .from("planned_workouts")
     .select(
-      "id, plan_cycle_id, user_id, workout_date, weekday, week_number, phase, workout_type, source_workout_type, title, notes, steps, display_order",
+      "id, plan_cycle_id, user_id, workout_date, weekday, week_number, phase, workout_type, source_workout_type, workout_family, workout_identity, calendar_icon_key, goal_context, metric_mode, title, notes, steps, display_order",
     )
     .eq("id", plannedWorkoutId)
     .eq("user_id", userId)
@@ -706,7 +712,7 @@ async function buildWorkoutAiPromptInput(args: {
   const workoutsResult = await supabase
     .from("planned_workouts")
     .select(
-      "id, plan_cycle_id, user_id, workout_date, weekday, week_number, phase, workout_type, source_workout_type, title, notes, steps, display_order",
+      "id, plan_cycle_id, user_id, workout_date, weekday, week_number, phase, workout_type, source_workout_type, workout_family, workout_identity, calendar_icon_key, goal_context, metric_mode, title, notes, steps, display_order",
     )
     .eq("plan_cycle_id", plannedWorkout.plan_cycle_id)
     .eq("user_id", userId)
@@ -826,6 +832,7 @@ function persistedWorkoutRowToView(
   currentDate: string,
 ): Workout {
   const mappedLog = log ? persistedWorkoutLogToView(log) : null;
+  const steps = Array.isArray(workout.steps) ? (workout.steps as Step[]) : [];
 
   return {
     id: workout.id,
@@ -835,9 +842,20 @@ function persistedWorkoutRowToView(
     phase: workout.phase,
     type: workout.workout_type,
     sourceWorkoutType: workout.source_workout_type,
+    ...deriveWorkoutRichModel({
+      type: workout.workout_type,
+      sourceWorkoutType: workout.source_workout_type,
+      workoutFamily: workout.workout_family,
+      workoutIdentity: workout.workout_identity,
+      calendarIconKey: workout.calendar_icon_key,
+      goalContext: workout.goal_context,
+      metricMode: workout.metric_mode,
+      title: workout.title,
+      steps,
+    }),
     title: workout.title,
     notes: workout.notes,
-    steps: Array.isArray(workout.steps) ? (workout.steps as Step[]) : [],
+    steps,
     feedbackMarker: null,
     log: mappedLog,
     status: inferWorkoutStatus(workout.workout_type, workout.workout_date, currentDate, mappedLog),

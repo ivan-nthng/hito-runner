@@ -29,6 +29,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 ## Must Do
 
 - use current docs/plans as source of truth
+- start orchestration/review/handoff responses with the owning plan/spec/doc file, then `Task`, `Stage`, `What we did`, `Where we are`, and `What we do next`
+- show existing plan/spec/doc files as clickable markdown links with absolute workspace paths; do not render the plan file as inline code/plain text
+- explicitly write `Plan file: none` when a task has no active plan/spec/doc
 - prefer one next role, not many
 - keep prompts concrete and execution-ready
 - require every execution/QA feedback output to name the current `Task` and `Stage`

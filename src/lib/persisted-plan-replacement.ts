@@ -1,6 +1,12 @@
 import type { ImportedPlanSeed } from "@/lib/imported-plan";
+import {
+  normalizeCanonicalGoalContext,
+  resolveCanonicalWorkoutModel,
+  toCanonicalMetricModeJson,
+} from "@/lib/rich-workout-model";
 import type { Json } from "@/lib/supabase/database";
 import type { Database } from "@/lib/supabase/database";
+import { normalizeExecutableStepInstructions, type Step } from "@/lib/training";
 
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
@@ -20,6 +26,11 @@ export function buildPersistedWorkoutInsertRows(
     workout_type: workout.workoutType,
     source_workout_id: workout.sourceWorkoutId,
     source_workout_type: workout.sourceWorkoutType,
+    workout_family: workout.workoutFamily,
+    workout_identity: workout.workoutIdentity,
+    calendar_icon_key: workout.calendarIconKey,
+    goal_context: workout.goalContext as Json,
+    metric_mode: workout.metricMode as Json,
     title: workout.title,
     notes: workout.notes,
     planned_rpe: workout.plannedRpe,
@@ -28,6 +39,53 @@ export function buildPersistedWorkoutInsertRows(
     steps: workout.steps as Json,
     display_order: workout.displayOrder,
   }));
+}
+
+export function persistedWorkoutRowToImportedSeed(
+  workout: PersistedPlannedWorkoutRow,
+  options: {
+    displayOrder?: number;
+    fallbackSourceWorkoutIdPrefix?: string;
+    normalizeSteps?: boolean;
+  } = {},
+): ImportedPlanSeed["workouts"][number] {
+  const rawSteps = ((workout.steps as Step[] | null) ?? []).map((step) => ({ ...step }));
+  const steps =
+    options.normalizeSteps === false ? rawSteps : normalizeExecutableStepInstructions(rawSteps);
+  const richWorkout = resolveCanonicalWorkoutModel({
+    workoutType: workout.workout_type,
+    sourceWorkoutType: workout.source_workout_type,
+    workoutFamily: workout.workout_family,
+    workoutIdentity: workout.workout_identity,
+    calendarIconKey: workout.calendar_icon_key,
+    metricMode: workout.metric_mode,
+    title: workout.title,
+    steps,
+  });
+
+  return {
+    workoutDate: workout.workout_date,
+    weekday: workout.weekday,
+    weekNumber: workout.week_number,
+    phase: workout.phase,
+    workoutType: workout.workout_type,
+    sourceWorkoutId:
+      workout.source_workout_id ??
+      `${options.fallbackSourceWorkoutIdPrefix ?? "preserved"}-${workout.id}`,
+    sourceWorkoutType: workout.source_workout_type ?? workout.workout_type,
+    workoutFamily: richWorkout.workoutFamily,
+    workoutIdentity: richWorkout.workoutIdentity,
+    calendarIconKey: richWorkout.calendarIconKey,
+    goalContext: normalizeCanonicalGoalContext(workout.goal_context),
+    metricMode: toCanonicalMetricModeJson(richWorkout.metricMode),
+    title: workout.title,
+    notes: workout.notes ?? null,
+    plannedRpe: workout.planned_rpe ?? null,
+    estimatedFatigue: workout.estimated_fatigue ?? null,
+    recoveryPriority: workout.recovery_priority ?? null,
+    steps,
+    displayOrder: options.displayOrder ?? workout.display_order,
+  };
 }
 
 export function buildImportedLogCarryForwardPlan(

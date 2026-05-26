@@ -631,7 +631,17 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      apply_active_plan_schedule_reflow: {
+        Args: {
+          p_applied_at: string;
+          p_expected_plan_updated_at: string;
+          p_plan_id: string;
+          p_plan_preferences: Json;
+          p_updates: Json;
+          p_user_id: string;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       plan_cycle_status: "active" | "archived";

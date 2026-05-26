@@ -322,6 +322,11 @@ function toExportMetricMode(metricMode: CanonicalMetricMode) {
     guidance: metricMode.guidance,
     pace_targets_allowed: metricMode.paceTargetsAllowed,
     hr_targets_allowed: metricMode.hrTargetsAllowed,
+    hr_target_source: metricMode.hrTargetSource,
+    ...(metricMode.hrTargetLabel ? { hr_target_label: metricMode.hrTargetLabel } : {}),
+    ...(metricMode.hrTargetSourceNote
+      ? { hr_target_source_note: metricMode.hrTargetSourceNote }
+      : {}),
     reason: metricMode.reason,
   };
 }
@@ -440,6 +445,9 @@ function exportTarget(target: StepTarget | undefined) {
 
   push("intensity", target.intensity);
   push("hr_bpm_range", target.hr_bpm_range ?? target.hr_bpm);
+  push("hr_target_source", target.hr_target_source);
+  push("label", target.label);
+  push("source_note", target.source_note);
   push("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
   push("pace", target.pace);
   push("rpe", target.rpe);

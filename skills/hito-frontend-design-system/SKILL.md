@@ -34,6 +34,16 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 5. Handle loading, empty, error, success, disabled, and destructive confirmation states.
 6. Verify mobile width and Safari-sensitive controls when relevant.
 
+## Minimal Diff And Reuse Rule
+
+- For copy-only or token-only requests, change only the requested copy/token unless a real bug blocks it.
+- Before adding a component, hook, helper, or local style, search for an existing equivalent and reuse it.
+- If the requested change should be one or two lines, do not turn it into a refactor.
+- If implementation appears likely to touch many files, add a new abstraction, or produce a large diff for a small request, stop and get explicit confirmation first.
+- Consolidate repeated UI patterns only when repetition is proven by nearby code; do not create generic components speculatively.
+- Prefer deleting route-local drift and wiring to existing DS primitives over adding new wrapper layers.
+- In the final report, call out when the diff stayed intentionally minimal or when a larger diff was unavoidable.
+
 ## Do Not
 
 - add route-local color/typography/spacing recipes when Hito DS covers the need

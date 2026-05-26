@@ -56,6 +56,14 @@ export const CANONICAL_METRIC_GUIDANCE_VALUES = ["effort", "pace", "heart_rate",
 
 export type CanonicalMetricGuidance = (typeof CANONICAL_METRIC_GUIDANCE_VALUES)[number];
 
+export const HR_TARGET_SOURCE_VALUES = [
+  "personal_hr_zone",
+  "default_estimated_hr",
+  "effort_only",
+] as const;
+
+export type HrTargetSource = (typeof HR_TARGET_SOURCE_VALUES)[number];
+
 export type LegacyWorkoutType =
   | "easy"
   | "steady_or_easy"
@@ -80,6 +88,9 @@ export interface CanonicalMetricMode {
   guidance: CanonicalMetricGuidance;
   paceTargetsAllowed: boolean;
   hrTargetsAllowed: boolean;
+  hrTargetSource: HrTargetSource;
+  hrTargetLabel: string | null;
+  hrTargetSourceNote: string | null;
   reason: string;
 }
 
@@ -87,6 +98,9 @@ export interface CanonicalMetricModeJson {
   guidance: CanonicalMetricGuidance;
   pace_targets_allowed: boolean;
   hr_targets_allowed: boolean;
+  hr_target_source: HrTargetSource;
+  hr_target_label?: string | null;
+  hr_target_source_note?: string | null;
   reason: string;
 }
 
@@ -122,6 +136,7 @@ const FAMILY_VALUES = new Set<string>(CANONICAL_WORKOUT_FAMILY_VALUES);
 const IDENTITY_VALUES = new Set<string>(CANONICAL_WORKOUT_IDENTITY_VALUES);
 const ICON_VALUES = new Set<string>(CALENDAR_ICON_KEY_VALUES);
 const GUIDANCE_VALUES = new Set<string>(CANONICAL_METRIC_GUIDANCE_VALUES);
+const HR_TARGET_SOURCE_VALUE_SET = new Set<string>(HR_TARGET_SOURCE_VALUES);
 
 const identityFamilyMap: Record<CanonicalWorkoutIdentity, CanonicalWorkoutFamily> = {
   rest_and_recovery: "rest",
@@ -276,12 +291,22 @@ export function normalizeCanonicalMetricMode(value: unknown): CanonicalMetricMod
 
   const paceTargetsAllowed = readBoolean(record.paceTargetsAllowed, record.pace_targets_allowed);
   const hrTargetsAllowed = readBoolean(record.hrTargetsAllowed, record.hr_targets_allowed);
+  const hrTargetSource =
+    normalizeHrTargetSource(record.hrTargetSource ?? record.hr_target_source) ??
+    (hrTargetsAllowed ? "personal_hr_zone" : "effort_only");
+  const hrTargetLabel =
+    readString(record.hrTargetLabel, record.hr_target_label, record.label) ?? null;
+  const hrTargetSourceNote =
+    readString(record.hrTargetSourceNote, record.hr_target_source_note, record.source_note) ?? null;
   const reason = typeof record.reason === "string" ? record.reason.trim().slice(0, 200) : "";
 
   return {
     guidance,
     paceTargetsAllowed,
     hrTargetsAllowed,
+    hrTargetSource,
+    hrTargetLabel,
+    hrTargetSourceNote,
     reason: reason || "Metric mode was provided by backend-compatible workout truth.",
   };
 }
@@ -293,6 +318,11 @@ export function toCanonicalMetricModeJson(
     guidance: metricMode.guidance,
     pace_targets_allowed: metricMode.paceTargetsAllowed,
     hr_targets_allowed: metricMode.hrTargetsAllowed,
+    hr_target_source: metricMode.hrTargetSource,
+    ...(metricMode.hrTargetLabel ? { hr_target_label: metricMode.hrTargetLabel } : {}),
+    ...(metricMode.hrTargetSourceNote
+      ? { hr_target_source_note: metricMode.hrTargetSourceNote }
+      : {}),
     reason: metricMode.reason,
   };
 }
@@ -356,13 +386,20 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
   const hasHr = segments.some((segment) =>
     segmentContainsTargetKeys(segment, ["hr_bpm_range", "hr_bpm"]),
   );
+  const hrMetadata = hasHr ? deriveHrTargetMetadata(segments) : null;
 
   if (hasPace && hasHr) {
     return {
       guidance: "mixed",
       paceTargetsAllowed: true,
       hrTargetsAllowed: true,
-      reason: "Workout includes explicit pace and heart-rate targets.",
+      hrTargetSource: hrMetadata?.source ?? "personal_hr_zone",
+      hrTargetLabel: hrMetadata?.label ?? null,
+      hrTargetSourceNote: hrMetadata?.sourceNote ?? null,
+      reason:
+        hrMetadata?.source === "default_estimated_hr"
+          ? "Workout includes explicit pace targets and default estimated heart-rate guidance."
+          : "Workout includes explicit pace and heart-rate targets.",
     };
   }
 
@@ -371,6 +408,9 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
       guidance: "pace",
       paceTargetsAllowed: true,
       hrTargetsAllowed: false,
+      hrTargetSource: "effort_only",
+      hrTargetLabel: null,
+      hrTargetSourceNote: null,
       reason: "Workout includes explicit pace targets.",
     };
   }
@@ -380,7 +420,13 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
       guidance: "heart_rate",
       paceTargetsAllowed: false,
       hrTargetsAllowed: true,
-      reason: "Workout includes explicit heart-rate targets.",
+      hrTargetSource: hrMetadata?.source ?? "personal_hr_zone",
+      hrTargetLabel: hrMetadata?.label ?? null,
+      hrTargetSourceNote: hrMetadata?.sourceNote ?? null,
+      reason:
+        hrMetadata?.source === "default_estimated_hr"
+          ? "Workout includes default estimated heart-rate guidance."
+          : "Workout includes explicit heart-rate targets.",
     };
   }
 
@@ -388,7 +434,41 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
     guidance: "effort",
     paceTargetsAllowed: false,
     hrTargetsAllowed: false,
+    hrTargetSource: "effort_only",
+    hrTargetLabel: null,
+    hrTargetSourceNote: null,
     reason: "No numeric pace or heart-rate targets are present; use effort cues.",
+  };
+}
+
+function deriveHrTargetMetadata(segments: WorkoutSegmentLike[]) {
+  const targets = segments.flatMap((segment) =>
+    [segment.target, segment.recovery_target].filter(
+      (target): target is Record<string, unknown> =>
+        Boolean(target) &&
+        (typeof target.hr_bpm_range === "string" || typeof target.hr_bpm === "string"),
+    ),
+  );
+  const sources = targets
+    .map((target) => normalizeHrTargetSource(target.hr_target_source))
+    .filter((source): source is HrTargetSource => Boolean(source));
+
+  if (sources.length > 0 && sources.every((source) => source === "default_estimated_hr")) {
+    const metadataTarget = targets.find(
+      (target) => normalizeHrTargetSource(target.hr_target_source) === "default_estimated_hr",
+    );
+
+    return {
+      source: "default_estimated_hr" as const,
+      label: readString(metadataTarget?.label) ?? null,
+      sourceNote: readString(metadataTarget?.source_note) ?? null,
+    };
+  }
+
+  return {
+    source: "personal_hr_zone" as const,
+    label: null,
+    sourceNote: null,
   };
 }
 
@@ -492,6 +572,9 @@ function buildRestMetricMode(): CanonicalMetricMode {
     guidance: "effort",
     paceTargetsAllowed: false,
     hrTargetsAllowed: false,
+    hrTargetSource: "effort_only",
+    hrTargetLabel: null,
+    hrTargetSourceNote: null,
     reason: "Rest day has no execution metric targets.",
   };
 }
@@ -589,6 +672,12 @@ function segmentContainsTargetKeys(segment: WorkoutSegmentLike, keys: string[]):
   return [segment.work, segment.recovery].some(
     (child) => child != null && segmentContainsTargetKeys(child, keys),
   );
+}
+
+function normalizeHrTargetSource(value: unknown): HrTargetSource | null {
+  const token = normalizeToken(value);
+
+  return token && HR_TARGET_SOURCE_VALUE_SET.has(token) ? (token as HrTargetSource) : null;
 }
 
 function readBoolean(...values: unknown[]) {

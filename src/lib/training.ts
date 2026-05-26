@@ -24,6 +24,9 @@ export interface StepTarget {
   intensity?: string;
   hr_bpm_range?: string;
   hr_bpm?: string;
+  hr_target_source?: string;
+  label?: string;
+  source_note?: string;
   pace_min_per_km_range?: string;
   pace_range_min_km?: string;
   pace?: string;
@@ -117,6 +120,13 @@ export interface PlanMeta {
   raceDate: string | null;
   goal: string;
   source: "preview" | "persisted";
+  schedulePreferences: PlanSchedulePreferencesSummary | null;
+}
+
+export interface PlanSchedulePreferencesSummary {
+  fixedRestDays: string[];
+  runningDaysPerWeek: number | null;
+  preferredLongRunDay: string | null;
 }
 
 export interface RunnerProfileSummary {
@@ -528,6 +538,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
       raceDate: previewPlan.meta.race_date ?? null,
       goal: previewPlan.meta.goal,
       source: "preview",
+      schedulePreferences: null,
     },
     profile: null,
     workouts,
@@ -773,6 +784,7 @@ export function displayTargetEntries(target: StepTarget | undefined) {
   };
 
   pushEntry("intensity", target.intensity);
+  pushEntry("label", target.label);
   pushEntry("hr_bpm_range", target.hr_bpm_range ?? target.hr_bpm);
   pushEntry("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
   pushEntry("pace", target.pace);
@@ -780,6 +792,7 @@ export function displayTargetEntries(target: StepTarget | undefined) {
   pushEntry("cadence_spm_range", target.cadence_spm_range);
   pushEntry("cue", target.cue);
   pushEntry("hint", target.hint);
+  pushEntry("source_note", target.source_note);
 
   for (const [key, value] of Object.entries(target.extra ?? {})) {
     if (typeof value === "string" || typeof value === "number") {
@@ -989,6 +1002,10 @@ function humanizeTargetLabel(key: string) {
       return "Effort";
     case "hr_bpm_range":
       return "Heart rate";
+    case "label":
+      return "Target";
+    case "source_note":
+      return "Source";
     case "pace_min_per_km_range":
     case "pace":
       return "Pace";

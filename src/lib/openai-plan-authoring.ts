@@ -328,7 +328,7 @@ function buildRichWorkoutDraftSystemPrompt() {
     "Rest days must stay sparse and must not become running workouts.",
     "Use only backend taxonomy values provided by the schema for workoutFamily, workoutIdentity, and calendarIconKey.",
     "Use effort, purpose, cue, and hint language to make support runs feel coach-authored.",
-    "Do not invent numeric heart-rate targets. Set hrBpmRange and hrBpm to null.",
+    "Do not invent numeric heart-rate targets. Set hrBpmRange and hrBpm to null; the backend preserves allowed personal/default HR truth separately.",
     "Do not invent numeric pace targets. Set paceMinPerKmRange and pace to null; the backend preserves allowed deterministic pace truth separately.",
     "If metricMode says pace or HR is not allowed, keep target wording effort-based.",
     "Do not change fixed rest days, target dates, event truth, runner profile truth, logs, or completion state.",

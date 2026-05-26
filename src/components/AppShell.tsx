@@ -49,7 +49,7 @@ export function AppShell({
   const weekStatus = WEEK_STATUS_META[shellSnapshot.weekStatus];
   const modeLabel =
     shellSnapshot.mode === "authenticated"
-      ? "Saved mode"
+      ? "Beta"
       : shellSnapshot.mode === "onboarding"
         ? "Setup required"
         : "Preview mode";
@@ -79,7 +79,7 @@ export function AppShell({
           <Link to="/" reloadDocument={useFreshHomeRequest} aria-label="Hito home">
             <HitoLogo className="[--hito-logo-height:1.45rem]" />
           </Link>
-          <p className="hito-micro-label mt-1">{modeLabel}</p>
+          <p className="hito-shell-brand-kicker">{modeLabel}</p>
         </div>
 
         <nav className="hito-shell-nav px-3">

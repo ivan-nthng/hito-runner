@@ -27,6 +27,16 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 7. Update generated/local database types only when schema actually changes.
 8. Update permanent docs only for implemented behavior.
 
+## Minimal Diff And Reuse Rule
+
+- For one-field, one-copy, or one-condition requests, make the smallest direct change that satisfies the request.
+- Before adding a module, action, helper, schema, migration, or table, search for an existing owner and reuse or extend it.
+- Do not turn a small behavior change into a broad backend decomposition.
+- If the likely implementation touches many files, changes public contracts, adds storage, or introduces a new abstraction for a small request, stop and get explicit confirmation first.
+- Consolidate repeated backend patterns only when duplication is proven and the consolidation removes more code or risk than it adds.
+- Prefer existing canonical entities and server-action patterns over parallel models.
+- In the final report, call out when the diff stayed intentionally minimal or when a larger diff was unavoidable.
+
 ## Hito Backend Rules
 
 - Supabase canonical truth must not be bypassed by local fallback truth.

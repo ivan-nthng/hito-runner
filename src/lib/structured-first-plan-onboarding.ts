@@ -646,20 +646,27 @@ function hasReviewTargetTimePressure(authoringInput: StructuredFirstPlanAuthorin
 function buildMetricPolicyReview(input: StructuredFirstPlanOnboardingInput) {
   const execution = normalizeFirstPlanExecutionMode(input.execution);
   const hasBenchmark = input.benchmark.kind !== "unknown";
+  const hasAge = typeof input.profile.age === "number";
 
   if (
     execution.watchAccess === "watch_or_app" &&
     (execution.guidancePreference === "pace" || execution.guidancePreference === "mixed") &&
     hasBenchmark
   ) {
-    return "Broad pace targets may appear where the recent 5K benchmark supports them.";
+    return hasAge
+      ? "Broad pace targets may appear where the recent 5K benchmark supports them; HR guidance, when shown, is an age-estimated default and not personalized zones."
+      : "Broad pace targets may appear where the recent 5K benchmark supports them.";
   }
 
   if (execution.guidancePreference === "heart_rate") {
-    return "Heart-rate preference is noted, but numeric HR targets are omitted until real HR-zone truth exists.";
+    return hasAge
+      ? "Heart-rate guidance may use broad age-estimated defaults; those ranges are not personalized HR zones."
+      : "Heart-rate preference is noted, but numeric HR targets are omitted until profile age or personal HR-zone truth exists.";
   }
 
-  return "Targets stay effort/cue based unless watch/app access and benchmark-supported pace guidance are available.";
+  return hasAge
+    ? "Targets stay effort/cue based unless watch/app access and benchmark-supported pace guidance are available; broad default HR guidance may appear from age."
+    : "Targets stay effort/cue based unless watch/app access and benchmark-supported pace guidance are available.";
 }
 
 function buildStructuredReviewAssumptions(
@@ -670,12 +677,26 @@ function buildStructuredReviewAssumptions(
   const execution = normalizeFirstPlanExecutionMode(input.execution);
 
   if (input.benchmark.kind === "unknown") {
-    assumptions.push("No recent 5K benchmark was supplied, so Hito keeps targets effort-based.");
+    assumptions.push(
+      typeof input.profile.age === "number"
+        ? "No recent 5K benchmark was supplied, so Hito keeps pace targets effort-based; any HR range shown is a broad age-estimated default."
+        : "No recent 5K benchmark was supplied, so Hito keeps numeric targets effort-based.",
+    );
   }
 
   if (execution.guidancePreference === "heart_rate") {
+    if (typeof input.profile.age === "number") {
+      assumptions.push(
+        "Heart-rate guidance uses broad age-estimated defaults where appropriate; those ranges are not personalized HR zones.",
+      );
+    } else {
+      assumptions.push(
+        "Heart-rate guidance was requested, but this draft does not use numeric HR targets because profile age and personal HR-zone truth are missing.",
+      );
+    }
+  } else if (typeof input.profile.age === "number") {
     assumptions.push(
-      "Heart-rate guidance was requested, but this draft does not use numeric HR targets because no HR-zone truth exists yet.",
+      "Any HR range shown is default guidance estimated from age, not personalized HR-zone truth.",
     );
   }
 

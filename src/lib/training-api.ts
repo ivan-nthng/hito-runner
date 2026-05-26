@@ -13,6 +13,12 @@ import {
   type ApplyActivePlanRefreshProposalResult,
   type ProposeActivePlanRefreshResult,
 } from "@/lib/active-plan-refresh-contract";
+import type {
+  ActivePlanScheduleEditInput,
+  ActivePlanScheduleEditPreview,
+  ActivePlanScheduleReflowApplyInput,
+  ActivePlanScheduleReflowApplyResult,
+} from "@/lib/active-plan-schedule-edit-preview";
 import {
   loadHomeRouteData,
   loadProgressRouteData,
@@ -39,15 +45,17 @@ import {
   normalizeExecutableStepInstructions,
   todayIso,
   type RunnerProfileSummary,
+  type PlanSchedulePreferencesSummary,
   type Step,
   type TrainingSnapshot,
   type Workout,
   type WorkoutLog,
 } from "@/lib/training";
 import { saveWorkoutLogForUser, workoutLogInputSchema } from "@/lib/workout-log-actions";
-import type { Database } from "@/lib/supabase/database";
+import type { Database, Json } from "@/lib/supabase/database";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { RUNNER_TRAINING_WEEKDAYS } from "@/lib/runner-training-preferences";
 
 export {
   completeStructuredFirstPlanOnboarding,
@@ -80,6 +88,11 @@ export type {
   ApplyActivePlanRefreshProposalResult,
   ProposeActivePlanRefreshResult,
 } from "@/lib/active-plan-refresh-contract";
+export type {
+  ActivePlanScheduleEditInput,
+  ActivePlanScheduleEditPreview,
+  ActivePlanScheduleReflowApplyResult,
+} from "@/lib/active-plan-schedule-edit-preview";
 
 export interface ViewerSummary {
   name: string | null;
@@ -164,6 +177,18 @@ export const applyActivePlanRefreshProposal = createServerFn({ method: "POST" })
     return applyActivePlanRefreshProposalForCurrentRequestServer(data.proposal);
   });
 
+export const previewActivePlanScheduleEdit = createServerFn({ method: "POST" })
+  .inputValidator(parseActivePlanScheduleEditInput)
+  .handler(async ({ data }): Promise<ActivePlanScheduleEditPreview> => {
+    return previewActivePlanScheduleEditForCurrentRequestServer(data);
+  });
+
+export const applyActivePlanScheduleReflowPreview = createServerFn({ method: "POST" })
+  .inputValidator(parseActivePlanScheduleReflowApplyInput)
+  .handler(async ({ data }): Promise<ActivePlanScheduleReflowApplyResult> => {
+    return applyActivePlanScheduleReflowPreviewForCurrentRequestServer(data);
+  });
+
 export const saveWorkoutLog = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
@@ -220,6 +245,32 @@ const applyActivePlanRefreshProposalForUserServer = createServerOnlyFn(
   },
 );
 
+const previewActivePlanScheduleEditForCurrentRequestServer = createServerOnlyFn(
+  async (data: ActivePlanScheduleEditInput): Promise<ActivePlanScheduleEditPreview> => {
+    const { previewActivePlanScheduleEditForUser } =
+      await import("@/lib/active-plan-schedule-edit-preview");
+
+    return previewActivePlanScheduleEditForUser(
+      await requirePersistedUserIdForCurrentRequest(),
+      data,
+    );
+  },
+);
+
+const applyActivePlanScheduleReflowPreviewForCurrentRequestServer = createServerOnlyFn(
+  async (
+    data: ActivePlanScheduleReflowApplyInput,
+  ): Promise<ActivePlanScheduleReflowApplyResult> => {
+    const { applyActivePlanScheduleReflowPreviewForUser } =
+      await import("@/lib/active-plan-schedule-edit-preview");
+
+    return applyActivePlanScheduleReflowPreviewForUser(
+      await requirePersistedUserIdForCurrentRequest(),
+      data,
+    );
+  },
+);
+
 async function getSnapshotForRequest() {
   const auth = getRequestAuthContext();
 
@@ -256,6 +307,127 @@ async function getViewerForRequest(): Promise<ViewerSummary | null> {
     email: auth.email,
     avatarUrl,
   };
+}
+
+function parseActivePlanScheduleReflowApplyInput(
+  value: unknown,
+): ActivePlanScheduleReflowApplyInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Schedule apply input must be an object.");
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.previewToken !== "string" || !record.previewToken.trim()) {
+    throw new Error("Schedule preview token is required.");
+  }
+
+  if (
+    !record.scheduleEditInput ||
+    typeof record.scheduleEditInput !== "object" ||
+    Array.isArray(record.scheduleEditInput)
+  ) {
+    throw new Error("Reviewed schedule input is required.");
+  }
+
+  return {
+    previewToken: record.previewToken,
+    scheduleEditInput:
+      record.scheduleEditInput as ActivePlanScheduleReflowApplyInput["scheduleEditInput"],
+  };
+}
+
+function parseActivePlanScheduleEditInput(value: unknown): ActivePlanScheduleEditInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Schedule edit input must be an object.");
+  }
+
+  const record = value as Record<string, unknown>;
+
+  return {
+    activePlanId:
+      typeof record.activePlanId === "string" || record.activePlanId === null
+        ? record.activePlanId
+        : undefined,
+    fixedRestDays: record.fixedRestDays,
+    preferredLongRunDay: record.preferredLongRunDay,
+    runningDaysPerWeek: record.runningDaysPerWeek,
+    runningDays: record.runningDays,
+    proposedRunningDays: record.proposedRunningDays,
+    saveAsDefaultTrainingPreferences: record.saveAsDefaultTrainingPreferences,
+    intent:
+      record.intent && typeof record.intent === "object" && !Array.isArray(record.intent)
+        ? (record.intent as ActivePlanScheduleEditInput["intent"])
+        : null,
+  };
+}
+
+function buildPlanSchedulePreferencesSummary(
+  value: Json | null,
+): PlanSchedulePreferencesSummary | null {
+  const record = asJsonRecord(value);
+
+  if (!record) {
+    return null;
+  }
+
+  const fixedRestDays = readPlanWeekdays(record.blocked_days);
+  const preferredRunDays = readPlanWeekdays(record.preferred_run_days);
+  const runningDaysPerWeek =
+    readPositiveInteger(record.max_running_days_per_week) ??
+    (preferredRunDays.length > 0 ? preferredRunDays.length : null);
+  const preferredLongRunDay = readPlanWeekday(record.preferred_long_run_day);
+
+  if (!fixedRestDays.length && runningDaysPerWeek == null && !preferredLongRunDay) {
+    return null;
+  }
+
+  return {
+    fixedRestDays,
+    runningDaysPerWeek,
+    preferredLongRunDay,
+  };
+}
+
+function asJsonRecord(value: Json | null | undefined): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function readPlanWeekdays(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const weekdays: string[] = [];
+
+  for (const item of value) {
+    const weekday = readPlanWeekday(item);
+
+    if (weekday && !weekdays.includes(weekday)) {
+      weekdays.push(weekday);
+    }
+  }
+
+  return weekdays;
+}
+
+function readPlanWeekday(value: unknown): string | null {
+  return typeof value === "string" &&
+    (RUNNER_TRAINING_WEEKDAYS as readonly string[]).includes(value)
+    ? value
+    : null;
+}
+
+function readPositiveInteger(value: unknown): number | null {
+  if (!Number.isInteger(value) || typeof value !== "number" || value < 1) {
+    return null;
+  }
+
+  return value;
 }
 
 async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
@@ -320,6 +492,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
       raceDate: planCycle.target_date ?? planCycle.end_date,
       goal: planCycle.goal_summary,
       source: "persisted",
+      schedulePreferences: buildPlanSchedulePreferencesSummary(planCycle.plan_preferences),
     },
     profile,
     workouts,

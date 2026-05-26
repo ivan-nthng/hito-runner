@@ -13,8 +13,17 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-05-26
+
+- Updated the plan-authoring metric resolver so missing personal HR zones can still produce clearly labelled age-estimated default HR guidance from runner age, while no-age plans remain effort-only and pace gates, fixed rest days, and AI metric normalization stay backend-owned.
+
 ## 2026-05-25
 
+- Prefilled `Open plan` schedule editing from active-plan scheduling preferences when available, so fixed rest days, weekly running days, and preferred long-run day reflect saved plan truth before a runner reviews changes.
+- Added the `Open plan` schedule edit surface: runners can review fixed rest-day/running-day/long-run changes, see backend-owned date-move proof before mutation, apply same-frequency reflows only by reviewed preview token, and route regeneration-required changes into the existing Update plan review flow without changing Settings defaults.
+- Hardened active-plan schedule reflow apply with one transaction-backed Supabase RPC, so reviewed date moves and active-plan schedule preferences commit atomically or not at all while preserving the same preview-token, stale, fixed-rest, and protected-history guards.
+- Added token-gated active-plan schedule reflow apply: same-frequency schedule edits now rebuild the current preview server-side from the reviewed `previewToken`, reject stale/regeneration-required/protected-history cases, update only reviewed future non-rest workout date metadata plus active-plan schedule preferences, and preserve workout content, rich fields, metric targets, and runner Settings defaults.
+- Added the first active-plan schedule edit preview contract: backend can now validate proposed fixed rest days/running days/long-run day, classify same-frequency edits as non-mutating `schedule_reflow`, route frequency changes to `requires_regeneration`, preserve protected logged/Garmin/evidence-backed history in preview, and return bounded date-change/fixed-rest/rich-field proof without calling OpenAI or mutating the plan.
 - Tightened saved structured plan richness end to end: first-plan creation now preserves bounded rich goal context through fixed rest-day insertion, cutback/taper long runs and taper/cutback support days persist as structured multi-segment rows, and conservative low-support marathon plans vary safe recovery/cutback support identities without adding hard days or loosening pace/HR gates.
 - Bounded live active-plan refresh proposals so an OpenAI proposal timeout now returns deterministic proposal/draft fallback metadata instead of hanging before `refreshDraft.richWorkoutDraftMetadata` is observable.
 - Added proposal-time rich workout drafting to active-plan refresh: refresh proposals now sign the exact reviewed future draft after optional rich normalization, expose bounded rich-draft applied/fallback metadata, and keep apply as a no-OpenAI exact-draft persistence path.

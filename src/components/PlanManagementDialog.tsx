@@ -19,11 +19,16 @@ import {
   completeTextOnboarding,
   deleteActivePlan,
   applyActivePlanRefreshProposal,
+  applyActivePlanScheduleReflowPreview,
+  previewActivePlanScheduleEdit,
   proposeActivePlanRefresh,
+  type ActivePlanScheduleEditInput,
+  type ActivePlanScheduleEditPreview,
   type ProposeActivePlanRefreshResult,
   type ViewerSummary,
 } from "@/lib/training-api";
-import type { TrainingSnapshot } from "@/lib/training";
+import type { TrainingSnapshot, Workout } from "@/lib/training";
+import { WEEKDAY_OPTIONS, type WeekdayName } from "@/components/onboarding/onboarding-form-model";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +52,12 @@ import {
   type PlanRefreshApplyStatus,
   type PlanRefreshStatus,
 } from "@/components/plan-management/PlanRefreshPanel";
+import {
+  PlanScheduleEditPanel,
+  type PlanScheduleApplyStatus,
+  type PlanScheduleEditSummary,
+  type PlanSchedulePreviewStatus,
+} from "@/components/plan-management/PlanScheduleEditPanel";
 import {
   PlanTextReplacementPanel,
   type PlanTextReplacementStatus,
@@ -76,6 +87,8 @@ export function PlanManagementDialog({
   const clearUpcomingScheduleFn = useServerFn(clearUpcomingSchedule);
   const proposeActivePlanRefreshFn = useServerFn(proposeActivePlanRefresh);
   const applyActivePlanRefreshProposalFn = useServerFn(applyActivePlanRefreshProposal);
+  const previewActivePlanScheduleEditFn = useServerFn(previewActivePlanScheduleEdit);
+  const applyActivePlanScheduleReflowPreviewFn = useServerFn(applyActivePlanScheduleReflowPreview);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
   const exportResetTimerRef = useRef<number | null>(null);
@@ -85,6 +98,7 @@ export function PlanManagementDialog({
 
   const planMeta = snapshot?.planMeta;
   const defaultStartDate = snapshot?.currentDate ?? todayLocalIso();
+  const initialScheduleDefaults = deriveScheduleEditDefaults(snapshot);
   const [authoringText, setAuthoringText] = useState("");
   const [textStatus, setTextStatus] = useState<PlanTextReplacementStatus>("idle");
   const [textError, setTextError] = useState<string | null>(null);
@@ -117,6 +131,26 @@ export function PlanManagementDialog({
     ProposeActivePlanRefreshResult,
     { ok: true }
   > | null>(null);
+  const [scheduleFixedRestDays, setScheduleFixedRestDays] = useState<WeekdayName[]>(
+    initialScheduleDefaults.fixedRestDays,
+  );
+  const [scheduleRestDaysAnswered, setScheduleRestDaysAnswered] = useState(true);
+  const [scheduleRunningDaysPerWeek, setScheduleRunningDaysPerWeek] = useState(
+    String(initialScheduleDefaults.runningDaysPerWeek),
+  );
+  const [schedulePreferredLongRunDay, setSchedulePreferredLongRunDay] = useState<WeekdayName | "">(
+    initialScheduleDefaults.preferredLongRunDay ?? "",
+  );
+  const [schedulePreviewStatus, setSchedulePreviewStatus] =
+    useState<PlanSchedulePreviewStatus>("idle");
+  const [scheduleApplyStatus, setScheduleApplyStatus] = useState<PlanScheduleApplyStatus>("idle");
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduleStaleMessage, setScheduleStaleMessage] = useState<string | null>(null);
+  const [scheduleDecisionMessage, setScheduleDecisionMessage] = useState<string | null>(null);
+  const [schedulePreviewResult, setSchedulePreviewResult] =
+    useState<ActivePlanScheduleEditPreview | null>(null);
+  const [scheduleReviewedInput, setScheduleReviewedInput] =
+    useState<ActivePlanScheduleEditInput | null>(null);
 
   const isBusy =
     textStatus !== "idle" ||
@@ -125,7 +159,9 @@ export function PlanManagementDialog({
     clearStatus !== "idle" ||
     exportStatus !== "idle" ||
     refreshStatus !== "idle" ||
-    refreshApplyStatus !== "idle";
+    refreshApplyStatus !== "idle" ||
+    schedulePreviewStatus !== "idle" ||
+    scheduleApplyStatus !== "idle";
   const importedSummary = importedPlan ? summarizeImportedPlan(importedPlan) : null;
   const replaceBlockedReason = isReplaceBlockedError(jsonError) ? jsonError : null;
   const canOfferClearBeforeImport = Boolean(planMeta && requestedStartDate > defaultStartDate);
@@ -133,6 +169,7 @@ export function PlanManagementDialog({
   const planWorkoutCount =
     snapshot?.workouts.filter((workout) => workout.type !== "rest").length ?? 0;
   const planDayCount = snapshot?.workouts.length ?? 0;
+  const scheduleSummary = deriveScheduleEditSummary(snapshot, initialScheduleDefaults);
 
   useEffect(() => {
     if (!open) {
@@ -166,12 +203,24 @@ export function PlanManagementDialog({
       setRefreshStaleMessage(null);
       setRefreshDecisionMessage(null);
       setRefreshResult(null);
+      const nextScheduleDefaults = deriveScheduleEditDefaults(snapshot);
+      setScheduleFixedRestDays(nextScheduleDefaults.fixedRestDays);
+      setScheduleRestDaysAnswered(true);
+      setScheduleRunningDaysPerWeek(String(nextScheduleDefaults.runningDaysPerWeek));
+      setSchedulePreferredLongRunDay(nextScheduleDefaults.preferredLongRunDay ?? "");
+      setSchedulePreviewStatus("idle");
+      setScheduleApplyStatus("idle");
+      setScheduleError(null);
+      setScheduleStaleMessage(null);
+      setScheduleDecisionMessage(null);
+      setSchedulePreviewResult(null);
+      setScheduleReviewedInput(null);
       if (refreshSuccessTimerRef.current != null && typeof window !== "undefined") {
         window.clearTimeout(refreshSuccessTimerRef.current);
         refreshSuccessTimerRef.current = null;
       }
     }
-  }, [defaultStartDate, open]);
+  }, [defaultStartDate, open, snapshot]);
 
   useEffect(() => {
     return () => {
@@ -540,6 +589,154 @@ export function PlanManagementDialog({
     }
   };
 
+  const resetScheduleReview = () => {
+    setScheduleError(null);
+    setScheduleStaleMessage(null);
+    setScheduleDecisionMessage(null);
+    setScheduleApplyStatus("idle");
+    setSchedulePreviewResult(null);
+    setScheduleReviewedInput(null);
+  };
+
+  const buildScheduleEditInput = (): ActivePlanScheduleEditInput | null => {
+    const runningDaysPerWeek = Number.parseInt(scheduleRunningDaysPerWeek, 10);
+
+    if (!scheduleRestDaysAnswered) {
+      setScheduleError("Choose fixed rest days or choose no fixed rest days first.");
+      return null;
+    }
+
+    if (!Number.isInteger(runningDaysPerWeek) || runningDaysPerWeek < 1) {
+      setScheduleError("Choose how many running days per week Hito should use.");
+      return null;
+    }
+
+    return {
+      fixedRestDays: scheduleFixedRestDays,
+      preferredLongRunDay: schedulePreferredLongRunDay || null,
+      runningDaysPerWeek,
+      saveAsDefaultTrainingPreferences: false,
+      intent: {
+        source: "open_plan_edit_schedule",
+      },
+    };
+  };
+
+  const submitSchedulePreview = async () => {
+    resetScheduleReview();
+
+    const input = buildScheduleEditInput();
+
+    if (!input) {
+      return;
+    }
+
+    setScheduleReviewedInput(input);
+    setSchedulePreviewStatus("previewing");
+
+    try {
+      const result = await previewActivePlanScheduleEditFn({ data: input });
+
+      setSchedulePreviewStatus("idle");
+
+      if (!result.ok) {
+        setScheduleError(result.message);
+        return;
+      }
+
+      setSchedulePreviewResult(result);
+
+      if (result.mode === "requires_regeneration") {
+        hitoToast.error({
+          title: "Update plan needed",
+          description: result.message,
+          duration: 6800,
+        });
+        return;
+      }
+
+      hitoToast.success({
+        title: "Schedule preview ready",
+        description: "Review the date moves before applying anything.",
+      });
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : "Could not preview schedule changes.";
+      setSchedulePreviewStatus("idle");
+      setScheduleError(message);
+    }
+  };
+
+  const submitApplyScheduleReflow = async () => {
+    const result = schedulePreviewResult;
+
+    if (!result?.ok || result.mode !== "schedule_reflow" || !scheduleReviewedInput) {
+      setScheduleError("Review schedule changes before applying them.");
+      return;
+    }
+
+    setScheduleApplyStatus("applying");
+    setScheduleError(null);
+    setScheduleStaleMessage(null);
+    setScheduleDecisionMessage(null);
+
+    try {
+      const applyResult = await applyActivePlanScheduleReflowPreviewFn({
+        data: {
+          previewToken: result.previewToken,
+          scheduleEditInput: scheduleReviewedInput,
+        },
+      });
+
+      if (!applyResult.ok) {
+        setScheduleApplyStatus("idle");
+        setScheduleStaleMessage(applyResult.message);
+        hitoToast.error({
+          title: "Schedule not applied",
+          description: applyResult.message,
+          duration: 7200,
+        });
+        return;
+      }
+
+      setScheduleApplyStatus("idle");
+      setScheduleDecisionMessage(
+        `Schedule updated. ${applyResult.movedWorkoutCount} future workout${
+          applyResult.movedWorkoutCount === 1 ? "" : "s"
+        } moved. Opening the updated plan...`,
+      );
+      hitoToast.success({
+        title: "Schedule updated",
+        description: "The active plan now uses the reviewed schedule changes.",
+      });
+      finishAtHome(onOpenChange);
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : "Could not apply schedule changes.";
+      setScheduleApplyStatus("idle");
+      setScheduleError(message);
+      hitoToast.error({
+        title: "Schedule not applied",
+        description: message,
+        duration: 7200,
+      });
+    }
+  };
+
+  const useSchedulePromptInRefresh = (prompt: string) => {
+    setRefreshPrompt(prompt);
+    setRefreshError(null);
+    setRefreshStaleMessage(null);
+    setRefreshDecisionMessage(
+      "Schedule prompt copied to Update plan. Generate a proposal there before applying anything.",
+    );
+    setRefreshResult(null);
+    hitoToast.success({
+      title: "Prompt copied",
+      description: "Open Update plan to generate a reviewed proposal.",
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -592,6 +789,34 @@ export function PlanManagementDialog({
                 void submitApplyRefreshProposal();
               }}
               onKeepCurrentPlan={keepCurrentPlan}
+            />
+
+            <PlanScheduleEditPanel
+              available={Boolean(planMeta)}
+              fixedRestDays={scheduleFixedRestDays}
+              restDaysAnswered={scheduleRestDaysAnswered}
+              maxRunningDaysPerWeek={scheduleRunningDaysPerWeek}
+              preferredLongRunDay={schedulePreferredLongRunDay}
+              previewStatus={schedulePreviewStatus}
+              applyStatus={scheduleApplyStatus}
+              result={schedulePreviewResult}
+              error={scheduleError}
+              staleMessage={scheduleStaleMessage}
+              decisionMessage={scheduleDecisionMessage}
+              summary={scheduleSummary}
+              isBusy={isBusy}
+              onFixedRestDaysChange={setScheduleFixedRestDays}
+              onRestDaysAnsweredChange={setScheduleRestDaysAnswered}
+              onMaxRunningDaysPerWeekChange={setScheduleRunningDaysPerWeek}
+              onPreferredLongRunDayChange={setSchedulePreferredLongRunDay}
+              onReview={() => {
+                void submitSchedulePreview();
+              }}
+              onApply={() => {
+                void submitApplyScheduleReflow();
+              }}
+              onReviewAgain={resetScheduleReview}
+              onUseRefreshPrompt={useSchedulePromptInRefresh}
             />
 
             <PlanTextReplacementPanel
@@ -711,6 +936,96 @@ export function PlanManagementDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function deriveScheduleEditSummary(
+  snapshot: TrainingSnapshot | null | undefined,
+  defaults: ScheduleEditDefaults,
+): PlanScheduleEditSummary {
+  const workoutCount = snapshot?.workouts.filter((workout) => workout.type !== "rest").length ?? 0;
+
+  return {
+    fixedRestDays: defaults.fixedRestDays,
+    runningDaysPerWeek: defaults.runningDaysPerWeek,
+    preferredLongRunDay: defaults.preferredLongRunDay,
+    workoutCount,
+  };
+}
+
+interface ScheduleEditDefaults {
+  fixedRestDays: WeekdayName[];
+  runningDaysPerWeek: number;
+  preferredLongRunDay: WeekdayName | null;
+}
+
+function deriveScheduleEditDefaults(
+  snapshot: TrainingSnapshot | null | undefined,
+): ScheduleEditDefaults {
+  const persistedPreferences = snapshot?.planMeta?.schedulePreferences ?? null;
+  const workouts = snapshot?.workouts ?? [];
+  const nonRestWorkouts = workouts.filter((workout) => workout.type !== "rest");
+  const runningWeekdays = uniqueWeekdays(nonRestWorkouts.map((workout) => workout.weekday));
+  const fallbackRunningDaysPerWeek = deriveRunningDaysPerWeek(
+    nonRestWorkouts,
+    runningWeekdays.length,
+  );
+
+  return {
+    fixedRestDays: uniqueWeekdays(persistedPreferences?.fixedRestDays ?? []),
+    runningDaysPerWeek: persistedPreferences?.runningDaysPerWeek ?? fallbackRunningDaysPerWeek,
+    preferredLongRunDay:
+      parseWeekdayName(persistedPreferences?.preferredLongRunDay) ??
+      derivePreferredLongRunDay(nonRestWorkouts),
+  };
+}
+
+function deriveRunningDaysPerWeek(workouts: Workout[], fallback: number) {
+  const countsByWeek = new Map<number, number>();
+
+  for (const workout of workouts) {
+    countsByWeek.set(workout.week, (countsByWeek.get(workout.week) ?? 0) + 1);
+  }
+
+  const maxWeekCount = Math.max(0, ...countsByWeek.values());
+
+  if (maxWeekCount > 0) {
+    return Math.min(7, maxWeekCount);
+  }
+
+  if (fallback > 0) {
+    return Math.min(7, fallback);
+  }
+
+  return 4;
+}
+
+function derivePreferredLongRunDay(workouts: Workout[]): WeekdayName | null {
+  const longRun = workouts.find(
+    (workout) =>
+      workout.calendarIconKey === "long" ||
+      workout.workoutFamily === "long" ||
+      workout.type === "long_run",
+  );
+
+  return parseWeekdayName(longRun?.weekday);
+}
+
+function uniqueWeekdays(values: (string | null | undefined)[]) {
+  const weekdays: WeekdayName[] = [];
+
+  for (const value of values) {
+    const weekday = parseWeekdayName(value);
+
+    if (weekday && !weekdays.includes(weekday)) {
+      weekdays.push(weekday);
+    }
+  }
+
+  return weekdays;
+}
+
+function parseWeekdayName(value: string | null | undefined): WeekdayName | null {
+  return WEEKDAY_OPTIONS.find((option) => option.value === value)?.value ?? null;
 }
 
 function finishAtHome(onOpenChange: (open: boolean) => void) {

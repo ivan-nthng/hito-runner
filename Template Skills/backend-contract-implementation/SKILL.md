@@ -21,6 +21,16 @@ Implement server-owned behavior safely and in the smallest useful slice.
 8. Add migration/rollback notes when schema changes.
 9. Run targeted tests/checks and report gaps.
 
+## Minimal Diff And Reuse Rule
+
+- For one-field, one-copy, or one-condition requests, make the smallest direct change that satisfies the request.
+- Before adding a module, action, helper, schema, migration, or table, search for an existing owner and reuse or extend it.
+- Do not turn a small behavior change into a broad backend decomposition.
+- If the likely implementation touches many files, changes public contracts, adds storage, or introduces a new abstraction for a small request, stop and get explicit confirmation first.
+- Consolidate repeated backend patterns only when duplication is proven and the consolidation removes more code or risk than it adds.
+- Prefer existing canonical entities and server-action patterns over parallel models.
+- In the final report, call out when the diff stayed intentionally minimal or when a larger diff was unavoidable.
+
 ## Rules
 
 - Backend owns final validation, authorization, persistence, lifecycle, and mutation safety.

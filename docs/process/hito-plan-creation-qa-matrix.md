@@ -10,7 +10,25 @@ QA
 
 ## Last Updated
 
-2026-05-25
+2026-05-26
+
+## Release-Readiness Closeout
+
+Final status: controlled beta ready.
+
+Release evidence on 2026-05-26 is internally closed:
+
+- the first richness QA pass found S7/S8 under-structured ultra and mountain/trail workout-detail issues
+- backend repaired ultra time-on-feet, technical trail, and climbing steady segment structure
+- the rerun evidence superseded the earlier partial-pass verdict
+- visual QA passed with screenshot evidence in `docs/process/screenshots/plan-creation-richness-2026-05-26/`
+- Running Coach approved plan creation as coach-credible enough for first real users / controlled beta
+
+No launch blockers remain for plan creation. Future work should treat the following as backlog polish, not release blockers:
+
+- capture one visual screenshot that explicitly shows `Default HR guidance`
+- keep improving plain easy/support day detail richness
+- consider stronger ultra calendar wording if users still perceive relaxed ultra plans as too Long-heavy
 
 ## Purpose
 
@@ -45,7 +63,9 @@ Every scenario must verify:
 - Exactly one active plan after successful first-plan confirm.
 - Fixed rest days stay off.
 - No fake numeric pace or HR targets.
-- `hr_bpm_range` appears only when real HR-zone truth exists.
+- Personalized HR targets require personal HR-zone truth.
+- Default estimated HR guidance may appear when profile age exists; it must be labelled default/estimated/not personalized.
+- No bpm HR guidance appears when age is missing or the workout type is unsuitable for HR guidance.
 - `pace_min_per_km_range` appears only when watch/app access, pace or mixed preference, and usable recent 5K benchmark truth allow it.
 - Workout detail reflects backend-shaped truth.
 - Exact workout identity is visible where detail/review should show it.
@@ -71,7 +91,8 @@ Expected:
 - Mostly easy running.
 - Weekly long run present but conservative.
 - No pace targets.
-- No numeric HR targets.
+- No personalized HR targets.
+- If age is present, any bpm HR guidance is broad default estimated guidance and clearly marked not personalized.
 - Effort/cue language only.
 - Review says nothing has been created yet.
 - After confirm, exactly one active plan exists.
@@ -82,7 +103,8 @@ Expected:
 
 - Benchmark does not force pace targets.
 - One light quality stimulus at most.
-- No numeric HR.
+- No personalized HR targets.
+- If age is present, default estimated HR guidance may appear; it must be labelled as default/estimated/not personalized.
 - Pace remains effort-based.
 - Review does not overstate race readiness.
 
@@ -185,13 +207,14 @@ Expected:
 - Quality density does not silently increase.
 - Assumptions mention scheduling or recovery limits where supported.
 
-#### 13. Heart-rate guidance preference without HR-zone truth
+#### 13. Heart-rate guidance preference without personal HR-zone truth
 
 Expected:
 
-- No `hr_bpm_range`.
-- Review explicitly says heart-rate targets are omitted for now.
-- Workout detail uses effort cues or safe hints instead.
+- With age, broad `default_estimated_hr` ranges may appear where the workout type supports HR guidance.
+- Default HR guidance is labelled `Default HR guidance` and explains it is estimated from age, not personalized zones.
+- Without age, no bpm HR guidance appears and effort-only guidance remains.
+- Workout detail uses effort cues or safe hints whenever numeric HR is absent or unsuitable.
 
 #### 14. Mixed or pace-guided preference with watch/app and benchmark
 
@@ -199,7 +222,8 @@ Expected:
 
 - Pace ranges appear only on appropriate segments.
 - Easy/long runs do not become over-precise everywhere.
-- No HR targets unless HR-zone truth exists.
+- No personalized HR targets unless personal HR-zone truth exists.
+- Default estimated HR guidance may appear when age exists and must remain clearly labelled as default/estimated/not personalized.
 - Pace ranges remain broad and workout-specific.
 
 ### D. Review And Mutation Safety
@@ -328,7 +352,8 @@ Across all generated plans, verify:
 - Exact workout titles are diverse enough to feel intentional.
 - Hard days do not exceed runner frequency/recovery support.
 - Fixed rest days remain fixed.
-- Pace/HR precision follows backend metric policy.
+- Pace precision follows backend metric policy.
+- HR guidance follows backend metric policy: personal zones only from personal HR-zone truth, default estimated HR only from age, and no bpm HR guidance without age or on unsuitable workout types.
 
 ## Execution Notes
 

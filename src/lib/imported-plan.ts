@@ -9,6 +9,7 @@ import {
   CANONICAL_METRIC_GUIDANCE_VALUES,
   CANONICAL_WORKOUT_FAMILY_VALUES,
   CANONICAL_WORKOUT_IDENTITY_VALUES,
+  HR_TARGET_SOURCE_VALUES,
   resolveCanonicalWorkoutModel,
   toCanonicalMetricModeJson,
   type CalendarIconKey,
@@ -74,6 +75,9 @@ const v2TargetSchema = z
     intensity: z.string().trim().min(1).optional(),
     hr_bpm_range: z.string().trim().min(1).optional(),
     hr_bpm: z.string().trim().min(1).optional(),
+    hr_target_source: z.enum(HR_TARGET_SOURCE_VALUES).optional(),
+    label: z.string().trim().min(1).max(120).optional(),
+    source_note: z.string().trim().min(1).max(200).optional(),
     pace_min_per_km_range: z.string().trim().min(1).optional(),
     pace_range_min_km: z.string().trim().min(1).optional(),
     pace: z.string().trim().min(1).optional(),
@@ -171,6 +175,9 @@ const v2WorkoutMetricModeSchema = z
     guidance: z.enum(CANONICAL_METRIC_GUIDANCE_VALUES),
     pace_targets_allowed: z.boolean(),
     hr_targets_allowed: z.boolean(),
+    hr_target_source: z.enum(HR_TARGET_SOURCE_VALUES).optional(),
+    hr_target_label: z.string().trim().min(1).max(120).optional().nullable(),
+    hr_target_source_note: z.string().trim().min(1).max(200).optional().nullable(),
     reason: z.string().trim().min(1).max(200),
   })
   .strict();
@@ -1119,6 +1126,9 @@ function normalizeSegmentTarget(
     if (
       key === "hr_bpm" ||
       key === "hr_bpm_range" ||
+      key === "hr_target_source" ||
+      key === "label" ||
+      key === "source_note" ||
       key === "pace_range_min_km" ||
       key === "pace_min_per_km_range"
     ) {
@@ -1133,6 +1143,9 @@ function normalizeSegmentTarget(
       key === "intensity" ||
       key === "hr_bpm_range" ||
       key === "hr_bpm" ||
+      key === "hr_target_source" ||
+      key === "label" ||
+      key === "source_note" ||
       key === "pace_min_per_km_range" ||
       key === "pace_range_min_km" ||
       key === "pace" ||
@@ -1164,6 +1177,11 @@ function normalizeSegmentTarget(
   return {
     ...(typeof target.intensity === "string" ? { intensity: target.intensity } : {}),
     ...(hrRange ? { hr_bpm_range: hrRange } : {}),
+    ...(typeof target.hr_target_source === "string"
+      ? { hr_target_source: target.hr_target_source }
+      : {}),
+    ...(typeof target.label === "string" ? { label: target.label } : {}),
+    ...(typeof target.source_note === "string" ? { source_note: target.source_note } : {}),
     ...(paceRange ? { pace_min_per_km_range: paceRange } : {}),
     ...(typeof target.pace === "string" ? { pace: target.pace } : {}),
     ...(typeof target.rpe === "string" || typeof target.rpe === "number"

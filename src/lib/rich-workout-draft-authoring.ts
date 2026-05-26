@@ -151,7 +151,13 @@ type DraftSegment = DraftWorkout["segments"][number];
 const MAIN_LIKE_SEGMENT_TYPES = new Set(["main", "tempo_block", "interval_block", "strides"]);
 
 const PACE_TARGET_KEYS = ["pace_min_per_km_range", "pace_range_min_km", "pace"] as const;
-const HR_TARGET_KEYS = ["hr_bpm_range", "hr_bpm"] as const;
+const HR_TARGET_KEYS = [
+  "hr_bpm_range",
+  "hr_bpm",
+  "hr_target_source",
+  "label",
+  "source_note",
+] as const;
 
 export function normalizeRichWorkoutDraftToTrainingPlan({
   canonicalPlan,
@@ -522,6 +528,7 @@ function normalizeSafeMetricMode(
       guidance: "effort",
       pace_targets_allowed: false,
       hr_targets_allowed: false,
+      hr_target_source: "effort_only",
       reason:
         "Metric resolver keeps this workout effort-guided without numeric pace or HR targets.",
     };

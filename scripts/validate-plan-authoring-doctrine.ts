@@ -106,6 +106,18 @@ function buildPlan(input: StructuredFirstPlanOnboardingRequestInput) {
   };
 }
 
+function buildPlanWithNoAge(input: StructuredFirstPlanOnboardingRequestInput) {
+  const { authoringInput } = buildPlan(input);
+
+  return buildStructuredAuthoringPlan({
+    ...authoringInput,
+    runnerProfile: {
+      ...authoringInput.runnerProfile,
+      age: null,
+    },
+  });
+}
+
 function buildPlanWithHorizon(
   goalDistance: StructuredFirstPlanOnboardingRequestInput["goal"]["goalDistance"],
   horizonWeeks: number,
@@ -171,10 +183,121 @@ function hasTargetKey(plan: TrainingPlanV2, key: string) {
   });
 }
 
+function hrTargetRecords(plan: TrainingPlanV2) {
+  return allSegments(plan).flatMap((segment) => {
+    const targets = [segment.target, segment.recovery_target] as Array<
+      Record<string, unknown> | undefined
+    >;
+
+    return targets.filter(
+      (target): target is Record<string, unknown> =>
+        typeof target?.hr_bpm_range === "string" || typeof target?.hr_bpm === "string",
+    );
+  });
+}
+
+function assertDefaultEstimatedHrGuidance(plan: TrainingPlanV2, label: string) {
+  const hrTargets = hrTargetRecords(plan);
+
+  assert.ok(hrTargets.length > 0, `${label}: expected default estimated HR guidance`);
+
+  for (const target of hrTargets) {
+    assert.equal(
+      target.hr_target_source,
+      "default_estimated_hr",
+      `${label}: HR target should identify default estimated source`,
+    );
+    assert.equal(target.label, "Default HR guidance", `${label}: HR label should be bounded`);
+    assert.equal(
+      target.source_note,
+      "Estimated from age, not personalized zones.",
+      `${label}: HR source note should avoid personalization claims`,
+    );
+  }
+
+  const hrMetricModes = plan.planned_workouts
+    .map((workout) => workout.metric_mode)
+    .filter((metricMode) => metricMode?.hr_targets_allowed);
+
+  assert.ok(hrMetricModes.length > 0, `${label}: metric_mode should expose HR-enabled workouts`);
+
+  for (const metricMode of hrMetricModes) {
+    assert.equal(
+      metricMode?.hr_target_source,
+      "default_estimated_hr",
+      `${label}: metric_mode should expose default estimated HR source`,
+    );
+  }
+}
+
+function assertEffortOnlyHrGuidance(plan: TrainingPlanV2, label: string) {
+  assert.equal(hasTargetKey(plan, "hr_bpm_range"), false, `${label}: should not emit HR ranges`);
+  assert.equal(hasTargetKey(plan, "hr_bpm"), false, `${label}: should not emit HR values`);
+
+  for (const workout of plan.planned_workouts) {
+    assert.equal(
+      workout.metric_mode?.hr_targets_allowed,
+      false,
+      `${label}: metric_mode should keep HR disabled when no age or personal zones exist`,
+    );
+    assert.equal(
+      workout.metric_mode?.hr_target_source,
+      "effort_only",
+      `${label}: metric_mode should identify effort-only HR policy`,
+    );
+  }
+}
+
+function targetHasHr(target: Record<string, unknown> | undefined) {
+  return typeof target?.hr_bpm_range === "string" || typeof target?.hr_bpm === "string";
+}
+
+function assertNoHrOnMainTargetsForIdentities(
+  plan: TrainingPlanV2,
+  identities: string[],
+  label: string,
+) {
+  const identitySet = new Set(identities);
+  const offenders = nonRestWorkouts(plan).flatMap((workout) => {
+    if (!identitySet.has(workout.source_workout_type ?? "")) {
+      return [];
+    }
+
+    return (workout.segments as SegmentRecord[])
+      .filter((segment) =>
+        ["main", "tempo_block", "interval_block", "strides"].includes(
+          String(segment.segment_type ?? ""),
+        ),
+      )
+      .filter((segment) => targetHasHr(segment.target as Record<string, unknown> | undefined))
+      .map((segment) => `${workout.workout_id}:${workout.source_workout_type}:${segment.label}`);
+  });
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `${label}: interval/hill/trail work targets should not carry misleading HR ranges`,
+  );
+}
+
 function targetKeys(segment: SegmentRecord) {
   const target = segment.target as Record<string, unknown> | undefined;
 
   return target ? Object.keys(target).filter((key) => target[key] != null) : [];
+}
+
+function workoutDurationMin(workout: TrainingPlanV2["planned_workouts"][number]) {
+  return (workout.segments as SegmentRecord[]).reduce((sum, segment) => {
+    const prescription = segment.prescription as Record<string, unknown> | undefined;
+    const duration =
+      typeof segment.duration_min === "number"
+        ? segment.duration_min
+        : typeof prescription?.duration_min === "number"
+          ? prescription.duration_min
+          : 0;
+
+    return sum + duration;
+  }, 0);
 }
 
 function supportWorkoutSample(plan: TrainingPlanV2, sourceWorkoutType: string) {
@@ -203,6 +326,64 @@ function assertSupportRunRichness(plan: TrainingPlanV2, label: string) {
         `${label}: ${sourceWorkoutType} segment should include target cue, hint, or intensity`,
       );
     }
+  }
+}
+
+function assertSubstantialWorkoutIdentitiesAreStructured({
+  plan,
+  label,
+  sourceWorkoutTypes,
+  minimumDurationMin,
+  expectedText,
+}: {
+  plan: TrainingPlanV2;
+  label: string;
+  sourceWorkoutTypes: string[];
+  minimumDurationMin: number;
+  expectedText: RegExp[];
+}) {
+  const matchingWorkouts = plan.planned_workouts.filter(
+    (workout) =>
+      sourceWorkoutTypes.includes(workout.source_workout_type ?? "") &&
+      workoutDurationMin(workout) >= minimumDurationMin,
+  );
+
+  assert.ok(
+    matchingWorkouts.length > 0,
+    `${label}: expected at least one substantial ${sourceWorkoutTypes.join(", ")} workout`,
+  );
+
+  const singleSegmentWorkouts = matchingWorkouts.map((workout) => {
+    if (workout.segments.length > 1) return null;
+
+    return `${workout.date}:${workout.source_workout_type}:${workoutDurationMin(workout)}min`;
+  });
+
+  assert.deepEqual(
+    singleSegmentWorkouts.filter(Boolean),
+    [],
+    `${label}: substantial terrain/endurance workouts should not persist as one block`,
+  );
+
+  for (const workout of matchingWorkouts) {
+    for (const segment of workout.segments as SegmentRecord[]) {
+      assert.ok(
+        typeof segment.guidance === "string" && segment.guidance.trim().length > 0,
+        `${label}: ${workout.source_workout_type} segment should include runner guidance`,
+      );
+      assert.ok(
+        targetKeys(segment).includes("cue") ||
+          targetKeys(segment).includes("hint") ||
+          targetKeys(segment).includes("intensity"),
+        `${label}: ${workout.source_workout_type} segment should include target cue, hint, or intensity`,
+      );
+    }
+  }
+
+  const text = JSON.stringify(matchingWorkouts);
+
+  for (const pattern of expectedText) {
+    assert.match(text, pattern, `${label}: expected meaningful terrain/endurance guidance`);
   }
 }
 
@@ -473,7 +654,7 @@ function assertRichWorkoutContract(plan: TrainingPlanV2, label: string) {
 
 function assertRichAiDraftNormalizer() {
   const paceEnabledPlan = buildPlan(buildRequest("10k")).plan;
-  const effortOnlyPlan = buildPlan(
+  const defaultEstimatedHrPlan = buildPlan(
     buildRequest("half_marathon", {
       benchmark: { kind: "unknown" },
       goal: {
@@ -486,6 +667,19 @@ function assertRichAiDraftNormalizer() {
       execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
     }),
   ).plan;
+  const noAgeEffortOnlyPlan = buildPlanWithNoAge(
+    buildRequest("half_marathon", {
+      benchmark: { kind: "unknown" },
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: "2026-08-30",
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+  );
 
   const normalizedValid = normalizeRichWorkoutDraftToTrainingPlan({
     canonicalPlan: paceEnabledPlan,
@@ -522,8 +716,8 @@ function assertRichAiDraftNormalizer() {
   }
 
   const fakeHrNormalized = normalizeRichWorkoutDraftToTrainingPlan({
-    canonicalPlan: effortOnlyPlan,
-    draft: buildAiLikeRichWorkoutDraft(effortOnlyPlan, { includeFakeHr: true }),
+    canonicalPlan: noAgeEffortOnlyPlan,
+    draft: buildAiLikeRichWorkoutDraft(noAgeEffortOnlyPlan, { includeFakeHr: true }),
   });
 
   assert.equal(
@@ -533,10 +727,9 @@ function assertRichAiDraftNormalizer() {
   );
 
   if (fakeHrNormalized.ok) {
-    assert.equal(
-      hasTargetKey(fakeHrNormalized.canonicalPlan, "hr_bpm_range"),
-      false,
-      "AI rich draft normalization must strip fake HR targets without HR-zone truth",
+    assertEffortOnlyHrGuidance(
+      fakeHrNormalized.canonicalPlan,
+      "AI rich draft normalization without age",
     );
     assert.equal(
       hasTargetKey(fakeHrNormalized.canonicalPlan, "pace_min_per_km_range"),
@@ -545,7 +738,30 @@ function assertRichAiDraftNormalizer() {
     );
   }
 
-  const malformedDraft = buildAiLikeRichWorkoutDraft(effortOnlyPlan);
+  const fakeHrWithDefaultNormalized = normalizeRichWorkoutDraftToTrainingPlan({
+    canonicalPlan: defaultEstimatedHrPlan,
+    draft: buildAiLikeRichWorkoutDraft(defaultEstimatedHrPlan, { includeFakeHr: true }),
+  });
+
+  assert.equal(
+    fakeHrWithDefaultNormalized.ok,
+    true,
+    "fake HR draft with age should normalize through backend default HR policy",
+  );
+
+  if (fakeHrWithDefaultNormalized.ok) {
+    assertDefaultEstimatedHrGuidance(
+      fakeHrWithDefaultNormalized.canonicalPlan,
+      "AI rich draft normalization with default estimated HR",
+    );
+    assert.equal(
+      JSON.stringify(fakeHrWithDefaultNormalized.canonicalPlan).includes("150-160"),
+      false,
+      "AI rich draft normalization must not preserve unsupported AI-supplied HR ranges",
+    );
+  }
+
+  const malformedDraft = buildAiLikeRichWorkoutDraft(defaultEstimatedHrPlan);
   const firstRunningWorkout = malformedDraft.workouts.find(
     (workout) => workout.workoutFamily !== "rest",
   );
@@ -556,7 +772,7 @@ function assertRichAiDraftNormalizer() {
   );
 
   const malformedResult = normalizeRichWorkoutDraftToTrainingPlan({
-    canonicalPlan: effortOnlyPlan,
+    canonicalPlan: defaultEstimatedHrPlan,
     draft: malformedDraft,
   });
 
@@ -1337,6 +1553,35 @@ function assertRichCompatibilityMapping() {
     "Rest day has no execution metric targets.",
     "rest metric mode should not imply effort execution cues",
   );
+
+  const defaultHrMetricMode = resolveCanonicalWorkoutModel({
+    workoutType: "easy",
+    sourceWorkoutType: null,
+    title: "Easy aerobic run",
+    steps: [
+      {
+        segment_type: "main",
+        label: "Easy aerobic block",
+        target: {
+          hr_bpm_range: "110-130 bpm",
+          hr_target_source: "default_estimated_hr",
+          label: "Default HR guidance",
+          source_note: "Estimated from age, not personalized zones.",
+        },
+      },
+    ],
+  }).metricMode;
+
+  assert.equal(
+    defaultHrMetricMode.hrTargetSource,
+    "default_estimated_hr",
+    "metric-mode fallback should preserve target-level default HR source",
+  );
+  assert.equal(
+    defaultHrMetricMode.hrTargetLabel,
+    "Default HR guidance",
+    "metric-mode fallback should preserve default HR label",
+  );
 }
 
 function assertRichPersistenceReadback() {
@@ -1993,10 +2238,9 @@ function assertBeginnerBuildConsistencyQualityCap() {
     false,
     "beginner consistency plan without watch/benchmark support should not emit pace targets",
   );
-  assert.equal(
-    hasTargetKey(plan, "hr_bpm_range"),
-    false,
-    "beginner consistency plan should not emit HR targets without HR-zone truth",
+  assertDefaultEstimatedHrGuidance(
+    plan,
+    "beginner consistency plan with age but no personal HR zones",
   );
 
   const weakSupportConsistency = buildPlan(
@@ -2022,6 +2266,7 @@ function assertBeginnerBuildConsistencyQualityCap() {
 
 function assertMetricTargetPolicy() {
   const supportedPace = buildPlan(buildRequest("10k")).plan;
+  const mountainPlan = buildPlan(buildRequest("mountain_running")).plan;
 
   assert.equal(
     hasTargetKey(supportedPace, "pace_min_per_km_range"),
@@ -2082,17 +2327,52 @@ function assertMetricTargetPolicy() {
     "mixed guidance must not invent pace targets without usable recent 5K truth",
   );
 
-  for (const plan of [
-    supportedPace,
-    buildPlan(buildRequest("marathon")).plan,
-    buildPlan(buildRequest("mountain_running")).plan,
-  ]) {
-    assert.equal(
-      hasTargetKey(plan, "hr_bpm_range"),
-      false,
-      "HR targets remain absent without runner-level HR-zone truth",
+  for (const plan of [supportedPace, buildPlan(buildRequest("marathon")).plan, mountainPlan]) {
+    assertDefaultEstimatedHrGuidance(
+      plan,
+      "age-supported plan without personal HR zones should use default estimated HR",
     );
   }
+
+  assertEffortOnlyHrGuidance(
+    buildPlanWithNoAge(buildRequest("10k")),
+    "plan without age or personal HR zones",
+  );
+
+  assertNoHrOnMainTargetsForIdentities(
+    supportedPace,
+    ["distance_intervals", "time_intervals", "10k_rhythm_intervals", "5k_sharpening_repeats"],
+    "short rep and interval workouts",
+  );
+  assertNoHrOnMainTargetsForIdentities(
+    mountainPlan,
+    [
+      "uphill_repeats",
+      "rolling_hills_session",
+      "technical_trail_easy",
+      "controlled_downhill_durability",
+      "climbing_steady_run",
+    ],
+    "hill and technical trail workouts",
+  );
+
+  const halfPlan = buildPlan(buildRequest("half_marathon")).plan;
+  const sustainedTempoHrTargets = nonRestWorkouts(halfPlan)
+    .filter((workout) =>
+      ["controlled_tempo_session", "half_marathon_threshold_durability"].includes(
+        workout.source_workout_type ?? "",
+      ),
+    )
+    .flatMap((workout) => workout.segments as SegmentRecord[])
+    .filter((segment) =>
+      ["main", "tempo_block", "interval_block"].includes(String(segment.segment_type ?? "")),
+    )
+    .filter((segment) => targetHasHr(segment.target as Record<string, unknown> | undefined));
+
+  assert.ok(
+    sustainedTempoHrTargets.length > 0,
+    "sustained tempo/threshold blocks should receive broad default estimated HR guidance when age exists",
+  );
 }
 
 for (const goalDistance of [
@@ -2106,7 +2386,7 @@ for (const goalDistance of [
   const { plan } = buildPlan(buildRequest(goalDistance));
 
   assertFixedRestDays(plan);
-  assert.equal(hasTargetKey(plan, "hr_bpm_range"), false, "HR targets require real HR-zone truth");
+  assertDefaultEstimatedHrGuidance(plan, `${goalDistance} with age but no personal HR zones`);
   assert.equal(
     hasTargetKey(plan, "pace_min_per_km_range"),
     true,
@@ -2160,6 +2440,41 @@ assertMountainTrailDoctrine(
   ).plan,
   "ultra with mountain terrain",
 );
+
+const ultraEffortOnlyRichnessPlan = buildPlan(
+  buildRequest("ultra_marathon", {
+    benchmark: { kind: "unknown" },
+    execution: { watchAccess: "none", guidancePreference: "effort" },
+  }),
+).plan;
+assertSubstantialWorkoutIdentitiesAreStructured({
+  plan: ultraEffortOnlyRichnessPlan,
+  label: "S7 ultra effort-only richness",
+  sourceWorkoutTypes: ["ultra_time_on_feet_durability"],
+  minimumDurationMin: 45,
+  expectedText: [/time[- ]on[- ]feet/i, /hike/i, /durability|recovery protection/i],
+});
+
+const mountainEffortOnlyRichnessPlan = buildPlan(
+  buildRequest("mountain_running", {
+    benchmark: { kind: "unknown" },
+    execution: { watchAccess: "none", guidancePreference: "effort" },
+  }),
+).plan;
+assertSubstantialWorkoutIdentitiesAreStructured({
+  plan: mountainEffortOnlyRichnessPlan,
+  label: "S8 mountain technical trail richness",
+  sourceWorkoutTypes: ["technical_trail_easy"],
+  minimumDurationMin: 30,
+  expectedText: [/technical|trail|footing/i, /control|risky|cautious/i],
+});
+assertSubstantialWorkoutIdentitiesAreStructured({
+  plan: mountainEffortOnlyRichnessPlan,
+  label: "S8 mountain climbing steady richness",
+  sourceWorkoutTypes: ["climbing_steady_run"],
+  minimumDurationMin: 35,
+  expectedText: [/climb|hill|hilly/i, /controlled|grade|descent/i],
+});
 assertGoalFamilyWorkoutIdentity();
 assertBeginnerBuildConsistencyQualityCap();
 assertMetricTargetPolicy();
@@ -2193,10 +2508,9 @@ assertRichWorkoutContract(
     false,
     "saved half marathon without benchmark should stay effort-only",
   );
-  assert.equal(
-    hasTargetKey(halfBalancedNoBenchmark, "hr_bpm_range"),
-    false,
-    "saved half marathon without HR-zone truth should not emit HR targets",
+  assertDefaultEstimatedHrGuidance(
+    halfBalancedNoBenchmark,
+    "saved half marathon without benchmark but with age",
   );
 }
 
@@ -2254,10 +2568,9 @@ assertRichWorkoutContract(
     false,
     "target-time half marathon without benchmark must stay effort-only even with watch/app mixed guidance",
   );
-  assert.equal(
-    hasTargetKey(plan, "hr_bpm_range"),
-    false,
-    "target-time half marathon without HR-zone truth must not emit HR targets",
+  assertDefaultEstimatedHrGuidance(
+    plan,
+    "target-time half marathon without benchmark but with age",
   );
   assert.ok(
     sourceWorkoutTypes(plan).has("half_marathon_threshold_durability"),
@@ -2330,10 +2643,9 @@ assertRichWorkoutContract(
     false,
     "low-support balanced marathon without benchmark/watch support should not emit pace targets",
   );
-  assert.equal(
-    hasTargetKey(plan, "hr_bpm_range"),
-    false,
-    "low-support balanced marathon should not emit HR targets without HR-zone truth",
+  assertDefaultEstimatedHrGuidance(
+    plan,
+    "low-support balanced marathon with age but no personal HR zones",
   );
 }
 

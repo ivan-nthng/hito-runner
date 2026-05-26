@@ -19,6 +19,16 @@ Build UI slices that preserve product truth and design-system consistency.
 6. Handle states: loading, empty, error, disabled, success, and destructive confirmation.
 7. Verify desktop and mobile layout.
 
+## Minimal Diff And Reuse Rule
+
+- For copy-only or token-only requests, change only the requested copy/token unless a real bug blocks it.
+- Before adding a component, hook, helper, or local style, search for an existing equivalent and reuse it.
+- If the requested change should be one or two lines, do not turn it into a refactor.
+- If implementation appears likely to touch many files, add a new abstraction, or produce a large diff for a small request, stop and get explicit confirmation first.
+- Consolidate repeated UI patterns only when repetition is proven by nearby code; do not create generic components speculatively.
+- Prefer deleting local drift and wiring to existing design-system primitives over adding new wrapper layers.
+- In the final report, call out when the diff stayed intentionally minimal or when a larger diff was unavoidable.
+
 ## Rules
 
 - Do not invent business rules in frontend code.

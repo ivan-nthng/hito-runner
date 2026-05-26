@@ -688,9 +688,12 @@ function buildRefreshHardConstraintNotes(proposalOutput: {
 function buildMetricPolicySummary(input: StructuredAuthoringInput) {
   const execution = input.execution;
   const hasRecent5k = typeof input.currentLevel.recent5kPaceSecondsPerKm === "number";
+  const hasAge = typeof input.runnerProfile.age === "number";
 
   if (execution.guidancePreference === "heart_rate") {
-    return "Effort-based targets are used because Hito does not have verified heart-rate zone truth for this runner.";
+    return hasAge
+      ? "Heart-rate guidance may use broad age-estimated defaults; those ranges are not personalized HR zones."
+      : "Effort-based targets are used because Hito does not have age or verified heart-rate zone truth for this runner.";
   }
 
   if (
@@ -698,18 +701,26 @@ function buildMetricPolicySummary(input: StructuredAuthoringInput) {
     hasRecent5k &&
     (execution.guidancePreference === "pace" || execution.guidancePreference === "mixed")
   ) {
-    return "Broad pace targets are allowed from watch/app access plus recent 5K benchmark truth; heart-rate targets remain disabled without zone truth.";
+    return hasAge
+      ? "Broad pace targets are allowed from watch/app access plus recent 5K benchmark truth; HR guidance, when shown, is age-estimated default guidance rather than personalized zones."
+      : "Broad pace targets are allowed from watch/app access plus recent 5K benchmark truth; heart-rate targets stay effort-only without age or zone truth.";
   }
 
   if (execution.watchAccess !== "watch_or_app") {
-    return "Effort-based targets are used because watch/app pace execution is not confirmed.";
+    return hasAge
+      ? "Pace targets stay effort-based because watch/app pace execution is not confirmed; broad HR guidance may appear from age-estimated defaults."
+      : "Effort-based targets are used because watch/app pace execution is not confirmed.";
   }
 
   if (!hasRecent5k) {
-    return "Effort-based targets are used because no usable recent 5K benchmark is available.";
+    return hasAge
+      ? "Pace targets stay effort-based because no usable recent 5K benchmark is available; broad HR guidance may appear from age-estimated defaults."
+      : "Effort-based targets are used because no usable recent 5K benchmark is available.";
   }
 
-  return "Effort-based targets are used for this refresh; numeric heart-rate targets are not emitted without zone truth.";
+  return hasAge
+    ? "Refresh targets stay effort-led, with broad default HR guidance where age supports it and no personalized zone claims."
+    : "Effort-based targets are used for this refresh; numeric heart-rate targets are not emitted without age or zone truth.";
 }
 
 function buildTargetTimeHonestyAssumptions(

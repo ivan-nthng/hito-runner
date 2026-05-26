@@ -213,6 +213,8 @@ interface StructuredMetricMode {
 
 type TrainingPhase = "Base" | "Build" | "Specific" | "Taper";
 
+type EasySupportKind = "easy" | "recovery" | "cutback";
+
 interface LongRunGoalPolicy {
   floorKm: number;
   peakKm: number;
@@ -525,6 +527,33 @@ function buildEasyWorkout({
 }: BuildWorkoutContext) {
   const easyDurationMin = deriveEasyDurationMin(normalized, weekNumber);
   const technicalTrailExposure = isMountainSpecificPlan(normalized) && phase === "Base";
+  const supportKind = deriveEasySupportKind({
+    normalized,
+    weekNumber,
+    phase,
+    technicalTrailExposure,
+  });
+  const sourceWorkoutType = technicalTrailExposure
+    ? "technical_trail_easy"
+    : supportKind === "recovery"
+      ? "recovery_jog"
+      : supportKind === "cutback"
+        ? "cutback_aerobic_run"
+        : "easy_aerobic_run";
+  const title = technicalTrailExposure
+    ? "Technical trail easy run"
+    : supportKind === "recovery"
+      ? "Recovery jog"
+      : supportKind === "cutback"
+        ? "Cutback aerobic run"
+        : "Easy aerobic run";
+  const summary = technicalTrailExposure
+    ? `${easyDurationMin} min easy running with low-risk trail or uneven-ground awareness.`
+    : supportKind === "recovery"
+      ? `${easyDurationMin} min very easy recovery running to absorb the block.`
+      : supportKind === "cutback"
+        ? `${easyDurationMin} min deliberately easy aerobic running for a lower-load week.`
+        : `${easyDurationMin} min comfortable aerobic running.`;
 
   return {
     workout_id: workoutId,
@@ -533,17 +562,16 @@ function buildEasyWorkout({
     week_number: weekNumber,
     phase,
     workout_type: "easy" as const,
-    source_workout_type: technicalTrailExposure ? "technical_trail_easy" : "easy_aerobic_run",
-    title: technicalTrailExposure ? "Technical trail easy run" : "Easy aerobic run",
-    summary: technicalTrailExposure
-      ? `${easyDurationMin} min easy running with low-risk trail or uneven-ground awareness.`
-      : `${easyDurationMin} min comfortable aerobic running.`,
+    source_workout_type: sourceWorkoutType,
+    title,
+    summary,
     planned_rpe: 4,
     segments: buildEasyRunSegments({
       workoutId,
       durationMin: easyDurationMin,
       normalized,
       technicalTrailExposure,
+      supportKind,
     }),
   };
 }
@@ -579,22 +607,38 @@ function buildEasyRunSegments({
   durationMin,
   normalized,
   technicalTrailExposure,
+  supportKind,
 }: {
   workoutId: string;
   durationMin: number;
   normalized: NormalizedStructuredInput;
   technicalTrailExposure: boolean;
+  supportKind: EasySupportKind;
 }) {
-  if (durationMin < 35) {
+  const isRecovery = supportKind === "recovery";
+  const isCutback = supportKind === "cutback";
+  const splitThresholdMin = isRecovery || isCutback ? 30 : 35;
+
+  if (durationMin < splitThresholdMin) {
     return [
       {
         segment_id: `${workoutId}_seg_1`,
         sequence: 1,
         segment_type: "main" as const,
-        label: technicalTrailExposure ? "Easy trail awareness" : "Easy aerobic running",
+        label: technicalTrailExposure
+          ? "Easy trail awareness"
+          : isRecovery
+            ? "Gentle recovery running"
+            : isCutback
+              ? "Reduced aerobic running"
+              : "Easy aerobic running",
         guidance: technicalTrailExposure
           ? "Choose forgiving terrain if available. Keep the effort conversational, watch footing, and avoid risky technical sections."
-          : "Stay relaxed and conversational.",
+          : isRecovery
+            ? "Keep this lighter than a normal easy run; the purpose is recovery, not extra fitness."
+            : isCutback
+              ? "Keep this intentionally easy so the week absorbs training instead of adding a new stressor."
+              : "Stay relaxed and conversational.",
         prescription: {
           mode: "time" as const,
           duration_min: durationMin,
@@ -613,10 +657,20 @@ function buildEasyRunSegments({
       segment_id: `${workoutId}_seg_1`,
       sequence: 1,
       segment_type: "warmup" as const,
-      label: technicalTrailExposure ? "Gentle trail opening" : "Easy opening rhythm",
+      label: technicalTrailExposure
+        ? "Gentle trail opening"
+        : isRecovery
+          ? "Very easy recovery opening"
+          : isCutback
+            ? "Gentle cutback opening"
+            : "Easy opening rhythm",
       guidance: technicalTrailExposure
         ? "Start on forgiving terrain if available; keep attention on relaxed footing."
-        : "Start softer than planned and let breathing settle.",
+        : isRecovery
+          ? "Start extra easy and let the legs loosen without chasing pace."
+          : isCutback
+            ? "Start softer than usual and keep the day intentionally low-stress."
+            : "Start softer than planned and let breathing settle.",
       prescription: {
         mode: "time" as const,
         duration_min: openerMin,
@@ -630,10 +684,18 @@ function buildEasyRunSegments({
       segment_type: "main" as const,
       label: technicalTrailExposure
         ? "Conversational trail running"
-        : "Conversational aerobic running",
+        : isRecovery
+          ? "Easy recovery body"
+          : isCutback
+            ? "Reduced aerobic body"
+            : "Conversational aerobic running",
       guidance: technicalTrailExposure
         ? "Keep the trail exposure low-risk and controlled; avoid chasing pace on uneven ground."
-        : "Hold a relaxed, repeatable aerobic rhythm.",
+        : isRecovery
+          ? "Stay relaxed and light. If the effort drifts up, shorten the run or slow down."
+          : isCutback
+            ? "Hold a comfortable rhythm that supports recovery for the next training block."
+            : "Hold a relaxed, repeatable aerobic rhythm.",
       prescription: {
         mode: "time" as const,
         duration_min: mainMin,
@@ -645,8 +707,16 @@ function buildEasyRunSegments({
       segment_id: `${workoutId}_seg_3`,
       sequence: 3,
       segment_type: "cooldown" as const,
-      label: "Relaxed finish check-in",
-      guidance: "Finish smooth and easy; you should feel like you could keep going.",
+      label: isRecovery
+        ? "Recovery finish check-in"
+        : isCutback
+          ? "Low-stress finish check-in"
+          : "Relaxed finish check-in",
+      guidance: isRecovery
+        ? "Finish feeling fresher than when you started."
+        : isCutback
+          ? "Finish relaxed; the win is leaving energy in reserve."
+          : "Finish smooth and easy; you should feel like you could keep going.",
       prescription: {
         mode: "time" as const,
         duration_min: finishMin,
@@ -973,12 +1043,8 @@ function buildLongAerobicSupportSegments({
   cutback: boolean;
   taper: boolean;
 }) {
-  if (cutback || taper) {
-    return null;
-  }
-
   if (normalized.runnerProfile.baselineLongRunKm) {
-    if (distanceKm < 8) {
+    if (distanceKm < 6) {
       return null;
     }
 
@@ -993,8 +1059,16 @@ function buildLongAerobicSupportSegments({
         segment_id: `${workoutId}_seg_1`,
         sequence: 1,
         segment_type: "warmup" as const,
-        label: "Patient long-run opening",
-        guidance: "Start deliberately easier than the rest of the run.",
+        label: cutback
+          ? "Gentle cutback opening"
+          : taper
+            ? "Fresh taper opening"
+            : "Patient long-run opening",
+        guidance: cutback
+          ? "Start very comfortably; this long run is here to absorb the block."
+          : taper
+            ? "Start relaxed and keep the first section confidence-building."
+            : "Start deliberately easier than the rest of the run.",
         prescription: {
           mode: "distance" as const,
           distance_km: openingDistanceKm,
@@ -1006,10 +1080,14 @@ function buildLongAerobicSupportSegments({
         segment_id: `${workoutId}_seg_2`,
         sequence: 2,
         segment_type: "main" as const,
-        label: isMountainSpecificPlan(normalized)
-          ? "Mountain time-on-feet body"
-          : "Long aerobic body",
-        guidance: buildLongRunGuidance(normalized, false, false),
+        label: cutback
+          ? "Reduced long-run body"
+          : taper
+            ? "Shortened taper endurance"
+            : isMountainSpecificPlan(normalized)
+              ? "Mountain time-on-feet body"
+              : "Long aerobic body",
+        guidance: buildLongRunGuidance(normalized, cutback, taper),
         prescription: {
           mode: "distance" as const,
           distance_km: mainDistanceKm,
@@ -1021,10 +1099,18 @@ function buildLongAerobicSupportSegments({
         segment_id: `${workoutId}_seg_3`,
         sequence: 3,
         segment_type: "cooldown" as const,
-        label: "Patient finish",
-        guidance: isMountainSpecificPlan(normalized)
-          ? "Finish with controlled descents and hike breaks if they protect the full session."
-          : "Keep form tall and finish controlled rather than fast.",
+        label: cutback
+          ? "Easy absorption finish"
+          : taper
+            ? "Freshness-preserving finish"
+            : "Patient finish",
+        guidance: cutback
+          ? "Finish easy and controlled; do not turn this into a make-up workout."
+          : taper
+            ? "Finish feeling fresh, with no late push."
+            : isMountainSpecificPlan(normalized)
+              ? "Finish with controlled descents and hike breaks if they protect the full session."
+              : "Keep form tall and finish controlled rather than fast.",
         prescription: {
           mode: "distance" as const,
           distance_km: finishDistanceKm,
@@ -1035,7 +1121,7 @@ function buildLongAerobicSupportSegments({
     ];
   }
 
-  if (durationMin < 50) {
+  if (durationMin < 45) {
     return null;
   }
 
@@ -1048,8 +1134,16 @@ function buildLongAerobicSupportSegments({
       segment_id: `${workoutId}_seg_1`,
       sequence: 1,
       segment_type: "warmup" as const,
-      label: "Patient long-run opening",
-      guidance: "Start deliberately easier than the rest of the run.",
+      label: cutback
+        ? "Gentle cutback opening"
+        : taper
+          ? "Fresh taper opening"
+          : "Patient long-run opening",
+      guidance: cutback
+        ? "Start very comfortably; this long run is here to absorb the block."
+        : taper
+          ? "Start relaxed and keep the first section confidence-building."
+          : "Start deliberately easier than the rest of the run.",
       prescription: {
         mode: "time" as const,
         duration_min: openingMin,
@@ -1061,10 +1155,14 @@ function buildLongAerobicSupportSegments({
       segment_id: `${workoutId}_seg_2`,
       sequence: 2,
       segment_type: "main" as const,
-      label: isMountainSpecificPlan(normalized)
-        ? "Mountain time-on-feet body"
-        : "Long aerobic body",
-      guidance: buildLongRunGuidance(normalized, false, false),
+      label: cutback
+        ? "Reduced long-run body"
+        : taper
+          ? "Shortened taper endurance"
+          : isMountainSpecificPlan(normalized)
+            ? "Mountain time-on-feet body"
+            : "Long aerobic body",
+      guidance: buildLongRunGuidance(normalized, cutback, taper),
       prescription: {
         mode: "time" as const,
         duration_min: mainMin,
@@ -1076,10 +1174,18 @@ function buildLongAerobicSupportSegments({
       segment_id: `${workoutId}_seg_3`,
       sequence: 3,
       segment_type: "cooldown" as const,
-      label: "Patient finish",
-      guidance: isMountainSpecificPlan(normalized)
-        ? "Finish with controlled descents and hike breaks if they protect the full session."
-        : "Keep form tall and finish controlled rather than fast.",
+      label: cutback
+        ? "Easy absorption finish"
+        : taper
+          ? "Freshness-preserving finish"
+          : "Patient finish",
+      guidance: cutback
+        ? "Finish easy and controlled; do not turn this into a make-up workout."
+        : taper
+          ? "Finish feeling fresh, with no late push."
+          : isMountainSpecificPlan(normalized)
+            ? "Finish with controlled descents and hike breaks if they protect the full session."
+            : "Keep form tall and finish controlled rather than fast.",
       prescription: {
         mode: "time" as const,
         duration_min: finishMin,
@@ -1240,21 +1346,13 @@ function buildCutbackAerobicWorkout({
     title: "Cutback aerobic run",
     summary: `${durationMin} min deliberately easy aerobic running for a lower-load week.`,
     planned_rpe: 4,
-    segments: [
-      {
-        segment_id: `${workoutId}_seg_1`,
-        sequence: 1,
-        segment_type: "main" as const,
-        label: "Reduced aerobic running",
-        guidance:
-          "Keep this intentionally easy so the week absorbs training instead of adding a new stressor.",
-        prescription: {
-          mode: "time" as const,
-          duration_min: durationMin,
-        },
-        target: buildEasyTarget(normalized),
-      },
-    ],
+    segments: buildEasyRunSegments({
+      workoutId,
+      durationMin,
+      normalized,
+      technicalTrailExposure: false,
+      supportKind: "cutback",
+    }),
   };
 }
 
@@ -1269,6 +1367,31 @@ function buildTaperTuneupWorkout({
   const durationMin = Math.max(25, deriveEasyDurationMin(normalized, weekNumber) - 5);
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
   const mountainSpecific = isMountainSpecificPlan(normalized);
+  const segments =
+    durationMin >= 30
+      ? buildTaperTuneupSegments({ workoutId, durationMin, normalized, mountainSpecific })
+      : [
+          {
+            segment_id: `${workoutId}_seg_1`,
+            sequence: 1,
+            segment_type: "main" as const,
+            label: "Easy taper running",
+            guidance: mountainSpecific
+              ? "Stay fresh. Use smooth, low-risk terrain and avoid hard climbing or technical descent stress."
+              : "Stay fresh. Add only a short controlled lift if the legs feel good.",
+            prescription: {
+              mode: "time" as const,
+              duration_min: durationMin,
+            },
+            target: {
+              intensity: "easy_with_short_lift",
+              ...(paceTargets?.easy ? { pace_min_per_km_range: paceTargets.easy } : {}),
+              cue: mountainSpecific
+                ? "Light and relaxed; preserve freshness over terrain specificity."
+                : "Light, relaxed, and never forced.",
+            },
+          },
+        ];
 
   return {
     workout_id: workoutId,
@@ -1283,29 +1406,75 @@ function buildTaperTuneupWorkout({
       ? `${durationMin} min easy tune-up that reduces terrain stress and keeps descents gentle.`
       : `${durationMin} min easy run with a short controlled lift to stay sharp.`,
     planned_rpe: 4,
-    segments: [
-      {
-        segment_id: `${workoutId}_seg_1`,
-        sequence: 1,
-        segment_type: "main" as const,
-        label: "Easy taper running",
-        guidance: mountainSpecific
-          ? "Stay fresh. Use smooth, low-risk terrain and avoid hard climbing or technical descent stress."
-          : "Stay fresh. Add only a short controlled lift if the legs feel good.",
-        prescription: {
-          mode: "time" as const,
-          duration_min: durationMin,
-        },
-        target: {
-          intensity: "easy_with_short_lift",
-          ...(paceTargets?.easy ? { pace_min_per_km_range: paceTargets.easy } : {}),
-          cue: mountainSpecific
-            ? "Light and relaxed; preserve freshness over terrain specificity."
-            : "Light, relaxed, and never forced.",
-        },
-      },
-    ],
+    segments,
   };
+}
+
+function buildTaperTuneupSegments({
+  workoutId,
+  durationMin,
+  normalized,
+  mountainSpecific,
+}: {
+  workoutId: string;
+  durationMin: number;
+  normalized: NormalizedStructuredInput;
+  mountainSpecific: boolean;
+}) {
+  const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const openerMin = 8;
+  const finishMin = 5;
+  const mainMin = Math.max(10, durationMin - openerMin - finishMin);
+
+  return [
+    {
+      segment_id: `${workoutId}_seg_1`,
+      sequence: 1,
+      segment_type: "warmup" as const,
+      label: "Fresh taper opening",
+      guidance: "Start smooth and easy; the goal is freshness, not added load.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: openerMin,
+      },
+      duration_min: openerMin,
+      target: buildEasyTarget(normalized),
+    },
+    {
+      segment_id: `${workoutId}_seg_2`,
+      sequence: 2,
+      segment_type: "main" as const,
+      label: mountainSpecific ? "Low-stress terrain tune-up" : "Easy taper tune-up",
+      guidance: mountainSpecific
+        ? "Use smooth, low-risk terrain and avoid hard climbing or technical descent stress."
+        : "Keep the run easy, with only a short controlled lift if the legs feel good.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: mainMin,
+      },
+      duration_min: mainMin,
+      target: {
+        intensity: "easy_with_short_lift",
+        ...(paceTargets?.easy ? { pace_min_per_km_range: paceTargets.easy } : {}),
+        cue: mountainSpecific
+          ? "Light and relaxed; preserve freshness over terrain specificity."
+          : "Light, relaxed, and never forced.",
+      },
+    },
+    {
+      segment_id: `${workoutId}_seg_3`,
+      sequence: 3,
+      segment_type: "cooldown" as const,
+      label: "Freshness check-out",
+      guidance: "Finish relaxed and leave energy in reserve.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: finishMin,
+      },
+      duration_min: finishMin,
+      target: buildEasyTarget(normalized),
+    },
+  ];
 }
 
 function buildProgressionWorkout({
@@ -2416,6 +2585,39 @@ function shouldUseBaseStrides(normalized: NormalizedStructuredInput) {
   }
 
   return ["5k", "10k"].includes(normalized.goal.goalType);
+}
+
+function deriveEasySupportKind({
+  normalized,
+  weekNumber,
+  phase,
+  technicalTrailExposure,
+}: {
+  normalized: NormalizedStructuredInput;
+  weekNumber: number;
+  phase: TrainingPhase;
+  technicalTrailExposure: boolean;
+}): EasySupportKind {
+  if (technicalTrailExposure) return "easy";
+  if (phase === "Taper") return "recovery";
+  if (isCutbackWeek(weekNumber, normalized)) return "cutback";
+
+  if (shouldVaryConservativeSupportRuns(normalized) && weekNumber > 1 && weekNumber % 3 === 0) {
+    return "recovery";
+  }
+
+  return "easy";
+}
+
+function shouldVaryConservativeSupportRuns(normalized: NormalizedStructuredInput) {
+  if (shouldAvoidQuality(normalized)) return true;
+  if (normalized.runnerProfile.baselineSessionsPerWeek <= 3) return true;
+  if (normalized.availability.maxRunningDaysPerWeek <= 3) return true;
+
+  return (
+    normalized.runnerProfile.experienceLevel === "new_runner" &&
+    !getRecent5kPaceSecondsPerKm(normalized)
+  );
 }
 
 function isLimitedSharpeningSupport(normalized: NormalizedStructuredInput) {

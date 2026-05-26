@@ -15,6 +15,7 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 
 ## 2026-05-25
 
+- Tightened saved structured plan richness end to end: first-plan creation now preserves bounded rich goal context through fixed rest-day insertion, cutback/taper long runs and taper/cutback support days persist as structured multi-segment rows, and conservative low-support marathon plans vary safe recovery/cutback support identities without adding hard days or loosening pace/HR gates.
 - Bounded live active-plan refresh proposals so an OpenAI proposal timeout now returns deterministic proposal/draft fallback metadata instead of hanging before `refreshDraft.richWorkoutDraftMetadata` is observable.
 - Added proposal-time rich workout drafting to active-plan refresh: refresh proposals now sign the exact reviewed future draft after optional rich normalization, expose bounded rich-draft applied/fallback metadata, and keep apply as a no-OpenAI exact-draft persistence path.
 - Moved the text-authoring ops smoke path onto the real TypeScript OpenAI seam: `npm run author-plan-from-text` now defaults to deterministic no-rich-draft output, supports explicit `--rich-draft`, supports dry-run/mock/timeout validation, and reports bounded rich-draft status plus sample rich workout metadata.

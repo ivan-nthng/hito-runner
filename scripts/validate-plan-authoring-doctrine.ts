@@ -26,6 +26,7 @@ import {
   buildPlanScopedStructuredAuthoringMetadata,
   mergePlanPersistenceMetadata,
 } from "../src/lib/plan-authoring-snapshot";
+import { prepareImportedPlanApplyPolicy } from "../src/lib/plan-apply-policy";
 import {
   buildPersistedWorkoutInsertRows,
   persistedWorkoutRowToImportedSeed,
@@ -203,6 +204,60 @@ function assertSupportRunRichness(plan: TrainingPlanV2, label: string) {
       );
     }
   }
+}
+
+function assertNoSingleSegmentNonRestRows(
+  rows: ReturnType<typeof buildPersistedWorkoutInsertRows>,
+  label: string,
+) {
+  const singleSegmentRows = rows
+    .filter(
+      (row) => row.workout_type !== "rest" && ((row.steps as SegmentRecord[]) ?? []).length <= 1,
+    )
+    .map((row) => `${row.workout_date}:${row.workout_identity ?? row.source_workout_type}`);
+
+  assert.deepEqual(
+    singleSegmentRows,
+    [],
+    `${label}: saved non-rest workouts should not be anonymous one-block rows`,
+  );
+}
+
+function assertStructuredCreatePersistsRichWorkoutTruth(
+  input: StructuredFirstPlanOnboardingRequestInput,
+  label: string,
+) {
+  const { plan } = buildPlan(input);
+  const preparedApply = prepareImportedPlanApplyPolicy(
+    plan,
+    { workouts: [], logsByWorkoutId: new Map() },
+    null,
+    null,
+    plan.start_date,
+    null,
+  );
+  const rows = buildPersistedWorkoutInsertRows(
+    "00000000-0000-4000-8000-000000000950",
+    "00000000-0000-4000-8000-000000000951",
+    preparedApply.importedSeed.workouts,
+  );
+  const missingRichRows = rows
+    .filter(
+      (row) =>
+        !row.workout_family ||
+        !row.workout_identity ||
+        !row.calendar_icon_key ||
+        !row.goal_context ||
+        !row.metric_mode,
+    )
+    .map((row) => `${row.workout_date}:${row.title}`);
+
+  assert.deepEqual(missingRichRows, [], `${label}: saved rows should persist rich workout fields`);
+  assertNoSingleSegmentNonRestRows(rows, label);
+  assertRichWorkoutContract(plan, label);
+  assertFixedRestDays(plan);
+
+  return { plan, rows };
 }
 
 function assertFixedRestDays(plan: TrainingPlanV2) {
@@ -1894,6 +1949,7 @@ function assertBeginnerBuildConsistencyQualityCap() {
   ];
   const allowedConsistencyTypes = new Set([
     "easy_aerobic_run",
+    "recovery_jog",
     "steady_aerobic_run",
     "long_aerobic_run",
     "cutback_aerobic_run",
@@ -2124,6 +2180,27 @@ assertRichWorkoutContract(
 );
 
 {
+  const { plan: halfBalancedNoBenchmark } = assertStructuredCreatePersistsRichWorkoutTruth(
+    buildRequest("half_marathon", {
+      benchmark: { fitnessLevel: "running_regularly", recent5kTime: null },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+    "saved structured half marathon balanced without benchmark",
+  );
+
+  assert.equal(
+    hasTargetKey(halfBalancedNoBenchmark, "pace_min_per_km_range"),
+    false,
+    "saved half marathon without benchmark should stay effort-only",
+  );
+  assert.equal(
+    hasTargetKey(halfBalancedNoBenchmark, "hr_bpm_range"),
+    false,
+    "saved half marathon without HR-zone truth should not emit HR targets",
+  );
+}
+
+{
   const request = buildRequest("half_marathon", {
     benchmark: { kind: "unknown" },
     goal: {
@@ -2187,6 +2264,10 @@ assertRichWorkoutContract(
     "target-time half marathon should still include half-marathon threshold durability structure",
   );
   assertSupportRunRichness(plan, "target-time half marathon without benchmark");
+  assertStructuredCreatePersistsRichWorkoutTruth(
+    request,
+    "saved structured half marathon target-time without benchmark",
+  );
 }
 
 {
@@ -2209,6 +2290,51 @@ assertRichWorkoutContract(
     "target-time half marathon with recent 5K and watch/app pace guidance should keep pace targets",
   );
   assertSupportRunRichness(plan, "target-time half marathon with benchmark");
+}
+
+{
+  const { plan } = assertStructuredCreatePersistsRichWorkoutTruth(
+    buildRequest("marathon", {
+      benchmark: { fitnessLevel: "beginner", recent5kTime: null },
+      availability: {
+        runningDaysPerWeek: 5,
+        fixedRestDays: [...fixedRestDays],
+        preferredLongRunDay: "Saturday",
+      },
+      execution: { watchAccess: "none", guidancePreference: "effort" },
+    }),
+    "saved structured marathon balanced low-support",
+  );
+  const sourceTypes = sourceWorkoutTypes(plan);
+  const forbiddenHardIdentities = [
+    "controlled_tempo_session",
+    "time_intervals",
+    "distance_intervals",
+    "5k_sharpening_repeats",
+    "10k_rhythm_intervals",
+    "half_marathon_threshold_durability",
+    "marathon_steady_specificity",
+  ];
+
+  assert.ok(
+    sourceTypes.has("recovery_jog") && sourceTypes.has("cutback_aerobic_run"),
+    "low-support balanced marathon should vary safe support-run purpose without adding hard days",
+  );
+  assert.equal(
+    forbiddenHardIdentities.some((identity) => sourceTypes.has(identity)),
+    false,
+    "low-support balanced marathon should not add hard quality identities for calendar variety",
+  );
+  assert.equal(
+    hasTargetKey(plan, "pace_min_per_km_range"),
+    false,
+    "low-support balanced marathon without benchmark/watch support should not emit pace targets",
+  );
+  assert.equal(
+    hasTargetKey(plan, "hr_bpm_range"),
+    false,
+    "low-support balanced marathon should not emit HR targets without HR-zone truth",
+  );
 }
 
 {

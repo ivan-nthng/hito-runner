@@ -291,7 +291,7 @@ function buildInsertedRestWorkout(
     workoutFamily: richWorkout.workoutFamily,
     workoutIdentity: richWorkout.workoutIdentity,
     calendarIconKey: richWorkout.calendarIconKey,
-    goalContext: null,
+    goalContext: sourceWorkout?.goalContext ?? null,
     metricMode: toCanonicalMetricModeJson(richWorkout.metricMode),
     title: "Rest day",
     notes: "Fixed weekday rest day.",

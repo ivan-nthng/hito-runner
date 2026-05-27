@@ -4,7 +4,10 @@ import {
   trainingPlanV2Schema,
   type TrainingPlanV2,
 } from "@/lib/imported-plan";
-import type { AiFirstPlanDraftMetadata } from "@/lib/ai-first-plan-draft-authoring";
+import type {
+  AiFirstPlanBlueprintTraceMetadata,
+  AiFirstPlanDraftMetadata,
+} from "@/lib/ai-first-plan-draft-authoring";
 import {
   CANONICAL_METRIC_GUIDANCE_VALUES,
   HR_TARGET_SOURCE_VALUES,
@@ -585,13 +588,25 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   const parsedBlueprint = aiFirstPlanBlueprintSchema.safeParse(blueprint);
 
   if (!parsedBlueprint.success) {
+    const issues = parsedBlueprint.error.issues.slice(0, 12).map((issue) => ({
+      code: "schema_invalid",
+      path: issue.path.join(".") || "root",
+      message: issue.message,
+    }));
+
     return failedAiBlueprintNormalization(
       "ai_first_plan_blueprint_schema_invalid",
-      parsedBlueprint.error.issues.slice(0, 12).map((issue) => ({
-        code: "schema_invalid",
-        path: issue.path.join(".") || "root",
-        message: issue.message,
-      })),
+      issues,
+      buildAiFirstPlanBlueprintTrace({
+        authoringInput,
+        blueprint: null,
+        normalizedWorkouts: null,
+        sourceStatus: "deterministic_fallback",
+        sourceKind: "structured_authoring_v1",
+        fallbackReason: "ai_first_plan_blueprint_schema_invalid",
+        issues,
+        repairs: [],
+      }),
     );
   }
 
@@ -602,7 +617,20 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   validateBlueprintShell(parsedBlueprint.data, context, issues);
 
   if (issues.length > 0) {
-    return failedAiBlueprintNormalization("ai_first_plan_blueprint_validation_failed", issues);
+    return failedAiBlueprintNormalization(
+      "ai_first_plan_blueprint_validation_failed",
+      issues,
+      buildAiFirstPlanBlueprintTrace({
+        authoringInput,
+        blueprint: parsedBlueprint.data,
+        normalizedWorkouts: null,
+        sourceStatus: "deterministic_fallback",
+        sourceKind: "structured_authoring_v1",
+        fallbackReason: "ai_first_plan_blueprint_validation_failed",
+        issues,
+        repairs,
+      }),
+    );
   }
 
   const deterministicPlan = buildStructuredAuthoringPlan(authoringInput);
@@ -659,7 +687,20 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   validateNormalizedPlanDoctrine(normalizedWorkouts, context, issues);
 
   if (issues.length > 0) {
-    return failedAiBlueprintNormalization("ai_first_plan_blueprint_validation_failed", issues);
+    return failedAiBlueprintNormalization(
+      "ai_first_plan_blueprint_validation_failed",
+      issues,
+      buildAiFirstPlanBlueprintTrace({
+        authoringInput,
+        blueprint: parsedBlueprint.data,
+        normalizedWorkouts,
+        sourceStatus: "deterministic_fallback",
+        sourceKind: "structured_authoring_v1",
+        fallbackReason: "ai_first_plan_blueprint_validation_failed",
+        issues,
+        repairs,
+      }),
+    );
   }
 
   const candidatePlan = {
@@ -737,13 +778,25 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   const parsedPlan = trainingPlanV2Schema.safeParse(candidatePlan);
 
   if (!parsedPlan.success) {
+    const issues = parsedPlan.error.issues.slice(0, 12).map((issue) => ({
+      code: "training_plan_v2_invalid",
+      path: issue.path.join(".") || "root",
+      message: issue.message,
+    }));
+
     return failedAiBlueprintNormalization(
       "ai_first_plan_blueprint_training_plan_v2_invalid",
-      parsedPlan.error.issues.slice(0, 12).map((issue) => ({
-        code: "training_plan_v2_invalid",
-        path: issue.path.join(".") || "root",
-        message: issue.message,
-      })),
+      issues,
+      buildAiFirstPlanBlueprintTrace({
+        authoringInput,
+        blueprint: parsedBlueprint.data,
+        normalizedWorkouts,
+        sourceStatus: "deterministic_fallback",
+        sourceKind: "structured_authoring_v1",
+        fallbackReason: "ai_first_plan_blueprint_training_plan_v2_invalid",
+        issues,
+        repairs,
+      }),
     );
   }
 
@@ -757,6 +810,16 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
       repairs,
       reviewAssumptions: parsedBlueprint.data.reviewAssumptions,
       metricPolicySummary: parsedBlueprint.data.metricPolicySummary,
+      blueprintTrace: buildAiFirstPlanBlueprintTrace({
+        authoringInput,
+        blueprint: parsedBlueprint.data,
+        normalizedWorkouts: parsedPlan.data.planned_workouts,
+        sourceStatus: repairs.length > 0 ? "repaired_ai_draft" : "ai_authored",
+        sourceKind: parsedPlan.data.source_kind ?? "ai_first_plan_blueprint_v1",
+        fallbackReason: null,
+        issues: [],
+        repairs,
+      }),
     },
   };
 }
@@ -1049,6 +1112,11 @@ function validateGoalFamilyCadence(
       )
       .map((week) => week.weekNumber),
   );
+
+  if (context.requiredCadenceSlots.size > 0) {
+    return;
+  }
+
   const step = context.goalFamilyPolicy.cadence.frequency === "weekly" ? 1 : 2;
   const cadenceLabel =
     context.goalFamilyPolicy.cadence.kind === "quality"
@@ -2595,9 +2663,135 @@ function containsForbiddenCoachingClaims(workout: AiBlueprintWorkout) {
   );
 }
 
+export function buildAiFirstPlanBlueprintTrace({
+  authoringInput,
+  blueprint,
+  normalizedWorkouts,
+  sourceStatus,
+  sourceKind,
+  fallbackReason,
+  issues,
+  repairs,
+}: {
+  authoringInput: StructuredAuthoringInput;
+  blueprint: AiFirstPlanBlueprint | null;
+  normalizedWorkouts: TrainingPlanV2["planned_workouts"] | null;
+  sourceStatus: AiFirstPlanBlueprintTraceMetadata["sourceStatus"];
+  sourceKind: string | null;
+  fallbackReason: string | null;
+  issues: Array<{ code: string; message: string; path?: string }>;
+  repairs: string[];
+}): AiFirstPlanBlueprintTraceMetadata {
+  const context = buildNormalizationContext(authoringInput);
+  const normalizedWeeks = normalizedWorkouts
+    ? groupCanonicalIdentityTraceByWeek(normalizedWorkouts)
+    : [];
+
+  return {
+    sourceKind,
+    sourceStatus,
+    fallbackReason,
+    model: null,
+    timeoutMs: null,
+    elapsedMs: null,
+    requestSummary: {
+      goalFamily: context.goalFamilyPolicy.label,
+      goalType: authoringInput.goal.goalType,
+      goalStyle: authoringInput.goal.goalStyle ?? null,
+      goalDistance: authoringInput.goal.goalType,
+      targetTimePresent: Boolean(authoringInput.goal.targetTime),
+      targetDate: authoringInput.schedule.targetDate ?? null,
+      runningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+      fixedRestDays: authoringInput.availability.unavailableDays,
+      preferredLongRunDay: authoringInput.availability.preferredLongRunDay ?? null,
+    },
+    requiredCadenceSlots: [...context.requiredCadenceSlots.entries()].map(([weekNumber, slot]) => ({
+      weekNumber,
+      date: slot.date,
+      weekday: slot.weekday,
+      kind: slot.kind,
+      identityOptions: slot.identityOptions.slice(0, 12),
+      purpose: boundedTraceText(slot.purpose),
+    })),
+    authoredBlueprintWeeks: blueprint ? groupAuthoredBlueprintTraceByWeek(blueprint) : [],
+    validationIssueCodes: issues.map((issue) => issue.code).slice(0, 24),
+    validationIssueSummary: issues
+      .map((issue) => `${issue.code}: ${issue.message}`)
+      .map(boundedTraceText)
+      .slice(0, 12),
+    repairs: repairs.map(boundedTraceText).slice(0, 12),
+    normalizedCanonicalWeeks: normalizedWeeks,
+    deterministicFallbackBoundary: {
+      used: sourceStatus === "deterministic_fallback",
+      reason: fallbackReason,
+    },
+    finalReviewedPlanIdentityCounts: normalizedWorkouts
+      ? countCanonicalWorkoutField(normalizedWorkouts, "workout_identity")
+      : {},
+    finalReviewedPlanFamilyCounts: normalizedWorkouts
+      ? countCanonicalWorkoutField(normalizedWorkouts, "workout_family")
+      : {},
+    finalReviewedPlanIconCounts: normalizedWorkouts
+      ? countCanonicalWorkoutField(normalizedWorkouts, "calendar_icon_key")
+      : {},
+    persistedIdentityCounts: null,
+  };
+}
+
+function groupAuthoredBlueprintTraceByWeek(blueprint: AiFirstPlanBlueprint) {
+  return blueprint.weeks.slice(0, 52).map((week) => ({
+    weekNumber: week.weekNumber,
+    phase: week.phase,
+    theme: boundedTraceText(week.theme),
+    identities: week.plannedWorkouts.map((workout) => workout.workoutIdentity).slice(0, 7),
+    families: week.plannedWorkouts.map((workout) => workout.workoutFamily).slice(0, 7),
+    icons: week.plannedWorkouts.map((workout) => workout.calendarIconKey).slice(0, 7),
+    dates: week.plannedWorkouts
+      .map((workout) => workout.date ?? workout.weekday)
+      .filter(Boolean)
+      .slice(0, 7),
+  }));
+}
+
+function groupCanonicalIdentityTraceByWeek(workouts: TrainingPlanV2["planned_workouts"]) {
+  const byWeek = new Map<number, TrainingPlanV2["planned_workouts"]>();
+
+  for (const workout of workouts) {
+    byWeek.set(workout.week_number, [...(byWeek.get(workout.week_number) ?? []), workout]);
+  }
+
+  return [...byWeek.entries()]
+    .sort(([left], [right]) => left - right)
+    .slice(0, 52)
+    .map(([weekNumber, weekWorkouts]) => ({
+      weekNumber,
+      identities: weekWorkouts.map((workout) => workout.workout_identity ?? "unknown").slice(0, 7),
+      families: weekWorkouts.map((workout) => workout.workout_family ?? "unknown").slice(0, 7),
+      icons: weekWorkouts.map((workout) => workout.calendar_icon_key ?? "unknown").slice(0, 7),
+    }));
+}
+
+function countCanonicalWorkoutField(
+  workouts: TrainingPlanV2["planned_workouts"],
+  field: "workout_identity" | "workout_family" | "calendar_icon_key",
+) {
+  return workouts.reduce<Record<string, number>>((counts, workout) => {
+    const value = workout[field] ?? "unknown";
+    counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function boundedTraceText(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+
+  return normalized.length > 180 ? `${normalized.slice(0, 177)}...` : normalized;
+}
+
 function failedAiBlueprintNormalization(
   reason: string,
   issues: NormalizationIssue[],
+  blueprintTrace?: AiFirstPlanBlueprintTraceMetadata,
 ): Extract<AiFirstPlanBlueprintNormalizationResult, { ok: false }> {
   return {
     ok: false,
@@ -2613,6 +2807,7 @@ function failedAiBlueprintNormalization(
       ],
       metricPolicySummary:
         "Deterministic fallback preserves existing pace, default-HR, fixed-rest-day, and effort-safety gates.",
+      blueprintTrace: blueprintTrace ?? null,
     },
   };
 }
@@ -2739,7 +2934,6 @@ function buildPromptRequiredWorkoutSlots(authoringInput: StructuredAuthoringInpu
 
 function buildPromptGoalFamilyIdentityPolicy(authoringInput: StructuredAuthoringInput) {
   const policy = resolveGoalFamilyIdentityPolicy(authoringInput);
-  const cadencePlan = isGoalFamilyCadencePlan(authoringInput, policy);
 
   return {
     family: policy.label,
@@ -2750,13 +2944,7 @@ function buildPromptGoalFamilyIdentityPolicy(authoringInput: StructuredAuthoring
     cutbackTaperIdentities: [...policy.cutbackTaperIdentities],
     specialtyIdentities: [...policy.specialtyIdentities],
     excludedIdentities: [...policy.excludedIdentities],
-    cadence: cadencePlan
-      ? policy.cadence
-      : {
-          kind: "none",
-          frequency: "none",
-          reason: "Runner support level does not require forced quality or specialty cadence.",
-        },
+    cadence: buildPromptGoalFamilyCadencePolicy(authoringInput, policy),
   };
 }
 
@@ -2784,11 +2972,8 @@ function buildRequiredCadenceSlots(
 
   for (let weekIndex = 0; weekIndex < horizonWeeks; weekIndex += 1) {
     const weekNumber = weekIndex + 1;
-    const shouldRequireSlot =
-      policy.cadence.frequency === "weekly" ||
-      (policy.cadence.frequency === "every_two_weeks" && weekNumber % 2 === 1);
 
-    if (!shouldRequireSlot) {
+    if (!shouldRequireGoalFamilyCadenceSlot(authoringInput, policy, weekNumber)) {
       continue;
     }
 
@@ -2854,10 +3039,60 @@ function isGoalFamilyCadencePlan(
       authoringInput.goal.goalStyle === "target_time" ||
       authoringInput.goal.goalStyle === "ambitious";
 
-    return hasPerformanceIntent;
+    return hasPerformanceIntent || isBalancedHalfMarathonCadencePlan(authoringInput, policy);
   }
 
   return policy.key !== "beginner_consistency";
+}
+
+function isBalancedHalfMarathonCadencePlan(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+) {
+  return (
+    policy.key === "half_marathon" &&
+    authoringInput.goal.goalStyle === "balanced" &&
+    !authoringInput.goal.targetTime
+  );
+}
+
+function buildPromptGoalFamilyCadencePolicy(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+) {
+  if (!isGoalFamilyCadencePlan(authoringInput, policy)) {
+    return {
+      kind: "none",
+      frequency: "none",
+      reason: "Runner support level does not require forced quality or specialty cadence.",
+    };
+  }
+
+  if (isBalancedHalfMarathonCadencePlan(authoringInput, policy)) {
+    return {
+      kind: "quality",
+      frequency: "moderate_every_two_weeks_after_week_1",
+      reason:
+        "Supported balanced half-marathon plans may use Week 1 to acclimate, then need moderate half-specific rhythm from Week 2 without target-time intensity.",
+    };
+  }
+
+  return policy.cadence;
+}
+
+function shouldRequireGoalFamilyCadenceSlot(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+  weekNumber: number,
+) {
+  if (isBalancedHalfMarathonCadencePlan(authoringInput, policy)) {
+    return weekNumber >= 2 && weekNumber % 2 === 0;
+  }
+
+  return (
+    policy.cadence.frequency === "weekly" ||
+    (policy.cadence.frequency === "every_two_weeks" && weekNumber % 2 === 1)
+  );
 }
 
 function chooseGoalFamilyCadenceWeekday(
@@ -2889,6 +3124,14 @@ function cadenceIdentityOptionsForGoal(
 ) {
   const isFinalTwoWeeks =
     weekNumber >= Math.max(1, resolveAuthoringHorizonWeeks(authoringInput) - 1);
+
+  if (isBalancedHalfMarathonCadencePlan(authoringInput, policy)) {
+    const balancedHalfOptions: AuthoredWorkoutIdentity[] = isFinalTwoWeeks
+      ? ["taper_tuneup_run", "progression_run", "controlled_tempo_session"]
+      : ["progression_run", "controlled_tempo_session", "half_marathon_threshold_durability"];
+
+    return balancedHalfOptions.filter((identity) => policy.allowedIdentities.has(identity));
+  }
 
   if (isFinalTwoWeeks) {
     const taperOptions = [...policy.cutbackTaperIdentities].filter((identity) =>
@@ -2933,6 +3176,10 @@ function cadencePurposeForGoal(
     case "ten_k":
       return "Sustained rhythm, cruise-style intervals, or controlled faster running.";
     case "half_marathon":
+      if (isBalancedHalfMarathonCadencePlan(authoringInput, policy)) {
+        return "Moderate balanced half-marathon rhythm: progression, controlled tempo, or threshold durability without early target-time intensity.";
+      }
+
       return "Half-marathon threshold durability, controlled tempo, or race-rhythm preparation.";
     case "marathon":
       return "Marathon-specific steady durability without unsupported race-pace precision.";

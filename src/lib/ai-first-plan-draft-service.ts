@@ -4,6 +4,7 @@ import {
   type AiFirstPlanDraftMetadata,
 } from "@/lib/ai-first-plan-draft-authoring";
 import {
+  buildAiFirstPlanBlueprintTrace,
   buildAiFirstPlanBlueprintPrompt,
   normalizeAiFirstPlanBlueprintToTrainingPlan,
 } from "@/lib/ai-first-plan-blueprint-authoring";
@@ -212,6 +213,21 @@ export async function generateAiFirstPlanDraftPreview({
         elapsedMs: Date.now() - startedAt,
         validationIssueCount: normalized.metadata.validationIssues.length,
         debug: { ...response.debug, requestPhase: "normalized" },
+        blueprintTrace:
+          contractMode === "blueprint"
+            ? enrichAiFirstPlanBlueprintTrace({
+                trace: normalized.metadata.blueprintTrace ?? null,
+                authoringInput,
+                canonicalPlan: normalized.canonicalPlan,
+                sourceStatus: normalized.metadata.status,
+                fallbackReason: null,
+                issues: normalized.metadata.validationIssues,
+                repairs: normalized.metadata.repairs,
+                model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+                elapsedMs: Date.now() - startedAt,
+                debug: { ...response.debug, requestPhase: "normalized" },
+              })
+            : (normalized.metadata.blueprintTrace ?? null),
       },
     };
   } catch (error) {
@@ -520,6 +536,22 @@ function deterministicFallback({
     .map((issue) => issue.trim())
     .filter(Boolean)
     .slice(0, 12);
+  const elapsedMs = Date.now() - startedAt;
+  const fallbackTrace =
+    debug.contractMode === "blueprint"
+      ? enrichAiFirstPlanBlueprintTrace({
+          trace: fallbackMetadata?.blueprintTrace ?? null,
+          authoringInput,
+          canonicalPlan,
+          sourceStatus: "deterministic_fallback",
+          fallbackReason: reason,
+          issues: validationIssues,
+          repairs: fallbackMetadata?.repairs ?? [],
+          model,
+          elapsedMs,
+          debug,
+        })
+      : (fallbackMetadata?.blueprintTrace ?? null);
 
   return {
     ok: true,
@@ -543,9 +575,66 @@ function deterministicFallback({
       validationIssues,
       model,
       responseId,
-      elapsedMs: Date.now() - startedAt,
+      elapsedMs,
       validationIssueCount: validationIssues.length,
       debug,
+      blueprintTrace: fallbackTrace,
+    },
+  };
+}
+
+function enrichAiFirstPlanBlueprintTrace({
+  trace,
+  authoringInput,
+  canonicalPlan,
+  sourceStatus,
+  fallbackReason,
+  issues,
+  repairs,
+  model,
+  elapsedMs,
+  debug,
+}: {
+  trace: AiFirstPlanDraftPreviewMetadata["blueprintTrace"];
+  authoringInput: StructuredFirstPlanAuthoringInput;
+  canonicalPlan: TrainingPlanV2;
+  sourceStatus: AiFirstPlanDraftPreviewMetadata["status"];
+  fallbackReason: string | null;
+  issues: string[];
+  repairs: string[];
+  model: string;
+  elapsedMs: number;
+  debug: AiFirstPlanDraftDebugMetadata;
+}) {
+  const baseTrace =
+    trace ??
+    buildAiFirstPlanBlueprintTrace({
+      authoringInput,
+      blueprint: null,
+      normalizedWorkouts: canonicalPlan.planned_workouts,
+      sourceStatus,
+      sourceKind: canonicalPlan.source_kind ?? null,
+      fallbackReason,
+      issues: issues.map((issue) => ({
+        code: issue.includes(":")
+          ? (issue.split(":")[0]?.trim() ?? "unknown")
+          : (fallbackReason ?? "unknown"),
+        message: issue,
+      })),
+      repairs,
+    });
+
+  return {
+    ...baseTrace,
+    sourceKind: canonicalPlan.source_kind ?? baseTrace.sourceKind,
+    sourceStatus,
+    fallbackReason,
+    model,
+    timeoutMs: debug.timeoutMs,
+    elapsedMs,
+    deterministicFallbackBoundary: {
+      used: sourceStatus === "deterministic_fallback",
+      reason: fallbackReason,
     },
   };
 }

@@ -8,6 +8,7 @@ import {
 import {
   AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
   type AiFirstPlanDraft,
+  type AiFirstPlanBlueprintTraceMetadata,
 } from "../src/lib/ai-first-plan-draft-authoring";
 import {
   AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
@@ -28,7 +29,12 @@ import { addDaysIso, type Step, type StepPrescription } from "../src/lib/trainin
 
 type ParsedArgs = Record<string, string | true>;
 type ScriptMode = "mock" | "mock_invalid" | "mock_timeout" | "live";
-type FixtureKind = "one_week_smoke" | "compact_smoke" | "full_half" | "identity_coverage";
+type FixtureKind =
+  | "one_week_smoke"
+  | "compact_smoke"
+  | "balanced_half"
+  | "full_half"
+  | "identity_coverage";
 
 const COACH_SAMPLE_IDENTITIES = [
   "5k_sharpening_repeats",
@@ -40,6 +46,38 @@ const COACH_SAMPLE_IDENTITIES = [
   "hike_run_endurance",
   "mountain_long_run_time_on_feet",
 ] as const;
+
+const TRACE_QUALITY_OR_SPECIFIC_IDENTITIES = new Set<string>([
+  "5k_sharpening_repeats",
+  "10k_rhythm_intervals",
+  "time_intervals",
+  "distance_intervals",
+  "controlled_tempo_session",
+  "half_marathon_threshold_durability",
+  "marathon_steady_specificity",
+  "progression_run",
+  "race_pace_session",
+  "taper_tuneup_run",
+  "long_run_with_steady_finish",
+  "uphill_repeats",
+  "rolling_hills_session",
+  "technical_trail_easy",
+  "controlled_downhill_durability",
+  "hike_run_endurance",
+  "mountain_long_run_time_on_feet",
+  "ultra_time_on_feet_durability",
+  "climbing_steady_run",
+]);
+
+const TRACE_LONG_RUN_IDENTITIES = new Set<string>([
+  "long_aerobic_run",
+  "long_run_with_steady_finish",
+  "cutback_long_run",
+  "taper_long_run",
+  "hike_run_endurance",
+  "mountain_long_run_time_on_feet",
+  "ultra_time_on_feet_durability",
+]);
 
 const DEFAULT_REFERENCE_FILE =
   "/Users/ivan/Downloads/ivan_half_marathon_training_plan_v2_full_2026-05-05.json";
@@ -70,6 +108,7 @@ const timeoutMs = parsePositiveIntegerOption(options["timeout-ms"]) ?? 45_000;
 const maxOutputTokens = parsePositiveIntegerOption(options["max-output-tokens"]) ?? 32_000;
 const authoringInput = resolveAuthoringInput(input, inputKind);
 const includeCoachSample = hasFlag(options, "coach-sample");
+const includeBlueprintTrace = hasFlag(options, "trace-blueprint");
 const fetchImpl =
   mode === "live"
     ? undefined
@@ -131,6 +170,16 @@ if (!result.ok) {
         workoutCount: result.canonicalPlan.planned_workouts.length,
         weekCount: countWeeks(result.canonicalPlan),
         sampleWeeks: buildSampleWeeks(result.canonicalPlan),
+        blueprintTrace:
+          includeBlueprintTrace && contractMode === "blueprint"
+            ? buildBlueprintTraceOutput({
+                result,
+                mode,
+                fixtureKind,
+                inputKind,
+                referenceIncluded: Boolean(referenceExample),
+              })
+            : undefined,
         coachSample: includeCoachSample
           ? buildCoachSample(result.canonicalPlan, COACH_SAMPLE_IDENTITIES)
           : undefined,
@@ -677,6 +726,38 @@ function mockCadenceIdentityForGoal(
         ? cadenceSpec("race", "taper_tuneup_run", "race", "Taper tune-up run")
         : cadenceSpec("intervals", "10k_rhythm_intervals", "intervals", "10K rhythm intervals");
     case "half_marathon":
+      if (authoringInput.goal.goalStyle === "balanced" && !authoringInput.goal.targetTime) {
+        if (weekNumber < 2 || weekNumber % 2 !== 0) {
+          return null;
+        }
+
+        if (finalTwoWeeks) {
+          return cadenceSpec("race", "taper_tuneup_run", "race", "Taper tune-up run");
+        }
+
+        const balancedCycle = Math.floor((weekNumber - 2) / 2) % 3;
+
+        if (balancedCycle === 0) {
+          return cadenceSpec("progression", "progression_run", "progression", "Progression run");
+        }
+
+        if (balancedCycle === 1) {
+          return cadenceSpec(
+            "tempo",
+            "controlled_tempo_session",
+            "tempo",
+            "Controlled tempo session",
+          );
+        }
+
+        return cadenceSpec(
+          "tempo",
+          "half_marathon_threshold_durability",
+          "tempo",
+          "Half marathon threshold durability",
+        );
+      }
+
       if (
         authoringInput.goal.goalStyle !== "target_time" &&
         authoringInput.goal.goalStyle !== "ambitious" &&
@@ -1009,6 +1090,150 @@ function buildSampleWeeks(plan: TrainingPlanV2) {
   }));
 }
 
+function buildBlueprintTraceOutput({
+  result,
+  mode,
+  fixtureKind,
+  inputKind,
+  referenceIncluded,
+}: {
+  result: Extract<Awaited<ReturnType<typeof generateAiFirstPlanDraftPreview>>, { ok: true }>;
+  mode: ScriptMode;
+  fixtureKind: FixtureKind;
+  inputKind: AiFirstPlanDraftServiceInputKind;
+  referenceIncluded: boolean;
+}) {
+  const trace = result.metadata.blueprintTrace;
+
+  if (!trace) {
+    return null;
+  }
+
+  return {
+    requestSummary: {
+      ...trace.requestSummary,
+      inputKind,
+      referenceIncluded,
+    },
+    openAiOrFallbackStatus: {
+      sourceKind: trace.sourceKind,
+      sourceStatus: trace.sourceStatus,
+      fallbackReason: trace.fallbackReason,
+      model: trace.model,
+      responseId: result.metadata.responseId,
+      mode,
+      fixture: fixtureKind,
+      timeoutMs: trace.timeoutMs,
+      elapsedMs: trace.elapsedMs,
+      requestPhase: result.metadata.debug.requestPhase,
+      abortFired: result.metadata.debug.abortFired,
+    },
+    requiredCadenceByWeek: trace.requiredCadenceSlots.map((slot) => ({
+      weekNumber: slot.weekNumber,
+      date: slot.date,
+      weekday: slot.weekday,
+      kind: slot.kind,
+      identityOptions: slot.identityOptions,
+      purpose: slot.purpose,
+    })),
+    authoredBlueprintIdentitiesByWeek: trace.authoredBlueprintWeeks.map((week) => ({
+      weekNumber: week.weekNumber,
+      phase: week.phase,
+      theme: week.theme,
+      identities: week.identities,
+      families: week.families,
+      icons: week.icons,
+      dates: week.dates,
+    })),
+    validationIssuesAndRepairs: {
+      issueCodes: trace.validationIssueCodes,
+      issueSummary: trace.validationIssueSummary,
+      repairs: trace.repairs,
+    },
+    normalizedCanonicalIdentitiesByWeek: trace.normalizedCanonicalWeeks.map((week) => ({
+      weekNumber: week.weekNumber,
+      identities: week.identities,
+      families: week.families,
+      icons: week.icons,
+    })),
+    firstSixWeekAcceptance: buildFirstSixWeekAcceptanceReport({
+      plan: result.canonicalPlan,
+      trace,
+    }),
+    finalCounts: {
+      identities: trace.finalReviewedPlanIdentityCounts,
+      families: trace.finalReviewedPlanFamilyCounts,
+      icons: trace.finalReviewedPlanIconCounts,
+      persistedIdentities: trace.persistedIdentityCounts,
+    },
+    safetyMetadata: {
+      deterministicFallbackBoundary: trace.deterministicFallbackBoundary,
+      persisted: false,
+      rawPromptPrinted: false,
+      rawAiPayloadPrinted: false,
+      metricPolicySummary: result.metadata.metricPolicySummary,
+    },
+  };
+}
+
+function buildFirstSixWeekAcceptanceReport({
+  plan,
+  trace,
+}: {
+  plan: TrainingPlanV2;
+  trace: AiFirstPlanBlueprintTraceMetadata;
+}) {
+  return Array.from({ length: Math.min(6, countWeeks(plan)) }, (_value, index) => {
+    const weekNumber = index + 1;
+    const authoredWeek = trace.authoredBlueprintWeeks.find(
+      (week) => week.weekNumber === weekNumber,
+    );
+    const normalizedWeek = trace.normalizedCanonicalWeeks.find(
+      (week) => week.weekNumber === weekNumber,
+    );
+    const weekWorkouts = plan.planned_workouts.filter(
+      (workout) => workout.week_number === weekNumber,
+    );
+    const qualityOrSpecificWorkouts = weekWorkouts
+      .filter((workout) =>
+        workout.workout_identity
+          ? TRACE_QUALITY_OR_SPECIFIC_IDENTITIES.has(workout.workout_identity)
+          : false,
+      )
+      .map((workout) => ({
+        date: workout.date,
+        identity: workout.workout_identity,
+        family: workout.workout_family,
+        title: workout.title,
+      }));
+    const longRun = weekWorkouts.find((workout) =>
+      workout.workout_identity
+        ? TRACE_LONG_RUN_IDENTITIES.has(workout.workout_identity) ||
+          workout.workout_family === "long"
+        : workout.workout_family === "long",
+    );
+
+    return {
+      weekNumber,
+      authoredIdentities: authoredWeek?.identities ?? [],
+      normalizedIdentities: normalizedWeek?.identities ?? [],
+      requiredCadenceSlots: trace.requiredCadenceSlots
+        .filter((slot) => slot.weekNumber === weekNumber)
+        .map((slot) => ({
+          date: slot.date,
+          weekday: slot.weekday,
+          identityOptions: slot.identityOptions,
+          purpose: slot.purpose,
+        })),
+      qualityOrSpecificWorkouts,
+      longRunIdentity: longRun?.workout_identity ?? null,
+      restDays: weekWorkouts
+        .filter((workout) => workout.workout_family === "rest" || workout.workout_type === "rest")
+        .map((workout) => workout.weekday),
+    };
+  });
+}
+
 function buildCoachSample(
   plan: TrainingPlanV2,
   identities: readonly TrainingPlanV2["planned_workouts"][number]["workout_identity"][],
@@ -1146,6 +1371,10 @@ function buildDefaultAuthoringInput(fixtureKind: FixtureKind) {
     return buildCompactSmokeAuthoringInput();
   }
 
+  if (fixtureKind === "balanced_half") {
+    return buildBalancedHalfAuthoringInput();
+  }
+
   return {
     goal: {
       goalType: "half_marathon",
@@ -1192,6 +1421,61 @@ function buildDefaultAuthoringInput(fixtureKind: FixtureKind) {
       strengthOrMobilityInterest: "mobility",
       indoorTreadmillOk: false,
       notes: "Ops smoke fixture for AI-authored first-plan draft validation.",
+    },
+    execution: {
+      watchAccess: "watch_or_app",
+      guidancePreference: "mixed",
+    },
+  } satisfies StructuredFirstPlanAuthoringInput;
+}
+
+function buildBalancedHalfAuthoringInput() {
+  return {
+    goal: {
+      goalType: "half_marathon",
+      goalLabel: "Half marathon · Balanced cadence smoke",
+      goalStyle: "balanced",
+      targetTime: null,
+      targetEventName: "Balanced half marathon plan",
+    },
+    schedule: {
+      startDate: "2026-06-01",
+      targetDate: "2026-07-12",
+      preparationHorizonWeeks: 6,
+    },
+    runnerProfile: {
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunKm: 11,
+      baselineLongRunDurationMin: null,
+      age: 38,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "mixed",
+    },
+    currentLevel: {
+      recentResultSummary: "Recent 5K time: 24:30.",
+      recentRaceResults: [{ distance: "5K", resultTime: "24:30", resultDate: null }],
+      recent5kPaceSecondsPerKm: 294,
+      currentEasyPaceRange: "6:25-7:20/km",
+      currentTrainingLoadSummary: null,
+    },
+    availability: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      unavailableDays: ["Wednesday", "Sunday"],
+      maxRunningDaysPerWeek: 5,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Saturday",
+    },
+    constraints: {
+      injuryConstraints: [],
+      hardConstraints: [],
+    },
+    preferences: {
+      preferredWorkoutMix: "balanced",
+      terrainFocus: "standard",
+      strengthOrMobilityInterest: "mobility",
+      indoorTreadmillOk: false,
+      notes: "Balanced half-marathon live trace fixture for moderate early cadence validation.",
     },
     execution: {
       watchAccess: "watch_or_app",
@@ -1417,6 +1701,10 @@ function parseFixtureKind(value: string | true | undefined): FixtureKind {
     return "compact_smoke";
   }
 
+  if (normalized === "balanced-half" || normalized === "balanced_half") {
+    return "balanced_half";
+  }
+
   if (normalized === "full-half" || normalized === "full_half") {
     return "full_half";
   }
@@ -1427,7 +1715,7 @@ function parseFixtureKind(value: string | true | undefined): FixtureKind {
 
   if (normalized) {
     throw new Error(
-      "--fixture must be one-week-smoke, compact-smoke, full-half, or identity-coverage.",
+      "--fixture must be one-week-smoke, compact-smoke, balanced-half, full-half, or identity-coverage.",
     );
   }
 
@@ -1505,12 +1793,13 @@ function printHelp() {
       "  --input-file <path>            JSON structured authoring input or onboarding input.",
       "  --input-kind <kind>            structured_authoring or structured_onboarding.",
       "  --contract <kind>              blueprint (default) or strict-draft diagnostic.",
-      "  --fixture <kind>               one-week-smoke, compact-smoke, full-half, or identity-coverage when no input file is supplied.",
+      "  --fixture <kind>               one-week-smoke, compact-smoke, balanced-half, full-half, or identity-coverage when no input file is supplied.",
       "  --reference-file <path>        Optional rich reference JSON for prompt style guidance.",
       "  --no-reference                 Omit reference-style guidance for compact live latency smoke.",
       "  --timeout-ms <number>          Bounded OpenAI timeout. Default: 45000.",
       "  --max-output-tokens <number>   Bounded OpenAI output limit. Default: 32000.",
       "  --coach-sample                 Include bounded expanded segment bodies for coach review.",
+      "  --trace-blueprint              Include bounded blueprint pipeline trace metadata.",
       "",
       "The script is non-mutating and prints bounded review metadata only; it does not persist plans.",
     ].join("\n"),

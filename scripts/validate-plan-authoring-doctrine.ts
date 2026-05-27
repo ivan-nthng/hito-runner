@@ -3860,6 +3860,71 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
       ],
     },
     {
+      label: "half marathon balanced supported",
+      authoringInput: buildGoalFamilyCadenceAuthoringInput({
+        goalDistance: "half_marathon",
+        goalStyle: "balanced",
+        targetTime: null,
+        runningDays: fiveDay,
+      }),
+      weeks: [
+        [
+          "easy_aerobic_run",
+          "steady_aerobic_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "progression_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "steady_aerobic_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "cutback_long_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "controlled_tempo_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "half_marathon_threshold_durability",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_run_with_steady_finish",
+        ],
+        [
+          "easy_aerobic_run",
+          "taper_tuneup_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
+      ],
+      expected: [
+        "progression_run",
+        "controlled_tempo_session",
+        "half_marathon_threshold_durability",
+      ],
+      forbidden: ["5k_sharpening_repeats", "race_pace_session", "mountain_long_run_time_on_feet"],
+      cadence: [
+        "progression_run",
+        "controlled_tempo_session",
+        "half_marathon_threshold_durability",
+        "taper_tuneup_run",
+      ],
+    },
+    {
       label: "marathon",
       authoringInput: buildGoalFamilyCadenceAuthoringInput({
         goalDistance: "marathon",
@@ -4083,6 +4148,43 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         `${testCase.label}: supported plan should not collapse into generic support filler`,
       );
     }
+  }
+
+  const genericBalancedHalfInput = buildGoalFamilyCadenceAuthoringInput({
+    goalDistance: "half_marathon",
+    goalStyle: "balanced",
+    targetTime: null,
+    runningDays: fiveDay,
+  });
+  const genericBalancedHalfResult = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: buildGoalFamilyCadenceBlueprint({
+      planName: "Generic balanced half cadence should fail",
+      goalSummary: "balanced half without early specificity",
+      authoringInput: genericBalancedHalfInput,
+      weeklyIdentities: Array.from({ length: 6 }, (_value, index) => [
+        "easy_aerobic_run",
+        "steady_aerobic_run",
+        "steady_aerobic_run",
+        "recovery_jog",
+        index === 2 ? "cutback_long_run" : index === 5 ? "taper_long_run" : "long_aerobic_run",
+      ]),
+    }),
+    authoringInput: genericBalancedHalfInput,
+  });
+
+  assert.equal(
+    genericBalancedHalfResult.ok,
+    false,
+    "supported balanced half-marathon blueprints should not pass with empty early cadence",
+  );
+
+  if (!genericBalancedHalfResult.ok) {
+    assert.ok(
+      genericBalancedHalfResult.issues.some(
+        (issue) => issue.code === "missing_required_goal_family_cadence",
+      ),
+      "supported balanced half-marathon fallback should explain missing required cadence",
+    );
   }
 }
 

@@ -65,6 +65,73 @@ const structuredFirstPlanDraftGenerationDebugSchema = z
   })
   .strict();
 
+const structuredFirstPlanBlueprintTraceWeekSchema = z
+  .object({
+    weekNumber: z.number().int().min(1).max(52),
+    phase: z.string().trim().min(1).nullable().optional(),
+    theme: z.string().trim().min(1).max(180).nullable().optional(),
+    identities: z.array(z.string().trim().min(1).max(120)).max(7),
+    families: z.array(z.string().trim().min(1).max(120)).max(7),
+    icons: z.array(z.string().trim().min(1).max(120)).max(7),
+    dates: z.array(z.string().trim().min(1).max(32)).max(7).optional(),
+  })
+  .strict();
+
+const structuredFirstPlanBlueprintTraceSchema = z
+  .object({
+    sourceKind: z.string().trim().min(1).nullable(),
+    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft", "deterministic_fallback"]),
+    fallbackReason: z.string().trim().min(1).nullable(),
+    model: z.string().trim().min(1).nullable(),
+    timeoutMs: z.number().int().nonnegative().nullable(),
+    elapsedMs: z.number().int().nonnegative().nullable(),
+    opsMode: z.string().trim().min(1).nullable().optional(),
+    opsFixture: z.string().trim().min(1).nullable().optional(),
+    requestSummary: z
+      .object({
+        goalFamily: z.string().trim().min(1).max(80),
+        goalType: z.string().trim().min(1).max(80),
+        goalStyle: z.string().trim().min(1).max(80).nullable(),
+        goalDistance: z.string().trim().min(1).max(80),
+        targetTimePresent: z.boolean(),
+        targetDate: z.string().trim().min(1).nullable(),
+        runningDaysPerWeek: z.number().int().min(1).max(7),
+        fixedRestDays: z.array(z.string().trim().min(1).max(16)).max(7),
+        preferredLongRunDay: z.string().trim().min(1).max(16).nullable(),
+      })
+      .strict(),
+    requiredCadenceSlots: z
+      .array(
+        z
+          .object({
+            weekNumber: z.number().int().min(1).max(52),
+            date: z.string().trim().min(1).max(32),
+            weekday: z.string().trim().min(1).max(16),
+            kind: z.string().trim().min(1).max(40),
+            identityOptions: z.array(z.string().trim().min(1).max(120)).max(12),
+            purpose: z.string().trim().min(1).max(180),
+          })
+          .strict(),
+      )
+      .max(52),
+    authoredBlueprintWeeks: z.array(structuredFirstPlanBlueprintTraceWeekSchema).max(52),
+    validationIssueCodes: z.array(z.string().trim().min(1).max(120)).max(24),
+    validationIssueSummary: z.array(z.string().trim().min(1).max(220)).max(12),
+    repairs: z.array(z.string().trim().min(1).max(220)).max(12),
+    normalizedCanonicalWeeks: z.array(structuredFirstPlanBlueprintTraceWeekSchema).max(52),
+    deterministicFallbackBoundary: z
+      .object({
+        used: z.boolean(),
+        reason: z.string().trim().min(1).nullable(),
+      })
+      .strict(),
+    finalReviewedPlanIdentityCounts: z.record(z.string(), z.number().int().nonnegative()),
+    finalReviewedPlanFamilyCounts: z.record(z.string(), z.number().int().nonnegative()),
+    finalReviewedPlanIconCounts: z.record(z.string(), z.number().int().nonnegative()),
+    persistedIdentityCounts: z.record(z.string(), z.number().int().nonnegative()).nullable(),
+  })
+  .strict();
+
 const structuredFirstPlanDraftGenerationMetadataSchema = z
   .object({
     sourceStatus: z.enum(["ai_authored", "repaired_ai_draft", "deterministic_fallback"]),
@@ -79,6 +146,7 @@ const structuredFirstPlanDraftGenerationMetadataSchema = z
     responseId: z.string().trim().min(1).nullable(),
     elapsedMs: z.number().int().nonnegative().nullable(),
     debug: structuredFirstPlanDraftGenerationDebugSchema.nullable(),
+    blueprintTrace: structuredFirstPlanBlueprintTraceSchema.nullable().optional(),
   })
   .strict();
 
@@ -628,6 +696,7 @@ function buildStructuredDraftGenerationMetadata(
     responseId: metadata.responseId,
     elapsedMs: metadata.elapsedMs,
     debug: sanitizeStructuredDraftGenerationDebug(metadata.debug),
+    blueprintTrace: metadata.blueprintTrace ?? null,
   });
 }
 
@@ -656,6 +725,7 @@ function buildStructuredDraftGenerationMetadataFromFallback({
     responseId: null,
     elapsedMs: null,
     debug: null,
+    blueprintTrace: null,
   });
 }
 

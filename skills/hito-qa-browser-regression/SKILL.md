@@ -35,6 +35,9 @@ Verify Hito behavior with real browser evidence and honest coverage.
 
 ## Screenshot Artifact Policy
 
+- For any visual, interface, layout, design-system, calendar, workout-detail, admin, onboarding, or other UI-facing QA task, capture screenshot evidence whenever the browser/tooling can reasonably do so.
+- Screenshot evidence should cover the states that make the verdict believable: the main inspected surface, important before/after or pass/fail states, and any visual bug or regression being reported.
+- If screenshots are not possible or not useful for a UI-facing task, state the concrete reason in `Coverage gaps`.
 - Save routine screenshots under the gitignored local artifact root:
   `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/`
 - Do not commit `qa-artifacts/` by default.
@@ -51,8 +54,9 @@ Verify Hito behavior with real browser evidence and honest coverage.
 4. Test admin/auth blocking separately from happy path when relevant.
 5. Verify data outcomes for any mutation.
 6. Source-verify any branch that cannot be safely exercised.
-7. Report exact failures with repro steps.
-8. End with a verdict.
+7. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
+8. Report exact failures with repro steps.
+9. End with a verdict.
 
 ## Hito-Specific Checks
 
@@ -71,7 +75,8 @@ Verify Hito behavior with real browser evidence and honest coverage.
 5. Results
 6. Issues found
 7. Coverage gaps
-8. Verdict
+8. Screenshot evidence
+9. Verdict
 
 Verdict must be exactly:
 

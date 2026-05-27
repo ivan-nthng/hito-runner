@@ -204,6 +204,62 @@ export const aiFirstPlanDraftSchema = z
 
 export type AiFirstPlanDraft = z.output<typeof aiFirstPlanDraftSchema>;
 
+export interface AiFirstPlanBlueprintTraceMetadata {
+  sourceKind: string | null;
+  sourceStatus: "ai_authored" | "repaired_ai_draft" | "deterministic_fallback";
+  fallbackReason: string | null;
+  model: string | null;
+  timeoutMs: number | null;
+  elapsedMs: number | null;
+  opsMode?: string | null;
+  opsFixture?: string | null;
+  requestSummary: {
+    goalFamily: string;
+    goalType: string;
+    goalStyle: string | null;
+    goalDistance: string;
+    targetTimePresent: boolean;
+    targetDate: string | null;
+    runningDaysPerWeek: number;
+    fixedRestDays: string[];
+    preferredLongRunDay: string | null;
+  };
+  requiredCadenceSlots: Array<{
+    weekNumber: number;
+    date: string;
+    weekday: string;
+    kind: string;
+    identityOptions: string[];
+    purpose: string;
+  }>;
+  authoredBlueprintWeeks: Array<{
+    weekNumber: number;
+    phase: string | null;
+    theme: string | null;
+    identities: string[];
+    families: string[];
+    icons: string[];
+    dates: string[];
+  }>;
+  validationIssueCodes: string[];
+  validationIssueSummary: string[];
+  repairs: string[];
+  normalizedCanonicalWeeks: Array<{
+    weekNumber: number;
+    identities: string[];
+    families: string[];
+    icons: string[];
+  }>;
+  deterministicFallbackBoundary: {
+    used: boolean;
+    reason: string | null;
+  };
+  finalReviewedPlanIdentityCounts: Record<string, number>;
+  finalReviewedPlanFamilyCounts: Record<string, number>;
+  finalReviewedPlanIconCounts: Record<string, number>;
+  persistedIdentityCounts: Record<string, number> | null;
+}
+
 export interface AiFirstPlanDraftMetadata {
   status: "ai_authored" | "repaired_ai_draft" | "deterministic_fallback";
   source:
@@ -214,6 +270,7 @@ export interface AiFirstPlanDraftMetadata {
   repairs: string[];
   reviewAssumptions: string[];
   metricPolicySummary: string;
+  blueprintTrace?: AiFirstPlanBlueprintTraceMetadata | null;
 }
 
 export type AiFirstPlanDraftNormalizationResult =

@@ -1,8 +1,13 @@
 import type { z } from "zod";
-import { importedPlanSchema, type ImportedPlanSeed } from "@/lib/imported-plan";
+import {
+  buildImportedPlanSeed,
+  importedPlanSchema,
+  type ImportedPlanSeed,
+} from "@/lib/imported-plan";
 import {
   prepareImportedPlanApplyPolicy,
   type FirstDayResolution,
+  type PlanApplySuccessResult,
   type PlanApplyResult,
   type PreparedPlanApplySuccess,
 } from "@/lib/plan-apply-policy";
@@ -15,6 +20,10 @@ import type { StructuredFirstPlanProfilePatch } from "@/lib/structured-first-pla
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { todayIso, type RunnerProfileSummary } from "@/lib/training";
+import {
+  resolveWeekdayRestInvariant,
+  validateWorkoutsAgainstWeekdayRestInvariant,
+} from "@/lib/weekday-rest-invariants";
 
 export type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 export type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -62,6 +71,48 @@ export async function applyImportedPlanForUser(
   );
 
   return preparedApply.result;
+}
+
+export function buildReviewedFirstPlanImportedSeed(
+  reviewedPlan: ImportedPlanInput,
+): ImportedPlanSeed {
+  const importedSeed = buildImportedPlanSeed(reviewedPlan);
+  const weekdayRestInvariant = resolveWeekdayRestInvariant({
+    importedPlanPreferences: reviewedPlan.plan_preferences,
+    importedTrainingConstraints: reviewedPlan.training_constraints,
+  });
+
+  validateWorkoutsAgainstWeekdayRestInvariant(importedSeed.workouts, weekdayRestInvariant);
+
+  return importedSeed;
+}
+
+export async function createFirstPlanFromReviewedCanonicalPlanForUser(
+  userId: string,
+  reviewedPlan: ImportedPlanInput,
+  profilePatch: StructuredFirstPlanProfilePatch | null = null,
+  planMetadata: AdditionalPlanPersistenceMetadata | null = null,
+): Promise<PlanApplySuccessResult> {
+  const planContext = await getExistingPlanContext(userId);
+
+  if (planContext.activePlan) {
+    throw new Error("A first plan cannot be created while another active plan exists.");
+  }
+
+  const importedSeed = buildReviewedFirstPlanImportedSeed(reviewedPlan);
+
+  await upsertRunnerProfile(userId, importedSeed.profile, profilePatch);
+  await createAssignedPlanFromImportedSeed(userId, importedSeed, "active", planMetadata);
+
+  return {
+    ok: true,
+    status: "applied",
+    effectiveStartDate: importedSeed.startDate,
+    appliedStartDate: importedSeed.startDate,
+    normalizedFromStartDate: null,
+    firstDayResolution: null,
+    workoutCount: importedSeed.workouts.filter((workout) => workout.workoutType !== "rest").length,
+  };
 }
 
 export async function getActivePlan(userId: string) {

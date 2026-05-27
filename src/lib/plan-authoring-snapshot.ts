@@ -6,6 +6,7 @@ type StructuredAuthoringInput = z.output<typeof structuredPlanAuthoringInputSche
 
 export type PlanAuthoringSnapshotSource =
   | "structured_first_plan"
+  | "ai_first_plan_blueprint"
   | "voice_to_plan"
   | "text_authoring"
   | "active_plan_refresh";

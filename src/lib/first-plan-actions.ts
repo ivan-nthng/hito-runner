@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { applyImportedPlanForUser } from "@/lib/active-plan-persistence";
+import {
+  applyImportedPlanForUser,
+  createFirstPlanFromReviewedCanonicalPlanForUser,
+} from "@/lib/active-plan-persistence";
+import type {
+  AiFirstPlanDraftDebugMetadata,
+  AiFirstPlanDraftPreviewMetadata,
+  GenerateAiFirstPlanDraftPreviewOptions,
+} from "@/lib/ai-first-plan-draft-service";
 import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
 import { importedPlanSchema, type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
@@ -23,6 +31,7 @@ import {
 } from "@/lib/structured-plan-authoring";
 import { buildPlanScopedStructuredAuthoringMetadata } from "@/lib/plan-authoring-snapshot";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { serverEnv } from "@/lib/supabase/env";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
 
@@ -31,12 +40,56 @@ const structuredFirstPlanConfirmInputSchema = z.unknown();
 const voiceToPlanInputSchema = z.unknown();
 const voiceToPlanConfirmInputSchema = z.unknown();
 
+const structuredFirstPlanDraftGenerationDebugSchema = z
+  .object({
+    timeoutMs: z.number().int().nonnegative(),
+    maxOutputTokens: z.number().int().positive(),
+    contractMode: z.enum(["blueprint", "strict_draft"]),
+    responseSchemaMode: z.enum([
+      "responses_json_schema_blueprint_strict",
+      "responses_json_schema_draft_strict",
+    ]),
+    requestPhase: z.enum([
+      "not_started",
+      "request_started",
+      "response_parsed",
+      "normalized",
+      "fallback_after_validation",
+      "request_failed",
+      "timeout_before_response",
+    ]),
+    abortFired: z.boolean(),
+    openAiElapsedMs: z.number().int().nonnegative().nullable(),
+    promptCharEstimate: z.number().int().nonnegative().nullable(),
+    reasoningEffortSent: z.boolean(),
+  })
+  .strict();
+
+const structuredFirstPlanDraftGenerationMetadataSchema = z
+  .object({
+    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft", "deterministic_fallback"]),
+    sourceKind: z.string().trim().min(1),
+    fallbackReason: z.string().trim().min(1).nullable(),
+    repairs: z.array(z.string().trim().min(1)).max(12),
+    validationIssues: z.array(z.string().trim().min(1)).max(12),
+    validationIssueCount: z.number().int().min(0),
+    reviewAssumptions: z.array(z.string().trim().min(1)).max(8),
+    metricPolicySummary: z.string().trim().min(1).max(360).nullable(),
+    model: z.string().trim().min(1).nullable(),
+    responseId: z.string().trim().min(1).nullable(),
+    elapsedMs: z.number().int().nonnegative().nullable(),
+    debug: structuredFirstPlanDraftGenerationDebugSchema.nullable(),
+  })
+  .strict();
+
 const structuredFirstPlanDraftPayloadSchema = z
   .object({
     input: structuredFirstPlanOnboardingInputSchema,
     authoringInput: structuredPlanAuthoringInputSchema,
     canonicalPlan: importedPlanSchema,
     summary: z.unknown().optional(),
+    generation: structuredFirstPlanDraftGenerationMetadataSchema,
+    draftToken: z.string().trim().min(16),
   })
   .strict();
 
@@ -58,14 +111,17 @@ export type StructuredFirstPlanDraftResult =
 export interface StructuredFirstPlanDraftSuccess {
   ok: true;
   status: "draft_ready";
-  sourceKind: "structured_constructor";
+  sourceKind: string;
   review: StructuredFirstPlanDraftReview;
   draft: {
     input: StructuredFirstPlanOnboardingInput;
     authoringInput: StructuredFirstPlanAuthoringInput;
     canonicalPlan: TrainingPlanV2;
     summary: StructuredFirstPlanDraftSummary;
+    generation: StructuredFirstPlanDraftGenerationMetadata;
+    draftToken: string;
   };
+  generation: StructuredFirstPlanDraftGenerationMetadata;
   safety: StructuredFirstPlanDraftSafety;
 }
 
@@ -86,6 +142,23 @@ export interface StructuredFirstPlanDraftSafety {
   doesNotMutatePlan: true;
   rawInputPersisted: false;
   usesCanonicalStructuredAuthoring: true;
+}
+
+export type StructuredFirstPlanDraftGenerationMetadata = z.output<
+  typeof structuredFirstPlanDraftGenerationMetadataSchema
+>;
+
+export interface GenerateStructuredFirstPlanDraftOptions {
+  aiPreview?: Pick<
+    GenerateAiFirstPlanDraftPreviewOptions,
+    | "apiKey"
+    | "model"
+    | "timeoutMs"
+    | "maxOutputTokens"
+    | "fetchImpl"
+    | "referenceExample"
+    | "today"
+  >;
 }
 
 export type ConfirmStructuredFirstPlanDraftResult =
@@ -262,6 +335,7 @@ export const confirmVoiceToPlanDraft = createServerFn({ method: "POST" })
 export async function generateStructuredFirstPlanDraftForUser(
   userId: string,
   input: unknown,
+  options: GenerateStructuredFirstPlanDraftOptions = {},
 ): Promise<StructuredFirstPlanDraftResult> {
   void userId;
 
@@ -273,20 +347,27 @@ export async function generateStructuredFirstPlanDraftForUser(
 
   try {
     const authoringInput = buildStructuredFirstPlanAuthoringInput(parsed.input);
-    const canonicalPlan = buildStructuredAuthoringPlan(authoringInput);
+    const aiDraft = await generateFirstPlanBlueprintDraft(authoringInput, options);
+    const canonicalPlan = aiDraft.canonicalPlan;
+    const generation = aiDraft.generation;
     const summary = buildStructuredFirstPlanDraftSummary(canonicalPlan, authoringInput);
+    const draft = {
+      input: parsed.input,
+      authoringInput,
+      canonicalPlan,
+      summary,
+      generation,
+      draftToken: "",
+    };
+    draft.draftToken = await signStructuredFirstPlanDraft(draft);
 
     return {
       ok: true,
       status: "draft_ready",
-      sourceKind: "structured_constructor",
+      sourceKind: generation.sourceKind,
       review: buildStructuredFirstPlanDraftReview(parsed.input, canonicalPlan, authoringInput),
-      draft: {
-        input: parsed.input,
-        authoringInput,
-        canonicalPlan,
-        summary,
-      },
+      draft,
+      generation,
       safety: buildStructuredDraftSafety(),
     };
   } catch (error) {
@@ -334,9 +415,7 @@ export async function confirmStructuredFirstPlanDraftForUser(
       };
     }
 
-    const generatedPlan = buildStructuredAuthoringPlan(rebuiltAuthoringInput);
-
-    if (!draftPlanStillMatches(parsed.request.draft.canonicalPlan, generatedPlan)) {
+    if (!(await isStructuredFirstPlanDraftSignatureValid(parsed.request.draft))) {
       return {
         ok: false,
         status: "blocked",
@@ -347,44 +426,41 @@ export async function confirmStructuredFirstPlanDraftForUser(
     }
 
     const profilePatch = buildStructuredFirstPlanProfilePatch(parsed.request.draft.input);
+    const reviewedPlan = parsed.request.draft.canonicalPlan;
     const review = buildStructuredFirstPlanDraftReview(
       parsed.request.draft.input,
-      generatedPlan,
+      reviewedPlan,
       rebuiltAuthoringInput,
     );
-    const applyResult = await applyImportedPlanForUser(
+    const applyResult = await createFirstPlanFromReviewedCanonicalPlanForUser(
       userId,
-      generatedPlan,
-      null,
-      null,
+      reviewedPlan,
       profilePatch,
       buildPlanScopedStructuredAuthoringMetadata({
-        source: "structured_first_plan",
+        source:
+          reviewedPlan.source_kind === "ai_first_plan_blueprint_v1"
+            ? "ai_first_plan_blueprint"
+            : "structured_first_plan",
         authoringInput: rebuiltAuthoringInput,
         goalStyle: parsed.request.draft.input.goal.goalStyle,
         targetTime:
           parsed.request.draft.input.goal.goalStyle === "target_time"
             ? (parsed.request.draft.input.goal.targetTime ?? null)
             : null,
-        metricPolicySummary: review.planShape.metricPolicy,
-        reviewAssumptions: review.assumptions,
+        metricPolicySummary:
+          parsed.request.draft.generation.metricPolicySummary ?? review.planShape.metricPolicy,
+        reviewAssumptions:
+          parsed.request.draft.generation.reviewAssumptions.length > 0
+            ? parsed.request.draft.generation.reviewAssumptions
+            : review.assumptions,
       }),
     );
-
-    if (!applyResult.ok) {
-      return {
-        ok: false,
-        status: "blocked",
-        reason: "apply_blocked",
-        message: "This structured draft needs review before it can create a plan.",
-      };
-    }
 
     return {
       ...applyResult,
       status: "created",
-      schemaVersion: generatedPlan.schema_version,
-      sourceKind: generatedPlan.source_kind,
+      schemaVersion: reviewedPlan.schema_version,
+      sourceKind: reviewedPlan.source_kind,
       onboardingContract: "structured_first_plan_onboarding_v1",
       safety: {
         requiresExplicitApply: false,
@@ -504,6 +580,112 @@ function buildStructuredCorrectionResult(error: unknown): StructuredFirstPlanCor
   };
 }
 
+async function generateFirstPlanBlueprintDraft(
+  authoringInput: StructuredFirstPlanAuthoringInput,
+  options: GenerateStructuredFirstPlanDraftOptions,
+) {
+  const { generateAiFirstPlanDraftPreview } = await import("@/lib/ai-first-plan-draft-service");
+  const result = await generateAiFirstPlanDraftPreview({
+    input: authoringInput,
+    inputKind: "structured_authoring",
+    contractMode: "blueprint",
+    ...(options.aiPreview ?? {}),
+  });
+
+  if (!result.ok) {
+    const canonicalPlan = buildStructuredAuthoringPlan(authoringInput);
+
+    return {
+      canonicalPlan,
+      generation: buildStructuredDraftGenerationMetadataFromFallback({
+        sourceKind: canonicalPlan.source_kind ?? "structured_authoring_v1",
+        fallbackReason: result.reason,
+        validationIssues: result.issues,
+      }),
+    };
+  }
+
+  return {
+    canonicalPlan: result.canonicalPlan,
+    generation: buildStructuredDraftGenerationMetadata(result.metadata, result.canonicalPlan),
+  };
+}
+
+function buildStructuredDraftGenerationMetadata(
+  metadata: AiFirstPlanDraftPreviewMetadata,
+  canonicalPlan: TrainingPlanV2,
+): StructuredFirstPlanDraftGenerationMetadata {
+  return structuredFirstPlanDraftGenerationMetadataSchema.parse({
+    sourceStatus: metadata.status,
+    sourceKind: canonicalPlan.source_kind ?? sourceKindFromGenerationSource(metadata.source),
+    fallbackReason: metadata.fallbackReason,
+    repairs: metadata.repairs.slice(0, 12),
+    validationIssues: metadata.validationIssues.slice(0, 12),
+    validationIssueCount: metadata.validationIssueCount,
+    reviewAssumptions: metadata.reviewAssumptions.slice(0, 8),
+    metricPolicySummary: metadata.metricPolicySummary || null,
+    model: metadata.model || null,
+    responseId: metadata.responseId,
+    elapsedMs: metadata.elapsedMs,
+    debug: sanitizeStructuredDraftGenerationDebug(metadata.debug),
+  });
+}
+
+function buildStructuredDraftGenerationMetadataFromFallback({
+  sourceKind,
+  fallbackReason,
+  validationIssues,
+}: {
+  sourceKind: string;
+  fallbackReason: string;
+  validationIssues: string[];
+}): StructuredFirstPlanDraftGenerationMetadata {
+  return structuredFirstPlanDraftGenerationMetadataSchema.parse({
+    sourceStatus: "deterministic_fallback",
+    sourceKind,
+    fallbackReason,
+    repairs: [],
+    validationIssues: validationIssues.slice(0, 12),
+    validationIssueCount: validationIssues.length,
+    reviewAssumptions: [
+      "Hito used the deterministic structured generator because AI first-plan drafting did not return a valid reviewed draft.",
+    ],
+    metricPolicySummary:
+      "Deterministic fallback preserves existing pace, default-HR, fixed-rest-day, and effort-safety gates.",
+    model: null,
+    responseId: null,
+    elapsedMs: null,
+    debug: null,
+  });
+}
+
+function sourceKindFromGenerationSource(source: AiFirstPlanDraftPreviewMetadata["source"]) {
+  switch (source) {
+    case "openai_ai_first_plan_blueprint":
+      return "ai_first_plan_blueprint_v1";
+    case "openai_ai_first_plan_draft":
+      return "ai_first_plan_draft_v1";
+    case "deterministic_structured_generator":
+      return "structured_authoring_v1";
+  }
+}
+
+function sanitizeStructuredDraftGenerationDebug(
+  debug: AiFirstPlanDraftDebugMetadata,
+): z.output<typeof structuredFirstPlanDraftGenerationDebugSchema> {
+  return structuredFirstPlanDraftGenerationDebugSchema.parse({
+    timeoutMs: debug.timeoutMs,
+    maxOutputTokens: debug.maxOutputTokens,
+    contractMode: debug.contractMode,
+    responseSchemaMode: debug.responseSchemaMode,
+    requestPhase: debug.requestPhase,
+    abortFired: debug.abortFired,
+    openAiElapsedMs: debug.openAiElapsedMs,
+    promptCharEstimate: debug.promptCharEstimate,
+    reasoningEffortSent: debug.reasoningEffortSent,
+  });
+}
+
 function collectStructuredCorrectionFields(error: unknown) {
   if (!(error instanceof z.ZodError)) {
     return [];
@@ -525,27 +707,84 @@ function sameJson(left: unknown, right: unknown) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function draftPlanStillMatches(reviewedPlan: TrainingPlanV2, generatedPlan: TrainingPlanV2) {
-  return sameJson(planComparisonPayload(reviewedPlan), planComparisonPayload(generatedPlan));
+async function signStructuredFirstPlanDraft(
+  draft: z.output<typeof structuredFirstPlanDraftPayloadSchema>,
+) {
+  const payload = stableJsonStringify({ ...draft, draftToken: "" });
+  const secret = serverEnv.supabaseServiceRoleKey ?? serverEnv.openAiApiKey;
+
+  if (!secret) {
+    return `sha256:${await digestSha256Hex(payload)}`;
+  }
+
+  return `hmac-sha256:${await hmacSha256Hex(secret, payload)}`;
 }
 
-function planComparisonPayload(plan: TrainingPlanV2) {
-  return {
-    schemaVersion: plan.schema_version,
-    sourceKind: plan.source_kind,
-    planName: plan.plan_name,
-    startDate: plan.start_date,
-    targetDate: plan.target_date ?? null,
-    workoutCount: plan.planned_workouts.length,
-    workouts: plan.planned_workouts.map((workout) => ({
-      date: workout.date,
-      workoutType: workout.workout_type,
-      sourceWorkoutType: workout.source_workout_type ?? null,
-      title: workout.title,
-      summary: workout.summary,
-      segments: workout.segments,
-    })),
-  };
+async function isStructuredFirstPlanDraftSignatureValid(
+  draft: z.output<typeof structuredFirstPlanDraftPayloadSchema>,
+) {
+  const expected = await signStructuredFirstPlanDraft({ ...draft, draftToken: "" });
+
+  return safeTokenEqual(draft.draftToken, expected);
+}
+
+function safeTokenEqual(left: string, right: string) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  let mismatch = 0;
+
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+
+  return mismatch === 0;
+}
+
+async function digestSha256Hex(payload: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+
+  return bytesToHex(digest);
+}
+
+async function hmacSha256Hex(secret: string, payload: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+
+  return bytesToHex(signature);
+}
+
+function bytesToHex(value: ArrayBuffer) {
+  return Array.from(new Uint8Array(value))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function stableJsonStringify(value: unknown): string {
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortJsonValue(entry));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+        .map(([key, nestedValue]) => [key, sortJsonValue(nestedValue)]),
+    );
+  }
+
+  return value;
 }
 
 async function hasActivePlanForUser(userId: string) {

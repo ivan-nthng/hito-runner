@@ -1,0 +1,734 @@
+# AI-Authored First-Plan Pipeline
+
+## Status
+
+Active / Live blueprint onboarding draft acceptance proven, awaiting QA rerun
+
+## Owner
+
+ARCHITECT / BACKEND / QA / RUNNING COACH
+
+## Last Updated
+
+2026-05-27
+
+## Implementation Notes
+
+- 2026-05-26: Backend Slice 1 implemented `src/lib/ai-first-plan-draft-authoring.ts` as a non-live contract/normalizer foundation. The visible structured first-plan path still uses the deterministic generator; no persistence, Voice, refresh/apply, DB schema, or frontend wiring changed in this slice.
+- 2026-05-26: Backend Slice 2A implemented `src/lib/ai-first-plan-draft-service.ts` plus `npm run author-ai-first-plan-draft` as the non-mutating OpenAI service/ops seam. Mock, invalid, timeout, and live modes return bounded source/fallback metadata and canonical `training-plan-v2` review samples without saving or wiring the visible structured onboarding path.
+- 2026-05-26: Backend Slice 2B tightened live smoke viability. The service now sends minimal reasoning only to models that support it, caps output tokens, validates that AI drafts cover the full requested horizon with seven calendar rows per week, and tells the model to leave numeric HR fields null so backend HR policy owns defaults. The default `gpt-5` route still timed out for compact smoke at 45s, but the env-routed command `OPENAI_PLAN_MODEL=gpt-4.1-mini npm run author-ai-first-plan-draft -- --live --fixture compact-smoke --no-reference --timeout-ms 120000 --max-output-tokens 16000` returned `sourceStatus: ai_authored` with canonical `training-plan-v2`, 14 workouts, no repairs, and no persistence.
+- 2026-05-26: Backend Slice 2B reliability fix added bounded request diagnostics and a one-week live diagnostic fixture after QA could not reproduce the two-week compact smoke success. The two-week strict-schema call can still exceed 120s; the documented reproducible live proof is now `OPENAI_PLAN_MODEL=gpt-4.1-mini npm run author-ai-first-plan-draft -- --live --fixture one-week-smoke --no-reference --timeout-ms 120000 --max-output-tokens 10000`, which returned `sourceStatus: ai_authored`, canonical `training-plan-v2`, 7 workouts, no repairs, `persisted: false`, `requestPhase: normalized`, and `abortFired: false`.
+- 2026-05-26: Backend pivoted the production direction from full strict nested drafts to compact weekly coaching blueprints. `src/lib/ai-first-plan-blueprint-authoring.ts` defines `ai-first-plan-blueprint-v1`; `src/lib/ai-first-plan-draft-service.ts` now defaults the non-mutating ops path to `--contract blueprint`, keeps the strict draft contract behind `--contract strict-draft`, and expands accepted blueprint intent into canonical `training-plan-v2` with backend-owned segment and metric policy. Live `gpt-4.1-mini` compact blueprint smoke returned `sourceStatus: ai_authored`, 14 workouts, `persisted: false`, and `requestPhase: normalized` in about 18s; strict compact draft timed out at a 30s comparison cap.
+- 2026-05-26: Backend repaired the `ai-first-plan-blueprint-v1` expansion seam after Running Coach rejected generic family-level workout details. Blueprint-authored workouts now expand with identity-aware executable structure for tempo/threshold, interval, hill, trail, ultra, long-run, cutback/taper, recovery, easy, and steady identities while preserving backend-owned metric gates and the non-mutating ops-only boundary.
+- 2026-05-26: Backend closed the remaining blueprint identity coverage gap before broad onboarding review. Dedicated expansion now covers 5K sharpening repeats, 10K rhythm intervals, race-pace sessions, taper tune-ups, marathon steady specificity, controlled downhill durability, hike-run endurance, and mountain long-run time-on-feet; `npm run author-ai-first-plan-draft -- --mock-openai --fixture identity-coverage --coach-sample` prints a bounded coach-facing segment artifact for these identities without prompts, secrets, raw AI payloads, persistence, or frontend wiring.
+- 2026-05-27: Backend wired `ai-first-plan-blueprint-v1` into the structured first-plan draft/review seam. `generateStructuredFirstPlanDraft` now attempts the compact blueprint contract, returns bounded source/fallback/repair/debug metadata with the reviewed canonical plan, and signs that reviewed draft; `confirmStructuredFirstPlanDraft` verifies the reviewed draft token and does not call OpenAI or regenerate.
+- 2026-05-27: Backend fixed first-plan confirm exactness after QA found the reviewed canonical plan was still being saved through imported-plan weekday remapping. Structured first-plan confirm now uses a reviewed-draft persistence seam that validates fixed rest days but preserves reviewed calendar rows, rest rows, trailing days, rich fields, steps, goal context, metric mode, icons, targets, and notes without synthetic fixed-rest insertion.
+- 2026-05-27: Backend proved live blueprint acceptance through the real structured onboarding draft path. The blueprint prompt now includes exact required date/weekday slots and the response schema requires the validated weekly running-day count while excluding rest identities from authored workouts; the long-run progression validator now permits safe post-cutback rebounds against the pre-cutback peak. A linked-DB disposable first-plan smoke with `OPENAI_PLAN_MODEL=gpt-4.1-mini` returned `sourceStatus: repaired_ai_draft` with only bounded taxonomy canonicalization repairs, persisted all 84 reviewed rows exactly, preserved the 2026-08-19 end date, kept 84 rich rows, and made zero OpenAI calls during confirm.
+
+## Problem Statement
+
+Hito first-plan creation is safe, but it is still built around a deterministic generator that often behaves like a slotter:
+
+- structured setup is validated well, but normal first-plan structure is mostly generated by `buildStructuredAuthoringPlan`
+- OpenAI currently extracts intent for text authoring and can enrich rich workout structure after a deterministic skeleton exists
+- the rich draft seam cannot add, remove, move, or reorder workouts, so it cannot truly design weekly microcycles
+- easy, steady, long, and support-day variety has improved, but the architecture still encourages patching the deterministic generator every time coaching quality feels thin
+- the visible result can still feel like repeated Easy / Steady / Long weeks instead of a coach-authored week-by-week plan
+
+The desired product model is simpler:
+
+`runner data + Hito schema/terminology + constraints + examples -> OpenAI authors a rich full-plan draft -> backend validates/normalizes -> canonical training-plan-v2 -> review -> confirm/save`
+
+This plan replaces the weak deterministic-first authoring pattern for normal structured first-plan creation while preserving every safety boundary that already works.
+
+Reference quality artifact:
+
+- `/Users/ivan/Downloads/ivan_half_marathon_training_plan_v2_full_2026-05-05.json`
+
+That file is not a persistence contract to copy blindly because it includes runtime noise and placeholder fields. It is a quality reference for:
+
+- clear weekly rhythm
+- varied workout identities
+- tempo / interval / recovery / long / progression / race structure
+- detailed warmup / main / cooldown and supporting segment cues
+- calendar-ready days
+- runner-readable coaching intent
+
+## Current Pipeline Root-Cause Audit
+
+Current structured first-plan pipeline:
+
+1. `StructuredPlanConstructor` collects bounded runner input.
+2. `generateStructuredFirstPlanDraft` validates the input in `first-plan-actions.ts`.
+3. `buildStructuredFirstPlanAuthoringInput` maps setup answers into `structuredPlanAuthoringInput`.
+4. `buildStructuredAuthoringPlan` in `structured-plan-authoring.ts` deterministically creates the full `training-plan-v2` plan.
+5. `buildStructuredFirstPlanDraftReview` creates the non-mutating review.
+6. `confirmStructuredFirstPlanDraft` rebuilds the same deterministic plan and applies it through `active-plan-persistence`.
+7. Saved-mode calendar and workout detail render persisted canonical workout truth.
+
+Where richness is lost:
+
+- the deterministic generator owns workout dates, phase distribution, quality-session placement, long-run progression, and most workout identities
+- OpenAI cannot design the week because the current rich-draft seam must obey a prebuilt deterministic skeleton
+- rich-draft normalization can improve segment copy and structure, but cannot rethink the weekly plan
+- every coaching upgrade becomes another deterministic rule branch, which increases code weight and still tends toward repeated patterns
+- the structured path does not use the external reference-style examples as authoring guidance
+
+What should be demoted:
+
+- `buildStructuredAuthoringPlan` should stop being the primary rich author for normal structured first-plan creation
+- deterministic weekly slotting should become fallback, repair support, fixture support, and safety comparison support
+- current text/refresh rich workout draft logic should not be copied into structured first-plan as-is because it is skeleton-bound
+
+What should stay:
+
+- structured onboarding input validation
+- backend-owned review-before-create
+- `training-plan-v2` canonical import/persistence/export shape
+- rich workout taxonomy and compatibility mapping
+- metric gates, including pace gating and default estimated HR labeling
+- fixed rest-day invariants
+- active-plan schedule edit reflow
+- active-plan refresh exact reviewed draft/apply safety
+- existing saved-plan readback, calendar, workout detail, export/import compatibility
+
+## New Canonical Pipeline
+
+Target pipeline:
+
+1. Runner submits structured setup.
+2. Backend validates runner input and maps it to one bounded authoring context.
+3. Backend builds an OpenAI prompt containing:
+   - current date
+   - runner setup truth
+   - Hito canonical `training-plan-v2` terminology
+   - allowed workout families, identities, icon keys, segment types, and metric modes
+   - fixed rest days and preferred long-run day constraints
+   - running-days/week and horizon limits
+   - pace/HR/default-HR policy
+   - examples of rich week-by-week output based on the reference JSON
+   - explicit forbidden runtime fields and fake precision rules
+4. OpenAI returns a full AI plan draft for all weeks/workouts.
+5. Backend validates the AI draft schema and taxonomy.
+6. Backend normalizes the draft into canonical `training-plan-v2`.
+7. Backend runs deterministic safety validation against the normalized plan.
+8. If valid, `generateStructuredFirstPlanDraft` returns a non-mutating review with source metadata.
+9. `confirmStructuredFirstPlanDraft` persists only the reviewed canonical plan after checksum/freshness validation.
+10. Saved mode stores the same canonical entities and keeps schedule edit/refresh/import/export compatibility.
+
+Canonical rule:
+
+OpenAI authors the plan, but backend owns truth.
+
+## AI Blueprint Schema Decision
+
+Use a new intermediate schema:
+
+`ai-first-plan-blueprint-v1`
+
+Do not ask OpenAI to emit directly persisted `training-plan-v2` as final truth.
+
+Reason:
+
+- the reference JSON includes useful richness but also runtime fields such as completion placeholders and provider placeholders
+- the backend needs one controlled place to reject, repair, strip, or normalize AI output
+- the plan must keep movable workout entities and persisted canonical shape separate from model creativity
+- live full nested draft output is latency-prone under bounded production smoke; compact blueprints keep model authorship useful while letting backend own segment expansion
+
+The AI blueprint should still be close to Hito terminology so the model authors the real week-by-week coaching plan, not vague prose. The previous `ai-first-plan-draft-v1` full strict nested schema remains available as diagnostic/reference code only until cleanup is explicitly approved.
+
+Required top-level fields:
+
+- `schemaVersion: "ai-first-plan-blueprint-v1"`
+- `planName`
+- `generatedFor`
+- `goalSummary`
+- `startDate`
+- `targetDate`
+- `preparationHorizonWeeks`
+- `planPreferences`
+- `reviewAssumptions`
+- `metricPolicySummary`
+- `weeks[]`
+
+Each week should include:
+
+- `weekNumber`
+- `phase`
+- `theme`
+- `microcycleIntent`
+- `cutbackWeek`
+- `taperWeek`
+- `longRunIntent`
+- `longRunProgression`
+- `plannedWorkouts[]` containing authored running workouts only; backend fills rest days
+
+Each workout should include:
+
+- `date`
+- `weekday`
+- `workoutFamily`
+- `workoutIdentity`
+- `calendarIconKey`
+- `title`
+- `summary`
+- `plannedRpe`
+- `estimatedFatigue`
+- `recoveryPriority`
+- `segmentIntent`, not a full strict segment tree
+- `metricIntent`, not final metric truth
+
+Backend expansion owns:
+
+- canonical warmup/main/cooldown or rest segments
+- `goal_context`
+- `metric_mode`
+- pace target preservation only when benchmark/watch gates allow it
+- labelled age-estimated default HR guidance only through backend policy
+
+AI should not output:
+
+- user ids
+- plan cycle ids
+- planned workout ids
+- workout logs
+- completion state
+- Garmin/Strava placeholders
+- AI verdict fields
+- provider sync placeholders
+- raw prompt text
+- medical diagnosis
+- exact elevation prescriptions
+- unsupported personalized HR or pace targets
+
+## Backend Validation Contract
+
+The backend validator must check the normalized plan before review and before confirm.
+
+Schema and taxonomy:
+
+- output matches `ai-first-plan-blueprint-v1`
+- normalized output matches canonical `training-plan-v2`
+- every workout identity is in `CANONICAL_WORKOUT_IDENTITY_VALUES`
+- every family/icon pairing is valid through `rich-workout-model.ts`
+- legacy `workout_type` is derived by backend, not trusted from AI
+- plan dates are contiguous enough for calendar use and within requested horizon
+- no duplicate workout dates after normalization
+
+Schedule invariants:
+
+- fixed rest days contain only rest workouts
+- running-day count matches requested/default running-days/week unless explicitly reviewed as a backend fallback
+- preferred long-run day is used when possible and never violates fixed rest days
+- long-run placement is coherent across weeks
+- no back-to-back hard sessions unless allowed and justified
+
+Training doctrine:
+
+- weekly hard-day density fits frequency and runner support
+- beginner/low-support plans stay conservative
+- build-consistency plans avoid race-like quality density
+- long-run progression differs by goal family
+- cutback rhythm appears where appropriate
+- taper weeks stay below pre-taper long-run peak
+- ultra/mountain plans include time-on-feet, terrain, downhill/control, hike-run, and caution language when relevant
+- 5K/10K/HM/marathon plans show goal-family specificity when runner support allows it
+
+Segment quality:
+
+- substantial non-rest workouts include warmup, main-equivalent work, and cooldown
+- short recovery/easy sessions may be simpler only when intentionally short and still runner-readable
+- interval/tempo/hill sessions include work/recovery structure
+- long runs include goal-appropriate purpose such as durability, steady finish, fueling practice, cutback, or taper
+- no generic one-block filler for long, tempo, interval, hill, trail, ultra, or mountain workouts
+- segment guidance/cue/hint is present and executable
+
+Metric safety:
+
+- pace ranges only survive when watch/app plus pace/mixed guidance plus usable benchmark truth allow them
+- personal HR targets only survive with personal HR-zone truth
+- default estimated HR guidance may survive only when age exists, with `Default HR guidance` and `Estimated from age, not personalized zones`
+- no unlabeled HR bpm guidance
+- no fake lab/medical physiological claims
+- no exact elevation or route prescription without trusted route/elevation truth
+
+Review safety:
+
+- review must expose whether the plan came from `ai_authored`, `deterministic_fallback`, or `repaired_ai_draft`
+- review assumptions must call out weak support, conservative/durability-limited contexts, default HR labels, and target-time honesty
+- confirm must persist the exact reviewed normalized plan, not regenerate a different plan silently
+
+## Fallback And Repair Policy
+
+Use a conservative fallback ladder:
+
+1. AI timeout or unavailable:
+   - return deterministic fallback plan with metadata
+   - review says Hito used fallback because AI authoring was unavailable or timed out
+
+2. AI schema invalid:
+   - do not attempt broad magical repair in Slice 1
+   - fall back to deterministic generator with validation metadata
+
+3. AI mostly valid but contains forbidden target precision or runtime noise:
+   - strip forbidden runtime fields
+   - remove unsupported pace/HR target keys
+   - preserve safe effort/cue guidance
+   - mark metadata as `repaired_ai_draft` only if the plan still passes all doctrine checks
+
+4. AI violates schedule safety, rest days, hard-day density, taper, or protected policy:
+   - reject the AI draft and use deterministic fallback
+   - do not silently move lots of workouts in the first slice unless that repair is deterministic and review-visible
+
+5. AI draft valid:
+   - normalize to `training-plan-v2`
+   - return `ai_authored` metadata
+
+Fallback is acceptable for availability; it is not the product goal. QA must be able to see when fallback happened.
+
+## Schedule Flexibility Contract
+
+The new AI-authored plan must remain movable after creation.
+
+Required behavior:
+
+- fixed rest days from setup are hard constraints in AI prompt and backend validation
+- preferred long-run day is a planning preference and validation target
+- normalized `planned_workouts` remain individual movable saved rows
+- `plan_preferences` should store active-plan schedule truth for later edit/reflow
+- active-plan `Edit schedule` still handles same-frequency weekday changes without OpenAI
+- running-day count changes still route to active-plan refresh/regeneration review/apply
+- JSON import weekday remapping keeps using backend weekday-rest invariants
+- saved plans created before this migration remain readable through existing compatibility fallback
+
+Important boundary:
+
+AI may design dates in the draft, but backend validation owns whether those dates are allowed.
+
+## Migration / Compatibility Strategy
+
+Do not delete current deterministic infrastructure immediately.
+
+Phase strategy:
+
+1. Add the new AI-authored draft contract beside current structured generator.
+2. Add backend validation/normalization to canonical `training-plan-v2`.
+3. Wire structured first-plan draft to use AI-authored path behind an explicit backend option or env/feature switch first.
+4. Prove with deterministic mock OpenAI fixtures.
+5. Prove with live OpenAI smoke where fallback timeout is allowed but visible.
+6. Make AI-authored path the default for structured first-plan generation only after QA and Running Coach pass.
+7. Keep deterministic generator as fallback and fixture support.
+8. Remove or demote obsolete rich-draft seams only after the AI-authored path is stable.
+
+Compatibility rules:
+
+- existing saved plans must not change
+- existing `training-plan-v2` import/export must continue to accept current rich fields
+- visible frontend review modal should remain the same product flow unless backend review data needs one small source/status line
+- active-plan refresh/apply should not be changed in this plan unless a later slice explicitly ports it
+- voice-to-plan remains out of scope unless product reopens voice
+
+## Implementation Slices
+
+### Slice 1: Backend AI Draft Contract And Prompt Builder
+
+Owner: BACKEND
+
+Status: QA-green
+
+Create the non-persistent backend contract for AI-authored first-plan drafts.
+
+Scope:
+
+- add `ai-first-plan-draft-v1` schema
+- add OpenAI response schema builder
+- add prompt builder for structured setup context
+- include Hito taxonomy values, metric policy, rest-day constraints, long-run preference, and compact reference-style examples
+- add mockable helper that returns either parsed draft or bounded fallback metadata
+- do not wire visible structured onboarding yet
+- do not persist anything
+
+Validation:
+
+- unit/script validation with mocked OpenAI response
+- invalid schema returns bounded failure/fallback metadata
+- forbidden runtime fields are rejected or stripped by explicit normalizer rules
+
+### Slice 2: Backend Normalization To Canonical `training-plan-v2`
+
+Owner: BACKEND
+
+Status: QA-green
+
+Normalize valid AI drafts into canonical plan truth.
+
+Scope:
+
+- map weeks/workouts into `training-plan-v2`
+- derive legacy `workout_type` from rich family/identity
+- validate date/order/rest-day/running-day/long-run constraints
+- run metric gates and strip unsupported targets
+- validate segment structure and doctrine constraints
+- build review assumptions/source metadata
+- keep deterministic fallback available
+- no visible frontend changes yet
+
+Validation:
+
+- mocked rich half-marathon reference-style draft normalizes
+- fixed rest-day violations fail/fallback
+- fake personal HR is stripped/rejected
+- no one-block substantial non-rest workouts pass
+
+### Slice 2A: Non-Mutating Service And Ops Script
+
+Owner: BACKEND
+
+Status: Implemented / full identity coverage awaiting QA
+
+Exercise the Slice 1/2 contract through one explicit non-mutating service and bounded ops script without changing live structured onboarding.
+
+Scope:
+
+- add a backend service that accepts structured authoring context or structured onboarding input
+- call OpenAI through the `ai-first-plan-draft-v1` prompt/response contract
+- normalize only through backend validation into canonical `training-plan-v2`
+- return bounded source, repair, validation, timeout, and deterministic-fallback metadata
+- add an ops command with mock, invalid, timeout, and live modes
+- do not persist anything
+- do not wire visible structured onboarding, Voice, refresh/apply, or DB schema
+
+Validation:
+
+- mock valid draft returns normalized `training-plan-v2` with `ai_authored` status
+- invalid draft returns deterministic fallback with validation metadata
+- timeout returns deterministic fallback with timeout metadata
+- live OpenAI smoke returns either accepted draft or bounded fallback metadata without mutation
+
+### Slice 2B: Live Smoke Latency, Model-Route Hardening, And Blueprint Pivot
+
+Owner: BACKEND
+
+Status: Implemented / full identity coverage awaiting QA
+
+Prove a real live AI-authored contract can pass backend validation, and pivot away from the full strict nested draft when bounded live smoke shows the heavy contract is not production-reliable.
+
+Scope:
+
+- keep the non-mutating service/ops boundary
+- reduce live-smoke prompt/output pressure without weakening full-plan validation
+- preserve deterministic fallback and timeout metadata
+- validate complete-horizon draft coverage before accepting AI output
+- keep model choice inside the existing `OPENAI_PLAN_MODEL` env contract
+- add `ai-first-plan-blueprint-v1` as the production-direction compact contract
+- keep `ai-first-plan-draft-v1` available only as an explicit diagnostic/reference contract
+- do not wire structured onboarding, persistence, Voice, refresh/apply, frontend, or DB schema
+
+Validation:
+
+- default deterministic fallback remains bounded for missing, invalid, and timed-out OpenAI responses
+- blueprint mock valid, invalid, and timeout paths return bounded source/fallback metadata
+- one-week no-reference blueprint smoke with `OPENAI_PLAN_MODEL=gpt-4.1-mini`, 120s timeout, and 8k output cap returns `sourceStatus: ai_authored`
+- two-week no-reference blueprint compact smoke with `OPENAI_PLAN_MODEL=gpt-4.1-mini`, 120s timeout, and 8k output cap returns `sourceStatus: ai_authored`
+- strict nested compact draft remains diagnostic-only and timed out at a 30s comparison cap
+- accepted live blueprint normalizes to canonical `training-plan-v2`
+- blueprint-expanded tempo/threshold, interval, hill, trail, ultra, long-run, cutback/taper, recovery, easy, steady, 5K sharpening, 10K rhythm, race-pace, taper tune-up, marathon-specific, controlled downhill, hike-run, and mountain time-on-feet identities produce identity-specific executable segments instead of generic family-only shells
+- `--fixture identity-coverage --coach-sample` prints bounded coach-facing expanded segment bodies for the full newly covered identity set without secrets, raw prompts, or raw AI payloads
+- mock, invalid, timeout, and doctrine fixtures remain green
+
+### Slice 3: Structured First-Plan Draft Integration Behind Explicit Backend Switch
+
+Owner: BACKEND
+
+Status: Implemented / QA rerun needed after live blueprint acceptance fix
+
+Wire `generateStructuredFirstPlanDraft` to use the AI-authored blueprint path while preserving explicit review/confirm.
+
+Scope:
+
+- attempt `ai-first-plan-blueprint-v1` during non-mutating structured draft generation
+- preserve deterministic fallback when OpenAI is missing, invalid, or timed out
+- include bounded source, fallback, repair, validation, model, timeout, and debug metadata in the draft/review payload
+- confirm must persist the exact reviewed normalized plan by signed draft token rather than regenerating a different plan silently
+- preserve active-plan-exists blocking
+- preserve profile patch and plan-scoped authoring metadata
+
+Validation:
+
+- non-mutating draft remains non-mutating
+- confirm persists exactly reviewed plan
+- tampered draft blocks
+- deterministic fallback still works
+- mocked valid blueprint returns `sourceStatus: ai_authored` and canonical `ai_first_plan_blueprint_v1` truth
+- mocked invalid and timeout blueprints return deterministic fallback metadata
+
+### Slice 4: Make AI-Authored Structured First Plan The Default
+
+Owner: BACKEND / QA
+
+After Slice 3 passes, flip normal structured first-plan creation to AI-authored by default with deterministic fallback.
+
+Scope:
+
+- default `generateStructuredFirstPlanDraft` to AI-authored path when OpenAI is configured
+- fallback to deterministic on timeout/unavailable/invalid AI draft
+- review clearly shows source/fallback status
+- no frontend redesign
+
+Validation:
+
+- live or mocked OpenAI path produces `ai_authored` or bounded fallback metadata
+- fallback does not block first-plan creation
+- controlled beta safety still passes
+
+### Slice 5: Frontend Review Source/Assumption Readback
+
+Owner: FRONTEND
+
+Only if backend review data needs visible source/fallback clarity.
+
+Scope:
+
+- keep existing review modal
+- add a small source/status line such as `AI-authored plan` or `Fallback plan used`
+- show backend review assumptions, not frontend-invented coaching logic
+- do not redesign onboarding
+
+### Slice 6: QA And Running Coach Evidence
+
+Owner: QA / RUNNING COACH
+
+Run full visual/coaching proof before closing this migration wave.
+
+Scope:
+
+- structured first-plan UI
+- saved-mode calendar
+- workout detail
+- screenshots
+- default HR and pace gate checks
+- schedule edit after creation
+
+### Slice 7: Cleanup / Deletion
+
+Owner: ARCHITECT / BACKEND
+
+Only after AI-authored default is QA-green.
+
+Candidate cleanup:
+
+- demote or simplify deterministic generator branches that only existed to fake richness
+- remove duplicate rich-draft pathways that are no longer used
+- keep deterministic fallback and fixture support
+- keep import/export compatibility
+- keep refresh exact-draft safety
+
+## QA Matrix
+
+Required end-to-end scenarios:
+
+1. Beginner consistency:
+   - no watch/app
+   - no benchmark
+   - age present
+   - 3 days/week
+   - fixed rest days
+   - expected: simple but not empty, no fake pace, labelled default HR only if emitted
+
+2. 5K:
+   - watch/app
+   - recent 5K benchmark
+   - 4 days/week
+   - expected: safe sharpening/strides or short reps, not too much intensity
+
+3. 10K:
+   - watch/app
+   - recent 5K benchmark
+   - mixed/pace guidance
+   - expected: rhythm intervals or controlled tempo variety with pace only where allowed
+
+4. Half marathon target-time:
+   - watch/app
+   - recent 5K benchmark
+   - 5 days/week
+   - target time
+   - expected: threshold/steady durability, long-run progression, honest target support
+
+5. Marathon low support:
+   - no benchmark
+   - watch unknown
+   - 4 days/week
+   - expected: conservative/durability-limited assumptions, goal-specific long-run structure, no fake precision
+
+6. Ultra:
+   - no watch/app
+   - unknown benchmark
+   - 4 days/week
+   - expected: time-on-feet, durability, cutback/taper, no road-race interval flattening
+
+7. Mountain:
+   - no watch/app
+   - fixed rest days
+   - unknown benchmark
+   - expected: technical trail, hills, controlled descent, hike-run/time-on-feet, no exact elevation prescriptions
+
+8. No age:
+   - HR preference
+   - no personal zones
+   - expected: no bpm default HR, effort-only cues
+
+9. Fixed rest days and long-run day:
+   - impossible combinations return correction/fallback
+   - valid combinations keep rest days empty and long run preferred when possible
+
+10. Schedule edit after creation:
+   - create AI-authored plan
+   - use active-plan same-frequency schedule reflow
+   - expected: content/rich fields/segments preserved while dates move
+
+11. Fallback:
+   - OpenAI timeout/mock invalid output
+   - expected: deterministic fallback with source metadata and no mutation before confirm
+
+12. Tamper safety:
+   - modify reviewed draft before confirm
+   - expected: confirm blocks
+
+QA evidence must include screenshots for calendar and workout detail pages, especially mid-cycle marathon/ultra weeks where repetition risk is highest.
+
+## Running Coach Acceptance Criteria
+
+Running Coach should approve only if:
+
+- plans read as coach-authored week-by-week, not slot-filled
+- weekly microcycles differ by goal family and runner support
+- easy/recovery/steady/long support runs have clear purpose and enough execution detail
+- substantial non-rest workouts are not one-block filler
+- quality sessions have warmup/work/recovery/cooldown logic
+- long-run progression, cutbacks, and taper are visible
+- ultra/mountain plans feel distinct from road marathon plans
+- beginner/low-support plans are conservative without becoming empty
+- pace and HR targets are honest and labelled correctly
+- review assumptions honestly explain weak support, target-time uncertainty, and default HR guidance
+
+Running Coach should not approve broad onboarding wiring from limited-scenario coverage alone; the intended AI-authored path must be coach-authored, varied, executable, and trustworthy across the supported goal families before user-facing rollout.
+
+## Cleanup / Deletion Strategy
+
+Do not delete working safety infrastructure early.
+
+Later deletion candidates:
+
+- deterministic branches whose only purpose is adding surface-level variety after AI-authored default is stable
+- skeleton-bound rich draft seams for structured first-plan if they become unused
+- duplicated prompt fragments between text authoring and first-plan AI authoring
+- compatibility wrappers with no remaining imports
+
+Keep long term:
+
+- deterministic fallback path
+- canonical `training-plan-v2` schema
+- import/export compatibility
+- rich workout taxonomy
+- metric gate resolver
+- default estimated HR policy
+- fixed rest-day invariant helpers
+- active-plan schedule edit and refresh/apply safety
+
+## Risks
+
+- live OpenAI latency can make setup feel slow
+- AI may produce beautiful but unsafe density unless backend doctrine checks are strict
+- reference JSON contains useful richness but also runtime noise and unsupported precision that must not become canonical
+- broad repair logic can become as complex as the old deterministic generator if overbuilt
+- prompt/examples may overfit half marathon unless QA covers all goal families
+- confirm path must avoid regenerating a different plan than the reviewed AI draft
+
+## Exit Criteria
+
+- AI-authored structured first-plan draft path exists behind backend validation
+- backend normalizes AI draft to canonical `training-plan-v2`
+- structured review remains non-mutating
+- confirm persists exactly the reviewed normalized plan
+- deterministic fallback remains available and source-visible
+- pace/HR/default-HR safety is preserved
+- fixed rest days and long-run preferences are enforced
+- active-plan schedule edit still works after AI-authored plan creation
+- import/export/saved-mode readback still works
+- QA matrix passes
+- Running Coach approves controlled beta readiness for AI-authored structured first plans
+- cleanup candidates are documented before any deletion
+
+## Next Recommended Role
+
+BACKEND
+
+## Suggested Next Step
+
+Implement Slice 1: backend AI draft contract and prompt builder only. Do not wire it into the visible structured first-plan flow yet.
+
+## Exact BACKEND Prompt For Slice 1
+
+```text
+ROLE: BACKEND
+
+TASK:
+Implement Slice 1 for docs/plans/active/2026-05-26-ai-authored-first-plan-pipeline.md.
+
+STAGE:
+BACKEND implementation
+
+GOAL:
+Add a non-persistent backend contract for OpenAI-authored full first-plan drafts. This slice should define the AI draft schema and prompt builder, but must not replace the current structured first-plan path yet.
+
+REQUIRED READING:
+1. AGENTS.md
+2. docs/plans/active/2026-05-26-ai-authored-first-plan-pipeline.md
+3. docs/current-system.md
+4. docs/current-product.md
+5. docs/current-state.md
+6. src/lib/first-plan-actions.ts
+7. src/lib/structured-first-plan-onboarding.ts
+8. src/lib/structured-plan-authoring.ts
+9. src/lib/imported-plan.ts
+10. src/lib/rich-workout-model.ts
+11. src/lib/rich-workout-draft-authoring.ts
+12. src/lib/openai-plan-authoring.ts
+13. /Users/ivan/Downloads/ivan_half_marathon_training_plan_v2_full_2026-05-05.json
+
+IMPLEMENTATION SCOPE:
+- Create a backend-only module for `ai-first-plan-draft-v1`.
+- Define a Zod schema for the AI-authored full-plan draft.
+- Define a matching OpenAI response schema/prompt helper.
+- Prompt must include Hito taxonomy, allowed workout identities, segment rules, metric policy, fixed rest-day constraints, preferred long-run day, running-days/week, and bounded reference-style examples.
+- Add a mockable helper that accepts structured first-plan authoring context and returns either a parsed AI draft or bounded fallback metadata.
+- Reject or strip runtime-noise fields such as status, completion_state, Garmin/Strava placeholders, user feedback placeholders, logs, AI verdicts, and provider sync placeholders.
+- Do not persist raw AI drafts.
+- Do not wire this into `generateStructuredFirstPlanDraft` yet.
+- Do not change frontend.
+- Do not delete the deterministic generator.
+
+SAFETY RULES:
+- Backend owns validation and normalization.
+- OpenAI cannot persist directly.
+- No fake personalized HR zones.
+- Default estimated HR can appear only if labelled as default/estimated/not personalized and only when age exists.
+- Pace targets remain gated by watch/app plus pace/mixed guidance plus usable benchmark.
+- Fixed rest days are hard constraints.
+- Substantial non-rest workouts must include warmup, main-equivalent work, and cooldown.
+
+VALIDATION:
+- Add deterministic/mock validation for one rich half-marathon-style AI draft.
+- Add invalid-output validation for runtime-noise fields or schema mismatch.
+- Run the smallest relevant test/typecheck command available for touched backend files.
+- Run `git diff --check`.
+
+OUTPUT FORMAT:
+1. Task
+2. Stage
+3. Root cause
+4. Files changed
+5. What changed
+6. Validation results
+7. Blockers
+```

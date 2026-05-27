@@ -12,9 +12,10 @@ import {
   parseActivePlanRefreshDraftPayload,
   rebuildActivePlanRefreshDraftWithRichWorkoutDraft,
 } from "../src/lib/active-plan-refresh-draft";
-import type {
-  PersistedPlanCycleRow,
-  PersistedPlannedWorkoutRow,
+import {
+  buildReviewedFirstPlanImportedSeed,
+  type PersistedPlanCycleRow,
+  type PersistedPlannedWorkoutRow,
 } from "../src/lib/active-plan-persistence";
 import {
   generateCanonicalPlanFromText,
@@ -49,15 +50,33 @@ import {
   normalizeRichWorkoutDraftToTrainingPlan,
 } from "../src/lib/rich-workout-draft-authoring";
 import {
+  AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
+  buildAiFirstPlanDraftPrompt,
+  normalizeAiFirstPlanDraftToTrainingPlan,
+  type AiFirstPlanDraft,
+} from "../src/lib/ai-first-plan-draft-authoring";
+import {
+  AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+  buildAiFirstPlanBlueprintPrompt,
+  normalizeAiFirstPlanBlueprintToTrainingPlan,
+  type AiFirstPlanBlueprint,
+} from "../src/lib/ai-first-plan-blueprint-authoring";
+import { generateAiFirstPlanDraftPreview } from "../src/lib/ai-first-plan-draft-service";
+import { generateStructuredFirstPlanDraftForUser } from "../src/lib/first-plan-actions";
+import {
   buildActivePlanRefreshFingerprint,
   buildDeterministicActivePlanRefreshProposal,
   generateActivePlanRefreshProposal,
 } from "../src/lib/plan-refresh-proposal";
 import type { RunnerCoachContext } from "../src/lib/runner-coach-context";
-import { buildStructuredAuthoringPlan } from "../src/lib/structured-plan-authoring";
+import {
+  buildStructuredAuthoringPlan,
+  structuredPlanAuthoringInputSchema,
+} from "../src/lib/structured-plan-authoring";
 import { addDaysIso, deriveWorkoutRichModel, weekdayLong } from "../src/lib/training";
 import { parseVoiceToPlanConfirmRequest } from "../src/lib/voice-to-plan-authoring";
 import { serverEnv } from "../src/lib/supabase/env";
+import type { WeekdayName } from "../src/lib/weekday-rest-invariants";
 import {
   buildImportedPlanSeed,
   importedPlanSchema,
@@ -2375,6 +2394,2000 @@ function assertMetricTargetPolicy() {
   );
 }
 
+function buildAiFirstPlanAuthoringInput(
+  overrides: Partial<ReturnType<typeof structuredPlanAuthoringInputSchema.parse>> = {},
+) {
+  const { authoringInput } = buildPlan(
+    buildRequest("half_marathon", {
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: "2026-06-14",
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+  );
+
+  return structuredPlanAuthoringInputSchema.parse({
+    ...authoringInput,
+    ...overrides,
+    schedule: {
+      ...authoringInput.schedule,
+      startDate: "2026-06-01",
+      targetDate: "2026-06-14",
+      preparationHorizonWeeks: 2,
+      ...(overrides.schedule ?? {}),
+    },
+    availability: {
+      ...authoringInput.availability,
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      unavailableDays: ["Wednesday", "Sunday"],
+      maxRunningDaysPerWeek: 5,
+      preferredLongRunDay: "Saturday",
+      ...(overrides.availability ?? {}),
+    },
+  });
+}
+
+function buildAiFirstPlanDraftFixture(): AiFirstPlanDraft {
+  const startDate = "2026-06-01";
+  const goalContext = {
+    goalType: "half_marathon",
+    goalStyle: "target_time",
+    terrainFocus: "standard" as const,
+    targetDate: "2026-06-14",
+    targetTime: "2:00:00",
+  };
+  const metricMode = {
+    guidance: "mixed" as const,
+    paceTargetsAllowed: true,
+    hrTargetsAllowed: false,
+    hrTargetSource: "effort_only" as const,
+    hrTargetLabel: null,
+    hrTargetSourceNote: null,
+    reason: "Pace may be used only where backend benchmark/watch gates allow it.",
+  };
+
+  const workoutsByDay = [
+    {
+      family: "easy",
+      identity: "easy_aerobic_run",
+      icon: "easy",
+      title: "Easy aerobic run",
+      summary: "Easy support run with relaxed mechanics and a controlled finish.",
+      mainType: "main",
+      mainLabel: "Easy aerobic block",
+      durationMin: 45,
+      rpe: 4,
+      fatigue: "low",
+      recovery: "medium",
+      pace: "6:20-7:20/km",
+    },
+    {
+      family: "tempo",
+      identity: "half_marathon_threshold_durability",
+      icon: "tempo",
+      title: "Half marathon threshold durability",
+      summary: "Controlled threshold durability without forcing target pace.",
+      mainType: "tempo_block",
+      mainLabel: "Controlled threshold block",
+      durationMin: 54,
+      rpe: 6,
+      fatigue: "medium_high",
+      recovery: "medium",
+      pace: "5:20-5:50/km",
+    },
+    null,
+    {
+      family: "steady",
+      identity: "steady_aerobic_run",
+      icon: "steady",
+      title: "Steady aerobic run",
+      summary: "Steady support run that builds half-marathon durability.",
+      mainType: "main",
+      mainLabel: "Steady aerobic block",
+      durationMin: 50,
+      rpe: 5,
+      fatigue: "medium",
+      recovery: "medium",
+      pace: "5:55-6:35/km",
+    },
+    {
+      family: "recovery",
+      identity: "recovery_jog",
+      icon: "recovery",
+      title: "Recovery jog",
+      summary: "Very easy recovery day to absorb the week's work.",
+      mainType: "main",
+      mainLabel: "Recovery jog block",
+      durationMin: 35,
+      rpe: 3,
+      fatigue: "very_low",
+      recovery: "high",
+      pace: null,
+    },
+    {
+      family: "long",
+      identity: "long_run_with_steady_finish",
+      icon: "long",
+      title: "Long run with steady finish",
+      summary: "Aerobic long run with a short steady finish for target-time awareness.",
+      mainType: "main",
+      mainLabel: "Long aerobic block",
+      durationMin: 80,
+      rpe: 5,
+      fatigue: "medium_high",
+      recovery: "high",
+      pace: "6:25-7:25/km",
+    },
+    null,
+  ] as const;
+
+  const weeks = [1, 2].map((weekNumber) => ({
+    weekNumber,
+    phase: weekNumber === 1 ? ("Base" as const) : ("Build" as const),
+    theme: weekNumber === 1 ? "Settle into rhythm" : "Add controlled durability",
+    microcycleIntent:
+      weekNumber === 1
+        ? "Introduce half-marathon rhythm while keeping easy days truly easy."
+        : "Progress steady durability and keep the long run on Saturday.",
+    cutbackWeek: false,
+    taperWeek: false,
+    plannedWorkouts: workoutsByDay.map((template, dayIndex) => {
+      const date = addDaysIso(startDate, (weekNumber - 1) * 7 + dayIndex);
+      const weekday = weekdayLong(date);
+
+      if (!template) {
+        return buildAiRestDraftWorkout(date, weekday, goalContext, metricMode);
+      }
+
+      return buildAiRunningDraftWorkout({
+        date,
+        weekday,
+        goalContext,
+        metricMode,
+        ...template,
+      });
+    }),
+  }));
+
+  return {
+    schemaVersion: AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
+    planName: "AI half marathon draft",
+    generatedFor: "Doctrine fixture",
+    goal: {
+      goalType: "half_marathon",
+      goalLabel: "Half marathon",
+      goalStyle: "target_time",
+      targetTime: "2:00:00",
+      targetDate: "2026-06-14",
+    },
+    startDate,
+    targetDate: "2026-06-14",
+    preparationHorizonWeeks: 2,
+    planPreferences: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      fixedRestDays: ["Wednesday", "Sunday"],
+      preferredLongRunDay: "Saturday",
+      maxRunningDaysPerWeek: 5,
+    },
+    reviewAssumptions: [
+      "Target-time work is included only where benchmark support allows pace guidance.",
+      "Default HR guidance, if shown, is estimated from age and not personalized zones.",
+    ],
+    metricPolicySummary:
+      "Pace is gated by watch/app plus recent benchmark truth; HR is default estimated only.",
+    weeks,
+  };
+}
+
+function buildAiFirstPlanBlueprintFixture(): AiFirstPlanBlueprint {
+  const startDate = "2026-06-01";
+  const workoutsByDay = [
+    {
+      family: "easy",
+      identity: "easy_aerobic_run",
+      icon: "easy",
+      title: "Easy aerobic run",
+      summary: "Easy support run with relaxed mechanics and a controlled finish.",
+      rpe: 4,
+      fatigue: "low",
+      recovery: "medium",
+      segmentIntent: "easy_aerobic",
+      metricIntent: "mixed_if_allowed",
+    },
+    {
+      family: "tempo",
+      identity: "half_marathon_threshold_durability",
+      icon: "tempo",
+      title: "Half marathon threshold durability",
+      summary: "Controlled threshold durability without forcing target pace.",
+      rpe: 6,
+      fatigue: "medium_high",
+      recovery: "medium",
+      segmentIntent: "tempo_sustained",
+      metricIntent: "mixed_if_allowed",
+    },
+    null,
+    {
+      family: "steady",
+      identity: "steady_aerobic_run",
+      icon: "steady",
+      title: "Steady aerobic run",
+      summary: "Steady support run that builds half-marathon durability.",
+      rpe: 5,
+      fatigue: "medium",
+      recovery: "medium",
+      segmentIntent: "steady_aerobic",
+      metricIntent: "mixed_if_allowed",
+    },
+    {
+      family: "recovery",
+      identity: "recovery_jog",
+      icon: "recovery",
+      title: "Recovery jog",
+      summary: "Very easy recovery day to absorb the week's work.",
+      rpe: 3,
+      fatigue: "very_low",
+      recovery: "high",
+      segmentIntent: "recovery",
+      metricIntent: "effort_only",
+    },
+    {
+      family: "long",
+      identity: "long_run_with_steady_finish",
+      icon: "long",
+      title: "Long run with steady finish",
+      summary: "Aerobic long run with a short steady finish for target-time awareness.",
+      rpe: 5,
+      fatigue: "medium_high",
+      recovery: "high",
+      segmentIntent: "long_durability",
+      metricIntent: "mixed_if_allowed",
+    },
+    null,
+  ] as const;
+
+  const weeks = [1, 2].map((weekNumber) => ({
+    weekNumber,
+    phase: weekNumber === 1 ? ("Base" as const) : ("Build" as const),
+    theme: weekNumber === 1 ? "Settle into rhythm" : "Add controlled durability",
+    microcycleIntent:
+      weekNumber === 1
+        ? "Introduce half-marathon rhythm while keeping easy days truly easy."
+        : "Progress steady durability and keep the long run on Saturday.",
+    cutbackWeek: false,
+    taperWeek: false,
+    longRunIntent: "Keep Saturday durability progressing without forcing race effort.",
+    longRunProgression: "Use backend expansion to preserve safe long-run progression.",
+    plannedWorkouts: workoutsByDay.flatMap((template, dayIndex) => {
+      if (!template) {
+        return [];
+      }
+
+      const date = addDaysIso(startDate, (weekNumber - 1) * 7 + dayIndex);
+
+      return [
+        {
+          date,
+          weekday: weekdayLong(
+            date,
+          ) as AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number]["weekday"],
+          workoutFamily: template.family,
+          workoutIdentity: template.identity,
+          calendarIconKey: template.icon,
+          title: template.title,
+          summary: template.summary,
+          plannedRpe: template.rpe,
+          estimatedFatigue: template.fatigue,
+          recoveryPriority: template.recovery,
+          segmentIntent: template.segmentIntent,
+          metricIntent: template.metricIntent,
+        },
+      ];
+    }),
+  }));
+
+  return {
+    schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+    planName: "AI blueprint half marathon",
+    generatedFor: "Doctrine fixture",
+    goalSummary: "Half marathon target-time plan",
+    startDate,
+    targetDate: "2026-06-14",
+    preparationHorizonWeeks: 2,
+    planPreferences: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      fixedRestDays: ["Wednesday", "Sunday"],
+      preferredLongRunDay: "Saturday",
+      maxRunningDaysPerWeek: 5,
+    },
+    reviewAssumptions: [
+      "Target-time work is included only where benchmark support allows pace guidance.",
+      "Backend expands compact workout intent into canonical segments and metric truth.",
+    ],
+    metricPolicySummary:
+      "AI supplies metric intent only; backend applies pace gates and default estimated HR policy.",
+    weeks,
+  };
+}
+
+function buildAiFirstPlanBlueprintIdentityFixture(): AiFirstPlanBlueprint {
+  const startDate = "2026-06-01";
+  const weekdayOffsets = new Map([
+    ["Monday", 0],
+    ["Tuesday", 1],
+    ["Wednesday", 2],
+    ["Thursday", 3],
+    ["Friday", 4],
+    ["Saturday", 5],
+    ["Sunday", 6],
+  ]);
+  const weeks = [
+    {
+      phase: "Base" as const,
+      theme: "Establish rhythm",
+      microcycleIntent: "Pair easy support with threshold durability and a steady-finish long run.",
+      cutbackWeek: false,
+      taperWeek: false,
+      workouts: [
+        blueprintWorkoutTemplate("Monday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate(
+          "Tuesday",
+          "tempo",
+          "half_marathon_threshold_durability",
+          "tempo",
+          "Half marathon threshold durability",
+        ),
+        blueprintWorkoutTemplate(
+          "Thursday",
+          "steady",
+          "steady_aerobic_run",
+          "steady",
+          "Steady aerobic run",
+        ),
+        blueprintWorkoutTemplate(
+          "Friday",
+          "intervals",
+          "time_intervals",
+          "intervals",
+          "Time intervals",
+        ),
+        blueprintWorkoutTemplate(
+          "Saturday",
+          "long",
+          "long_run_with_steady_finish",
+          "long",
+          "Long run with steady finish",
+        ),
+      ],
+    },
+    {
+      phase: "Build" as const,
+      theme: "Build repeatability",
+      microcycleIntent:
+        "Use controlled repeats, trail skill, and longer durability without extra hard days.",
+      cutbackWeek: false,
+      taperWeek: false,
+      workouts: [
+        blueprintWorkoutTemplate("Monday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
+        blueprintWorkoutTemplate(
+          "Tuesday",
+          "intervals",
+          "distance_intervals",
+          "intervals",
+          "Distance intervals",
+        ),
+        blueprintWorkoutTemplate(
+          "Thursday",
+          "hills",
+          "rolling_hills_session",
+          "hills",
+          "Rolling hills session",
+        ),
+        blueprintWorkoutTemplate(
+          "Friday",
+          "trail",
+          "technical_trail_easy",
+          "trail",
+          "Technical trail easy run",
+        ),
+        blueprintWorkoutTemplate(
+          "Saturday",
+          "long",
+          "ultra_time_on_feet_durability",
+          "long",
+          "Ultra time-on-feet durability",
+        ),
+      ],
+    },
+    {
+      phase: "Specific" as const,
+      theme: "Absorb and climb",
+      microcycleIntent:
+        "Keep cutback support while adding controlled tempo and climbing specificity.",
+      cutbackWeek: true,
+      taperWeek: false,
+      workouts: [
+        blueprintWorkoutTemplate(
+          "Monday",
+          "easy",
+          "cutback_aerobic_run",
+          "easy",
+          "Cutback aerobic run",
+        ),
+        blueprintWorkoutTemplate(
+          "Tuesday",
+          "tempo",
+          "controlled_tempo_session",
+          "tempo",
+          "Controlled tempo session",
+        ),
+        blueprintWorkoutTemplate(
+          "Thursday",
+          "hills",
+          "climbing_steady_run",
+          "hills",
+          "Climbing steady run",
+        ),
+        blueprintWorkoutTemplate("Friday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate(
+          "Saturday",
+          "long",
+          "cutback_long_run",
+          "long",
+          "Cutback long run",
+        ),
+      ],
+    },
+    {
+      phase: "Taper" as const,
+      theme: "Freshen up",
+      microcycleIntent: "Keep one controlled hill stimulus, then reduce the long-run load.",
+      cutbackWeek: false,
+      taperWeek: true,
+      workouts: [
+        blueprintWorkoutTemplate(
+          "Monday",
+          "steady",
+          "steady_aerobic_run",
+          "steady",
+          "Steady aerobic run",
+        ),
+        blueprintWorkoutTemplate("Tuesday", "hills", "uphill_repeats", "hills", "Uphill repeats"),
+        blueprintWorkoutTemplate(
+          "Thursday",
+          "easy",
+          "easy_aerobic_run",
+          "easy",
+          "Easy aerobic run",
+        ),
+        blueprintWorkoutTemplate("Friday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
+        blueprintWorkoutTemplate("Saturday", "long", "taper_long_run", "long", "Taper long run"),
+      ],
+    },
+  ];
+
+  return {
+    schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+    planName: "AI blueprint identity matrix",
+    generatedFor: "Doctrine fixture",
+    goalSummary: "Half marathon identity-aware blueprint expansion",
+    startDate,
+    targetDate: "2026-06-28",
+    preparationHorizonWeeks: 4,
+    planPreferences: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      fixedRestDays: ["Wednesday", "Sunday"],
+      preferredLongRunDay: "Saturday",
+      maxRunningDaysPerWeek: 5,
+    },
+    reviewAssumptions: [
+      "Backend expands compact identity intent into executable workout details.",
+      "AI supplies no numeric metric truth; backend owns pace and HR policy.",
+    ],
+    metricPolicySummary:
+      "AI supplies metric intent only; backend applies pace gates and default estimated HR policy.",
+    weeks: weeks.map((week, weekIndex) => ({
+      weekNumber: weekIndex + 1,
+      phase: week.phase,
+      theme: week.theme,
+      microcycleIntent: week.microcycleIntent,
+      cutbackWeek: week.cutbackWeek,
+      taperWeek: week.taperWeek,
+      longRunIntent: "Keep Saturday durability specific but controlled.",
+      longRunProgression: "Backend validates long-run and taper sanity after expansion.",
+      plannedWorkouts: week.workouts.map((workout) => {
+        const offset = weekIndex * 7 + (weekdayOffsets.get(workout.weekday) ?? 0);
+        const date = addDaysIso(startDate, offset);
+
+        return {
+          ...workout,
+          date,
+        };
+      }),
+    })),
+  };
+}
+
+function buildAiFirstPlanBlueprintMissingIdentityFixture(): AiFirstPlanBlueprint {
+  const startDate = "2026-07-06";
+  const weekdayOffsets = new Map([
+    ["Monday", 0],
+    ["Tuesday", 1],
+    ["Wednesday", 2],
+    ["Thursday", 3],
+    ["Friday", 4],
+    ["Saturday", 5],
+    ["Sunday", 6],
+  ]);
+  const weeks = [
+    {
+      phase: "Base" as const,
+      theme: "Sharpen without overload",
+      microcycleIntent:
+        "Introduce 5K coordination, marathon-steady patience, and mountain time-on-feet.",
+      cutbackWeek: false,
+      taperWeek: false,
+      workouts: [
+        blueprintWorkoutTemplate("Monday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate(
+          "Tuesday",
+          "intervals",
+          "5k_sharpening_repeats",
+          "intervals",
+          "5K sharpening repeats",
+        ),
+        blueprintWorkoutTemplate(
+          "Thursday",
+          "steady",
+          "marathon_steady_specificity",
+          "steady",
+          "Marathon steady specificity",
+        ),
+        blueprintWorkoutTemplate("Friday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
+        blueprintWorkoutTemplate(
+          "Saturday",
+          "trail",
+          "mountain_long_run_time_on_feet",
+          "trail",
+          "Mountain long run time on feet",
+        ),
+      ],
+    },
+    {
+      phase: "Build" as const,
+      theme: "Rhythm and terrain control",
+      microcycleIntent:
+        "Pair 10K rhythm with controlled downhill durability and hike-run endurance.",
+      cutbackWeek: false,
+      taperWeek: false,
+      workouts: [
+        blueprintWorkoutTemplate(
+          "Monday",
+          "steady",
+          "steady_aerobic_run",
+          "steady",
+          "Steady aerobic run",
+        ),
+        blueprintWorkoutTemplate(
+          "Tuesday",
+          "intervals",
+          "10k_rhythm_intervals",
+          "intervals",
+          "10K rhythm intervals",
+        ),
+        blueprintWorkoutTemplate(
+          "Thursday",
+          "hills",
+          "controlled_downhill_durability",
+          "hills",
+          "Controlled downhill durability",
+        ),
+        blueprintWorkoutTemplate("Friday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate(
+          "Saturday",
+          "trail",
+          "hike_run_endurance",
+          "trail",
+          "Hike-run endurance",
+        ),
+      ],
+    },
+    {
+      phase: "Specific" as const,
+      theme: "Controlled race rhythm",
+      microcycleIntent:
+        "Use a race-rhythm rehearsal while keeping terrain support and cutback durability conservative.",
+      cutbackWeek: true,
+      taperWeek: false,
+      workouts: [
+        blueprintWorkoutTemplate("Monday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
+        blueprintWorkoutTemplate(
+          "Tuesday",
+          "race",
+          "race_pace_session",
+          "race",
+          "Race pace session",
+        ),
+        blueprintWorkoutTemplate(
+          "Thursday",
+          "hills",
+          "rolling_hills_session",
+          "hills",
+          "Rolling hills session",
+        ),
+        blueprintWorkoutTemplate("Friday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate(
+          "Saturday",
+          "long",
+          "cutback_long_run",
+          "long",
+          "Cutback long run",
+        ),
+      ],
+    },
+    {
+      phase: "Taper" as const,
+      theme: "Freshness and tune-up",
+      microcycleIntent: "Keep a light tune-up and reduce the long-run load for freshness.",
+      cutbackWeek: false,
+      taperWeek: true,
+      workouts: [
+        blueprintWorkoutTemplate("Monday", "race", "taper_tuneup_run", "race", "Taper tune-up run"),
+        blueprintWorkoutTemplate("Tuesday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate(
+          "Thursday",
+          "steady",
+          "steady_aerobic_run",
+          "steady",
+          "Steady aerobic run",
+        ),
+        blueprintWorkoutTemplate("Friday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
+        blueprintWorkoutTemplate("Saturday", "long", "taper_long_run", "long", "Taper long run"),
+      ],
+    },
+  ];
+
+  return {
+    schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+    planName: "AI blueprint full identity coverage",
+    generatedFor: "Doctrine fixture",
+    goalSummary: "Performance and mountain identity-aware blueprint expansion",
+    startDate,
+    targetDate: "2026-08-02",
+    preparationHorizonWeeks: 4,
+    planPreferences: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      fixedRestDays: ["Wednesday", "Sunday"],
+      preferredLongRunDay: "Saturday",
+      maxRunningDaysPerWeek: 5,
+    },
+    reviewAssumptions: [
+      "Backend expands performance and mountain blueprint identities into executable detail.",
+      "AI supplies no numeric metric truth; backend owns pace and HR policy.",
+    ],
+    metricPolicySummary:
+      "AI supplies metric intent only; backend applies pace gates and default estimated HR policy.",
+    weeks: weeks.map((week, weekIndex) => ({
+      weekNumber: weekIndex + 1,
+      phase: week.phase,
+      theme: week.theme,
+      microcycleIntent: week.microcycleIntent,
+      cutbackWeek: week.cutbackWeek,
+      taperWeek: week.taperWeek,
+      longRunIntent: "Keep Saturday durability specific but controlled.",
+      longRunProgression: "Backend validates long-run and taper sanity after expansion.",
+      plannedWorkouts: week.workouts.map((workout) => {
+        const offset = weekIndex * 7 + (weekdayOffsets.get(workout.weekday) ?? 0);
+        const date = addDaysIso(startDate, offset);
+
+        return {
+          ...workout,
+          date,
+        };
+      }),
+    })),
+  };
+}
+
+function blueprintWorkoutTemplate(
+  weekday: AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number]["weekday"],
+  workoutFamily: CanonicalWorkoutFamily,
+  workoutIdentity: CanonicalWorkoutIdentity,
+  calendarIconKey: CalendarIconKey,
+  title: string,
+): AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number] {
+  const segmentIntentByFamily: Record<
+    CanonicalWorkoutFamily,
+    AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number]["segmentIntent"]
+  > = {
+    easy: "easy_aerobic",
+    recovery: "recovery",
+    steady: "steady_aerobic",
+    long: "long_durability",
+    tempo: "tempo_sustained",
+    intervals: "interval_repeats",
+    hills: "hill_strength",
+    trail: "trail_terrain",
+    progression: "progression",
+    race: "race_tuneup",
+    rest: "rest",
+  };
+
+  return {
+    date: null,
+    weekday,
+    workoutFamily,
+    workoutIdentity,
+    calendarIconKey,
+    title,
+    summary: `${title} authored as compact blueprint intent for backend expansion.`,
+    plannedRpe:
+      workoutFamily === "recovery"
+        ? 3
+        : workoutFamily === "long"
+          ? 5
+          : workoutFamily === "easy"
+            ? 4
+            : 6,
+    estimatedFatigue:
+      workoutFamily === "recovery"
+        ? "very_low"
+        : workoutFamily === "long"
+          ? "medium_high"
+          : "medium",
+    recoveryPriority: workoutFamily === "long" || workoutFamily === "recovery" ? "high" : "medium",
+    segmentIntent: segmentIntentByFamily[workoutFamily],
+    metricIntent: "mixed_if_allowed",
+  };
+}
+
+function buildAiRunningDraftWorkout({
+  date,
+  weekday,
+  goalContext,
+  metricMode,
+  family,
+  identity,
+  icon,
+  title,
+  summary,
+  mainType,
+  mainLabel,
+  durationMin,
+  rpe,
+  fatigue,
+  recovery,
+  pace,
+}: {
+  date: string;
+  weekday: string;
+  goalContext: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["goalContext"];
+  metricMode: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["metricMode"];
+  family: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["workoutFamily"];
+  identity: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["workoutIdentity"];
+  icon: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["calendarIconKey"];
+  title: string;
+  summary: string;
+  mainType: "main" | "tempo_block";
+  mainLabel: string;
+  durationMin: number;
+  rpe: number;
+  fatigue: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["estimatedFatigue"];
+  recovery: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["recoveryPriority"];
+  pace: string | null;
+}): AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number] {
+  return {
+    date,
+    weekday: weekday as AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["weekday"],
+    workoutFamily: family,
+    workoutIdentity: identity,
+    calendarIconKey: icon,
+    title,
+    summary,
+    plannedRpe: rpe,
+    estimatedFatigue: fatigue,
+    recoveryPriority: recovery,
+    goalContext,
+    metricMode,
+    segments: [
+      buildAiDraftSegment("warmup", "Warm up", 1, 10, "Start easy and settle your stride.", null),
+      buildAiDraftSegment(
+        mainType,
+        mainLabel,
+        2,
+        Math.max(10, durationMin - 20),
+        "Keep the effort controlled and repeatable.",
+        pace,
+      ),
+      buildAiDraftSegment("cooldown", "Cool down", 3, 10, "Ease down before stopping.", null),
+    ],
+  };
+}
+
+function buildAiRestDraftWorkout(
+  date: string,
+  weekday: string,
+  goalContext: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["goalContext"],
+  metricMode: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["metricMode"],
+): AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number] {
+  return {
+    date,
+    weekday: weekday as AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["weekday"],
+    workoutFamily: "rest",
+    workoutIdentity: "rest_and_recovery",
+    calendarIconKey: "rest",
+    title: "Rest and recovery",
+    summary: "No running today. Keep the day genuinely restful.",
+    plannedRpe: 1,
+    estimatedFatigue: "very_low",
+    recoveryPriority: "high",
+    goalContext,
+    metricMode: { ...metricMode, guidance: "effort", paceTargetsAllowed: false },
+    segments: [
+      {
+        segmentId: `rest-${date}`,
+        segmentType: "rest",
+        label: "Rest",
+        sequence: 1,
+        prescription: {
+          mode: "none",
+          durationMin: null,
+          distanceKm: null,
+          repeatCount: null,
+          repeatUnit: null,
+          recoveryUnit: null,
+        },
+        guidance: "No running today.",
+        target: emptyAiDraftTarget(),
+      },
+    ],
+  };
+}
+
+function buildAiDraftSegment(
+  segmentType: AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["segments"][number]["segmentType"],
+  label: string,
+  sequence: number,
+  durationMin: number,
+  guidance: string,
+  paceMinPerKmRange: string | null,
+) {
+  return {
+    segmentId: `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${sequence}`,
+    segmentType,
+    label,
+    sequence,
+    prescription: {
+      mode: "time",
+      durationMin,
+      distanceKm: null,
+      repeatCount: null,
+      repeatUnit: null,
+      recoveryUnit: null,
+    },
+    guidance,
+    target: {
+      ...emptyAiDraftTarget(),
+      intensity:
+        segmentType === "tempo_block" ? "comfortably hard and controlled" : "easy to steady",
+      rpe: segmentType === "tempo_block" ? 6 : 4,
+      cue: guidance,
+      paceMinPerKmRange,
+    },
+  };
+}
+
+function emptyAiDraftTarget() {
+  return {
+    intensity: null,
+    rpe: null,
+    cue: null,
+    hint: null,
+    paceMinPerKmRange: null,
+    pace: null,
+    hrBpmRange: null,
+    hrBpm: null,
+    hrTargetSource: null,
+    label: null,
+    sourceNote: null,
+  };
+}
+
+function readAiFirstPlanReferenceFixture() {
+  try {
+    return JSON.parse(
+      readFileSync(
+        "/Users/ivan/Downloads/ivan_half_marathon_training_plan_v2_full_2026-05-05.json",
+        "utf8",
+      ),
+    ) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function assertAiFirstPlanDraftContract() {
+  const authoringInput = buildAiFirstPlanAuthoringInput();
+  const referenceFixture = readAiFirstPlanReferenceFixture();
+  const prompt = buildAiFirstPlanDraftPrompt({
+    authoringInput,
+    today: "2026-05-26",
+    referenceExample: referenceFixture,
+  });
+
+  assert.equal(
+    prompt.responseSchema.properties.schemaVersion.enum[0],
+    AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
+    "AI first-plan prompt should expose the draft schema version",
+  );
+  assert.match(
+    prompt.userPrompt,
+    /Reference is for richness and weekly structure only/,
+    "AI first-plan prompt should use the external plan only as bounded reference guidance",
+  );
+  assert.doesNotMatch(
+    prompt.userPrompt,
+    /garmin_sync_placeholder|completion_state|user_feedback_placeholder/,
+    "AI first-plan reference guidance must not include runtime placeholder truth",
+  );
+
+  const draft = buildAiFirstPlanDraftFixture();
+  const normalized = normalizeAiFirstPlanDraftToTrainingPlan({ draft, authoringInput });
+
+  assert.equal(normalized.ok, true, "valid rich AI first-plan draft should normalize");
+
+  if (normalized.ok) {
+    assert.equal(
+      normalized.metadata.status,
+      "ai_authored",
+      "valid AI first-plan draft should report ai_authored metadata",
+    );
+    assert.equal(
+      normalized.canonicalPlan.schema_version,
+      "training-plan-v2",
+      "AI first-plan output should be canonical training-plan-v2",
+    );
+    assertRichWorkoutContract(normalized.canonicalPlan, "AI first-plan normalized output");
+    assertFixedRestDays(normalized.canonicalPlan);
+    assertDefaultEstimatedHrGuidance(
+      normalized.canonicalPlan,
+      "AI first-plan default estimated HR",
+    );
+    assert.equal(
+      hasTargetKey(normalized.canonicalPlan, "pace_min_per_km_range"),
+      true,
+      "AI first-plan output may keep pace only when backend gates allow it",
+    );
+  }
+
+  const fakePersonalHrDraft = structuredClone(draft);
+  fakePersonalHrDraft.weeks[0]!.plannedWorkouts[0]!.segments[1]!.target.hrBpmRange = "150-160 bpm";
+  fakePersonalHrDraft.weeks[0]!.plannedWorkouts[0]!.segments[1]!.target.hrTargetSource =
+    "personal_hr_zone";
+  const fakePersonalHrNormalized = normalizeAiFirstPlanDraftToTrainingPlan({
+    draft: fakePersonalHrDraft,
+    authoringInput,
+  });
+
+  assert.equal(
+    fakePersonalHrNormalized.ok,
+    true,
+    "AI first-plan normalizer should repair fake personalized HR instead of preserving it",
+  );
+
+  if (fakePersonalHrNormalized.ok) {
+    assert.equal(
+      JSON.stringify(fakePersonalHrNormalized.canonicalPlan).includes("personal_hr_zone"),
+      false,
+      "AI first-plan normalizer must not preserve fake personal HR-zone source",
+    );
+    assert.ok(
+      fakePersonalHrNormalized.metadata.repairs.some((repair) => /HR target/i.test(repair)),
+      "AI first-plan normalizer should make HR repair metadata visible",
+    );
+  }
+
+  const noPaceAuthoringInput = buildAiFirstPlanAuthoringInput({
+    currentLevel: { recentRaceResults: [], recent5kPaceSecondsPerKm: null },
+    execution: { watchAccess: "none", guidancePreference: "effort" },
+  });
+  const unsupportedPaceNormalized = normalizeAiFirstPlanDraftToTrainingPlan({
+    draft,
+    authoringInput: noPaceAuthoringInput,
+  });
+
+  assert.equal(
+    unsupportedPaceNormalized.ok,
+    true,
+    "AI first-plan normalizer should repair unsupported pace targets instead of failing",
+  );
+
+  if (unsupportedPaceNormalized.ok) {
+    assert.equal(
+      hasTargetKey(unsupportedPaceNormalized.canonicalPlan, "pace_min_per_km_range"),
+      false,
+      "AI first-plan normalizer must strip unsupported pace targets",
+    );
+    assert.ok(
+      unsupportedPaceNormalized.metadata.repairs.some((repair) => /pace target/i.test(repair)),
+      "AI first-plan normalizer should make pace repair metadata visible",
+    );
+  }
+
+  const fixedRestViolationDraft = structuredClone(draft);
+  fixedRestViolationDraft.weeks[0]!.plannedWorkouts[2] =
+    fixedRestViolationDraft.weeks[0]!.plannedWorkouts[0]!;
+  fixedRestViolationDraft.weeks[0]!.plannedWorkouts[2]!.date = "2026-06-03";
+  fixedRestViolationDraft.weeks[0]!.plannedWorkouts[2]!.weekday = "Wednesday";
+  const fixedRestViolation = normalizeAiFirstPlanDraftToTrainingPlan({
+    draft: fixedRestViolationDraft,
+    authoringInput,
+  });
+
+  assert.equal(fixedRestViolation.ok, false, "fixed rest-day violations should be rejected");
+
+  const incompleteHorizonDraft = structuredClone(draft);
+  incompleteHorizonDraft.weeks = [incompleteHorizonDraft.weeks[0]!];
+  const incompleteHorizonResult = normalizeAiFirstPlanDraftToTrainingPlan({
+    draft: incompleteHorizonDraft,
+    authoringInput,
+  });
+
+  assert.equal(
+    incompleteHorizonResult.ok,
+    false,
+    "AI first-plan drafts must cover the full requested horizon",
+  );
+
+  const oneBlockDraft = structuredClone(draft);
+  const longWorkout = oneBlockDraft.weeks[0]!.plannedWorkouts[5]!;
+  longWorkout.segments = [longWorkout.segments[1]!];
+  const oneBlockResult = normalizeAiFirstPlanDraftToTrainingPlan({
+    draft: oneBlockDraft,
+    authoringInput,
+  });
+
+  assert.equal(oneBlockResult.ok, false, "one-block substantial non-rest workouts are rejected");
+
+  const invalidTaxonomyDraft = structuredClone(draft) as unknown as Record<string, unknown>;
+  (
+    (invalidTaxonomyDraft.weeks as Array<{ plannedWorkouts: Array<Record<string, unknown>> }>)[0]!
+      .plannedWorkouts[0] as Record<string, unknown>
+  ).workoutIdentity = "banana_repeats";
+  const invalidTaxonomyResult = normalizeAiFirstPlanDraftToTrainingPlan({
+    draft: invalidTaxonomyDraft,
+    authoringInput,
+  });
+
+  assert.equal(invalidTaxonomyResult.ok, false, "invalid AI workout taxonomy is rejected");
+}
+
+function assertAiFirstPlanBlueprintContract() {
+  const authoringInput = buildAiFirstPlanAuthoringInput();
+  const referenceFixture = readAiFirstPlanReferenceFixture();
+  const prompt = buildAiFirstPlanBlueprintPrompt({
+    authoringInput,
+    today: "2026-05-26",
+    referenceExample: referenceFixture,
+  });
+
+  assert.equal(
+    prompt.responseSchema.properties.schemaVersion.enum[0],
+    AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+    "AI first-plan blueprint prompt should expose the blueprint schema version",
+  );
+  assert.match(
+    prompt.systemPrompt,
+    /backend expands it into canonical training-plan-v2/,
+    "AI first-plan blueprint prompt should make backend expansion ownership explicit",
+  );
+  assert.doesNotMatch(
+    prompt.userPrompt,
+    /garmin_sync_placeholder|completion_state|user_feedback_placeholder/,
+    "AI first-plan blueprint prompt must not include runtime placeholder truth",
+  );
+  assert.match(
+    prompt.userPrompt,
+    /Required authored workout slots/,
+    "AI first-plan blueprint prompt should provide exact required date slots",
+  );
+  assert.equal(
+    prompt.responseSchema.properties.weeks.items.properties.plannedWorkouts.minItems,
+    authoringInput.availability.maxRunningDaysPerWeek,
+    "AI first-plan blueprint response schema should require the validated weekly running-day count",
+  );
+  assert.equal(
+    prompt.responseSchema.properties.weeks.items.properties.plannedWorkouts.maxItems,
+    authoringInput.availability.maxRunningDaysPerWeek,
+    "AI first-plan blueprint response schema should reject extra authored weekly workouts",
+  );
+  assert.doesNotMatch(
+    JSON.stringify(prompt.responseSchema.properties.weeks.items.properties.plannedWorkouts),
+    /rest_and_recovery/,
+    "AI first-plan blueprint authored workout schema should exclude rest identities",
+  );
+
+  const blueprint = buildAiFirstPlanBlueprintFixture();
+  const normalized = normalizeAiFirstPlanBlueprintToTrainingPlan({ blueprint, authoringInput });
+
+  assert.equal(normalized.ok, true, "valid compact AI first-plan blueprint should normalize");
+
+  if (normalized.ok) {
+    assert.equal(
+      normalized.metadata.status,
+      "ai_authored",
+      "valid AI first-plan blueprint should report ai_authored metadata",
+    );
+    assert.equal(
+      normalized.metadata.source,
+      "openai_ai_first_plan_blueprint",
+      "valid AI first-plan blueprint should report blueprint source metadata",
+    );
+    assert.equal(
+      normalized.canonicalPlan.source_kind,
+      "ai_first_plan_blueprint_v1",
+      "AI first-plan blueprint output should be source-visible canonical training-plan-v2",
+    );
+    assertRichWorkoutContract(normalized.canonicalPlan, "AI first-plan blueprint output");
+    assertFixedRestDays(normalized.canonicalPlan);
+    assertDefaultEstimatedHrGuidance(
+      normalized.canonicalPlan,
+      "AI first-plan blueprint default estimated HR",
+    );
+    assert.equal(
+      hasTargetKey(normalized.canonicalPlan, "pace_min_per_km_range"),
+      true,
+      "AI first-plan blueprint may keep pace only when backend gates allow it",
+    );
+    assert.equal(
+      normalized.canonicalPlan.planned_workouts.some(
+        (workout) =>
+          workout.workout_type !== "rest" &&
+          workout.segments.length < 3 &&
+          workoutDurationMin(workout) >= 35,
+      ),
+      false,
+      "AI first-plan blueprint expansion must not create one-block substantial workouts",
+    );
+  }
+
+  const identityAuthoringInput = buildAiFirstPlanAuthoringInput({
+    schedule: {
+      startDate: "2026-06-01",
+      targetDate: "2026-06-28",
+      preparationHorizonWeeks: 4,
+    },
+  });
+  const identityBlueprint = buildAiFirstPlanBlueprintIdentityFixture();
+  const identityNormalized = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: identityBlueprint,
+    authoringInput: identityAuthoringInput,
+  });
+
+  assert.equal(
+    identityNormalized.ok,
+    true,
+    identityNormalized.ok
+      ? "AI first-plan blueprint identity matrix should normalize"
+      : `AI first-plan blueprint identity matrix should normalize: ${JSON.stringify(
+          identityNormalized.issues,
+        )}`,
+  );
+
+  if (identityNormalized.ok) {
+    const plan = identityNormalized.canonicalPlan;
+    assertBlueprintIdentityExpansion(plan, "half_marathon_threshold_durability", [
+      /threshold/i,
+      /sustained|durability/i,
+    ]);
+    assertBlueprintIdentityExpansion(plan, "long_run_with_steady_finish", [/steady finish/i]);
+    assertBlueprintIdentityExpansion(plan, "time_intervals", [/repeat|3 min/i], true);
+    assertBlueprintIdentityExpansion(plan, "distance_intervals", [/400m|distance/i], true);
+    assertBlueprintIdentityExpansion(
+      plan,
+      "rolling_hills_session",
+      [/rolling|hill|terrain/i],
+      true,
+    );
+    assertBlueprintIdentityExpansion(plan, "uphill_repeats", [/uphill|climb|effort/i], true);
+    assertBlueprintIdentityExpansion(plan, "technical_trail_easy", [/technical|trail|footing/i]);
+    assertBlueprintIdentityExpansion(plan, "climbing_steady_run", [/climbing|hill|grade/i]);
+    assertBlueprintIdentityExpansion(plan, "ultra_time_on_feet_durability", [
+      /time-on-feet|durability/i,
+      /hike|fueling/i,
+    ]);
+    assertBlueprintIdentityExpansion(plan, "controlled_tempo_session", [/tempo|controlled/i]);
+    assertBlueprintIdentityExpansion(plan, "cutback_long_run", [/cutback|reduced/i]);
+    assertBlueprintIdentityExpansion(plan, "taper_long_run", [/taper|fresh/i]);
+    assertBlueprintIdentityExpansion(plan, "recovery_jog", [/recovery/i]);
+    assertBlueprintIdentityExpansion(plan, "cutback_aerobic_run", [/cutback|reduced/i]);
+    assertBlueprintIdentityExpansion(plan, "steady_aerobic_run", [/steady aerobic/i]);
+    assertBlueprintIdentityExpansion(plan, "easy_aerobic_run", [/easy aerobic|conversational/i]);
+    assert.deepEqual(
+      nonRestWorkouts(plan)
+        .filter((workout) => workoutDurationMin(workout) >= 35)
+        .filter((workout) => workout.segments.length < 3)
+        .map((workout) => workout.source_workout_type),
+      [],
+      "AI first-plan blueprint identity expansion should not create substantial one-block shells",
+    );
+    assertNoHrOnMainTargetsForIdentities(
+      plan,
+      [
+        "time_intervals",
+        "distance_intervals",
+        "rolling_hills_session",
+        "uphill_repeats",
+        "technical_trail_easy",
+        "climbing_steady_run",
+      ],
+      "AI first-plan blueprint identity expansion",
+    );
+  }
+
+  const missingIdentityAuthoringInput = buildAiFirstPlanAuthoringInput({
+    schedule: {
+      startDate: "2026-07-06",
+      targetDate: "2026-08-02",
+      preparationHorizonWeeks: 4,
+    },
+  });
+  const missingIdentityBlueprint = buildAiFirstPlanBlueprintMissingIdentityFixture();
+  const missingIdentityNormalized = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: missingIdentityBlueprint,
+    authoringInput: missingIdentityAuthoringInput,
+  });
+
+  assert.equal(
+    missingIdentityNormalized.ok,
+    true,
+    missingIdentityNormalized.ok
+      ? "AI first-plan blueprint full identity coverage should normalize"
+      : `AI first-plan blueprint full identity coverage should normalize: ${JSON.stringify(
+          missingIdentityNormalized.issues,
+        )}`,
+  );
+
+  if (missingIdentityNormalized.ok) {
+    const plan = missingIdentityNormalized.canonicalPlan;
+    assertBlueprintIdentityExpansion(plan, "5k_sharpening_repeats", [/5K|quick|repeat/i], true);
+    assertBlueprintIdentityExpansion(plan, "10k_rhythm_intervals", [/10K|rhythm|repeat/i], true);
+    assertBlueprintIdentityExpansion(plan, "race_pace_session", [/race|rhythm|controlled/i]);
+    assertBlueprintIdentityExpansion(plan, "taper_tuneup_run", [/taper|tune-up|fresh/i]);
+    assertBlueprintIdentityExpansion(plan, "marathon_steady_specificity", [
+      /marathon|steady|durability/i,
+    ]);
+    assertBlueprintIdentityExpansion(
+      plan,
+      "controlled_downhill_durability",
+      [/downhill|descent|control|cadence/i],
+      true,
+    );
+    assertBlueprintIdentityExpansion(plan, "hike_run_endurance", [/hike|run|climb|descend/i]);
+    assertBlueprintIdentityExpansion(plan, "mountain_long_run_time_on_feet", [
+      /mountain|time-on-feet|terrain/i,
+      /fueling|hydration|effort/i,
+    ]);
+    assert.deepEqual(
+      nonRestWorkouts(plan)
+        .filter((workout) => workoutDurationMin(workout) >= 35)
+        .filter((workout) => workout.segments.length < 3)
+        .map((workout) => workout.source_workout_type),
+      [],
+      "AI first-plan blueprint full identity coverage should not create substantial one-block shells",
+    );
+    assertNoHrOnMainTargetsForIdentities(
+      plan,
+      [
+        "5k_sharpening_repeats",
+        "10k_rhythm_intervals",
+        "controlled_downhill_durability",
+        "hike_run_endurance",
+        "mountain_long_run_time_on_feet",
+      ],
+      "AI first-plan blueprint full identity coverage",
+    );
+  }
+
+  const noPaceAuthoringInput = buildAiFirstPlanAuthoringInput({
+    currentLevel: { recentRaceResults: [], recent5kPaceSecondsPerKm: null },
+    execution: { watchAccess: "none", guidancePreference: "effort" },
+  });
+  const unsupportedPaceNormalized = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint,
+    authoringInput: noPaceAuthoringInput,
+  });
+
+  assert.equal(
+    unsupportedPaceNormalized.ok,
+    true,
+    "AI first-plan blueprint normalizer should repair unsupported pace intent instead of failing",
+  );
+
+  if (unsupportedPaceNormalized.ok) {
+    assert.equal(
+      hasTargetKey(unsupportedPaceNormalized.canonicalPlan, "pace_min_per_km_range"),
+      false,
+      "AI first-plan blueprint normalizer must strip unsupported pace targets",
+    );
+  }
+
+  const fixedRestViolationBlueprint = structuredClone(blueprint);
+  fixedRestViolationBlueprint.weeks[0]!.plannedWorkouts[0]!.date = "2026-06-03";
+  fixedRestViolationBlueprint.weeks[0]!.plannedWorkouts[0]!.weekday = "Wednesday";
+  const fixedRestViolation = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: fixedRestViolationBlueprint,
+    authoringInput,
+  });
+
+  assert.equal(fixedRestViolation.ok, false, "blueprint fixed rest-day violations are rejected");
+
+  const invalidTaxonomyBlueprint = structuredClone(blueprint) as unknown as Record<string, unknown>;
+  (
+    (
+      invalidTaxonomyBlueprint.weeks as Array<{ plannedWorkouts: Array<Record<string, unknown>> }>
+    )[0]!.plannedWorkouts[0] as Record<string, unknown>
+  ).workoutIdentity = "banana_repeats";
+  const invalidTaxonomyResult = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: invalidTaxonomyBlueprint,
+    authoringInput,
+  });
+
+  assert.equal(invalidTaxonomyResult.ok, false, "invalid blueprint taxonomy is rejected");
+
+  const fakeHrBlueprint = structuredClone(blueprint);
+  fakeHrBlueprint.weeks[0]!.plannedWorkouts[0]!.summary =
+    "Easy run with fake 150-160 bpm personal threshold HR.";
+  const fakeHrResult = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: fakeHrBlueprint,
+    authoringInput,
+  });
+
+  assert.equal(fakeHrResult.ok, false, "fake personalized HR claims in blueprint are rejected");
+}
+
+function assertBlueprintIdentityExpansion(
+  plan: TrainingPlanV2,
+  identity: CanonicalWorkoutIdentity,
+  expectedPatterns: RegExp[],
+  expectRepeatBlock = false,
+) {
+  const workout = plan.planned_workouts.find(
+    (candidate) => candidate.source_workout_type === identity,
+  );
+
+  assert.ok(workout, `AI first-plan blueprint should include ${identity}`);
+  assert.ok(
+    workout.segments.length >= 3,
+    `AI first-plan blueprint ${identity} should expand into executable segment structure`,
+  );
+
+  const segmentText = JSON.stringify(workout.segments);
+
+  for (const pattern of expectedPatterns) {
+    assert.match(
+      segmentText,
+      pattern,
+      `AI first-plan blueprint ${identity} should include identity-specific guidance matching ${pattern}`,
+    );
+  }
+
+  if (expectRepeatBlock) {
+    assert.ok(
+      (workout.segments as SegmentRecord[]).some(
+        (segment) =>
+          segment.segment_type === "interval_block" &&
+          (segment.prescription as Record<string, unknown> | undefined)?.mode === "repeats",
+      ),
+      `AI first-plan blueprint ${identity} should use repeat-aware interval structure`,
+    );
+  }
+}
+
+async function assertAiFirstPlanDraftServiceContract() {
+  const authoringInput = buildAiFirstPlanAuthoringInput();
+  const referenceFixture = readAiFirstPlanReferenceFixture();
+  const draft = buildAiFirstPlanDraftFixture();
+  const blueprint = buildAiFirstPlanBlueprintFixture();
+  const validResult = await generateAiFirstPlanDraftPreview({
+    input: authoringInput,
+    inputKind: "structured_authoring",
+    referenceExample: referenceFixture,
+    today: "2026-05-26",
+    apiKey: "test-openai-key",
+    model: "test-ai-first-plan-model",
+    timeoutMs: 1_000,
+    fetchImpl: (async () =>
+      openAiFixtureResponse("ai-first-plan-blueprint-valid", blueprint)) as typeof fetch,
+  });
+
+  assert.equal(validResult.ok, true, "AI first-plan service should return a bounded result");
+
+  if (validResult.ok) {
+    assert.equal(
+      validResult.metadata.status,
+      "ai_authored",
+      "valid AI first-plan service draft should preserve ai_authored status",
+    );
+    assert.equal(
+      validResult.metadata.responseId,
+      "ai-first-plan-blueprint-valid",
+      "AI first-plan service should expose bounded response id metadata",
+    );
+    assert.equal(
+      validResult.metadata.source,
+      "openai_ai_first_plan_blueprint",
+      "AI first-plan service should default to the compact blueprint contract",
+    );
+    assert.equal(
+      validResult.canonicalPlan.schema_version,
+      "training-plan-v2",
+      "AI first-plan service should return normalized training-plan-v2",
+    );
+  }
+
+  const strictDiagnosticResult = await generateAiFirstPlanDraftPreview({
+    input: authoringInput,
+    inputKind: "structured_authoring",
+    referenceExample: referenceFixture,
+    today: "2026-05-26",
+    apiKey: "test-openai-key",
+    model: "test-ai-first-plan-model",
+    contractMode: "strict_draft",
+    timeoutMs: 1_000,
+    fetchImpl: (async () => openAiFixtureResponse("ai-first-plan-valid", draft)) as typeof fetch,
+  });
+
+  assert.equal(
+    strictDiagnosticResult.ok,
+    true,
+    "strict diagnostic AI first-plan service path should remain available",
+  );
+
+  if (strictDiagnosticResult.ok) {
+    assert.equal(
+      strictDiagnosticResult.metadata.source,
+      "openai_ai_first_plan_draft",
+      "strict diagnostic path should preserve draft source metadata",
+    );
+  }
+
+  const invalidResult = await generateAiFirstPlanDraftPreview({
+    input: authoringInput,
+    inputKind: "structured_authoring",
+    apiKey: "test-openai-key",
+    model: "test-ai-first-plan-model",
+    timeoutMs: 1_000,
+    fetchImpl: (async () =>
+      openAiFixtureResponse("ai-first-plan-invalid", {
+        schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+        planName: "Invalid",
+        weeks: [],
+      })) as typeof fetch,
+  });
+
+  assert.equal(
+    invalidResult.ok,
+    true,
+    "invalid AI first-plan service draft should return deterministic fallback, not throw",
+  );
+
+  if (invalidResult.ok) {
+    assert.equal(
+      invalidResult.metadata.status,
+      "deterministic_fallback",
+      "invalid AI first-plan service draft should be source-visible fallback",
+    );
+    assert.equal(
+      invalidResult.metadata.fallbackReason,
+      "ai_first_plan_blueprint_schema_invalid",
+      "invalid AI first-plan service draft should expose validation fallback reason",
+    );
+    assert.ok(
+      invalidResult.metadata.validationIssueCount > 0,
+      "invalid AI first-plan service draft should expose bounded validation issue count",
+    );
+  }
+
+  const timeoutResult = await generateAiFirstPlanDraftPreview({
+    input: authoringInput,
+    inputKind: "structured_authoring",
+    apiKey: "test-openai-key",
+    model: "test-ai-first-plan-model",
+    timeoutMs: 5,
+    fetchImpl: (async () => new Promise<Response>(() => undefined)) as typeof fetch,
+  });
+
+  assert.equal(
+    timeoutResult.ok,
+    true,
+    "timed-out AI first-plan service should return deterministic fallback, not hang",
+  );
+
+  if (timeoutResult.ok) {
+    assert.equal(
+      timeoutResult.metadata.status,
+      "deterministic_fallback",
+      "timed-out AI first-plan service should use deterministic fallback",
+    );
+    assert.equal(
+      timeoutResult.metadata.fallbackReason,
+      "ai_first_plan_blueprint_timed_out",
+      "timed-out AI first-plan service should expose timeout fallback reason",
+    );
+  }
+}
+
+async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
+  const availability = {
+    runningDaysPerWeek: 2,
+    fixedRestDays: ["Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    preferredLongRunDay: "Tuesday",
+  } satisfies StructuredFirstPlanOnboardingRequestInput["availability"];
+  const initialInput = parseStructuredFirstPlanOnboardingInput(
+    buildRequest("half_marathon", {
+      availability,
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: "2026-06-14",
+      },
+    }),
+  );
+  const initialAuthoringInput = buildStructuredFirstPlanAuthoringInput(initialInput);
+  const targetDate = addDaysIso(initialAuthoringInput.schedule.startDate, 13);
+  const input = parseStructuredFirstPlanOnboardingInput(
+    buildRequest("half_marathon", {
+      availability,
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate,
+      },
+    }),
+  );
+  const authoringInput = buildStructuredFirstPlanAuthoringInput(input);
+  const blueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(authoringInput);
+  const aiResult = await generateStructuredFirstPlanDraftForUser("doctrine-fixture-user", input, {
+    aiPreview: {
+      apiKey: "test-openai-key",
+      model: "test-ai-first-plan-model",
+      timeoutMs: 1_000,
+      fetchImpl: (async () =>
+        openAiFixtureResponse("structured-first-plan-blueprint-valid", blueprint)) as typeof fetch,
+    },
+  });
+
+  assert.equal(aiResult.ok, true, "structured first-plan draft should return a bounded result");
+  assert.equal(aiResult.status, "draft_ready", "structured first-plan draft should be ready");
+
+  if (aiResult.ok && aiResult.status === "draft_ready") {
+    assert.equal(
+      aiResult.sourceKind,
+      "ai_first_plan_blueprint_v1",
+      "structured first-plan draft should expose AI blueprint source kind",
+    );
+    assert.equal(
+      aiResult.generation.sourceStatus,
+      "ai_authored",
+      "structured first-plan draft should expose AI-authored source status",
+    );
+    assert.equal(
+      aiResult.draft.canonicalPlan.source_kind,
+      "ai_first_plan_blueprint_v1",
+      "structured first-plan draft should review canonical AI blueprint plan truth",
+    );
+    assert.ok(
+      aiResult.draft.draftToken.includes(":"),
+      "structured first-plan draft should include a signed reviewed-plan token",
+    );
+    assertRichWorkoutContract(aiResult.draft.canonicalPlan, "structured first-plan AI draft");
+    assertFixedRestDays(aiResult.draft.canonicalPlan);
+  }
+
+  const invalidResult = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-fixture-user",
+    input,
+    {
+      aiPreview: {
+        apiKey: "test-openai-key",
+        model: "test-ai-first-plan-model",
+        timeoutMs: 1_000,
+        fetchImpl: (async () =>
+          openAiFixtureResponse("structured-first-plan-blueprint-invalid", {
+            schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+            planName: "Invalid",
+            weeks: [],
+          })) as typeof fetch,
+      },
+    },
+  );
+
+  assert.equal(
+    invalidResult.ok,
+    true,
+    "invalid blueprint structured first-plan draft should still return bounded fallback",
+  );
+  assert.equal(
+    invalidResult.status,
+    "draft_ready",
+    "invalid blueprint fallback should still produce a reviewable deterministic draft",
+  );
+
+  if (invalidResult.ok && invalidResult.status === "draft_ready") {
+    assert.equal(
+      invalidResult.generation.sourceStatus,
+      "deterministic_fallback",
+      "invalid blueprint structured draft should expose deterministic fallback status",
+    );
+    assert.equal(
+      invalidResult.generation.fallbackReason,
+      "ai_first_plan_blueprint_schema_invalid",
+      "invalid blueprint structured draft should expose bounded fallback reason",
+    );
+    assert.equal(
+      invalidResult.draft.canonicalPlan.source_kind,
+      "structured_authoring_v1",
+      "invalid blueprint structured draft should fall back to deterministic canonical plan truth",
+    );
+  }
+
+  const timeoutResult = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-fixture-user",
+    input,
+    {
+      aiPreview: {
+        apiKey: "test-openai-key",
+        model: "test-ai-first-plan-model",
+        timeoutMs: 5,
+        fetchImpl: (async () => new Promise<Response>(() => undefined)) as typeof fetch,
+      },
+    },
+  );
+
+  assert.equal(
+    timeoutResult.ok,
+    true,
+    "timed-out blueprint structured first-plan draft should still return bounded fallback",
+  );
+
+  if (timeoutResult.ok && timeoutResult.status === "draft_ready") {
+    assert.equal(
+      timeoutResult.generation.sourceStatus,
+      "deterministic_fallback",
+      "timed-out blueprint structured draft should expose deterministic fallback status",
+    );
+    assert.equal(
+      timeoutResult.generation.fallbackReason,
+      "ai_first_plan_blueprint_timed_out",
+      "timed-out blueprint structured draft should expose bounded timeout reason",
+    );
+    assert.ok(
+      timeoutResult.draft.draftToken.includes(":"),
+      "timed-out fallback structured draft should still include a reviewed-plan token",
+    );
+  }
+}
+
+function assertReviewedFirstPlanPersistenceExactness() {
+  const reviewedPlan = buildReviewedFirstPlanExactnessFixture();
+  const seed = buildReviewedFirstPlanImportedSeed(reviewedPlan);
+  const rows = buildPersistedWorkoutInsertRows("reviewed-plan", "reviewed-user", seed.workouts);
+
+  assert.equal(
+    seed.workouts.length,
+    reviewedPlan.planned_workouts.length,
+    "reviewed first-plan persistence seed should keep every reviewed calendar row",
+  );
+  assert.equal(
+    seed.endDate,
+    "2026-06-01",
+    "reviewed first-plan persistence seed should keep trailing reviewed calendar days",
+  );
+  assert.equal(
+    rows.length,
+    reviewedPlan.planned_workouts.length,
+    "reviewed first-plan persisted rows should match reviewed row count exactly",
+  );
+  assert.equal(
+    rows.at(-1)?.workout_date,
+    "2026-06-01",
+    "reviewed first-plan persisted rows should keep reviewed final date",
+  );
+
+  const reviewedRestRow = rows.find((row) => row.workout_date === "2026-05-31");
+  assert.ok(reviewedRestRow, "reviewed rest day should be persisted");
+  assert.equal(
+    reviewedRestRow?.title,
+    "Rest and recovery",
+    "reviewed rest day title should not be rewritten into synthetic fixed-rest copy",
+  );
+  assert.equal(
+    reviewedRestRow?.notes,
+    "No run today; protect recovery.",
+    "reviewed rest day notes should come from the reviewed canonical row",
+  );
+  assert.deepEqual(
+    reviewedRestRow?.steps,
+    [],
+    "reviewed rest day should keep the canonical empty persisted steps shape",
+  );
+  assert.notEqual(
+    reviewedRestRow?.notes,
+    "Fixed weekday rest day.",
+    "reviewed first-plan confirm must not insert synthetic fixed-rest notes",
+  );
+
+  const invalidReviewedPlan: TrainingPlanV2 = {
+    ...reviewedPlan,
+    planned_workouts: reviewedPlan.planned_workouts.map((workout) =>
+      workout.date === "2026-05-31"
+        ? {
+            ...workout,
+            workout_type: "easy",
+            source_workout_type: "easy_aerobic_run",
+            workout_family: "easy",
+            workout_identity: "easy_aerobic_run",
+            calendar_icon_key: "easy",
+            title: "Invalid fixed-rest run",
+            summary: "This tampered draft tries to place running on a fixed rest day.",
+            segments: [
+              {
+                segment_id: "invalid-main",
+                segment_type: "main",
+                label: "Easy run",
+                sequence: 1,
+                guidance: "This should be rejected before persistence.",
+                prescription: { mode: "time", duration_min: 30 },
+              },
+            ],
+          }
+        : workout,
+    ),
+  };
+
+  assert.throws(
+    () => buildReviewedFirstPlanImportedSeed(invalidReviewedPlan),
+    /Fixed rest-day constraints would be violated/,
+    "reviewed first-plan persistence should validate fixed rest days without rewriting",
+  );
+}
+
+function buildReviewedFirstPlanExactnessFixture(): TrainingPlanV2 {
+  const metricMode = {
+    guidance: "effort" as const,
+    pace_targets_allowed: false,
+    hr_targets_allowed: false,
+    hr_target_source: "effort_only" as const,
+    reason: "Fixture stays effort-only.",
+  };
+  const goalContext = {
+    goal_type: "half_marathon",
+    goal_style: "target_time",
+    terrain_focus: "standard" as const,
+    target_date: "2026-06-01",
+    target_time: "2:00:00",
+  };
+
+  return {
+    schema_version: "training-plan-v2",
+    plan_name: "Reviewed AI blueprint exactness fixture",
+    source_kind: "ai_first_plan_blueprint_v1",
+    generated_for: "Doctrine fixture",
+    goal: {
+      goal_type: "half_marathon",
+      goal_label: "Half marathon target-time plan",
+      target_event: { date: "2026-06-01" },
+    },
+    runner_profile: {
+      experience_level: "returning_runner",
+      baseline_sessions_per_week: 2,
+      baseline_long_run_duration_min: 45,
+      age: 34,
+      primary_goal: "Half marathon",
+    },
+    start_date: "2026-05-30",
+    preparation_horizon_weeks: 1,
+    target_date: "2026-06-01",
+    plan_preferences: {
+      preferred_run_days: ["Saturday"],
+      blocked_days: ["Sunday"],
+      max_running_days_per_week: 1,
+      preferred_long_run_day: "Saturday",
+    },
+    training_constraints: {
+      running_days_per_week: 1,
+      full_rest_days: ["Sunday"],
+      long_run_day: "Saturday",
+    },
+    planned_workouts: [
+      {
+        workout_id: "reviewed-easy-2026-05-30",
+        date: "2026-05-30",
+        weekday: "Saturday",
+        week_number: 1,
+        phase: "Base",
+        workout_type: "easy",
+        source_workout_type: "easy_aerobic_run",
+        workout_family: "easy",
+        workout_identity: "easy_aerobic_run",
+        calendar_icon_key: "easy",
+        goal_context: goalContext,
+        metric_mode: metricMode,
+        title: "Easy aerobic run",
+        summary: "A reviewed easy run with visible structure.",
+        planned_rpe: 4,
+        estimated_fatigue: "low",
+        recovery_priority: "medium",
+        segments: [
+          {
+            segment_id: "easy-warmup",
+            segment_type: "warmup",
+            label: "Ease in",
+            sequence: 1,
+            guidance: "Start relaxed and conversational.",
+            prescription: { mode: "time", duration_min: 8 },
+          },
+          {
+            segment_id: "easy-main",
+            segment_type: "main",
+            label: "Easy aerobic",
+            sequence: 2,
+            guidance: "Stay smooth and effort-led.",
+            prescription: { mode: "time", duration_min: 24 },
+          },
+          {
+            segment_id: "easy-finish",
+            segment_type: "cooldown",
+            label: "Easy finish",
+            sequence: 3,
+            guidance: "Finish lighter than you started.",
+            prescription: { mode: "time", duration_min: 8 },
+          },
+        ],
+      },
+      {
+        workout_id: "reviewed-rest-2026-05-31",
+        date: "2026-05-31",
+        weekday: "Sunday",
+        week_number: 1,
+        phase: "Base",
+        workout_type: "rest",
+        source_workout_type: "rest_and_recovery",
+        workout_family: "rest",
+        workout_identity: "rest_and_recovery",
+        calendar_icon_key: "rest",
+        goal_context: goalContext,
+        metric_mode: metricMode,
+        title: "Rest and recovery",
+        summary: "Reviewed rest day should persist exactly.",
+        estimated_fatigue: "low",
+        recovery_priority: "high",
+        segments: [
+          {
+            segment_id: "reviewed-rest",
+            segment_type: "rest",
+            label: "Rest and recovery",
+            sequence: 1,
+            guidance: "No run today; protect recovery.",
+            prescription: { mode: "none" },
+          },
+        ],
+      },
+      {
+        workout_id: "reviewed-trailing-rest-2026-06-01",
+        date: "2026-06-01",
+        weekday: "Monday",
+        week_number: 1,
+        phase: "Base",
+        workout_type: "rest",
+        source_workout_type: "rest_and_recovery",
+        workout_family: "rest",
+        workout_identity: "rest_and_recovery",
+        calendar_icon_key: "rest",
+        goal_context: goalContext,
+        metric_mode: metricMode,
+        title: "Trailing reviewed rest",
+        summary: "Reviewed trailing calendar day should not be dropped.",
+        estimated_fatigue: "low",
+        recovery_priority: "medium",
+        segments: [
+          {
+            segment_id: "reviewed-trailing-rest",
+            segment_type: "rest",
+            label: "Rest",
+            sequence: 1,
+            guidance: "Keep the reviewed trailing day in saved mode.",
+            prescription: { mode: "none" },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function buildMinimalAiFirstPlanBlueprintForAuthoringInput(
+  authoringInput: ReturnType<typeof buildStructuredFirstPlanAuthoringInput>,
+): AiFirstPlanBlueprint {
+  const startDate = authoringInput.schedule.startDate;
+  const runningDays = authoringInput.availability.preferredRunningDays.filter(
+    (weekday) => !authoringInput.availability.unavailableDays.includes(weekday),
+  );
+  const horizonWeeks = 2;
+
+  return {
+    schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+    planName: "AI blueprint first-plan review fixture",
+    generatedFor: "Doctrine fixture",
+    goalSummary: "Half marathon target-time plan",
+    startDate,
+    targetDate: authoringInput.schedule.targetDate ?? addDaysIso(startDate, 13),
+    preparationHorizonWeeks: horizonWeeks,
+    planPreferences: {
+      preferredRunningDays: authoringInput.availability.preferredRunningDays,
+      fixedRestDays: authoringInput.availability.unavailableDays,
+      preferredLongRunDay: authoringInput.availability.preferredLongRunDay,
+      maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+    },
+    reviewAssumptions: [
+      "Backend expands compact workout intent into canonical segments and metric truth.",
+    ],
+    metricPolicySummary:
+      "AI supplies metric intent only; backend applies pace gates and default estimated HR policy.",
+    weeks: Array.from({ length: horizonWeeks }, (_value, weekIndex) => ({
+      weekNumber: weekIndex + 1,
+      phase: weekIndex === 0 ? "Base" : "Build",
+      theme: weekIndex === 0 ? "Set rhythm" : "Progress durability",
+      microcycleIntent: "Keep the compact AI-authored week simple but reviewable.",
+      cutbackWeek: false,
+      taperWeek: false,
+      longRunIntent: "Keep the long run on the reviewed preferred long-run day.",
+      longRunProgression: "Progress long-run durability conservatively.",
+      plannedWorkouts: runningDays.map((weekday) => {
+        const isLongRun = weekday === authoringInput.availability.preferredLongRunDay;
+        const date = dateForWeekdayInSevenDayWindow(addDaysIso(startDate, weekIndex * 7), weekday);
+
+        return {
+          date,
+          weekday,
+          workoutFamily: isLongRun ? "long" : "easy",
+          workoutIdentity: isLongRun ? "long_aerobic_run" : "easy_aerobic_run",
+          calendarIconKey: isLongRun ? "long" : "easy",
+          title: isLongRun ? "Long aerobic run" : "Easy aerobic run",
+          summary: isLongRun
+            ? "Reviewable long-run durability from the AI-authored blueprint."
+            : "Reviewable easy support running from the AI-authored blueprint.",
+          plannedRpe: isLongRun ? 5 : 4,
+          estimatedFatigue: isLongRun ? "medium" : "low",
+          recoveryPriority: isLongRun ? "high" : "medium",
+          segmentIntent: isLongRun ? "long_durability" : "easy_aerobic",
+          metricIntent: "mixed_if_allowed",
+        };
+      }),
+    })),
+  };
+}
+
+function dateForWeekdayInSevenDayWindow(startDate: string, weekday: WeekdayName) {
+  for (let offset = 0; offset < 7; offset += 1) {
+    const date = addDaysIso(startDate, offset);
+
+    if (weekdayLong(date) === weekday) {
+      return date;
+    }
+  }
+
+  return startDate;
+}
+
 for (const goalDistance of [
   "5k",
   "10k",
@@ -2483,6 +4496,11 @@ assertRichPersistenceReadback();
 assertRichImportExportRoundtrip();
 assertRichSavedModeQaFixture();
 assertRichAiDraftNormalizer();
+assertAiFirstPlanDraftContract();
+assertAiFirstPlanBlueprintContract();
+await assertAiFirstPlanDraftServiceContract();
+await assertStructuredFirstPlanDraftBlueprintReviewContract();
+assertReviewedFirstPlanPersistenceExactness();
 await assertTextAuthoringRichDraftOptInContract();
 assertActivePlanRefreshRichDraftContract();
 assertActivePlanRefreshApplyDoesNotGenerate();

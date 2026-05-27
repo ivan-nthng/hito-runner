@@ -244,6 +244,16 @@ Completion gate:
   - whether Safari was used as fallback or because Safari-specific verification was explicitly required
 - A QA browser report that skips this preflight, uses Safari first without justification, or opens extra Safari windows without a stated test requirement is invalid and must be redone.
 
+## 6.6) QA Screenshot Artifact Policy
+
+- Routine QA screenshots must be saved under the gitignored local artifact root:
+  `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/`
+- Do not commit `qa-artifacts/` by default.
+- In markdown QA reports, reference routine screenshot folders textually instead of embedding local-only images.
+- Promote selected screenshots into `docs/process/screenshots/<task-slug>/` only when permanent release evidence is explicitly required.
+- If screenshots are promoted into `docs/process/screenshots/`, the QA report must explain why they are permanent evidence.
+- Existing committed screenshots under `docs/process/screenshots/` are preserved unless a separate Architect cleanup slice explicitly moves or archives them.
+
 ## 7) Handoff Footer (Conditional)
 
 Handoff footer is required only when continuity would otherwise be lost:

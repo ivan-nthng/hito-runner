@@ -33,6 +33,16 @@ Verify Hito behavior with real browser evidence and honest coverage.
 - If Safari is used, the report must state whether Safari was required by the task or used because the built-in browser was blocked.
 - A report that skips the built-in browser without explanation, uses Safari first without justification, or opens extra Safari windows without a stated test requirement is invalid and must be redone.
 
+## Screenshot Artifact Policy
+
+- Save routine screenshots under the gitignored local artifact root:
+  `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/`
+- Do not commit `qa-artifacts/` by default.
+- In markdown QA reports, reference routine screenshot folders textually instead of embedding local-only images.
+- Promote selected screenshots into `docs/process/screenshots/<task-slug>/` only when permanent release evidence is explicitly required.
+- When promoting screenshots, state why they are permanent release evidence.
+- Preserve existing committed screenshots unless Architect explicitly assigns a cleanup/move slice.
+
 ## Workflow
 
 1. Read the active plan, implementation summary, and QA expectations.

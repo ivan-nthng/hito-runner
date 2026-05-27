@@ -36,6 +36,16 @@ Verify that plan creation produces credible, diverse, safe running plans across 
 
 This matrix exists to catch regressions where a plan "creates successfully" but violates coaching quality, mutation safety, metric gating, fixed rest-day truth, segment structure, or visible workout identity/glyph semantics.
 
+## Screenshot Artifact Policy
+
+Routine screenshot evidence for this matrix should be saved under the local gitignored path:
+
+```text
+qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/
+```
+
+QA reports should reference that local folder textually. Promote selected screenshots into `docs/process/screenshots/<task-slug>/` only when the pass is explicitly release evidence, and state why the screenshots are permanent.
+
 ## In Scope
 
 - Structured first-plan creation on `/`.

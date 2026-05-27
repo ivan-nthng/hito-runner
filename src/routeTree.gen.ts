@@ -16,7 +16,6 @@ import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as HubRouteImport } from './routes/hub'
 import { Route as HitoDSRouteImport } from './routes/hitoDS'
 import { Route as ChangelogRouteImport } from './routes/changelog'
-import { Route as Body2RouteImport } from './routes/body 2'
 import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
@@ -64,11 +63,6 @@ const HitoDSRoute = HitoDSRouteImport.update({
 const ChangelogRoute = ChangelogRouteImport.update({
   id: '/changelog',
   path: '/changelog',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const Body2Route = Body2RouteImport.update({
-  id: '/body 2',
-  path: '/body 2',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BodyRoute = BodyRouteImport.update({
@@ -140,7 +134,6 @@ const ApiAdminAuthLoginRoute = ApiAdminAuthLoginRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/body': typeof BodyRoute
-  '/body 2': typeof Body2Route
   '/changelog': typeof ChangelogRoute
   '/hitoDS': typeof HitoDSRoute
   '/hub': typeof HubRoute
@@ -163,7 +156,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/body': typeof BodyRoute
-  '/body 2': typeof Body2Route
   '/changelog': typeof ChangelogRoute
   '/hitoDS': typeof HitoDSRoute
   '/hub': typeof HubRoute
@@ -187,7 +179,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/body': typeof BodyRoute
-  '/body 2': typeof Body2Route
   '/changelog': typeof ChangelogRoute
   '/hitoDS': typeof HitoDSRoute
   '/hub': typeof HubRoute
@@ -212,7 +203,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/body'
-    | '/body 2'
     | '/changelog'
     | '/hitoDS'
     | '/hub'
@@ -235,7 +225,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/body'
-    | '/body 2'
     | '/changelog'
     | '/hitoDS'
     | '/hub'
@@ -258,7 +247,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/body'
-    | '/body 2'
     | '/changelog'
     | '/hitoDS'
     | '/hub'
@@ -282,7 +270,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BodyRoute: typeof BodyRoute
-  Body2Route: typeof Body2Route
   ChangelogRoute: typeof ChangelogRoute
   HitoDSRoute: typeof HitoDSRoute
   HubRoute: typeof HubRoute
@@ -352,13 +339,6 @@ declare module '@tanstack/react-router' {
       path: '/changelog'
       fullPath: '/changelog'
       preLoaderRoute: typeof ChangelogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/body 2': {
-      id: '/body 2'
-      path: '/body 2'
-      fullPath: '/body 2'
-      preLoaderRoute: typeof Body2RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/body': {
@@ -458,7 +438,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BodyRoute: BodyRoute,
-  Body2Route: Body2Route,
   ChangelogRoute: ChangelogRoute,
   HitoDSRoute: HitoDSRoute,
   HubRoute: HubRoute,

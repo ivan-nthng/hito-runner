@@ -25,7 +25,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
 import { hitoToast } from "@/components/ui/hito-toast";
-import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconName } from "@/components/ui/icon";
+import {
+  HITO_ICON_META,
+  HITO_ICON_SIZES,
+  Icon,
+  type HitoIconName,
+  type HitoIconSize,
+} from "@/components/ui/icon";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -121,6 +127,7 @@ const BUTTON_TONES = ["default", "success", "error"] as const;
 const BUTTON_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
 const INPUT_VARIANTS = ["primary", "secondary"] as const;
 const FIELD_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
+const ICON_PREVIEW_SIZES = Object.keys(HITO_ICON_SIZES) as HitoIconSize[];
 const INPUT_STATES = ["default", "hover", "focus", "disabled", "readonly"] as const;
 const INPUT_FEEDBACK = ["neutral", "error", "success"] as const;
 const CHOICE_TOGGLE_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
@@ -163,39 +170,215 @@ const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
   { label: "Rest", glyph: "rest", family: "rest", color: "var(--rest)" },
 ] as const;
 
+const COLOR_TABS = ["semantic", "primitive"] as const;
+
+type ColorTab = (typeof COLOR_TABS)[number];
+
 const RAW_COLOR_PRIMITIVES = [
-  { name: "stone-950", value: "var(--stone-950)", use: "Sidebar and deepest chrome" },
-  { name: "stone-900", value: "var(--stone-900)", use: "Page canvas" },
-  { name: "stone-850", value: "var(--stone-850)", use: "Base surface" },
-  { name: "stone-800", value: "var(--stone-800)", use: "Elevated or muted surface" },
-  { name: "stone-700", value: "var(--stone-700)", use: "Accent wash foundation" },
-  { name: "sand-100", value: "var(--sand-100)", use: "Primary text" },
-  { name: "sand-500", value: "var(--sand-500)", use: "Muted text" },
-  { name: "amber-500", value: "var(--amber-500)", use: "Signal accent" },
-  { name: "blue-500", value: "var(--blue-500)", use: "Easy workout family" },
-  { name: "terracotta-500", value: "var(--terracotta-500)", use: "Quality workout family" },
-  { name: "green-500", value: "var(--green-500)", use: "Success tone" },
-  { name: "orange-500", value: "var(--orange-500)", use: "Warning tone" },
-  { name: "red-500", value: "var(--red-500)", use: "Error/destructive tone" },
+  {
+    title: "Stone",
+    meta: "Primitive / neutral dark",
+    colors: [
+      {
+        step: "950",
+        token: "--stone-950",
+        value: "var(--stone-950)",
+        hex: "#0B0907",
+        contrast: "light 17.6:1",
+      },
+      {
+        step: "900",
+        token: "--stone-900",
+        value: "var(--stone-900)",
+        hex: "#0F0D0B",
+        contrast: "light 17.2:1",
+      },
+      {
+        step: "850",
+        token: "--stone-850",
+        value: "var(--stone-850)",
+        hex: "#161312",
+        contrast: "light 16.4:1",
+      },
+      {
+        step: "825",
+        token: "--stone-825",
+        value: "var(--stone-825)",
+        hex: "#1A1816",
+        contrast: "light 15.7:1",
+      },
+      {
+        step: "800",
+        token: "--stone-800",
+        value: "var(--stone-800)",
+        hex: "#1D1A18",
+        contrast: "light 15.4:1",
+      },
+      {
+        step: "750",
+        token: "--stone-750",
+        value: "var(--stone-750)",
+        hex: "#211F1C",
+        contrast: "light 14.6:1",
+      },
+      {
+        step: "700",
+        token: "--stone-700",
+        value: "var(--stone-700)",
+        hex: "#272320",
+        contrast: "light 13.8:1",
+      },
+      {
+        step: "500",
+        token: "--stone-500",
+        value: "var(--stone-500)",
+        hex: "#75716B",
+        contrast: "light 4.3:1",
+      },
+    ],
+  },
+  {
+    title: "Sand",
+    meta: "Primitive / neutral light",
+    colors: [
+      {
+        step: "50",
+        token: "--sand-50",
+        value: "var(--sand-50)",
+        hex: "#FAF8F5",
+        contrast: "dark 18.3:1",
+      },
+      {
+        step: "100",
+        token: "--sand-100",
+        value: "var(--sand-100)",
+        hex: "#F3F1EE",
+        contrast: "dark 17.2:1",
+      },
+      {
+        step: "200",
+        token: "--sand-200",
+        value: "var(--sand-200)",
+        hex: "#E6E4E1",
+        contrast: "dark 15.3:1",
+      },
+      {
+        step: "500",
+        token: "--sand-500",
+        value: "var(--sand-500)",
+        hex: "#8A8580",
+        contrast: "dark 5.3:1",
+      },
+    ],
+  },
+  {
+    title: "Signal",
+    meta: "Primitive / brand and corporate accent",
+    colors: [
+      {
+        step: "500",
+        token: "--amber-500",
+        value: "var(--amber-500)",
+        hex: "#F4A34B",
+        contrast: "dark 9.4:1",
+      },
+      {
+        step: "600",
+        token: "--amber-600",
+        value: "var(--amber-600)",
+        hex: "#D58B4B",
+        contrast: "dark 7.0:1",
+      },
+    ],
+  },
+  {
+    title: "Workout and feedback bases",
+    meta: "Primitive / purposeful base tones",
+    colors: [
+      {
+        step: "blue-500",
+        token: "--blue-500",
+        value: "var(--blue-500)",
+        hex: "#6DB2B6",
+        contrast: "dark 8.0:1",
+      },
+      {
+        step: "terracotta-500",
+        token: "--terracotta-500",
+        value: "var(--terracotta-500)",
+        hex: "#F2716A",
+        contrast: "dark 6.8:1",
+      },
+      {
+        step: "green-500",
+        token: "--green-500",
+        value: "var(--green-500)",
+        hex: "#57BC80",
+        contrast: "dark 8.2:1",
+      },
+      {
+        step: "orange-500",
+        token: "--orange-500",
+        value: "var(--orange-500)",
+        hex: "#F88F4F",
+        contrast: "dark 8.3:1",
+      },
+      {
+        step: "red-500",
+        token: "--red-500",
+        value: "var(--red-500)",
+        hex: "#DE4E4B",
+        contrast: "dark 4.9:1",
+      },
+    ],
+  },
 ] as const;
 
 const SEMANTIC_COLOR_TOKENS = [
-  { name: "background", value: "var(--background)", mapsTo: "stone-900" },
-  { name: "foreground", value: "var(--foreground)", mapsTo: "sand-100" },
-  { name: "surface", value: "var(--surface)", mapsTo: "stone-850" },
-  { name: "surface-elevated", value: "var(--surface-elevated)", mapsTo: "stone-800" },
-  { name: "hairline", value: "var(--hairline)", mapsTo: "sand-alpha-06" },
-  { name: "muted", value: "var(--muted)", mapsTo: "stone-800" },
-  { name: "muted-foreground", value: "var(--muted-foreground)", mapsTo: "sand-500" },
-  { name: "accent", value: "var(--accent)", mapsTo: "stone-700" },
-  { name: "signal", value: "var(--signal)", mapsTo: "amber-500" },
-  { name: "success", value: "var(--success)", mapsTo: "green-500" },
-  { name: "warn", value: "var(--warn)", mapsTo: "orange-500" },
-  { name: "destructive", value: "var(--destructive)", mapsTo: "red-500" },
-  { name: "easy", value: "var(--easy)", mapsTo: "blue-500" },
-  { name: "long", value: "var(--long)", mapsTo: "signal" },
-  { name: "quality", value: "var(--quality)", mapsTo: "terracotta-500" },
-  { name: "rest", value: "var(--rest)", mapsTo: "stone-500" },
+  { name: "background", value: "var(--background)", mapsTo: "stone-900", group: "canvas" },
+  { name: "foreground", value: "var(--foreground)", mapsTo: "sand-100", group: "text" },
+  { name: "surface", value: "var(--surface)", mapsTo: "stone-850", group: "surface" },
+  {
+    name: "surface-elevated",
+    value: "var(--surface-elevated)",
+    mapsTo: "stone-800",
+    group: "surface",
+  },
+  { name: "card", value: "var(--card)", mapsTo: "surface", group: "surface" },
+  { name: "popover", value: "var(--popover)", mapsTo: "stone-825", group: "surface" },
+  { name: "border", value: "var(--border)", mapsTo: "sand-alpha-08", group: "border / alpha" },
+  { name: "hairline", value: "var(--hairline)", mapsTo: "sand-alpha-06", group: "border / alpha" },
+  { name: "input", value: "var(--input)", mapsTo: "sand-alpha-10", group: "interactive / alpha" },
+  { name: "ring", value: "var(--ring)", mapsTo: "amber-600", group: "interactive" },
+  { name: "muted", value: "var(--muted)", mapsTo: "stone-800", group: "surface" },
+  { name: "muted-foreground", value: "var(--muted-foreground)", mapsTo: "sand-500", group: "text" },
+  { name: "accent", value: "var(--accent)", mapsTo: "stone-700", group: "interactive" },
+  { name: "signal", value: "var(--signal)", mapsTo: "amber-500", group: "accent" },
+  { name: "success", value: "var(--success)", mapsTo: "green-500", group: "status" },
+  { name: "warn", value: "var(--warn)", mapsTo: "orange-500", group: "status" },
+  { name: "destructive", value: "var(--destructive)", mapsTo: "red-500", group: "status" },
+  { name: "easy", value: "var(--easy)", mapsTo: "blue-500", group: "workout" },
+  { name: "long", value: "var(--long)", mapsTo: "signal", group: "workout" },
+  { name: "quality", value: "var(--quality)", mapsTo: "terracotta-500", group: "workout" },
+  { name: "rest", value: "var(--rest)", mapsTo: "stone-500", group: "workout" },
+  {
+    name: "canvas atmosphere",
+    value: "hito-canvas-atmosphere",
+    mapsTo: "stone alpha gradients",
+    group: "gradient / overlay",
+  },
+  {
+    name: "auth photo overlay",
+    value: "hito-auth-photo-overlay",
+    mapsTo: "stone alpha gradients",
+    group: "gradient / overlay",
+  },
+  {
+    name: "editorial signal wash",
+    value: "hito-editorial-signal-wash",
+    mapsTo: "signal alpha wash",
+    group: "gradient / overlay",
+  },
 ] as const;
 
 const SPACING_PRIMITIVES = [
@@ -405,6 +588,8 @@ function HitoDesignSystemPage() {
   const [inputRightIcon, setInputRightIcon] = useState(false);
   const [inputState, setInputState] = useState<InputState>("default");
   const [inputFeedback, setInputFeedback] = useState<InputFeedback>("neutral");
+  const [colorTab, setColorTab] = useState<ColorTab>("semantic");
+  const [iconPreviewSize, setIconPreviewSize] = useState<HitoIconSize>("md");
   const [tabStyle, setTabStyle] = useState<TabStyle>("enclosed");
   const [tabIcon, setTabIcon] = useState(true);
   const [tabBadge, setTabBadge] = useState(true);
@@ -531,6 +716,38 @@ function HitoDesignSystemPage() {
         description: "The same toast resolved into a bounded error state.",
       });
     }, 900);
+  };
+
+  const copyColorValue = async (value: string, label: string) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      copyTextWithLegacySelection(value);
+      hitoToast.success({
+        id: "hito-ds-color-copy",
+        title: "Copied color token",
+        description: `${label}: ${value}`,
+        duration: 1800,
+      });
+    } catch {
+      try {
+        await navigator.clipboard.writeText(value);
+        hitoToast.success({
+          id: "hito-ds-color-copy",
+          title: "Copied color token",
+          description: `${label}: ${value}`,
+          duration: 1800,
+        });
+      } catch {
+        hitoToast.error({
+          id: "hito-ds-color-copy",
+          title: "Could not copy",
+          description: "Try selecting the token manually.",
+        });
+      }
+    }
   };
 
   return (
@@ -945,46 +1162,76 @@ function HitoDesignSystemPage() {
               />
 
               <div className="grid gap-8">
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                  <div className="grid gap-4">
+                <div className="grid gap-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                      <p className="hito-label">Raw color primitives</p>
-                      <p className="hito-body-small mt-2 max-w-2xl">
-                        Primitive names can describe appearance. Use them to map semantic tokens,
-                        not directly in product UI unless a DS primitive specimen needs them.
+                      <p className="hito-label">Color documentation</p>
+                      <p className="hito-body-small mt-2 max-w-3xl">
+                        Semantic tokens are the product API. Primitive swatches document the solid
+                        Hito palette underneath them; alpha overlays and gradients stay semantic
+                        because they describe usage context.
                       </p>
                     </div>
-                    <div className="hito-reference-list">
-                      {RAW_COLOR_PRIMITIVES.map((token) => (
-                        <ColorSwatchRow
-                          key={token.name}
-                          name={token.name}
-                          value={token.value}
-                          meta={token.use}
-                        />
+                    <div
+                      className="hito-tabs hito-tabs-enclosed"
+                      role="tablist"
+                      aria-label="Color token tabs"
+                    >
+                      {COLOR_TABS.map((tab) => (
+                        <button
+                          key={tab}
+                          type="button"
+                          role="tab"
+                          aria-selected={colorTab === tab}
+                          className="hito-tab"
+                          data-active={colorTab === tab ? "true" : undefined}
+                          onClick={() => setColorTab(tab)}
+                        >
+                          {tab === "semantic" ? "Semantic Colors" : "Primitive"}
+                        </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="grid gap-4">
-                    <div>
-                      <p className="hito-label">Semantic color tokens</p>
-                      <p className="hito-body-small mt-2 max-w-2xl">
-                        Product code should prefer semantic tokens. This keeps signal, feedback,
-                        surfaces, and workout color meaning stable across screens.
-                      </p>
+                  {colorTab === "semantic" ? (
+                    <div className="grid gap-4" role="tabpanel" aria-label="Semantic Colors">
+                      <div className="hito-reference-note">
+                        <p className="hito-label">Semantic Colors</p>
+                        <p className="hito-body-small mt-2 max-w-3xl">
+                          Click a card to copy the semantic code. Previews may resolve through
+                          primitive colors, alpha mixes, or documented gradient/overlay classes, but
+                          product code should use the semantic token or recipe.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {SEMANTIC_COLOR_TOKENS.map((token) => (
+                          <SemanticColorCard
+                            key={token.name}
+                            token={token}
+                            onCopy={copyColorValue}
+                          />
+                        ))}
+                      </div>
                     </div>
-                    <div className="hito-reference-list">
-                      {SEMANTIC_COLOR_TOKENS.map((token) => (
-                        <ColorSwatchRow
-                          key={token.name}
-                          name={token.name}
-                          value={token.value}
-                          meta={`maps to ${token.mapsTo}`}
+                  ) : (
+                    <div className="grid gap-5" role="tabpanel" aria-label="Primitive">
+                      <div className="hito-reference-note">
+                        <p className="hito-label">Primitive</p>
+                        <p className="hito-body-small mt-2 max-w-3xl">
+                          These are solid base colors already defined in Hito. Click a swatch to
+                          copy its hex value. Alpha tokens are intentionally excluded from this
+                          primitive tab and documented as semantic usage colors.
+                        </p>
+                      </div>
+                      {RAW_COLOR_PRIMITIVES.map((group) => (
+                        <PrimitiveColorGroup
+                          key={group.title}
+                          group={group}
+                          onCopy={copyColorValue}
                         />
                       ))}
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="hito-row-group">
@@ -1100,17 +1347,39 @@ function HitoDesignSystemPage() {
               />
 
               <div className="grid gap-5">
-                <div className="hito-reference-note">
-                  <p className="hito-label">Canonical sizing</p>
-                  <p className="hito-body-small mt-2 max-w-3xl">
-                    Icons use four sizes only: xs 14, sm 16, md 20, and lg 24. Small icons use a
-                    1.75 stroke by default; medium and large icons use 1.5.
-                  </p>
+                <div className="hito-reference-note flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="hito-label">Canonical sizing</p>
+                    <p className="hito-body-small mt-2 max-w-3xl">
+                      Icons use four sizes only: xs 14, sm 16, md 20, and lg 24. Small icons use a
+                      1.75 stroke by default; medium and large icons use 1.5. Preview the registry
+                      at one size at a time to inspect names and shapes without repeated rows.
+                    </p>
+                  </div>
+                  <div
+                    className="hito-choice-toggle-group items-center"
+                    role="radiogroup"
+                    aria-label="Icon preview size"
+                  >
+                    {ICON_PREVIEW_SIZES.map((previewSize) => (
+                      <button
+                        key={previewSize}
+                        type="button"
+                        role="radio"
+                        aria-checked={iconPreviewSize === previewSize}
+                        className="hito-choice-toggle hito-choice-toggle-sm uppercase"
+                        data-selected={iconPreviewSize === previewSize ? "true" : undefined}
+                        onClick={() => setIconPreviewSize(previewSize)}
+                      >
+                        {previewSize}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="hito-reference-list">
                   {HITO_ICON_META.map((icon) => (
-                    <IconSpecimen key={icon.name} icon={icon} />
+                    <IconSpecimen key={icon.name} icon={icon} size={iconPreviewSize} />
                   ))}
                 </div>
 
@@ -3296,23 +3565,150 @@ function LogoSpecimen({
   );
 }
 
-function ColorSwatchRow({ name, value, meta }: { name: string; value: string; meta: string }) {
+function PrimitiveColorGroup({
+  group,
+  onCopy,
+}: {
+  group: (typeof RAW_COLOR_PRIMITIVES)[number];
+  onCopy: (value: string, label: string) => void;
+}) {
   return (
-    <article className="hito-reference-row">
-      <div className="flex items-center gap-3">
+    <section className="grid gap-3" aria-labelledby={`${slugifyToken(group.title)}-colors`}>
+      <div>
+        <h3 id={`${slugifyToken(group.title)}-colors`} className="hito-panel-title">
+          {group.title}
+        </h3>
+        <p className="hito-caption mt-1">{group.meta}</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {group.colors.map((color) => (
+          <button
+            key={color.token}
+            type="button"
+            className="group grid min-h-36 content-between rounded-2xl border border-hairline p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-signal/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            style={
+              {
+                background: color.value,
+                color: color.contrast.startsWith("light") ? "var(--sand-100)" : "var(--stone-900)",
+              } satisfies CSSProperties
+            }
+            onClick={() => onCopy(color.hex, color.token)}
+            aria-label={`Copy ${color.token} hex ${color.hex}`}
+          >
+            <span className="flex items-start justify-between gap-3">
+              <span className="hito-technical-mono text-lg">{color.step}</span>
+              <span className="rounded-full bg-black/20 px-2 py-1 text-[0.625rem] font-medium uppercase tracking-[0.12em] backdrop-blur-sm">
+                {color.contrast}
+              </span>
+            </span>
+            <span className="flex items-center justify-between gap-3">
+              <span>
+                <span className="block hito-technical-mono">{color.hex}</span>
+                <span className="mt-1 block text-[0.7rem] opacity-80">{color.token}</span>
+              </span>
+              <Icon
+                name="copy"
+                size="xs"
+                className="opacity-0 transition group-hover:opacity-80 group-focus-visible:opacity-100"
+              />
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SemanticColorCard({
+  token,
+  onCopy,
+}: {
+  token: (typeof SEMANTIC_COLOR_TOKENS)[number];
+  onCopy: (value: string, label: string) => void;
+}) {
+  const copyValue = token.value.startsWith("var(") ? token.value : token.value;
+  const previewStyle = token.value.startsWith("var(")
+    ? ({ background: token.value } satisfies CSSProperties)
+    : getSemanticRecipePreviewStyle(token.value);
+
+  return (
+    <button
+      type="button"
+      className="group hito-surface-flat grid min-h-40 content-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-signal/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      onClick={() => onCopy(copyValue, token.name)}
+      aria-label={`Copy ${token.name} semantic token`}
+    >
+      <span className="flex items-start justify-between gap-3">
+        <span>
+          <span className="hito-label">{token.group}</span>
+          <span className="mt-2 block hito-list-row-title">{token.name}</span>
+          <span className="mt-1 block hito-caption">maps to {token.mapsTo}</span>
+        </span>
         <span
           aria-hidden="true"
-          className="h-8 w-8 shrink-0 rounded-xl border border-hairline"
-          style={{ background: value } satisfies CSSProperties}
+          className="h-10 w-10 shrink-0 rounded-xl border border-hairline"
+          style={previewStyle}
         />
-        <div className="min-w-0">
-          <p className="hito-list-row-title">{name}</p>
-          <p className="hito-caption mt-1">{meta}</p>
-        </div>
-      </div>
-      <code className="hito-technical-mono">{value}</code>
-    </article>
+      </span>
+      <span className="flex items-center justify-between gap-3">
+        <code className="hito-technical-mono min-w-0 truncate">{copyValue}</code>
+        <Icon
+          name="copy"
+          size="xs"
+          className="shrink-0 opacity-0 transition group-hover:opacity-80 group-focus-visible:opacity-100"
+        />
+      </span>
+    </button>
   );
+}
+
+function getSemanticRecipePreviewStyle(value: string): CSSProperties {
+  if (value === "hito-canvas-atmosphere") {
+    return {
+      background:
+        "radial-gradient(ellipse at top, oklch(0.22 0.01 60 / 0.4), transparent 60%), radial-gradient(ellipse at bottom, oklch(0.13 0.005 60 / 0.6), transparent 50%), var(--background)",
+    };
+  }
+
+  if (value === "hito-auth-photo-overlay") {
+    return {
+      background:
+        "linear-gradient(135deg, color-mix(in oklch, var(--stone-950) 92%, transparent), color-mix(in oklch, var(--stone-800) 34%, transparent))",
+    };
+  }
+
+  if (value === "hito-editorial-signal-wash") {
+    return {
+      background:
+        "linear-gradient(135deg, color-mix(in oklch, var(--signal) 22%, transparent), color-mix(in oklch, var(--surface) 82%, transparent))",
+    };
+  }
+
+  return { background: "var(--surface-elevated)" };
+}
+
+function slugifyToken(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function copyTextWithLegacySelection(value: string) {
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error("Copy command failed");
+  }
 }
 
 function TypographyFamilyRow({ item }: { item: (typeof TYPOGRAPHY_FAMILIES)[number] }) {
@@ -3367,7 +3763,13 @@ function TypographyRoleCard({ role }: { role: (typeof TYPOGRAPHY_ROLES)[number] 
   );
 }
 
-function IconSpecimen({ icon }: { icon: (typeof HITO_ICON_META)[number] }) {
+function IconSpecimen({
+  icon,
+  size,
+}: {
+  icon: (typeof HITO_ICON_META)[number];
+  size: HitoIconSize;
+}) {
   return (
     <article className="hito-reference-row">
       <div className="flex items-start justify-between gap-3">
@@ -3379,13 +3781,9 @@ function IconSpecimen({ icon }: { icon: (typeof HITO_ICON_META)[number] }) {
           {icon.label}
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-3">
-        {(Object.keys(HITO_ICON_SIZES) as (keyof typeof HITO_ICON_SIZES)[]).map((size) => (
-          <div key={size} className="grid place-items-center gap-2">
-            <Icon name={icon.name} size={size} />
-            <span className="hito-caption uppercase">{size}</span>
-          </div>
-        ))}
+      <div className="grid min-h-16 place-items-center gap-2 rounded-2xl border border-hairline bg-background/35 p-4">
+        <Icon name={icon.name} size={size} />
+        <span className="hito-caption uppercase">{size}</span>
       </div>
     </article>
   );

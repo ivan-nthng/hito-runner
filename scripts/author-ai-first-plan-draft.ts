@@ -43,6 +43,13 @@ const COACH_SAMPLE_IDENTITIES = [
 
 const DEFAULT_REFERENCE_FILE =
   "/Users/ivan/Downloads/ivan_half_marathon_training_plan_v2_full_2026-05-05.json";
+type BlueprintWorkout = AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number];
+type MockCadenceSpec = {
+  family: BlueprintWorkout["workoutFamily"];
+  identity: BlueprintWorkout["workoutIdentity"];
+  icon: BlueprintWorkout["calendarIconKey"];
+  title: string;
+};
 
 const options = parseArgs(process.argv.slice(2));
 
@@ -542,9 +549,15 @@ function buildMockAiBlueprintWorkoutTemplate(
 }
 
 function buildMockAiBlueprintWorkout(
-  _authoringInput: StructuredFirstPlanAuthoringInput,
+  authoringInput: StructuredFirstPlanAuthoringInput,
   workout: TrainingPlanV2["planned_workouts"][number],
-): AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number] {
+): BlueprintWorkout {
+  const cadenceWorkout = buildMockGoalFamilyCadenceWorkout(authoringInput, workout);
+
+  if (cadenceWorkout) {
+    return cadenceWorkout;
+  }
+
   const resolved = resolveCanonicalWorkoutModel({
     workoutType: workout.workout_type,
     sourceWorkoutType: workout.source_workout_type,
@@ -554,6 +567,21 @@ function buildMockAiBlueprintWorkout(
     title: workout.title,
     steps: workout.segments,
   });
+
+  if (shouldUseMockSupportWorkoutInsteadOfExtraHardDay(authoringInput, workout, resolved)) {
+    return {
+      ...buildMockAiBlueprintWorkoutTemplate(
+        workout.weekday as BlueprintWorkout["weekday"],
+        "easy",
+        "easy_aerobic_run",
+        "easy",
+        "Easy aerobic run",
+      ),
+      date: workout.date,
+      summary:
+        "Mock AI blueprint keeps non-cadence support days easy so backend hard-day density remains valid.",
+    };
+  }
 
   return {
     date: workout.date,
@@ -570,6 +598,135 @@ function buildMockAiBlueprintWorkout(
     segmentIntent: segmentIntentForFamily(resolved.workoutFamily),
     metricIntent: resolved.metricMode.paceTargetsAllowed ? "mixed_if_allowed" : "effort_only",
   };
+}
+
+function shouldUseMockSupportWorkoutInsteadOfExtraHardDay(
+  authoringInput: StructuredFirstPlanAuthoringInput,
+  workout: TrainingPlanV2["planned_workouts"][number],
+  resolved: ReturnType<typeof resolveCanonicalWorkoutModel>,
+) {
+  const cadenceWeekday = chooseMockCadenceWeekday(authoringInput);
+  const cadence = mockCadenceIdentityForGoal(authoringInput, workout.week_number);
+
+  if (!cadenceWeekday || !cadence || workout.weekday === cadenceWeekday) {
+    return false;
+  }
+
+  return ["tempo", "intervals", "race", "hills"].includes(resolved.workoutFamily);
+}
+
+function buildMockGoalFamilyCadenceWorkout(
+  authoringInput: StructuredFirstPlanAuthoringInput,
+  workout: TrainingPlanV2["planned_workouts"][number],
+): BlueprintWorkout | null {
+  if (
+    authoringInput.runnerProfile.experienceLevel === "new_runner" ||
+    authoringInput.availability.maxRunningDaysPerWeek <= 3
+  ) {
+    return null;
+  }
+
+  const cadenceWeekday = chooseMockCadenceWeekday(authoringInput);
+  const cadence = mockCadenceIdentityForGoal(authoringInput, workout.week_number);
+
+  if (!cadenceWeekday || !cadence || workout.weekday !== cadenceWeekday) {
+    return null;
+  }
+
+  return {
+    ...buildMockAiBlueprintWorkoutTemplate(
+      workout.weekday as BlueprintWorkout["weekday"],
+      cadence.family,
+      cadence.identity,
+      cadence.icon,
+      cadence.title,
+    ),
+    date: workout.date,
+    summary: `${cadence.title} keeps the mock AI blueprint aligned with the backend goal-family cadence policy.`,
+  };
+}
+
+function chooseMockCadenceWeekday(authoringInput: StructuredFirstPlanAuthoringInput) {
+  const runningDays = authoringInput.availability.preferredRunningDays.filter(
+    (weekday) => !authoringInput.availability.unavailableDays.includes(weekday),
+  );
+  const preferredLongRunDay = authoringInput.availability.preferredLongRunDay ?? null;
+  const candidateOrder = ["Tuesday", "Thursday", "Monday", "Friday", "Wednesday", "Saturday"];
+
+  return (
+    candidateOrder.find(
+      (weekday) => runningDays.includes(weekday) && weekday !== preferredLongRunDay,
+    ) ?? null
+  );
+}
+
+function mockCadenceIdentityForGoal(
+  authoringInput: StructuredFirstPlanAuthoringInput,
+  weekNumber: number,
+): MockCadenceSpec | null {
+  const finalTwoWeeks =
+    weekNumber >= Math.max(1, authoringInput.schedule.preparationHorizonWeeks - 1);
+
+  switch (authoringInput.goal.goalType) {
+    case "5k":
+      return finalTwoWeeks
+        ? cadenceSpec("race", "taper_tuneup_run", "race", "Taper tune-up run")
+        : cadenceSpec("intervals", "5k_sharpening_repeats", "intervals", "5K sharpening repeats");
+    case "10k":
+      return finalTwoWeeks
+        ? cadenceSpec("race", "taper_tuneup_run", "race", "Taper tune-up run")
+        : cadenceSpec("intervals", "10k_rhythm_intervals", "intervals", "10K rhythm intervals");
+    case "half_marathon":
+      if (
+        authoringInput.goal.goalStyle !== "target_time" &&
+        authoringInput.goal.goalStyle !== "ambitious" &&
+        !authoringInput.goal.targetTime
+      ) {
+        return null;
+      }
+
+      return finalTwoWeeks
+        ? cadenceSpec("race", "taper_tuneup_run", "race", "Taper tune-up run")
+        : cadenceSpec(
+            "tempo",
+            "half_marathon_threshold_durability",
+            "tempo",
+            "Half marathon threshold durability",
+          );
+    case "marathon":
+      return weekNumber % 2 === 1
+        ? cadenceSpec(
+            "steady",
+            "marathon_steady_specificity",
+            "steady",
+            "Marathon steady specificity",
+          )
+        : null;
+    case "ultra_marathon":
+      return weekNumber % 2 === 1
+        ? cadenceSpec(
+            "trail",
+            "ultra_time_on_feet_durability",
+            "trail",
+            "Ultra time-on-feet durability",
+          )
+        : null;
+    case "mountain_running":
+      return weekNumber % 2 === 1
+        ? cadenceSpec("hills", "rolling_hills_session", "hills", "Rolling hills session")
+        : null;
+    default:
+      return null;
+  }
+}
+
+function cadenceSpec(
+  family: BlueprintWorkout["workoutFamily"],
+  identity: BlueprintWorkout["workoutIdentity"],
+  icon: BlueprintWorkout["calendarIconKey"],
+  title: string,
+) {
+  return { family, identity, icon, title };
 }
 
 function buildMockAiFirstPlanDraft(

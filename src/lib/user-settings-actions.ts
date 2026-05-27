@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getRequestAuthContext } from "@/lib/backend/auth";
+import { buildHeartRateZonesSummary, type HeartRateZonesSummary } from "@/lib/heart-rate-zones";
 import {
   getPersistedUserIdForAuthContext,
   requirePersistedUserIdForCurrentRequest,
@@ -27,6 +28,7 @@ export interface UserSettingsSummary {
   weightKg: number | null;
   heightCm: number | null;
   trainingPreferences: RunnerTrainingPreferences | null;
+  heartRateZones: HeartRateZonesSummary;
 }
 
 type SettingsViewerSummary = {
@@ -99,6 +101,7 @@ export async function getUserSettingsForUserId(
     weightKg: profile.weight_kg,
     heightCm: profile.height_cm,
     trainingPreferences: parseStoredRunnerTrainingPreferences(profile.training_preferences),
+    heartRateZones: buildHeartRateZonesSummary(profile.age),
   };
 }
 
@@ -159,6 +162,7 @@ export async function updateUserSettingsForUserId(
     trainingPreferences: parseStoredRunnerTrainingPreferences(
       updatedProfile.data.training_preferences,
     ),
+    heartRateZones: buildHeartRateZonesSummary(updatedProfile.data.age),
   };
 }
 

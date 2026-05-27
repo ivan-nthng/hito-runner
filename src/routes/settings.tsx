@@ -243,8 +243,8 @@ function SettingsPage() {
         </div>
 
         {activeTab === "personal" ? (
-          <section className="grid gap-8 lg:grid-cols-[180px_1fr]" role="tabpanel">
-            <div className="hito-avatar-stack">
+          <section className="grid gap-8 lg:grid-cols-[7rem_minmax(0,1fr)]" role="tabpanel">
+            <div className="hito-avatar-stack self-start">
               <Avatar className="hito-avatar-tile hito-profile-avatar h-28 w-28">
                 {settings.avatarUrl ? (
                   <AvatarImage src={settings.avatarUrl} alt="Profile avatar" />
@@ -390,13 +390,7 @@ function SettingsPage() {
                 </div>
               </section>
 
-              <section className="border-t border-hairline pt-5">
-                <h2 className="hito-section-title">Heart rate zones</h2>
-                <p className="hito-support-copy mt-3">
-                  This is where your runner-level zones will live. Manual entry and FIT-based
-                  estimation are planned next.
-                </p>
-              </section>
+              <HeartRateZonesPanel summary={settings.heartRateZones} />
 
               <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
                 <button
@@ -532,6 +526,67 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
         className="hito-field hito-field-md"
       />
     </label>
+  );
+}
+
+function HeartRateZonesPanel({ summary }: { summary: UserSettingsSummary["heartRateZones"] }) {
+  const isDefaultEstimated = summary.source === "default_estimated";
+  const isPersonal = summary.source === "personal";
+
+  return (
+    <section className="border-t border-hairline pt-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="hito-section-title">
+              {isPersonal ? "Personal/manual zones" : summary.title}
+            </h2>
+            {isDefaultEstimated ? (
+              <span className="hito-status-pill" data-tone="signal">
+                Default
+              </span>
+            ) : null}
+            {isPersonal ? (
+              <span className="hito-status-pill" data-tone="success">
+                Personal
+              </span>
+            ) : null}
+          </div>
+          <p className="hito-support-copy mt-3 max-w-2xl">{summary.description}</p>
+          {summary.sourceNote ? <p className="hito-caption mt-2">{summary.sourceNote}</p> : null}
+        </div>
+        <button
+          type="button"
+          className="hito-button hito-button-secondary hito-button-sm"
+          disabled
+          aria-disabled="true"
+          title="Manual personal zones are not saved in settings yet."
+        >
+          <Icon name="edit" size="sm" />
+          Edit zones
+        </button>
+      </div>
+
+      {summary.zones.length > 0 ? (
+        <div className="hito-row-group mt-4">
+          {summary.zones.map((zone) => (
+            <div key={zone.label} className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">{zone.label}</p>
+                <p className="hito-list-row-copy">{zone.description}</p>
+              </div>
+              <span className="hito-metric-value whitespace-nowrap">{zone.rangeBpm}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="hito-surface-flat mt-4 p-4">
+          <p className="hito-body-small">
+            Hito will show broad default estimated ranges here once profile data supports them.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 

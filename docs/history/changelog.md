@@ -15,11 +15,14 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 
 ## 2026-05-27
 
+- Updated `/settings` Personal data so the avatar Edit/Upload action sits directly under the avatar tile and Heart rate zones now show backend-shaped default estimated starting ranges when profile age supports them, with copy that keeps the ranges clearly non-personalized.
 - Reworked the `/hitoDS` foundations color documentation into Semantic Colors and Primitive tabs: semantic cards now copy token/recipe code, primitive swatches copy existing Hito hex values, and alpha/gradient usage stays documented as semantic context instead of becoming a separate generated palette.
 - Simplified the `/hitoDS` icon registry preview so each icon renders once at the selected XS/SM/MD/LG documentation size instead of repeating every icon across all sizes.
 - Wired the AI-authored blueprint planner into structured first-plan review: `generateStructuredFirstPlanDraft` now attempts `ai-first-plan-blueprint-v1`, exposes bounded source/fallback/repair/debug metadata, signs the reviewed canonical plan, and `confirmStructuredFirstPlanDraft` persists that exact reviewed plan without calling OpenAI or regenerating.
 - Fixed structured first-plan confirm/save exactness: reviewed AI blueprint drafts now persist through a first-plan reviewed-draft seam that validates fixed rest days but does not run imported-plan weekday remapping, so reviewed rest rows, trailing calendar days, rich fields, steps, notes, goal context, metric mode, icons, and targets are preserved.
 - Proved live AI blueprint onboarding acceptance end-to-end: the blueprint prompt now supplies exact required workout slots, the response schema excludes rest identities and requires the validated weekly running-day count, safe post-cutback long-run rebounds pass validation, and a disposable linked-DB smoke accepted a live `repaired_ai_draft` then confirmed it with exact row persistence and zero OpenAI calls during save.
+- Tightened half-marathon target-time AI blueprint quality and reference-plan import richness: supported road target-time plans now enforce week-aware tempo/threshold/interval/race-rhythm cadence when runner support allows it, compact-only imported plans preserve stronger tempo/interval/race/tune-up identity from title and segment semantics, and linked/disposable smokes proved exact saved rows and rich fields while surfacing full-draft latency as the remaining rollout risk.
+- Generalized AI first-plan blueprint identity selection into a backend-owned goal-family matrix: beginner/consistency, 5K, 10K, half marathon, marathon, ultra, and mountain/trail plans now validate allowed, expected, long-run, cutback/taper, specialty, and excluded identities with week-aware cadence fixtures instead of accepting generic support-filler calendars.
 
 ## 2026-05-26
 

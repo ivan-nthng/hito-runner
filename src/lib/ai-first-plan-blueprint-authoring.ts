@@ -111,6 +111,373 @@ const boundedTextSchema = z.string().trim().min(1).max(360);
 const nullableBoundedTextSchema = z.string().trim().min(1).max(360).nullable();
 const hardWorkoutFamilies = new Set(["tempo", "intervals", "hills", "race"]);
 const mainLikeSegmentTypes = new Set(["main", "tempo_block", "interval_block", "strides"]);
+type AuthoredWorkoutIdentity = (typeof authoredWorkoutIdentityValues)[number];
+type AuthoredWorkoutFamily = (typeof authoredWorkoutFamilyValues)[number];
+type GoalFamilyPolicyKey =
+  | "beginner_consistency"
+  | "five_k"
+  | "ten_k"
+  | "half_marathon"
+  | "marathon"
+  | "ultra"
+  | "mountain_trail";
+
+type GoalFamilyCadenceKind = "none" | "quality" | "specialty";
+type GoalFamilyCadenceFrequency = "none" | "weekly" | "every_two_weeks";
+
+interface GoalFamilyIdentityPolicy {
+  key: GoalFamilyPolicyKey;
+  label: string;
+  allowedIdentities: Set<AuthoredWorkoutIdentity>;
+  expectedSupportIdentities: Set<AuthoredWorkoutIdentity>;
+  expectedQualityIdentities: Set<AuthoredWorkoutIdentity>;
+  longRunIdentities: Set<AuthoredWorkoutIdentity>;
+  cutbackTaperIdentities: Set<AuthoredWorkoutIdentity>;
+  specialtyIdentities: Set<AuthoredWorkoutIdentity>;
+  excludedIdentities: Set<AuthoredWorkoutIdentity>;
+  cadence: {
+    kind: GoalFamilyCadenceKind;
+    frequency: GoalFamilyCadenceFrequency;
+    useLongRunSlot?: boolean;
+  };
+}
+
+const supportIdentityValues = [
+  "easy_aerobic_run",
+  "recovery_jog",
+  "steady_aerobic_run",
+  "cutback_aerobic_run",
+  "easy_run_with_strides",
+] as const satisfies readonly AuthoredWorkoutIdentity[];
+const baseLongRunIdentityValues = [
+  "long_aerobic_run",
+  "long_run_with_steady_finish",
+  "cutback_long_run",
+  "taper_long_run",
+] as const satisfies readonly AuthoredWorkoutIdentity[];
+const cutbackTaperIdentityValues = [
+  "cutback_aerobic_run",
+  "cutback_long_run",
+  "taper_long_run",
+  "taper_tuneup_run",
+] as const satisfies readonly AuthoredWorkoutIdentity[];
+const roadPerformanceIdentityValues = [
+  "time_intervals",
+  "distance_intervals",
+  "5k_sharpening_repeats",
+  "10k_rhythm_intervals",
+  "controlled_tempo_session",
+  "half_marathon_threshold_durability",
+  "race_pace_session",
+  "taper_tuneup_run",
+] as const satisfies readonly AuthoredWorkoutIdentity[];
+
+const identitySet = (values: readonly AuthoredWorkoutIdentity[]) =>
+  new Set<AuthoredWorkoutIdentity>(values);
+const allSupportAndLongIdentities = [
+  ...supportIdentityValues,
+  ...baseLongRunIdentityValues,
+] as const satisfies readonly AuthoredWorkoutIdentity[];
+
+const goalFamilyIdentityPolicies: Record<GoalFamilyPolicyKey, GoalFamilyIdentityPolicy> = {
+  beginner_consistency: {
+    key: "beginner_consistency",
+    label: "Beginner / consistency",
+    allowedIdentities: identitySet([
+      ...supportIdentityValues,
+      "long_aerobic_run",
+      "cutback_long_run",
+      "taper_long_run",
+      "progression_run",
+    ]),
+    expectedSupportIdentities: identitySet(supportIdentityValues),
+    expectedQualityIdentities: identitySet(["progression_run"]),
+    longRunIdentities: identitySet(["long_aerobic_run"]),
+    cutbackTaperIdentities: identitySet([
+      "cutback_aerobic_run",
+      "cutback_long_run",
+      "taper_long_run",
+    ]),
+    specialtyIdentities: identitySet([]),
+    excludedIdentities: identitySet([
+      "controlled_tempo_session",
+      "time_intervals",
+      "distance_intervals",
+      "5k_sharpening_repeats",
+      "10k_rhythm_intervals",
+      "half_marathon_threshold_durability",
+      "marathon_steady_specificity",
+      "race_pace_session",
+      "taper_tuneup_run",
+      "quality_session",
+    ]),
+    cadence: { kind: "none", frequency: "none" },
+  },
+  five_k: {
+    key: "five_k",
+    label: "5K",
+    allowedIdentities: identitySet([
+      ...allSupportAndLongIdentities,
+      "progression_run",
+      "controlled_tempo_session",
+      "time_intervals",
+      "distance_intervals",
+      "5k_sharpening_repeats",
+      "race_pace_session",
+      "taper_tuneup_run",
+    ]),
+    expectedSupportIdentities: identitySet(supportIdentityValues),
+    expectedQualityIdentities: identitySet([
+      "5k_sharpening_repeats",
+      "time_intervals",
+      "distance_intervals",
+      "controlled_tempo_session",
+      "race_pace_session",
+      "taper_tuneup_run",
+    ]),
+    longRunIdentities: identitySet(["long_aerobic_run", "cutback_long_run", "taper_long_run"]),
+    cutbackTaperIdentities: identitySet(cutbackTaperIdentityValues),
+    specialtyIdentities: identitySet(["5k_sharpening_repeats"]),
+    excludedIdentities: identitySet([
+      "10k_rhythm_intervals",
+      "half_marathon_threshold_durability",
+      "marathon_steady_specificity",
+      "ultra_time_on_feet_durability",
+      "mountain_long_run_time_on_feet",
+      "hike_run_endurance",
+      "quality_session",
+    ]),
+    cadence: { kind: "quality", frequency: "weekly" },
+  },
+  ten_k: {
+    key: "ten_k",
+    label: "10K",
+    allowedIdentities: identitySet([
+      ...allSupportAndLongIdentities,
+      "progression_run",
+      "controlled_tempo_session",
+      "time_intervals",
+      "distance_intervals",
+      "10k_rhythm_intervals",
+      "race_pace_session",
+      "taper_tuneup_run",
+    ]),
+    expectedSupportIdentities: identitySet(supportIdentityValues),
+    expectedQualityIdentities: identitySet([
+      "10k_rhythm_intervals",
+      "time_intervals",
+      "distance_intervals",
+      "controlled_tempo_session",
+      "race_pace_session",
+      "taper_tuneup_run",
+    ]),
+    longRunIdentities: identitySet(["long_aerobic_run", "cutback_long_run", "taper_long_run"]),
+    cutbackTaperIdentities: identitySet(cutbackTaperIdentityValues),
+    specialtyIdentities: identitySet(["10k_rhythm_intervals"]),
+    excludedIdentities: identitySet([
+      "5k_sharpening_repeats",
+      "half_marathon_threshold_durability",
+      "marathon_steady_specificity",
+      "ultra_time_on_feet_durability",
+      "mountain_long_run_time_on_feet",
+      "hike_run_endurance",
+      "quality_session",
+    ]),
+    cadence: { kind: "quality", frequency: "weekly" },
+  },
+  half_marathon: {
+    key: "half_marathon",
+    label: "Half marathon",
+    allowedIdentities: identitySet([
+      ...allSupportAndLongIdentities,
+      "progression_run",
+      "controlled_tempo_session",
+      "half_marathon_threshold_durability",
+      "time_intervals",
+      "distance_intervals",
+      "race_pace_session",
+      "taper_tuneup_run",
+    ]),
+    expectedSupportIdentities: identitySet(supportIdentityValues),
+    expectedQualityIdentities: identitySet([
+      "half_marathon_threshold_durability",
+      "controlled_tempo_session",
+      "time_intervals",
+      "distance_intervals",
+      "race_pace_session",
+      "taper_tuneup_run",
+    ]),
+    longRunIdentities: identitySet([
+      "long_aerobic_run",
+      "long_run_with_steady_finish",
+      "cutback_long_run",
+      "taper_long_run",
+    ]),
+    cutbackTaperIdentities: identitySet(cutbackTaperIdentityValues),
+    specialtyIdentities: identitySet([
+      "half_marathon_threshold_durability",
+      "long_run_with_steady_finish",
+    ]),
+    excludedIdentities: identitySet([
+      "5k_sharpening_repeats",
+      "10k_rhythm_intervals",
+      "marathon_steady_specificity",
+      "ultra_time_on_feet_durability",
+      "mountain_long_run_time_on_feet",
+      "hike_run_endurance",
+      "quality_session",
+    ]),
+    cadence: { kind: "quality", frequency: "weekly" },
+  },
+  marathon: {
+    key: "marathon",
+    label: "Marathon",
+    allowedIdentities: identitySet([
+      ...allSupportAndLongIdentities,
+      "progression_run",
+      "controlled_tempo_session",
+      "marathon_steady_specificity",
+      "race_pace_session",
+      "taper_tuneup_run",
+    ]),
+    expectedSupportIdentities: identitySet(supportIdentityValues),
+    expectedQualityIdentities: identitySet([
+      "marathon_steady_specificity",
+      "controlled_tempo_session",
+      "race_pace_session",
+      "taper_tuneup_run",
+    ]),
+    longRunIdentities: identitySet([
+      "long_aerobic_run",
+      "long_run_with_steady_finish",
+      "cutback_long_run",
+      "taper_long_run",
+    ]),
+    cutbackTaperIdentities: identitySet(cutbackTaperIdentityValues),
+    specialtyIdentities: identitySet([
+      "marathon_steady_specificity",
+      "long_run_with_steady_finish",
+    ]),
+    excludedIdentities: identitySet([
+      "5k_sharpening_repeats",
+      "10k_rhythm_intervals",
+      "half_marathon_threshold_durability",
+      "ultra_time_on_feet_durability",
+      "mountain_long_run_time_on_feet",
+      "hike_run_endurance",
+      "quality_session",
+    ]),
+    cadence: { kind: "quality", frequency: "every_two_weeks" },
+  },
+  ultra: {
+    key: "ultra",
+    label: "Ultra",
+    allowedIdentities: identitySet([
+      ...supportIdentityValues,
+      "long_aerobic_run",
+      "cutback_long_run",
+      "taper_long_run",
+      "cutback_aerobic_run",
+      "steady_aerobic_run",
+      "ultra_time_on_feet_durability",
+      "hike_run_endurance",
+      "technical_trail_easy",
+      "rolling_hills_session",
+      "climbing_steady_run",
+    ]),
+    expectedSupportIdentities: identitySet(supportIdentityValues),
+    expectedQualityIdentities: identitySet([]),
+    longRunIdentities: identitySet([
+      "ultra_time_on_feet_durability",
+      "hike_run_endurance",
+      "long_aerobic_run",
+      "cutback_long_run",
+      "taper_long_run",
+    ]),
+    cutbackTaperIdentities: identitySet([
+      "cutback_aerobic_run",
+      "cutback_long_run",
+      "taper_long_run",
+    ]),
+    specialtyIdentities: identitySet([
+      "ultra_time_on_feet_durability",
+      "hike_run_endurance",
+      "technical_trail_easy",
+      "rolling_hills_session",
+      "climbing_steady_run",
+    ]),
+    excludedIdentities: identitySet([
+      "5k_sharpening_repeats",
+      "10k_rhythm_intervals",
+      "half_marathon_threshold_durability",
+      "marathon_steady_specificity",
+      "race_pace_session",
+      "quality_session",
+    ]),
+    cadence: { kind: "specialty", frequency: "every_two_weeks" },
+  },
+  mountain_trail: {
+    key: "mountain_trail",
+    label: "Mountain / trail",
+    allowedIdentities: identitySet([
+      ...supportIdentityValues,
+      "long_aerobic_run",
+      "cutback_long_run",
+      "taper_long_run",
+      "technical_trail_easy",
+      "rolling_hills_session",
+      "uphill_repeats",
+      "controlled_downhill_durability",
+      "hike_run_endurance",
+      "mountain_long_run_time_on_feet",
+      "ultra_time_on_feet_durability",
+      "climbing_steady_run",
+    ]),
+    expectedSupportIdentities: identitySet(supportIdentityValues),
+    expectedQualityIdentities: identitySet(["rolling_hills_session", "uphill_repeats"]),
+    longRunIdentities: identitySet([
+      "mountain_long_run_time_on_feet",
+      "hike_run_endurance",
+      "ultra_time_on_feet_durability",
+      "long_aerobic_run",
+      "cutback_long_run",
+      "taper_long_run",
+    ]),
+    cutbackTaperIdentities: identitySet([
+      "cutback_aerobic_run",
+      "cutback_long_run",
+      "taper_long_run",
+    ]),
+    specialtyIdentities: identitySet([
+      "technical_trail_easy",
+      "rolling_hills_session",
+      "uphill_repeats",
+      "controlled_downhill_durability",
+      "hike_run_endurance",
+      "mountain_long_run_time_on_feet",
+      "ultra_time_on_feet_durability",
+      "climbing_steady_run",
+    ]),
+    excludedIdentities: identitySet([
+      "5k_sharpening_repeats",
+      "10k_rhythm_intervals",
+      "half_marathon_threshold_durability",
+      "marathon_steady_specificity",
+      "race_pace_session",
+      "taper_tuneup_run",
+      "quality_session",
+    ]),
+    cadence: { kind: "specialty", frequency: "every_two_weeks" },
+  },
+};
+
+type RequiredCadenceSlot = {
+  date: string;
+  weekday: string;
+  kind: GoalFamilyCadenceKind;
+  identityOptions: AuthoredWorkoutIdentity[];
+  purpose: string;
+};
 
 type StructuredAuthoringInput = z.output<typeof structuredPlanAuthoringInputSchema>;
 type AiBlueprintWeek = AiFirstPlanBlueprint["weeks"][number];
@@ -415,6 +782,8 @@ function buildNormalizationContext(authoringInput: StructuredAuthoringInput) {
     (authoringInput.runnerProfile.experienceLevel === "new_runner" ||
       authoringInput.availability.maxRunningDaysPerWeek <= 3 ||
       (!authoringInput.currentLevel.recent5kPaceSecondsPerKm && !authoringInput.goal.targetTime));
+  const goalFamilyPolicy = resolveGoalFamilyIdentityPolicy(authoringInput);
+  const goalFamilyCadencePlan = isGoalFamilyCadencePlan(authoringInput, goalFamilyPolicy);
 
   return {
     authoringInput,
@@ -425,6 +794,9 @@ function buildNormalizationContext(authoringInput: StructuredAuthoringInput) {
     estimatedMaxHr,
     defaultHrAllowed: Boolean(estimatedMaxHr),
     lowSupportBuildConsistency,
+    goalFamilyPolicy,
+    goalFamilyCadencePlan,
+    requiredCadenceSlots: buildRequiredCadenceSlots(authoringInput, goalFamilyPolicy),
   };
 }
 
@@ -499,6 +871,7 @@ function validateBlueprintShell(
     }
 
     validateHardDayDensity(week, context, issues);
+    validateGoalFamilyCadenceWeek(week, context, issues);
 
     for (const workout of week.plannedWorkouts) {
       const date = resolveBlueprintWorkoutDate(workout, week, context);
@@ -558,6 +931,8 @@ function validateBlueprintShell(
         });
       }
 
+      validateGoalFamilyWorkoutIdentity(workout, date, context, issues);
+
       if (
         context.lowSupportBuildConsistency &&
         [
@@ -588,6 +963,8 @@ function validateBlueprintShell(
       }
     }
   }
+
+  validateGoalFamilyCadence(blueprint, context, issues);
 }
 
 function validateHardDayDensity(
@@ -620,6 +997,100 @@ function validateHardDayDensity(
       });
       break;
     }
+  }
+}
+
+function validateGoalFamilyCadenceWeek(
+  week: AiBlueprintWeek,
+  context: ReturnType<typeof buildNormalizationContext>,
+  issues: NormalizationIssue[],
+) {
+  if (!context.goalFamilyCadencePlan) {
+    return;
+  }
+
+  const requiredCadenceSlot = context.requiredCadenceSlots.get(week.weekNumber);
+
+  if (!requiredCadenceSlot) {
+    return;
+  }
+
+  const cadenceWorkout = week.plannedWorkouts.find((workout) => {
+    const date = resolveBlueprintWorkoutDate(workout, week, context);
+
+    return date === requiredCadenceSlot.date;
+  });
+
+  if (
+    !cadenceWorkout ||
+    !requiredCadenceSlot.identityOptions.includes(cadenceWorkout.workoutIdentity)
+  ) {
+    issues.push({
+      code: "missing_required_goal_family_cadence",
+      path: `weeks.${week.weekNumber}.plannedWorkouts`,
+      message: `Week ${week.weekNumber} must use the required ${requiredCadenceSlot.weekday} slot for ${context.goalFamilyPolicy.label} ${requiredCadenceSlot.kind} work.`,
+    });
+  }
+}
+
+function validateGoalFamilyCadence(
+  blueprint: AiFirstPlanBlueprint,
+  context: ReturnType<typeof buildNormalizationContext>,
+  issues: NormalizationIssue[],
+) {
+  if (!context.goalFamilyCadencePlan) {
+    return;
+  }
+
+  const cadenceWeeks = new Set(
+    blueprint.weeks
+      .filter((week) =>
+        week.plannedWorkouts.some((workout) => isBlueprintCadenceIntent(workout, context)),
+      )
+      .map((week) => week.weekNumber),
+  );
+  const step = context.goalFamilyPolicy.cadence.frequency === "weekly" ? 1 : 2;
+  const cadenceLabel =
+    context.goalFamilyPolicy.cadence.kind === "quality"
+      ? "quality, rhythm, or tune-up"
+      : "goal-family specialty";
+
+  for (let weekNumber = 1; weekNumber <= context.expectedHorizonWeeks; weekNumber += step) {
+    const nextWeekNumber = step === 1 ? weekNumber : weekNumber + 1;
+
+    if (!cadenceWeeks.has(weekNumber) && !cadenceWeeks.has(nextWeekNumber)) {
+      issues.push({
+        code: "goal_family_identity_cadence_gap",
+        path: `weeks.${weekNumber}`,
+        message: `${context.goalFamilyPolicy.label} plans need ${cadenceLabel} identities on the required week-aware cadence.`,
+      });
+    }
+  }
+}
+
+function validateGoalFamilyWorkoutIdentity(
+  workout: AiBlueprintWorkout,
+  date: string,
+  context: ReturnType<typeof buildNormalizationContext>,
+  issues: NormalizationIssue[],
+) {
+  const policy = context.goalFamilyPolicy;
+
+  if (policy.excludedIdentities.has(workout.workoutIdentity)) {
+    issues.push({
+      code: "goal_family_identity_excluded",
+      path: `${date}.workoutIdentity`,
+      message: `${workout.workoutIdentity} is not appropriate for ${policy.label} blueprint plans.`,
+    });
+    return;
+  }
+
+  if (!policy.allowedIdentities.has(workout.workoutIdentity)) {
+    issues.push({
+      code: "goal_family_identity_not_allowed",
+      path: `${date}.workoutIdentity`,
+      message: `${workout.workoutIdentity} is outside the backend ${policy.label} identity matrix.`,
+    });
   }
 }
 
@@ -1768,6 +2239,26 @@ function isBlueprintLongRunIntent(workout: AiBlueprintWorkout) {
   );
 }
 
+function isBlueprintCadenceIntent(
+  workout: AiBlueprintWorkout,
+  context: ReturnType<typeof buildNormalizationContext>,
+) {
+  const policy = context.goalFamilyPolicy;
+
+  return (
+    policy.expectedQualityIdentities.has(workout.workoutIdentity) ||
+    policy.specialtyIdentities.has(workout.workoutIdentity) ||
+    (policy.cadence.useLongRunSlot && policy.longRunIdentities.has(workout.workoutIdentity)) ||
+    (policy.cadence.kind === "quality" && isQualityFamily(workout.workoutFamily))
+  );
+}
+
+function isQualityFamily(family: AuthoredWorkoutFamily) {
+  return (
+    family === "tempo" || family === "intervals" || family === "progression" || family === "race"
+  );
+}
+
 type DefaultEstimatedHrBand = "recovery" | "easy" | "longAerobic" | "steady" | "tempo";
 
 const defaultEstimatedHrBands: Record<DefaultEstimatedHrBand, [number, number]> = {
@@ -2137,6 +2628,8 @@ function buildAiFirstPlanBlueprintSystemPrompt() {
     "Respect fixed rest days as hard constraints and use the requested running days/week.",
     "Use the preferred long-run day whenever feasible and include exactly one long-run intent per week.",
     "Taper and final weeks still need a reduced long-run intent, usually taper_long_run, cutback_long_run, long_aerobic_run, hike_run_endurance, mountain_long_run_time_on_feet, or ultra_time_on_feet_durability depending on the goal.",
+    "Follow the backend goal-family identity policy. Beginner/low-support plans stay mostly easy, recovery, steady, and long; supported performance, marathon, ultra, and mountain/trail plans use the required cadence slots for their specific workout identities.",
+    "Do not fill required cadence slots with generic easy, steady, recovery, or long support work unless the slot explicitly asks for a long-run specialty identity.",
     "Keep segmentIntent compact: describe the session shape, not a full segment tree.",
     "Keep metricIntent compact. Do not output numeric HR, pace ranges, personalized zones, or metric targets.",
     "Do not output user ids, plan ids, logs, completion state, provider sync placeholders, AI verdicts, or feedback placeholders.",
@@ -2173,10 +2666,14 @@ function buildAiFirstPlanBlueprintUserPrompt({
     "Metric policy:",
     JSON.stringify(buildPromptMetricPolicy(authoringInput)),
     "",
+    "Goal-family identity policy:",
+    JSON.stringify(buildPromptGoalFamilyIdentityPolicy(authoringInput)),
+    "",
     "Required authored workout slots:",
     JSON.stringify(buildPromptRequiredWorkoutSlots(authoringInput)),
     "Use every required slot exactly once in the matching week. Do not add extra dates, omit slots, move slots, or place authored workouts on fixed rest days.",
     "Each week has one required long-run slot. That slot must use workoutFamily long, hike_run_endurance, mountain_long_run_time_on_feet, or ultra_time_on_feet_durability.",
+    "If a slot includes requiredIdentityOptions, choose one of those identities for that exact slot. If mustBeQuality=true, use workoutFamily tempo, intervals, progression, or race unless the option itself is a backend long-run specialty.",
     "",
     "Reference-style example guidance:",
     JSON.stringify(buildReferenceStyleSummary(referenceExample)),
@@ -2190,6 +2687,8 @@ function buildPromptRequiredWorkoutSlots(authoringInput: StructuredAuthoringInpu
     authoringInput.availability.preferredRunningDays.filter((day) => !fixedRestDays.has(day)),
   );
   const preferredLongRunDay = authoringInput.availability.preferredLongRunDay ?? null;
+  const policy = resolveGoalFamilyIdentityPolicy(authoringInput);
+  const cadenceSlots = buildRequiredCadenceSlots(authoringInput, policy);
 
   return Array.from({ length: horizonWeeks }, (_value, weekIndex) => {
     const weekNumber = weekIndex + 1;
@@ -2206,9 +2705,29 @@ function buildPromptRequiredWorkoutSlots(authoringInput: StructuredAuthoringInpu
         date,
         weekday,
         mustBeLongRun: preferredLongRunDay ? weekday === preferredLongRunDay : false,
+        mustBeQuality:
+          cadenceSlots.get(weekNumber)?.date === date &&
+          cadenceSlots.get(weekNumber)?.kind === "quality",
+        ...(cadenceSlots.get(weekNumber)?.date === date
+          ? {
+              cadenceKind: cadenceSlots.get(weekNumber)!.kind,
+              requiredIdentityOptions: cadenceSlots.get(weekNumber)!.identityOptions,
+              cadencePurpose: cadenceSlots.get(weekNumber)!.purpose,
+            }
+          : {}),
       };
-    }).filter((slot): slot is { date: string; weekday: string; mustBeLongRun: boolean } =>
-      Boolean(slot),
+    }).filter(
+      (
+        slot,
+      ): slot is {
+        date: string;
+        weekday: string;
+        mustBeLongRun: boolean;
+        mustBeQuality: boolean;
+        cadenceKind?: GoalFamilyCadenceKind;
+        requiredIdentityOptions?: AuthoredWorkoutIdentity[];
+        cadencePurpose?: string;
+      } => Boolean(slot),
     );
 
     return {
@@ -2216,6 +2735,214 @@ function buildPromptRequiredWorkoutSlots(authoringInput: StructuredAuthoringInpu
       slots,
     };
   });
+}
+
+function buildPromptGoalFamilyIdentityPolicy(authoringInput: StructuredAuthoringInput) {
+  const policy = resolveGoalFamilyIdentityPolicy(authoringInput);
+  const cadencePlan = isGoalFamilyCadencePlan(authoringInput, policy);
+
+  return {
+    family: policy.label,
+    allowedIdentities: [...policy.allowedIdentities],
+    expectedSupportIdentities: [...policy.expectedSupportIdentities],
+    expectedQualityIdentities: [...policy.expectedQualityIdentities],
+    longRunIdentities: [...policy.longRunIdentities],
+    cutbackTaperIdentities: [...policy.cutbackTaperIdentities],
+    specialtyIdentities: [...policy.specialtyIdentities],
+    excludedIdentities: [...policy.excludedIdentities],
+    cadence: cadencePlan
+      ? policy.cadence
+      : {
+          kind: "none",
+          frequency: "none",
+          reason: "Runner support level does not require forced quality or specialty cadence.",
+        },
+  };
+}
+
+function buildRequiredCadenceSlots(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+) {
+  const slots = new Map<number, RequiredCadenceSlot>();
+
+  if (!isGoalFamilyCadencePlan(authoringInput, policy)) {
+    return slots;
+  }
+
+  const horizonWeeks = resolveAuthoringHorizonWeeks(authoringInput);
+  const fixedRestDays = new Set(authoringInput.availability.unavailableDays);
+  const runningDays = authoringInput.availability.preferredRunningDays.filter(
+    (day) => !fixedRestDays.has(day),
+  );
+  const preferredLongRunDay = authoringInput.availability.preferredLongRunDay ?? null;
+  const cadenceWeekday = chooseGoalFamilyCadenceWeekday(policy, runningDays, preferredLongRunDay);
+
+  if (!cadenceWeekday) {
+    return slots;
+  }
+
+  for (let weekIndex = 0; weekIndex < horizonWeeks; weekIndex += 1) {
+    const weekNumber = weekIndex + 1;
+    const shouldRequireSlot =
+      policy.cadence.frequency === "weekly" ||
+      (policy.cadence.frequency === "every_two_weeks" && weekNumber % 2 === 1);
+
+    if (!shouldRequireSlot) {
+      continue;
+    }
+
+    const weekStart = addDaysIso(authoringInput.schedule.startDate, weekIndex * 7);
+    const cadenceDate = Array.from({ length: 7 }, (_day, dayIndex) =>
+      addDaysIso(weekStart, dayIndex),
+    ).find((date) => weekdayLong(date) === cadenceWeekday);
+
+    if (cadenceDate) {
+      slots.set(weekNumber, {
+        date: cadenceDate,
+        weekday: cadenceWeekday,
+        kind: policy.cadence.kind,
+        identityOptions: cadenceIdentityOptionsForGoal(authoringInput, policy, weekNumber),
+        purpose: cadencePurposeForGoal(authoringInput, policy, weekNumber),
+      });
+    }
+  }
+
+  return slots;
+}
+
+function resolveGoalFamilyIdentityPolicy(
+  authoringInput: StructuredAuthoringInput,
+): GoalFamilyIdentityPolicy {
+  switch (authoringInput.goal.goalType) {
+    case "5k":
+      return goalFamilyIdentityPolicies.five_k;
+    case "10k":
+      return goalFamilyIdentityPolicies.ten_k;
+    case "half_marathon":
+      return goalFamilyIdentityPolicies.half_marathon;
+    case "marathon":
+      return goalFamilyIdentityPolicies.marathon;
+    case "ultra_marathon":
+      return goalFamilyIdentityPolicies.ultra;
+    case "mountain_running":
+      return goalFamilyIdentityPolicies.mountain_trail;
+    case "build_consistency":
+    default:
+      return goalFamilyIdentityPolicies.beginner_consistency;
+  }
+}
+
+function isGoalFamilyCadencePlan(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+) {
+  if (policy.cadence.frequency === "none") {
+    return false;
+  }
+
+  if (
+    authoringInput.runnerProfile.experienceLevel === "new_runner" ||
+    authoringInput.availability.maxRunningDaysPerWeek <= 3
+  ) {
+    return false;
+  }
+
+  if (policy.key === "half_marathon") {
+    const hasPerformanceIntent =
+      Boolean(authoringInput.goal.targetTime) ||
+      authoringInput.goal.goalStyle === "target_time" ||
+      authoringInput.goal.goalStyle === "ambitious";
+
+    return hasPerformanceIntent;
+  }
+
+  return policy.key !== "beginner_consistency";
+}
+
+function chooseGoalFamilyCadenceWeekday(
+  policy: GoalFamilyIdentityPolicy,
+  runningDays: string[],
+  preferredLongRunDay: string | null,
+) {
+  if (
+    policy.cadence.useLongRunSlot &&
+    preferredLongRunDay &&
+    runningDays.includes(preferredLongRunDay)
+  ) {
+    return preferredLongRunDay;
+  }
+
+  const candidateOrder = ["Tuesday", "Thursday", "Monday", "Friday", "Wednesday", "Saturday"];
+
+  return (
+    candidateOrder.find(
+      (weekday) => runningDays.includes(weekday) && weekday !== preferredLongRunDay,
+    ) ?? null
+  );
+}
+
+function cadenceIdentityOptionsForGoal(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+  weekNumber: number,
+) {
+  const isFinalTwoWeeks =
+    weekNumber >= Math.max(1, resolveAuthoringHorizonWeeks(authoringInput) - 1);
+
+  if (isFinalTwoWeeks) {
+    const taperOptions = [...policy.cutbackTaperIdentities].filter((identity) =>
+      policy.allowedIdentities.has(identity),
+    );
+
+    if (policy.cadence.kind === "specialty") {
+      return [...new Set([...taperOptions, ...policy.specialtyIdentities])];
+    }
+
+    return [...new Set([...taperOptions, ...policy.expectedQualityIdentities])];
+  }
+
+  if (policy.cadence.useLongRunSlot) {
+    return [...new Set([...policy.longRunIdentities, ...policy.specialtyIdentities])];
+  }
+
+  return [
+    ...new Set([
+      ...policy.expectedQualityIdentities,
+      ...policy.specialtyIdentities,
+      ...policy.longRunIdentities,
+    ]),
+  ].filter((identity) => policy.allowedIdentities.has(identity));
+}
+
+function cadencePurposeForGoal(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+  weekNumber: number,
+) {
+  const isFinalTwoWeeks =
+    weekNumber >= Math.max(1, resolveAuthoringHorizonWeeks(authoringInput) - 1);
+
+  if (isFinalTwoWeeks) {
+    return "Reduced specificity that preserves freshness while keeping the goal-family signal visible.";
+  }
+
+  switch (policy.key) {
+    case "five_k":
+      return "Controlled faster-running rhythm or short sharpening repeats.";
+    case "ten_k":
+      return "Sustained rhythm, cruise-style intervals, or controlled faster running.";
+    case "half_marathon":
+      return "Half-marathon threshold durability, controlled tempo, or race-rhythm preparation.";
+    case "marathon":
+      return "Marathon-specific steady durability without unsupported race-pace precision.";
+    case "ultra":
+      return "Ultra time-on-feet, hike-run durability, or terrain-patient endurance.";
+    case "mountain_trail":
+      return "Trail, hill, downhill-control, climbing, or mountain time-on-feet specificity.";
+    default:
+      return "Safe goal-family cadence without adding unsupported hard-day density.";
+  }
 }
 
 function buildPromptAuthoringSummary(authoringInput: StructuredAuthoringInput) {

@@ -523,12 +523,31 @@ function inferWorkoutIdentity(
   if (/\buphill\b|\bhill\s+repeats?\b|\bhill\s+work\b/i.test(semanticText)) {
     return "uphill_repeats";
   }
+  if (/\brace\s+week\b|\bleg\s+opener\b/i.test(semanticText)) return "taper_tuneup_run";
+  if (/\btaper\b|tune[-_\s]?up\b/i.test(semanticText)) return "taper_tuneup_run";
+  const hasRaceRhythmCue =
+    /\brace\s+rhythm\b|\brace\s+pace\b|\brace[-_\s]?specific\b|\btime\s+trial\b/i.test(
+      semanticText,
+    );
+
+  if (hasRaceRhythmCue) {
+    return "race_pace_session";
+  }
   if (/\bdistance\s+intervals?\b|\bintervals?\b.*\bdistance\b/i.test(semanticText)) {
     return "distance_intervals";
   }
   if (/\btime\s+intervals?\b|\bintervals?\b.*\btime\b/i.test(semanticText)) {
     return "time_intervals";
   }
+  if (
+    /\b(?:controlled|introductory|technique|short|longer|support|aerobic\s+power|reduced\s+load)\b.*\bintervals?\b/i.test(
+      semanticText,
+    ) ||
+    hasSemanticSegmentType(steps, "interval_block")
+  ) {
+    return "distance_intervals";
+  }
+  if (/\bstrides?\b|\bsharpening\b/i.test(titleText)) return "easy_run_with_strides";
   if (/\b5k\b/i.test(semanticText)) return "5k_sharpening_repeats";
   if (/\b10k\b/i.test(semanticText)) return "10k_rhythm_intervals";
   if (/\bthreshold\b|\bhalf[-_\s]?marathon\b/i.test(semanticText)) {
@@ -609,6 +628,19 @@ function collectSegmentSemanticText(step: WorkoutSegmentLike): string[] {
   }
 
   return entries.filter((entry): entry is string => Boolean(entry?.trim()));
+}
+
+function hasSemanticSegmentType(steps: WorkoutSegmentLike[], segmentType: string): boolean {
+  return steps.some((step) => {
+    if (step.segment_type === segmentType || step.type === segmentType) {
+      return true;
+    }
+
+    return (
+      (step.work ? hasSemanticSegmentType([step.work], segmentType) : false) ||
+      (step.recovery ? hasSemanticSegmentType([step.recovery], segmentType) : false)
+    );
+  });
 }
 
 function readTargetText(target: Record<string, unknown>, key: string) {

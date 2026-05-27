@@ -1377,7 +1377,7 @@ function HitoDesignSystemPage() {
                   </div>
                 </div>
 
-                <div className="hito-reference-list">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))] gap-x-4 gap-y-7">
                   {HITO_ICON_META.map((icon) => (
                     <IconSpecimen key={icon.name} icon={icon} size={iconPreviewSize} />
                   ))}
@@ -3771,19 +3771,13 @@ function IconSpecimen({
   size: HitoIconSize;
 }) {
   return (
-    <article className="hito-reference-row">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="hito-list-row-title">{icon.name}</p>
-          <p className="hito-caption mt-1">{icon.category}</p>
-        </div>
-        <span className="hito-status-pill" data-tone="neutral">
-          {icon.label}
-        </span>
-      </div>
-      <div className="grid min-h-16 place-items-center gap-2 rounded-2xl border border-hairline bg-background/35 p-4">
+    <article className="grid justify-items-center gap-2 text-center">
+      <div className="grid h-8 place-items-center text-foreground">
         <Icon name={icon.name} size={size} />
-        <span className="hito-caption uppercase">{size}</span>
+      </div>
+      <div className="grid gap-1">
+        <p className="hito-list-row-title">{icon.name}</p>
+        <p className="hito-caption">{icon.category}</p>
       </div>
     </article>
   );

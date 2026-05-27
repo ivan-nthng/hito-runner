@@ -2,7 +2,7 @@
 
 ## Status
 
-Active / Live blueprint onboarding draft acceptance proven, awaiting QA rerun
+Active / Universal goal-family cadence implemented, race-event backlog documented, latency decision still required
 
 ## Owner
 
@@ -24,6 +24,9 @@ ARCHITECT / BACKEND / QA / RUNNING COACH
 - 2026-05-27: Backend wired `ai-first-plan-blueprint-v1` into the structured first-plan draft/review seam. `generateStructuredFirstPlanDraft` now attempts the compact blueprint contract, returns bounded source/fallback/repair/debug metadata with the reviewed canonical plan, and signs that reviewed draft; `confirmStructuredFirstPlanDraft` verifies the reviewed draft token and does not call OpenAI or regenerate.
 - 2026-05-27: Backend fixed first-plan confirm exactness after QA found the reviewed canonical plan was still being saved through imported-plan weekday remapping. Structured first-plan confirm now uses a reviewed-draft persistence seam that validates fixed rest days but preserves reviewed calendar rows, rest rows, trailing days, rich fields, steps, goal context, metric mode, icons, targets, and notes without synthetic fixed-rest insertion.
 - 2026-05-27: Backend proved live blueprint acceptance through the real structured onboarding draft path. The blueprint prompt now includes exact required date/weekday slots and the response schema requires the validated weekly running-day count while excluding rest identities from authored workouts; the long-run progression validator now permits safe post-cutback rebounds against the pre-cutback peak. A linked-DB disposable first-plan smoke with `OPENAI_PLAN_MODEL=gpt-4.1-mini` returned `sourceStatus: repaired_ai_draft` with only bounded taxonomy canonicalization repairs, persisted all 84 reviewed rows exactly, preserved the 2026-08-19 end date, kept 84 rich rows, and made zero OpenAI calls during confirm.
+- 2026-05-27: Backend fixed the half-marathon target-time richness gap before broad rollout. Road-performance 5K/10K/half-marathon target-time blueprints now receive backend-required quality slots and validation enforces a week-aware interval/tempo/threshold/race-rhythm cadence when runner support allows it, so early weeks cannot collapse into only easy/steady/recovery/long filler. A linked-DB half-marathon target-time smoke returned `sourceStatus: repaired_ai_draft`, `sourceKind: ai_first_plan_blueprint_v1`, `validationIssueCount: 0`, and first-six-week identities including `controlled_tempo_session`, `half_marathon_threshold_durability`, `distance_intervals`, `long_run_with_steady_finish`, and `time_intervals`; confirm persisted all 84 reviewed rows exactly with zero OpenAI calls. The same slice tightened compact-only import inference so the reference half-marathon JSON preserves tempo, interval, race-rhythm, and taper tune-up identities instead of falling back to generic quality/support labels. The accepted full half-marathon live draft still took about 104.5s on `gpt-4.1-mini`, so broad frontend rollout still needs a latency/product decision even though the backend quality gate now passes.
+- 2026-05-27: Backend generalized the half-marathon cadence fix into a universal `ai-first-plan-blueprint-v1` goal-family identity matrix. The blueprint prompt now exposes allowed, support, quality, long-run, cutback/taper, specialty, and excluded identities for beginner/consistency, 5K, 10K, half marathon, marathon, ultra, and mountain/trail goals; validation rejects excluded or generic identities, enforces required cadence slots when support level allows, preserves beginner/low-support easy-first behavior, and falls back instead of accepting plans that collapse into generic support filler. Doctrine fixtures now cover the first six weeks for all supported families, including quality cadence, long-run cadence, safe beginner distribution, ultra durability, mountain/trail specialty, and reference JSON variety preservation.
+- 2026-05-27: QA created a local all-workout-types coverage fixture proving Hito already has a rich canonical workout vocabulary and UI/detail rendering surface for 11 workout families and 29 identities. The disposable local account `qa-all-workout-types-20260527@local.test` imported `QA All Workout Types Coverage Plan` with 42 rich workouts, Friday/Sunday fixed rest days, Saturday preferred long-run placement, and no non-rest workouts without segments. Routine screenshots live under ignored local artifacts at `qa-artifacts/screenshots/2026-05-27/all-workout-types-coverage/`; this evidence supports taxonomy/UI coverage only and does not approve broad rollout by itself.
 
 ## Problem Statement
 
@@ -200,6 +203,121 @@ AI should not output:
 - medical diagnosis
 - exact elevation prescriptions
 - unsupported personalized HR or pace targets
+
+## Canonical Workout Identity Doctrine
+
+OpenAI must author plans using Hito canonical workout language, not a new or generic taxonomy.
+
+The model should choose from the existing two-layer workout contract:
+
+- calendar family / icon key:
+  `rest`, `recovery`, `easy`, `steady`, `long`, `tempo`, `intervals`, `progression`,
+  `race`, `hills`, `trail`
+- exact workout identity:
+  `rest_and_recovery`, `easy_aerobic_run`, `recovery_jog`, `steady_aerobic_run`,
+  `cutback_aerobic_run`, `easy_run_with_strides`, `long_aerobic_run`,
+  `long_run_with_steady_finish`, `cutback_long_run`, `taper_long_run`,
+  `controlled_tempo_session`, `half_marathon_threshold_durability`,
+  `marathon_steady_specificity`, `distance_intervals`, `time_intervals`,
+  `5k_sharpening_repeats`, `10k_rhythm_intervals`, `progression_run`,
+  `race_pace_session`, `taper_tuneup_run`, `uphill_repeats`,
+  `rolling_hills_session`, `technical_trail_easy`, `controlled_downhill_durability`,
+  `hike_run_endurance`, `mountain_long_run_time_on_feet`,
+  `ultra_time_on_feet_durability`, `climbing_steady_run`, `quality_session`
+
+Rules:
+
+- AI authors week-by-week coaching intent by selecting canonical families and identities.
+- AI must not invent new workout taxonomy values such as generic `speed day`, `aerobic power`,
+  or `mountain strength`.
+- If a useful coaching phrase is needed, it belongs in title, summary, theme, or segment intent,
+  not as a new identity.
+- Backend validates every authored family, identity, and icon key against `rich-workout-model.ts`.
+- Backend may canonicalize bounded aliases, but broad unknown identities should fail validation or
+  fall back rather than creating parallel product language.
+- Calendar renders family/icon truth; workout detail renders exact identity plus canonical segments.
+
+The QA all-workout-types fixture proves the current product can already display many of these
+identities. That fixture is coverage evidence, not training-quality approval for arbitrary
+generated plans.
+
+## Weekly Training Rules / Cadence Doctrine
+
+The blueprint should create real week-by-week training rhythm. It should not fill weeks with
+generic support slots unless that simplicity is justified by runner support.
+
+Goal-family expectations:
+
+- Beginner / low-support:
+  mostly `easy`, `recovery`, `steady`, and `long` identities; no forced hard workouts; quality
+  appears only as very light strides or controlled rhythm when support allows it.
+- Supported 5K:
+  regular but safe `5k_sharpening_repeats`, short controlled intervals, strides, or rhythm work;
+  weekly aerobic endurance or long-run support remains present.
+- Supported 10K:
+  regular `10k_rhythm_intervals`, controlled tempo, or race-rhythm stimulus when safe; long run
+  remains weekly and quality density stays bounded.
+- Half marathon:
+  recurring threshold/tempo/race-rhythm or steady-finish long-run stimulus when support allows it;
+  long run remains weekly and should evolve toward durability.
+- Marathon:
+  `marathon_steady_specificity`, controlled steady work, long-run progression, fueling/durability
+  cues, and conservative quality; do not fake race-pace precision when support is weak.
+- Ultra:
+  `ultra_time_on_feet_durability`, `hike_run_endurance`, fueling practice, durability, cutback
+  rhythm, and long-run progression; avoid flattening into road-race intervals.
+- Mountain / trail:
+  `uphill_repeats`, `rolling_hills_session`, `climbing_steady_run`,
+  `controlled_downhill_durability`, `technical_trail_easy`, `hike_run_endurance`, and
+  `mountain_long_run_time_on_feet` where appropriate; no exact elevation prescription without
+  route/elevation truth.
+- Cutback / taper:
+  reduce total load and peak durability stress while preserving purposeful tune-up, rhythm, or
+  easy aerobic intent where appropriate.
+
+Backend enforcement direction:
+
+- enforce weekly quality cadence only when runner support and goal family justify it
+- enforce long-run cadence and progression without placing peak durability stress inside
+  taper-labelled weeks
+- cap hard-day density by frequency, experience, ambition, current load, and support truth
+- reject or repair generic `quality_session` overuse when a more specific canonical identity is
+  required
+- preserve fixed rest days and preferred long-run day constraints
+- preserve pace gates and reject fake pace precision
+- preserve personal HR gates and reject fake personal HR truth
+- allow default estimated HR only through backend policy and labelling
+- reject exact elevation prescriptions and unsafe medical/rehab claims
+- fall back deterministically with source metadata if AI output is invalid
+
+## Race Event Backlog
+
+Race day should become a user-owned event/goal anchor in a future product slice. Do not implement
+it in this plan wave.
+
+Future product model:
+
+- user can add or edit a race event date
+- user can set race distance
+- later fields may include target time, event type, terrain, event name, and priority
+- Hito treats the race as a calendar event and training goal anchor
+- plan generation uses race event date/distance as target date and target distance truth
+- race-day workout identity stays canonical, such as `race_pace_session` or a future explicit
+  race-day identity if approved
+- race event metadata is user-owned and distinct from generated workout content
+- moving race day requires explicit review because it can change phases, long-run progression,
+  taper, and future workout structure
+- active-plan schedule edit may move ordinary workouts, but it must not silently move or
+  reinterpret the race event
+
+Why backlog, not now:
+
+- current first-plan work is still focused on AI-authored weekly blueprint reliability, canonical
+  identity cadence, validation, exact persistence, and latency/product decision
+- adding race events needs product UI, storage, mutation rules, and review/apply semantics beyond
+  this implementation wave
+- no DB schema, frontend UI, or backend event model should be added until this becomes an explicit
+  selected slice
 
 ## Backend Validation Contract
 
@@ -440,7 +558,7 @@ Validation:
 
 Owner: BACKEND
 
-Status: Implemented / QA rerun needed after live blueprint acceptance fix
+Status: Implemented / universal goal-family cadence fixed, latency QA needed
 
 Wire `generateStructuredFirstPlanDraft` to use the AI-authored blueprint path while preserving explicit review/confirm.
 
@@ -461,6 +579,9 @@ Validation:
 - deterministic fallback still works
 - mocked valid blueprint returns `sourceStatus: ai_authored` and canonical `ai_first_plan_blueprint_v1` truth
 - mocked invalid and timeout blueprints return deterministic fallback metadata
+- supported road target-time plans expose required quality slots and fail validation when the required weekly quality slot is replaced by generic steady/easy work
+- beginner, 5K, 10K, half-marathon target-time, marathon, ultra, and mountain/trail blueprint fixtures prove first-six-week goal-family identity cadence without unsafe hard-day density
+- linked-DB half-marathon target-time smoke returns `ai_authored` or acceptable `repaired_ai_draft`, `validationIssueCount: 0`, exact reviewed-row persistence, and `confirmOpenAiRequestCount: 0`
 
 ### Slice 4: Make AI-Authored Structured First Plan The Default
 
@@ -596,6 +717,16 @@ Required end-to-end scenarios:
 
 QA evidence must include screenshots for calendar and workout detail pages, especially mid-cycle marathon/ultra weeks where repetition risk is highest.
 
+Future QA / Running Coach evidence should also compare:
+
+- authored blueprint identities by week
+- validation or repair issue codes by week
+- canonical persisted identities by week
+- rendered calendar labels and icons
+- workout detail segment richness, including warmup/main/cooldown and repeat/recovery structure
+- fixed rest days and preferred long-run placement
+- screenshots saved under `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` by default, not committed unless explicitly promoted as release evidence
+
 ## Running Coach Acceptance Criteria
 
 Running Coach should approve only if:
@@ -638,6 +769,7 @@ Keep long term:
 ## Risks
 
 - live OpenAI latency can make setup feel slow
+- a full 12-week half-marathon target-time linked-DB draft now passes backend quality and exact-persistence gates, but the successful `gpt-4.1-mini` run took about 104.5s; broad rollout needs either a better latency policy, a validated faster model route, or a deliberate async review experience before this feels product-ready
 - AI may produce beautiful but unsafe density unless backend doctrine checks are strict
 - reference JSON contains useful richness but also runtime noise and unsupported precision that must not become canonical
 - broad repair logic can become as complex as the old deterministic generator if overbuilt
@@ -653,6 +785,7 @@ Keep long term:
 - deterministic fallback remains available and source-visible
 - pace/HR/default-HR safety is preserved
 - fixed rest days and long-run preferences are enforced
+- goal-family identity cadence is backend-owned across beginner/consistency, 5K, 10K, half marathon, marathon, ultra, and mountain/trail blueprints
 - active-plan schedule edit still works after AI-authored plan creation
 - import/export/saved-mode readback still works
 - QA matrix passes

@@ -621,6 +621,39 @@ function sourceWorkoutTypesByPhase(plan: TrainingPlanV2) {
   return identitiesByPhase;
 }
 
+function assertRoadPerformanceQualityCadence(plan: TrainingPlanV2, label: string) {
+  const qualityIdentities = new Set([
+    "time_intervals",
+    "distance_intervals",
+    "5k_sharpening_repeats",
+    "10k_rhythm_intervals",
+    "controlled_tempo_session",
+    "half_marathon_threshold_durability",
+    "race_pace_session",
+    "taper_tuneup_run",
+  ]);
+  const qualityWeeks = new Set(
+    nonRestWorkouts(plan)
+      .filter((workout) =>
+        qualityIdentities.has(workout.source_workout_type ?? workout.workout_identity ?? ""),
+      )
+      .map((workout) => workout.week_number),
+  );
+  const weekNumbers = Array.from(
+    new Set(plan.planned_workouts.map((workout) => workout.week_number)),
+  ).sort((left, right) => left - right);
+
+  for (let index = 0; index < weekNumbers.length; index += 2) {
+    const week = weekNumbers[index]!;
+    const nextWeek = weekNumbers[index + 1];
+
+    assert.ok(
+      qualityWeeks.has(week) || (nextWeek != null && qualityWeeks.has(nextWeek)),
+      `${label}: road performance quality should appear at least every 1-2 weeks`,
+    );
+  }
+}
+
 function assertRichWorkoutContract(plan: TrainingPlanV2, label: string) {
   for (const workout of plan.planned_workouts) {
     assert.ok(workout.workout_family, `${label}: workout_family should be present`);
@@ -1518,6 +1551,37 @@ function assertRichCompatibilityMapping() {
     family: "intervals",
     icon: "intervals",
   });
+  assertLegacyCompactOnlyInference("Introductory Controlled Intervals", {
+    identity: "distance_intervals",
+    family: "intervals",
+    icon: "intervals",
+  });
+  assertLegacyCompactOnlyInference("Reduced Load Race Rhythm", {
+    identity: "race_pace_session",
+    family: "race",
+    icon: "race",
+  });
+  assertLegacyCompactOnlyInference("Race Week Leg Opener", {
+    identity: "taper_tuneup_run",
+    family: "race",
+    icon: "race",
+  });
+  assertLegacyCompactOnlyInference(
+    "Quality session",
+    {
+      identity: "distance_intervals",
+      family: "intervals",
+      icon: "intervals",
+    },
+    [
+      {
+        type: "intervals",
+        segment_type: "interval_block",
+        label: "Intervals",
+        target: { intensity: "hard but controlled" },
+      },
+    ],
+  );
   assertLegacyCompactOnlyInference("Progression run", {
     identity: "progression_run",
     family: "progression",
@@ -1834,6 +1898,37 @@ function assertRichImportExportRoundtrip() {
     "tempo",
     "older compact-only training-plan-v2 imports should derive rich family from fallback semantics",
   );
+
+  const referenceFixture = readAiFirstPlanReferenceFixture();
+
+  if (referenceFixture) {
+    const parsedReference = importedPlanSchema.parse(referenceFixture);
+    const referenceSeed = buildImportedPlanSeed(parsedReference);
+    const referenceIdentities = new Set(
+      referenceSeed.workouts.map((workout) => workout.workoutIdentity),
+    );
+
+    assert.ok(
+      referenceIdentities.has("distance_intervals"),
+      "reference-style imports should preserve interval identity from title/segment truth",
+    );
+    assert.ok(
+      referenceIdentities.has("controlled_tempo_session"),
+      "reference-style imports should preserve tempo identity from title/segment truth",
+    );
+    assert.ok(
+      referenceIdentities.has("race_pace_session"),
+      "reference-style imports should preserve race-rhythm identity from title/segment truth",
+    );
+    assert.ok(
+      !referenceSeed.workouts.some(
+        (workout) =>
+          workout.title.match(/interval|race rhythm|leg opener/i) &&
+          workout.workoutIdentity === "quality_session",
+      ),
+      "reference-style imports should not collapse clear interval/race-rhythm rows to generic quality_session",
+    );
+  }
 }
 
 function assertRichSavedModeQaFixture() {
@@ -2768,7 +2863,7 @@ function buildAiFirstPlanBlueprintIdentityFixture(): AiFirstPlanBlueprint {
       phase: "Build" as const,
       theme: "Build repeatability",
       microcycleIntent:
-        "Use controlled repeats, trail skill, and longer durability without extra hard days.",
+        "Use controlled repeats and steady support without adding terrain-specific work.",
       cutbackWeek: false,
       taperWeek: false,
       workouts: [
@@ -2782,90 +2877,19 @@ function buildAiFirstPlanBlueprintIdentityFixture(): AiFirstPlanBlueprint {
         ),
         blueprintWorkoutTemplate(
           "Thursday",
-          "hills",
-          "rolling_hills_session",
-          "hills",
-          "Rolling hills session",
-        ),
-        blueprintWorkoutTemplate(
-          "Friday",
-          "trail",
-          "technical_trail_easy",
-          "trail",
-          "Technical trail easy run",
-        ),
-        blueprintWorkoutTemplate(
-          "Saturday",
-          "long",
-          "ultra_time_on_feet_durability",
-          "long",
-          "Ultra time-on-feet durability",
-        ),
-      ],
-    },
-    {
-      phase: "Specific" as const,
-      theme: "Absorb and climb",
-      microcycleIntent:
-        "Keep cutback support while adding controlled tempo and climbing specificity.",
-      cutbackWeek: true,
-      taperWeek: false,
-      workouts: [
-        blueprintWorkoutTemplate(
-          "Monday",
-          "easy",
-          "cutback_aerobic_run",
-          "easy",
-          "Cutback aerobic run",
-        ),
-        blueprintWorkoutTemplate(
-          "Tuesday",
           "tempo",
           "controlled_tempo_session",
           "tempo",
           "Controlled tempo session",
         ),
-        blueprintWorkoutTemplate(
-          "Thursday",
-          "hills",
-          "climbing_steady_run",
-          "hills",
-          "Climbing steady run",
-        ),
-        blueprintWorkoutTemplate("Friday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate("Friday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
         blueprintWorkoutTemplate(
           "Saturday",
           "long",
-          "cutback_long_run",
+          "long_run_with_steady_finish",
           "long",
-          "Cutback long run",
+          "Long run with steady finish",
         ),
-      ],
-    },
-    {
-      phase: "Taper" as const,
-      theme: "Freshen up",
-      microcycleIntent: "Keep one controlled hill stimulus, then reduce the long-run load.",
-      cutbackWeek: false,
-      taperWeek: true,
-      workouts: [
-        blueprintWorkoutTemplate(
-          "Monday",
-          "steady",
-          "steady_aerobic_run",
-          "steady",
-          "Steady aerobic run",
-        ),
-        blueprintWorkoutTemplate("Tuesday", "hills", "uphill_repeats", "hills", "Uphill repeats"),
-        blueprintWorkoutTemplate(
-          "Thursday",
-          "easy",
-          "easy_aerobic_run",
-          "easy",
-          "Easy aerobic run",
-        ),
-        blueprintWorkoutTemplate("Friday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
-        blueprintWorkoutTemplate("Saturday", "long", "taper_long_run", "long", "Taper long run"),
       ],
     },
   ];
@@ -2876,8 +2900,8 @@ function buildAiFirstPlanBlueprintIdentityFixture(): AiFirstPlanBlueprint {
     generatedFor: "Doctrine fixture",
     goalSummary: "Half marathon identity-aware blueprint expansion",
     startDate,
-    targetDate: "2026-06-28",
-    preparationHorizonWeeks: 4,
+    targetDate: "2026-06-14",
+    preparationHorizonWeeks: 2,
     planPreferences: {
       preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
       fixedRestDays: ["Wednesday", "Sunday"],
@@ -2927,25 +2951,24 @@ function buildAiFirstPlanBlueprintMissingIdentityFixture(): AiFirstPlanBlueprint
     {
       phase: "Base" as const,
       theme: "Sharpen without overload",
-      microcycleIntent:
-        "Introduce 5K coordination, marathon-steady patience, and mountain time-on-feet.",
+      microcycleIntent: "Introduce trail skill, controlled climbing, and mountain time-on-feet.",
       cutbackWeek: false,
       taperWeek: false,
       workouts: [
         blueprintWorkoutTemplate("Monday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
         blueprintWorkoutTemplate(
           "Tuesday",
-          "intervals",
-          "5k_sharpening_repeats",
-          "intervals",
-          "5K sharpening repeats",
+          "trail",
+          "technical_trail_easy",
+          "trail",
+          "Technical trail easy run",
         ),
         blueprintWorkoutTemplate(
           "Thursday",
-          "steady",
-          "marathon_steady_specificity",
-          "steady",
-          "Marathon steady specificity",
+          "hills",
+          "climbing_steady_run",
+          "hills",
+          "Climbing steady run",
         ),
         blueprintWorkoutTemplate("Friday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
         blueprintWorkoutTemplate(
@@ -2961,7 +2984,7 @@ function buildAiFirstPlanBlueprintMissingIdentityFixture(): AiFirstPlanBlueprint
       phase: "Build" as const,
       theme: "Rhythm and terrain control",
       microcycleIntent:
-        "Pair 10K rhythm with controlled downhill durability and hike-run endurance.",
+        "Pair rolling terrain with controlled downhill durability and hike-run endurance.",
       cutbackWeek: false,
       taperWeek: false,
       workouts: [
@@ -2974,10 +2997,10 @@ function buildAiFirstPlanBlueprintMissingIdentityFixture(): AiFirstPlanBlueprint
         ),
         blueprintWorkoutTemplate(
           "Tuesday",
-          "intervals",
-          "10k_rhythm_intervals",
-          "intervals",
-          "10K rhythm intervals",
+          "hills",
+          "rolling_hills_session",
+          "hills",
+          "Rolling hills session",
         ),
         blueprintWorkoutTemplate(
           "Thursday",
@@ -3000,44 +3023,44 @@ function buildAiFirstPlanBlueprintMissingIdentityFixture(): AiFirstPlanBlueprint
       phase: "Specific" as const,
       theme: "Controlled race rhythm",
       microcycleIntent:
-        "Use a race-rhythm rehearsal while keeping terrain support and cutback durability conservative.",
+        "Use uphill strength while keeping terrain support and cutback durability conservative.",
       cutbackWeek: true,
       taperWeek: false,
       workouts: [
         blueprintWorkoutTemplate("Monday", "recovery", "recovery_jog", "recovery", "Recovery jog"),
-        blueprintWorkoutTemplate(
-          "Tuesday",
-          "race",
-          "race_pace_session",
-          "race",
-          "Race pace session",
-        ),
+        blueprintWorkoutTemplate("Tuesday", "hills", "uphill_repeats", "hills", "Uphill repeats"),
         blueprintWorkoutTemplate(
           "Thursday",
-          "hills",
-          "rolling_hills_session",
-          "hills",
-          "Rolling hills session",
+          "trail",
+          "technical_trail_easy",
+          "trail",
+          "Technical trail easy run",
         ),
         blueprintWorkoutTemplate("Friday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
         blueprintWorkoutTemplate(
           "Saturday",
-          "long",
-          "cutback_long_run",
-          "long",
-          "Cutback long run",
+          "trail",
+          "ultra_time_on_feet_durability",
+          "trail",
+          "Ultra time-on-feet durability",
         ),
       ],
     },
     {
       phase: "Taper" as const,
-      theme: "Freshness and tune-up",
-      microcycleIntent: "Keep a light tune-up and reduce the long-run load for freshness.",
+      theme: "Freshness and terrain control",
+      microcycleIntent: "Keep light terrain rhythm and reduce the long-run load for freshness.",
       cutbackWeek: false,
       taperWeek: true,
       workouts: [
-        blueprintWorkoutTemplate("Monday", "race", "taper_tuneup_run", "race", "Taper tune-up run"),
-        blueprintWorkoutTemplate("Tuesday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate("Monday", "easy", "easy_aerobic_run", "easy", "Easy aerobic run"),
+        blueprintWorkoutTemplate(
+          "Tuesday",
+          "trail",
+          "technical_trail_easy",
+          "trail",
+          "Technical trail easy run",
+        ),
         blueprintWorkoutTemplate(
           "Thursday",
           "steady",
@@ -3049,16 +3072,16 @@ function buildAiFirstPlanBlueprintMissingIdentityFixture(): AiFirstPlanBlueprint
         blueprintWorkoutTemplate("Saturday", "long", "taper_long_run", "long", "Taper long run"),
       ],
     },
-  ];
+  ].slice(0, 1);
 
   return {
     schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
     planName: "AI blueprint full identity coverage",
     generatedFor: "Doctrine fixture",
-    goalSummary: "Performance and mountain identity-aware blueprint expansion",
+    goalSummary: "Mountain identity-aware blueprint expansion",
     startDate,
-    targetDate: "2026-08-02",
-    preparationHorizonWeeks: 4,
+    targetDate: "2026-07-12",
+    preparationHorizonWeeks: 1,
     planPreferences: {
       preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
       fixedRestDays: ["Wednesday", "Sunday"],
@@ -3142,6 +3165,169 @@ function blueprintWorkoutTemplate(
     recoveryPriority: workoutFamily === "long" || workoutFamily === "recovery" ? "high" : "medium",
     segmentIntent: segmentIntentByFamily[workoutFamily],
     metricIntent: "mixed_if_allowed",
+  };
+}
+
+function blueprintWorkoutFromIdentity(
+  weekday: AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number]["weekday"],
+  workoutIdentity: CanonicalWorkoutIdentity,
+) {
+  const title = titleFromIdentity(workoutIdentity);
+  const resolved = resolveCanonicalWorkoutModel({ workoutIdentity, title });
+
+  return blueprintWorkoutTemplate(
+    weekday,
+    resolved.workoutFamily,
+    resolved.workoutIdentity,
+    resolved.calendarIconKey,
+    title,
+  );
+}
+
+function titleFromIdentity(identity: CanonicalWorkoutIdentity) {
+  return identity
+    .split("_")
+    .map((part) => (part.length > 0 ? part[0]!.toUpperCase() + part.slice(1) : part))
+    .join(" ");
+}
+
+function buildGoalFamilyCadenceAuthoringInput({
+  goalDistance,
+  goalStyle = "ambitious",
+  targetTime = null,
+  targetDate = "2026-07-12",
+  terrainFocus = "standard",
+  experienceLevel = "experienced_runner",
+  runningDays = ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+  horizonWeeks = 6,
+}: {
+  goalDistance: StructuredFirstPlanOnboardingRequestInput["goal"]["goalDistance"];
+  goalStyle?: StructuredFirstPlanOnboardingRequestInput["goal"]["goalStyle"];
+  targetTime?: string | null;
+  targetDate?: string | null;
+  terrainFocus?: StructuredFirstPlanOnboardingRequestInput["goal"]["terrainFocus"];
+  experienceLevel?: ReturnType<
+    typeof structuredPlanAuthoringInputSchema.parse
+  >["runnerProfile"]["experienceLevel"];
+  runningDays?: string[];
+  horizonWeeks?: number;
+}) {
+  const startDate = "2026-06-01";
+  const baselineLongRunDurationMin =
+    goalDistance === "ultra_marathon" || goalDistance === "mountain_running"
+      ? 80
+      : goalDistance === "marathon"
+        ? 70
+        : goalDistance === "build_consistency"
+          ? 35
+          : 55;
+
+  return buildAiFirstPlanAuthoringInput({
+    goal: {
+      goalType: goalDistance,
+      goalLabel: titleFromIdentity(
+        goalDistance === "build_consistency" ? "easy_aerobic_run" : "long_aerobic_run",
+      ),
+      goalStyle,
+      targetTime,
+    },
+    runnerProfile: {
+      age: 34,
+      experienceLevel,
+      baselineSessionsPerWeek: runningDays.length,
+      baselineLongRunDurationMin,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "mixed",
+    },
+    preferences: {
+      terrainFocus,
+      preferredWorkoutMix: "balanced",
+      strengthTraining: "some",
+    },
+    schedule: {
+      startDate,
+      targetDate,
+      preparationHorizonWeeks: horizonWeeks,
+    },
+    availability: {
+      preferredRunningDays: runningDays,
+      unavailableDays: ["Wednesday", "Sunday"],
+      maxRunningDaysPerWeek: runningDays.length,
+      preferredLongRunDay: "Saturday",
+    },
+  });
+}
+
+function buildGoalFamilyCadenceBlueprint({
+  planName,
+  goalSummary,
+  authoringInput,
+  weeklyIdentities,
+}: {
+  planName: string;
+  goalSummary: string;
+  authoringInput: ReturnType<typeof structuredPlanAuthoringInputSchema.parse>;
+  weeklyIdentities: CanonicalWorkoutIdentity[][];
+}): AiFirstPlanBlueprint {
+  const weekdayOffsets = new Map([
+    ["Monday", 0],
+    ["Tuesday", 1],
+    ["Wednesday", 2],
+    ["Thursday", 3],
+    ["Friday", 4],
+    ["Saturday", 5],
+    ["Sunday", 6],
+  ]);
+  const runningDays = authoringInput.availability.preferredRunningDays;
+
+  return {
+    schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+    planName,
+    generatedFor: "Goal-family doctrine fixture",
+    goalSummary,
+    startDate: authoringInput.schedule.startDate,
+    targetDate: authoringInput.schedule.targetDate,
+    preparationHorizonWeeks: authoringInput.schedule.preparationHorizonWeeks,
+    planPreferences: {
+      preferredRunningDays: runningDays,
+      fixedRestDays: authoringInput.availability.unavailableDays,
+      preferredLongRunDay: authoringInput.availability.preferredLongRunDay,
+      maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+    },
+    reviewAssumptions: ["Goal-family identity cadence is backend-validated."],
+    metricPolicySummary: "Backend owns pace and HR target truth.",
+    weeks: weeklyIdentities.map((identities, weekIndex) => ({
+      weekNumber: weekIndex + 1,
+      phase:
+        weekIndex >= weeklyIdentities.length - 1
+          ? ("Taper" as const)
+          : weekIndex >= Math.floor(weeklyIdentities.length * 0.6)
+            ? ("Specific" as const)
+            : weekIndex >= Math.floor(weeklyIdentities.length * 0.25)
+              ? ("Build" as const)
+              : ("Base" as const),
+      theme: `Week ${weekIndex + 1} goal-family cadence`,
+      microcycleIntent: `Use ${goalSummary} identities without random filler.`,
+      cutbackWeek: weekIndex === 2,
+      taperWeek: weekIndex >= weeklyIdentities.length - 1,
+      longRunIntent: "Keep the Saturday long-run slot durable and controlled.",
+      longRunProgression: "Backend validates long-run and taper sanity after expansion.",
+      plannedWorkouts: identities.map((identity, dayIndex) => {
+        const weekday = runningDays[dayIndex]!;
+        const date = addDaysIso(
+          authoringInput.schedule.startDate,
+          weekIndex * 7 + (weekdayOffsets.get(weekday) ?? 0),
+        );
+
+        return {
+          ...blueprintWorkoutFromIdentity(
+            weekday as AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number]["weekday"],
+            identity,
+          ),
+          date,
+        };
+      }),
+    })),
   };
 }
 
@@ -3466,6 +3652,483 @@ function assertAiFirstPlanDraftContract() {
   assert.equal(invalidTaxonomyResult.ok, false, "invalid AI workout taxonomy is rejected");
 }
 
+function assertAiFirstPlanBlueprintGoalFamilyCadence() {
+  const fiveDay = ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"];
+  const cases = [
+    {
+      label: "beginner consistency",
+      authoringInput: buildGoalFamilyCadenceAuthoringInput({
+        goalDistance: "build_consistency",
+        goalStyle: "relaxed",
+        targetDate: null,
+        experienceLevel: "new_runner",
+        runningDays: ["Monday", "Thursday", "Saturday"],
+      }),
+      weeks: Array.from({ length: 6 }, (_value, index) => [
+        index === 2 ? "cutback_aerobic_run" : "easy_aerobic_run",
+        "steady_aerobic_run",
+        index === 5 ? "taper_long_run" : "long_aerobic_run",
+      ]),
+      expected: ["easy_aerobic_run", "steady_aerobic_run"],
+      forbidden: ["controlled_tempo_session", "time_intervals", "race_pace_session"],
+      cadence: [],
+    },
+    {
+      label: "5K supported",
+      authoringInput: buildGoalFamilyCadenceAuthoringInput({
+        goalDistance: "5k",
+        goalStyle: "ambitious",
+        runningDays: fiveDay,
+      }),
+      weeks: [
+        [
+          "easy_aerobic_run",
+          "5k_sharpening_repeats",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "time_intervals",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "distance_intervals",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "cutback_long_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "controlled_tempo_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "5k_sharpening_repeats",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "taper_tuneup_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
+      ],
+      expected: ["5k_sharpening_repeats", "time_intervals"],
+      forbidden: ["10k_rhythm_intervals", "marathon_steady_specificity"],
+      cadence: [
+        "5k_sharpening_repeats",
+        "time_intervals",
+        "distance_intervals",
+        "controlled_tempo_session",
+        "taper_tuneup_run",
+      ],
+    },
+    {
+      label: "10K supported",
+      authoringInput: buildGoalFamilyCadenceAuthoringInput({
+        goalDistance: "10k",
+        goalStyle: "ambitious",
+        runningDays: fiveDay,
+      }),
+      weeks: [
+        [
+          "easy_aerobic_run",
+          "10k_rhythm_intervals",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "controlled_tempo_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "time_intervals",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "cutback_long_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "distance_intervals",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "race_pace_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "taper_tuneup_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
+      ],
+      expected: ["10k_rhythm_intervals", "race_pace_session"],
+      forbidden: ["5k_sharpening_repeats", "mountain_long_run_time_on_feet"],
+      cadence: [
+        "10k_rhythm_intervals",
+        "controlled_tempo_session",
+        "time_intervals",
+        "distance_intervals",
+        "race_pace_session",
+        "taper_tuneup_run",
+      ],
+    },
+    {
+      label: "half marathon target-time",
+      authoringInput: buildGoalFamilyCadenceAuthoringInput({
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        targetTime: "2:00:00",
+        runningDays: fiveDay,
+      }),
+      weeks: [
+        [
+          "easy_aerobic_run",
+          "half_marathon_threshold_durability",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_run_with_steady_finish",
+        ],
+        [
+          "easy_aerobic_run",
+          "controlled_tempo_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "distance_intervals",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "cutback_long_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "race_pace_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_run_with_steady_finish",
+        ],
+        [
+          "easy_aerobic_run",
+          "time_intervals",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "taper_tuneup_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
+      ],
+      expected: ["half_marathon_threshold_durability", "race_pace_session"],
+      forbidden: ["5k_sharpening_repeats", "mountain_long_run_time_on_feet"],
+      cadence: [
+        "half_marathon_threshold_durability",
+        "controlled_tempo_session",
+        "distance_intervals",
+        "race_pace_session",
+        "time_intervals",
+        "taper_tuneup_run",
+      ],
+    },
+    {
+      label: "marathon",
+      authoringInput: buildGoalFamilyCadenceAuthoringInput({
+        goalDistance: "marathon",
+        goalStyle: "target_time",
+        targetTime: "4:15:00",
+        runningDays: fiveDay,
+      }),
+      weeks: [
+        [
+          "easy_aerobic_run",
+          "marathon_steady_specificity",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_run_with_steady_finish",
+        ],
+        [
+          "easy_aerobic_run",
+          "steady_aerobic_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "controlled_tempo_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "cutback_long_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "steady_aerobic_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_run_with_steady_finish",
+        ],
+        [
+          "easy_aerobic_run",
+          "marathon_steady_specificity",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "taper_tuneup_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
+      ],
+      expected: ["marathon_steady_specificity", "long_run_with_steady_finish"],
+      forbidden: ["5k_sharpening_repeats", "10k_rhythm_intervals"],
+      cadence: ["marathon_steady_specificity", "controlled_tempo_session", "taper_tuneup_run"],
+    },
+    {
+      label: "ultra",
+      authoringInput: buildGoalFamilyCadenceAuthoringInput({
+        goalDistance: "ultra_marathon",
+        goalStyle: "balanced",
+        runningDays: fiveDay,
+      }),
+      weeks: [
+        [
+          "easy_aerobic_run",
+          "technical_trail_easy",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "steady_aerobic_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "rolling_hills_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "hike_run_endurance",
+        ],
+        [
+          "easy_aerobic_run",
+          "steady_aerobic_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "technical_trail_easy",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "ultra_time_on_feet_durability",
+        ],
+        [
+          "easy_aerobic_run",
+          "technical_trail_easy",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
+      ],
+      expected: ["ultra_time_on_feet_durability", "hike_run_endurance"],
+      forbidden: ["5k_sharpening_repeats", "race_pace_session"],
+      cadence: [
+        "ultra_time_on_feet_durability",
+        "hike_run_endurance",
+        "technical_trail_easy",
+        "rolling_hills_session",
+        "climbing_steady_run",
+      ],
+    },
+    {
+      label: "mountain/trail",
+      authoringInput: buildGoalFamilyCadenceAuthoringInput({
+        goalDistance: "mountain_running",
+        goalStyle: "ambitious",
+        terrainFocus: "mountain",
+        runningDays: fiveDay,
+      }),
+      weeks: [
+        [
+          "easy_aerobic_run",
+          "technical_trail_easy",
+          "climbing_steady_run",
+          "recovery_jog",
+          "mountain_long_run_time_on_feet",
+        ],
+        [
+          "easy_aerobic_run",
+          "steady_aerobic_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "controlled_downhill_durability",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "hike_run_endurance",
+        ],
+        [
+          "easy_aerobic_run",
+          "rolling_hills_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "uphill_repeats",
+          "climbing_steady_run",
+          "recovery_jog",
+          "mountain_long_run_time_on_feet",
+        ],
+        [
+          "easy_aerobic_run",
+          "technical_trail_easy",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
+      ],
+      expected: [
+        "technical_trail_easy",
+        "controlled_downhill_durability",
+        "mountain_long_run_time_on_feet",
+      ],
+      forbidden: ["5k_sharpening_repeats", "race_pace_session"],
+      cadence: [
+        "technical_trail_easy",
+        "controlled_downhill_durability",
+        "rolling_hills_session",
+        "uphill_repeats",
+        "mountain_long_run_time_on_feet",
+      ],
+    },
+  ] as const;
+
+  for (const testCase of cases) {
+    const result = normalizeAiFirstPlanBlueprintToTrainingPlan({
+      blueprint: buildGoalFamilyCadenceBlueprint({
+        planName: `${testCase.label} cadence`,
+        goalSummary: testCase.label,
+        authoringInput: testCase.authoringInput,
+        weeklyIdentities: testCase.weeks,
+      }),
+      authoringInput: testCase.authoringInput,
+    });
+
+    assert.equal(
+      result.ok,
+      true,
+      result.ok
+        ? `${testCase.label} goal-family cadence should normalize`
+        : `${testCase.label} goal-family cadence should normalize: ${JSON.stringify(result.issues)}`,
+    );
+
+    if (!result.ok) continue;
+
+    const firstSix = firstSixWeekIdentityReport(result.canonicalPlan);
+    const identities = new Set(firstSix.flat());
+
+    for (const expected of testCase.expected) {
+      assert.ok(identities.has(expected), `${testCase.label}: expected ${expected}`);
+    }
+
+    for (const forbidden of testCase.forbidden) {
+      assert.ok(!identities.has(forbidden), `${testCase.label}: should not include ${forbidden}`);
+    }
+
+    if (testCase.cadence.length > 0) {
+      assertGoalFamilyCadence(firstSix, [...testCase.cadence], testCase.label);
+      assert.ok(
+        !onlyGenericSupportIdentities(firstSix),
+        `${testCase.label}: supported plan should not collapse into generic support filler`,
+      );
+    }
+  }
+}
+
+function firstSixWeekIdentityReport(plan: TrainingPlanV2) {
+  return Array.from({ length: 6 }, (_value, weekIndex) =>
+    nonRestWorkouts(plan)
+      .filter((workout) => workout.week_number === weekIndex + 1)
+      .map(
+        (workout) =>
+          workout.source_workout_type ?? workout.workout_identity ?? workout.workout_type,
+      ),
+  );
+}
+
+function onlyGenericSupportIdentities(firstSixWeekIdentities: Array<Array<string | null>>) {
+  const generic = new Set([
+    "easy_aerobic_run",
+    "steady_aerobic_run",
+    "recovery_jog",
+    "long_aerobic_run",
+  ]);
+
+  return firstSixWeekIdentities.flat().every((identity) => identity && generic.has(identity));
+}
+
+function assertGoalFamilyCadence(
+  firstSixWeekIdentities: Array<Array<string | null>>,
+  cadenceIdentities: string[],
+  label: string,
+) {
+  const cadenceSet = new Set(cadenceIdentities);
+
+  for (let index = 0; index < firstSixWeekIdentities.length; index += 2) {
+    const current = firstSixWeekIdentities[index] ?? [];
+    const next = firstSixWeekIdentities[index + 1] ?? [];
+    const hasCadence = [...current, ...next].some((identity) =>
+      identity ? cadenceSet.has(identity) : false,
+    );
+
+    assert.ok(
+      hasCadence,
+      `${label}: expected goal-family cadence in weeks ${index + 1}-${index + 2}`,
+    );
+  }
+}
+
 function assertAiFirstPlanBlueprintContract() {
   const authoringInput = buildAiFirstPlanAuthoringInput();
   const referenceFixture = readAiFirstPlanReferenceFixture();
@@ -3494,6 +4157,21 @@ function assertAiFirstPlanBlueprintContract() {
     prompt.userPrompt,
     /Required authored workout slots/,
     "AI first-plan blueprint prompt should provide exact required date slots",
+  );
+  assert.match(
+    prompt.userPrompt,
+    /mustBeQuality/,
+    "AI first-plan blueprint prompt should require quality slots for supported road target-time plans",
+  );
+  assert.match(
+    prompt.userPrompt,
+    /Goal-family identity policy/,
+    "AI first-plan blueprint prompt should expose the backend goal-family identity policy",
+  );
+  assert.match(
+    prompt.systemPrompt,
+    /required cadence slots/,
+    "AI first-plan blueprint prompt should require goal-family cadence slots for supported plans",
   );
   assert.equal(
     prompt.responseSchema.properties.weeks.items.properties.plannedWorkouts.minItems,
@@ -3543,6 +4221,7 @@ function assertAiFirstPlanBlueprintContract() {
       true,
       "AI first-plan blueprint may keep pace only when backend gates allow it",
     );
+    assertRoadPerformanceQualityCadence(normalized.canonicalPlan, "valid AI first-plan blueprint");
     assert.equal(
       normalized.canonicalPlan.planned_workouts.some(
         (workout) =>
@@ -3558,8 +4237,8 @@ function assertAiFirstPlanBlueprintContract() {
   const identityAuthoringInput = buildAiFirstPlanAuthoringInput({
     schedule: {
       startDate: "2026-06-01",
-      targetDate: "2026-06-28",
-      preparationHorizonWeeks: 4,
+      targetDate: "2026-06-14",
+      preparationHorizonWeeks: 2,
     },
   });
   const identityBlueprint = buildAiFirstPlanBlueprintIdentityFixture();
@@ -3587,24 +4266,8 @@ function assertAiFirstPlanBlueprintContract() {
     assertBlueprintIdentityExpansion(plan, "long_run_with_steady_finish", [/steady finish/i]);
     assertBlueprintIdentityExpansion(plan, "time_intervals", [/repeat|3 min/i], true);
     assertBlueprintIdentityExpansion(plan, "distance_intervals", [/400m|distance/i], true);
-    assertBlueprintIdentityExpansion(
-      plan,
-      "rolling_hills_session",
-      [/rolling|hill|terrain/i],
-      true,
-    );
-    assertBlueprintIdentityExpansion(plan, "uphill_repeats", [/uphill|climb|effort/i], true);
-    assertBlueprintIdentityExpansion(plan, "technical_trail_easy", [/technical|trail|footing/i]);
-    assertBlueprintIdentityExpansion(plan, "climbing_steady_run", [/climbing|hill|grade/i]);
-    assertBlueprintIdentityExpansion(plan, "ultra_time_on_feet_durability", [
-      /time-on-feet|durability/i,
-      /hike|fueling/i,
-    ]);
     assertBlueprintIdentityExpansion(plan, "controlled_tempo_session", [/tempo|controlled/i]);
-    assertBlueprintIdentityExpansion(plan, "cutback_long_run", [/cutback|reduced/i]);
-    assertBlueprintIdentityExpansion(plan, "taper_long_run", [/taper|fresh/i]);
     assertBlueprintIdentityExpansion(plan, "recovery_jog", [/recovery/i]);
-    assertBlueprintIdentityExpansion(plan, "cutback_aerobic_run", [/cutback|reduced/i]);
     assertBlueprintIdentityExpansion(plan, "steady_aerobic_run", [/steady aerobic/i]);
     assertBlueprintIdentityExpansion(plan, "easy_aerobic_run", [/easy aerobic|conversational/i]);
     assert.deepEqual(
@@ -3630,10 +4293,21 @@ function assertAiFirstPlanBlueprintContract() {
   }
 
   const missingIdentityAuthoringInput = buildAiFirstPlanAuthoringInput({
+    goal: {
+      goalType: "mountain_running",
+      goalLabel: "Mountain running",
+      goalStyle: "ambitious",
+      targetTime: null,
+    },
+    preferences: {
+      terrainFocus: "mountain",
+      preferredWorkoutMix: "balanced",
+      strengthTraining: "some",
+    },
     schedule: {
       startDate: "2026-07-06",
-      targetDate: "2026-08-02",
-      preparationHorizonWeeks: 4,
+      targetDate: "2026-07-12",
+      preparationHorizonWeeks: 1,
     },
   });
   const missingIdentityBlueprint = buildAiFirstPlanBlueprintMissingIdentityFixture();
@@ -3654,20 +4328,8 @@ function assertAiFirstPlanBlueprintContract() {
 
   if (missingIdentityNormalized.ok) {
     const plan = missingIdentityNormalized.canonicalPlan;
-    assertBlueprintIdentityExpansion(plan, "5k_sharpening_repeats", [/5K|quick|repeat/i], true);
-    assertBlueprintIdentityExpansion(plan, "10k_rhythm_intervals", [/10K|rhythm|repeat/i], true);
-    assertBlueprintIdentityExpansion(plan, "race_pace_session", [/race|rhythm|controlled/i]);
-    assertBlueprintIdentityExpansion(plan, "taper_tuneup_run", [/taper|tune-up|fresh/i]);
-    assertBlueprintIdentityExpansion(plan, "marathon_steady_specificity", [
-      /marathon|steady|durability/i,
-    ]);
-    assertBlueprintIdentityExpansion(
-      plan,
-      "controlled_downhill_durability",
-      [/downhill|descent|control|cadence/i],
-      true,
-    );
-    assertBlueprintIdentityExpansion(plan, "hike_run_endurance", [/hike|run|climb|descend/i]);
+    assertBlueprintIdentityExpansion(plan, "technical_trail_easy", [/technical|trail|footing/i]);
+    assertBlueprintIdentityExpansion(plan, "climbing_steady_run", [/climbing|hill|grade/i]);
     assertBlueprintIdentityExpansion(plan, "mountain_long_run_time_on_feet", [
       /mountain|time-on-feet|terrain/i,
       /fueling|hydration|effort/i,
@@ -3682,13 +4344,7 @@ function assertAiFirstPlanBlueprintContract() {
     );
     assertNoHrOnMainTargetsForIdentities(
       plan,
-      [
-        "5k_sharpening_repeats",
-        "10k_rhythm_intervals",
-        "controlled_downhill_durability",
-        "hike_run_endurance",
-        "mountain_long_run_time_on_feet",
-      ],
+      ["mountain_long_run_time_on_feet"],
       "AI first-plan blueprint full identity coverage",
     );
   }
@@ -3725,6 +4381,26 @@ function assertAiFirstPlanBlueprintContract() {
   });
 
   assert.equal(fixedRestViolation.ok, false, "blueprint fixed rest-day violations are rejected");
+
+  const missingQualityBlueprint = structuredClone(blueprint);
+  missingQualityBlueprint.weeks[0]!.plannedWorkouts[1] = {
+    ...missingQualityBlueprint.weeks[0]!.plannedWorkouts[1]!,
+    workoutFamily: "steady",
+    workoutIdentity: "steady_aerobic_run",
+    calendarIconKey: "steady",
+    title: "Steady aerobic run",
+    segmentIntent: "steady_aerobic",
+  };
+  const missingQualityResult = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: missingQualityBlueprint,
+    authoringInput,
+  });
+
+  assert.equal(
+    missingQualityResult.ok,
+    false,
+    "supported road target-time blueprints must preserve required weekly quality cadence",
+  );
 
   const invalidTaxonomyBlueprint = structuredClone(blueprint) as unknown as Record<string, unknown>;
   (
@@ -4497,6 +5173,7 @@ assertRichImportExportRoundtrip();
 assertRichSavedModeQaFixture();
 assertRichAiDraftNormalizer();
 assertAiFirstPlanDraftContract();
+assertAiFirstPlanBlueprintGoalFamilyCadence();
 assertAiFirstPlanBlueprintContract();
 await assertAiFirstPlanDraftServiceContract();
 await assertStructuredFirstPlanDraftBlueprintReviewContract();

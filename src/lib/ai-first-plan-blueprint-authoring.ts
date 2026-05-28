@@ -2868,6 +2868,7 @@ function buildAiFirstPlanBlueprintUserPrompt({
     JSON.stringify(buildPromptRequiredWorkoutSlots(authoringInput)),
     "Use every required slot exactly once in the matching week. Do not add extra dates, omit slots, move slots, or place authored workouts on fixed rest days.",
     "Each week has one required long-run slot. That slot must use workoutFamily long, hike_run_endurance, mountain_long_run_time_on_feet, or ultra_time_on_feet_durability.",
+    "Required cadence slots are pre-spaced away from the long run when possible. Keep the day after a long run easy or recovery unless the backend explicitly marks that date as a required cadence slot.",
     "If a slot includes requiredIdentityOptions, choose one of those identities for that exact slot. If mustBeQuality=true, use workoutFamily tempo, intervals, progression, or race unless the option itself is a backend long-run specialty.",
     "",
     "Reference-style example guidance:",
@@ -3108,13 +3109,53 @@ function chooseGoalFamilyCadenceWeekday(
     return preferredLongRunDay;
   }
 
+  const candidateWeekdays = runningDays.filter((weekday) => weekday !== preferredLongRunDay);
+
+  if (preferredLongRunDay && runningDays.includes(preferredLongRunDay)) {
+    const safetyRankedCandidates = candidateWeekdays
+      .map((weekday) => ({
+        weekday,
+        safety: scoreCadenceWeekdaySafety(weekday, preferredLongRunDay),
+      }))
+      .filter((candidate) => !candidate.safety.adjacentToLongRun)
+      .sort(
+        (left, right) =>
+          right.safety.spacingScore - left.safety.spacingScore ||
+          cadenceWeekdayPreferenceIndex(left.weekday) -
+            cadenceWeekdayPreferenceIndex(right.weekday),
+      );
+
+    if (safetyRankedCandidates[0]) {
+      return safetyRankedCandidates[0].weekday;
+    }
+
+    return null;
+  }
+
   const candidateOrder = ["Tuesday", "Thursday", "Monday", "Friday", "Wednesday", "Saturday"];
 
-  return (
-    candidateOrder.find(
-      (weekday) => runningDays.includes(weekday) && weekday !== preferredLongRunDay,
-    ) ?? null
-  );
+  return candidateOrder.find((weekday) => candidateWeekdays.includes(weekday)) ?? null;
+}
+
+function scoreCadenceWeekdaySafety(weekday: string, preferredLongRunDay: string) {
+  const weekdayOffset = forwardWeekdayOffset(preferredLongRunDay, weekday);
+  const reverseOffset = forwardWeekdayOffset(weekday, preferredLongRunDay);
+
+  return {
+    adjacentToLongRun: weekdayOffset === 1 || reverseOffset === 1,
+    spacingScore: Math.min(weekdayOffset, reverseOffset),
+  };
+}
+
+function forwardWeekdayOffset(fromWeekday: string, toWeekday: string) {
+  return (weekdayIndex(toWeekday) - weekdayIndex(fromWeekday) + 7) % 7;
+}
+
+function cadenceWeekdayPreferenceIndex(weekday: string) {
+  const preferenceOrder = ["Tuesday", "Thursday", "Wednesday", "Friday", "Monday", "Saturday"];
+  const index = preferenceOrder.indexOf(weekday);
+
+  return index === -1 ? preferenceOrder.length : index;
 }
 
 function cadenceIdentityOptionsForGoal(

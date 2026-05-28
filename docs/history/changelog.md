@@ -15,7 +15,10 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 
 ## 2026-05-28
 
+- Added local/dev structured-onboarding browser-action trace artifacts for AI first-plan review attempts, capturing sanitized request/setup/authoring summaries, effective first-plan model/timeout/token/env source, cadence slots, validation issue codes, normalized identities, and failure layer under ignored `qa-artifacts/debug/...` without prompts, secrets, or raw OpenAI payloads.
 - Added a reproducible saved blueprint visual QA proof path: `npm run seed-ai-first-plan-blueprint-proof` now uses an existing disposable tester, calls live `ai-first-plan-blueprint-v1` with deterministic fallback disabled, saves only accepted blueprint truth, verifies persisted `source_kind`, reviewed/persisted row count and end date, rich rows, executable non-rest steps, and `marathon_steady_specificity`, then prints bounded login and cleanup details for browser QA.
+- Fixed AI blueprint required cadence placement so supported marathon and goal-family quality slots avoid the day before or after the preferred long run when another viable running day exists; Sunday-long marathon plans now keep Monday easy/recovery and place required marathon specificity on a safer midweek slot.
+- Aligned the visible structured onboarding action with the successful blueprint preview seam: first-plan review now uses first-plan-specific blueprint model/timeout defaults (`gpt-4.1-mini`, 240000 ms, 32000 output tokens unless server env overrides them) instead of inheriting the generic text-plan model route and 45s service timeout.
 
 ## 2026-05-27
 

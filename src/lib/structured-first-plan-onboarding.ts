@@ -423,7 +423,7 @@ export function buildStructuredFirstPlanDraftReview(
       terrainFocus,
       workoutCount: canonicalPlan.planned_workouts.length,
       longRunDay: authoringInput.availability.preferredLongRunDay ?? null,
-      qualityRhythm: buildQualityRhythm(authoringInput),
+      qualityRhythm: buildQualityRhythm(canonicalPlan, authoringInput),
       metricPolicy: buildMetricPolicyReview(input),
     },
     assumptions: buildStructuredReviewAssumptions(input, authoringInput),
@@ -558,21 +558,84 @@ function buildStructuredActivityMix(
   return mix;
 }
 
-function buildQualityRhythm(authoringInput: StructuredFirstPlanAuthoringInput) {
+function buildQualityRhythm(
+  canonicalPlan: TrainingPlanV2,
+  authoringInput: StructuredFirstPlanAuthoringInput,
+) {
   if (shouldReviewAvoidRegularQuality(authoringInput)) {
     return "No regular quality day; runs stay mostly easy.";
   }
 
-  const nonLongRunDays = authoringInput.availability.preferredRunningDays.filter(
-    (weekday) => weekday !== authoringInput.availability.preferredLongRunDay,
-  );
-  const qualityDay = nonLongRunDays[0] ?? null;
+  const qualityDays = deriveReviewedQualityWeekdays(canonicalPlan);
 
-  if (!qualityDay || authoringInput.availability.maxRunningDaysPerWeek < 3) {
+  if (qualityDays.length === 0 || authoringInput.availability.maxRunningDaysPerWeek < 3) {
     return "No regular quality day; runs stay mostly easy.";
   }
 
-  return `Quality work is planned around ${qualityDay}, with cutback weeks simplified.`;
+  return `Quality work is planned around ${formatWeekdayList(qualityDays)}, with cutback weeks simplified.`;
+}
+
+function deriveReviewedQualityWeekdays(canonicalPlan: TrainingPlanV2) {
+  const weekdayCounts = new Map<string, number>();
+
+  canonicalPlan.planned_workouts.forEach((workout) => {
+    if (!isReviewedQualityWorkout(workout)) {
+      return;
+    }
+
+    weekdayCounts.set(workout.weekday, (weekdayCounts.get(workout.weekday) ?? 0) + 1);
+  });
+
+  return [...weekdayCounts.entries()]
+    .sort((left, right) => right[1] - left[1] || weekdayOrder(left[0]) - weekdayOrder(right[0]))
+    .map(([weekday]) => weekday);
+}
+
+function isReviewedQualityWorkout(workout: TrainingPlanV2["planned_workouts"][number]) {
+  if (workout.workout_type === "rest" || workout.workout_type === "long_run") {
+    return false;
+  }
+
+  const identity = workout.workout_identity ?? workout.source_workout_type ?? workout.workout_type;
+
+  if (
+    [
+      "controlled_tempo_session",
+      "distance_intervals",
+      "time_intervals",
+      "5k_sharpening_repeats",
+      "10k_rhythm_intervals",
+      "half_marathon_threshold_durability",
+      "marathon_steady_specificity",
+      "race_pace_session",
+      "progression_run",
+      "rolling_hills_session",
+      "hill_repeats",
+      "uphill_repeats",
+    ].includes(identity)
+  ) {
+    return true;
+  }
+
+  return ["quality", "tempo", "intervals", "progression", "race"].includes(workout.workout_type);
+}
+
+function formatWeekdayList(weekdays: string[]) {
+  if (weekdays.length <= 1) {
+    return weekdays[0] ?? "the reviewed plan";
+  }
+
+  if (weekdays.length === 2) {
+    return `${weekdays[0]} and ${weekdays[1]}`;
+  }
+
+  return `${weekdays.slice(0, -1).join(", ")}, and ${weekdays.at(-1)}`;
+}
+
+function weekdayOrder(weekday: string) {
+  const index = WEEKDAY_NAMES.indexOf(weekday as WeekdayName);
+
+  return index === -1 ? WEEKDAY_NAMES.length : index;
 }
 
 function shouldReviewAvoidRegularQuality(authoringInput: StructuredFirstPlanAuthoringInput) {

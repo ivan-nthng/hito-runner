@@ -161,6 +161,8 @@ Current project skills:
   Use for next-role prompts, execution handoffs, QA prompts, and checkpoint continuity.
 - `skills/hito-running-coach-audit/SKILL.md`
   Use for training-plan quality, running doctrine, workout diversity, progression, recovery, terrain/hill logic, metric-target realism, and sports-safety guardrail reviews.
+- `skills/hito-backlog-intake/SKILL.md`
+  Use for capturing bugs, UI screenshots, improvement ideas, product irritations, or unclear feedback into structured backlog items without implementing code.
 
 If a task matches one of these skills, load the skill before doing substantial work and follow its workflow
 unless the user gives a stricter instruction.

@@ -36,6 +36,9 @@ const structuredFirstPlanDraftInputSchema = z.unknown();
 const structuredFirstPlanConfirmInputSchema = z.unknown();
 const voiceToPlanInputSchema = z.unknown();
 const voiceToPlanConfirmInputSchema = z.unknown();
+const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MODEL = "gpt-4.1-mini";
+const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_TIMEOUT_MS = 240_000;
+const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MAX_OUTPUT_TOKENS = 32_000;
 
 const structuredFirstPlanDraftGenerationDebugSchema = z
   .object({
@@ -243,6 +246,33 @@ export interface GenerateStructuredFirstPlanDraftOptions {
   >;
 }
 
+interface StructuredFirstPlanActionDebugContext {
+  actionPathName: "generateStructuredFirstPlanDraft";
+  userId: string;
+  rawInput: unknown;
+  parsedInput: StructuredFirstPlanOnboardingInput | null;
+  authoringInput: StructuredFirstPlanAuthoringInput | null;
+  serviceOptions: StructuredFirstPlanAiPreviewDebugSummary;
+  result: StructuredFirstPlanDraftResult;
+  errorLayer: string | null;
+}
+
+interface StructuredFirstPlanAiPreviewDebugSummary {
+  contractMode: "blueprint";
+  model: string | null;
+  timeoutMs: number | null;
+  maxOutputTokens: number | null;
+  referenceExampleProvided: boolean;
+  explicitOptionKeys: string[];
+  envSource: {
+    openAiFirstPlanModel: "env" | "default";
+    openAiFirstPlanTimeoutMs: "env" | "default";
+    openAiFirstPlanMaxOutputTokens: "env" | "default";
+    fallbackGenericOpenAiPlanModelUsed: boolean;
+    genericOpenAiPlanModelConfigured: boolean;
+  };
+}
+
 export type ConfirmStructuredFirstPlanDraftResult =
   | {
       ok: true;
@@ -419,19 +449,40 @@ export async function generateStructuredFirstPlanDraftForUser(
   input: unknown,
   options: GenerateStructuredFirstPlanDraftOptions = {},
 ): Promise<StructuredFirstPlanDraftResult> {
-  void userId;
-
+  const aiPreviewConfig = resolveStructuredFirstPlanAiPreviewConfig(options.aiPreview);
   const parsed = parseStructuredFirstPlanDraftInput(input);
 
   if (!parsed.ok) {
+    await writeStructuredFirstPlanActionDebugArtifact({
+      actionPathName: "generateStructuredFirstPlanDraft",
+      userId,
+      rawInput: input,
+      parsedInput: null,
+      authoringInput: null,
+      serviceOptions: aiPreviewConfig.summary,
+      result: parsed.result,
+      errorLayer: "backend_parser",
+    });
+
     return parsed.result;
   }
 
   try {
     const authoringInput = buildStructuredFirstPlanAuthoringInput(parsed.input);
-    const aiDraft = await generateFirstPlanBlueprintDraft(authoringInput, options);
+    const aiDraft = await generateFirstPlanBlueprintDraft(authoringInput, aiPreviewConfig.options);
 
     if (!aiDraft.ok) {
+      await writeStructuredFirstPlanActionDebugArtifact({
+        actionPathName: "generateStructuredFirstPlanDraft",
+        userId,
+        rawInput: input,
+        parsedInput: parsed.input,
+        authoringInput,
+        serviceOptions: aiPreviewConfig.summary,
+        result: aiDraft.result,
+        errorLayer: classifyStructuredDraftFailureLayer(aiDraft.result),
+      });
+
       return aiDraft.result;
     }
 
@@ -448,7 +499,7 @@ export async function generateStructuredFirstPlanDraftForUser(
     };
     draft.draftToken = await signStructuredFirstPlanDraft(draft);
 
-    return {
+    const result: StructuredFirstPlanDraftResult = {
       ok: true,
       status: "draft_ready",
       sourceKind: generation.sourceKind,
@@ -457,8 +508,34 @@ export async function generateStructuredFirstPlanDraftForUser(
       generation,
       safety: buildStructuredDraftSafety(),
     };
+
+    await writeStructuredFirstPlanActionDebugArtifact({
+      actionPathName: "generateStructuredFirstPlanDraft",
+      userId,
+      rawInput: input,
+      parsedInput: parsed.input,
+      authoringInput,
+      serviceOptions: aiPreviewConfig.summary,
+      result,
+      errorLayer: null,
+    });
+
+    return result;
   } catch (error) {
-    return buildStructuredCorrectionResult(error);
+    const result = buildStructuredCorrectionResult(error);
+
+    await writeStructuredFirstPlanActionDebugArtifact({
+      actionPathName: "generateStructuredFirstPlanDraft",
+      userId,
+      rawInput: input,
+      parsedInput: parsed.ok ? parsed.input : null,
+      authoringInput: null,
+      serviceOptions: aiPreviewConfig.summary,
+      result,
+      errorLayer: "authoring_input_mapper",
+    });
+
+    return result;
   }
 }
 
@@ -660,7 +737,7 @@ function buildStructuredCorrectionResult(error: unknown): StructuredFirstPlanCor
 
 async function generateFirstPlanBlueprintDraft(
   authoringInput: StructuredFirstPlanAuthoringInput,
-  options: GenerateStructuredFirstPlanDraftOptions,
+  aiPreviewOptions: GenerateStructuredFirstPlanDraftOptions["aiPreview"],
 ): Promise<
   | {
       ok: true;
@@ -677,7 +754,7 @@ async function generateFirstPlanBlueprintDraft(
     input: authoringInput,
     inputKind: "structured_authoring",
     contractMode: "blueprint",
-    ...(options.aiPreview ?? {}),
+    ...(aiPreviewOptions ?? {}),
   });
 
   if (!result.ok) {
@@ -724,6 +801,55 @@ async function generateFirstPlanBlueprintDraft(
     canonicalPlan: result.canonicalPlan,
     generation: buildStructuredDraftGenerationMetadata(result.metadata, result.canonicalPlan),
   };
+}
+
+function resolveStructuredFirstPlanAiPreviewConfig(
+  overrides: GenerateStructuredFirstPlanDraftOptions["aiPreview"] = {},
+) {
+  const defaults = {
+    model: serverEnv.openAiFirstPlanModel ?? DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MODEL,
+    timeoutMs: positiveIntegerEnv(
+      serverEnv.openAiFirstPlanTimeoutMs,
+      DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_TIMEOUT_MS,
+    ),
+    maxOutputTokens: positiveIntegerEnv(
+      serverEnv.openAiFirstPlanMaxOutputTokens,
+      DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MAX_OUTPUT_TOKENS,
+    ),
+    referenceExample: null,
+  };
+  const options = { ...defaults, ...(overrides ?? {}) };
+
+  return {
+    options,
+    summary: {
+      contractMode: "blueprint" as const,
+      model: typeof options.model === "string" ? options.model : null,
+      timeoutMs: typeof options.timeoutMs === "number" ? options.timeoutMs : null,
+      maxOutputTokens: typeof options.maxOutputTokens === "number" ? options.maxOutputTokens : null,
+      referenceExampleProvided: Boolean(options.referenceExample),
+      explicitOptionKeys: Object.keys(overrides ?? {}).sort(),
+      envSource: {
+        openAiFirstPlanModel: serverEnv.openAiFirstPlanModel ? "env" : "default",
+        openAiFirstPlanTimeoutMs: serverEnv.openAiFirstPlanTimeoutMs ? "env" : "default",
+        openAiFirstPlanMaxOutputTokens: serverEnv.openAiFirstPlanMaxOutputTokens
+          ? "env"
+          : "default",
+        fallbackGenericOpenAiPlanModelUsed: false,
+        genericOpenAiPlanModelConfigured: Boolean(serverEnv.openAiPlanModel),
+      },
+    } satisfies StructuredFirstPlanAiPreviewDebugSummary,
+  };
+}
+
+function positiveIntegerEnv(value: string | null, fallback: number) {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function buildStructuredDraftGenerationMetadata(
@@ -780,6 +906,330 @@ function buildStructuredBlueprintUnavailableResult(result: {
     },
     safety: buildStructuredDraftSafety(),
   };
+}
+
+function classifyStructuredDraftFailureLayer(
+  result: Extract<StructuredFirstPlanDraftResult, { ok: false }>,
+) {
+  const fallbackReason = result.generation.fallbackReason;
+  const requestPhase = result.generation.debug?.requestPhase ?? null;
+
+  if (fallbackReason.includes("timed_out") || requestPhase === "timeout_before_response") {
+    return "openai_timeout";
+  }
+
+  if (fallbackReason.includes("schema") || fallbackReason.includes("non_json")) {
+    return "openai_schema";
+  }
+
+  if (fallbackReason.includes("request_failed")) {
+    return "openai_request";
+  }
+
+  if (fallbackReason.includes("not_configured")) {
+    return "service_unavailable";
+  }
+
+  if (requestPhase === "fallback_after_validation") {
+    return "blueprint_validation";
+  }
+
+  return "action_result_mapping";
+}
+
+async function writeStructuredFirstPlanActionDebugArtifact(
+  context: StructuredFirstPlanActionDebugContext,
+) {
+  if (!shouldWriteStructuredFirstPlanActionDebugArtifact()) {
+    return;
+  }
+
+  try {
+    const fsModule = "node:fs/promises";
+    const pathModule = "node:path";
+    const { mkdir, writeFile } = (await import(
+      /* @vite-ignore */ fsModule
+    )) as typeof import("node:fs/promises");
+    const { join } = (await import(/* @vite-ignore */ pathModule)) as typeof import("node:path");
+    const processLike = getProcessLike();
+    const cwd = processLike?.cwd?.() ?? ".";
+    const timestamp = new Date().toISOString();
+    const date = timestamp.slice(0, 10);
+    const userHash = await digestSha256Hex(context.userId);
+    const resultSummary = summarizeStructuredFirstPlanActionResult(context.result);
+    const artifactDir = join(
+      cwd,
+      "qa-artifacts",
+      "debug",
+      date,
+      "structured-onboarding-browser-action",
+    );
+    const artifactPath = join(
+      artifactDir,
+      `${timestamp.replace(/[:.]/g, "-")}-${context.actionPathName}-${resultSummary.status}-${userHash.slice(0, 12)}.json`,
+    );
+    const artifact = {
+      timestamp,
+      actionPathName: context.actionPathName,
+      artifactKind: "structured_onboarding_browser_action_trace_v1",
+      user: {
+        userIdHash: userHash,
+        userIdSuffix: context.userId.slice(-8),
+      },
+      runtime: {
+        nodeEnv: processLike?.env?.NODE_ENV ?? null,
+        vercelEnv: processLike?.env?.VERCEL_ENV ?? null,
+      },
+      frontendRequestPayload: summarizeStructuredFirstPlanRequestPayload(context.rawInput),
+      parsedStructuredSetupRequest: context.parsedInput
+        ? summarizeStructuredFirstPlanSetup(context.parsedInput)
+        : null,
+      derivedAuthoringInputSummary: context.authoringInput
+        ? summarizeStructuredFirstPlanAuthoringInput(context.authoringInput)
+        : null,
+      effectiveServiceOptions: context.serviceOptions,
+      result: resultSummary,
+      failure: {
+        layer: context.errorLayer,
+        category: context.errorLayer,
+        openAiReturnedBeforeFailure: didOpenAiReturnBeforeStructuredResult(context.result),
+      },
+      blueprintTrace: extractStructuredResultBlueprintTrace(context.result),
+      comparisonKeys: {
+        setupSummaryHash: await digestSha256Hex(
+          stableJsonStringify(
+            context.parsedInput ? summarizeStructuredFirstPlanSetup(context.parsedInput) : null,
+          ),
+        ),
+        authoringSummaryHash: await digestSha256Hex(
+          stableJsonStringify(
+            context.authoringInput
+              ? summarizeStructuredFirstPlanAuthoringInput(context.authoringInput)
+              : null,
+          ),
+        ),
+      },
+    };
+
+    await mkdir(artifactDir, { recursive: true });
+    await writeFile(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`, "utf8");
+  } catch (error) {
+    console.warn("Could not write structured onboarding debug artifact.", error);
+  }
+}
+
+function shouldWriteStructuredFirstPlanActionDebugArtifact() {
+  const processLike = getProcessLike();
+  const env = processLike?.env ?? {};
+
+  if (env.HITO_STRUCTURED_ONBOARDING_DEBUG === "0") {
+    return false;
+  }
+
+  return (
+    env.HITO_STRUCTURED_ONBOARDING_DEBUG === "1" ||
+    env.NODE_ENV === "development" ||
+    env.VERCEL_ENV === "development" ||
+    env.VERCEL_ENV === "preview"
+  );
+}
+
+function getProcessLike():
+  | {
+      env?: Record<string, string | undefined>;
+      cwd?: () => string;
+    }
+  | undefined {
+  return (
+    globalThis as typeof globalThis & {
+      process?: {
+        env?: Record<string, string | undefined>;
+        cwd?: () => string;
+      };
+    }
+  ).process;
+}
+
+function summarizeStructuredFirstPlanRequestPayload(input: unknown) {
+  if (!input || typeof input !== "object") {
+    return {
+      type: typeof input,
+      keys: [],
+    };
+  }
+
+  return {
+    type: "object",
+    keys: Object.keys(input).sort(),
+    shapeHashSafe: true,
+  };
+}
+
+function summarizeStructuredFirstPlanSetup(input: StructuredFirstPlanOnboardingInput) {
+  return {
+    profile: {
+      age: input.profile.age,
+      heightCm: input.profile.heightCm,
+      weightKg: input.profile.weightKg,
+    },
+    availability: {
+      fixedRestDays: input.availability.fixedRestDays,
+      runningDaysPerWeek: input.availability.runningDaysPerWeek,
+      preferredLongRunDay: input.availability.preferredLongRunDay ?? null,
+    },
+    benchmark: summarizeStructuredBenchmark(input.benchmark),
+    execution: input.execution,
+    goal: {
+      goalDistance: input.goal.goalDistance,
+      goalStyle: input.goal.goalStyle,
+      terrainFocus: "terrainFocus" in input.goal ? input.goal.terrainFocus : null,
+      targetTimePresent: "targetTime" in input.goal ? Boolean(input.goal.targetTime) : false,
+      targetDatePresent: "targetDate" in input.goal ? Boolean(input.goal.targetDate) : false,
+    },
+    strengthPreference: input.strengthPreference,
+    comment: {
+      present: Boolean(input.comment?.trim()),
+      chars: input.comment?.trim().length ?? 0,
+    },
+  };
+}
+
+function summarizeStructuredBenchmark(benchmark: StructuredFirstPlanOnboardingInput["benchmark"]) {
+  if ("fitnessLevel" in benchmark) {
+    return {
+      kind: benchmark.kind,
+      fitnessLevel: benchmark.fitnessLevel,
+      recent5kTimePresent: false,
+      recent5kPacePresent: false,
+    };
+  }
+
+  return {
+    kind: benchmark.kind,
+    recent5kTimePresent: "recent5kTime" in benchmark && Boolean(benchmark.recent5kTime),
+    recent5kPacePresent: "recent5kPace" in benchmark && Boolean(benchmark.recent5kPace),
+  };
+}
+
+function summarizeStructuredFirstPlanAuthoringInput(
+  authoringInput: StructuredFirstPlanAuthoringInput,
+) {
+  return {
+    goal: {
+      goalType: authoringInput.goal.goalType,
+      goalLabel: authoringInput.goal.goalLabel,
+      goalStyle: authoringInput.goal.goalStyle,
+      targetTimePresent: Boolean(authoringInput.goal.targetTime),
+    },
+    schedule: {
+      startDate: authoringInput.schedule.startDate,
+      targetDate: authoringInput.schedule.targetDate ?? null,
+      preparationHorizonWeeks: authoringInput.schedule.preparationHorizonWeeks ?? null,
+    },
+    availability: {
+      preferredRunningDays: authoringInput.availability.preferredRunningDays,
+      unavailableDays: authoringInput.availability.unavailableDays,
+      maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+      allowBackToBackDays: authoringInput.availability.allowBackToBackDays,
+      preferredLongRunDay: authoringInput.availability.preferredLongRunDay ?? null,
+    },
+    runnerProfile: {
+      age: authoringInput.runnerProfile.age,
+      experienceLevel: authoringInput.runnerProfile.experienceLevel,
+      baselineSessionsPerWeek: authoringInput.runnerProfile.baselineSessionsPerWeek ?? null,
+      baselineLongRunDurationMin: authoringInput.runnerProfile.baselineLongRunDurationMin ?? null,
+    },
+    currentLevel: {
+      hasRecentResultSummary: Boolean(authoringInput.currentLevel.recentResultSummary),
+      recentRaceResultCount: authoringInput.currentLevel.recentRaceResults.length,
+      hasRecent5kPace: authoringInput.currentLevel.recent5kPaceSecondsPerKm != null,
+      hasCurrentTrainingLoadSummary: Boolean(
+        authoringInput.currentLevel.currentTrainingLoadSummary,
+      ),
+    },
+    execution: authoringInput.execution,
+    preferences: {
+      terrainFocus: authoringInput.preferences.terrainFocus ?? null,
+      preferredWorkoutMix: authoringInput.preferences.preferredWorkoutMix ?? null,
+      strengthOrMobilityInterest: authoringInput.preferences.strengthOrMobilityInterest ?? null,
+      notes: {
+        present: Boolean(authoringInput.preferences.notes?.trim()),
+        chars: authoringInput.preferences.notes?.trim().length ?? 0,
+      },
+    },
+  };
+}
+
+function summarizeStructuredFirstPlanActionResult(result: StructuredFirstPlanDraftResult) {
+  if (result.ok && result.status === "draft_ready") {
+    return {
+      ok: true,
+      status: result.status,
+      sourceKind: result.generation.sourceKind,
+      sourceStatus: result.generation.sourceStatus,
+      fallbackReason: result.generation.fallbackReason,
+      validationIssueCount: result.generation.validationIssueCount,
+      validationIssues: result.generation.validationIssues,
+      model: result.generation.model,
+      elapsedMs: result.generation.elapsedMs,
+      workoutCount: result.draft.canonicalPlan.planned_workouts.length,
+      deterministicFallbackBoundary:
+        result.generation.blueprintTrace?.deterministicFallbackBoundary ?? null,
+      debug: result.generation.debug,
+    };
+  }
+
+  if (result.ok && result.status === "correction_required") {
+    return {
+      ok: true,
+      status: result.status,
+      reason: result.reason,
+      fields: result.correction.fields,
+      message: result.correction.message,
+    };
+  }
+
+  return {
+    ok: false,
+    status: result.status,
+    reason: result.reason,
+    code: result.code,
+    message: result.message,
+    sourceKind: result.generation.sourceKind,
+    sourceStatus: result.generation.sourceStatus,
+    fallbackReason: result.generation.fallbackReason,
+    validationIssueCount: result.generation.validationIssueCount,
+    validationIssues: result.generation.validationIssues,
+    model: result.generation.model,
+    elapsedMs: result.generation.elapsedMs,
+    deterministicFallbackBoundary:
+      result.generation.blueprintTrace?.deterministicFallbackBoundary ?? null,
+    debug: result.generation.debug,
+  };
+}
+
+function didOpenAiReturnBeforeStructuredResult(result: StructuredFirstPlanDraftResult) {
+  const debug =
+    result.ok && result.status === "draft_ready"
+      ? result.generation.debug
+      : !result.ok
+        ? result.generation.debug
+        : null;
+  const requestPhase = debug?.requestPhase ?? null;
+
+  return requestPhase === "fallback_after_validation" || requestPhase === "normalized";
+}
+
+function extractStructuredResultBlueprintTrace(result: StructuredFirstPlanDraftResult) {
+  if (result.ok && result.status === "draft_ready") {
+    return result.generation.blueprintTrace ?? null;
+  }
+
+  if (!result.ok) {
+    return result.generation.blueprintTrace ?? null;
+  }
+
+  return null;
 }
 
 function sourceKindFromGenerationSource(source: AiFirstPlanDraftPreviewMetadata["source"]) {

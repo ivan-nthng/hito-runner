@@ -57,6 +57,7 @@ import {
 } from "../src/lib/ai-first-plan-draft-authoring";
 import {
   AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
+  buildAiFirstPlanBlueprintTrace,
   buildAiFirstPlanBlueprintPrompt,
   normalizeAiFirstPlanBlueprintToTrainingPlan,
   type AiFirstPlanBlueprint,
@@ -4186,6 +4187,8 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
       "supported balanced half-marathon fallback should explain missing required cadence",
     );
   }
+
+  assertMarathonCadenceAvoidsPostLongRunQuality();
 }
 
 function firstSixWeekIdentityReport(plan: TrainingPlanV2) {
@@ -4229,6 +4232,117 @@ function assertGoalFamilyCadence(
       `${label}: expected goal-family cadence in weeks ${index + 1}-${index + 2}`,
     );
   }
+}
+
+function assertMarathonCadenceAvoidsPostLongRunQuality() {
+  const authoringInput = buildAiFirstPlanAuthoringInput({
+    goal: {
+      goalType: "marathon",
+      goalLabel: "Marathon · Balanced cadence placement",
+      goalStyle: "balanced",
+      targetTime: null,
+    },
+    schedule: {
+      startDate: "2026-05-29",
+      targetDate: null,
+      preparationHorizonWeeks: 16,
+    },
+    runnerProfile: {
+      age: 38,
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunDurationMin: 120,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "rpe",
+    },
+    currentLevel: {
+      recentResultSummary: null,
+      recentRaceResults: [],
+      recent5kPaceSecondsPerKm: null,
+      currentEasyPaceRange: null,
+      currentTrainingLoadSummary: null,
+    },
+    availability: {
+      preferredRunningDays: ["Monday", "Wednesday", "Friday", "Saturday", "Sunday"],
+      unavailableDays: ["Tuesday", "Thursday"],
+      maxRunningDaysPerWeek: 5,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Sunday",
+    },
+    execution: {
+      watchAccess: "unknown",
+      guidancePreference: "effort",
+    },
+  });
+
+  const trace = buildAiFirstPlanBlueprintTrace({
+    authoringInput,
+    blueprint: null,
+    normalizedWorkouts: null,
+    sourceStatus: "blueprint_unavailable",
+    sourceKind: "ai_first_plan_blueprint_v1",
+    fallbackReason: null,
+    issues: [],
+    repairs: [],
+  });
+  const cadenceWeekdays = new Set(trace.requiredCadenceSlots.map((slot) => slot.weekday));
+
+  assert.ok(
+    cadenceWeekdays.has("Wednesday") || cadenceWeekdays.has("Friday"),
+    "marathon Sunday-long cadence should choose Wednesday or Friday quality",
+  );
+  assert.ok(
+    !cadenceWeekdays.has("Monday"),
+    "marathon Sunday-long cadence must not force Monday quality after Sunday long run",
+  );
+  assert.ok(
+    !cadenceWeekdays.has("Saturday"),
+    "marathon Sunday-long cadence must not force Saturday quality before Sunday long run",
+  );
+
+  const prompt = buildAiFirstPlanBlueprintPrompt({ authoringInput, today: "2026-05-28" });
+  const promptSlots = extractRequiredWorkoutSlotsFromPrompt(prompt.userPrompt);
+  const firstWeek = promptSlots[0]!;
+  const sundayLongSlot = firstWeek.slots.find((slot) => slot.weekday === "Sunday");
+  const mondaySlot = firstWeek.slots.find((slot) => slot.weekday === "Monday");
+  const qualitySlot = firstWeek.slots.find((slot) => slot.mustBeQuality);
+
+  assert.equal(sundayLongSlot?.mustBeLongRun, true, "Sunday should remain the long-run slot");
+  assert.equal(
+    mondaySlot?.mustBeQuality,
+    false,
+    "Monday after Sunday long run should not be marked as required quality",
+  );
+  assert.ok(
+    qualitySlot && ["Wednesday", "Friday"].includes(qualitySlot.weekday),
+    "required quality slot should land on Wednesday or Friday when Sunday is long run",
+  );
+}
+
+function extractRequiredWorkoutSlotsFromPrompt(userPrompt: string): Array<{
+  weekNumber: number;
+  slots: Array<{
+    date: string;
+    weekday: string;
+    mustBeLongRun: boolean;
+    mustBeQuality: boolean;
+  }>;
+}> {
+  const match = userPrompt.match(
+    /Required authored workout slots:\n(?<json>[\s\S]*?)\nUse every required slot exactly once/,
+  );
+
+  assert.ok(match?.groups?.json, "prompt should include parseable required workout slots JSON");
+
+  return JSON.parse(match.groups.json) as Array<{
+    weekNumber: number;
+    slots: Array<{
+      date: string;
+      weekday: string;
+      mustBeLongRun: boolean;
+      mustBeQuality: boolean;
+    }>;
+  }>;
 }
 
 function assertAiFirstPlanBlueprintContract() {

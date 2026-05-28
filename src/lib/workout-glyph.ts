@@ -38,9 +38,19 @@ const VISIBLE_TYPE_GLYPH: Record<VisibleWorkoutType, WorkoutGlyphKind> = {
 export function workoutGlyphKind(
   workout: Pick<
     Workout,
-    "type" | "title" | "steps" | "sourceWorkoutType" | "workoutFamily" | "calendarIconKey"
+    | "type"
+    | "title"
+    | "steps"
+    | "sourceWorkoutType"
+    | "workoutFamily"
+    | "workoutIdentity"
+    | "calendarIconKey"
   >,
 ): WorkoutGlyphKind {
+  if (workout.workoutIdentity === "marathon_steady_specificity") {
+    return "steady";
+  }
+
   const visibleType = resolveWorkoutVisibleType(workout);
 
   if (visibleType) {

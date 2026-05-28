@@ -7,6 +7,7 @@ import {
 import type {
   AiFirstPlanDraftDebugMetadata,
   AiFirstPlanDraftPreviewMetadata,
+  AiFirstPlanDraftUnavailableMetadata,
   GenerateAiFirstPlanDraftPreviewOptions,
 } from "@/lib/ai-first-plan-draft-service";
 import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
@@ -16,7 +17,6 @@ import {
   buildStructuredFirstPlanDraftReview,
   buildStructuredFirstPlanDraftSummary,
   buildStructuredFirstPlanProfilePatch,
-  buildStructuredFirstPlanResultContext,
   parseStructuredFirstPlanOnboardingInput,
   structuredFirstPlanOnboardingInputSchema,
   type StructuredFirstPlanAuthoringInput,
@@ -25,10 +25,7 @@ import {
   type StructuredFirstPlanOnboardingInput,
 } from "@/lib/structured-first-plan-onboarding";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
-import {
-  buildStructuredAuthoringPlan,
-  structuredPlanAuthoringInputSchema,
-} from "@/lib/structured-plan-authoring";
+import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring";
 import { buildPlanScopedStructuredAuthoringMetadata } from "@/lib/plan-authoring-snapshot";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { serverEnv } from "@/lib/supabase/env";
@@ -80,7 +77,7 @@ const structuredFirstPlanBlueprintTraceWeekSchema = z
 const structuredFirstPlanBlueprintTraceSchema = z
   .object({
     sourceKind: z.string().trim().min(1).nullable(),
-    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft", "deterministic_fallback"]),
+    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft"]),
     fallbackReason: z.string().trim().min(1).nullable(),
     model: z.string().trim().min(1).nullable(),
     timeoutMs: z.number().int().nonnegative().nullable(),
@@ -134,7 +131,7 @@ const structuredFirstPlanBlueprintTraceSchema = z
 
 const structuredFirstPlanDraftGenerationMetadataSchema = z
   .object({
-    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft", "deterministic_fallback"]),
+    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft"]),
     sourceKind: z.string().trim().min(1),
     fallbackReason: z.string().trim().min(1).nullable(),
     repairs: z.array(z.string().trim().min(1)).max(12),
@@ -172,8 +169,12 @@ export type StructuredFirstPlanDraftResult =
   | StructuredFirstPlanCorrectionRequired
   | {
       ok: false;
-      reason: "generation_failed";
+      status: "draft_failed";
+      reason: "ai_first_plan_blueprint_unavailable";
+      code: "ai_first_plan_blueprint_unavailable";
       message: string;
+      generation: StructuredFirstPlanDraftFailureMetadata;
+      safety: StructuredFirstPlanDraftSafety;
     };
 
 export interface StructuredFirstPlanDraftSuccess {
@@ -215,6 +216,19 @@ export interface StructuredFirstPlanDraftSafety {
 export type StructuredFirstPlanDraftGenerationMetadata = z.output<
   typeof structuredFirstPlanDraftGenerationMetadataSchema
 >;
+
+export interface StructuredFirstPlanDraftFailureMetadata {
+  sourceKind: "ai_first_plan_blueprint_v1";
+  sourceStatus: "blueprint_unavailable";
+  fallbackReason: string;
+  validationIssues: string[];
+  validationIssueCount: number;
+  model: string | null;
+  responseId: string | null;
+  elapsedMs: number | null;
+  debug: z.output<typeof structuredFirstPlanDraftGenerationDebugSchema> | null;
+  blueprintTrace: AiFirstPlanDraftUnavailableMetadata["blueprintTrace"];
+}
 
 export interface GenerateStructuredFirstPlanDraftOptions {
   aiPreview?: Pick<
@@ -416,6 +430,11 @@ export async function generateStructuredFirstPlanDraftForUser(
   try {
     const authoringInput = buildStructuredFirstPlanAuthoringInput(parsed.input);
     const aiDraft = await generateFirstPlanBlueprintDraft(authoringInput, options);
+
+    if (!aiDraft.ok) {
+      return aiDraft.result;
+    }
+
     const canonicalPlan = aiDraft.canonicalPlan;
     const generation = aiDraft.generation;
     const summary = buildStructuredFirstPlanDraftSummary(canonicalPlan, authoringInput);
@@ -495,6 +514,22 @@ export async function confirmStructuredFirstPlanDraftForUser(
 
     const profilePatch = buildStructuredFirstPlanProfilePatch(parsed.request.draft.input);
     const reviewedPlan = parsed.request.draft.canonicalPlan;
+    const reviewedGeneration = parsed.request.draft.generation;
+
+    if (
+      reviewedPlan.source_kind !== "ai_first_plan_blueprint_v1" ||
+      reviewedGeneration.sourceKind !== "ai_first_plan_blueprint_v1" ||
+      !["ai_authored", "repaired_ai_draft"].includes(reviewedGeneration.sourceStatus)
+    ) {
+      return {
+        ok: false,
+        status: "blocked",
+        reason: "invalid_draft",
+        message:
+          "This structured draft was not created by the supported AI blueprint path. Generate a fresh review before creating a plan.",
+      };
+    }
+
     const review = buildStructuredFirstPlanDraftReview(
       parsed.request.draft.input,
       reviewedPlan,
@@ -505,10 +540,7 @@ export async function confirmStructuredFirstPlanDraftForUser(
       reviewedPlan,
       profilePatch,
       buildPlanScopedStructuredAuthoringMetadata({
-        source:
-          reviewedPlan.source_kind === "ai_first_plan_blueprint_v1"
-            ? "ai_first_plan_blueprint"
-            : "structured_first_plan",
+        source: "ai_first_plan_blueprint",
         authoringInput: rebuiltAuthoringInput,
         goalStyle: parsed.request.draft.input.goal.goalStyle,
         targetTime:
@@ -551,39 +583,17 @@ export async function completeStructuredFirstPlanOnboardingForUser(
   userId: string,
   input: StructuredFirstPlanOnboardingInput,
 ) {
-  try {
-    const authoringInput = buildStructuredFirstPlanAuthoringInput(input);
-    const generatedPlan = buildStructuredAuthoringPlan(authoringInput);
-    const profilePatch = buildStructuredFirstPlanProfilePatch(input);
-    const review = buildStructuredFirstPlanDraftReview(input, generatedPlan, authoringInput);
-    const applyResult = await applyImportedPlanForUser(
-      userId,
-      generatedPlan,
-      null,
-      null,
-      profilePatch,
-      buildPlanScopedStructuredAuthoringMetadata({
-        source: "structured_first_plan",
-        authoringInput,
-        goalStyle: input.goal.goalStyle,
-        targetTime: input.goal.goalStyle === "target_time" ? (input.goal.targetTime ?? null) : null,
-        metricPolicySummary: review.planShape.metricPolicy,
-        reviewAssumptions: review.assumptions,
-      }),
-    );
-    const generationContext = buildStructuredFirstPlanResultContext(input);
+  void userId;
+  void input;
 
-    return {
-      ...applyResult,
-      schemaVersion: generatedPlan.schema_version,
-      sourceKind: generatedPlan.source_kind,
-      workoutCount: generatedPlan.planned_workouts.length,
-      onboardingContract: "structured_first_plan_onboarding_v1" as const,
-      generationContext,
-    };
-  } catch (error) {
-    throw new Error(mapStructuredFirstPlanOnboardingError(error));
-  }
+  return {
+    ok: false,
+    status: "blocked",
+    reason: "review_required",
+    message:
+      "Structured first-plan creation now requires a successful AI blueprint draft and explicit review confirmation.",
+    onboardingContract: "structured_first_plan_onboarding_v1" as const,
+  };
 }
 
 function parseStructuredFirstPlanDraftInput(input: unknown):
@@ -651,7 +661,17 @@ function buildStructuredCorrectionResult(error: unknown): StructuredFirstPlanCor
 async function generateFirstPlanBlueprintDraft(
   authoringInput: StructuredFirstPlanAuthoringInput,
   options: GenerateStructuredFirstPlanDraftOptions,
-) {
+): Promise<
+  | {
+      ok: true;
+      canonicalPlan: TrainingPlanV2;
+      generation: StructuredFirstPlanDraftGenerationMetadata;
+    }
+  | {
+      ok: false;
+      result: Extract<StructuredFirstPlanDraftResult, { ok: false }>;
+    }
+> {
   const { generateAiFirstPlanDraftPreview } = await import("@/lib/ai-first-plan-draft-service");
   const result = await generateAiFirstPlanDraftPreview({
     input: authoringInput,
@@ -661,19 +681,46 @@ async function generateFirstPlanBlueprintDraft(
   });
 
   if (!result.ok) {
-    const canonicalPlan = buildStructuredAuthoringPlan(authoringInput);
-
     return {
-      canonicalPlan,
-      generation: buildStructuredDraftGenerationMetadataFromFallback({
-        sourceKind: canonicalPlan.source_kind ?? "structured_authoring_v1",
-        fallbackReason: result.reason,
-        validationIssues: result.issues,
+      ok: false,
+      result: buildStructuredBlueprintUnavailableResult(result),
+    };
+  }
+
+  if (
+    result.canonicalPlan.source_kind !== "ai_first_plan_blueprint_v1" ||
+    result.metadata.status === "deterministic_fallback"
+  ) {
+    return {
+      ok: false,
+      result: buildStructuredBlueprintUnavailableResult({
+        ok: false,
+        reason: "ai_first_plan_blueprint_unavailable",
+        message: "We could not create a safe AI-authored plan draft. Please retry.",
+        issues: [
+          "AI first-plan blueprint generation returned an unsupported deterministic fallback.",
+        ],
+        authoringInput,
+        metadata: {
+          sourceKind: "ai_first_plan_blueprint_v1",
+          sourceStatus: "blueprint_unavailable",
+          fallbackReason: "structured_authoring_v1_blocked",
+          model: result.metadata.model,
+          responseId: result.metadata.responseId,
+          elapsedMs: result.metadata.elapsedMs,
+          validationIssues: [
+            "AI first-plan blueprint generation returned an unsupported deterministic fallback.",
+          ],
+          validationIssueCount: 1,
+          debug: result.metadata.debug,
+          blueprintTrace: result.metadata.blueprintTrace ?? null,
+        },
       }),
     };
   }
 
   return {
+    ok: true,
     canonicalPlan: result.canonicalPlan,
     generation: buildStructuredDraftGenerationMetadata(result.metadata, result.canonicalPlan),
   };
@@ -700,33 +747,39 @@ function buildStructuredDraftGenerationMetadata(
   });
 }
 
-function buildStructuredDraftGenerationMetadataFromFallback({
-  sourceKind,
-  fallbackReason,
-  validationIssues,
-}: {
-  sourceKind: string;
-  fallbackReason: string;
-  validationIssues: string[];
-}): StructuredFirstPlanDraftGenerationMetadata {
-  return structuredFirstPlanDraftGenerationMetadataSchema.parse({
-    sourceStatus: "deterministic_fallback",
-    sourceKind,
-    fallbackReason,
-    repairs: [],
-    validationIssues: validationIssues.slice(0, 12),
-    validationIssueCount: validationIssues.length,
-    reviewAssumptions: [
-      "Hito used the deterministic structured generator because AI first-plan drafting did not return a valid reviewed draft.",
-    ],
-    metricPolicySummary:
-      "Deterministic fallback preserves existing pace, default-HR, fixed-rest-day, and effort-safety gates.",
-    model: null,
-    responseId: null,
-    elapsedMs: null,
-    debug: null,
-    blueprintTrace: null,
-  });
+function buildStructuredBlueprintUnavailableResult(result: {
+  issues: string[];
+  message?: string;
+  reason: string;
+  metadata?: AiFirstPlanDraftUnavailableMetadata;
+}): Extract<StructuredFirstPlanDraftResult, { ok: false }> {
+  const validationIssues = (result.metadata?.validationIssues ?? result.issues)
+    .map((issue) => issue.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+  return {
+    ok: false,
+    status: "draft_failed",
+    reason: "ai_first_plan_blueprint_unavailable",
+    code: "ai_first_plan_blueprint_unavailable",
+    message: result.message ?? "We could not create a safe AI-authored plan draft. Please retry.",
+    generation: {
+      sourceKind: "ai_first_plan_blueprint_v1",
+      sourceStatus: "blueprint_unavailable",
+      fallbackReason: result.metadata?.fallbackReason ?? result.reason,
+      validationIssues,
+      validationIssueCount: result.metadata?.validationIssueCount ?? validationIssues.length,
+      model: result.metadata?.model ?? null,
+      responseId: result.metadata?.responseId ?? null,
+      elapsedMs: result.metadata?.elapsedMs ?? null,
+      debug: result.metadata?.debug
+        ? sanitizeStructuredDraftGenerationDebug(result.metadata.debug)
+        : null,
+      blueprintTrace: result.metadata?.blueprintTrace ?? null,
+    },
+    safety: buildStructuredDraftSafety(),
+  };
 }
 
 function sourceKindFromGenerationSource(source: AiFirstPlanDraftPreviewMetadata["source"]) {

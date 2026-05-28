@@ -9,6 +9,14 @@ description: Use when reviewing Hito training-plan quality, running doctrine, wo
 
 Verify that Hito's generated running plans and recommendations are credible, safe, and specific enough for the runner's context.
 
+## Role Boundary
+
+- Running Coach reviews sports quality only: plan credibility, workout diversity, progression, recovery, race specificity, metric realism, and health-safe training doctrine.
+- Running Coach may read already-produced evidence, such as screenshots, QA reports, exported plan JSON, Backend summaries, copied workout tables, or fixture outputs.
+- Running Coach must not produce technical evidence by running SQL, Supabase queries, migrations, product scripts, browser QA, CLI validation, build checks, or database inspections.
+- Running Coach must not log into product/admin surfaces, create/delete test accounts, validate persistence, or prove auth/mutation/API behavior.
+- If the requested review lacks enough generated-plan evidence, Running Coach should state the missing evidence and hand off to QA or Backend. It should not self-test.
+
 ## Required Reading
 
 For Hito plan-quality work, read:
@@ -18,6 +26,8 @@ For Hito plan-quality work, read:
 3. `docs/current-state.md`
 4. relevant plan-authoring or training-plan active plan
 5. relevant generated plan fixture, prompt output, or product surface
+
+Only read product surfaces when they are provided as screenshots or reports unless the user explicitly asks Running Coach to inspect a visible artifact. Do not perform browser QA under this skill.
 
 ## Review Checklist
 

@@ -13,8 +13,13 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-05-28
+
+- Added a reproducible saved blueprint visual QA proof path: `npm run seed-ai-first-plan-blueprint-proof` now uses an existing disposable tester, calls live `ai-first-plan-blueprint-v1` with deterministic fallback disabled, saves only accepted blueprint truth, verifies persisted `source_kind`, reviewed/persisted row count and end date, rich rows, executable non-rest steps, and `marathon_steady_specificity`, then prints bounded login and cleanup details for browser QA.
+
 ## 2026-05-27
 
+- Polished saved-mode marathon-specific workout representation: `marathon_steady_specificity` now reads as `Marathon` in calendar cells and `Marathon steady` in workout detail, using durability color and the steady glyph without changing backend generation or persisted identity.
 - Updated `/settings` Personal data so the avatar Edit/Upload action sits directly under the avatar tile and Heart rate zones now show backend-shaped default estimated starting ranges when profile age supports them, with copy that keeps the ranges clearly non-personalized.
 - Reworked the `/hitoDS` foundations color documentation into Semantic Colors and Primitive tabs: semantic cards now copy token/recipe code, primitive swatches copy existing Hito hex values, and alpha/gradient usage stays documented as semantic context instead of becoming a separate generated palette.
 - Simplified the `/hitoDS` icon registry preview so each icon renders once at the selected XS/SM/MD/LG documentation size instead of repeating every icon across all sizes.
@@ -25,6 +30,7 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - Generalized AI first-plan blueprint identity selection into a backend-owned goal-family matrix: beginner/consistency, 5K, 10K, half marathon, marathon, ultra, and mountain/trail plans now validate allowed, expected, long-run, cutback/taper, specialty, and excluded identities with week-aware cadence fixtures instead of accepting generic support-filler calendars.
 - Added bounded AI first-plan blueprint trace metadata: draft review and `npm run author-ai-first-plan-draft -- --trace-blueprint` can now show setup summary, required cadence slots, authored blueprint identities before normalization, validation issue codes, repair notes, normalized identities, final identity counts, and fallback boundaries without exposing prompts, secrets, or raw AI payloads.
 - Fixed supported balanced half-marathon AI blueprint cadence: balanced half plans now receive moderate Week 2+ cadence slots with progression/tempo/threshold options, reject early generic support filler when runner support allows specificity, and the ops trace prints first-six-week cadence evidence for QA.
+- Blocked deterministic first-plan fallback leakage from structured onboarding: `generateStructuredFirstPlanDraft` now returns a non-mutating `ai_first_plan_blueprint_unavailable` retry/failure state for invalid, timed-out, or unavailable blueprint attempts instead of reviewing `structured_authoring_v1`, confirm rejects non-blueprint reviewed drafts, the legacy direct structured create action is blocked behind review/confirm, and a live disposable marathon-balanced proof saved `ai_first_plan_blueprint_v1` rows with zero OpenAI calls during confirm.
 
 ## 2026-05-26
 

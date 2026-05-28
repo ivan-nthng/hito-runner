@@ -1,6 +1,7 @@
 import {
   buildAiFirstPlanDraftPrompt,
   normalizeAiFirstPlanDraftToTrainingPlan,
+  type AiFirstPlanBlueprintTraceMetadata,
   type AiFirstPlanDraftMetadata,
 } from "@/lib/ai-first-plan-draft-authoring";
 import {
@@ -52,6 +53,7 @@ export interface GenerateAiFirstPlanDraftPreviewOptions {
   apiKey?: string | null;
   model?: string | null;
   contractMode?: AiFirstPlanGenerationContract;
+  allowDeterministicFallback?: boolean;
   fetchImpl?: typeof fetch;
 }
 
@@ -88,12 +90,33 @@ export interface AiFirstPlanDraftDebugMetadata {
   reasoningEffortSent: boolean;
 }
 
+export interface AiFirstPlanDraftUnavailableMetadata {
+  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_draft_v1";
+  sourceStatus: "blueprint_unavailable" | "draft_unavailable";
+  fallbackReason: string;
+  model: string;
+  responseId: string | null;
+  elapsedMs: number;
+  validationIssues: string[];
+  validationIssueCount: number;
+  debug: AiFirstPlanDraftDebugMetadata;
+  blueprintTrace?: AiFirstPlanBlueprintTraceMetadata | null;
+}
+
 export type AiFirstPlanDraftPreviewResult =
   | {
       ok: true;
       authoringInput: StructuredFirstPlanAuthoringInput;
       canonicalPlan: TrainingPlanV2;
       metadata: AiFirstPlanDraftPreviewMetadata;
+    }
+  | {
+      ok: false;
+      reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_draft_unavailable";
+      message: string;
+      issues: string[];
+      authoringInput: StructuredFirstPlanAuthoringInput;
+      metadata: AiFirstPlanDraftUnavailableMetadata;
     }
   | {
       ok: false;
@@ -122,6 +145,7 @@ export async function generateAiFirstPlanDraftPreview({
   apiKey = serverEnv.openAiApiKey,
   model = serverEnv.openAiPlanModel ?? DEFAULT_OPENAI_PLAN_MODEL,
   contractMode = DEFAULT_AI_FIRST_PLAN_CONTRACT,
+  allowDeterministicFallback,
   fetchImpl = globalThis.fetch,
 }: GenerateAiFirstPlanDraftPreviewOptions): Promise<AiFirstPlanDraftPreviewResult> {
   const authoringInputResult = resolveStructuredAuthoringInput(input, inputKind);
@@ -132,15 +156,18 @@ export async function generateAiFirstPlanDraftPreview({
 
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
+  const useDeterministicFallback =
+    allowDeterministicFallback ?? contractMode !== DEFAULT_AI_FIRST_PLAN_CONTRACT;
 
   if (!apiKey) {
-    return deterministicFallback({
+    return fallbackOrUnavailable({
       authoringInput,
       reason: "openai_not_configured",
       issues: ["OpenAI is not configured for AI-authored first-plan drafting."],
       model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
       responseId: null,
       startedAt,
+      allowDeterministicFallback: useDeterministicFallback,
       debug: buildNotStartedDebug({
         timeoutMs,
         maxOutputTokens,
@@ -166,13 +193,14 @@ export async function generateAiFirstPlanDraftPreview({
     const parsedOutput = safeParseJson(rawOutput);
 
     if (!parsedOutput) {
-      return deterministicFallback({
+      return fallbackOrUnavailable({
         authoringInput,
         reason: "ai_first_plan_draft_non_json_output",
         issues: ["OpenAI returned a non-JSON AI first-plan draft payload."],
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
         responseId: response.body.id ?? null,
         startedAt,
+        allowDeterministicFallback: useDeterministicFallback,
         debug: { ...response.debug, requestPhase: "fallback_after_validation" },
       });
     }
@@ -189,7 +217,7 @@ export async function generateAiFirstPlanDraftPreview({
           });
 
     if (!normalized.ok) {
-      return deterministicFallback({
+      return fallbackOrUnavailable({
         authoringInput,
         reason: normalized.reason,
         issues: normalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
@@ -197,6 +225,7 @@ export async function generateAiFirstPlanDraftPreview({
         responseId: response.body.id ?? null,
         startedAt,
         fallbackMetadata: normalized.fallback,
+        allowDeterministicFallback: useDeterministicFallback,
         debug: { ...response.debug, requestPhase: "fallback_after_validation" },
       });
     }
@@ -233,13 +262,14 @@ export async function generateAiFirstPlanDraftPreview({
   } catch (error) {
     const fallbackReason = classifyAiFirstPlanDraftError(error, contractMode);
 
-    return deterministicFallback({
+    return fallbackOrUnavailable({
       authoringInput,
       reason: fallbackReason,
       issues: [boundedErrorMessage(error, fallbackReason)],
       model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
       responseId: null,
       startedAt,
+      allowDeterministicFallback: useDeterministicFallback,
       debug:
         error instanceof AiFirstPlanDraftServiceError
           ? error.debug
@@ -512,6 +542,103 @@ function supportsReasoningEffort(model: string) {
   return normalized.startsWith("gpt-5") || normalized.startsWith("o");
 }
 
+function fallbackOrUnavailable({
+  allowDeterministicFallback,
+  ...args
+}: {
+  allowDeterministicFallback: boolean;
+  authoringInput: StructuredFirstPlanAuthoringInput;
+  reason: string;
+  issues: string[];
+  model: string;
+  responseId: string | null;
+  startedAt: number;
+  fallbackMetadata?: AiFirstPlanDraftMetadata;
+  debug: AiFirstPlanDraftDebugMetadata;
+}):
+  | Extract<AiFirstPlanDraftPreviewResult, { ok: true }>
+  | Extract<
+      AiFirstPlanDraftPreviewResult,
+      {
+        ok: false;
+        reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_draft_unavailable";
+      }
+    > {
+  if (allowDeterministicFallback) {
+    return deterministicFallback(args);
+  }
+
+  return unavailableAiFirstPlanDraft(args);
+}
+
+function unavailableAiFirstPlanDraft({
+  authoringInput,
+  reason,
+  issues,
+  model,
+  responseId,
+  startedAt,
+  fallbackMetadata,
+  debug,
+}: {
+  authoringInput: StructuredFirstPlanAuthoringInput;
+  reason: string;
+  issues: string[];
+  model: string;
+  responseId: string | null;
+  startedAt: number;
+  fallbackMetadata?: AiFirstPlanDraftMetadata;
+  debug: AiFirstPlanDraftDebugMetadata;
+}): Extract<
+  AiFirstPlanDraftPreviewResult,
+  {
+    ok: false;
+    reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_draft_unavailable";
+  }
+> {
+  const validationIssues = issues
+    .map((issue) => issue.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+  const elapsedMs = Date.now() - startedAt;
+  const isBlueprint = debug.contractMode === "blueprint";
+  const sourceKind = isBlueprint ? "ai_first_plan_blueprint_v1" : "ai_first_plan_draft_v1";
+  const sourceStatus = isBlueprint ? "blueprint_unavailable" : "draft_unavailable";
+  const blueprintTrace = isBlueprint
+    ? buildUnavailableBlueprintTrace({
+        trace: fallbackMetadata?.blueprintTrace ?? null,
+        authoringInput,
+        sourceKind,
+        reason,
+        issues: validationIssues,
+        repairs: fallbackMetadata?.repairs ?? [],
+        model,
+        elapsedMs,
+        debug,
+      })
+    : (fallbackMetadata?.blueprintTrace ?? null);
+
+  return {
+    ok: false,
+    reason: isBlueprint ? "ai_first_plan_blueprint_unavailable" : "ai_first_plan_draft_unavailable",
+    message: "We could not create a safe AI-authored plan draft. Please retry.",
+    issues: validationIssues,
+    authoringInput,
+    metadata: {
+      sourceKind,
+      sourceStatus,
+      fallbackReason: reason,
+      model,
+      responseId,
+      elapsedMs,
+      validationIssues,
+      validationIssueCount: validationIssues.length,
+      debug,
+      blueprintTrace,
+    },
+  };
+}
+
 function deterministicFallback({
   authoringInput,
   reason,
@@ -583,6 +710,55 @@ function deterministicFallback({
   };
 }
 
+function buildUnavailableBlueprintTrace({
+  trace,
+  authoringInput,
+  sourceKind,
+  reason,
+  issues,
+  repairs,
+  model,
+  elapsedMs,
+  debug,
+}: {
+  trace: AiFirstPlanBlueprintTraceMetadata | null;
+  authoringInput: StructuredFirstPlanAuthoringInput;
+  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_draft_v1";
+  reason: string;
+  issues: string[];
+  repairs: string[];
+  model: string;
+  elapsedMs: number;
+  debug: AiFirstPlanDraftDebugMetadata;
+}): AiFirstPlanBlueprintTraceMetadata {
+  const baseTrace =
+    trace ??
+    buildAiFirstPlanBlueprintTrace({
+      authoringInput,
+      blueprint: null,
+      normalizedWorkouts: null,
+      sourceStatus: "blueprint_unavailable",
+      sourceKind,
+      fallbackReason: reason,
+      issues: issuesToTraceIssues(issues, reason),
+      repairs,
+    });
+
+  return {
+    ...baseTrace,
+    sourceKind,
+    sourceStatus: "blueprint_unavailable",
+    fallbackReason: reason,
+    model,
+    timeoutMs: debug.timeoutMs,
+    elapsedMs,
+    deterministicFallbackBoundary: {
+      used: false,
+      reason,
+    },
+  };
+}
+
 function enrichAiFirstPlanBlueprintTrace({
   trace,
   authoringInput,
@@ -615,12 +791,7 @@ function enrichAiFirstPlanBlueprintTrace({
       sourceStatus,
       sourceKind: canonicalPlan.source_kind ?? null,
       fallbackReason,
-      issues: issues.map((issue) => ({
-        code: issue.includes(":")
-          ? (issue.split(":")[0]?.trim() ?? "unknown")
-          : (fallbackReason ?? "unknown"),
-        message: issue,
-      })),
+      issues: issuesToTraceIssues(issues, fallbackReason ?? "unknown"),
       repairs,
     });
 
@@ -637,6 +808,13 @@ function enrichAiFirstPlanBlueprintTrace({
       reason: fallbackReason,
     },
   };
+}
+
+function issuesToTraceIssues(issues: string[], fallbackCode: string) {
+  return issues.map((issue) => ({
+    code: issue.includes(":") ? (issue.split(":")[0]?.trim() ?? "unknown") : fallbackCode,
+    message: issue,
+  }));
 }
 
 async function withTimeout<T>(

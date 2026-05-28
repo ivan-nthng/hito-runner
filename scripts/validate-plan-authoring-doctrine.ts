@@ -4650,15 +4650,15 @@ async function assertAiFirstPlanDraftServiceContract() {
 
   assert.equal(
     invalidResult.ok,
-    true,
-    "invalid AI first-plan service draft should return deterministic fallback, not throw",
+    false,
+    "invalid AI first-plan service draft should return bounded blueprint-unavailable failure",
   );
 
-  if (invalidResult.ok) {
+  if (!invalidResult.ok && invalidResult.reason === "ai_first_plan_blueprint_unavailable") {
     assert.equal(
-      invalidResult.metadata.status,
-      "deterministic_fallback",
-      "invalid AI first-plan service draft should be source-visible fallback",
+      invalidResult.metadata.sourceStatus,
+      "blueprint_unavailable",
+      "invalid AI first-plan service draft should not become deterministic fallback",
     );
     assert.equal(
       invalidResult.metadata.fallbackReason,
@@ -4682,15 +4682,15 @@ async function assertAiFirstPlanDraftServiceContract() {
 
   assert.equal(
     timeoutResult.ok,
-    true,
-    "timed-out AI first-plan service should return deterministic fallback, not hang",
+    false,
+    "timed-out AI first-plan service should return bounded blueprint-unavailable failure",
   );
 
-  if (timeoutResult.ok) {
+  if (!timeoutResult.ok && timeoutResult.reason === "ai_first_plan_blueprint_unavailable") {
     assert.equal(
-      timeoutResult.metadata.status,
-      "deterministic_fallback",
-      "timed-out AI first-plan service should use deterministic fallback",
+      timeoutResult.metadata.sourceStatus,
+      "blueprint_unavailable",
+      "timed-out AI first-plan service should not become deterministic fallback",
     );
     assert.equal(
       timeoutResult.metadata.fallbackReason,
@@ -4791,20 +4791,20 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
 
   assert.equal(
     invalidResult.ok,
-    true,
-    "invalid blueprint structured first-plan draft should still return bounded fallback",
+    false,
+    "invalid blueprint structured first-plan draft should return bounded failure",
   );
   assert.equal(
     invalidResult.status,
-    "draft_ready",
-    "invalid blueprint fallback should still produce a reviewable deterministic draft",
+    "draft_failed",
+    "invalid blueprint must not produce a reviewable deterministic draft",
   );
 
-  if (invalidResult.ok && invalidResult.status === "draft_ready") {
+  if (!invalidResult.ok && invalidResult.status === "draft_failed") {
     assert.equal(
       invalidResult.generation.sourceStatus,
-      "deterministic_fallback",
-      "invalid blueprint structured draft should expose deterministic fallback status",
+      "blueprint_unavailable",
+      "invalid blueprint structured draft should expose unavailable status",
     );
     assert.equal(
       invalidResult.generation.fallbackReason,
@@ -4812,9 +4812,9 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
       "invalid blueprint structured draft should expose bounded fallback reason",
     );
     assert.equal(
-      invalidResult.draft.canonicalPlan.source_kind,
-      "structured_authoring_v1",
-      "invalid blueprint structured draft should fall back to deterministic canonical plan truth",
+      invalidResult.generation.sourceKind,
+      "ai_first_plan_blueprint_v1",
+      "invalid blueprint structured draft should keep the blueprint source boundary",
     );
   }
 
@@ -4833,15 +4833,15 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
 
   assert.equal(
     timeoutResult.ok,
-    true,
-    "timed-out blueprint structured first-plan draft should still return bounded fallback",
+    false,
+    "timed-out blueprint structured first-plan draft should return bounded failure",
   );
 
-  if (timeoutResult.ok && timeoutResult.status === "draft_ready") {
+  if (!timeoutResult.ok && timeoutResult.status === "draft_failed") {
     assert.equal(
       timeoutResult.generation.sourceStatus,
-      "deterministic_fallback",
-      "timed-out blueprint structured draft should expose deterministic fallback status",
+      "blueprint_unavailable",
+      "timed-out blueprint structured draft should expose unavailable status",
     );
     assert.equal(
       timeoutResult.generation.fallbackReason,
@@ -4849,8 +4849,8 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
       "timed-out blueprint structured draft should expose bounded timeout reason",
     );
     assert.ok(
-      timeoutResult.draft.draftToken.includes(":"),
-      "timed-out fallback structured draft should still include a reviewed-plan token",
+      !("draft" in timeoutResult),
+      "timed-out blueprint structured draft must not include a reviewed-plan token",
     );
   }
 }

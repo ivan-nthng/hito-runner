@@ -284,6 +284,16 @@ const VISIBLE_TYPE_META: Record<
   rest: TYPE_META.rest,
 };
 
+const WORKOUT_IDENTITY_VISIBLE_META: Partial<
+  Record<CanonicalWorkoutIdentity, { label: string; short: string; color: string; ring: string }>
+> = {
+  marathon_steady_specificity: {
+    ...TYPE_META.long_run,
+    label: "Marathon steady",
+    short: "Marathon",
+  },
+};
+
 const SOURCE_WORKOUT_VISIBLE_TYPE: Record<string, VisibleWorkoutType> = {
   recovery: "recovery",
   intervals: "intervals",
@@ -315,7 +325,7 @@ const SOURCE_WORKOUT_VISIBLE_TYPE: Record<string, VisibleWorkoutType> = {
 };
 
 type WorkoutVisibleInput = Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType"> &
-  Partial<Pick<Workout, "workoutFamily" | "calendarIconKey">>;
+  Partial<Pick<Workout, "workoutFamily" | "workoutIdentity" | "calendarIconKey">>;
 
 export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   label: string;
@@ -324,6 +334,12 @@ export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   ring: string;
 } {
   const base = TYPE_META[workout.type];
+  const identityMeta = resolveWorkoutVisibleMetaFromIdentity(workout.workoutIdentity);
+
+  if (identityMeta) {
+    return identityMeta;
+  }
+
   const visibleType = resolveWorkoutVisibleType(workout);
 
   if (!visibleType) {
@@ -331,6 +347,12 @@ export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   }
 
   return VISIBLE_TYPE_META[visibleType];
+}
+
+function resolveWorkoutVisibleMetaFromIdentity(
+  workoutIdentity: CanonicalWorkoutIdentity | null | undefined,
+) {
+  return workoutIdentity ? WORKOUT_IDENTITY_VISIBLE_META[workoutIdentity] : null;
 }
 
 export function resolveWorkoutVisibleType(workout: WorkoutVisibleInput): VisibleWorkoutType | null {

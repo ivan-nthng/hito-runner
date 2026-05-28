@@ -33,6 +33,7 @@ type FixtureKind =
   | "one_week_smoke"
   | "compact_smoke"
   | "balanced_half"
+  | "marathon_balanced"
   | "full_half"
   | "identity_coverage";
 
@@ -127,7 +128,7 @@ const result = await generateAiFirstPlanDraftPreview({
 });
 
 if (!result.ok) {
-  console.error(
+  console.log(
     JSON.stringify(
       {
         ok: false,
@@ -137,13 +138,35 @@ if (!result.ok) {
         fixture: fixtureKind,
         referenceIncluded: Boolean(referenceExample),
         reason: result.reason,
+        message: "message" in result ? result.message : undefined,
         issues: result.issues,
+        sourceKind: "metadata" in result ? result.metadata.sourceKind : undefined,
+        sourceStatus: "metadata" in result ? result.metadata.sourceStatus : undefined,
+        fallbackReason: "metadata" in result ? result.metadata.fallbackReason : undefined,
+        validationIssueCount:
+          "metadata" in result ? result.metadata.validationIssueCount : result.issues.length,
+        model: "metadata" in result ? result.metadata.model : undefined,
+        responseId: "metadata" in result ? result.metadata.responseId : undefined,
+        elapsedMs: "metadata" in result ? result.metadata.elapsedMs : undefined,
+        debug: "metadata" in result ? result.metadata.debug : undefined,
+        blueprintTrace:
+          includeBlueprintTrace && contractMode === "blueprint"
+            ? buildBlueprintUnavailableTraceOutput({
+                result,
+                mode,
+                fixtureKind,
+                inputKind,
+                referenceIncluded: Boolean(referenceExample),
+              })
+            : undefined,
       },
       null,
       2,
     ),
   );
-  process.exitCode = 1;
+  if (result.reason === "structured_input_invalid") {
+    process.exitCode = 1;
+  }
 } else {
   console.log(
     JSON.stringify(
@@ -1176,6 +1199,87 @@ function buildBlueprintTraceOutput({
   };
 }
 
+function buildBlueprintUnavailableTraceOutput({
+  result,
+  mode,
+  fixtureKind,
+  inputKind,
+  referenceIncluded,
+}: {
+  result: Extract<Awaited<ReturnType<typeof generateAiFirstPlanDraftPreview>>, { ok: false }>;
+  mode: ScriptMode;
+  fixtureKind: FixtureKind;
+  inputKind: AiFirstPlanDraftServiceInputKind;
+  referenceIncluded: boolean;
+}) {
+  if (!("metadata" in result) || !result.metadata.blueprintTrace) {
+    return null;
+  }
+
+  const trace = result.metadata.blueprintTrace;
+
+  return {
+    requestSummary: {
+      ...trace.requestSummary,
+      inputKind,
+      referenceIncluded,
+    },
+    openAiOrFallbackStatus: {
+      sourceKind: trace.sourceKind,
+      sourceStatus: trace.sourceStatus,
+      fallbackReason: trace.fallbackReason,
+      model: trace.model,
+      responseId: result.metadata.responseId,
+      mode,
+      fixture: fixtureKind,
+      timeoutMs: trace.timeoutMs,
+      elapsedMs: trace.elapsedMs,
+      requestPhase: result.metadata.debug.requestPhase,
+      abortFired: result.metadata.debug.abortFired,
+    },
+    requiredCadenceByWeek: trace.requiredCadenceSlots.map((slot) => ({
+      weekNumber: slot.weekNumber,
+      date: slot.date,
+      weekday: slot.weekday,
+      kind: slot.kind,
+      identityOptions: slot.identityOptions,
+      purpose: slot.purpose,
+    })),
+    authoredBlueprintIdentitiesByWeek: trace.authoredBlueprintWeeks.map((week) => ({
+      weekNumber: week.weekNumber,
+      phase: week.phase,
+      theme: week.theme,
+      identities: week.identities,
+      families: week.families,
+      icons: week.icons,
+      dates: week.dates,
+    })),
+    validationIssuesAndRepairs: {
+      issueCodes: trace.validationIssueCodes,
+      issueSummary: trace.validationIssueSummary,
+      repairs: trace.repairs,
+    },
+    normalizedCanonicalIdentitiesByWeek: trace.normalizedCanonicalWeeks.map((week) => ({
+      weekNumber: week.weekNumber,
+      identities: week.identities,
+      families: week.families,
+      icons: week.icons,
+    })),
+    finalCounts: {
+      identities: trace.finalReviewedPlanIdentityCounts,
+      families: trace.finalReviewedPlanFamilyCounts,
+      icons: trace.finalReviewedPlanIconCounts,
+      persistedIdentities: trace.persistedIdentityCounts,
+    },
+    safetyMetadata: {
+      deterministicFallbackBoundary: trace.deterministicFallbackBoundary,
+      persisted: false,
+      rawPromptPrinted: false,
+      rawAiPayloadPrinted: false,
+    },
+  };
+}
+
 function buildFirstSixWeekAcceptanceReport({
   plan,
   trace,
@@ -1375,6 +1479,10 @@ function buildDefaultAuthoringInput(fixtureKind: FixtureKind) {
     return buildBalancedHalfAuthoringInput();
   }
 
+  if (fixtureKind === "marathon_balanced") {
+    return buildMarathonBalancedAuthoringInput();
+  }
+
   return {
     goal: {
       goalType: "half_marathon",
@@ -1421,6 +1529,62 @@ function buildDefaultAuthoringInput(fixtureKind: FixtureKind) {
       strengthOrMobilityInterest: "mobility",
       indoorTreadmillOk: false,
       notes: "Ops smoke fixture for AI-authored first-plan draft validation.",
+    },
+    execution: {
+      watchAccess: "watch_or_app",
+      guidancePreference: "mixed",
+    },
+  } satisfies StructuredFirstPlanAuthoringInput;
+}
+
+function buildMarathonBalancedAuthoringInput() {
+  return {
+    goal: {
+      goalType: "marathon",
+      goalLabel: "Marathon · Balanced blueprint-only proof",
+      goalStyle: "balanced",
+      targetTime: null,
+      targetEventName: "Balanced marathon plan",
+    },
+    schedule: {
+      startDate: "2026-06-01",
+      targetDate: "2026-07-26",
+      preparationHorizonWeeks: 8,
+    },
+    runnerProfile: {
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunKm: 18,
+      baselineLongRunDurationMin: null,
+      age: 38,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "mixed",
+    },
+    currentLevel: {
+      recentResultSummary: "Recent 5K time: 24:30.",
+      recentRaceResults: [{ distance: "5K", resultTime: "24:30", resultDate: null }],
+      recent5kPaceSecondsPerKm: 294,
+      currentEasyPaceRange: "6:25-7:20/km",
+      currentTrainingLoadSummary:
+        "Currently running five days per week with a comfortable long run near 18 km.",
+    },
+    availability: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      unavailableDays: ["Wednesday", "Sunday"],
+      maxRunningDaysPerWeek: 5,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Saturday",
+    },
+    constraints: {
+      injuryConstraints: [],
+      hardConstraints: [],
+    },
+    preferences: {
+      preferredWorkoutMix: "balanced",
+      terrainFocus: "standard",
+      strengthOrMobilityInterest: "mobility",
+      indoorTreadmillOk: false,
+      notes: "Marathon balanced live proof fixture for blueprint-only first-plan creation.",
     },
     execution: {
       watchAccess: "watch_or_app",
@@ -1705,6 +1869,10 @@ function parseFixtureKind(value: string | true | undefined): FixtureKind {
     return "balanced_half";
   }
 
+  if (normalized === "marathon-balanced" || normalized === "marathon_balanced") {
+    return "marathon_balanced";
+  }
+
   if (normalized === "full-half" || normalized === "full_half") {
     return "full_half";
   }
@@ -1715,7 +1883,7 @@ function parseFixtureKind(value: string | true | undefined): FixtureKind {
 
   if (normalized) {
     throw new Error(
-      "--fixture must be one-week-smoke, compact-smoke, balanced-half, full-half, or identity-coverage.",
+      "--fixture must be one-week-smoke, compact-smoke, balanced-half, marathon-balanced, full-half, or identity-coverage.",
     );
   }
 
@@ -1784,16 +1952,17 @@ function printHelp() {
       "  npm run author-ai-first-plan-draft -- --mock-invalid",
       "  npm run author-ai-first-plan-draft -- --mock-timeout --timeout-ms 20",
       "  OPENAI_PLAN_MODEL=gpt-4.1-mini npm run author-ai-first-plan-draft -- --live --contract blueprint --fixture compact-smoke --no-reference --timeout-ms 120000 --max-output-tokens 8000",
+      "  OPENAI_PLAN_MODEL=gpt-4.1-mini npm run author-ai-first-plan-draft -- --live --contract blueprint --fixture marathon-balanced --no-reference --timeout-ms 120000 --max-output-tokens 12000 --trace-blueprint",
       "",
       "Options:",
       "  --live                         Use the real OpenAI Responses API.",
       "  --mock-openai                  Use deterministic mock OpenAI output. This is the default.",
-      "  --mock-invalid                 Use invalid mock output and verify deterministic fallback.",
-      "  --mock-timeout                 Simulate a hung OpenAI request and verify timeout fallback.",
+      "  --mock-invalid                 Use invalid mock output and verify blueprint-unavailable failure.",
+      "  --mock-timeout                 Simulate a hung OpenAI request and verify blueprint-unavailable failure.",
       "  --input-file <path>            JSON structured authoring input or onboarding input.",
       "  --input-kind <kind>            structured_authoring or structured_onboarding.",
       "  --contract <kind>              blueprint (default) or strict-draft diagnostic.",
-      "  --fixture <kind>               one-week-smoke, compact-smoke, balanced-half, full-half, or identity-coverage when no input file is supplied.",
+      "  --fixture <kind>               one-week-smoke, compact-smoke, balanced-half, marathon-balanced, full-half, or identity-coverage when no input file is supplied.",
       "  --reference-file <path>        Optional rich reference JSON for prompt style guidance.",
       "  --no-reference                 Omit reference-style guidance for compact live latency smoke.",
       "  --timeout-ms <number>          Bounded OpenAI timeout. Default: 45000.",

@@ -206,7 +206,11 @@ export type AiFirstPlanDraft = z.output<typeof aiFirstPlanDraftSchema>;
 
 export interface AiFirstPlanBlueprintTraceMetadata {
   sourceKind: string | null;
-  sourceStatus: "ai_authored" | "repaired_ai_draft" | "deterministic_fallback";
+  sourceStatus:
+    | "ai_authored"
+    | "repaired_ai_draft"
+    | "deterministic_fallback"
+    | "blueprint_unavailable";
   fallbackReason: string | null;
   model: string | null;
   timeoutMs: number | null;

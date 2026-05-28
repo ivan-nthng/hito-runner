@@ -27,6 +27,15 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 7. Update generated/local database types only when schema actually changes.
 8. Update permanent docs only for implemented behavior.
 
+## Hard Reuse And Cleanup Gate
+
+- Existing backend owners, validators, server actions, persistence helpers, scripts, and canonical entities must be reused before adding new ones.
+- Before creating a module, table, migration, RPC, script, helper, or abstraction, search for the existing owner and extend it if that keeps the system smaller.
+- New storage or a new subsystem requires a concrete plan-backed reason; do not add it because it is convenient for one slice.
+- If an implementation attempt is abandoned, reverted, or replaced, remove the stale code/config/script in the same slice whenever safe.
+- Temporary compatibility layers, fallbacks, diagnostic helpers, or legacy bridges must include a removal condition or follow-up cleanup note.
+- After replacing a legacy path, delete or hard-block the old path once QA proves the replacement, unless an active plan explicitly keeps it for compatibility.
+
 ## Minimal Diff And Reuse Rule
 
 - For one-field, one-copy, or one-condition requests, make the smallest direct change that satisfies the request.
@@ -44,6 +53,8 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 - Entitlement and admin checks are backend-owned.
 - AI receives compact backend-built context, not unrestricted database access.
 - Compatibility exports may remain only when useful and should not re-own logic.
+- Do not duplicate canonical lifecycle, validation, persistence, admin, entitlement, or AI-context logic in a parallel seam.
+- Do not leave dead code behind for "maybe later"; move it to a documented backlog/plan or delete it.
 
 ## Validation
 

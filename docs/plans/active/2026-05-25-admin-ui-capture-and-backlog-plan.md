@@ -2,7 +2,7 @@
 
 ## Status
 
-Active / Ready for Backend Slice 1
+Active / `/admin/capture` Backlog v1 QA-passed, future capture phases paused
 
 ## Owner
 
@@ -10,7 +10,7 @@ Architect / Backend / Frontend / QA
 
 ## Last Updated
 
-2026-05-25
+2026-05-28
 
 ## Context
 
@@ -24,6 +24,14 @@ Current admin truth already exists:
 - local Test accounts are explicitly local/dev-only and are not production user management.
 
 This plan adds a new internal capture/backlog workflow alongside the existing admin surface.
+
+Current implemented phase:
+
+- backend storage/admin capture contract is implemented and QA-proven
+- `/admin/capture` Backlog v1 is implemented and QA-passed
+- backend-owned backlog truth is the current source for the admin surface
+- route-spanning capture overlay, screenshot upload, live editing, OpenAI, Codex auto-dispatch, and
+  unified work-item/status modeling are not part of the completed v1 phase
 
 Important product correction:
 
@@ -425,6 +433,73 @@ Frontend must not:
 - require the product owner to enter `/admin/capture` before every capture
 - make capture mode persistent after navigation unless the explicit query/flag remains present
 
+## Backlog Design-System Contract
+
+The admin `Backlog` surface must be built from Hito DS and existing admin workbench patterns.
+
+This surface must not introduce a separate backlog UI kit, parallel component language, or
+route-local visual system.
+
+Canonical reuse rules:
+
+- use the existing admin shell/tabs if they are available
+- reuse Hito DS typography, surfaces, buttons, tabs, badges, dialogs, disclosures, tables, lists,
+  empty states, loading states, and error states
+- assemble filters, task disclosure, quick note form, prompt copy actions, status controls,
+  priority controls, and role controls from existing Hito DS/admin primitives
+- inspect `/hitoDS`, `src/routes/hitoDS.tsx`, and `src/components/ui/*` before creating any new
+  UI primitive
+- visual capture backlog items and quick notes must land in the same `/admin/capture` backlog
+  surface, not a separate admin product
+
+Forbidden:
+
+- a new backlog-specific design system
+- one-off badge/button/card/table styling when a Hito DS/admin primitive exists
+- a separate visual-capture queue that bypasses the canonical backlog
+- frontend-owned backlog truth, prompt generation, status rules, priority rules, or role rules
+
+Backend remains the source of truth for capture items, quick notes, status, priority, target role,
+notes, assets, and deterministic prompt generation.
+
+Frontend owns interaction only:
+
+- render backend-shaped backlog view models
+- let admin filter, expand, copy, triage, and create quick notes
+- show loading/error/empty states honestly
+- never invent backlog lifecycle rules locally
+
+Designer deliverable expectation:
+
+- define layout anatomy using existing Hito DS/admin primitives
+- specify how filters, task disclosure, item detail, quick note, and copy actions should look
+- call out any truly missing primitive before requesting a new component
+- avoid redesigning `/admin/analytics` or creating a new admin visual language
+
+Copy deliverable expectation:
+
+- write concise internal-admin copy for the page header, quick note form, empty states, unavailable
+  states, copy-success states, and prompt-copy labels
+- keep language operational and clear, not runner-facing marketing
+
+Frontend implementation constraints:
+
+- no new route beyond the planned `/admin/capture`
+- no broad admin shell redesign
+- no new generic component framework
+- prefer deletion/reuse over adding new wrappers
+- add a new primitive only when repeated backlog/admin needs prove an existing DS primitive cannot
+  cover the state
+
+QA visual checks:
+
+- `/admin/capture` uses Hito DS/admin typography, surfaces, controls, and spacing
+- filters, disclosures, quick note, copy actions, and status/priority controls match existing
+  interaction patterns
+- empty, loading, unavailable, and error states are present and DS-consistent
+- normal runners never see backlog controls
+- visual capture-created items and manual quick notes appear in the same backlog list/detail flow
+
 ## Admin Backlog Surface
 
 Route:
@@ -518,6 +593,8 @@ Use the project role output format.
 
 Owner: BACKEND
 
+Status: Implemented / backend QA proof complete
+
 Scope:
 
 - add migration for `admin_capture_items`, `admin_capture_assets`, and private bucket
@@ -532,6 +609,13 @@ Exit criteria:
 - admin can list/update item status
 - copy prompt is generated from stored truth
 - no screenshot support required yet
+
+Implemented evidence:
+
+- `supabase/migrations/20260528190000_admin_capture_backlog.sql` adds RLS-enabled backlog tables and the private `admin-capture-assets` bucket.
+- `src/lib/admin-capture.ts` and `src/lib/admin-capture.server.ts` expose admin-only availability, list, detail, create, triage, note update/append, and deterministic copy-prompt seams.
+- `scripts/validate-admin-capture-backlog.ts` proves admin create/list/read/update, non-admin rejection, deterministic prompt output, metadata redaction, and archived-item exclusion without requiring frontend implementation.
+- `npm run validate-admin-capture-backlog:live` probes the linked Supabase project and proves the tables and private bucket exist, service-role create/list/read/update works, publishable-key read/write is blocked, archived items are excluded from active lists, prompt metadata is redacted, and the disposable proof row is cleaned up.
 
 ### Slice 2: Backend asset upload support
 
@@ -554,6 +638,8 @@ Exit criteria:
 
 Owner: FRONTEND
 
+Status: QA-passed / `/admin/capture` Backlog v1 complete
+
 Scope:
 
 - create `/admin/capture`
@@ -568,6 +654,34 @@ Exit criteria:
 - admin can review and triage saved items
 - normal runner is redirected/blocked
 - no auto-Codex behavior exists
+
+Implemented evidence:
+
+- `src/routes/admin.capture.tsx` adds the standalone `/admin/capture` workbench route with admin-only loader redirect, status tabs, compact search/filter controls, inline item detail, quick-note creation, triage updates, note append, archive-by-status, and deterministic copy-prompt clipboard actions.
+- `src/routes/admin.analytics.tsx` links to Capture backlog as a sibling admin surface without moving backlog UI into analytics.
+- The route renders backend-shaped `admin-capture` view models only; it does not add screenshot upload, route-spanning capture overlay, live UI editing, auto-Codex dispatch, or new backend schema.
+
+Final QA evidence:
+
+- signed-out redirect passed
+- non-admin denial passed
+- admin access passed
+- `q` search persists and filters, including numeric-looking `q` values
+- search submit persists `q`
+- filters preserve `q`
+- clear filters resets `q`
+- inline detail opens
+- status, priority, target role, and note updates persist
+- archive removes item from active list and archived tab shows it
+- Safari copy prompt degrades to a populated selectable fallback instead of a terminal failure when
+  clipboard access is blocked
+- narrow viewport has no page-level overflow
+- `npm run build` passed
+
+Non-blocking note:
+
+- Safari may use the selectable prompt fallback when the browser blocks clipboard writes. This is
+  accepted for v1 because the generated prompt remains available and copyable by the admin.
 
 ### Slice 4: Designer capture-layer interaction spec
 
@@ -682,17 +796,17 @@ Required checks:
 
 ## Checklist
 
-- [ ] Backend storage migration exists.
-- [ ] Backend admin capture module exists.
-- [ ] Admin-only create/list/detail/update/copy-prompt seams exist.
+- [x] Backend storage migration exists.
+- [x] Backend admin capture module exists.
+- [x] Admin-only create/list/detail/update/copy-prompt seams exist.
 - [ ] Optional screenshot asset upload is private and admin-only.
-- [ ] `/admin/capture` backlog route exists.
+- [x] `/admin/capture` backlog route exists.
 - [ ] Designer capture-layer interaction spec exists.
 - [ ] Route-spanning inspect/capture overlay is explicit, admin-verified, and activated through a floating launcher.
 - [ ] Capture can save bug, change request, and context capture items.
-- [ ] Backlog can filter by status/type/role/route/date.
-- [ ] Copy prompt is deterministic and manual.
-- [ ] QA validates admin-only access and no auto-dispatch.
+- [x] Backlog can filter by status/type/role/route/date/search.
+- [x] Copy prompt is deterministic and manual.
+- [x] QA validates `/admin/capture` v1 admin-only access, triage, copy prompt, responsive behavior, and no auto-dispatch.
 
 ## Exit Criteria
 
@@ -706,46 +820,56 @@ Required checks:
 
 ## Next Recommended Role
 
-BACKEND
+ARCHITECT
 
 ## Suggested Next Step
 
-Implement Slice 1: add the backend-owned storage model and admin-only capture contract.
+Plan the unified admin work-item/status model across Supabase-backed backlog items, repo task docs,
+and active/archive plans. This should be a separate architecture slice; do not start screenshot
+upload, capture overlay, live editing, OpenAI, Codex auto-dispatch, or broad UI redesign as part of
+the `/admin/capture` v1 closeout.
 
 Prompt:
 
 ```md
-ROLE: BACKEND
+ROLE: ARCHITECT
 
 TASK:
-Implement Slice 1 of `docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md`.
+Define the unified admin work-item/status model after `/admin/capture` Backlog v1 QA pass.
 
-Goal:
-Add the smallest backend-owned admin capture backlog foundation without frontend inspect mode or screenshots yet.
+STAGE:
+ARCHITECT planning
 
-Scope:
-- Add Supabase migration for `admin_capture_items` and `admin_capture_assets`.
-- Add private bucket setup for `admin-capture-assets` if project migration conventions support bucket creation.
-- Add `src/lib/admin-capture.ts` route-facing types/server functions.
-- Add `src/lib/admin-capture.server.ts` server-only implementation.
-- Reuse/extract existing admin access verification instead of duplicating unsafe auth logic.
-- Add a minimal admin capture availability/probe seam for the future route-spanning overlay, exposed only through `/api/admin/*` or equivalent admin-guarded server functions.
-- Implement admin-only create/list/detail/update/copy-prompt for text-only capture items.
-- Validate allowed item type/status/priority/target role and cap text/metadata lengths.
-- Do not implement browser overlay, screenshots, `/admin/capture` UI, Chrome/Codex/VS Code plugins, or Codex dispatch.
+PLAN:
+docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md
 
-Validation:
-- Typecheck/build if backend code or database types change.
-- Add minimal deterministic tests/checks if repo patterns allow.
-- Confirm normal runner/non-admin cannot use the server seams.
-- Run `git diff --check`.
+CONTEXT:
+Backend Slice 1 and `/admin/capture` Backlog v1 are QA-passed. The current implementation uses backend-owned backlog truth, Hito DS/admin primitives, manual deterministic copy prompts, quick notes, filters, inline detail, triage updates, archive flow, and admin-only access.
 
-Output format:
+GOAL:
+Design a small unified work-item/status model that can eventually connect:
+- Supabase admin backlog items
+- repo task docs under `docs/tasks/backlog/`
+- active/archive plans
+
+REQUIREMENTS:
+- Do not reopen `/admin/capture` v1 implementation.
+- Do not start screenshot upload or route-spanning capture overlay.
+- Do not add live editing, OpenAI generation, or Codex auto-dispatch.
+- Preserve backend-owned backlog truth for the current admin surface.
+- Decide whether repo markdown sync is import-only, export-only, or two-way with explicit IDs.
+- Define status/type/priority/owner mappings without building a full Jira clone.
+- Keep the existing Hito DS reuse contract intact.
+
+OUTPUT FORMAT:
 1. Task
 2. Stage
-3. Root cause
-4. Files changed
-5. What changed
-6. Validation results
-7. Blockers
+3. Current state
+4. Model options
+5. Recommendation
+6. Source-of-truth decision
+7. Implementation slices
+8. What not to touch
+9. Next recommended role
+10. Blockers
 ```

@@ -33,12 +33,20 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - keep validation explicit
 - document migration/rollback behavior when relevant
 - improve logging when debugging requires stronger evidence
+- reuse existing backend owners, server-action patterns, validators, persistence seams, and canonical entities before adding new modules, tables, scripts, or abstractions
+- keep the implementation smaller after a cleanup than before; if replacing an approach, remove or explicitly deprecate the old path in the same slice whenever safe
+- add a removal plan for any temporary compatibility layer, fallback, diagnostic helper, or legacy bridge that cannot be deleted immediately
+- clean up failed or reverted implementation attempts before handoff so dead code does not accumulate
 
 ## Must Not Do
 
 - silently change contracts
 - move important rules into frontend only
 - bypass project safeguards
+- create parallel backend models, duplicate server actions, duplicate scripts, or new storage when an existing canonical seam can be reused
+- leave obsolete legacy paths active after a replacement is proven unless the active plan explicitly keeps them for compatibility
+- keep unused code, stale migrations/scripts, or abandoned branches from a failed approach without calling them out and planning deletion
+- introduce broad abstractions for small fixes without explicit Architect approval
 
 ## Mandatory Handoff Block
 

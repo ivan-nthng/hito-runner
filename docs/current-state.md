@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-05-25
+2026-05-28
 
 ## Where We Are Now
 
@@ -34,6 +34,8 @@ Active
   `src/lib/admin-analytics.ts` exposes a server-action-ready view model over existing Supabase auth/profile/plan/workout/Garmin/AI/entitlement truth, with aggregate overview/funnel/feedback/AI counts plus real-user rows shaped on the server and no new telemetry, failure, issue, or production user-management tables; local, admin, metadata-marked test, `@local.test`, and disposable-prefix accounts are classified out of real-user product analytics and returned as excluded ops rows.
 - The Phase 1 admin analytics UI is implemented:
   `/admin/analytics` now renders Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs from backend-shaped view models, keeping the page standalone from the runner AppShell and avoiding client-side analytics authority beyond presentation formatting; the Users table shows only backend-classified real users, while Test accounts shows local/test/admin/suspected rows with contained horizontal tables, collapsed search, active-filter summaries, and DS-owned sortable/non-sortable header sort/filter states.
+- The first admin capture backlog route is implemented:
+  `/admin/capture` is an admin-only standalone workbench surface that renders backend-shaped capture items with status tabs, compact search/filter controls, inline detail, triage controls, quick-note creation, note append, archive-by-status, and deterministic prompt copy for manual Codex handoff. The linked Supabase project still owns RLS-enabled `admin_capture_items` / `admin_capture_assets` plus the private `admin-capture-assets` bucket, normal publishable access remains blocked, screenshot upload/live UI editing/route-spanning capture overlay remain future slices, and no item is automatically sent to Codex.
 - The dedicated owner admin login flow is implemented:
   `/admin/login` renders a standalone `Hito Admin` sign-in page that posts username plus password to `/api/admin/auth/login`, sanitizes admin-only `next` targets back to `/admin/analytics` when unsafe, uses the local protected fixture only on loopback local runtimes, uses server-only deployed password-hash/session-secret configuration outside local fixtures, rejects tester/product credentials with bounded admin-specific copy, and keeps `/login` plus `/api/auth/local-login` unchanged; `/admin/analytics` admin-required states now link to this admin login path.
 - The local/dev admin fixture is now a single protected owner admin account in `.tanstack/hito-running-local-accounts.json`; the legacy QA admin fixture has been removed from the local bypass file and linked auth user, while tester accounts remain separate and are still rejected by `/admin/login`.

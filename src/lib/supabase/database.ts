@@ -8,6 +8,131 @@ export type Database = {
   };
   public: {
     Tables: {
+      admin_capture_assets: {
+        Row: {
+          asset_kind: string;
+          byte_size: number | null;
+          capture_item_id: string;
+          checksum: string | null;
+          created_at: string;
+          height: number | null;
+          id: string;
+          mime_type: string;
+          storage_bucket: string;
+          storage_path: string;
+          width: number | null;
+        };
+        Insert: {
+          asset_kind: string;
+          byte_size?: number | null;
+          capture_item_id: string;
+          checksum?: string | null;
+          created_at?: string;
+          height?: number | null;
+          id?: string;
+          mime_type: string;
+          storage_bucket: string;
+          storage_path: string;
+          width?: number | null;
+        };
+        Update: {
+          asset_kind?: string;
+          byte_size?: number | null;
+          capture_item_id?: string;
+          checksum?: string | null;
+          created_at?: string;
+          height?: number | null;
+          id?: string;
+          mime_type?: string;
+          storage_bucket?: string;
+          storage_path?: string;
+          width?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "admin_capture_assets_capture_item_id_fkey";
+            columns: ["capture_item_id"];
+            isOneToOne: false;
+            referencedRelation: "admin_capture_items";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      admin_capture_items: {
+        Row: {
+          archived_at: string | null;
+          bounding_rect: Json | null;
+          created_at: string;
+          created_by_label: string | null;
+          created_by_user_id: string;
+          dom_path: string | null;
+          element_text: string | null;
+          id: string;
+          item_type: string;
+          metadata: Json;
+          nearby_heading: string | null;
+          note: string;
+          page_url: string;
+          priority: string | null;
+          route: string | null;
+          selector: string | null;
+          status: string;
+          target_role: string | null;
+          title: string | null;
+          updated_at: string;
+          viewport_height: number | null;
+          viewport_width: number | null;
+        };
+        Insert: {
+          archived_at?: string | null;
+          bounding_rect?: Json | null;
+          created_at?: string;
+          created_by_label?: string | null;
+          created_by_user_id: string;
+          dom_path?: string | null;
+          element_text?: string | null;
+          id?: string;
+          item_type: string;
+          metadata?: Json;
+          nearby_heading?: string | null;
+          note: string;
+          page_url: string;
+          priority?: string | null;
+          route?: string | null;
+          selector?: string | null;
+          status?: string;
+          target_role?: string | null;
+          title?: string | null;
+          updated_at?: string;
+          viewport_height?: number | null;
+          viewport_width?: number | null;
+        };
+        Update: {
+          archived_at?: string | null;
+          bounding_rect?: Json | null;
+          created_at?: string;
+          created_by_label?: string | null;
+          created_by_user_id?: string;
+          dom_path?: string | null;
+          element_text?: string | null;
+          id?: string;
+          item_type?: string;
+          metadata?: Json;
+          nearby_heading?: string | null;
+          note?: string;
+          page_url?: string;
+          priority?: string | null;
+          route?: string | null;
+          selector?: string | null;
+          status?: string;
+          target_role?: string | null;
+          title?: string | null;
+          updated_at?: string;
+          viewport_height?: number | null;
+          viewport_width?: number | null;
+        };
+        Relationships: [];
+      };
       plan_cycles: {
         Row: {
           created_at: string;

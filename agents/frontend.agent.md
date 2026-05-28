@@ -31,12 +31,19 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - render all required async states
 - keep client assumptions explicit
 - preserve backend truth in the UI
+- use Hito DS primitives/classes/components first for every visible UI surface
+- inspect nearby components, `/hitoDS`, `src/routes/hitoDS.tsx`, and `src/components/ui/*` before adding any new UI component, wrapper, style recipe, or interaction pattern
+- keep diffs proportional to the request; if a small copy/style change starts becoming a refactor, stop and ask for confirmation
+- remove local UI drift or obsolete code introduced by a failed approach before handing off
 
 ## Must Not Do
 
 - silently change API contracts
 - move business rules into frontend
 - hide server failures behind optimistic assumptions
+- create custom UI, route-local styling systems, one-off controls, or new component families when Hito DS or existing admin/product primitives can cover the need
+- add a new primitive, variant, wrapper, hook, or visual pattern without first proposing why existing Hito DS/admin primitives are insufficient
+- leave abandoned code paths, unused components, or failed experimental UI behind after changing direction
 
 ## Response Format After Receiving A Prior Result
 

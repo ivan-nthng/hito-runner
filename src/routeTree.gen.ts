@@ -20,6 +20,7 @@ import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as AdminCaptureRouteImport } from './routes/admin.capture'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
 import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
@@ -85,6 +86,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCaptureRoute = AdminCaptureRouteImport.update({
+  id: '/admin/capture',
+  path: '/admin/capture',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   id: '/admin/analytics',
   path: '/admin/analytics',
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
@@ -187,6 +195,7 @@ export interface FileRoutesById {
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
@@ -211,6 +220,7 @@ export interface FileRouteTypes {
     | '/progress'
     | '/settings'
     | '/admin/analytics'
+    | '/admin/capture'
     | '/admin/login'
     | '/workout/$date'
     | '/api/auth/confirm'
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
     | '/progress'
     | '/settings'
     | '/admin/analytics'
+    | '/admin/capture'
     | '/admin/login'
     | '/workout/$date'
     | '/api/auth/confirm'
@@ -255,6 +266,7 @@ export interface FileRouteTypes {
     | '/progress'
     | '/settings'
     | '/admin/analytics'
+    | '/admin/capture'
     | '/admin/login'
     | '/workout/$date'
     | '/api/auth/confirm'
@@ -278,6 +290,7 @@ export interface RootRouteChildren {
   ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminCaptureRoute: typeof AdminCaptureRoute
   AdminLoginRoute: typeof AdminLoginRoute
   WorkoutDateRoute: typeof WorkoutDateRoute
   ApiAuthConfirmRoute: typeof ApiAuthConfirmRoute
@@ -369,6 +382,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/capture': {
+      id: '/admin/capture'
+      path: '/admin/capture'
+      fullPath: '/admin/capture'
+      preLoaderRoute: typeof AdminCaptureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/analytics': {
       id: '/admin/analytics'
       path: '/admin/analytics'
@@ -446,6 +466,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
+  AdminCaptureRoute: AdminCaptureRoute,
   AdminLoginRoute: AdminLoginRoute,
   WorkoutDateRoute: WorkoutDateRoute,
   ApiAuthConfirmRoute: ApiAuthConfirmRoute,

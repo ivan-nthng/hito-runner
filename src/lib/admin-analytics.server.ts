@@ -459,7 +459,7 @@ async function selectAllRows<TTable extends keyof Database["public"]["Tables"]>(
       throw new Error(error.message);
     }
 
-    rows.push(...((data ?? []) as Array<Database["public"]["Tables"][TTable]["Row"]>));
+    rows.push(...((data ?? []) as unknown as Array<Database["public"]["Tables"][TTable]["Row"]>));
 
     if (!data || data.length < PAGE_SIZE) {
       return rows;

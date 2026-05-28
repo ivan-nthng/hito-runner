@@ -77,6 +77,11 @@
 - `src/lib/admin-auth-actions.ts`
   owns the dedicated admin-login contract for `/admin/login` UI:
   it exposes the admin-only redirect sanitizer and route data contract, while `src/lib/admin-auth-actions.server.ts` verifies local/dev fixture credentials only on loopback local runtimes, verifies the deployed owner admin against server-only `HITO_ADMIN_PASSWORD_HASH` plus `HITO_ADMIN_SESSION_SECRET` outside local fixtures, rejects tester credentials without creating a session, and sets either the existing local auth cookie or a signed admin-only cookie after admin verification; the local bypass fixture still keeps one protected owner admin account for local QA, and ordinary tester/product accounts are never accepted by `/admin/login`
+- `src/lib/admin-capture.ts` owns the backend contract for the future `/admin/capture` backlog:
+  it exposes admin-only server functions for capture availability, backlog list, item detail, text-only item create, triage updates, quick note update/append, and deterministic copy-prompt generation while keeping UI capture, screenshot upload, and automatic Codex dispatch out of this slice; `src/lib/admin-capture.server.ts` verifies the existing admin session boundary before every operation, reads/writes only through the service/admin Supabase seam, caps captured text and metadata, redacts secret-like metadata keys/values before prompt output, stores quick-note history in bounded item metadata, and returns frontend-ready view models rather than local mock state
+- `src/routes/admin.capture.tsx`
+  owns the first visible admin capture backlog route:
+  `/admin/capture` is an admin-only standalone workbench sibling to `/admin/analytics`; it renders backend-shaped backlog items with status tabs, compact search/filter controls, inline item detail, triage controls, quick-note creation, note append, archive-by-status, and deterministic copy-prompt clipboard actions while leaving admin access, storage, prompt shaping, lifecycle validation, screenshots, live UI capture, and any Codex dispatch on backend/future seams
 - `src/lib/first-plan-actions.ts`
   owns the first-plan server-action layer for the structured constructor and transcript-backed voice-to-plan path:
   `completeStructuredFirstPlanOnboarding`, `generateStructuredFirstPlanDraft`, `confirmStructuredFirstPlanDraft`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public imports through `training-api.ts`; the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
@@ -164,7 +169,7 @@
   it exposes a server-action-ready loader for `/admin/analytics` overview/funnel/integrations/AI/user sections, while the server-only implementation verifies admin access, reads only existing Supabase truth through the admin client, classifies local/test/admin/suspected accounts before aggregation, returns real-user product counts plus real-user rows separately from excluded test/local/suspected rows, and avoids raw payloads, prompts, transcripts, FIT contents, body-note text, storage paths, service keys, tokens, or sessions
 - `src/routes/admin.analytics.tsx`
   owns the Phase 1 admin analytics UI plus the local-only Test accounts UI:
-  it renders backend-shaped Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs, keeps the Users table scoped to backend-classified real users, keeps local/test/admin/suspected rows in Test accounts, and uses Hito table controls with collapsed search, active-filter summary, DS-owned sortable/non-sortable table headers, header sort/filter menus, and contained horizontal scrolling while leaving admin checks, account-file access, Supabase deletion, analytics aggregation, and all credential/sensitive-payload safety rules on server contracts
+  it renders backend-shaped Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, and Test accounts tabs, keeps the Users table scoped to backend-classified real users, keeps local/test/admin/suspected rows in Test accounts, links to `/admin/capture` as a sibling admin surface, and uses Hito table controls with collapsed search, active-filter summary, DS-owned sortable/non-sortable table headers, header sort/filter menus, and contained horizontal scrolling while leaving admin checks, account-file access, Supabase deletion, analytics aggregation, and all credential/sensitive-payload safety rules on server contracts
 - `src/routes/hub.tsx`
   owns the public standalone Hito destination launcher:
   it renders a desert-background card grid for Hito Running, Admin analytics, Design system, and Changelog links without runner AppShell chrome, while the target routes continue to own normal user auth, admin auth, or public access behavior
@@ -183,6 +188,12 @@
   `runner_entitlements` for explicit backend-owned Basic/Pro rows and `runner_capability_usage` for lifetime metered capability counters; both tables have RLS enabled with authenticated read-own policies only, while writes remain server/admin-owned
 - `supabase/migrations/20260522153725_runner_profile_training_preferences.sql`
   adds `runner_profiles.training_preferences jsonb` for bounded runner-level training defaults using plan-preference-compatible keys such as `blocked_days`, `preferred_long_run_day`, and `max_running_days_per_week`
+- `supabase/migrations/20260528190000_admin_capture_backlog.sql`
+  adds the first admin capture backlog storage foundation:
+  RLS-enabled `admin_capture_items` and `admin_capture_assets` tables plus a private `admin-capture-assets` bucket; no public policies are added, so runner/public clients cannot directly read or write backlog truth and all current access goes through admin-verified service-role server seams
+- `scripts/validate-admin-capture-backlog.ts`
+  owns the backend proof harness for the capture backlog:
+  the default deterministic mode verifies admin create/list/read/update, non-admin rejection, deterministic prompt generation, archived-list behavior, and metadata redaction; `--live-supabase` / `npm run validate-admin-capture-backlog:live` probes the linked Supabase project for table and bucket availability, service-role operations, publishable-key RLS blocking, and disposable-row cleanup without printing secrets
 
 ## State And Lifecycle Rules
 

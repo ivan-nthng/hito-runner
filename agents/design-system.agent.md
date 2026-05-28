@@ -119,6 +119,9 @@ If these disagree, report the drift explicitly and recommend the smallest alignm
 - Prefer Hito's existing low-chrome product language over new visual language.
 - Do not create a new token, variable, component, or variant unless it replaces repeated real drift.
 - Do not keep a compatibility class without a removal plan.
+- Treat Hito DS as the default UI contract for all frontend/admin/internal surfaces.
+- A new component primitive, token family, variant, or UI recipe must be proposed and justified before implementation; it cannot appear as an incidental frontend choice.
+- Custom route-local UI is a defect unless it is a documented geometry exception or a temporary migration step with a removal plan.
 
 ## Token Architecture Rules
 

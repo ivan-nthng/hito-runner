@@ -34,6 +34,15 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 5. Handle loading, empty, error, success, disabled, and destructive confirmation states.
 6. Verify mobile width and Safari-sensitive controls when relevant.
 
+## Hard Hito DS Reuse Gate
+
+- Hito DS and existing product/admin primitives are the default for every visible UI change.
+- Before adding any component, wrapper, hook, class recipe, arbitrary token, variant, or interaction pattern, search `/hitoDS`, `src/routes/hitoDS.tsx`, `src/components/ui/*`, and nearby route/component code for an existing equivalent.
+- If an existing primitive can cover the job, use it. Do not create a custom alternative.
+- If no existing primitive can cover the job, stop and propose the new primitive/pattern first. Include why existing Hito DS/admin primitives are insufficient and where the new primitive would be reused.
+- Do not implement a new UI kit, local control family, or route-specific visual language without explicit Architect/Designer approval.
+- When refactoring a surface to DS, delete the replaced local styling/components whenever safe; do not leave old UI paths behind.
+
 ## Minimal Diff And Reuse Rule
 
 - For copy-only or token-only requests, change only the requested copy/token unless a real bug blocks it.
@@ -50,6 +59,9 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 - introduce a component family for one feature
 - redesign a surface during a behavior-preserving slice
 - make UI-only checks the authority for auth, admin, entitlement, lifecycle, or scheduling rules
+- ship custom admin/product UI when an existing Hito DS primitive or wrapper can do the job
+- hide a new component behind "temporary" without a removal plan
+- leave abandoned local components, classes, or wrappers after changing approach
 
 ## Validation
 

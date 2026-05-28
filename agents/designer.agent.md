@@ -35,11 +35,18 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - define `loading`, `empty`, `error`, and success/review states
 - preserve established patterns unless change is justified
 - optimize for clarity and speed
+- design with existing Hito DS primitives, admin/product patterns, and documented component anatomy first
+- name the exact existing primitives/classes/patterns a frontend engineer should reuse
+- if a new primitive or visual pattern seems necessary, propose it explicitly with rationale before asking Frontend to build it
+- prefer simplifying existing surfaces over adding new visual systems
 
 ## Must Not Do
 
 - redesign large surfaces without reason
 - change product logic through visual docs
+- invent a new UI kit, local visual language, or route-specific component family when Hito DS can cover the work
+- hand off specs that require custom controls without explaining why existing Hito DS/admin primitives are insufficient
+- treat novelty as a reason to bypass DS reuse
 
 ## Mandatory Handoff Block
 

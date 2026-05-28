@@ -172,6 +172,20 @@ function AdminAnalyticsPage() {
             <p className="hito-micro-label mt-1">Local operations</p>
           </div>
 
+          <nav className="hito-shell-nav px-3 pb-4" aria-label="Admin surfaces">
+            <div className="grid gap-0.5">
+              <Link to="/admin/analytics" className="hito-shell-nav-row" data-active="true">
+                <Icon name="activity" className="hito-shell-nav-icon" />
+                Analytics
+                <span className="hito-shell-nav-dot" />
+              </Link>
+              <Link to="/admin/capture" className="hito-shell-nav-row">
+                <Icon name="plan-note" className="hito-shell-nav-icon" />
+                Capture backlog
+              </Link>
+            </div>
+          </nav>
+
           <AdminSectionNav activeTab={activeTab} onChange={setActiveTab} variant="sidebar" />
 
           <div className="mt-auto p-4">
@@ -219,6 +233,20 @@ function AdminAnalyticsPage() {
               </Link>
             </div>
             <AdminSectionNav activeTab={activeTab} onChange={setActiveTab} variant="mobile" />
+            <nav className="hito-workbench-section-rail lg:hidden" aria-label="Admin surfaces">
+              <div className="hito-workbench-quick-links">
+                <Link
+                  to="/admin/analytics"
+                  className="hito-workbench-quick-link"
+                  data-active="true"
+                >
+                  Analytics
+                </Link>
+                <Link to="/admin/capture" className="hito-workbench-quick-link">
+                  Capture backlog
+                </Link>
+              </div>
+            </nav>
           </header>
 
           <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">

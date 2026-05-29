@@ -2,7 +2,52 @@
 
 ## Status
 
-Future backlog
+backlog
+
+## Type
+
+product_brief
+
+## Priority
+
+low
+
+## Next Recommended Role
+
+ARCHITECT
+
+## Task
+
+Decide whether Hito needs a lightweight cookie consent notice before launch.
+
+## Stage
+
+ARCHITECT product decision
+
+## Exact Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+TASK:
+Decide whether Hito needs a lightweight cookie consent notice before launch.
+
+STAGE:
+ARCHITECT product decision
+
+CONTEXT:
+- Source path: docs/tasks/product-briefs/2026-05-25-cookie-consent-notice-brief.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

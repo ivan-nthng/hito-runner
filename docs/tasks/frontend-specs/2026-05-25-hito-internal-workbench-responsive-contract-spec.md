@@ -2,7 +2,52 @@
 
 ## Status
 
-Draft
+backlog
+
+## Type
+
+frontend_spec
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+FRONTEND
+
+## Task
+
+Define one responsive navigation and layout contract for Hito internal workbench surfaces:
+
+## Stage
+
+DESIGN SYSTEM audit / specification
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Define one responsive navigation and layout contract for Hito internal workbench surfaces:
+
+STAGE:
+DESIGN SYSTEM audit / specification
+
+CONTEXT:
+- Source path: docs/tasks/frontend-specs/2026-05-25-hito-internal-workbench-responsive-contract-spec.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 
@@ -11,17 +56,6 @@ Design System
 ## Last Updated
 
 2026-05-25
-
-## Task
-
-Define one responsive navigation and layout contract for Hito internal workbench surfaces:
-
-- `/hitoDS`
-- `/admin/analytics`
-
-## Stage
-
-DESIGN SYSTEM audit / specification
 
 ## Problem Statement
 

@@ -2,7 +2,52 @@
 
 ## Status
 
-Ready for Frontend correction pass.
+backlog
+
+## Type
+
+frontend_spec
+
+## Priority
+
+high
+
+## Next Recommended Role
+
+FRONTEND
+
+## Task
+
+Revise the admin Backlog page so it reads as a normal Hito Admin workbench surface.
+
+## Stage
+
+FRONTEND implementation
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Revise the admin Backlog page so it reads as a normal Hito Admin workbench surface.
+
+STAGE:
+FRONTEND implementation
+
+CONTEXT:
+- Source path: docs/tasks/frontend-specs/2026-05-28-admin-capture-backlog-page-revision.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

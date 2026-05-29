@@ -32,13 +32,93 @@ Create precise next-role prompts that preserve Hito decisions and avoid scope dr
 ## Hito Prompt Rules
 
 - Start orchestration/review/handoff responses with: `Plan file`, `Task`, `Stage`, `What we did`, `Where we are`, `What we do next`.
+- Write user-facing explanation/status in Russian by default.
+- Write the exact next-role execution prompt in English by default.
+- Do not mix Russian into execution prompts unless the user explicitly requests a Russian prompt.
 - Render existing `Plan file` values as clickable markdown links with absolute workspace paths, not inline code or plain text.
 - Always name `Task` and `Stage`.
 - Do not assume the next agent remembers chat history.
 - Do not ask an agent to implement outside its role.
 - Do not split a bounded task across roles prematurely.
+- Provide exactly one immediate next-role prompt per response.
+- Do not include optional QA prompts, follow-up prompts, or "after that" prompts unless the user explicitly asks for that single prompt next.
+- Include a clearly labelled `Exact prompt for that role` section for any handoff response.
+- Do not output a naked prompt without the required shell.
+- The exact prompt must be self-contained and include its own expected output/report format.
 - Preserve canonical architecture rules from `AGENTS.md`.
 - Keep prompts execution-ready, not inspirational.
+
+## Required Handoff Shell
+
+Use this exact shell for orchestration, prior-agent review, checkpoint, and handoff responses:
+
+1. `Plan file`
+2. `Task`
+3. `Stage`
+4. `What we did`
+5. `Where we are`
+6. `What we do next`
+7. `Exact prompt for that role`
+8. `Blockers`
+
+The shell is for the user-facing response. The exact prompt inside section 7 is for the next role.
+
+## Exact Prompt Requirements
+
+The prompt inside `Exact prompt for that role` must:
+
+- be in English by default
+- target one role only
+- start with `Task`
+- include `Stage`
+- include context and scope
+- list exact files/surfaces to inspect when relevant
+- list commands or browser policy when validation is required
+- include a precise output/report format
+- avoid optional second prompts or later-role prompts
+
+For QA handoffs, use a numbered prompt shape:
+
+```md
+1. Task
+
+<exact validation task>
+
+2. Stage
+
+QA validation / <specific checkpoint>
+
+3. Context
+
+<what changed and why this validation is needed>
+
+4. Browser Path Preflight
+
+<browser requirement or backend-only reason browser is not used>
+
+5. Validation coverage
+
+Read/inspect:
+- <file>
+
+Run:
+- <command>
+
+6. Required behavior proof
+
+<exact invariants, counts, statuses, and boundaries to verify>
+
+7. Report format
+
+Return:
+1. Task
+2. Stage
+3. Browser Path Preflight
+4. Validation coverage
+5. Issues found
+6. Coverage gaps
+7. Verdict: Passed or Failed
+```
 
 ## Output
 
@@ -49,5 +129,4 @@ Create precise next-role prompts that preserve Hito decisions and avoid scope dr
 5. Where we are
 6. What we do next
 7. Exact prompt for that role
-8. Optional QA prompt
-9. Blockers
+8. Blockers

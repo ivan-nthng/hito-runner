@@ -43,6 +43,7 @@ export type AdminCaptureFailureReason =
   | "capture_load_failed"
   | "capture_create_failed"
   | "capture_update_failed"
+  | "repo_derived_read_only"
   | "prompt_not_ready"
   | "prompt_generation_failed";
 
@@ -83,7 +84,7 @@ export interface AdminCaptureItemView {
     boundingRect: Json | null;
   };
   metadata: Json;
-  source: "captured_ui" | "quick_note";
+  source: "captured_ui" | "quick_note" | "repo_import";
   promptReady: boolean;
   assetCount: number;
   assets: AdminCaptureAssetView[];

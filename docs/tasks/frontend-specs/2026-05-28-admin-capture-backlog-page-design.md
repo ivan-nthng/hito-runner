@@ -2,7 +2,52 @@
 
 ## Status
 
-Ready for Frontend planning after backend capture seams exist.
+backlog
+
+## Type
+
+frontend_spec
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+FRONTEND
+
+## Task
+
+Implement the admin Backlog page design using existing Hito admin patterns.
+
+## Stage
+
+FRONTEND implementation
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Implement the admin Backlog page design using existing Hito admin patterns.
+
+STAGE:
+FRONTEND implementation
+
+CONTEXT:
+- Source path: docs/tasks/frontend-specs/2026-05-28-admin-capture-backlog-page-design.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

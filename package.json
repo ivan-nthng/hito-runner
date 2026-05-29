@@ -20,6 +20,7 @@
     "author-plan-from-text": "node --env-file=.env.local --import tsx ./scripts/author-plan-from-text.ts",
     "validate-admin-capture-backlog": "node --import tsx ./scripts/validate-admin-capture-backlog.ts",
     "validate-admin-capture-backlog:live": "node --env-file=.env.local --import tsx ./scripts/validate-admin-capture-backlog.ts --live-supabase",
+    "import-admin-backlog-work-items": "node --env-file=.env.local --import tsx ./scripts/import-repo-work-items-to-admin-backlog.ts",
     "test-user": "node --env-file=.env.local ./scripts/test-user.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."

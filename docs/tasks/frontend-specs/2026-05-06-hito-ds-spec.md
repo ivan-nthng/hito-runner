@@ -2,7 +2,52 @@
 
 ## Status
 
-Draft
+backlog
+
+## Type
+
+frontend_spec
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+FRONTEND
+
+## Task
+
+Advance Hito DS Spec.
+
+## Stage
+
+FRONTEND implementation spec
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Advance Hito DS Spec.
+
+STAGE:
+FRONTEND implementation spec
+
+CONTEXT:
+- Source path: docs/tasks/frontend-specs/2026-05-06-hito-ds-spec.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

@@ -1,8 +1,16 @@
 import { Link, createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { HitoLogo } from "@/components/ui/hito-logo";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type HitoIconName } from "@/components/ui/icon";
 import {
   adminCaptureItemTypes,
   adminCapturePriorities,
@@ -54,6 +62,19 @@ type MutationState = {
   tone: "success" | "error" | null;
 };
 
+type RepoDerivedInfo = {
+  readOnly: boolean;
+  sourcePath: string | null;
+  sourceType: string | null;
+  workItemStatus: string | null;
+  markdownStatus: string | null;
+  markdownType: string | null;
+  markdownPriority: string | null;
+  markdownNextRole: string | null;
+  missingRequiredFields: string[];
+  invalidRequiredFields: string[];
+};
+
 const STATUS_FILTERS: Array<{ value: CaptureStatusFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "new", label: "New" },
@@ -61,6 +82,21 @@ const STATUS_FILTERS: Array<{ value: CaptureStatusFilter; label: string }> = [
   { value: "ready_for_codex", label: "Ready for Codex" },
   { value: "done", label: "Done" },
   { value: "archived", label: "Archived" },
+];
+
+const ADMIN_CAPTURE_NAV: Array<{
+  label: string;
+  icon: HitoIconName;
+  href: "/admin/analytics" | "/admin/capture";
+  active?: boolean;
+}> = [
+  { label: "Overview", icon: "activity", href: "/admin/analytics" },
+  { label: "Funnel & Usage", icon: "progress", href: "/admin/analytics" },
+  { label: "Feedback", icon: "watch", href: "/admin/analytics" },
+  { label: "AI & Entitlements", icon: "sparkles", href: "/admin/analytics" },
+  { label: "Users", icon: "user", href: "/admin/analytics" },
+  { label: "Test accounts", icon: "shield-alert", href: "/admin/analytics" },
+  { label: "Backlog", icon: "plan-note", href: "/admin/capture", active: true },
 ];
 
 const initialQuickNoteState: QuickNoteState = {
@@ -86,7 +122,7 @@ export const Route = createFileRoute("/admin/capture")({
   }),
   head: () => ({
     meta: [
-      { title: `Capture backlog — ${APP_NAME}` },
+      { title: `Backlog — ${APP_NAME}` },
       {
         name: "description",
         content: "Internal Hito capture backlog for admin triage and manual Codex handoff.",
@@ -149,6 +185,7 @@ function AdminCapturePage() {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [appendNotes, setAppendNotes] = useState<Record<string, string>>({});
   const [copyFallbackPrompts, setCopyFallbackPrompts] = useState<Record<string, string>>({});
+  const [copiedPromptIds, setCopiedPromptIds] = useState<Record<string, boolean>>({});
   const [mutation, setMutation] = useState<MutationState>({
     itemId: null,
     field: null,
@@ -266,7 +303,7 @@ function AdminCapturePage() {
         setMutation({
           itemId: item.id,
           field: "triage",
-          message: updateResult.message,
+          message: formatCaptureMutationError(updateResult),
           tone: "error",
         });
         return;
@@ -314,7 +351,7 @@ function AdminCapturePage() {
         setMutation({
           itemId: item.id,
           field: "note",
-          message: appendResult.message,
+          message: formatCaptureMutationError(appendResult),
           tone: "error",
         });
         return;
@@ -347,7 +384,7 @@ function AdminCapturePage() {
         setMutation({
           itemId: item.id,
           field: "prompt",
-          message: promptResult.message,
+          message: formatCaptureMutationError(promptResult),
           tone: "error",
         });
         return;
@@ -374,7 +411,15 @@ function AdminCapturePage() {
         delete next[item.id];
         return next;
       });
-      setMutation({ itemId: item.id, field: "prompt", message: "Copied", tone: "success" });
+      setCopiedPromptIds((current) => ({ ...current, [item.id]: true }));
+      setMutation({ itemId: item.id, field: "prompt", message: null, tone: null });
+      window.setTimeout(() => {
+        setCopiedPromptIds((current) => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
+      }, 1600);
     } catch {
       setMutation({
         itemId: item.id,
@@ -397,32 +442,32 @@ function AdminCapturePage() {
                 <div className="hito-workbench-location lg:hidden">
                   <span className="hito-workbench-location-title">Admin</span>
                   <span className="hito-workbench-location-meta">
-                    <span>Capture backlog</span>
+                    <span>Backlog</span>
                     <span aria-hidden="true">/</span>
                     <span>{formatStatusLabel(search.status)}</span>
                   </span>
                 </div>
                 <p className="hito-micro-label">Admin</p>
                 <h1 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-                  Capture backlog
+                  Backlog
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  Review captured UI notes, triage items, and copy prompts for manual Codex handoff.
+                  Review captured work and copy prompts for manual handoff.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  to="/admin/analytics"
-                  className="hito-button hito-button-secondary hito-button-md"
-                >
-                  Back to analytics
-                </Link>
+              <div className="flex flex-wrap items-start gap-2 lg:items-center">
+                <QuickNotePanel
+                  quickNote={quickNote}
+                  setQuickNote={setQuickNote}
+                  onSubmit={submitQuickNote}
+                  variant="header"
+                />
                 <Link to="/" className="hito-button hito-button-secondary hito-button-md">
                   Back to Hito
                 </Link>
               </div>
             </div>
-            <AdminCaptureRouteRail activeRoute="capture" />
+            <AdminCaptureRouteRail />
           </header>
 
           <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
@@ -430,7 +475,6 @@ function AdminCapturePage() {
               <CaptureUnavailableState result={result} />
             ) : (
               <section className="grid gap-6 pt-6">
-                <CaptureHeader view={result.view} />
                 <CaptureStatusTabs
                   activeStatus={search.status}
                   counts={
@@ -445,13 +489,9 @@ function AdminCapturePage() {
                   rowCountLabel={`Showing ${result.view.shown} of ${result.view.total} items`}
                   search={search}
                 />
-                <QuickNotePanel
-                  quickNote={quickNote}
-                  setQuickNote={setQuickNote}
-                  onSubmit={submitQuickNote}
-                />
                 <CaptureBacklogList
                   appendNotes={appendNotes}
+                  copiedPromptIds={copiedPromptIds}
                   clearFiltersHref={clearFiltersHref}
                   copyFallbackPrompts={copyFallbackPrompts}
                   expandedItemId={expandedItemId}
@@ -499,15 +539,18 @@ function AdminCaptureSidebar() {
 
       <nav className="hito-shell-nav px-3" aria-label="Admin surfaces">
         <div className="grid gap-0.5">
-          <Link to="/admin/analytics" className="hito-shell-nav-row">
-            <Icon name="activity" className="hito-shell-nav-icon" />
-            Analytics
-          </Link>
-          <Link to="/admin/capture" className="hito-shell-nav-row" data-active="true">
-            <Icon name="plan-note" className="hito-shell-nav-icon" />
-            Capture backlog
-            <span className="hito-shell-nav-dot" />
-          </Link>
+          {ADMIN_CAPTURE_NAV.map((item) => (
+            <Link
+              key={item.label}
+              to={item.href}
+              className="hito-shell-nav-row"
+              data-active={item.active ? "true" : undefined}
+            >
+              <Icon name={item.icon} className="hito-shell-nav-icon" />
+              {item.label}
+              {item.active ? <span className="hito-shell-nav-dot" /> : null}
+            </Link>
+          ))}
         </div>
       </nav>
 
@@ -530,46 +573,22 @@ function AdminCaptureSidebar() {
   );
 }
 
-function AdminCaptureRouteRail({ activeRoute }: { activeRoute: "analytics" | "capture" }) {
+function AdminCaptureRouteRail() {
   return (
     <nav className="hito-workbench-section-rail lg:hidden" aria-label="Admin surfaces">
       <div className="hito-workbench-quick-links">
-        <Link
-          to="/admin/analytics"
-          className="hito-workbench-quick-link"
-          data-active={activeRoute === "analytics" ? "true" : undefined}
-        >
-          Analytics
-        </Link>
-        <Link
-          to="/admin/capture"
-          className="hito-workbench-quick-link"
-          data-active={activeRoute === "capture" ? "true" : undefined}
-        >
-          Capture backlog
-        </Link>
+        {ADMIN_CAPTURE_NAV.map((item) => (
+          <Link
+            key={item.label}
+            to={item.href}
+            className="hito-workbench-quick-link"
+            data-active={item.active ? "true" : undefined}
+          >
+            {item.label}
+          </Link>
+        ))}
       </div>
     </nav>
-  );
-}
-
-function CaptureHeader({ view }: { view: AdminCaptureBacklogView }) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <p className="hito-label">Backlog</p>
-        <h2 className="hito-modal-title mt-2">Captured admin work</h2>
-        <p className="hito-body mt-3 max-w-3xl text-muted-foreground">
-          List-first triage for quick admin notes and captured UI context.
-        </p>
-      </div>
-      <div className="grid gap-1 text-left sm:text-right">
-        <span className="hito-label">Generated</span>
-        <span className="hito-technical-mono text-xs text-muted-foreground">
-          {formatDateTime(view.generatedAt)}
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -616,269 +635,376 @@ function CaptureUtilityRow({
   rowCountLabel: string;
   search: CaptureSearch;
 }) {
+  const [searchOpen, setSearchOpen] = useState(Boolean(query));
+  const [draftQuery, setDraftQuery] = useState(query);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSearchOpen = searchOpen || query.length > 0 || draftQuery.length > 0;
+  const activeFilters = getActiveCaptureFilters(search);
+
+  const updateQuery = (value: string) => {
+    setDraftQuery(value);
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    searchTimerRef.current = setTimeout(() => {
+      window.location.href = buildCaptureHref(search, { q: value });
+    }, 350);
+  };
+
+  const goToFilter = (patch: Partial<CaptureSearch>) => {
+    window.location.href = buildCaptureHref(search, patch);
+  };
+
   return (
     <div className="hito-data-table-utility-row">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <details className="group" suppressHydrationWarning {...(query ? { open: true } : {})}>
-          <summary
+        {isSearchOpen ? (
+          <label className="hito-field hito-field-sm hito-data-table-search">
+            <span className="sr-only">Search backlog</span>
+            <Icon name="search" size="xs" className="text-muted-foreground" />
+            <input
+              autoFocus
+              className="hito-data-table-search-input"
+              onBlur={() => {
+                if (!draftQuery) {
+                  setSearchOpen(false);
+                }
+              }}
+              onChange={(event) => updateQuery(event.target.value)}
+              placeholder="Search notes, routes, text, or role"
+              type="search"
+              value={draftQuery}
+            />
+            {draftQuery ? (
+              <a
+                aria-label="Clear search backlog"
+                className="hito-button hito-button-ghost hito-button-xs hito-data-table-search-clear"
+                href={buildCaptureHref(search, { q: "" })}
+                onMouseDown={(event) => event.preventDefault()}
+              >
+                <Icon name="close" size="xs" />
+              </a>
+            ) : null}
+          </label>
+        ) : (
+          <button
+            type="button"
             aria-label="Search backlog"
-            className="hito-button hito-button-secondary hito-button-sm hito-data-table-icon-button cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+            className="hito-button hito-button-secondary hito-button-sm hito-data-table-icon-button"
+            onClick={() => setSearchOpen(true)}
           >
             <Icon name="search" size="sm" />
-            <span className="sr-only">Search backlog</span>
-          </summary>
-          <form
-            action="/admin/capture"
-            className="mt-2 flex flex-wrap items-center gap-2"
-            method="get"
-          >
-            <CaptureSearchHiddenInputs search={search} omit="q" />
-            <label className="hito-field hito-field-sm hito-data-table-search">
-              <span className="sr-only">Search backlog</span>
-              <Icon name="search" size="xs" className="text-muted-foreground" />
-              <input
-                className="hito-data-table-search-input"
-                defaultValue={query}
-                name="q"
-                placeholder="Search notes, routes, text, or role"
-                type="search"
-              />
-              {query ? (
-                <a
-                  aria-label="Clear search backlog"
-                  className="hito-button hito-button-ghost hito-button-xs hito-data-table-search-clear"
-                  href={buildCaptureHref(search, { q: "" })}
-                >
-                  <Icon name="close" size="xs" />
-                </a>
-              ) : null}
-            </label>
-            <button type="submit" className="hito-button hito-button-secondary hito-button-sm">
-              Apply
-            </button>
-          </form>
-        </details>
+          </button>
+        )}
 
-        <details className="group" suppressHydrationWarning>
-          <summary className="hito-button hito-button-secondary hito-button-sm hito-data-table-filter-summary cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-            <Icon name="settings" size="xs" />
-            Filters
-            {activeFilterCount > 0 ? (
-              <span className="hito-tab-badge">{activeFilterCount}</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-sm hito-data-table-filter-summary"
+              aria-label={
+                activeFilterCount > 0
+                  ? `${activeFilterCount} active backlog filters`
+                  : "Backlog filters"
+              }
+            >
+              <Icon name="settings" size="xs" />
+              Filters
+              {activeFilterCount > 0 ? (
+                <span className="hito-tab-badge">{activeFilterCount}</span>
+              ) : null}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            className="hito-shell-menu hito-data-table-column-menu w-72"
+          >
+            {activeFilters.length > 0 ? (
+              <>
+                <DropdownMenuLabel className="hito-micro-label">Active filters</DropdownMenuLabel>
+                {activeFilters.map((filter) => (
+                  <DropdownMenuItem
+                    key={filter.id}
+                    className="hito-shell-menu-item hito-data-table-menu-item"
+                    onSelect={() => goToFilter(filter.removePatch)}
+                  >
+                    <Icon name="close" size="xs" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{filter.label}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {filter.value}
+                      </span>
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="hito-shell-menu-item hito-data-table-menu-item"
+                  onSelect={() => {
+                    window.location.href = clearFiltersHref;
+                  }}
+                >
+                  <Icon name="x-circle" size="xs" />
+                  Clear all
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
             ) : null}
-          </summary>
-          <CaptureFilterPanel clearFiltersHref={clearFiltersHref} filters={search} />
-        </details>
-        {activeFilterCount > 0 ? (
-          <a className="hito-button hito-button-ghost hito-button-sm" href={clearFiltersHref}>
-            Clear filters
-          </a>
-        ) : null}
+            <DropdownMenuLabel className="hito-micro-label">Type</DropdownMenuLabel>
+            <CaptureFilterMenuItems
+              currentValue={search.type}
+              options={[
+                { value: "all", label: "All" },
+                ...adminCaptureItemTypes.map((type) => ({
+                  value: type,
+                  label: formatItemType(type),
+                })),
+              ]}
+              onSelect={(type) => goToFilter({ type: type as CaptureSearch["type"] })}
+            />
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="hito-micro-label">Priority</DropdownMenuLabel>
+            <CaptureFilterMenuItems
+              currentValue={search.priority}
+              options={[
+                { value: "all", label: "All" },
+                ...adminCapturePriorities.map((priority) => ({
+                  value: priority,
+                  label: formatPriority(priority),
+                })),
+              ]}
+              onSelect={(priority) =>
+                goToFilter({ priority: priority as CaptureSearch["priority"] })
+              }
+            />
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="hito-micro-label">Target role</DropdownMenuLabel>
+            <CaptureFilterMenuItems
+              currentValue={search.role}
+              options={[
+                { value: "all", label: "All" },
+                ...adminCaptureTargetRoles.map((role) => ({
+                  value: role,
+                  label: formatTargetRole(role),
+                })),
+              ]}
+              onSelect={(role) => goToFilter({ role: role as CaptureSearch["role"] })}
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <p className="hito-field-helper whitespace-nowrap">{rowCountLabel}</p>
     </div>
   );
 }
 
-function CaptureFilterPanel({
-  clearFiltersHref,
-  filters,
+function CaptureFilterMenuItems({
+  currentValue,
+  onSelect,
+  options,
 }: {
-  clearFiltersHref: string;
-  filters: CaptureSearch;
+  currentValue: string;
+  onSelect: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <form action="/admin/capture" className="hito-surface-flat mt-2 grid gap-4 p-4" method="get">
-      <input type="hidden" name="status" value={filters.status} />
-      <input type="hidden" name="q" value={filters.q} />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <SelectField
-          label="Type"
-          name="type"
-          value={filters.type}
-          options={[
-            { value: "all", label: "All" },
-            ...adminCaptureItemTypes.map((type) => ({ value: type, label: formatItemType(type) })),
-          ]}
-        />
-        <SelectField
-          label="Priority"
-          name="priority"
-          value={filters.priority}
-          options={[
-            { value: "all", label: "All" },
-            ...adminCapturePriorities.map((priority) => ({
-              value: priority,
-              label: formatPriority(priority),
-            })),
-          ]}
-        />
-        <SelectField
-          label="Target role"
-          name="role"
-          value={filters.role}
-          options={[
-            { value: "all", label: "All" },
-            ...adminCaptureTargetRoles.map((role) => ({
-              value: role,
-              label: formatTargetRole(role),
-            })),
-          ]}
-        />
-        <button type="submit" className="hito-button hito-button-primary hito-button-md">
-          Apply filters
-        </button>
-        <a className="hito-button hito-button-secondary hito-button-md" href={clearFiltersHref}>
-          Clear filters
-        </a>
-      </div>
-    </form>
+    <>
+      {options.map((option) => (
+        <DropdownMenuItem
+          key={option.value}
+          className="hito-shell-menu-item hito-data-table-menu-item"
+          onSelect={() => onSelect(option.value)}
+        >
+          {currentValue === option.value ? (
+            <Icon name="check" size="xs" className="text-signal" />
+          ) : null}
+          {option.label}
+        </DropdownMenuItem>
+      ))}
+    </>
   );
 }
 
 function QuickNotePanel({
+  variant = "inline",
   quickNote,
   setQuickNote,
   onSubmit,
 }: {
+  variant?: "header" | "inline";
   quickNote: QuickNoteState;
   setQuickNote: React.Dispatch<React.SetStateAction<QuickNoteState>>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const isHeader = variant === "header";
+
   return (
     <details
-      className="hito-row-group"
+      className={isHeader ? "relative" : "hito-row-group"}
       suppressHydrationWarning
       {...(quickNote.open || Boolean(quickNote.error || quickNote.success) ? { open: true } : {})}
     >
-      <summary className="hito-list-row w-full cursor-pointer text-left list-none [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0">
-          <span className="hito-list-row-title flex items-center gap-2">
-            <Icon name="plus" size="xs" className="text-signal" />
-            Quick note
-          </span>
-          <span className="hito-list-row-copy">Add a backlog item without selecting UI.</span>
-        </span>
-        <Icon name="chevron-down" size="sm" />
+      <summary
+        className={
+          isHeader
+            ? "hito-button hito-button-primary hito-button-md cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+            : "hito-list-row w-full cursor-pointer text-left list-none [&::-webkit-details-marker]:hidden"
+        }
+      >
+        {isHeader ? (
+          <>
+            <Icon name="plus" size="xs" />
+            Add quick note
+          </>
+        ) : (
+          <>
+            <span className="min-w-0">
+              <span className="hito-list-row-title flex items-center gap-2">
+                <Icon name="plus" size="xs" className="text-signal" />
+                Add quick note
+              </span>
+              <span className="hito-list-row-copy">
+                Capture a backlog item without selecting UI.
+              </span>
+            </span>
+            <Icon name="chevron-down" size="sm" />
+          </>
+        )}
       </summary>
-      <form className="grid gap-4 border-t border-hairline p-4" onSubmit={onSubmit}>
-        <div className="grid gap-4 lg:grid-cols-4">
-          <SelectField
-            label="Type"
-            name="itemType"
-            value={quickNote.itemType}
-            onChange={(itemType) =>
-              setQuickNote((current) => ({
-                ...current,
-                itemType: itemType as AdminCaptureItemType,
-              }))
-            }
-            options={adminCaptureItemTypes.map((type) => ({
-              value: type,
-              label: formatItemType(type),
-            }))}
-          />
-          <SelectField
-            label="Priority"
-            name="priority"
-            value={quickNote.priority}
-            onChange={(priority) =>
-              setQuickNote((current) => ({
-                ...current,
-                priority: priority as AdminCapturePriority | "",
-              }))
-            }
-            options={[
-              { value: "", label: "Unset" },
-              ...adminCapturePriorities.map((priority) => ({
-                value: priority,
-                label: formatPriority(priority),
-              })),
-            ]}
-          />
-          <SelectField
-            label="Target role"
-            name="targetRole"
-            value={quickNote.targetRole}
-            onChange={(targetRole) =>
-              setQuickNote((current) => ({
-                ...current,
-                targetRole: targetRole as AdminCaptureTargetRole | "",
-              }))
-            }
-            options={[
-              { value: "", label: "Unset" },
-              ...adminCaptureTargetRoles.map((role) => ({
-                value: role,
-                label: formatTargetRole(role),
-              })),
-            ]}
-          />
+      <div
+        className={
+          isHeader
+            ? "z-30 mt-2 w-[min(36rem,calc(100vw-2.5rem))] max-w-[calc(100vw-2.5rem)] sm:absolute sm:right-0"
+            : undefined
+        }
+      >
+        <form
+          className="grid gap-4 rounded-2xl border border-hairline bg-background p-4 shadow-soft"
+          onSubmit={onSubmit}
+        >
+          <div className="grid gap-1">
+            <h2 className="hito-body font-medium text-foreground">Add quick note</h2>
+            <p className="hito-field-helper">Capture a backlog item without selecting UI.</p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-4">
+            <SelectField
+              label="Type"
+              name="itemType"
+              value={quickNote.itemType}
+              onChange={(itemType) =>
+                setQuickNote((current) => ({
+                  ...current,
+                  itemType: itemType as AdminCaptureItemType,
+                }))
+              }
+              options={adminCaptureItemTypes.map((type) => ({
+                value: type,
+                label: formatItemType(type),
+              }))}
+            />
+            <SelectField
+              label="Priority"
+              name="priority"
+              value={quickNote.priority}
+              onChange={(priority) =>
+                setQuickNote((current) => ({
+                  ...current,
+                  priority: priority as AdminCapturePriority | "",
+                }))
+              }
+              options={[
+                { value: "", label: "Unset" },
+                ...adminCapturePriorities.map((priority) => ({
+                  value: priority,
+                  label: formatPriority(priority),
+                })),
+              ]}
+            />
+            <SelectField
+              label="Target role"
+              name="targetRole"
+              value={quickNote.targetRole}
+              onChange={(targetRole) =>
+                setQuickNote((current) => ({
+                  ...current,
+                  targetRole: targetRole as AdminCaptureTargetRole | "",
+                }))
+              }
+              options={[
+                { value: "", label: "Unset" },
+                ...adminCaptureTargetRoles.map((role) => ({
+                  value: role,
+                  label: formatTargetRole(role),
+                })),
+              ]}
+            />
+            <label className="grid gap-2">
+              <span className="hito-label">Route or URL</span>
+              <input
+                className="hito-field hito-field-md"
+                name="route"
+                value={quickNote.route}
+                onChange={(event) =>
+                  setQuickNote((current) => ({ ...current, route: event.target.value }))
+                }
+                placeholder="/settings"
+              />
+            </label>
+          </div>
           <label className="grid gap-2">
-            <span className="hito-label">Route or URL</span>
+            <span className="hito-label">Title</span>
             <input
               className="hito-field hito-field-md"
-              name="route"
-              value={quickNote.route}
+              name="title"
+              value={quickNote.title}
               onChange={(event) =>
-                setQuickNote((current) => ({ ...current, route: event.target.value }))
+                setQuickNote((current) => ({ ...current, title: event.target.value }))
               }
-              placeholder="/settings"
+              placeholder="Optional short title"
             />
           </label>
-        </div>
-        <label className="grid gap-2">
-          <span className="hito-label">Title</span>
-          <input
-            className="hito-field hito-field-md"
-            name="title"
-            value={quickNote.title}
-            onChange={(event) =>
-              setQuickNote((current) => ({ ...current, title: event.target.value }))
-            }
-            placeholder="Optional short title"
-          />
-        </label>
-        <label className="grid gap-2">
-          <span className="hito-label">Note</span>
-          <textarea
-            className="hito-field min-h-28 resize-y p-3"
-            name="note"
-            value={quickNote.note}
-            onChange={(event) =>
-              setQuickNote((current) => ({ ...current, note: event.target.value }))
-            }
-            placeholder="What should change, what looks wrong, or what context should be saved?"
-            required
-          />
-        </label>
-        {quickNote.error ? <p className="hito-field-error">{quickNote.error}</p> : null}
-        {quickNote.success ? (
-          <p className="hito-field-helper text-signal">{quickNote.success}</p>
-        ) : null}
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="submit"
-            className="hito-button hito-button-primary hito-button-md"
-            disabled={quickNote.pending}
-          >
-            {quickNote.pending ? "Saving..." : "Save note"}
-          </button>
-          <button
-            type="button"
-            className="hito-button hito-button-secondary hito-button-md"
-            onClick={() => setQuickNote(initialQuickNoteState)}
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+          <label className="grid gap-2">
+            <span className="hito-label">Note</span>
+            <textarea
+              className="hito-field min-h-28 resize-y p-3"
+              name="note"
+              value={quickNote.note}
+              onChange={(event) =>
+                setQuickNote((current) => ({ ...current, note: event.target.value }))
+              }
+              placeholder="What should change, what looks wrong, or what context should be saved?"
+              required
+            />
+          </label>
+          {quickNote.error ? <p className="hito-field-error">{quickNote.error}</p> : null}
+          {quickNote.success ? (
+            <p className="hito-field-helper text-signal">{quickNote.success}</p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              className="hito-button hito-button-primary hito-button-md"
+              disabled={quickNote.pending}
+            >
+              {quickNote.pending ? "Saving..." : "Save note"}
+            </button>
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-md"
+              onClick={() => setQuickNote(initialQuickNoteState)}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </details>
   );
 }
 
 function CaptureBacklogList({
   appendNotes,
+  copiedPromptIds,
   clearFiltersHref,
   copyFallbackPrompts,
   expandedItemId,
@@ -892,6 +1018,7 @@ function CaptureBacklogList({
   onUpdateTriage,
 }: {
   appendNotes: Record<string, string>;
+  copiedPromptIds: Record<string, boolean>;
   clearFiltersHref: string;
   copyFallbackPrompts: Record<string, string>;
   expandedItemId: string | null;
@@ -914,7 +1041,10 @@ function CaptureBacklogList({
 }) {
   if (result.items.length === 0) {
     const filtered =
-      search.q || search.type !== "all" || search.priority !== "all" || search.role !== "all";
+      captureQueryText(search.q) ||
+      search.type !== "all" ||
+      search.priority !== "all" ||
+      search.role !== "all";
 
     return filtered ? (
       <EmptyState
@@ -937,26 +1067,22 @@ function CaptureBacklogList({
   }
 
   return (
-    <div className="hito-row-group">
+    <div className="hito-row-group hito-backlog-list">
       {result.items.map((item) => {
         const expanded = expandedItemId === item.id;
+        const repoSource = getRepoDerivedInfo(item);
+        const readOnly = repoSource.readOnly;
         return (
-          <article key={item.id}>
-            <button
-              type="button"
-              className="hito-list-row w-full text-left"
-              aria-expanded={expanded}
-              onClick={() => setExpandedItemId(expanded ? null : item.id)}
-            >
-              <span className="grid min-w-0 gap-2">
+          <article key={item.id} data-expanded={expanded ? "true" : undefined}>
+            <div className="hito-list-row w-full items-start text-left">
+              <button
+                type="button"
+                className="grid min-w-0 flex-1 gap-2 text-left"
+                aria-expanded={expanded}
+                onClick={() => setExpandedItemId(expanded ? null : item.id)}
+              >
                 <span className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="hito-list-row-title truncate font-medium">{item.title}</span>
-                  <CapturePill>{formatItemType(item.itemType)}</CapturePill>
-                  <StatusPill status={item.status} />
-                  {item.priority ? <PriorityPill priority={item.priority} /> : null}
-                  {item.targetRole ? (
-                    <CapturePill>{formatTargetRole(item.targetRole)}</CapturePill>
-                  ) : null}
                   {item.promptReady ? (
                     <span className="hito-status-pill" data-tone="signal">
                       Prompt ready
@@ -964,32 +1090,139 @@ function CaptureBacklogList({
                   ) : null}
                 </span>
                 <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <code className="hito-technical-mono truncate">{item.route ?? "No route"}</code>
+                  <code className="hito-technical-mono truncate">
+                    {repoSource.sourcePath ?? item.route ?? "No route"}
+                  </code>
                   <span>{formatDateTime(item.createdAt)}</span>
-                  <span>{item.source === "captured_ui" ? "Captured UI" : "Quick note"}</span>
+                  <span>{formatItemSource(item)}</span>
+                  {repoSource.sourceType ? <span>{repoSource.sourceType}</span> : null}
                   <span>
                     {item.assetCount > 0 ? `${item.assetCount} screenshot` : "No screenshot"}
                   </span>
                 </span>
-              </span>
-              <Icon
-                name={expanded ? "chevron-up" : "chevron-down"}
-                size="sm"
-                className="shrink-0"
-              />
-            </button>
+              </button>
+              <div className="flex min-w-0 flex-wrap items-center justify-start gap-1.5 md:justify-end">
+                {readOnly ? (
+                  <>
+                    <ReadOnlyMetadataPill
+                      icon={repoMarkdownStatusIcon(repoSource)}
+                      tone={repoMarkdownStatusTone(repoSource)}
+                      value={formatRepoMarkdownStatus(repoSource, item)}
+                    />
+                    <ReadOnlyMetadataPill
+                      value={formatMarkdownMetadataValue(repoSource.markdownType, item.itemType)}
+                    />
+                    <ReadOnlyMetadataPill
+                      tone={
+                        repoSource.markdownPriority ? markdownPriorityTone(repoSource) : undefined
+                      }
+                      value={formatMarkdownMetadataValue(
+                        repoSource.markdownPriority,
+                        item.priority,
+                      )}
+                    />
+                    <ReadOnlyMetadataPill
+                      value={formatMarkdownMetadataValue(
+                        repoSource.markdownNextRole,
+                        item.targetRole,
+                      )}
+                    />
+                    {repoSource.missingRequiredFields.length > 0 ? (
+                      <ReadOnlyMetadataPill tone="warning" value="Missing metadata" />
+                    ) : null}
+                    {repoSource.invalidRequiredFields.length > 0 ? (
+                      <ReadOnlyMetadataPill tone="warning" value="Invalid metadata" />
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <MetadataMenu
+                      icon={statusIcon(item.status)}
+                      label="Status"
+                      value={item.status}
+                      displayValue={formatStatusLabel(item.status)}
+                      tone={statusTone(item.status)}
+                      options={adminCaptureStatuses.map((status) => ({
+                        value: status,
+                        label: formatStatusLabel(status),
+                      }))}
+                      onSelect={(status) =>
+                        onUpdateTriage(item, { status: status as AdminCaptureStatus })
+                      }
+                    />
+                    <MetadataMenu
+                      label="Type"
+                      value={item.itemType}
+                      displayValue={formatItemType(item.itemType)}
+                      options={adminCaptureItemTypes.map((type) => ({
+                        value: type,
+                        label: formatItemType(type),
+                      }))}
+                      onSelect={(itemType) =>
+                        onUpdateTriage(item, { itemType: itemType as AdminCaptureItemType })
+                      }
+                    />
+                    <MetadataMenu
+                      label="Priority"
+                      value={item.priority ?? ""}
+                      displayValue={item.priority ? formatPriority(item.priority) : "Unset"}
+                      tone={item.priority ? priorityTone(item.priority) : undefined}
+                      options={[
+                        { value: "", label: "Unset" },
+                        ...adminCapturePriorities.map((priority) => ({
+                          value: priority,
+                          label: formatPriority(priority),
+                        })),
+                      ]}
+                      onSelect={(priority) =>
+                        onUpdateTriage(item, {
+                          priority: priority ? (priority as AdminCapturePriority) : null,
+                        })
+                      }
+                    />
+                    <MetadataMenu
+                      label="Target role"
+                      value={item.targetRole ?? ""}
+                      displayValue={item.targetRole ? formatTargetRole(item.targetRole) : "No role"}
+                      options={[
+                        { value: "", label: "No role" },
+                        ...adminCaptureTargetRoles.map((role) => ({
+                          value: role,
+                          label: formatTargetRole(role),
+                        })),
+                      ]}
+                      onSelect={(targetRole) =>
+                        onUpdateTriage(item, {
+                          targetRole: targetRole ? (targetRole as AdminCaptureTargetRole) : null,
+                        })
+                      }
+                    />
+                  </>
+                )}
+                <button
+                  type="button"
+                  className="hito-button hito-button-ghost hito-button-xs"
+                  aria-label={expanded ? "Collapse item" : "Open item"}
+                  aria-expanded={expanded}
+                  onClick={() => setExpandedItemId(expanded ? null : item.id)}
+                >
+                  <Icon name={expanded ? "chevron-up" : "chevron-down"} size="sm" />
+                </button>
+              </div>
+            </div>
             {expanded ? (
               <CaptureItemDetail
                 appendNote={appendNotes[item.id] ?? ""}
+                copyButtonLabel={copiedPromptIds[item.id] ? "Copied" : "Copy prompt"}
                 copyFallbackPrompt={copyFallbackPrompts[item.id] ?? null}
                 item={item}
                 mutation={mutation}
+                repoSource={repoSource}
                 onAppendNote={() => onAppendNote(item)}
                 onAppendNoteChange={(note) =>
                   setAppendNotes((current) => ({ ...current, [item.id]: note }))
                 }
                 onCopyPrompt={() => onCopyPrompt(item)}
-                onUpdateTriage={(patch) => onUpdateTriage(item, patch)}
               />
             ) : null}
           </article>
@@ -1001,182 +1234,202 @@ function CaptureBacklogList({
 
 function CaptureItemDetail({
   appendNote,
+  copyButtonLabel,
   copyFallbackPrompt,
   item,
   mutation,
+  repoSource,
   onAppendNote,
   onAppendNoteChange,
   onCopyPrompt,
-  onUpdateTriage,
 }: {
   appendNote: string;
+  copyButtonLabel: string;
   copyFallbackPrompt: string | null;
   item: AdminCaptureItemView;
   mutation: MutationState;
+  repoSource: RepoDerivedInfo;
   onAppendNote: () => void;
   onAppendNoteChange: (note: string) => void;
   onCopyPrompt: () => void;
-  onUpdateTriage: (patch: {
-    itemType?: AdminCaptureItemType;
-    status?: AdminCaptureStatus;
-    priority?: AdminCapturePriority | null;
-    targetRole?: AdminCaptureTargetRole | null;
-  }) => void;
 }) {
   const currentMutation =
-    mutation.itemId === item.id && mutation.message ? (
+    mutation.itemId === item.id &&
+    mutation.message &&
+    !(mutation.field === "prompt" && mutation.tone === "success") ? (
       <p
         className={mutation.tone === "error" ? "hito-field-error" : "hito-field-helper text-signal"}
       >
         {mutation.message}
       </p>
     ) : null;
+  const promptBody = copyFallbackPrompt ?? item.note;
 
   return (
-    <div className="grid gap-5 border-t border-hairline bg-foreground/[0.025] p-4">
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <DetailBlock title="Captured context">
-          <DetailRow label="Route" value={item.route ?? "Not captured"} code />
-          <DetailRow label="URL" value={item.pageUrl} code />
-          <DetailRow
-            label="Selected text"
-            value={item.selectedElement.text ?? "No selected element"}
-          />
-          <DetailRow
-            label="Nearby heading"
-            value={item.selectedElement.nearbyHeading ?? "Not captured"}
-          />
-          <DetailRow
-            label="Selector"
-            value={item.selectedElement.selector ?? "Not captured"}
-            code
-          />
-          <DetailRow label="DOM path" value={item.selectedElement.domPath ?? "Not captured"} code />
-        </DetailBlock>
-        <DetailBlock title="Triage">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SelectField
-              label="Status"
-              value={item.status}
-              onChange={(status) => onUpdateTriage({ status: status as AdminCaptureStatus })}
-              options={adminCaptureStatuses.map((status) => ({
-                value: status,
-                label: formatStatusLabel(status),
-              }))}
+    <div className="hito-backlog-detail">
+      <div className="grid gap-5 pt-1">
+        {currentMutation ? <div>{currentMutation}</div> : null}
+
+        {repoSource.readOnly ? (
+          <div className="grid gap-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="hito-status-pill" data-tone="rollout">
+                Repo mirror
+              </span>
+              <span>Markdown is the source of truth. This item is read-only in Backlog.</span>
+            </div>
+            {repoSource.missingRequiredFields.length > 0 ? (
+              <MetadataHint label="Missing metadata" fields={repoSource.missingRequiredFields} />
+            ) : null}
+            {repoSource.invalidRequiredFields.length > 0 ? (
+              <MetadataHint label="Invalid metadata" fields={repoSource.invalidRequiredFields} />
+            ) : null}
+          </div>
+        ) : null}
+
+        {repoSource.readOnly ? (
+          <section className="grid gap-3 border-t border-hairline pt-4">
+            <h4 className="hito-label text-foreground">Markdown metadata</h4>
+            <div className="flex flex-wrap gap-2">
+              <ReadOnlyMetadataPill
+                icon={repoMarkdownStatusIcon(repoSource)}
+                tone={repoMarkdownStatusTone(repoSource)}
+                value={formatRepoMarkdownStatus(repoSource, item)}
+              />
+              <ReadOnlyMetadataPill
+                value={formatMarkdownMetadataValue(repoSource.markdownType, item.itemType)}
+              />
+              <ReadOnlyMetadataPill
+                tone={repoSource.markdownPriority ? markdownPriorityTone(repoSource) : undefined}
+                value={formatMarkdownMetadataValue(repoSource.markdownPriority, item.priority)}
+              />
+              <ReadOnlyMetadataPill
+                value={formatMarkdownMetadataValue(repoSource.markdownNextRole, item.targetRole)}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        <section className="grid gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h4 className="hito-label text-foreground">Prompt</h4>
+              <p className="hito-field-helper">
+                {copyFallbackPrompt
+                  ? "Copy blocked. Select the prompt below."
+                  : item.targetRole
+                    ? "Role-ready prompt is generated by the backend when copied."
+                    : "Set a target role to copy a role-ready prompt."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-sm min-w-36"
+              onClick={onCopyPrompt}
+            >
+              <Icon name={copyButtonLabel === "Copied" ? "check" : "copy"} size="xs" />
+              {copyButtonLabel}
+            </button>
+          </div>
+          <pre
+            className="hito-technical-mono max-h-80 min-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-black/35 p-4 text-xs leading-5 text-foreground"
+            tabIndex={0}
+          >
+            {promptBody}
+          </pre>
+        </section>
+
+        <section className="grid gap-3 border-t border-hairline pt-4">
+          <h4 className="hito-label text-foreground">Context</h4>
+          <div className="grid gap-3 md:grid-cols-2">
+            <DetailRow label="Created" value={formatDateTime(item.createdAt)} />
+            <DetailRow label="Updated" value={formatDateTime(item.updatedAt)} />
+            <DetailRow label="Route" value={item.route ?? "Not captured"} code />
+            <DetailRow label="URL" value={item.pageUrl} code />
+            {repoSource.sourcePath ? (
+              <DetailRow label="Source path" value={repoSource.sourcePath} code />
+            ) : null}
+            {repoSource.sourceType ? (
+              <DetailRow label="Source type" value={repoSource.sourceType} />
+            ) : null}
+            {repoSource.workItemStatus ? (
+              <DetailRow label="Work item status" value={repoSource.workItemStatus} />
+            ) : null}
+            <DetailRow
+              label="Selected text"
+              value={item.selectedElement.text ?? "No selected element"}
             />
-            <SelectField
-              label="Type"
-              value={item.itemType}
-              onChange={(itemType) =>
-                onUpdateTriage({ itemType: itemType as AdminCaptureItemType })
-              }
-              options={adminCaptureItemTypes.map((type) => ({
-                value: type,
-                label: formatItemType(type),
-              }))}
+            <DetailRow
+              label="Nearby heading"
+              value={item.selectedElement.nearbyHeading ?? "Not captured"}
             />
-            <SelectField
-              label="Priority"
-              value={item.priority ?? ""}
-              onChange={(priority) =>
-                onUpdateTriage({ priority: priority ? (priority as AdminCapturePriority) : null })
+            <DetailRow
+              label="Screenshot paths"
+              value={
+                item.assets.length > 0
+                  ? item.assets.map((asset) => asset.storagePath).join(", ")
+                  : "No screenshot paths"
               }
-              options={[
-                { value: "", label: "Unset" },
-                ...adminCapturePriorities.map((priority) => ({
-                  value: priority,
-                  label: formatPriority(priority),
-                })),
-              ]}
+              code={item.assets.length > 0}
             />
-            <SelectField
-              label="Target role"
-              value={item.targetRole ?? ""}
-              onChange={(targetRole) =>
-                onUpdateTriage({
-                  targetRole: targetRole ? (targetRole as AdminCaptureTargetRole) : null,
-                })
+            <DetailRow label="Created by" value={item.createdByLabel ?? item.createdByUserId} />
+          </div>
+        </section>
+
+        <details className="hito-disclosure">
+          <summary className="hito-disclosure-summary">
+            <span className="hito-label text-foreground">Technical details</span>
+            <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
+          </summary>
+          <div className="hito-disclosure-body mt-3 grid gap-3 md:grid-cols-2">
+            <DetailRow
+              label="Selector"
+              value={item.selectedElement.selector ?? "Not captured"}
+              code
+            />
+            <DetailRow
+              label="DOM path"
+              value={item.selectedElement.domPath ?? "Not captured"}
+              code
+            />
+            <DetailRow
+              label="Viewport"
+              value={
+                item.viewport.width && item.viewport.height
+                  ? `${item.viewport.width} x ${item.viewport.height}`
+                  : "Not captured"
               }
-              options={[
-                { value: "", label: "Unset" },
-                ...adminCaptureTargetRoles.map((role) => ({
-                  value: role,
-                  label: formatTargetRole(role),
-                })),
-              ]}
             />
           </div>
-          {currentMutation}
-        </DetailBlock>
-      </div>
+        </details>
 
-      <DetailBlock title="Admin note">
-        <p className="hito-body whitespace-pre-wrap text-foreground">{item.note}</p>
-        <label className="mt-4 grid gap-2">
-          <span className="hito-label">Append note</span>
-          <textarea
-            className="hito-field min-h-24 resize-y p-3"
-            value={appendNote}
-            onChange={(event) => onAppendNoteChange(event.target.value)}
-            placeholder="Add follow-up context."
-          />
-        </label>
-        <button
-          type="button"
-          className="hito-button hito-button-secondary hito-button-sm"
-          onClick={onAppendNote}
-        >
-          Save note
-        </button>
-      </DetailBlock>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <DetailBlock title="Assets">
-          <p className="hito-field-helper">
-            {item.assetCount > 0
-              ? `${item.assetCount} stored asset(s). Screenshot viewing is not part of this v1 slice.`
-              : "No screenshot"}
-          </p>
-        </DetailBlock>
-        <DetailBlock title="Prompt handoff">
-          <p className="hito-field-helper">
-            {item.targetRole
-              ? "Copy a deterministic role-ready prompt for manual Codex handoff."
-              : "Set a target role to copy a role-ready prompt."}
-          </p>
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-sm"
-            onClick={onCopyPrompt}
-          >
-            <Icon name="copy" size="xs" />
-            Copy prompt
-          </button>
-          {copyFallbackPrompt ? (
-            <label className="grid gap-2">
-              <span className="hito-label">Selectable prompt fallback</span>
-              <textarea
-                className="hito-field min-h-32 resize-y p-3 font-mono text-xs"
-                readOnly
-                value={copyFallbackPrompt}
-                onFocus={(event) => event.currentTarget.select()}
-              />
-            </label>
-          ) : null}
-        </DetailBlock>
-        <DetailBlock title="Metadata">
-          <DetailRow label="Created by" value={item.createdByLabel ?? item.createdByUserId} />
-          <DetailRow label="Created" value={formatDateTime(item.createdAt)} />
-          <DetailRow label="Updated" value={formatDateTime(item.updatedAt)} />
-          <DetailRow
-            label="Viewport"
-            value={
-              item.viewport.width && item.viewport.height
-                ? `${item.viewport.width} x ${item.viewport.height}`
-                : "Not captured"
-            }
-          />
-        </DetailBlock>
+        {!repoSource.readOnly ? (
+          <details className="hito-disclosure">
+            <summary className="hito-disclosure-summary">
+              <span className="hito-label text-foreground">Notes</span>
+              <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
+            </summary>
+            <div className="hito-disclosure-body mt-3 grid gap-3">
+              <p className="hito-body whitespace-pre-wrap text-foreground">{item.note}</p>
+              <label className="grid gap-2">
+                <span className="hito-label">Append note</span>
+                <textarea
+                  className="hito-field min-h-20 resize-y p-3"
+                  value={appendNote}
+                  onChange={(event) => onAppendNoteChange(event.target.value)}
+                  placeholder="Add follow-up context."
+                />
+              </label>
+              <button
+                type="button"
+                className="hito-button hito-button-secondary hito-button-sm justify-self-start"
+                onClick={onAppendNote}
+              >
+                Save note
+              </button>
+            </div>
+          </details>
+        ) : null}
       </div>
     </div>
   );
@@ -1189,8 +1442,8 @@ function CaptureUnavailableState({
 }) {
   const title =
     result.reason === "supabase_admin_unavailable"
-      ? "Capture backlog unavailable."
-      : "Capture backlog unavailable.";
+      ? "Backlog unavailable."
+      : "Backlog unavailable.";
 
   return (
     <section className="hito-surface-flat p-6" data-tone="warning">
@@ -1203,12 +1456,6 @@ function CaptureUnavailableState({
           <h2 className="hito-modal-title mt-4">{title}</h2>
           <p className="hito-body mt-3 max-w-2xl text-muted-foreground">{result.message}</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              to="/admin/analytics"
-              className="hito-button hito-button-secondary hito-button-md"
-            >
-              Back to analytics
-            </Link>
             <Link to="/" className="hito-button hito-button-secondary hito-button-md">
               Back to Hito
             </Link>
@@ -1244,15 +1491,6 @@ function EmptyState({
   );
 }
 
-function DetailBlock({ children, title }: { children: ReactNode; title: string }) {
-  return (
-    <section className="grid gap-3 rounded-2xl border border-hairline bg-background/50 p-4">
-      <h3 className="hito-label text-foreground">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
 function DetailRow({ code, label, value }: { code?: boolean; label: string; value: string }) {
   return (
     <div className="grid gap-1">
@@ -1266,13 +1504,95 @@ function DetailRow({ code, label, value }: { code?: boolean; label: string; valu
   );
 }
 
+function MetadataHint({ fields, label }: { fields: string[]; label: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="hito-status-pill" data-tone="warning">
+        {label}
+      </span>
+      <span>{fields.map(formatMetadataFieldName).join(", ")}</span>
+    </div>
+  );
+}
+
+function MetadataMenu({
+  displayValue,
+  icon,
+  label,
+  onSelect,
+  options,
+  tone,
+  value,
+}: {
+  displayValue: string;
+  icon?: HitoIconName;
+  label: string;
+  onSelect: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  tone?: string;
+  value: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="hito-status-pill cursor-pointer transition-colors hover:border-foreground/20"
+          data-icon="false"
+          data-tone={tone}
+          aria-label={`${label}: ${displayValue}`}
+        >
+          {icon ? <Icon name={icon} size="xs" aria-hidden="true" /> : null}
+          {displayValue}
+          <Icon name="chevron-down" size="xs" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="hito-shell-menu hito-data-table-column-menu w-56">
+        <DropdownMenuLabel className="hito-micro-label">{label}</DropdownMenuLabel>
+        {options.map((option) => {
+          const selected = value === option.value;
+          return (
+            <DropdownMenuItem
+              key={option.value || "unset"}
+              className="hito-shell-menu-item hito-data-table-menu-item"
+              onSelect={() => onSelect(option.value)}
+            >
+              {selected ? <Icon name="check" size="xs" className="text-signal" /> : null}
+              {option.label}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ReadOnlyMetadataPill({
+  icon,
+  tone,
+  value,
+}: {
+  icon?: HitoIconName;
+  tone?: string;
+  value: string;
+}) {
+  return (
+    <span className="hito-status-pill" data-icon={icon ? "false" : undefined} data-tone={tone}>
+      {icon ? <Icon name={icon} size="xs" aria-hidden="true" /> : null}
+      {value}
+    </span>
+  );
+}
+
 function SelectField({
+  compact = false,
   label,
   name,
   onChange,
   options,
   value,
 }: {
+  compact?: boolean;
   label: string;
   name?: string;
   onChange?: (value: string) => void;
@@ -1280,10 +1600,13 @@ function SelectField({
   value: string;
 }) {
   return (
-    <label className="grid min-w-0 flex-1 gap-2">
-      <span className="hito-label">{label}</span>
+    <label className={compact ? "grid min-w-0 gap-1" : "grid min-w-0 flex-1 gap-2"}>
+      <span className={compact ? "sr-only" : "hito-label"}>{label}</span>
       <select
-        className="hito-field hito-field-md"
+        aria-label={compact ? label : undefined}
+        className={
+          compact ? "hito-field hito-field-sm max-w-44 rounded-full" : "hito-field hito-field-md"
+        }
         name={name}
         {...(onChange ? { value } : { defaultValue: value })}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}
@@ -1307,47 +1630,19 @@ function CapturePill({ children }: { children: ReactNode }) {
 }
 
 function StatusPill({ status }: { status: AdminCaptureStatus }) {
-  const tone =
-    status === "ready_for_codex"
-      ? "signal"
-      : status === "done"
-        ? "success"
-        : status === "archived"
-          ? "warning"
-          : undefined;
-
   return (
-    <span className="hito-status-pill" data-tone={tone}>
+    <span className="hito-status-pill" data-icon="false" data-tone={statusTone(status)}>
+      <Icon name={statusIcon(status)} size="xs" aria-hidden="true" />
       {formatStatusLabel(status)}
     </span>
   );
 }
 
 function PriorityPill({ priority }: { priority: AdminCapturePriority }) {
-  const tone = priority === "urgent" || priority === "high" ? "warning" : undefined;
-
   return (
-    <span className="hito-status-pill" data-tone={tone}>
+    <span className="hito-status-pill" data-tone={priorityTone(priority)}>
       {formatPriority(priority)}
     </span>
-  );
-}
-
-function CaptureSearchHiddenInputs({
-  omit,
-  search,
-}: {
-  omit?: keyof CaptureSearch;
-  search: CaptureSearch;
-}) {
-  return (
-    <>
-      {omit !== "status" ? <input type="hidden" name="status" value={search.status} /> : null}
-      {omit !== "type" ? <input type="hidden" name="type" value={search.type} /> : null}
-      {omit !== "priority" ? <input type="hidden" name="priority" value={search.priority} /> : null}
-      {omit !== "role" ? <input type="hidden" name="role" value={search.role} /> : null}
-      {omit !== "q" ? <input type="hidden" name="q" value={captureQueryText(search.q)} /> : null}
-    </>
   );
 }
 
@@ -1360,6 +1655,204 @@ function buildCaptureHref(search: CaptureSearch, patch: Partial<CaptureSearch>) 
   params.set("role", next.role);
   params.set("q", captureQueryText(next.q));
   return `/admin/capture?${params.toString()}`;
+}
+
+function getActiveCaptureFilters(search: CaptureSearch) {
+  const query = captureQueryText(search.q);
+  const filters: Array<{
+    id: string;
+    label: string;
+    removePatch: Partial<CaptureSearch>;
+    value: string;
+  }> = [];
+
+  if (query) {
+    filters.push({
+      id: "q",
+      label: "Search",
+      value: query,
+      removePatch: { q: "" },
+    });
+  }
+
+  if (search.type !== "all") {
+    filters.push({
+      id: "type",
+      label: "Type",
+      value: formatItemType(search.type),
+      removePatch: { type: "all" },
+    });
+  }
+
+  if (search.priority !== "all") {
+    filters.push({
+      id: "priority",
+      label: "Priority",
+      value: formatPriority(search.priority),
+      removePatch: { priority: "all" },
+    });
+  }
+
+  if (search.role !== "all") {
+    filters.push({
+      id: "role",
+      label: "Target role",
+      value: formatTargetRole(search.role),
+      removePatch: { role: "all" },
+    });
+  }
+
+  return filters;
+}
+
+function statusTone(status: AdminCaptureStatus) {
+  switch (status) {
+    case "new":
+      return "rollout";
+    case "in_review":
+      return "warning";
+    case "ready_for_codex":
+      return "signal";
+    case "done":
+      return "success";
+    case "archived":
+      return "muted";
+  }
+}
+
+function statusIcon(status: AdminCaptureStatus): HitoIconName {
+  switch (status) {
+    case "new":
+      return "plus";
+    case "in_review":
+      return "search";
+    case "ready_for_codex":
+      return "sparkles";
+    case "done":
+      return "check";
+    case "archived":
+      return "file-text";
+  }
+}
+
+function priorityTone(priority: AdminCapturePriority) {
+  return priority === "urgent" || priority === "high" ? "warning" : undefined;
+}
+
+function formatCaptureMutationError(result: Extract<AdminCaptureResult<unknown>, { ok: false }>) {
+  return result.reason === "repo_derived_read_only"
+    ? "Repo-derived items are read-only. Edit the source markdown instead."
+    : result.message;
+}
+
+function formatItemSource(item: AdminCaptureItemView) {
+  if (getRepoDerivedInfo(item).readOnly) {
+    return "Repo import";
+  }
+
+  return item.source === "captured_ui" ? "Captured UI" : "Quick note";
+}
+
+function getRepoDerivedInfo(item: AdminCaptureItemView): RepoDerivedInfo {
+  const metadata = isJsonObject(item.metadata) ? item.metadata : {};
+  const sourcePath = getMetadataString(metadata.source_path);
+  const importedFromRepo =
+    metadata.imported_from_repo === true || item.source === "repo_import" || Boolean(sourcePath);
+
+  return {
+    readOnly: importedFromRepo,
+    sourcePath,
+    sourceType: getMetadataString(metadata.source_type),
+    workItemStatus: getMetadataString(metadata.work_item_status),
+    markdownStatus: getMetadataString(metadata.markdown_status),
+    markdownType: getMetadataString(metadata.markdown_type),
+    markdownPriority: getMetadataString(metadata.markdown_priority),
+    markdownNextRole: getMetadataString(metadata.markdown_next_role),
+    missingRequiredFields: getMetadataStringList(metadata.missing_required_fields),
+    invalidRequiredFields: getMetadataStringList(metadata.invalid_required_fields),
+  };
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getMetadataString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, 500) : null;
+}
+
+function getMetadataStringList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => getMetadataString(item))
+    .filter((item): item is string => Boolean(item));
+}
+
+function formatRepoMarkdownStatus(repoSource: RepoDerivedInfo, item: AdminCaptureItemView) {
+  const markdownStatus = repoSource.markdownStatus ?? repoSource.workItemStatus;
+
+  if (markdownStatus) {
+    return `Markdown: ${formatMarkdownMetadataValue(markdownStatus)}`;
+  }
+
+  return item.status === "in_review" ? "Markdown: Backlog" : formatStatusLabel(item.status);
+}
+
+function repoMarkdownStatusTone(repoSource: RepoDerivedInfo) {
+  const status = normalizeMarkdownValue(repoSource.markdownStatus ?? repoSource.workItemStatus);
+
+  return status === "completed"
+    ? "success"
+    : status === "closed" || status === "archived"
+      ? undefined
+      : status === "in_progress"
+        ? "signal"
+        : "rollout";
+}
+
+function repoMarkdownStatusIcon(repoSource: RepoDerivedInfo): HitoIconName {
+  const status = normalizeMarkdownValue(repoSource.markdownStatus ?? repoSource.workItemStatus);
+
+  return status === "completed"
+    ? "check"
+    : status === "closed" || status === "archived"
+      ? "file-text"
+      : status === "in_progress"
+        ? "sparkles"
+        : "plus";
+}
+
+function markdownPriorityTone(repoSource: RepoDerivedInfo) {
+  const priority = normalizeMarkdownValue(repoSource.markdownPriority);
+  return priority === "urgent" || priority === "high" ? "warning" : undefined;
+}
+
+function formatMarkdownMetadataValue(value: string | null | undefined, fallback?: string | null) {
+  return formatMetadataLabel(value ?? fallback ?? "Unset");
+}
+
+function formatMetadataFieldName(value: string) {
+  return formatMetadataLabel(value.replace(/^markdown_/, ""));
+}
+
+function formatMetadataLabel(value: string) {
+  return value
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function normalizeMarkdownValue(value: string | null | undefined) {
+  return (
+    value
+      ?.trim()
+      .toLowerCase()
+      .replace(/[-\s]+/g, "_") ?? ""
+  );
 }
 
 function parseCaptureStatus(value: unknown): CaptureStatusFilter {

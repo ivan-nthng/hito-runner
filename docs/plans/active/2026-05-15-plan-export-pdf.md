@@ -1,14 +1,53 @@
-Status
+# Active Plan PDF Export Plan
 
-Paused / backlog - implementation-ready
+## Status
 
-Owner
+backlog
 
-ARCHITECT / BACKEND
+## Type
 
-Last Updated
+plan
 
-2026-05-25
+## Priority
+
+medium
+
+## Next Recommended Role
+
+ARCHITECT
+
+## Task
+
+Plan a runner-facing PDF export for active training plans.
+
+## Stage
+
+ARCHITECT plan
+
+## Exact Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+TASK:
+Plan a runner-facing PDF export for active training plans.
+
+STAGE:
+ARCHITECT plan
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-15-plan-export-pdf.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 Active Inventory Note
 

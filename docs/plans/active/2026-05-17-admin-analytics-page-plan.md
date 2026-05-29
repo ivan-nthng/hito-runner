@@ -2,7 +2,52 @@
 
 ## Status
 
-Paused after Phase 1, local Test accounts, and dedicated owner admin login flow complete
+completed
+
+## Type
+
+plan
+
+## Priority
+
+low
+
+## Next Recommended Role
+
+ARCHITECT
+
+## Task
+
+Keep the completed admin analytics plan available as historical product context.
+
+## Stage
+
+ARCHITECT closeout
+
+## Exact Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+TASK:
+Keep the completed admin analytics plan available as historical product context.
+
+STAGE:
+ARCHITECT closeout
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-17-admin-analytics-page-plan.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

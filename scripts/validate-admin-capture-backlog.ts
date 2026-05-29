@@ -8,6 +8,7 @@ import {
   getAdminCaptureCopyPromptForDependencies,
   getAdminCaptureItemForDependencies,
   listAdminCaptureBacklogForDependencies,
+  updateAdminCaptureItemNoteForDependencies,
   type AdminCaptureDependencies,
   type AdminCaptureRepository,
   type AdminCaptureRowWithAssets,
@@ -262,6 +263,87 @@ async function runDeterministicHarness() {
   );
   assert.equal(archived.view.items.length, 1);
 
+  const repoDerivedRow = await repository.createItem({
+    item_type: "context_capture",
+    status: "ready_for_codex",
+    priority: "high",
+    target_role: "backend",
+    title: "Imported canonical markdown mirror",
+    note: "ROLE: BACKEND\n\nTASK:\nVerify imported markdown metadata.\n\nSTAGE:\nBACKEND validation",
+    page_url: "hito://repo/docs/plans/active/example.md",
+    route: null,
+    created_by_user_id: "repo-work-item-importer",
+    created_by_label: "Repo work item importer",
+    metadata: {
+      imported_from_repo: true,
+      source_path: "docs/plans/active/example.md",
+      source_type: "active_plan",
+      work_item_status: "in_progress",
+      markdown_status: "in_progress",
+      markdown_type: "context_capture",
+      markdown_priority: "high",
+      markdown_next_role: "backend",
+      markdown_prompt_source: "exact_handoff_prompt",
+    },
+  });
+  const repoList = await mustOk(
+    listAdminCaptureBacklogForDependencies(admin, {
+      status: "all",
+      includeArchived: false,
+      limit: 50,
+      search: "Imported canonical markdown mirror",
+    }),
+  );
+  assert.equal(repoList.view.items.length, 1);
+  assert.equal(repoList.view.items[0]?.source, "repo_import");
+
+  const repoDetail = await mustOk(
+    getAdminCaptureItemForDependencies(admin, { id: repoDerivedRow.id }),
+  );
+  assert.equal(repoDetail.item.source, "repo_import");
+
+  const repoPrompt = await mustOk(
+    getAdminCaptureCopyPromptForDependencies(admin, { id: repoDerivedRow.id }),
+  );
+  assert.equal(repoPrompt.prompt.targetRole, "backend");
+  assert.match(repoPrompt.prompt.prompt, /Verify imported markdown metadata/);
+  assert.match(repoPrompt.prompt.prompt, /Source path: docs\/plans\/active\/example\.md/);
+  assert.match(repoPrompt.prompt.prompt, /Source type: active_plan/);
+  assert.match(repoPrompt.prompt.prompt, /Work item status: in_progress/);
+
+  await mustRejectRepoDerivedMutation(
+    updateAdminCaptureItemTriageForDependencies(admin, {
+      id: repoDerivedRow.id,
+      itemType: "bug",
+      status: "done",
+      priority: "urgent",
+      targetRole: "frontend",
+      title: "Should not persist",
+    }),
+  );
+  await mustRejectRepoDerivedMutation(
+    appendAdminCaptureItemNoteForDependencies(admin, {
+      id: repoDerivedRow.id,
+      note: "Should not append.",
+    }),
+  );
+  await mustRejectRepoDerivedMutation(
+    updateAdminCaptureItemNoteForDependencies(admin, {
+      id: repoDerivedRow.id,
+      note: "Should not replace.",
+    }),
+  );
+  const repoAfterRejectedMutations = await repository.getItem(repoDerivedRow.id);
+  assert.equal(repoAfterRejectedMutations?.status, "ready_for_codex");
+  assert.equal(repoAfterRejectedMutations?.item_type, "context_capture");
+  assert.equal(repoAfterRejectedMutations?.priority, "high");
+  assert.equal(repoAfterRejectedMutations?.target_role, "backend");
+  assert.equal(repoAfterRejectedMutations?.title, "Imported canonical markdown mirror");
+  assert.equal(
+    repoAfterRejectedMutations?.note,
+    "ROLE: BACKEND\n\nTASK:\nVerify imported markdown metadata.\n\nSTAGE:\nBACKEND validation",
+  );
+
   console.log(
     JSON.stringify(
       {
@@ -273,6 +355,9 @@ async function runDeterministicHarness() {
           "deterministic_prompt",
           "metadata_redaction",
           "archived_excluded_from_active_list",
+          "repo_derived_list_detail_copy",
+          "repo_derived_markdown_prompt_copy",
+          "repo_derived_read_only",
         ],
         promptLength: prompt.prompt.prompt.length,
       },
@@ -304,6 +389,7 @@ async function runLiveSupabaseProbe() {
 
   const schemaReady = steps.every((step) => step.ok);
   let createdItemId: string | null = null;
+  let repoDerivedItemId: string | null = null;
 
   if (schemaReady) {
     const repository = createSupabaseAdminCaptureRepository(serviceClient);
@@ -378,6 +464,103 @@ async function runLiveSupabaseProbe() {
       detail: `prompt length ${prompt.prompt.prompt.length}`,
     });
 
+    const appended = await mustOk(
+      appendAdminCaptureItemNoteForDependencies(admin, {
+        id: createdItemId,
+        note: "Manual live probe note append should remain editable.",
+      }),
+    );
+    steps.push({
+      name: "manual_item_note_append",
+      ok: appended.item.note.includes("Manual live probe note append"),
+      detail: "manual quick-note/capture row note append still works",
+    });
+
+    const repoDerivedRow = await repository.createItem({
+      item_type: "context_capture",
+      status: "ready_for_codex",
+      priority: "high",
+      target_role: "backend",
+      title: "Live repo-derived read-only proof",
+      note: "ROLE: BACKEND\n\nTASK:\nVerify live repo-derived metadata mirror.\n\nSTAGE:\nBACKEND validation",
+      page_url: "hito://repo/docs/plans/active/live-proof.md",
+      route: null,
+      created_by_user_id: "repo-work-item-importer",
+      created_by_label: "Repo work item importer",
+      metadata: {
+        imported_from_repo: true,
+        source_path: "docs/plans/active/live-proof.md",
+        source_type: "active_plan",
+        work_item_status: "in_progress",
+        markdown_status: "in_progress",
+        markdown_type: "context_capture",
+        markdown_priority: "high",
+        markdown_next_role: "backend",
+        markdown_prompt_source: "exact_handoff_prompt",
+      },
+    });
+    repoDerivedItemId = repoDerivedRow.id;
+    const repoList = await mustOk(
+      listAdminCaptureBacklogForDependencies(admin, {
+        status: "all",
+        includeArchived: false,
+        limit: 20,
+        search: "Live repo-derived read-only proof",
+      }),
+    );
+    const repoDetail = await mustOk(
+      getAdminCaptureItemForDependencies(admin, { id: repoDerivedItemId }),
+    );
+    steps.push({
+      name: "repo_derived_list_detail_search",
+      ok:
+        repoList.view.items.some((item) => item.id === repoDerivedItemId) &&
+        repoDetail.item.source === "repo_import",
+      detail: "repo-derived item remains listable, searchable, and readable",
+    });
+
+    const repoPrompt = await mustOk(
+      getAdminCaptureCopyPromptForDependencies(admin, { id: repoDerivedItemId }),
+    );
+    steps.push({
+      name: "repo_derived_copy_prompt",
+      ok:
+        repoPrompt.prompt.prompt.includes("Source path: docs/plans/active/live-proof.md") &&
+        repoPrompt.prompt.prompt.includes("Source type: active_plan") &&
+        repoPrompt.prompt.prompt.includes("Verify live repo-derived metadata mirror"),
+      detail: `repo-derived prompt length ${repoPrompt.prompt.prompt.length}`,
+    });
+
+    const repoTriageBlocked = await updateAdminCaptureItemTriageForDependencies(admin, {
+      id: repoDerivedItemId,
+      itemType: "bug",
+      status: "done",
+      priority: "urgent",
+      targetRole: "frontend",
+      title: "Should not persist",
+    });
+    const repoAppendBlocked = await appendAdminCaptureItemNoteForDependencies(admin, {
+      id: repoDerivedItemId,
+      note: "Should not append.",
+    });
+    const repoUpdateNoteBlocked = await updateAdminCaptureItemNoteForDependencies(admin, {
+      id: repoDerivedItemId,
+      note: "Should not replace.",
+    });
+    const repoAfterRejectedMutations = await repository.getItem(repoDerivedItemId);
+    steps.push({
+      name: "repo_derived_mutation_blocked",
+      ok:
+        isRepoReadOnlyRejection(repoTriageBlocked) &&
+        isRepoReadOnlyRejection(repoAppendBlocked) &&
+        isRepoReadOnlyRejection(repoUpdateNoteBlocked) &&
+        repoAfterRejectedMutations?.status === "ready_for_codex" &&
+        repoAfterRejectedMutations?.target_role === "backend" &&
+        repoAfterRejectedMutations?.note ===
+          "ROLE: BACKEND\n\nTASK:\nVerify live repo-derived metadata mirror.\n\nSTAGE:\nBACKEND validation",
+      detail: "status/type/priority/target-role/title/note mutations were rejected",
+    });
+
     await mustOk(
       updateAdminCaptureItemTriageForDependencies(admin, {
         id: createdItemId,
@@ -399,6 +582,15 @@ async function runLiveSupabaseProbe() {
     });
 
     await probePublishableAccessBlocked(publishableClient, createdItemId, steps);
+  }
+
+  if (repoDerivedItemId) {
+    await serviceClient.from("admin_capture_items").delete().eq("id", repoDerivedItemId);
+    steps.push({
+      name: "repo_derived_cleanup",
+      ok: true,
+      detail: "deleted disposable repo-derived proof item",
+    });
   }
 
   if (createdItemId) {
@@ -562,6 +754,20 @@ function classifySupabaseError(error: { code?: string; message?: string; statusC
   }
 
   return `${code}: ${message.slice(0, 160)}`;
+}
+
+function isRepoReadOnlyRejection(result: AdminCaptureResult<unknown>) {
+  return !result.ok && result.reason === "repo_derived_read_only";
+}
+
+async function mustRejectRepoDerivedMutation(result: Promise<AdminCaptureResult<unknown>>) {
+  const resolved = await result;
+
+  assert.equal(resolved.ok, false);
+  if (!resolved.ok) {
+    assert.equal(resolved.reason, "repo_derived_read_only");
+    assert.match(resolved.message, /Repo-derived backlog items are read-only/);
+  }
 }
 
 async function mustOk<T>(

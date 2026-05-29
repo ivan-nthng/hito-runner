@@ -2,7 +2,54 @@
 
 ## Status
 
-Draft / Ready for ARCHITECT checkpoint before BACKEND Slice 1
+in_progress
+
+## Type
+
+plan
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+ARCHITECT
+
+## Task
+
+Select the next plan-authoring engine cleanup target after closing the structured authoring
+decomposition milestone.
+
+## Stage
+
+ARCHITECT checkpoint / refactor milestone decision
+
+## Exact Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+TASK:
+Select the next plan-authoring engine cleanup target after the structured authoring decomposition
+milestone.
+
+STAGE:
+ARCHITECT checkpoint / refactor milestone decision
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 
@@ -10,7 +57,7 @@ ARCHITECT / BACKEND / QA
 
 ## Last Updated
 
-2026-05-28
+2026-05-29
 
 ## Context
 
@@ -36,6 +83,224 @@ Current large hotspots from repo inspection:
 
 This plan exists to shrink and clarify those seams without deleting active safety infrastructure by
 accident.
+
+## Blueprint Facade Decomposition Closeout
+
+Status: Complete / behavior-preserving milestone closed on 2026-05-28.
+
+The `src/lib/ai-first-plan-blueprint-authoring.ts` phase is complete. The file remains the stable
+public facade/import seam for current service, ops, and doctrine callers, but the large internal
+responsibilities have been extracted into focused backend modules.
+
+Extracted modules:
+
+- `src/lib/ai-first-plan-blueprint-schema.ts`
+- `src/lib/ai-first-plan-blueprint-taxonomy.ts`
+- `src/lib/ai-first-plan-blueprint-policy.ts`
+- `src/lib/ai-first-plan-blueprint-prompt.ts`
+- `src/lib/ai-first-plan-blueprint-trace.ts`
+- `src/lib/ai-first-plan-blueprint-validation.ts`
+- `src/lib/ai-first-plan-blueprint-normalize.ts`
+- `src/lib/ai-first-plan-blueprint-expansion.ts`
+- `src/lib/ai-first-plan-blueprint-metrics.ts`
+
+Behavior-preservation evidence:
+
+- targeted ESLint passed
+- doctrine validator passed
+- mock blueprint passed with:
+  - `sourceKind: ai_first_plan_blueprint_v1`
+  - `sourceStatus: ai_authored`
+  - `workoutCount: 56`
+  - `weekCount: 8`
+- mock invalid returned `blueprint_unavailable`
+- mock timeout returned `blueprint_unavailable`
+- `deterministicFallbackBoundary.used` stayed `false` for invalid/timeout mocks
+- `git diff --check` passed
+- `npm run build` passed with existing warnings only
+
+Closeout decision:
+
+- do not reopen the blueprint facade extraction without a concrete regression
+- do not start another refactor as part of this milestone closeout
+- keep the facade as the public import seam until a future slice explicitly changes that contract
+- the next cleanup candidate should be selected as a separate slice, most likely
+  `structured-plan-authoring.ts` decomposition or doctrine validator decomposition
+
+## Next Cleanup Target Selection
+
+Status: Historical selection / completed through Slice 6F.
+
+Candidate audit:
+
+### `src/lib/structured-plan-authoring.ts`
+
+- size: 3335 lines
+- responsibility mix:
+  - structured authoring input schema and defaults
+  - normalized structured input shaping
+  - deterministic workout calendar generation
+  - rest/easy/steady/long/quality/mountain/trail/ultra workout builders
+  - segment construction
+  - pace/default-HR/metric target helpers
+  - phase, taper, cutback, long-run progression, and support-run policy helpers
+- direct production/compatibility callers include:
+  - `src/lib/active-plan-refresh-draft.ts`
+  - `src/lib/voice-to-plan-authoring.ts`
+  - `src/lib/openai-plan-authoring.ts`
+  - `src/lib/ai-first-plan-draft-service.ts`
+  - `src/lib/ai-first-plan-blueprint-authoring.ts`
+  - `src/lib/structured-first-plan-onboarding.ts`
+  - `src/lib/first-plan-actions.ts`
+  - `src/lib/plan-authoring-snapshot.ts`
+- ops/QA callers include:
+  - `scripts/author-plan-from-text.ts`
+  - `scripts/author-ai-first-plan-draft.ts`
+  - `scripts/author-structured-plan.mjs`
+  - `scripts/seed-ai-first-plan-blueprint-proof.ts`
+  - `scripts/validate-plan-authoring-doctrine.ts`
+  - legacy `scripts/lib/*.mjs` compatibility helpers
+- dependent product paths:
+  - active-plan refresh exact draft
+  - voice-to-plan confirmation
+  - text authoring compatibility
+  - AI blueprint deterministic comparison/fallback boundary
+  - plan-scoped authoring snapshots
+  - doctrine fixtures and ops scripts
+- deletion risk: high
+- extraction value: high, because it is still a runtime/compatibility hotspot and the same schema
+  is imported across many production seams
+
+### `scripts/validate-plan-authoring-doctrine.ts`
+
+- size: 6244 lines
+- responsibility mix:
+  - structured authoring doctrine assertions
+  - rich workout mapping/readback/persistence fixtures
+  - text rich draft tests
+  - active-plan refresh proposal/apply fixtures
+  - import/export roundtrip fixtures
+  - AI strict draft and blueprint fixtures
+  - first-plan review/confirm persistence exactness fixtures
+  - refresh fixture builders
+- direct usages are validation/runbook/documentation oriented rather than product runtime
+- dependent product paths:
+  - doctrine regression coverage only; it does not run inside app routes
+- deletion risk: high if split carelessly, because it is the safety net for plan-authoring behavior
+- extraction value: medium now, higher later after runtime compatibility seams are smaller
+
+Historical decision:
+
+- choose `src/lib/structured-plan-authoring.ts` as the next cleanup target
+- do not start doctrine validator decomposition yet
+- do not delete deterministic behavior
+- keep the next slice behavior-preserving and facade-compatible
+
+Reason at selection time:
+
+- `structured-plan-authoring.ts` is smaller than the doctrine validator but more important to runtime
+  architecture because refresh, voice, text, blueprint comparison, snapshots, ops, and doctrine still
+  depend on it
+- decomposing the runtime compatibility seam first will make later doctrine validator splitting safer
+  because fixtures can target clearer module boundaries
+- doctrine validator decomposition is useful, but doing it first mainly reorganizes the safety net
+  while leaving the runtime hotspot unchanged
+
+First bounded slice at selection time:
+
+### Slice 6A: structured authoring schema/types extraction
+
+Owner: BACKEND
+
+Scope:
+
+- create a focused structured authoring schema/types module, for example
+  `src/lib/structured-plan-authoring-schema.ts`
+- move only pure input schema/default/type ownership out of `structured-plan-authoring.ts`
+- keep `structured-plan-authoring.ts` as the stable public facade and re-export
+  `structuredPlanAuthoringInputSchema`
+- preserve current imports/callers; do not require broad caller rewrites
+- do not move workout builders, metric/default-HR helpers, phase policy, long-run policy, or segment
+  builders in this first slice
+- no behavior changes, no deletion, no production-path rewiring
+
+Validation for Slice 6A:
+
+- targeted ESLint for touched files
+- doctrine validator
+- at least one deterministic structured authoring mock/sample if available
+- `git diff --check`
+- build if source changes are broad enough to warrant it
+
+Exit criteria:
+
+- public imports still work from `@/lib/structured-plan-authoring`
+- active-plan refresh, voice, text, blueprint service, and doctrine callers compile against the same
+  schema contract
+- no generated plan output changes are expected or accepted in this slice
+
+## Structured Authoring Decomposition Closeout
+
+Status: Complete / behavior-preserving milestone closed on 2026-05-29.
+
+The `src/lib/structured-plan-authoring.ts` decomposition milestone is complete enough to stop. The
+file is now about 230 lines and reads as a stable public facade/orchestrator for the deterministic
+compatibility generator instead of a mixed-responsibility mega-module.
+
+Extracted modules:
+
+- `src/lib/structured-plan-authoring-schema.ts`
+- `src/lib/structured-plan-authoring-policy.ts`
+- `src/lib/structured-plan-authoring-metrics.ts`
+- `src/lib/structured-plan-authoring-segments.ts`
+- `src/lib/structured-plan-authoring-workouts.ts`
+- `src/lib/structured-plan-authoring-sequencing.ts`
+- `src/lib/structured-plan-authoring-finalize.ts`
+
+Current facade responsibilities:
+
+- public `buildStructuredAuthoringPlan` entrypoint
+- stable `structuredPlanAuthoringInputSchema` re-export
+- normalized input shaping
+- high-level calendar-date iteration
+- choosing rest, long-run, quality, steady, or easy builder per date
+- final `training-plan-v2` parse
+
+Final QA evidence:
+
+- representative deterministic half fixture stayed unchanged:
+  - total workouts: 56
+  - non-rest workouts: 40
+  - total segments: 133
+  - non-rest segments: 117
+- long runs remain on Saturday
+- long-run identity sequence remains unchanged
+- `meaningfulNonRestSegments` remains true
+- `singleSegmentNonRest` remains `[]`
+- `missingRichFields` remains 0
+- `nonRestMissingLabels` remains 0
+- `rowsWithTargets` remains 40
+- `rowsWithPaceTargets` remains 40
+- `rowsWithHrTargets` remains 40
+- `restRowIssues` remains `[]`
+- sample `metric_mode` and `goal_context` shape remained stable
+- blueprint mock valid remains `ai_first_plan_blueprint_v1` / `ai_authored`
+- invalid/timeout remain `blueprint_unavailable`
+- `deterministicFallbackBoundary.used` remains false for invalid/timeout
+- no `structured_authoring_v1` fallback leaked into first-plan blueprint paths
+- external callers still import through `@/lib/structured-plan-authoring`
+- `structured-plan-authoring-finalize.ts` is only imported by `structured-plan-authoring.ts`
+
+Decision:
+
+- close the structured authoring decomposition milestone now
+- do not define another `structured-plan-authoring.ts` extraction slice without a concrete new bug
+  or proven ownership problem
+- do not delete deterministic generation yet; it still supports refresh, voice, text compatibility,
+  blueprint comparison, ops, and doctrine fixtures
+- no deletion gate is satisfied by this milestone alone
+- the next cleanup target should shift to `scripts/validate-plan-authoring-doctrine.ts`, but only as
+  a separate bounded slice with its own architecture/coverage plan
 
 ## Problem
 
@@ -202,6 +467,8 @@ needs a dedicated branch/slice with focused validation.
 
 Owner: BACKEND
 
+Status: Complete / behavior-preserving validation passed.
+
 Goal:
 Extract pure schema, type, constants, and goal-family policy from
 `ai-first-plan-blueprint-authoring.ts` without behavior changes.
@@ -215,6 +482,13 @@ Scope:
 - keep `ai-first-plan-blueprint-authoring.ts` as facade
 - no prompt, validation, expansion, service, first-plan action, DB, or UI behavior changes
 
+Implementation note:
+
+- `ai-first-plan-blueprint-authoring.ts` remains the public facade for existing service, ops, and
+  doctrine callers.
+- Pure taxonomy constants, schema/OpenAI response shape, and goal-family cadence policy helpers now
+  live in focused backend modules.
+
 Validation:
 
 - plan authoring doctrine validation
@@ -226,9 +500,21 @@ Validation:
 
 Owner: BACKEND
 
+Status: Complete / behavior-preserving validation passed.
+
 Goal:
 Move prompt assembly and bounded trace helpers out of the facade without changing generated prompt
 content or trace shape.
+
+Implementation note:
+
+- Prompt assembly now lives in `src/lib/ai-first-plan-blueprint-prompt.ts`.
+- Bounded trace table/count helpers now live in `src/lib/ai-first-plan-blueprint-trace.ts`.
+- The normalization context and fallback-result formatter now live in
+  `src/lib/ai-first-plan-blueprint-validation.ts`; validation rule movement remains scoped to the
+  later validation extraction slice.
+- `ai-first-plan-blueprint-authoring.ts` remains the compatibility facade for service, ops, and
+  doctrine callers.
 
 Validation:
 
@@ -239,8 +525,22 @@ Validation:
 
 Owner: BACKEND
 
+Status: Complete / behavior-preserving validation passed.
+
 Goal:
 Move validation functions into a focused validation module.
+
+Implementation note:
+
+- Blueprint shell validation, schedule/date checks, required cadence checks, goal-family identity
+  validation, hard-day density validation, unsafe-claim checks, and normalized-plan doctrine checks
+  now live in `src/lib/ai-first-plan-blueprint-validation.ts`.
+- Blueprint workout row normalization and rest-row preparation now live in
+  `src/lib/ai-first-plan-blueprint-normalize.ts`, along with canonical candidate
+  `training-plan-v2` object preparation; identity-aware segment expansion and target-building remain
+  in the facade for the later expansion/metrics slice.
+- Existing service, ops, and doctrine imports still flow through
+  `src/lib/ai-first-plan-blueprint-authoring.ts`.
 
 Validation:
 
@@ -254,8 +554,19 @@ Validation:
 
 Owner: BACKEND
 
+Status: Complete / behavior-preserving validation passed.
+
 Goal:
 Move identity-aware segment expansion and metric normalization into focused modules.
+
+Implementation note:
+
+- Identity-aware blueprint segment scaffolds now live in
+  `src/lib/ai-first-plan-blueprint-expansion.ts`.
+- Blueprint metric target construction, pace gate reuse, default estimated HR target labels, and
+  metric repair notes now live in `src/lib/ai-first-plan-blueprint-metrics.ts`.
+- `src/lib/ai-first-plan-blueprint-authoring.ts` remains the stable public facade and orchestration
+  seam for existing service, ops, and doctrine callers.
 
 Validation:
 
@@ -287,6 +598,229 @@ Split `structured-plan-authoring.ts` by responsibility without deleting behavior
 
 Do not remove deterministic generation yet because active-plan refresh, voice, text, and fixtures
 still depend on it.
+
+### Slice 6A: Structured authoring schema/types extraction
+
+Owner: BACKEND
+
+Status: Complete / behavior-preserving QA passed.
+
+Goal:
+Extract pure structured authoring input schema/type ownership from `structured-plan-authoring.ts`
+while keeping the current facade import path stable.
+
+Scope:
+
+- create `src/lib/structured-plan-authoring-schema.ts` or equivalent focused module
+- move only schema/default/type constants needed for `structuredPlanAuthoringInputSchema`
+- keep `structured-plan-authoring.ts` exporting `structuredPlanAuthoringInputSchema`
+- avoid broad caller rewrites in this first slice
+- do not move workout builders, segment builders, metric helpers, phase policy, long-run policy, or
+  schedule generation logic yet
+- do not delete deterministic generation behavior
+
+Implementation note:
+
+- `src/lib/structured-plan-authoring-schema.ts` now owns the structured authoring input schema,
+  weekday schema/default parsing constants, and pure TypeScript helper types.
+- `src/lib/structured-plan-authoring.ts` remains the stable public facade for existing refresh,
+  voice, text, blueprint comparison, ops, and doctrine imports.
+- Deterministic generation, workout builders, segment builders, metric helpers, phase policy, and
+  long-run policy remain in the facade for later targeted slices.
+
+Validation:
+
+- targeted ESLint for touched files
+- doctrine validator
+- build if practical
+- `git diff --check`
+
+### Slice 6B: Structured authoring pure policy/helper extraction
+
+Owner: BACKEND
+
+Status: Complete / behavior-preserving QA passed.
+
+Goal:
+Extract stateless structured authoring helper/policy functions without moving generation builders.
+
+Scope:
+
+- create `src/lib/structured-plan-authoring-policy.ts`
+- move pure weekday/date/phase helpers, support-level predicates, benchmark parsing, and simple
+  formatting helpers
+- keep `src/lib/structured-plan-authoring.ts` as the stable public facade
+- do not move workout builders, segment builders, metric target construction, long-run workout
+  construction, refresh/voice/text behavior, or deterministic fallback behavior
+
+Implementation note:
+
+- Stateless helpers such as `phaseForWeek`, `firstTaperWeek`, `compareWeekdays`, `isoWeekday`,
+  support-intensity guards, and recent-5K benchmark parsing now live in
+  `src/lib/structured-plan-authoring-policy.ts`.
+- Deterministic workout/segment generation, duration derivation, pace/HR target construction, and
+  long-run construction remain in `src/lib/structured-plan-authoring.ts`.
+
+Validation:
+
+- targeted ESLint for touched files
+- doctrine validator
+- blueprint mock valid/invalid/timeout ops
+- build if practical
+- `git diff --check`
+
+### Slice 6C: Structured authoring metric/segment helper extraction
+
+Owner: BACKEND
+
+Status: Complete / behavior-preserving QA passed.
+
+Goal:
+Extract reusable metric target and segment helper logic from `structured-plan-authoring.ts` without
+changing deterministic generation behavior.
+
+Scope:
+
+- create `src/lib/structured-plan-authoring-metrics.ts`
+- create `src/lib/structured-plan-authoring-segments.ts`
+- move metric-mode formatting, pace target helpers, default estimated HR helpers, easy/long/steady
+  target builders, repeat recovery targets, warmup/cooldown segment constructors, support-run
+  segment builders, and the simple substantial-endurance split helper
+- keep `src/lib/structured-plan-authoring.ts` as the stable public facade
+- do not move workout builders, long-run construction policy, phase loops, refresh/voice/text
+  behavior, blueprint-only first-plan behavior, or deterministic fallback behavior
+
+Implementation note:
+
+- `src/lib/structured-plan-authoring-metrics.ts` now owns the deterministic pace/default-HR target
+  helpers and generated workout metric-mode summary builder.
+- `src/lib/structured-plan-authoring-segments.ts` now owns reusable easy/steady support-run segment
+  builders, generic warmup/cooldown segment constructors, and the simple endurance-duration split
+  helper.
+- Long-run construction, workout identity selection, dates, durations, phase generation, and public
+  facade exports remain unchanged.
+
+Validation:
+
+- targeted ESLint for touched files
+- doctrine validator
+- blueprint mock valid/invalid/timeout ops
+- build if practical
+- `git diff --check`
+
+### Slice 6D: Structured authoring deterministic workout builder extraction
+
+Owner: BACKEND
+
+Status: Complete / behavior-preserving QA passed.
+
+Goal:
+Extract deterministic workout builder functions from `structured-plan-authoring.ts` while keeping
+the facade responsible for plan orchestration, goal-family sequencing, long-run construction, and
+compatibility behavior.
+
+Scope:
+
+- create `src/lib/structured-plan-authoring-workouts.ts`
+- move rest, easy, steady, cutback, taper tune-up, progression, strides, road quality, mountain,
+  trail, hill, interval, tempo, and ultra support workout constructors
+- keep `src/lib/structured-plan-authoring.ts` as the stable public facade
+- keep high-level generation loops, quality workout selection, mountain/goal-family sequencing,
+  long-run progression/construction, refresh/voice/text behavior, blueprint-only first-plan behavior,
+  and deterministic fallback behavior unchanged
+
+Implementation note:
+
+- `src/lib/structured-plan-authoring-workouts.ts` now owns the self-contained deterministic workout
+  constructors plus the local easy-duration helper used only by those builders.
+- `src/lib/structured-plan-authoring.ts` still decides which workout builder to call for each
+  date/week/phase and still owns long-run progression and long-run segment construction.
+- Existing imports from `@/lib/structured-plan-authoring` remain stable for refresh, voice, text,
+  blueprint comparison, ops, and doctrine callers.
+
+Validation:
+
+- targeted ESLint for touched files
+- doctrine validator
+- blueprint mock valid/invalid/timeout ops
+- representative structured fixture row/segment count comparison
+- build if practical
+- `git diff --check`
+
+### Slice 6E: Structured authoring long-run and weekly sequencing extraction
+
+Owner: BACKEND
+
+Status: Complete / behavior-preserving QA passed.
+
+Goal:
+Extract long-run progression/construction and weekly quality sequencing helpers from
+`structured-plan-authoring.ts` without changing deterministic generation behavior.
+
+Scope:
+
+- create `src/lib/structured-plan-authoring-sequencing.ts`
+- move long-run goal policy, long-run duration/progression helpers, cutback/taper long-run
+  construction, steady-finish long-run construction, and quality workout selection helpers
+- keep `src/lib/structured-plan-authoring.ts` as the stable public facade
+- keep high-level plan generation, normalized input shaping, per-date loop orchestration,
+  canonical rich workout decoration, refresh/voice/text behavior, blueprint-only first-plan behavior,
+  and deterministic fallback behavior unchanged
+
+Implementation note:
+
+- `src/lib/structured-plan-authoring-sequencing.ts` now owns long-run construction/progression and
+  goal-family/mountain quality workout selection.
+- `src/lib/structured-plan-authoring.ts` still owns the public `buildStructuredAuthoringPlan`
+  entrypoint, input normalization, calendar-date iteration, and canonical workout field decoration.
+- Existing imports from `@/lib/structured-plan-authoring` remain stable for refresh, voice, text,
+  blueprint comparison, ops, and doctrine callers.
+
+Validation:
+
+- targeted ESLint for touched files
+- doctrine validator
+- blueprint mock valid/invalid/timeout ops
+- representative structured fixture row/segment/long-run placement comparison
+- build if practical
+- `git diff --check`
+
+### Slice 6F: Structured authoring final row decoration extraction
+
+Owner: BACKEND
+
+Status: Complete / behavior-preserving QA passed.
+
+Goal:
+Extract canonical rich workout decoration and final generated row normalization from
+`structured-plan-authoring.ts` without changing deterministic generation behavior.
+
+Scope:
+
+- create `src/lib/structured-plan-authoring-finalize.ts`
+- move generated workout rich field decoration, generated goal context construction, and metric-mode
+  finalization for generated rows
+- keep `src/lib/structured-plan-authoring.ts` as the stable public facade
+- keep public build entrypoint, normalized input shaping, per-date loop orchestration, refresh/voice
+  text behavior, blueprint-only first-plan behavior, and deterministic fallback behavior unchanged
+
+Implementation note:
+
+- `src/lib/structured-plan-authoring-finalize.ts` now owns the private final row decoration step that
+  resolves canonical workout family/identity/icon, generated goal context, and canonical metric mode.
+- `src/lib/structured-plan-authoring.ts` still owns the public `buildStructuredAuthoringPlan`
+  entrypoint, input normalization, and calendar-date iteration.
+- Existing imports from `@/lib/structured-plan-authoring` remain stable for refresh, voice, text,
+  blueprint comparison, ops, and doctrine callers.
+
+Validation:
+
+- targeted ESLint for touched files
+- doctrine validator
+- blueprint mock valid/invalid/timeout ops
+- representative structured fixture row/segment/long-run/rich-field comparison
+- build if practical
+- `git diff --check`
 
 ### Slice 7: Doctrine script decomposition
 
@@ -331,54 +865,64 @@ ARCHITECT
 
 ## Suggested Next Step
 
-Run a focused import/usage audit for the strict nested draft path and deterministic structured
-generator, then hand Slice 1 to BACKEND for pure blueprint schema/policy extraction.
+Stop extracting from `src/lib/structured-plan-authoring.ts` for now. The facade is small enough and
+further extraction would risk abstraction churn without deleting meaningful complexity.
 
-## Exact ARCHITECT Prompt For Import/Usage Audit
+Run a separate architecture selection pass for the next cleanup target:
+`scripts/validate-plan-authoring-doctrine.ts`. That pass should choose one bounded doctrine-validator
+decomposition slice only if it improves reviewability without weakening coverage.
+
+## Exact ARCHITECT Prompt For Doctrine Validator Cleanup Selection
 
 ```text
 ROLE: ARCHITECT
 
 TASK:
-Audit plan-authoring engine imports before decomposition and legacy deletion.
+Select the first bounded doctrine validator decomposition slice after structured authoring decomposition closeout.
 
 STAGE:
-ARCHITECT cleanup audit
+ARCHITECT cleanup-slice selection
 
 PLAN:
 docs/plans/active/2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md
 
+CONTEXT:
+The `src/lib/structured-plan-authoring.ts` decomposition milestone is complete. The facade is now
+small/focused enough to stop, with no behavior changes accepted and final QA evidence recorded in the
+plan. The remaining oversized hotspot is `scripts/validate-plan-authoring-doctrine.ts`, which is the
+main safety harness for first-plan blueprint, deterministic compatibility, refresh, text/voice,
+import/export, and rich workout regression coverage.
+
 GOAL:
-Confirm which plan-authoring modules are production, compatibility, diagnostic, fixture-only, or
-delete candidates before Backend extracts or deletes anything.
+Choose exactly one first doctrine validator decomposition slice that improves reviewability without
+weakening coverage.
 
 REQUIRED INSPECTION:
-- src/lib/ai-first-plan-blueprint-authoring.ts
-- src/lib/ai-first-plan-draft-authoring.ts
-- src/lib/ai-first-plan-draft-service.ts
-- src/lib/structured-plan-authoring.ts
-- src/lib/first-plan-actions.ts
-- src/lib/active-plan-refresh-draft.ts
-- src/lib/voice-to-plan-authoring.ts
-- src/lib/openai-plan-authoring.ts
-- scripts/author-ai-first-plan-draft.ts
 - scripts/validate-plan-authoring-doctrine.ts
-- scripts/lib/*.mjs
-
-OUTPUT:
-1. Current module map
-2. Import/dependency map
-3. Production seams
-4. Compatibility seams
-5. Diagnostic/fixture seams
-6. Delete-now candidates
-7. Delete-later-after-QA candidates
-8. Exact BACKEND prompt for Slice 1
-9. Blockers
+- package.json
+- docs/process/*plan-creation* if useful for current validation evidence
+- docs/plans/active/2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md
 
 CONSTRAINTS:
 - Do not edit product code.
-- Do not delete files.
-- Do not weaken blueprint-only first-plan behavior.
-- Do not touch admin-capture work in progress.
+- Do not delete assertions.
+- Do not reduce coverage.
+- Do not split by arbitrary line count.
+- Prefer extracting one focused assertion/fixture group first.
+- Keep the main doctrine command passing during and after any future split.
+- Preserve blueprint-only structured first-plan behavior.
+- Preserve refresh, voice/text compatibility, import/export, and rich workout regression coverage.
+
+OUTPUT:
+1. Task
+2. Stage
+3. Current state
+4. Candidate comparison
+5. Recommendation
+6. Why
+7. First bounded slice
+8. What not to touch
+9. Next recommended role
+10. Exact handoff prompt
+11. Blockers
 ```

@@ -2,15 +2,19 @@
 
 ## Status
 
-Draft
+backlog
 
-## Owner
+## Type
 
-Design System Agent
+frontend_spec
 
-## Last Updated
+## Priority
 
-2026-05-20
+medium
+
+## Next Recommended Role
+
+FRONTEND
 
 ## Task
 
@@ -19,6 +23,39 @@ Audit the `/changelog` page, identify which parts already use Hito DS, identify 
 ## Stage
 
 FRONTEND implementation spec
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Audit the `/changelog` page, identify which parts already use Hito DS, identify custom patterns worth preserving, and extract the reusable changelog patterns into the canonical design system without changing product behavior.
+
+STAGE:
+FRONTEND implementation spec
+
+CONTEXT:
+- Source path: docs/tasks/frontend-specs/2026-05-20-changelog-ds-extraction-spec.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
+
+## Owner
+
+Design System Agent
+
+## Last Updated
+
+2026-05-20
 
 ## Why This Exists
 

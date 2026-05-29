@@ -220,7 +220,7 @@ export async function createAdminCaptureItemForDependencies(
   }
 
   const now = dependencies.now?.() ?? new Date();
-  const metadata = buildMetadataWithNoteHistory(input.metadata, {
+  const metadata = buildMetadataWithNoteHistory(stripRepoImportMetadata(input.metadata), {
     action: "create",
     admin: accessResult.admin,
     at: now,
@@ -277,6 +277,21 @@ export async function updateAdminCaptureItemTriageForDependencies(
   }
 
   const now = dependencies.now?.() ?? new Date();
+
+  try {
+    const existing = await dependencies.repository.getItem(input.id);
+
+    if (!existing) {
+      return failure("capture_not_found", "Capture item was not found.");
+    }
+
+    if (isRepoDerivedRow(existing)) {
+      return repoDerivedReadOnlyFailure();
+    }
+  } catch {
+    return failure("capture_load_failed", "Capture item could not be loaded.");
+  }
+
   const patch: AdminCaptureItemUpdate = {};
 
   if (input.itemType !== undefined) {
@@ -376,6 +391,7 @@ export function buildAdminCaptureCopyPrompt(
   const selector = item.selectedElement.selector ?? item.selectedElement.domPath ?? "Not captured";
   const screenshots = item.assetCount > 0 ? `${item.assetCount} stored asset(s)` : "Unavailable";
   const metadataSummary = summarizeMetadata(item.metadata);
+  const repoSource = getRepoImportSource(item.metadata);
   const contextSummary = [
     `Type: ${formatItemType(item.itemType)}`,
     `Status: ${formatStatus(item.status)}`,
@@ -383,6 +399,9 @@ export function buildAdminCaptureCopyPrompt(
     `Target role: ${formatTargetRole(targetRole)}`,
     `Route: ${item.route ?? "Not captured"}`,
     `URL: ${item.pageUrl}`,
+    ...(repoSource
+      ? [`Source path: ${repoSource.sourcePath}`, `Source type: ${repoSource.sourceType}`]
+      : []),
   ].join("\n");
 
   const prompt = [
@@ -402,6 +421,13 @@ export function buildAdminCaptureCopyPrompt(
     `- Target role: ${formatTargetRole(targetRole)}`,
     `- Route: ${item.route ?? "Not captured"}`,
     `- URL: ${item.pageUrl}`,
+    ...(repoSource
+      ? [
+          `- Source path: ${repoSource.sourcePath}`,
+          `- Source type: ${repoSource.sourceType}`,
+          `- Work item status: ${repoSource.workItemStatus ?? "Not captured"}`,
+        ]
+      : []),
     `- Selected element: ${selectedElement}`,
     `- Nearby heading: ${item.selectedElement.nearbyHeading ?? "Not captured"}`,
     `- Selector/DOM path: ${selector}`,
@@ -456,6 +482,10 @@ async function mutateAdminCaptureNote(
 
     if (!existing) {
       return failure("capture_not_found", "Capture item was not found.");
+    }
+
+    if (isRepoDerivedRow(existing)) {
+      return repoDerivedReadOnlyFailure();
     }
 
     const now = dependencies.now?.() ?? new Date();
@@ -611,7 +641,11 @@ async function requireCaptureAdmin(dependencies: AdminCaptureDependencies): Prom
 
 function mapItemView(row: AdminCaptureRowWithAssets): AdminCaptureItemView {
   const assets = (row.admin_capture_assets ?? []).map(mapAssetView);
-  const source = hasCapturedElementContext(row) ? "captured_ui" : "quick_note";
+  const source = isRepoImportMetadata(row.metadata)
+    ? "repo_import"
+    : hasCapturedElementContext(row)
+      ? "captured_ui"
+      : "quick_note";
 
   return {
     id: row.id,
@@ -735,6 +769,29 @@ function hasCapturedElementContext(row: AdminCaptureItemRow) {
   return Boolean(row.element_text || row.selector || row.dom_path || row.nearby_heading);
 }
 
+function isRepoImportMetadata(metadata: Json) {
+  return isJsonObject(metadata) && metadata.imported_from_repo === true;
+}
+
+function isRepoDerivedRow(row: AdminCaptureItemRow) {
+  return isRepoImportMetadata(row.metadata);
+}
+
+function stripRepoImportMetadata(input: unknown): Json {
+  const metadata = normalizeJsonObject(input);
+
+  delete metadata.imported_from_repo;
+  delete metadata.source_path;
+  delete metadata.source_type;
+  delete metadata.work_item_status;
+  delete metadata.import_version;
+  delete metadata.admin_capture_status;
+  delete metadata.admin_capture_priority;
+  delete metadata.admin_capture_target_role;
+
+  return metadata as Json;
+}
+
 function sanitizeSearchTerm(input: string) {
   return input.replace(/[%(),]/g, " ").trim();
 }
@@ -754,6 +811,26 @@ function summarizeMetadata(metadata: Json) {
     .slice(0, 6)
     .map(([key, value]) => `${key}: ${formatMetadataValue(key, value)}`)
     .join("; ");
+}
+
+function getRepoImportSource(metadata: Json) {
+  if (!isJsonObject(metadata) || metadata.imported_from_repo !== true) {
+    return null;
+  }
+
+  const sourcePath = typeof metadata.source_path === "string" ? metadata.source_path : null;
+  const sourceType = typeof metadata.source_type === "string" ? metadata.source_type : null;
+
+  if (!sourcePath || !sourceType) {
+    return null;
+  }
+
+  return {
+    sourcePath: sourcePath.slice(0, 300),
+    sourceType: sourceType.slice(0, 80),
+    workItemStatus:
+      typeof metadata.work_item_status === "string" ? metadata.work_item_status.slice(0, 80) : null,
+  };
 }
 
 function formatMetadataValue(key: string, value: Json | undefined): string {
@@ -888,4 +965,11 @@ function failure<T = never>(
     message,
     ...(issues ? { issues } : {}),
   };
+}
+
+function repoDerivedReadOnlyFailure<T = never>(): AdminCaptureResult<T> {
+  return failure(
+    "repo_derived_read_only",
+    "Repo-derived backlog items are read-only. Edit the markdown source file and refresh the mirror.",
+  );
 }

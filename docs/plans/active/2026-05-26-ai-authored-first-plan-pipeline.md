@@ -2,7 +2,52 @@
 
 ## Status
 
-Active / Blueprint-only structured first-plan release gate passed, Running Coach visual review next
+in_progress
+
+## Type
+
+plan
+
+## Priority
+
+high
+
+## Next Recommended Role
+
+RUNNING COACH
+
+## Task
+
+Review AI-authored first-plan blueprint quality before broad product rollout.
+
+## Stage
+
+RUNNING COACH audit
+
+## Exact Handoff Prompt
+
+```text
+ROLE: RUNNING COACH
+
+TASK:
+Review AI-authored first-plan blueprint quality before broad product rollout.
+
+STAGE:
+RUNNING COACH audit
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-26-ai-authored-first-plan-pipeline.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

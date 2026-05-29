@@ -2,7 +2,52 @@
 
 ## Status
 
-Active / needs backend implementation
+in_progress
+
+## Type
+
+plan
+
+## Priority
+
+high
+
+## Next Recommended Role
+
+BACKEND
+
+## Task
+
+Implement the Polar auto-sync integration backend slice.
+
+## Stage
+
+BACKEND implementation
+
+## Exact Handoff Prompt
+
+```text
+ROLE: BACKEND
+
+TASK:
+Implement the Polar auto-sync integration backend slice.
+
+STAGE:
+BACKEND implementation
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-21-polar-auto-sync-integration-plan.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

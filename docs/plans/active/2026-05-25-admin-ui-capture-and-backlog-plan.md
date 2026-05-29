@@ -2,7 +2,52 @@
 
 ## Status
 
-Active / `/admin/capture` Backlog v1 QA-passed, future capture phases paused
+in_progress
+
+## Type
+
+plan
+
+## Priority
+
+high
+
+## Next Recommended Role
+
+FRONTEND
+
+## Task
+
+Render repo-derived admin Backlog rows as read-only while preserving manual quick-note editing.
+
+## Stage
+
+FRONTEND implementation
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Render repo-derived admin Backlog rows as read-only while preserving manual quick-note editing.
+
+STAGE:
+FRONTEND implementation
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 
@@ -30,8 +75,27 @@ Current implemented phase:
 - backend storage/admin capture contract is implemented and QA-proven
 - `/admin/capture` Backlog v1 is implemented and QA-passed
 - backend-owned backlog truth is the current source for the admin surface
+- Backend Slice 7 repo work-item import/refresh is implemented: an explicit ops script mirrors
+  markdown work items from the approved repo folders into `admin_capture_items` with
+  `metadata.source_path`, `metadata.source_type`, and `metadata.work_item_status` while keeping
+  markdown canonical for repo-authored work
 - route-spanning capture overlay, screenshot upload, live editing, OpenAI, Codex auto-dispatch, and
   unified work-item/status modeling are not part of the completed v1 phase
+- repo-authored tasks/plans now appear through an explicit imported mirror rather than a new docs
+  folder, automatic sync, or Jira-like subsystem
+- product correction after Slice 7: repo-authored markdown work items must be read-only in admin;
+  changing status/type/priority/role inside `/admin/capture` must not become a second source of
+  truth
+- Backend Slice 8 server-side immutability guard is implemented: repo-derived rows still list,
+  search, open, and copy prompts, but normal admin mutation seams reject title/body/status/type/
+  priority/target-role edits with bounded read-only copy
+- Backend Slice 9 markdown metadata alignment is implemented: the importer reads canonical markdown
+  `Status`, `Type`, `Priority`, `Next Recommended Role`, `Task`, `Stage`, and
+  `Exact Handoff Prompt` sections when present, reports missing/invalid metadata for older docs,
+  and never mirrors repo-derived rows as `in_review`
+- Backend Slice 10 actionable markdown cleanup is implemented: active plans, product briefs, and
+  frontend specs now carry canonical metadata blocks, import with human-readable `Task` titles, and
+  keep filename/source path as secondary metadata instead of primary Backlog labels
 
 Important product correction:
 
@@ -39,6 +103,11 @@ Important product correction:
 - the capture layer itself must work across the whole Hito product
 - admin should be able to open normal product routes, enable capture mode, select any visible product element, and save the item into the same admin backlog
 - `/admin/capture` is the queue, not the only place capture can happen
+- for repo-authored work, markdown files are the only canonical editable task truth
+- imported markdown work items in admin are for filtering, review, prompt copy, and discovery, not
+  editing lifecycle attributes
+- admin quick notes are scratchpad/intake records; they can be appended to and copied into a proper
+  markdown backlog/task file, but they should not replace canonical repo tasks
 
 ## Product Contract
 
@@ -52,7 +121,16 @@ V1 flow:
 6. Admin selects a visible UI element.
 7. Admin writes a note, classifies the capture, and chooses an optional target role/priority.
 8. Backend saves the item into the admin backlog.
-9. Admin opens the backlog, triages the item, and copies a role-targeted prompt into Codex manually.
+9. Admin opens the backlog, reviews the item, and copies a role-targeted prompt into Codex manually.
+
+Repo work-item flow:
+
+1. Architect or Backlog Manager creates or updates the canonical markdown task in the repo.
+2. Backend import/refresh mirrors that task into Supabase for `/admin/capture` discovery.
+3. Admin filters, opens, reads, and copies the task from the admin Backlog.
+4. Admin does not edit status/type/priority/role for repo-derived tasks in the UI.
+5. If extra context is needed, admin creates/appends a quick note, then a role agent turns that note
+   into a canonical markdown backlog item.
 
 V1 must not:
 
@@ -65,7 +143,11 @@ V1 must not:
 
 ## Canonical Pipeline
 
-`admin-selected UI context -> browser capture normalization -> backend admin validation -> canonical admin_capture_items/admin_capture_assets storage -> admin backlog triage -> deterministic copy-prompt generation -> manual Codex handoff`
+`admin-selected UI context -> browser capture normalization -> backend admin validation -> canonical admin_capture_items/admin_capture_assets storage -> admin backlog review -> deterministic copy-prompt generation -> manual Codex handoff`
+
+For repo-authored work:
+
+`markdown task/plan/spec -> explicit import/refresh -> Supabase read mirror -> admin Backlog read/copy -> manual Codex handoff`
 
 This follows the Hito rule: raw context is captured first, backend validates and stores canonical truth, and any future execution still requires explicit human handoff.
 
@@ -77,11 +159,14 @@ Use one new admin route for backlog/triage:
 
 Responsibilities:
 
-- canonical backlog list
+- canonical backlog list/read surface
 - item detail/review
 - status/type/role/priority filters
 - copy prompt actions
 - optional entry links for starting capture mode on common product routes
+
+The route must not become an editor for repo-authored task truth. Status, type, priority, role, and
+body edits for markdown-derived items belong in markdown, then flow back through import/refresh.
 
 Do not overload `/admin/analytics` with this backlog. Add only a small navigation/link between admin surfaces if needed.
 
@@ -465,9 +550,19 @@ notes, assets, and deterministic prompt generation.
 Frontend owns interaction only:
 
 - render backend-shaped backlog view models
-- let admin filter, expand, copy, triage, and create quick notes
+- let admin filter, expand, copy, and create/append quick notes
 - show loading/error/empty states honestly
 - never invent backlog lifecycle rules locally
+
+Mutation correction:
+
+- repo-derived work items are read-only in admin
+- status, type, priority, target role, title, and canonical body for repo-derived work must be
+  edited in markdown and then mirrored through import/refresh
+- quick notes may be created and appended in admin as scratchpad/intake context
+- turning a quick note into a real task is a manual repo action owned by Architect or Backlog Manager
+- no admin UI action should silently rewrite markdown or treat Supabase triage metadata as the
+  canonical task lifecycle
 
 Designer deliverable expectation:
 
@@ -499,6 +594,470 @@ QA visual checks:
 - empty, loading, unavailable, and error states are present and DS-consistent
 - normal runners never see backlog controls
 - visual capture-created items and manual quick notes appear in the same backlog list/detail flow
+
+## Unified Work-Item Consolidation Plan
+
+The admin Backlog should become one admin-facing work surface for real Hito work, not only ad-hoc
+capture notes.
+
+Canonical work-item concept:
+
+- a work item is one bounded actionable unit that can be reviewed, filtered, opened, and copied as
+  a role-ready prompt
+- work items can originate from:
+  - Supabase admin capture/quick-note rows
+  - repo backlog markdown under `docs/tasks/backlog/`
+  - product briefs under `docs/tasks/product-briefs/`
+  - frontend specs under `docs/tasks/frontend-specs/`
+  - active plans under `docs/plans/active/`
+  - archived plans under `docs/plans/archive/`
+- the admin Backlog renders a normalized work-item view; it does not become the only source of
+  truth for every source type
+
+Source-of-truth decision:
+
+- Supabase remains canonical for admin-created quick notes and future visual capture items.
+- Markdown remains canonical for repo-authored briefs, specs, backlog docs, active plans, and
+  archived plans.
+- The admin Backlog should store or read an indexed mirror of markdown-authored work so those items
+  are visible and prompt-copyable in the UI.
+- Do not duplicate full markdown document truth into Supabase as editable long-form content in v1.
+  Store only searchable/indexable fields, a short body excerpt, prompt text or prompt source, and a
+  stable `source_path` reference.
+- Admin must not edit status/type/priority/role/title/body for imported markdown items in the UI.
+  Those fields are canonical in markdown and should be refreshed from repo truth.
+- If admin creates a quick note, that row is Supabase scratchpad truth until a role agent turns it
+  into a canonical markdown backlog item.
+- Updating markdown from admin UI is out of scope. If this is ever needed, it must be an explicit
+  export/PR workflow, not automatic magic.
+
+Recommended folder/docs structure:
+
+- keep current folders for now:
+  - `docs/plans/active/`
+  - `docs/plans/archive/`
+  - `docs/tasks/backlog/`
+  - `docs/tasks/product-briefs/`
+  - `docs/tasks/frontend-specs/`
+- do not create `docs/work-items/` yet
+- do not move large doc trees until link/reference impact is understood
+- if consolidation is still desired later, do it as a separate staged docs migration with redirect
+  notes/reference updates
+
+Required normalized work-item metadata:
+
+- stable source key:
+  - Supabase capture rows use `admin_capture_items.id`
+  - markdown items use normalized `source_path`
+- `title`
+- normalized status:
+  - `backlog`
+  - `in_progress`
+  - `completed`
+  - `closed`
+  - `archived`
+- admin capture status when backed by `admin_capture_items`:
+  - `new`
+  - `in_review`
+  - `ready_for_codex`
+  - `done`
+  - `archived`
+- source type:
+  - `admin_capture`
+  - `quick_note`
+  - `backlog_doc`
+  - `product_brief`
+  - `frontend_spec`
+  - `active_plan`
+  - `archived_plan`
+- work type:
+  - `bug`
+  - `change_request`
+  - `context_capture`
+  - `plan`
+  - `brief`
+  - `frontend_spec`
+  - `qa_followup`
+  - `ops_followup`
+- `priority`
+- `target_role`
+- `owner`
+- `source_path`
+- `created_at`
+- `updated_at`
+- short summary/body excerpt
+- prompt/body text for copy handoff, or enough source context to generate the deterministic prompt
+- evidence paths, including local `qa-artifacts/` references or committed docs assets when present
+
+## Canonical Markdown Metadata Contract
+
+Repo-derived Backlog items are markdown-first. The importer mirrors markdown truth into Supabase for
+admin discovery; it does not create a second editable task record.
+
+Use explicit markdown sections as the canonical contract. Frontmatter is optional later, but not
+required now because current Hito plans/specs already use visible sections.
+
+Required sections for new backlog/task docs:
+
+````md
+# <Human-readable task title>
+
+## Status
+
+backlog
+
+## Type
+
+bug | change_request | context_capture
+
+## Priority
+
+low | medium | high | urgent
+
+## Next Recommended Role
+
+ARCHITECT | BACKEND | FRONTEND | QA | DESIGNER | COPY | RUNNING COACH
+
+## Task
+
+<one concise task statement>
+
+## Stage
+
+<role/stage label, for example ARCHITECT plan, BACKEND implementation, QA validation>
+
+## Context
+
+<bounded context and source facts>
+
+## Exact Handoff Prompt
+
+```text
+ROLE: <ROLE>
+
+TASK:
+<execution-ready task>
+
+STAGE:
+<stage>
+
+...
+```
+````
+
+Optional but recommended sections:
+
+- `## Evidence`
+- `## Source Investigation`
+- `## Expected Behavior`
+- `## Constraints`
+- `## What Not To Touch`
+- `## Blockers`
+
+Allowed values:
+
+- status:
+  - `backlog`
+  - `in_progress`
+  - `completed`
+  - `closed`
+  - `archived`
+- type:
+  - `bug`
+  - `change_request`
+  - `context_capture`
+- priority:
+  - `low`
+  - `medium`
+  - `high`
+  - `urgent`
+- next recommended role:
+  - `ARCHITECT`
+  - `BACKEND`
+  - `FRONTEND`
+  - `QA`
+  - `DESIGNER`
+  - `COPY`
+  - `RUNNING COACH`
+
+Type guidance:
+
+- use `bug` when something is broken or incorrect
+- use `change_request` for product/design/copy/behavior improvements
+- use `context_capture` for notes, evidence, or unclear observations that still need triage into a
+  real task
+- do not add broad new type taxonomy without an explicit architecture update
+
+Status guidance:
+
+- `backlog`: captured and not started
+- `in_progress`: actively owned by a role or handed off for execution
+- `completed`: implemented/validated enough to stop active work, but still useful in completed
+  filters
+- `closed`: intentionally not doing it, merged into another item, or no longer relevant
+- `archived`: historical/old item hidden by default
+- do not use `in_review` for repo-derived markdown work items
+
+Role guidance:
+
+- the importer must read target role from `## Next Recommended Role`
+- admin UI must not choose or mutate target role for repo-derived markdown items
+- if role is missing, importer should report missing metadata and use a conservative fallback only
+  for display
+
+Prompt guidance:
+
+- `## Exact Handoff Prompt` is the preferred source for copy prompt body
+- if absent, importer may build a fallback prompt from `Task`, `Stage`, `Context`, and
+  `Next Recommended Role`, but must report that the markdown item is missing an exact handoff prompt
+- prompt generation remains deterministic and must not call AI
+
+Importer metadata expectations for markdown items:
+
+- `metadata.imported_from_repo = true`
+- `metadata.source_path`
+- `metadata.source_type`
+- `metadata.work_item_status`
+- `metadata.markdown_status`
+- `metadata.markdown_type`
+- `metadata.markdown_priority`
+- `metadata.markdown_next_role`
+- `metadata.missing_required_fields` when any required section is absent
+
+Importer must not:
+
+- map repo-derived work to `in_review`
+- let Supabase triage values override markdown status/type/priority/role
+- treat old fallback metadata as canonical when explicit markdown fields exist
+- silently create duplicate rows when the same `source_path` is re-imported
+
+Status mapping:
+
+| Source | Default active visibility | Normalized status |
+| --- | --- | --- |
+| manual `admin_capture_items.status = new` | Active | scratchpad intake |
+| manual `admin_capture_items.status = in_review` | Active only for old/manual capture queue items | scratchpad review |
+| manual `admin_capture_items.status = ready_for_codex` | Active only for old/manual capture queue items | scratchpad ready |
+| manual `admin_capture_items.status = done` | Hidden unless completed/archived filters are selected | scratchpad done |
+| manual `admin_capture_items.status = archived` | Hidden unless archived filter is selected | scratchpad archived |
+| `docs/tasks/backlog/*.md` | Active | status from file, else `backlog` |
+| `docs/tasks/product-briefs/*.md` | Active when `Draft`, `Ready`, or no completed marker | `backlog` |
+| `docs/tasks/frontend-specs/*.md` | Active when `Draft`, `Ready`, or implementation is not closed | `backlog` |
+| `docs/plans/active/*.md` with active/in-progress status | Active | `in_progress` |
+| `docs/plans/active/*.md` with paused/backlog status | Active | `backlog` |
+| `docs/plans/active/*.md` with completed-but-not-archived status | Hidden unless completed filter is selected | `completed` |
+| `docs/plans/archive/*.md` | Hidden unless archived filter is selected | `archived` or `closed` |
+
+For repo-derived rows, importer must map markdown status to the closest existing
+`admin_capture_items.status` only as a UI/storage compatibility detail:
+
+- `backlog` -> `new`
+- `in_progress` -> `ready_for_codex`
+- `completed` -> `done`
+- `closed` -> `done`
+- `archived` -> `archived`
+
+`in_review` is not a valid repo-derived markdown status and should not be produced for imported
+markdown rows.
+
+Smallest safe import/sync mechanism:
+
+1. Backend adds an explicit docs-to-backlog import/refresh command.
+2. The command scans the allowed docs folders, extracts bounded metadata from markdown headings and
+   known fields, and upserts mirrored rows into the admin backlog using a deterministic
+   `source_path` key stored in `metadata`.
+3. The importer should not edit markdown files.
+4. The importer should not run automatically on every page request.
+5. The importer should be idempotent and safe to rerun after agents create or archive docs.
+6. The admin UI reads Supabase-backed rows like the current Backlog does today.
+7. A later explicit export command may write admin-created quick notes back into
+   `docs/tasks/backlog/` as markdown, but v1 should not try to make live two-way sync automatic.
+8. Imported repo rows should be treated as read-only in the admin UI; import/refresh owns their
+   lifecycle metadata.
+
+This gives the product owner the practical flow:
+
+`Architect/Backlog Manager creates markdown task -> explicit import/refresh -> Supabase mirror -> /admin/capture Backlog shows real item -> admin reviews/copies prompt`
+
+And for admin-created notes:
+
+`Admin adds quick note in /admin/capture -> Supabase row appears immediately -> admin copies note/context -> Architect or Backlog Manager creates canonical markdown task -> import/refresh mirrors it back into admin`
+
+Backend Slice 7: repo work-item import/refresh
+
+Owner: BACKEND
+
+Status: Implemented / backend import proof complete
+
+Scope:
+
+- [x] inspect the current `admin_capture_items` schema and use existing columns plus `metadata` before
+  proposing schema changes
+- [x] create a server/ops-only importer for:
+  - `docs/tasks/backlog/*.md`
+  - `docs/tasks/product-briefs/*.md`
+  - `docs/tasks/frontend-specs/*.md`
+  - `docs/plans/active/*.md`
+  - `docs/plans/archive/*.md`
+- [x] map source docs into existing backlog item shape where safe:
+  - source path in `metadata.source_path`
+  - source type in `metadata.source_type`
+  - normalized status in `metadata.work_item_status`
+  - title in `title`
+  - excerpt or handoff body in `note`
+  - status mapped to the closest existing admin capture status
+- [x] skip `.gitkeep`, README-only policy files unless explicitly useful, and any document that cannot
+  produce a bounded title/body
+- [x] add a deterministic validation/report mode before live upsert if possible
+- [x] preserve admin-only access and service-role storage boundaries
+- [x] preserve manual status/priority/target-role triage on imported rows by default; pass
+  `--refresh-triage` only when the repo import should intentionally re-own those fields
+
+Read-only correction note:
+
+- normal admin UI/API mutation seams now reject repo-derived row edits server-side
+- `--refresh-triage` remains an importer-only ops flag for intentionally re-owning mirrored
+  status/type/priority/target-role metadata from markdown-derived import rules
+
+Exit criteria:
+
+- [x] real markdown tasks/plans can be seeded into Supabase-backed Backlog without editing product code
+  routes
+- [x] rerunning the importer updates existing mirrored rows by `source_path` instead of creating
+  duplicates
+- [x] archived/closed docs do not flood the active Backlog by default
+- [x] quick notes and visual capture items still work exactly as they do now
+
+Frontend follow-up after Backend Slice 7:
+
+- keep `/admin/capture` as the route
+- render imported work items in the same list/detail flow
+- expose source type and source path as metadata
+- keep existing filters/status tabs as read/filter controls
+- hide or disable status/type/priority/target-role mutation controls for repo-derived items
+- keep quick-note create/append as scratchpad intake only
+- do not redesign the page or add a second route
+- do not invent frontend status truth; render backend-shaped status/source metadata only
+
+Backend Slice 8: repo-derived item immutability guard
+
+Owner: BACKEND
+
+Status: Implemented / backend guard proof complete
+
+Scope:
+
+- [x] detect imported markdown rows through `metadata.imported_from_repo`
+- [x] expose a backend-shaped editability flag or source classification so the frontend does not need
+  to infer mutability locally
+- [x] reject status/type/priority/target-role/title/body mutation for repo-derived markdown rows
+- [x] keep imported rows refreshable only through the explicit import/refresh path
+- [x] keep quick-note create and append behavior available for admin scratchpad intake
+- [x] keep prompt generation available for repo-derived rows
+- [x] preserve filters/search/list/detail behavior
+
+Exit criteria:
+
+- [x] direct server-action attempts to mutate repo-derived status/type/priority/role/title/body are
+  rejected with a bounded read-only/source-of-truth message
+- [x] import/refresh can still update mirrored repo rows from markdown truth
+- [x] admin-created quick notes can still be created and appended
+- [x] copied prompts still include source path/type metadata for repo-derived items
+
+Backend Slice 9: markdown metadata contract alignment
+
+Owner: BACKEND
+
+Status: Implemented / backend metadata import proof complete
+
+Scope:
+
+- [x] update the importer to read the canonical explicit markdown sections:
+  - `## Status`
+  - `## Type`
+  - `## Priority`
+  - `## Next Recommended Role`
+  - `## Task`
+  - `## Stage`
+  - `## Exact Handoff Prompt`
+- [x] enforce allowed markdown status values:
+  - `backlog`
+  - `in_progress`
+  - `completed`
+  - `closed`
+  - `archived`
+- [x] never map repo-derived markdown work to `in_review`
+- [x] report missing required metadata for old docs rather than silently treating fallback guesses as
+  canonical
+- [x] keep legacy fallback parsing conservative for old plans/specs, but surface
+  `metadata.missing_required_fields`
+- [x] keep quick-note/capture lifecycle separate from markdown work-item lifecycle
+
+Exit criteria:
+
+- [x] new markdown backlog docs import with exact status/type/priority/role from markdown
+- [x] old markdown docs without required fields still import conservatively and report missing metadata
+- [x] repo-derived rows never receive `in_review`
+- [x] imported role comes from `## Next Recommended Role`, not admin UI heuristics
+- [x] exact handoff prompt comes from `## Exact Handoff Prompt` when present
+
+Frontend Slice 9: read-only admin Backlog correction
+
+Owner: FRONTEND
+
+Scope:
+
+- render repo-derived markdown rows as read-only work items
+- remove or disable metadata mutation controls for repo-derived rows
+- keep status/type/priority/role as visible metadata and filters only
+- keep prompt copy and context copy available
+- keep quick-note creation/append available as scratchpad intake
+- do not redesign the Backlog page or add new UI kits
+
+Exit criteria:
+
+- admin can filter/search/open/copy repo-derived work items
+- admin cannot change repo-derived status/type/priority/role/title/body in the UI
+- quick notes remain available for temporary capture and can be copied into a canonical markdown
+  task by Architect or Backlog Manager
+- no automatic repo writeback exists
+
+Frontend Slice 10: markdown metadata readback alignment
+
+Owner: FRONTEND
+
+Scope:
+
+- show repo-derived status/type/priority/role as markdown-owned read-only metadata
+- show missing metadata hints when backend exposes `missing_required_fields`
+- avoid presenting `in_review` as a repo-derived work-item state
+- keep quick-note/capture queue labels separate from markdown work-item labels
+- preserve current Hito DS/admin workbench layout
+
+Backend Slice 10: actionable repo work-item canonicalization
+
+Owner: BACKEND
+
+Status: Implemented / markdown cleanup and import proof complete
+
+Scope:
+
+- [x] inventory actionable repo markdown under active plans, backlog, product briefs, and frontend
+  specs
+- [x] add canonical metadata sections to actionable active plans, product briefs, and frontend specs
+- [x] use `## Task` as the primary human Backlog title
+- [x] keep `metadata.source_path` and `metadata.source_type` as secondary provenance metadata
+- [x] preserve archive docs as importable history without fully rewriting historical noise
+- [x] refresh the Supabase mirror from markdown
+
+Exit criteria:
+
+- [x] actionable repo docs import without missing canonical metadata
+- [x] imported active/product/frontend examples show human-readable titles from `## Task`
+- [x] source paths remain metadata, not primary titles
+- [x] repo-derived rows never receive `in_review`
+- [x] duplicate source-path count remains zero
+- [x] repo-derived read-only guard and manual quick-note editability still validate
 
 ## Admin Backlog Surface
 
@@ -820,56 +1379,62 @@ Required checks:
 
 ## Next Recommended Role
 
-ARCHITECT
+FRONTEND
 
 ## Suggested Next Step
 
-Plan the unified admin work-item/status model across Supabase-backed backlog items, repo task docs,
-and active/archive plans. This should be a separate architecture slice; do not start screenshot
-upload, capture overlay, live editing, OpenAI, Codex auto-dispatch, or broad UI redesign as part of
-the `/admin/capture` v1 closeout.
+Implement Frontend Slice 9: render repo-derived `/admin/capture` Backlog rows as read-only. The
+server now rejects repo-derived mutations, but the UI should avoid presenting editable triage/note
+controls for imported markdown mirrors while keeping list/detail/search/copy available.
 
 Prompt:
 
 ```md
-ROLE: ARCHITECT
+ROLE: FRONTEND
 
 TASK:
-Define the unified admin work-item/status model after `/admin/capture` Backlog v1 QA pass.
+Render repo-derived `/admin/capture` Backlog items as read-only.
 
 STAGE:
-ARCHITECT planning
+FRONTEND implementation
 
 PLAN:
 docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md
 
 CONTEXT:
-Backend Slice 1 and `/admin/capture` Backlog v1 are QA-passed. The current implementation uses backend-owned backlog truth, Hito DS/admin primitives, manual deterministic copy prompts, quick notes, filters, inline detail, triage updates, archive flow, and admin-only access.
+Backend Slice 7 added `npm run import-admin-backlog-work-items`, which mirrors markdown work items
+from the approved repo folders into `admin_capture_items` using `metadata.source_path`,
+`metadata.source_type`, `metadata.work_item_status`, and the canonical markdown metadata fields when
+present. Markdown remains canonical for repo-authored work, while Supabase remains canonical for
+admin-created quick notes and captures.
+
+Product correction:
+Imported markdown work items must not be editable in admin. Status/type/priority/target role/title/body
+for repo-authored work belongs in markdown, then flows into Supabase through import/refresh. The admin
+Backlog is a read/filter/open/copy surface for those items, not a second task editor.
 
 GOAL:
-Design a small unified work-item/status model that can eventually connect:
-- Supabase admin backlog items
-- repo task docs under `docs/tasks/backlog/`
-- active/archive plans
+Update the admin Backlog UI so repo-derived imported markdown rows are clearly read-only while
+admin-created quick notes and manual captures remain editable scratchpad rows.
 
 REQUIREMENTS:
-- Do not reopen `/admin/capture` v1 implementation.
-- Do not start screenshot upload or route-spanning capture overlay.
-- Do not add live editing, OpenAI generation, or Codex auto-dispatch.
-- Preserve backend-owned backlog truth for the current admin surface.
-- Decide whether repo markdown sync is import-only, export-only, or two-way with explicit IDs.
-- Define status/type/priority/owner mappings without building a full Jira clone.
-- Keep the existing Hito DS reuse contract intact.
+- Use the existing backend-shaped `item.source === "repo_import"` signal.
+- Hide or disable status/type/priority/target-role/title/note mutation controls for repo-derived rows.
+- Show clear read-only copy: edit the markdown source file and refresh the mirror.
+- Keep list/detail/search/filter/copy prompt available for repo-derived rows.
+- Keep prompt generation available for repo-derived rows.
+- Keep quick-note creation and append available for admin scratchpad intake.
+- Do not write markdown files.
+- Do not add automatic two-way sync.
+- Do not change `/admin/capture` visual design.
+- Do not add screenshot upload, capture overlay, OpenAI, or Codex auto-dispatch.
 
 OUTPUT FORMAT:
 1. Task
 2. Stage
-3. Current state
-4. Model options
-5. Recommendation
-6. Source-of-truth decision
-7. Implementation slices
-8. What not to touch
-9. Next recommended role
-10. Blockers
+3. Root cause
+4. Files changed
+5. What changed
+6. Validation results
+7. Blockers
 ```

@@ -2,7 +2,52 @@
 
 ## Status
 
-Draft
+backlog
+
+## Type
+
+product_brief
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+DESIGNER
+
+## Task
+
+Advance Hito Running UI Absorption Scope.
+
+## Stage
+
+DESIGNER product brief
+
+## Exact Handoff Prompt
+
+```text
+ROLE: DESIGNER
+
+TASK:
+Advance Hito Running UI Absorption Scope.
+
+STAGE:
+DESIGNER product brief
+
+CONTEXT:
+- Source path: docs/tasks/product-briefs/2026-05-05-hito-running-ui-absorption-scope.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

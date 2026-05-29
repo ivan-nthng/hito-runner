@@ -2,7 +2,52 @@
 
 ## Status
 
-In progress
+in_progress
+
+## Type
+
+plan
+
+## Priority
+
+high
+
+## Next Recommended Role
+
+QA
+
+## Task
+
+Validate active-plan schedule edit preview and apply behavior.
+
+## Stage
+
+QA validation
+
+## Exact Handoff Prompt
+
+```text
+ROLE: QA
+
+TASK:
+Validate active-plan schedule edit preview and apply behavior.
+
+STAGE:
+QA validation
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-25-active-plan-schedule-edit-plan.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

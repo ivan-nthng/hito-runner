@@ -2,7 +2,52 @@
 
 ## Status
 
-Complete / Paused for backlog
+completed
+
+## Type
+
+frontend_spec
+
+## Priority
+
+low
+
+## Next Recommended Role
+
+FRONTEND
+
+## Task
+
+Clean up and formali
+
+## Stage
+
+ARCHITECT closeout
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Clean up and formali
+
+STAGE:
+ARCHITECT closeout
+
+CONTEXT:
+- Source path: docs/tasks/frontend-specs/2026-05-20-hito-ds-foundations-cleanup-and-rollout-spec.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 
@@ -12,9 +57,7 @@ Design System Agent
 
 2026-05-21
 
-## Task
-
-Clean up and formalize the Hito design system so Frontend can migrate the service from mixed local styling to one canonical DS contract without changing product behavior.
+ze the Hito design system so Frontend can migrate the service from mixed local styling to one canonical DS contract without changing product behavior.
 
 ## Stage
 

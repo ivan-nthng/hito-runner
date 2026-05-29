@@ -2,7 +2,52 @@
 
 ## Status
 
-Paused / Complete after Slice 4
+completed
+
+## Type
+
+frontend_spec
+
+## Priority
+
+low
+
+## Next Recommended Role
+
+FRONTEND
+
+## Task
+
+Audit Hito product surfaces against the design system and define the missing Hito DS coverage needed to make product UI consistently DS-owned.
+
+## Stage
+
+DESIGNER audit + specification
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Audit Hito product surfaces against the design system and define the missing Hito DS coverage needed to make product UI consistently DS-owned.
+
+STAGE:
+DESIGNER audit + specification
+
+CONTEXT:
+- Source path: docs/tasks/frontend-specs/2026-05-24-full-ds-coverage-audit-and-rollout-spec.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

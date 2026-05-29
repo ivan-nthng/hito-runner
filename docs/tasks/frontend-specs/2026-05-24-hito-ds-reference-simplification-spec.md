@@ -2,7 +2,52 @@
 
 ## Status
 
-Paused / Complete after Data table
+completed
+
+## Type
+
+frontend_spec
+
+## Priority
+
+low
+
+## Next Recommended Role
+
+FRONTEND
+
+## Task
+
+Simplify `/hitoDS` so it becomes easier to navigate, easier to understand, and more useful as a live design-system workbench instead of a long internal catalog.
+
+## Stage
+
+DESIGNER implementation spec
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+TASK:
+Simplify `/hitoDS` so it becomes easier to navigate, easier to understand, and more useful as a live design-system workbench instead of a long internal catalog.
+
+STAGE:
+DESIGNER implementation spec
+
+CONTEXT:
+- Source path: docs/tasks/frontend-specs/2026-05-24-hito-ds-reference-simplification-spec.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

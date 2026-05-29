@@ -2,7 +2,52 @@
 
 ## Status
 
-Paused after transcript-text v1; raw audio capture and transcription transport remain backlog
+backlog
+
+## Type
+
+plan
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+ARCHITECT
+
+## Task
+
+Plan the next voice-to-plan authoring slice when the product is ready to resume it.
+
+## Stage
+
+ARCHITECT plan
+
+## Exact Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+TASK:
+Plan the next voice-to-plan authoring slice when the product is ready to resume it.
+
+STAGE:
+ARCHITECT plan
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-18-voice-to-plan-authoring-plan.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

@@ -2,7 +2,52 @@
 
 ## Status
 
-Paused / backlog
+backlog
+
+## Type
+
+plan
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+ARCHITECT
+
+## Task
+
+Plan the next heart-rate zones profile and AeT estimation slice.
+
+## Stage
+
+ARCHITECT plan
+
+## Exact Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+TASK:
+Plan the next heart-rate zones profile and AeT estimation slice.
+
+STAGE:
+ARCHITECT plan
+
+CONTEXT:
+- Source path: docs/plans/active/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md
+- Markdown metadata is canonical for this repo-derived admin Backlog item.
+- Supabase mirrors this item for discovery and prompt copy only.
+
+CONSTRAINTS:
+- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Preserve Hito canonical architecture and current role boundaries.
+- Do not broaden scope beyond this work item.
+
+OUTPUT:
+Use the project role output format.
+```
 
 ## Owner
 

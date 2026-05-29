@@ -51,6 +51,25 @@ Explicitly forbidden:
 - opening deployed/local product URLs, logging into product/admin surfaces, or validating runtime behavior directly unless the user explicitly asks this orchestration agent to perform that exact manual action
 - converting a request for the "next step" into direct execution; default to a role prompt instead
 
+Important role-boundary clarification:
+
+- The execution ban above applies to this orchestration agent, not to role agents receiving an
+  explicit execution task.
+- A task addressed to `ROLE: QA` is an execution task for the QA agent. QA may run the commands,
+  scripts, builds, browser checks, local app sessions, screenshots, database-safe read checks, and
+  other validation tooling needed to prove or disprove the assigned behavior.
+- QA must not use that authority to implement product fixes, edit product code, run migrations, or
+  mutate production data unless the handoff explicitly scopes a disposable/local validation fixture.
+- If a QA prompt asks for CLI/build/browser validation, the correct QA behavior is to perform the
+  validation and report evidence, not to hand it off again because this orchestration section exists.
+- If the current role/thread/agent is QA, treat validation as direct execution authority even when
+  this repository-level instruction file also describes orchestration limits for other roles.
+- Handoff writers must not phrase QA work as "this role cannot run QA" in either the user-facing
+  handoff shell or the QA prompt. The correct framing is: QA owns validation and may use any safe
+  local/dev/test tooling needed to prove the assigned scope.
+- When preparing a QA handoff, do not justify the handoff by citing orchestration limits. Say that
+  the task is ready for direct QA validation, then provide one execution-ready QA prompt.
+
 Default response shape for orchestration, prior-agent review, and handoff requests:
 
 1. Plan file — name and link the active plan/spec/doc this task belongs to. If there is no plan, explicitly say `Plan file: none`.
@@ -107,6 +126,40 @@ Do not assume the reader can infer the task from prior chat history.
 Goal:
 
 Make the system smaller, not smarter.
+
+## 2.55) File Size And Decomposition Discipline (Mandatory)
+
+Large files are an architecture smell that must be handled early, not after they become impossible
+to review.
+
+Backend and frontend agents must keep files focused by responsibility:
+
+- Do not keep adding unrelated responsibilities to an already-large file.
+- Before adding substantial logic to a file, inspect whether the file already mixes multiple
+  responsibilities.
+- If a change would make a file harder to review, extract a stable responsibility seam in the same
+  slice when it is safe and behavior-preserving.
+- Prefer extraction by real ownership seams, not arbitrary line count:
+  schema/types, validation, normalization, persistence, orchestration, rendering, copy/view model,
+  component anatomy, hooks, fixtures, or test helpers.
+- Keep public facades stable when decomposing runtime modules unless the active plan explicitly
+  changes the import contract.
+- Do not create many tiny files just to reduce line count; decomposition must make ownership and
+  reviewability clearer.
+- Do not combine behavior changes with broad decomposition unless the active plan explicitly scopes
+  both and validation covers both.
+- If a file is becoming a hotspot but extraction is unsafe in the current slice, record a follow-up
+  cleanup note in the active plan or final report.
+- If adding more than a small patch to a file that is already roughly 700+ lines, the agent must
+  explicitly justify why it is still the right owner or extract a focused helper/module.
+- Files around 1000+ lines should not receive new responsibility without an explicit architecture
+  reason.
+- Files around 1500+ lines should be treated as active decomposition candidates unless they are
+  generated files, data fixtures, or intentionally consolidated docs.
+
+Goal:
+
+Prevent 4000-line modules by decomposing before the codebase hardens around them.
 
 ## 2.6) Canonical Hito Architecture Approach (Mandatory)
 

@@ -107,7 +107,14 @@ QA validation / <specific checkpoint>
 
 <whether browser is required; if backend-only, say built-in browser is not used because no frontend route is in scope>
 
-5. Validation coverage
+5. QA Execution Authority
+
+QA must execute this validation directly. Run the required CLI/build/script/browser/dev-server/local
+fixture checks needed to prove the scope. Do not return another handoff prompt merely because the
+validation uses commands, browser tooling, screenshots, local artifacts, or disposable local/test
+fixtures. Do not edit product code or implement fixes; report failures with evidence.
+
+6. Validation coverage
 
 Read/inspect:
 - <file>
@@ -115,21 +122,34 @@ Read/inspect:
 Run:
 - <command>
 
-6. Required behavior proof
+7. Required behavior proof
 
 <exact invariants, counts, statuses, and boundaries to verify>
 
-7. Report format
+8. Report format
 
 Return:
 1. Task
 2. Stage
 3. Browser Path Preflight
-4. Validation coverage
-5. Issues found
-6. Coverage gaps
-7. Verdict: Passed or Failed
+4. QA Execution Authority
+5. Validation coverage
+6. Issues found
+7. Coverage gaps
+8. Verdict: Passed or Failed
 ```
+
+QA prompt wording rule:
+
+- Never frame the user-facing handoff shell or QA prompt as "this orchestration role cannot run QA"
+  or imply QA should hand the work off again.
+- Do not write variants such as "this orchestration role cannot run browser/CLI QA", "I cannot run
+  QA here", or "the correct step is QA because this role is forbidden to validate".
+- The user-facing handoff may say that the task is ready for QA, but it must use positive ownership
+  language: QA executes validation directly.
+- The exact QA prompt itself must state that QA executes validation directly.
+- QA may do anything necessary for testing inside safe local/dev/test validation boundaries; QA must
+  not implement product fixes.
 
 For non-QA prompts, keep the same discipline:
 

@@ -62,6 +62,12 @@ import {
   normalizeAiFirstPlanBlueprintToTrainingPlan,
   type AiFirstPlanBlueprint,
 } from "../src/lib/ai-first-plan-blueprint-authoring";
+import { resolveAiFirstPlanBlueprintHorizonStrategy } from "../src/lib/ai-first-plan-blueprint-horizon";
+import { AI_FIRST_PLAN_ENVELOPE_SCHEMA_VERSION } from "../src/lib/ai-first-plan-envelope-schema";
+import { buildMockAiFirstPlanEnvelope } from "../src/lib/ai-first-plan-envelope-policy";
+import { decodeAndValidateAiFirstPlanEnvelope } from "../src/lib/ai-first-plan-envelope-decode";
+import { expandAiFirstPlanEnvelopeToTrainingPlan } from "../src/lib/ai-first-plan-envelope-expand";
+import { buildAiFirstPlanEnvelopeTrace } from "../src/lib/ai-first-plan-envelope-trace";
 import { generateAiFirstPlanDraftPreview } from "../src/lib/ai-first-plan-draft-service";
 import { generateStructuredFirstPlanDraftForUser } from "../src/lib/first-plan-actions";
 import {
@@ -74,7 +80,7 @@ import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "../src/lib/structured-plan-authoring";
-import { addDaysIso, deriveWorkoutRichModel, weekdayLong } from "../src/lib/training";
+import { addDaysIso, deriveWorkoutRichModel, diffDaysIso, weekdayLong } from "../src/lib/training";
 import { parseVoiceToPlanConfirmRequest } from "../src/lib/voice-to-plan-authoring";
 import { serverEnv } from "../src/lib/supabase/env";
 import type { WeekdayName } from "../src/lib/weekday-rest-invariants";
@@ -467,6 +473,38 @@ function assertFixedRestDays(plan: TrainingPlanV2) {
   );
 
   assert.equal(violations.length, 0, "fixed rest days must not contain non-rest workouts");
+}
+
+function assertFixedRestDayNames(plan: TrainingPlanV2, restDays: WeekdayName[], label: string) {
+  const restDaySet = new Set(restDays);
+  const violations = nonRestWorkouts(plan).filter((workout) =>
+    restDaySet.has(workout.weekday as WeekdayName),
+  );
+
+  assert.deepEqual(
+    violations.map((workout) => `${workout.date}:${workout.weekday}:${workout.title}`),
+    [],
+    `${label}: fixed rest days must not contain non-rest workouts`,
+  );
+}
+
+function assertWeeklyLongRunDay(plan: TrainingPlanV2, expectedWeekday: WeekdayName, label: string) {
+  const weekNumbers = [...new Set(plan.planned_workouts.map((workout) => workout.week_number))];
+
+  for (const weekNumber of weekNumbers) {
+    const longRuns = plan.planned_workouts.filter(
+      (workout) =>
+        workout.week_number === weekNumber &&
+        (workout.workout_family === "long" || workout.workout_type === "long_run"),
+    );
+
+    assert.equal(longRuns.length, 1, `${label}: week ${weekNumber} should have one long run`);
+    assert.equal(
+      longRuns[0]!.weekday,
+      expectedWeekday,
+      `${label}: week ${weekNumber} long run should land on ${expectedWeekday}`,
+    );
+  }
 }
 
 function assertLongRunDoctrine(plan: TrainingPlanV2, minPeakKm: number) {
@@ -2523,6 +2561,63 @@ function buildAiFirstPlanAuthoringInput(
       maxRunningDaysPerWeek: 5,
       preferredLongRunDay: "Saturday",
       ...(overrides.availability ?? {}),
+    },
+  });
+}
+
+function buildLongHorizonMarathonAiFirstPlanAuthoringInput() {
+  const base = buildAiFirstPlanAuthoringInput();
+
+  return structuredPlanAuthoringInputSchema.parse({
+    ...base,
+    goal: {
+      ...base.goal,
+      goalType: "marathon",
+      goalLabel: "Marathon target-time plan",
+      goalStyle: "target_time",
+      targetTime: "3:50:00",
+      targetEventName: null,
+    },
+    schedule: {
+      ...base.schedule,
+      startDate: "2026-05-29",
+      targetDate: "2026-12-11",
+      preparationHorizonWeeks: null,
+    },
+    runnerProfile: {
+      ...base.runnerProfile,
+      age: 36,
+      experienceLevel: "new_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunKm: null,
+      baselineLongRunDurationMin: 60,
+      preferredEffortLanguage: "mixed",
+    },
+    currentLevel: {
+      ...base.currentLevel,
+      recentResultSummary: null,
+      recentRaceResults: [],
+      recent5kPaceSecondsPerKm: null,
+      currentEasyPaceRange: null,
+      currentTrainingLoadSummary: null,
+    },
+    availability: {
+      ...base.availability,
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Sunday"],
+      unavailableDays: ["Wednesday", "Saturday"],
+      maxRunningDaysPerWeek: 5,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Sunday",
+    },
+    preferences: {
+      ...base.preferences,
+      preferredWorkoutMix: "balanced",
+      terrainFocus: "rolling",
+      strengthOrMobilityInterest: "mobility",
+    },
+    execution: {
+      watchAccess: "watch_or_app",
+      guidancePreference: "mixed",
     },
   });
 }
@@ -4631,6 +4726,57 @@ function assertAiFirstPlanBlueprintContract() {
 
   assert.equal(invalidTaxonomyResult.ok, false, "invalid blueprint taxonomy is rejected");
 
+  const partialLongHorizonAuthoringInput = buildLongHorizonMarathonAiFirstPlanAuthoringInput();
+  const partialLongHorizonBlueprint = {
+    ...buildMinimalAiFirstPlanBlueprintForAuthoringInput(partialLongHorizonAuthoringInput, {
+      horizonWeeks: 29,
+    }),
+  };
+  partialLongHorizonBlueprint.weeks = partialLongHorizonBlueprint.weeks.slice(0, 5);
+  const partialLongHorizonResult = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: partialLongHorizonBlueprint,
+    authoringInput: partialLongHorizonAuthoringInput,
+  });
+
+  assert.equal(
+    partialLongHorizonResult.ok,
+    false,
+    "partial long-horizon AI blueprint responses must be rejected before review",
+  );
+
+  if (!partialLongHorizonResult.ok) {
+    assert.equal(
+      partialLongHorizonResult.reason,
+      "ai_first_plan_blueprint_incomplete",
+      "partial long-horizon AI blueprint responses should expose incomplete-blueprint reason",
+    );
+    assert.ok(
+      partialLongHorizonResult.issues.some((issue) => issue.code === "incomplete_blueprint_weeks"),
+      "partial long-horizon AI blueprint responses should report missing weeks",
+    );
+    assert.ok(
+      partialLongHorizonResult.issues.some(
+        (issue) => issue.code === "incomplete_blueprint_required_slots",
+      ),
+      "partial long-horizon AI blueprint responses should report missing required slots",
+    );
+    assert.equal(
+      partialLongHorizonResult.fallback.blueprintTrace?.blueprintCompleteness?.expectedWeekCount,
+      29,
+      "partial blueprint trace should expose the expected 29-week horizon",
+    );
+    assert.equal(
+      partialLongHorizonResult.fallback.blueprintTrace?.blueprintCompleteness?.actualWeekCount,
+      5,
+      "partial blueprint trace should expose the authored 5-week response",
+    );
+    assert.equal(
+      partialLongHorizonResult.fallback.blueprintTrace?.deterministicFallbackBoundary.used,
+      false,
+      "partial blueprint rejection must not silently use deterministic fallback",
+    );
+  }
+
   const fakeHrBlueprint = structuredClone(blueprint);
   fakeHrBlueprint.weeks[0]!.plannedWorkouts[0]!.summary =
     "Easy run with fake 150-160 bpm personal threshold HR.";
@@ -4640,6 +4786,168 @@ function assertAiFirstPlanBlueprintContract() {
   });
 
   assert.equal(fakeHrResult.ok, false, "fake personalized HR claims in blueprint are rejected");
+}
+
+function assertAiFirstPlanEnvelopeContract() {
+  const authoringInput = buildLongHorizonMarathonAiFirstPlanAuthoringInput();
+  const envelope = buildMockAiFirstPlanEnvelope(authoringInput);
+  const decoded = decodeAndValidateAiFirstPlanEnvelope({ envelope, authoringInput });
+
+  assert.equal(
+    envelope.schemaVersion,
+    AI_FIRST_PLAN_ENVELOPE_SCHEMA_VERSION,
+    "AI first-plan envelope should expose the compact envelope schema version",
+  );
+  assert.equal(decoded.ok, true, "valid AI first-plan envelope should decode and validate");
+
+  if (decoded.ok) {
+    assert.equal(
+      decoded.decoded.horizonWeeks,
+      29,
+      "decoded long target-date envelope should preserve the requested horizon",
+    );
+    assert.equal(
+      decoded.decoded.weeklyRhythm.longRunDay,
+      "Sunday",
+      "decoded long target-date envelope should preserve preferred long-run day",
+    );
+  }
+
+  const expanded = expandAiFirstPlanEnvelopeToTrainingPlan({ envelope, authoringInput });
+
+  assert.equal(expanded.ok, true, "valid AI first-plan envelope should expand canonically");
+
+  if (expanded.ok) {
+    const plan = expanded.canonicalPlan;
+
+    assert.equal(
+      plan.source_kind,
+      "ai_first_plan_envelope_v1",
+      "AI first-plan envelope expansion should be source-visible and non-blueprint-production",
+    );
+    assert.equal(
+      plan.preparation_horizon_weeks,
+      29,
+      "AI first-plan envelope expansion should cover the full long target-date horizon",
+    );
+    assert.equal(
+      plan.planned_workouts.length,
+      29 * 7,
+      "AI first-plan envelope expansion should include one reviewed row per calendar date",
+    );
+    assert.equal(
+      countNonRestWorkouts(plan),
+      145,
+      "AI first-plan envelope expansion should preserve every validated running slot",
+    );
+    assertRichWorkoutContract(plan, "AI first-plan envelope expansion");
+    assertFixedRestDayNames(plan, ["Wednesday", "Saturday"], "AI first-plan envelope expansion");
+    assertWeeklyLongRunDay(plan, "Sunday", "AI first-plan envelope expansion");
+    assert.equal(
+      hasTargetKey(plan, "pace_min_per_km_range"),
+      false,
+      "AI first-plan envelope expansion must preserve backend pace gates",
+    );
+
+    const horizonStrategy = resolveAiFirstPlanBlueprintHorizonStrategy({
+      authoringInput,
+      today: "2026-05-29",
+      referenceExample: null,
+    });
+    const fullBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(authoringInput, {
+      horizonWeeks: horizonStrategy.requestedHorizonWeeks,
+    });
+    const boundedBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
+      horizonStrategy.openAiAuthoringInput,
+      { horizonWeeks: horizonStrategy.aiAuthoredHorizonWeeks },
+    );
+    const sizeComparison = {
+      envelopeOutputChars: JSON.stringify(envelope).length,
+      blueprintFullOutputChars: JSON.stringify(fullBlueprint).length,
+      blueprintBoundedOutputChars: JSON.stringify(boundedBlueprint).length,
+      blueprintPromptCharEstimateBefore: horizonStrategy.promptCharEstimateBefore,
+      blueprintPromptCharEstimateAfter: horizonStrategy.promptCharEstimateAfter,
+    };
+    const trace = buildAiFirstPlanEnvelopeTrace({
+      envelope,
+      authoringInput,
+      result: expanded,
+      sizeComparison,
+    });
+
+    assert.ok(
+      sizeComparison.envelopeOutputChars < sizeComparison.blueprintBoundedOutputChars,
+      "AI first-plan envelope should be materially smaller than bounded row-level blueprint output",
+    );
+    assert.equal(
+      trace.expandedPlan?.weekCount,
+      29,
+      "AI first-plan envelope trace should expose expanded week count",
+    );
+    assert.equal(
+      trace.expandedPlan?.richRowCompleteness.missingRichRows,
+      0,
+      "AI first-plan envelope trace should prove rich row completeness",
+    );
+    assert.equal(
+      trace.safetyMetadata.productionBlueprintPathChanged,
+      false,
+      "AI first-plan envelope proof must not change production blueprint behavior",
+    );
+  }
+
+  const invalidEnvelope = {
+    ...envelope,
+    weeklyRhythm: {
+      ...envelope.weeklyRhythm,
+      longRunDay: "we",
+      qualityFrequency: "w",
+      specialtyFrequency: "w",
+    },
+  };
+  const missingPhaseEnvelope = {
+    ...envelope,
+    phases: [],
+  };
+  const invalid = expandAiFirstPlanEnvelopeToTrainingPlan({
+    envelope: invalidEnvelope,
+    authoringInput,
+  });
+
+  assert.equal(invalid.ok, false, "invalid AI first-plan envelope should fail bounded");
+
+  if (!invalid.ok) {
+    assert.equal(
+      invalid.reason,
+      "ai_first_plan_envelope_invalid",
+      "invalid AI first-plan envelope should fail before canonical expansion",
+    );
+    assert.ok(
+      invalid.issues.some(
+        (issue) =>
+          issue.code === "envelope_long_run_day_mismatch" ||
+          issue.code === "envelope_long_run_on_fixed_rest_day",
+      ),
+      "invalid AI first-plan envelope should report long-run safety issues",
+    );
+  }
+
+  const missingPhases = expandAiFirstPlanEnvelopeToTrainingPlan({
+    envelope: missingPhaseEnvelope,
+    authoringInput,
+  });
+
+  assert.equal(missingPhases.ok, false, "missing envelope phases should fail bounded");
+
+  if (!missingPhases.ok) {
+    assert.ok(
+      missingPhases.issues.some(
+        (issue) =>
+          issue.code === "envelope_missing_phases" || issue.code === "envelope_schema_invalid",
+      ),
+      "invalid AI first-plan envelope should report missing phases",
+    );
+  }
 }
 
 function assertBlueprintIdentityExpansion(
@@ -4678,6 +4986,12 @@ function assertBlueprintIdentityExpansion(
       `AI first-plan blueprint ${identity} should use repeat-aware interval structure`,
     );
   }
+}
+
+function countNonRestWorkouts(plan: TrainingPlanV2) {
+  return plan.planned_workouts.filter(
+    (workout) => workout.workout_family !== "rest" && workout.workout_type !== "rest",
+  ).length;
 }
 
 async function assertAiFirstPlanDraftServiceContract() {
@@ -4719,6 +5033,87 @@ async function assertAiFirstPlanDraftServiceContract() {
       validResult.canonicalPlan.schema_version,
       "training-plan-v2",
       "AI first-plan service should return normalized training-plan-v2",
+    );
+  }
+
+  const longHorizonAuthoringInput = buildLongHorizonMarathonAiFirstPlanAuthoringInput();
+  const longHorizonStrategy = resolveAiFirstPlanBlueprintHorizonStrategy({
+    authoringInput: longHorizonAuthoringInput,
+    today: "2026-05-29",
+    referenceExample: null,
+  });
+  const boundedLongHorizonBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
+    longHorizonStrategy.openAiAuthoringInput,
+    { horizonWeeks: longHorizonStrategy.aiAuthoredHorizonWeeks },
+  );
+  const longHorizonResult = await generateAiFirstPlanDraftPreview({
+    input: longHorizonAuthoringInput,
+    inputKind: "structured_authoring",
+    referenceExample: null,
+    today: "2026-05-29",
+    apiKey: "test-openai-key",
+    model: "test-ai-first-plan-model",
+    timeoutMs: 1_000,
+    fetchImpl: (async () =>
+      openAiFixtureResponse(
+        "ai-first-plan-blueprint-long-horizon-valid",
+        boundedLongHorizonBlueprint,
+      )) as typeof fetch,
+  });
+
+  assert.equal(
+    longHorizonStrategy.requestedHorizonWeeks,
+    29,
+    "long target-date fixture should preserve the full 29-week requested horizon",
+  );
+  assert.equal(
+    longHorizonStrategy.aiAuthoredHorizonWeeks,
+    16,
+    "long target-date fixture should cap the AI-authored prompt horizon",
+  );
+  assert.equal(
+    longHorizonResult.ok,
+    true,
+    "bounded long-horizon blueprint should extend into a complete reviewable plan",
+  );
+
+  if (longHorizonResult.ok) {
+    assert.equal(
+      longHorizonResult.metadata.status,
+      "repaired_ai_draft",
+      "backend-extended long-horizon blueprint should be labelled as repaired metadata",
+    );
+    assert.equal(
+      longHorizonResult.canonicalPlan.source_kind,
+      "ai_first_plan_blueprint_v1",
+      "backend-extended long-horizon plan must keep blueprint source kind",
+    );
+    assert.equal(
+      longHorizonResult.canonicalPlan.preparation_horizon_weeks,
+      29,
+      "backend-extended long-horizon plan should cover the requested target-date horizon",
+    );
+    assert.equal(
+      longHorizonResult.canonicalPlan.planned_workouts.length,
+      29 * 7,
+      "backend-extended long-horizon plan should include every reviewed calendar row",
+    );
+    assert.equal(
+      countNonRestWorkouts(longHorizonResult.canonicalPlan),
+      145,
+      "backend-extended long-horizon plan should preserve every required running slot",
+    );
+    assert.equal(
+      longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks,
+      13,
+      "long-horizon trace should expose backend-extended weeks",
+    );
+    assert.ok(
+      (longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy
+        ?.promptCharEstimateAfter ?? Number.POSITIVE_INFINITY) <
+        (longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy
+          ?.promptCharEstimateBefore ?? 0),
+      "long-horizon trace should prove the capped prompt is smaller than the full prompt",
     );
   }
 
@@ -4929,6 +5324,195 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
       invalidResult.generation.sourceKind,
       "ai_first_plan_blueprint_v1",
       "invalid blueprint structured draft should keep the blueprint source boundary",
+    );
+  }
+
+  const partialInput = parseStructuredFirstPlanOnboardingInput(
+    buildRequest("marathon", {
+      profile: { age: 36, weightKg: 72, heightCm: 178 },
+      benchmark: { fitnessLevel: "new_to_running" },
+      availability: {
+        runningDaysPerWeek: 5,
+        fixedRestDays: ["Wednesday", "Saturday"],
+        preferredLongRunDay: "Sunday",
+      },
+      goal: {
+        goalDistance: "marathon",
+        goalStyle: "target_time",
+        terrainFocus: "rolling",
+        targetTime: "3:50:00",
+        targetDate: "2026-12-11",
+      },
+      strength: { preference: "mobility" },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+      comment: null,
+    }),
+  );
+  const partialAuthoringInput = buildStructuredFirstPlanAuthoringInput(partialInput);
+  const partialHorizonWeeks = Math.ceil(
+    (diffDaysIso(
+      partialAuthoringInput.schedule.targetDate!,
+      partialAuthoringInput.schedule.startDate,
+    ) +
+      1) /
+      7,
+  );
+  const boundedHorizonStrategy = resolveAiFirstPlanBlueprintHorizonStrategy({
+    authoringInput: partialAuthoringInput,
+    today: "2026-05-29",
+    referenceExample: null,
+  });
+  const boundedHorizonBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
+    boundedHorizonStrategy.openAiAuthoringInput,
+    { horizonWeeks: boundedHorizonStrategy.aiAuthoredHorizonWeeks },
+  );
+  const boundedHorizonResult = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-fixture-user",
+    partialInput,
+    {
+      aiPreview: {
+        apiKey: "test-openai-key",
+        model: "test-ai-first-plan-model",
+        timeoutMs: 1_000,
+        fetchImpl: (async () =>
+          openAiFixtureResponse(
+            "structured-first-plan-blueprint-long-horizon-valid",
+            boundedHorizonBlueprint,
+          )) as typeof fetch,
+      },
+    },
+  );
+
+  assert.equal(
+    partialHorizonWeeks,
+    29,
+    "long target-date structured first-plan scenario should reproduce the 29-week marathon horizon",
+  );
+  assert.equal(
+    boundedHorizonStrategy.aiAuthoredHorizonWeeks,
+    16,
+    "long target-date structured first-plan scenario should cap the OpenAI prompt horizon",
+  );
+  assert.equal(
+    boundedHorizonResult.ok,
+    true,
+    "long target-date structured first-plan draft should review a complete backend-extended blueprint plan",
+  );
+
+  if (boundedHorizonResult.ok && boundedHorizonResult.status === "draft_ready") {
+    assert.equal(
+      boundedHorizonResult.draft.canonicalPlan.source_kind,
+      "ai_first_plan_blueprint_v1",
+      "long target-date structured first-plan review should remain blueprint-backed",
+    );
+    assert.equal(
+      boundedHorizonResult.generation.sourceStatus,
+      "repaired_ai_draft",
+      "long target-date backend extension should be visible in review metadata",
+    );
+    assert.equal(
+      boundedHorizonResult.generation.blueprintTrace?.blueprintHorizonStrategy
+        ?.requestedHorizonWeeks,
+      29,
+      "structured review trace should preserve requested horizon weeks",
+    );
+    assert.equal(
+      boundedHorizonResult.generation.blueprintTrace?.blueprintHorizonStrategy
+        ?.backendExtendedWeeks,
+      13,
+      "structured review trace should expose backend-extended weeks",
+    );
+    assert.equal(
+      boundedHorizonResult.draft.canonicalPlan.planned_workouts.length,
+      29 * 7,
+      "long target-date structured review should include full calendar rows",
+    );
+    assert.equal(
+      countNonRestWorkouts(boundedHorizonResult.draft.canonicalPlan),
+      145,
+      "long target-date structured review should include every required running slot",
+    );
+    assert.equal(
+      boundedHorizonResult.generation.blueprintTrace?.deterministicFallbackBoundary.used,
+      false,
+      "long target-date structured review must not use deterministic fallback",
+    );
+  }
+
+  const partialBlueprint = {
+    ...buildMinimalAiFirstPlanBlueprintForAuthoringInput(partialAuthoringInput, {
+      horizonWeeks: partialHorizonWeeks,
+    }),
+  };
+  partialBlueprint.weeks = partialBlueprint.weeks.slice(0, 5);
+  const partialResult = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-fixture-user",
+    partialInput,
+    {
+      aiPreview: {
+        apiKey: "test-openai-key",
+        model: "test-ai-first-plan-model",
+        timeoutMs: 1_000,
+        fetchImpl: (async () =>
+          openAiFixtureResponse(
+            "structured-first-plan-blueprint-partial",
+            partialBlueprint,
+          )) as typeof fetch,
+      },
+    },
+  );
+
+  assert.equal(
+    partialHorizonWeeks,
+    29,
+    "partial blueprint doctrine scenario should reproduce the 29-week marathon horizon",
+  );
+  assert.equal(
+    partialResult.ok,
+    false,
+    "partial blueprint structured first-plan draft should return bounded failure",
+  );
+
+  if (!partialResult.ok && partialResult.status === "draft_failed") {
+    assert.equal(
+      partialResult.generation.fallbackReason,
+      "ai_first_plan_blueprint_incomplete",
+      "partial blueprint structured draft should expose incomplete fallback reason",
+    );
+    assert.ok(
+      partialResult.generation.validationIssues.some((issue) =>
+        issue.includes("incomplete_blueprint_weeks"),
+      ),
+      "partial blueprint structured draft should report missing week validation issue",
+    );
+    assert.equal(
+      partialResult.generation.blueprintTrace?.blueprintCompleteness?.expectedWeekCount,
+      16,
+      "partial blueprint structured draft trace should include the bounded AI-authored expected week count",
+    );
+    assert.equal(
+      partialResult.generation.blueprintTrace?.blueprintCompleteness?.actualWeekCount,
+      5,
+      "partial blueprint structured draft trace should include actual authored week count",
+    );
+    assert.equal(
+      partialResult.generation.blueprintTrace?.blueprintHorizonStrategy?.requestedHorizonWeeks,
+      29,
+      "partial blueprint structured draft trace should still expose the full requested horizon",
+    );
+    assert.equal(
+      partialResult.generation.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks,
+      13,
+      "partial blueprint structured draft trace should expose planned backend extension boundary",
+    );
+    assert.equal(
+      partialResult.generation.blueprintTrace?.deterministicFallbackBoundary.used,
+      false,
+      "partial blueprint structured draft must not use deterministic fallback",
+    );
+    assert.ok(
+      !("draft" in partialResult),
+      "partial blueprint structured draft must not include a reviewed-plan token",
     );
   }
 
@@ -5208,20 +5792,21 @@ function buildReviewedFirstPlanExactnessFixture(): TrainingPlanV2 {
 
 function buildMinimalAiFirstPlanBlueprintForAuthoringInput(
   authoringInput: ReturnType<typeof buildStructuredFirstPlanAuthoringInput>,
+  options: { horizonWeeks?: number } = {},
 ): AiFirstPlanBlueprint {
   const startDate = authoringInput.schedule.startDate;
   const runningDays = authoringInput.availability.preferredRunningDays.filter(
     (weekday) => !authoringInput.availability.unavailableDays.includes(weekday),
   );
-  const horizonWeeks = 2;
+  const horizonWeeks = options.horizonWeeks ?? 2;
 
   return {
     schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
     planName: "AI blueprint first-plan review fixture",
     generatedFor: "Doctrine fixture",
-    goalSummary: "Half marathon target-time plan",
+    goalSummary: authoringInput.goal.goalLabel,
     startDate,
-    targetDate: authoringInput.schedule.targetDate ?? addDaysIso(startDate, 13),
+    targetDate: authoringInput.schedule.targetDate ?? addDaysIso(startDate, horizonWeeks * 7 - 1),
     preparationHorizonWeeks: horizonWeeks,
     planPreferences: {
       preferredRunningDays: authoringInput.availability.preferredRunningDays,
@@ -5391,6 +5976,7 @@ assertRichAiDraftNormalizer();
 assertAiFirstPlanDraftContract();
 assertAiFirstPlanBlueprintGoalFamilyCadence();
 assertAiFirstPlanBlueprintContract();
+assertAiFirstPlanEnvelopeContract();
 await assertAiFirstPlanDraftServiceContract();
 await assertStructuredFirstPlanDraftBlueprintReviewContract();
 assertReviewedFirstPlanPersistenceExactness();

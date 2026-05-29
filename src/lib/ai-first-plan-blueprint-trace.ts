@@ -5,6 +5,7 @@ import {
   type StructuredAuthoringInput,
 } from "@/lib/ai-first-plan-blueprint-schema";
 import { buildNormalizationContext } from "@/lib/ai-first-plan-blueprint-validation";
+import { addDaysIso, weekdayLong } from "@/lib/training";
 
 export function buildAiFirstPlanBlueprintTrace({
   authoringInput,
@@ -48,6 +49,7 @@ export function buildAiFirstPlanBlueprintTrace({
       fixedRestDays: authoringInput.availability.unavailableDays,
       preferredLongRunDay: authoringInput.availability.preferredLongRunDay ?? null,
     },
+    blueprintCompleteness: blueprint ? buildBlueprintCompleteness(blueprint, context) : undefined,
     requiredCadenceSlots: [...context.requiredCadenceSlots.entries()].map(([weekNumber, slot]) => ({
       weekNumber,
       date: slot.date,
@@ -79,6 +81,64 @@ export function buildAiFirstPlanBlueprintTrace({
       : {},
     persistedIdentityCounts: null,
   };
+}
+
+function buildBlueprintCompleteness(
+  blueprint: AiFirstPlanBlueprint,
+  context: ReturnType<typeof buildNormalizationContext>,
+) {
+  const expectedRequiredDates = buildExpectedAuthoredWorkoutDates(context);
+  const authoredDates = new Set<string>();
+
+  for (const week of blueprint.weeks) {
+    for (const workout of week.plannedWorkouts) {
+      const date =
+        workout.date ?? resolveWorkoutDateFromWeekday(workout.weekday, week.weekNumber, context);
+
+      if (date) {
+        authoredDates.add(date);
+      }
+    }
+  }
+
+  const actualWeekNumbers = new Set(blueprint.weeks.map((week) => week.weekNumber));
+  const missingWeekNumbers = Array.from(
+    { length: context.expectedHorizonWeeks },
+    (_value, index) => index + 1,
+  ).filter((weekNumber) => !actualWeekNumbers.has(weekNumber));
+  const firstMissingRequiredDates = expectedRequiredDates.filter(
+    (date) => !authoredDates.has(date),
+  );
+
+  return {
+    expectedWeekCount: context.expectedHorizonWeeks,
+    actualWeekCount: blueprint.weeks.length,
+    expectedRequiredSlotCount: expectedRequiredDates.length,
+    actualAuthoredWorkoutCount: blueprint.weeks.reduce(
+      (count, week) => count + week.plannedWorkouts.length,
+      0,
+    ),
+    missingWeekNumbers: missingWeekNumbers.slice(0, 24),
+    firstMissingRequiredDates: firstMissingRequiredDates.slice(0, 12),
+  };
+}
+
+function buildExpectedAuthoredWorkoutDates(context: ReturnType<typeof buildNormalizationContext>) {
+  return Array.from({ length: context.expectedHorizonWeeks * 7 }, (_value, offset) =>
+    addDaysIso(context.authoringInput.schedule.startDate, offset),
+  ).filter((date) => context.runningDays.has(weekdayLong(date)));
+}
+
+function resolveWorkoutDateFromWeekday(
+  weekday: string,
+  weekNumber: number,
+  context: ReturnType<typeof buildNormalizationContext>,
+) {
+  const weekStart = addDaysIso(context.authoringInput.schedule.startDate, (weekNumber - 1) * 7);
+
+  return Array.from({ length: 7 }, (_value, offset) => addDaysIso(weekStart, offset)).find(
+    (date) => weekdayLong(date) === weekday,
+  );
 }
 
 function groupAuthoredBlueprintTraceByWeek(blueprint: AiFirstPlanBlueprint) {

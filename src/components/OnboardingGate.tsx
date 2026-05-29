@@ -10,6 +10,7 @@ import {
   buildVoiceSupplementFromConstructorState,
   isStructuredConstructorReady,
   resolveTerrainFocus,
+  todayIsoDateInput,
   type GoalDistance,
   type GoalStyle,
   type StrengthPreference,
@@ -38,6 +39,7 @@ type SetupMode = "quick" | "talk";
 
 const VOICE_TO_PLAN_TOAST_ID = "onboarding-voice-to-plan";
 const STRUCTURED_REVIEW_TOAST_ID = "onboarding-structured-review";
+const STRUCTURED_REVIEW_TIMEOUT_MS = 300_000;
 
 export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSummary | null }) {
   const generateStructuredFirstPlanDraftFn = useServerFn(generateStructuredFirstPlanDraft);
@@ -76,6 +78,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [goalDistance, setGoalDistance] = useState<GoalDistance>("build_consistency");
   const [goalStyle, setGoalStyle] = useState<GoalStyle>("balanced");
   const [targetTime, setTargetTime] = useState("");
+  const [startDate, setStartDate] = useState(todayIsoDateInput);
   const [targetDate, setTargetDate] = useState("");
   const [terrainFocus, setTerrainFocus] = useState<TerrainFocus>("standard");
   const [watchAccess, setWatchAccess] =
@@ -118,6 +121,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     goalDistance,
     goalStyle,
     targetTime,
+    startDate,
     targetDate,
     terrainFocus,
     watchAccess,
@@ -314,9 +318,11 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     });
 
     try {
-      const result = await generateStructuredFirstPlanDraftFn({
-        data: inputResult.input,
-      });
+      const result = await withStructuredReviewTimeout(
+        generateStructuredFirstPlanDraftFn({
+          data: inputResult.input,
+        }),
+      );
 
       setStructuredDraftResult(result);
       setConstructorStatus("idle");
@@ -524,6 +530,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             setGoalDistance,
             setGoalStyle,
             setTargetTime,
+            setStartDate,
             setTargetDate,
             setTerrainFocus,
             setWatchAccess,
@@ -586,6 +593,29 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       </details>
     </section>
   );
+}
+
+function withStructuredReviewTimeout<T>(promise: Promise<T>) {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(
+        new Error(
+          "The review is taking longer than expected. No plan was created. Try Review setup again.",
+        ),
+      );
+    }, STRUCTURED_REVIEW_TIMEOUT_MS);
+
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
 }
 
 function resultFailureMessage(result: { status?: string; message?: string }) {

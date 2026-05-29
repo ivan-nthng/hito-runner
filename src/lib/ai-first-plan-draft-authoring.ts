@@ -228,6 +228,24 @@ export interface AiFirstPlanBlueprintTraceMetadata {
     fixedRestDays: string[];
     preferredLongRunDay: string | null;
   };
+  blueprintCompleteness?: {
+    expectedWeekCount: number;
+    actualWeekCount: number;
+    expectedRequiredSlotCount: number;
+    actualAuthoredWorkoutCount: number;
+    missingWeekNumbers: number[];
+    firstMissingRequiredDates: string[];
+  };
+  blueprintHorizonStrategy?: {
+    requestedHorizonWeeks: number;
+    aiAuthoredHorizonWeeks: number;
+    backendExtendedWeeks: number;
+    promptRequiredSlotCount: number;
+    finalRequiredSlotCount: number;
+    promptCharEstimateBefore: number | null;
+    promptCharEstimateAfter: number | null;
+    finalWorkoutCount: number | null;
+  };
   requiredCadenceSlots: Array<{
     weekNumber: number;
     date: string;

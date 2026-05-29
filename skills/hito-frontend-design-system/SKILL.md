@@ -53,6 +53,16 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 - Prefer deleting route-local drift and wiring to existing DS primitives over adding new wrapper layers.
 - In the final report, call out when the diff stayed intentionally minimal or when a larger diff was unavoidable.
 
+## Large Route And Component Decomposition Gate
+
+- Before adding substantial UI logic, check whether the target route/component is already large or mixed-responsibility.
+- If a file is roughly 700+ lines and the change adds a new responsibility, either extract a focused component/hook/view helper or explicitly justify why that file remains the correct owner.
+- Files around 1000+ lines should not receive new responsibility without an architecture reason in the plan or final report.
+- Files around 1500+ lines are active decomposition candidates unless they are generated, fixture-only, or intentionally consolidated documentation.
+- Extract by stable frontend responsibility: route orchestration, presentational component, dialog/panel section, form state, formatting/readback helper, or DS-backed repeated anatomy.
+- Keep frontend extraction DS-first: extracted components must reuse existing Hito DS/admin primitives and must not become a new local UI kit.
+- Do not split by arbitrary line count, and do not combine broad decomposition with redesign unless the active plan explicitly scopes both.
+
 ## Do Not
 
 - add route-local color/typography/spacing recipes when Hito DS covers the need

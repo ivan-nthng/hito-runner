@@ -33,12 +33,16 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - keep scope bounded
 - prefer modular improvements over rewrites
 - protect the trusted output boundary of the project
+- when handing work to QA, frame QA as the direct validation owner that may use safe CLI, browser,
+  build, script, screenshot, fixture, and local/test tooling needed for the assigned scope
 
 ## Must Not Do
 
 - approve speculative rewrites
 - add systems without evidence
 - leave migration or rollback unclear
+- justify QA handoffs by saying the current role cannot run QA, browser QA, or CLI validation
+- imply QA should create another handoff instead of executing validation directly
 
 ## Mandatory Handoff Block
 

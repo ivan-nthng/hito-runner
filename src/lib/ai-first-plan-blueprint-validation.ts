@@ -105,11 +105,31 @@ export function validateBlueprintShell(
     });
   }
 
-  if (blueprint.weeks.length !== context.expectedHorizonWeeks) {
+  const completeness = buildBlueprintCompleteness(blueprint, context);
+
+  if (completeness.missingWeekNumbers.length > 0) {
+    issues.push({
+      code: "incomplete_blueprint_weeks",
+      path: "weeks",
+      message: `Blueprint included ${completeness.actualWeekCount} of ${completeness.expectedWeekCount} required week(s); missing weeks: ${formatBoundedList(
+        completeness.missingWeekNumbers,
+      )}.`,
+    });
+  } else if (blueprint.weeks.length !== context.expectedHorizonWeeks) {
     issues.push({
       code: "week_count_mismatch",
       path: "weeks",
       message: `Blueprint must include exactly ${context.expectedHorizonWeeks} week(s).`,
+    });
+  }
+
+  if (completeness.firstMissingRequiredDates.length > 0) {
+    issues.push({
+      code: "incomplete_blueprint_required_slots",
+      path: "weeks.plannedWorkouts",
+      message: `Blueprint authored ${completeness.actualAuthoredWorkoutCount} of ${completeness.expectedRequiredSlotCount} required workout slot(s); first missing dates: ${formatBoundedList(
+        completeness.firstMissingRequiredDates,
+      )}.`,
     });
   }
 
@@ -227,6 +247,58 @@ export function validateBlueprintShell(
   }
 
   validateGoalFamilyCadence(blueprint, context, issues);
+}
+
+function buildBlueprintCompleteness(
+  blueprint: AiFirstPlanBlueprint,
+  context: AiFirstPlanBlueprintNormalizationContext,
+) {
+  const expectedDates = buildExpectedAuthoredWorkoutDates(context);
+  const authoredDates = new Set<string>();
+
+  for (const week of blueprint.weeks) {
+    for (const workout of week.plannedWorkouts) {
+      const date = resolveBlueprintWorkoutDate(workout, week, context);
+
+      if (date) {
+        authoredDates.add(date);
+      }
+    }
+  }
+
+  const actualWeekNumbers = new Set(blueprint.weeks.map((week) => week.weekNumber));
+  const missingWeekNumbers = Array.from(
+    { length: context.expectedHorizonWeeks },
+    (_value, index) => index + 1,
+  ).filter((weekNumber) => !actualWeekNumbers.has(weekNumber));
+
+  return {
+    expectedWeekCount: context.expectedHorizonWeeks,
+    actualWeekCount: blueprint.weeks.length,
+    expectedRequiredSlotCount: expectedDates.length,
+    actualAuthoredWorkoutCount: blueprint.weeks.reduce(
+      (total, week) => total + week.plannedWorkouts.length,
+      0,
+    ),
+    missingWeekNumbers,
+    firstMissingRequiredDates: expectedDates
+      .filter((date) => !authoredDates.has(date))
+      .slice(0, 12),
+  };
+}
+
+function buildExpectedAuthoredWorkoutDates(context: AiFirstPlanBlueprintNormalizationContext) {
+  return Array.from({ length: context.expectedHorizonWeeks * 7 }, (_value, offset) =>
+    addDaysIso(context.authoringInput.schedule.startDate, offset),
+  ).filter((date) => context.runningDays.has(weekdayLong(date)));
+}
+
+function formatBoundedList(values: Array<string | number>) {
+  const visibleValues = values.slice(0, 12);
+  const suffix =
+    values.length > visibleValues.length ? `, +${values.length - visibleValues.length} more` : "";
+
+  return `${visibleValues.join(", ")}${suffix}`;
 }
 
 function validateHardDayDensity(

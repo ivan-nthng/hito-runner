@@ -67,6 +67,7 @@ interface StructuredPlanConstructorProps {
     setGoalDistance: (value: GoalDistance) => void;
     setGoalStyle: (value: GoalStyle) => void;
     setTargetTime: (value: string) => void;
+    setStartDate: (value: string) => void;
     setTargetDate: (value: string) => void;
     setTerrainFocus: (value: TerrainFocus) => void;
     setWatchAccess: (value: WatchAccess) => void;
@@ -109,6 +110,7 @@ export function StructuredPlanConstructor({
   return (
     <form
       ref={formRef}
+      noValidate
       className="mt-8 grid gap-8 pb-28"
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -263,6 +265,29 @@ export function StructuredPlanConstructor({
             </OptionGrid>
           </Field>
 
+          <Field
+            label="Plan start date"
+            helper="Use YYYY-MM-DD. Hito builds the first week from this date."
+          >
+            <input
+              id="structured-plan-start-date"
+              name="schedule.startDate"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Plan start date"
+              value={state.startDate}
+              onChange={(event) => setState.setStartDate(event.target.value)}
+              placeholder="2026-05-29"
+              maxLength={10}
+              className={cn(
+                "hito-field hito-field-primary hito-field-md",
+                !state.startDate.trim() && "hito-field-feedback-error",
+              )}
+            />
+          </Field>
+
           {showsTargetFields ? (
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Target time" helper="Required. Use 25:00 or 1:45:00.">
@@ -277,11 +302,22 @@ export function StructuredPlanConstructor({
                   )}
                 />
               </Field>
-              <Field label="Target date" helper="Optional. If used, choose at least 7 days out.">
+              <Field
+                label="Target date"
+                helper="Optional. Use YYYY-MM-DD, at least 7 days after plan start."
+              >
                 <input
-                  type="date"
+                  id="structured-plan-target-date"
+                  name="schedule.targetDate"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label="Target date"
                   value={state.targetDate}
                   onChange={(event) => setState.setTargetDate(event.target.value)}
+                  placeholder="2026-12-11"
+                  maxLength={10}
                   className="hito-field hito-field-primary hito-field-md"
                 />
               </Field>

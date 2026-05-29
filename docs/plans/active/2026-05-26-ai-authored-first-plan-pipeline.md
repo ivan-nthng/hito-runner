@@ -14,39 +14,67 @@ high
 
 ## Next Recommended Role
 
-RUNNING COACH
+QA
 
 ## Task
 
-Review AI-authored first-plan blueprint quality before broad product rollout.
+Validate 29-week first-plan confirm/save exactness after date-controls browser proof passed.
 
 ## Stage
 
-RUNNING COACH audit
+QA validation / first-plan confirm-save exactness
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: RUNNING COACH
+ROLE: QA
 
 TASK:
-Review AI-authored first-plan blueprint quality before broad product rollout.
+Validate 29-week first-plan confirm/save exactness after the date-controls browser proof passed.
 
 STAGE:
-RUNNING COACH audit
+QA validation / first-plan confirm-save exactness
 
 CONTEXT:
 - Source path: docs/plans/active/2026-05-26-ai-authored-first-plan-pipeline.md
 - Markdown metadata is canonical for this repo-derived admin Backlog item.
 - Supabase mirrors this item for discovery and prompt copy only.
+- Date-controls / targetDate persistence browser proof is QA-passed.
+- That proof opened a 29-week review successfully but intentionally canceled before confirm.
+- Production first-plan generation still uses ai-first-plan-blueprint-v1.
+- ai-first-plan-envelope-v1 remains non-live and ops/mock-only.
+
+QA EXECUTION AUTHORITY:
+QA must execute this validation directly. Run the required CLI/build/script/browser/dev-server/local
+fixture checks needed to prove the scope. Do not return another handoff prompt merely because the
+validation uses commands, browser tooling, screenshots, local artifacts, or disposable local/test
+fixtures. Do not edit product code or implement fixes; report failures with evidence.
 
 CONSTRAINTS:
 - Edit this markdown file, not the admin Backlog mirror, when task truth changes.
 - Preserve Hito canonical architecture and current role boundaries.
-- Do not broaden scope beyond this work item.
+- Use the built-in Codex browser first.
+- Use only disposable local/test runner data.
+- Do not mutate production data.
+- Do not validate or wire ai-first-plan-envelope-v1.
+- Do not accept structured_authoring_v1 as a successful first-plan result.
+- Do not implement fixes.
+- If confirm succeeds, verify persisted rows match the reviewed canonical plan as closely as current
+  artifacts allow: row count, source_kind, date range, rest days, long-run day, rich fields, and no
+  confirm-time OpenAI regeneration.
 
 OUTPUT:
-Use the project role output format.
+1. Task
+2. Stage
+3. Browser Path Preflight
+4. QA Execution Authority
+5. Scope tested
+6. Results
+7. Persisted exactness evidence
+8. Issues found
+9. Coverage gaps
+10. Screenshot/artifact evidence
+11. Verdict: Passed or Failed
 ```
 
 ## Owner
@@ -55,7 +83,7 @@ ARCHITECT / BACKEND / QA / RUNNING COACH
 
 ## Last Updated
 
-2026-05-28
+2026-05-29
 
 ## Implementation Notes
 
@@ -78,6 +106,20 @@ ARCHITECT / BACKEND / QA / RUNNING COACH
 - 2026-05-27: QA closed the blueprint-only structured first-plan release gate. Invalid and timeout blueprint attempts now return `draft_failed / ai_first_plan_blueprint_unavailable` without a draft token, reviewed canonical plan, deterministic fallback draft, or mutation; legacy direct structured creation is blocked with `review_required`; confirm rejects tampered non-blueprint reviewed drafts with `invalid_draft`; and a live marathon-balanced first-plan path saved 112 reviewed/persisted rich rows with `sourceKind: ai_first_plan_blueprint_v1`, `sourceStatus: repaired_ai_draft`, `fallbackReason: null`, `validationIssueCount: 0`, `deterministicFallbackBoundary.used: false`, and zero OpenAI calls during confirm. The next gate is runner-facing Running Coach visual/product-quality review of saved blueprint plans, not another backend patch.
 - 2026-05-28: Backend added `npm run seed-ai-first-plan-blueprint-proof` as an ops-only saved visual proof path for QA. The helper requires an existing disposable tester, calls the live `ai-first-plan-blueprint-v1` contract with deterministic fallback disabled, saves only accepted blueprint truth, verifies `plan_cycles.source_kind`, reviewed/persisted row count and end date, rich fields, non-rest steps, and `marathon_steady_specificity`, and prints tester login plus cleanup commands without prompts, secrets, or raw AI payloads. The documented visual proof fixture is an honest 8-week marathon-balanced saved-mode artifact for browser QA, not the full default marathon horizon.
 - 2026-05-28: Backend fixed marathon and other goal-family required cadence slot placement so required quality is spaced away from the preferred long-run day when another viable running day exists. Sunday-long plans with Monday/Wednesday/Friday/Saturday/Sunday availability now keep Sunday as long run and choose Wednesday or Friday for required marathon specificity instead of forcing Monday quality immediately after the long run.
+- 2026-05-29: Backend tightened partial `ai-first-plan-blueprint-v1` response handling for long-horizon structured onboarding. If OpenAI returns structurally valid JSON that omits required weeks or authored workout slots, validation now returns `ai_first_plan_blueprint_incomplete` with bounded completeness metadata (`expectedWeekCount`, `actualWeekCount`, required slot counts, missing week numbers, and first missing dates), keeps deterministic fallback disabled for structured first-plan review, and preserves the non-mutating unavailable state instead of opening a reviewable partial plan.
+- 2026-05-29: Backend added bounded long-horizon blueprint authoring for target-date structured first plans. When the requested horizon exceeds the safe AI-authored window, the OpenAI request is capped to the opening 16 weeks, the backend extends the remaining calendar weeks from validated setup truth and Hito-safe progression, and final review only opens after full-horizon coverage/fixed-rest/long-run validation passes. Trace metadata now exposes requested horizon weeks, AI-authored weeks, backend-extended weeks, prompt/final slot counts, before/after prompt size estimates, and final workout count; invalid, timeout, or partial blueprint responses still return non-mutating unavailable metadata with deterministic fallback disabled.
+- 2026-05-29: Frontend added explicit structured-onboarding date controls for first-plan setup. The visible form now keeps plan start date and optional target date as controlled `YYYY-MM-DD` fields, sends `schedule.startDate` and `schedule.targetDate` into the draft action payload, validates malformed dates locally, and preserves backend-owned long-horizon authoring/extension behavior.
+- 2026-05-29: Frontend closed the date-control browser release blocker by removing conflicting native date-pattern validation from the structured first-plan form, keeping ISO checks in the existing local input builder, and adding a bounded review timeout so `Reviewing draft...` cannot remain indefinitely stuck without a safe failure.
+- 2026-05-29: QA closed the structured first-plan date-controls release gate and exact long-horizon browser proof. The built-in Codex browser was used first; direct auth text entry was blocked by missing Browser Use virtual clipboard, so QA stayed in the built-in browser and used a local dev-only cookie helper for a disposable tester session. Safari fallback was not needed. The visible form retained `schedule.startDate = 2026-05-29`, `schedule.targetDate = 2026-12-11`, and target time `3:50:00`; native validation messages were empty. The fresh browser-action artifact `qa-artifacts/debug/2026-05-29/structured-onboarding-browser-action/2026-05-29T19-08-20-405Z-generateStructuredFirstPlanDraft-draft_ready-d9b69c7b33e7.json` proved `targetDatePresent: true`, requested horizon 29 weeks, AI-authored window 16 weeks, backend extension 13 weeks, final required slot count 145, `sourceKind: ai_first_plan_blueprint_v1`, `sourceStatus: repaired_ai_draft`, `fallbackReason: null`, and `deterministicFallbackBoundary.used: false`. The browser review modal opened as `Draft ready` with plan horizon 2026-05-29 to 2026-12-11, 203 planned workouts, Sunday long run, Wednesday/Saturday rest days, and Rolling terrain. QA canceled without confirm/save; no-mutation proof stayed at one runner profile and zero plan cycles, planned workouts, and workout logs before and after review. Command validation passed, including targeted ESLint, doctrine validator, long-horizon blueprint fixture, invalid/timeout/partial blueprint mocks, `git diff --check`, and `npm run build`. Routine screenshots are local-only under `qa-artifacts/screenshots/2026-05-29/first-plan-date-controls-release-qa/`.
+- 2026-05-29: Backend completed and QA closed the non-live `ai-first-plan-envelope-v1`
+  foundation. The envelope path remains ops/mock-only, is not wired into
+  `generateStructuredFirstPlanDraft`, is not persisted, and does not replace production
+  `ai-first-plan-blueprint-v1`. QA proved default, long-horizon, invalid, and live-unavailable
+  envelope behavior, plus production blueprint preservation and doctrine validation.
+- 2026-05-29: The deterministic Nitro public-assets build blocker is closed. Repeated normal builds
+  and explicit cold builds passed after the build lifecycle fix; `.output/public/favicon.svg`,
+  `.output/public/templates/hito-training-plan-v2-template.json`, and `.output/server/index.mjs`
+  were present, and no Nitro public-assets `ENOENT` reproduced.
 - 2026-05-28: Backend fixed the browser structured-onboarding action path mismatch with the successful preview seam. Visible first-plan review now uses first-plan-specific blueprint defaults (`OPENAI_FIRST_PLAN_MODEL`, `OPENAI_FIRST_PLAN_TIMEOUT_MS`, `OPENAI_FIRST_PLAN_MAX_OUTPUT_TOKENS`, defaulting to `gpt-4.1-mini`, 240000 ms, and 32000 tokens) instead of inheriting the generic text-plan model route plus 45s service timeout.
 - 2026-05-28: Backend added bounded local/dev browser-action trace artifacts for `generateStructuredFirstPlanDraft` attempts under `qa-artifacts/debug/YYYY-MM-DD/structured-onboarding-browser-action/`. The artifact captures sanitized frontend setup shape, parsed setup summary, derived authoring summary, effective model/timeout/token/env source, source status, validation issue codes, cadence slots, normalized identities, and failure layer without raw prompts, secrets, or full OpenAI payloads. A built-in browser proof for the Sunday-long marathon scenario opened the review modal, confirmed the reviewed draft, and saved 112 exact rich `ai_first_plan_blueprint_v1` rows with no deterministic fallback.
 - 2026-05-27: QA created a local all-workout-types coverage fixture proving Hito already has a rich canonical workout vocabulary and UI/detail rendering surface for 11 workout families and 29 identities. The disposable local account `qa-all-workout-types-20260527@local.test` imported `QA All Workout Types Coverage Plan` with 42 rich workouts, Friday/Sunday fixed rest days, Saturday preferred long-run placement, and no non-rest workouts without segments. Routine screenshots live under ignored local artifacts at `qa-artifacts/screenshots/2026-05-27/all-workout-types-coverage/`; this evidence supports taxonomy/UI coverage only and does not approve broad rollout by itself.
@@ -166,7 +208,9 @@ Target pipeline:
    - pace/HR/default-HR policy
    - examples of rich week-by-week output based on the reference JSON
    - explicit forbidden runtime fields and fake precision rules
-4. OpenAI returns a full AI plan draft for all weeks/workouts.
+4. OpenAI returns bounded coaching authorship data, not final persisted truth. In v1 this is a
+   compact workout blueprint for a bounded window; the target v2 contract should shrink this further
+   into a planning envelope and backend-expanded workout rows.
 5. Backend validates the AI draft schema and taxonomy.
 6. Backend normalizes the draft into canonical `training-plan-v2`.
 7. Backend runs deterministic safety validation against the normalized plan.
@@ -177,6 +221,320 @@ Target pipeline:
 Canonical rule:
 
 OpenAI authors the plan, but backend owns truth.
+
+## First-Plan AI Contract Simplification Decision
+
+Status: ARCHITECT decision / non-live Slice 7A foundation QA-passed; production adoption pending.
+
+### Current pipeline map
+
+Current browser structured first-plan flow:
+
+1. Frontend `StructuredPlanConstructor` owns controlled setup state for profile, availability,
+   benchmark, execution preference, goal, optional start date, optional target date, strength/mobility,
+   and comment.
+2. Frontend serializes that setup into `generateStructuredFirstPlanDraft`.
+3. Backend `first-plan-actions.ts` parses the setup and calls
+   `buildStructuredFirstPlanAuthoringInput`.
+4. `structured-first-plan-onboarding.ts` derives backend authoring truth:
+   start date, target date or default horizon, preferred running days, fixed rest days, preferred
+   long-run day, goal style, benchmark support, execution mode, terrain, notes, and runner profile.
+5. `ai-first-plan-draft-service.ts` resolves the `blueprint` contract and builds the OpenAI request.
+6. `ai-first-plan-blueprint-horizon.ts` now caps long target-date requests to an AI-authored
+   opening window, currently 16 weeks, and records requested vs authored vs backend-extended horizon.
+7. `ai-first-plan-blueprint-prompt.ts` sends validated setup truth, taxonomy arrays, metric policy,
+   goal-family identity policy, and required authored workout slots to OpenAI.
+8. OpenAI returns `ai-first-plan-blueprint-v1`: weeks, phase/theme/microcycle intent, and authored
+   workout rows with dates, weekdays, family, identity, icon, title, summary, RPE, fatigue, recovery
+   priority, segment intent, and metric intent.
+9. `ai-first-plan-blueprint-validation.ts` validates schema, taxonomy, dates, slot completeness,
+   fixed rest days, goal-family cadence, hard-day density, long-run/taper sanity, and unsafe claims.
+10. `ai-first-plan-blueprint-normalize.ts` and expansion helpers turn accepted blueprint rows into
+    canonical `training-plan-v2` workouts with backend-owned segments, targets, goal context, metric
+    mode, and rich workout fields.
+11. `ai-first-plan-blueprint-horizon.ts` extends weeks beyond the AI-authored window from validated
+    Hito backend progression rules before review.
+12. `generateStructuredFirstPlanDraft` returns a non-mutating review only if source kind is
+    `ai_first_plan_blueprint_v1` and status is `ai_authored` or `repaired_ai_draft`.
+13. `confirmStructuredFirstPlanDraft` persists exactly the reviewed canonical plan and does not call
+    OpenAI or regenerate.
+
+### Brittle points found
+
+- Browser setup truth can break before generation if date inputs are not fully controlled. The
+  current frontend date-control slice addresses this, but date state remains a high-risk boundary.
+- `targetDate` currently converts into a resolved week count; if far enough out, it can create a
+  large authoring horizon.
+- V1 prompt construction still serializes verbose taxonomy arrays and exact required slot tables.
+- V1 response still asks OpenAI to emit every authored workout row for every AI-authored week.
+- Long field names and verbose workout identity strings make prompt/output larger than necessary.
+- Required slot serialization repeats date, weekday, long-run flags, quality flags, and identity
+  options across weeks.
+- AI still owns more row-level interpretation than necessary: exact workout date, weekday, title,
+  summary, phase flags, RPE, fatigue, recovery priority, segment intent, and metric intent.
+- Backend extension fixed long-horizon timeout risk, but it is a stepping stone: it extends after a
+  row-level AI blueprint rather than making backend the primary slot/row owner.
+- Failure metadata is now much better, but user-facing copy still collapses timeout, partial, schema,
+  and validation failures into one retry message.
+- Debug artifacts are readable, but compact protocols will need decoded traces so QA and Running
+  Coach can still review human-readable plan intent.
+
+### Options assessed
+
+#### Option 1: Compact Blueprint Protocol
+
+AI receives compact setup, taxonomy, and slot codes. AI returns compact workout codes. Backend decodes
+to canonical Hito taxonomy and traces decoded human-readable output.
+
+Pros:
+
+- immediate token reduction
+- preserves current row-level blueprint behavior
+- smaller change from v1
+
+Cons:
+
+- still asks AI to author every workout row in the authored window
+- compact codes can reduce model quality if too opaque
+- still requires slot tables unless combined with backend-owned slot generation
+
+Verdict:
+
+Useful as an incremental optimization, but not enough as the target architecture.
+
+#### Option 2: Planning Envelope + Backend Expansion
+
+AI authors the coaching plan shape: phase intent, weekly rhythm, progression intent, goal-family
+emphasis, key workout pattern, and optional variation hints. Backend owns exact dates, slots,
+long-run placement, cutbacks, taper, metric policy, canonical row expansion, and final workout
+identity validation.
+
+Pros:
+
+- largest reduction in prompt/output fragility
+- moves canonical interpretation to backend
+- keeps AI where it is strongest: coaching rhythm and emphasis
+- avoids asking AI to reproduce deterministic calendar slots
+- easier to extend long target-date plans
+
+Cons:
+
+- requires a new `ai-first-plan-envelope-v1` contract and backend expander
+- backend must be careful not to collapse richness back into generic deterministic filler
+- needs Running Coach fixtures to ensure envelope expansion still feels coach-authored
+
+Verdict:
+
+Recommended target architecture.
+
+#### Option 3: Bounded AI Window + Backend Extension
+
+Current direction: AI authors first N weeks, backend extends the rest.
+
+Pros:
+
+- already implemented
+- fixes the concrete long target-date timeout class
+- preserves current review/confirm and source-kind boundaries
+
+Cons:
+
+- still uses verbose v1 row-level blueprint in the authored window
+- backend extension may feel less coach-authored if not guided by richer phase envelope
+- does not solve setup/prompt fragility globally
+
+Verdict:
+
+Keep as near-term safety bridge, not final architecture.
+
+#### Option 4: Chunked Generation Before Review
+
+AI authors bounded chunks, backend stitches and validates the full plan before review.
+
+Pros:
+
+- avoids very large single responses
+- can preserve row-level AI authorship for full horizon
+
+Cons:
+
+- more OpenAI calls and more failure modes
+- harder to make review latency predictable
+- stitching conflicts can become a new subsystem
+- still keeps AI too involved in exact rows
+
+Verdict:
+
+Backlog only. Do not choose unless envelope expansion fails.
+
+#### Option 5: Progressive Background Generation
+
+Runner can use early weeks while later weeks generate.
+
+Pros:
+
+- could improve perceived latency later
+
+Cons:
+
+- complicates review/confirm because only part of the plan is reviewed
+- creates partial-plan persistence and mutation semantics
+- conflicts with current explicit review-before-create safety
+
+Verdict:
+
+Future architecture only, not v1/v2 first-plan creation.
+
+#### Option 6: Persistent/System Instruction Or Prompt Caching
+
+Use stable provider-side instructions or prompt caching to reduce repeated taxonomy/policy cost.
+
+Pros:
+
+- may reduce cost/latency
+- can coexist with any contract
+
+Cons:
+
+- does not fix output-size fragility
+- does not move row ownership to backend
+- provider-specific optimization, not product architecture
+
+Verdict:
+
+Optimization later, not the main solution.
+
+### Recommended target architecture
+
+Move from row-level `ai-first-plan-blueprint-v1` toward an envelope-first contract:
+
+`setup truth -> backend slot/phase scaffold -> AI coaching envelope -> backend canonical expansion -> review -> confirm`
+
+AI should author:
+
+- plan-level coaching thesis
+- phase emphasis and progression intent
+- weekly rhythm pattern
+- quality/specialty cadence intent by goal family
+- long-run progression intent
+- cutback/taper intent
+- variation hints for support runs
+- target-time honesty/assumption language
+- optional preferred identity emphasis from Hito's canonical identity set
+
+Backend should own:
+
+- exact dates and weekdays
+- required running slots
+- fixed rest days
+- preferred long-run placement
+- phase boundaries
+- cutback/taper placement and load reduction validation
+- exact canonical workout identity finalization
+- title/summary generation when AI only provides intent
+- segment expansion
+- `goal_context`
+- `metric_mode`
+- pace/default-HR/personal-HR gates
+- full-horizon extension
+- review token and exact confirm persistence
+
+The envelope may use compact codes for backend-known concepts:
+
+- goal family
+- phase
+- cadence type
+- support-run mix
+- workout identity hints
+- terrain emphasis
+- metric intent
+
+But some fields should remain human-readable because they improve coaching quality and reviewability:
+
+- weekly theme
+- microcycle intent
+- target-time honesty assumptions
+- long-run progression intent
+- terrain/ultra/mountain caution intent
+
+### Source status policy
+
+Keep `sourceKind: ai_first_plan_blueprint_v1` for the current v1 row-level blueprint path until v2
+is implemented.
+
+For the target contract, introduce a new source kind or schema label such as:
+
+- `ai_first_plan_envelope_v1`
+
+Recommended source status values:
+
+- `ai_authored_envelope`
+- `repaired_ai_envelope`
+- `envelope_unavailable`
+
+If the product wants to keep the public source kind stable, trace metadata must still distinguish
+row-level blueprint from envelope-expanded backend rows. Do not hide backend extension as pure AI
+authorship.
+
+### Debug and QA trace policy
+
+Compact AI output must not make QA blind. Trace artifacts should include both raw bounded metadata
+and decoded human-readable tables:
+
+- setup summary
+- requested horizon
+- AI-authored window or envelope horizon
+- backend-expanded horizon
+- AI envelope phase/rhythm table
+- backend-decoded weekly identity table
+- final canonical identity counts
+- validation issue codes
+- repair notes
+- prompt/output size estimates
+- timeout/model/response status
+
+Do not include raw prompts, secrets, full OpenAI payloads, or private runner data.
+
+### Recommended near-term slice
+
+Backend Slice 7A: create a non-live `ai-first-plan-envelope-v1` contract foundation.
+
+Scope:
+
+- define envelope schema/types in a focused module
+- define compact code maps for phase, cadence, goal emphasis, and optional identity hints
+- add pure validator and decoder into Hito human-readable debug tables
+- add an ops/mock path that turns a mock envelope into canonical `training-plan-v2` through backend
+  expansion
+- do not wire structured onboarding yet
+- do not persist anything
+- keep current v1 blueprint path as production
+
+Why this slice:
+
+- it proves the smaller contract without risking the current product path
+- it gives Backend and Running Coach a concrete artifact to judge before replacing v1
+- it avoids another one-off timeout patch
+
+### Validation strategy
+
+- deterministic fixture for a long target-date half marathon similar to the failed 29-week case
+- mock envelope for 5K, half marathon, marathon, ultra, and mountain/trail
+- compare prompt/output size against v1 row-level blueprint
+- ensure decoded final canonical plan preserves fixed rest days, long-run day, cadence, and metric
+  policy
+- ensure no `structured_authoring_v1` fallback success is introduced
+- doctrine validator or focused equivalent for envelope fixtures
+- local debug artifact showing compact envelope plus decoded readable trace
+
+### Explicit non-goals
+
+- do not implement progressive partial-plan persistence
+- do not use deterministic `structured_authoring_v1` as a successful first-plan fallback
+- do not move schedule truth into frontend
+- do not ask Running Coach to run SQL or validation scripts
+- do not replace the production v1 blueprint path until v2 envelope fixtures pass
+- do not add a new queue/background subsystem in this slice
 
 ## AI Blueprint Schema Decision
 
@@ -706,6 +1064,254 @@ Candidate cleanup:
 - keep import/export compatibility
 - keep refresh exact-draft safety
 
+### Slice 7A: Non-Live Planning Envelope Contract Foundation
+
+Owner: BACKEND
+
+Status: Complete / QA-passed / non-live foundation only.
+
+Create a smaller `ai-first-plan-envelope-v1` contract beside the current production blueprint path.
+
+Scope:
+
+- define focused envelope schema/types and compact code maps
+- validate and decode envelope output into human-readable debug tables
+- expand accepted mock envelopes into canonical `training-plan-v2` through backend-owned slot,
+  phase, long-run, segment, and metric-policy logic
+- compare envelope prompt/output size against current row-level blueprint fixtures
+- keep `ai-first-plan-blueprint-v1` as the production structured first-plan path
+- no persistence
+- no frontend wiring
+- no DB schema
+
+Validation:
+
+- long target-date half-marathon envelope fixture
+- 5K, marathon, ultra, and mountain/trail mock envelope fixtures where practical
+- fixed rest days, preferred long-run day, full-horizon coverage, cadence policy, and metric policy
+  preserved after expansion
+- invalid envelope output remains non-mutating and cannot become a reviewed draft
+- no `structured_authoring_v1` success fallback is introduced
+- `git diff --check`
+
+Implementation note, 2026-05-29:
+
+- Added a non-live `ai-first-plan-envelope-v1` foundation beside the current production blueprint
+  path. The envelope schema uses compact goal/style/phase/cadence/terrain/metric codes, decodes
+  them into human-readable trace output, validates setup alignment and safety, and expands accepted
+  mock envelopes through backend-owned canonical plan generation into `training-plan-v2` rows.
+- `npm run author-ai-first-plan-draft -- --contract envelope` is ops/mock-only in this slice; live
+  envelope calls intentionally return bounded unavailable metadata. Production
+  `ai-first-plan-blueprint-v1` draft/review behavior is unchanged.
+- Build closeout note: `npm run build` now clears generated `.output` and Nitro Vite cache before
+  building, stages client assets in Nitro's build cache instead of writing them directly into
+  `.output/public`, restores staged/source public assets immediately before Nitro's virtual
+  public-assets module reads them, stages the Nitro server bundle, and runs a `postbuild` finalizer
+  that restores/verifies `.output/public` and `.output/server` after Nitro closes. Dev-server Nitro
+  output is isolated under `node_modules/.nitro/dev-output` on restart so local dev watchers do not
+  share the production `.output` lifecycle.
+
+QA closeout evidence, 2026-05-29:
+
+- default envelope mock passed:
+  - `sourceKind: ai_first_plan_envelope_v1`
+  - `sourceStatus: expanded_from_envelope`
+  - `weekCount: 8`
+  - `workoutCount: 56`
+  - `nonRestCount: 40`
+  - `completeRichRows: 40`
+  - `persisted: false`
+- long marathon envelope passed:
+  - `weekCount: 29`
+  - `workoutCount: 203`
+  - `nonRestCount: 145`
+  - `completeRichRows: 145`
+  - fixed rest days preserved: Wednesday/Saturday
+  - preferred long run preserved: Sunday
+  - cadence safe for low-support case
+- invalid envelope returned bounded `ai_first_plan_envelope_invalid` with `persisted: false`
+- live envelope mode returned bounded unavailable/non-live metadata and made no OpenAI call
+- production blueprint preservation passed:
+  - valid remains `ai_first_plan_blueprint_v1` / `ai_authored`
+  - invalid remains `blueprint_unavailable` / `ai_first_plan_blueprint_schema_invalid`
+  - timeout remains `blueprint_unavailable` / `ai_first_plan_blueprint_timed_out`
+  - `deterministicFallbackBoundary.used` remains false
+  - no `structured_authoring_v1` fallback success leaked
+- doctrine validator passed
+
+Build blocker closeout evidence, 2026-05-29:
+
+- two normal `npm run build` runs passed
+- two explicit cold builds after cleanup passed
+- required artifacts were present:
+  - `.output/public/favicon.svg`
+  - `.output/public/templates/hito-training-plan-v2-template.json`
+  - `.output/server/index.mjs`
+- Nitro public-assets `ENOENT` did not reproduce
+- client assets now stage outside `.output/public`
+- postbuild finalizer restores/verifies `.output/public` and `.output/server`
+
+Closeout boundary:
+
+- `ai-first-plan-envelope-v1` remains non-live and ops/mock-only
+- it is not wired into `generateStructuredFirstPlanDraft`
+- it is not persisted
+- production first-plan generation still uses `ai-first-plan-blueprint-v1`
+- production envelope adoption remains a future selected slice
+
+### Slice 7B: Production Envelope Adoption
+
+Owner: ARCHITECT / BACKEND / QA
+
+Status: Future / not started / eligible for architecture selection after date-control proof.
+
+Only select this after Architect explicitly decides the non-live envelope foundation should move
+toward production. The browser long-horizon/date-control proof is now passed; production adoption
+still requires a deliberate rollout decision and follow-up QA/Running Coach evidence.
+
+Scope when selected:
+
+- decide whether `ai-first-plan-envelope-v1` replaces or sits beside `ai-first-plan-blueprint-v1`
+- define source-kind/source-status semantics for reviewed plans
+- wire structured first-plan draft to envelope behind an explicit backend option first
+- prove no regression in review/confirm, fixed rest days, long-run day, metric gates, and saved-mode
+  rendering
+- do not persist partial envelope output
+
+### Date Controls And Long-Horizon Browser Proof Release Gate
+
+Owner: FRONTEND / BACKEND / QA
+
+Status: Complete / QA-passed.
+
+Closeout evidence, 2026-05-29:
+
+- built-in Codex browser was used first
+- direct auth text entry was blocked by missing Browser Use virtual clipboard
+- QA stayed in the built-in browser and used a local dev-only cookie helper for the disposable
+  tester session
+- Safari fallback was not needed
+- visible date-control values before submit:
+  - plan start date: `2026-05-29`
+  - target date: `2026-12-11`
+  - target time: `3:50:00`
+  - native validation messages: empty
+  - named submit fields: `schedule.startDate = 2026-05-29` and
+    `schedule.targetDate = 2026-12-11`
+- fresh browser-action artifact:
+  `qa-artifacts/debug/2026-05-29/structured-onboarding-browser-action/2026-05-29T19-08-20-405Z-generateStructuredFirstPlanDraft-draft_ready-d9b69c7b33e7.json`
+- artifact proof:
+  - `targetDatePresent: true`
+  - `startDate: 2026-05-29`
+  - `targetDate: 2026-12-11`
+  - `requestedHorizonWeeks: 29`
+  - `aiAuthoredHorizonWeeks: 16`
+  - `backendExtendedWeeks: 13`
+  - `finalRequiredSlotCount: 145`
+  - `sourceKind: ai_first_plan_blueprint_v1`
+  - `sourceStatus: repaired_ai_draft`
+  - `fallbackReason: null`
+  - `deterministicFallbackBoundary.used: false`
+- review modal opened successfully instead of `Review failed`
+- visible modal state: `Draft ready`
+- visible copy: `Nothing has been created yet. Confirm this setup to create your plan.`
+- review summary showed:
+  - plan horizon: `2026-05-29` to `2026-12-11`
+  - `203` planned workouts
+  - long run: Sunday
+  - rest days: Wednesday, Saturday
+  - terrain: Rolling
+- QA canceled and did not confirm/save
+- no-mutation proof:
+  - before review: `runnerProfiles: 1`, `planCycles: 0`, `plannedWorkouts: 0`,
+    `workoutLogs: 0`
+  - after review modal opened and before confirm: `runnerProfiles: 1`, `planCycles: 0`,
+    `plannedWorkouts: 0`, `workoutLogs: 0`
+- disposable runner profile and tester cleanup passed
+- command validation passed:
+  - targeted ESLint
+  - doctrine validator
+  - long-horizon blueprint fixture
+  - invalid/timeout/partial blueprint mocks
+  - `git diff --check`
+  - `npm run build`
+- screenshot folder:
+  `qa-artifacts/screenshots/2026-05-29/first-plan-date-controls-release-qa/`
+- screenshots:
+  - `valid-retained-date-fields-before-submit.png`
+  - `review-modal-success.png`
+
+Closeout boundaries:
+
+- production first-plan generation remains on `ai-first-plan-blueprint-v1`
+- `ai-first-plan-envelope-v1` remains future/non-production
+- latest browser proof verifies review opening and no mutation before confirm
+- latest browser proof does not prove confirm/save exactness because QA canceled before confirm
+
+Non-blocking follow-up:
+
+- The fresh artifact shows the first Monday after the first Sunday long run as
+  `steady_aerobic_run`, not easy/recovery. Treat this as a non-blocking
+  Running Coach / policy review item, not a date-control release blocker.
+
+### Selected Next Slice: Confirm/Save Exactness QA
+
+Owner: QA
+
+Status: Selected / ready for direct QA validation.
+
+Decision, 2026-05-29:
+
+- choose focused confirm/save exactness QA as the next bounded slice
+- do not start production envelope adoption yet
+- do not start the Monday-after-long-run training-quality policy review yet
+- do not split or archive the whole plan yet
+
+Why this is next:
+
+- the date-controls browser proof already showed the 29-week review can open successfully
+- the same proof intentionally canceled before confirm, so persisted exactness for that exact
+  long-horizon browser path remains the most direct release-risk gap
+- production envelope adoption would be a larger architecture rollout and should not begin until the
+  current production blueprint path has complete review -> confirm/save proof
+- the Monday-after-long-run `steady_aerobic_run` observation is real but non-blocking and belongs to
+  a Running Coach / policy follow-up, not this release gate
+
+Validation expectations:
+
+- use the built-in Codex browser first
+- create or reset only disposable local/test runner data
+- reproduce the long-horizon setup with:
+  - start date: `2026-05-29`
+  - target date: `2026-12-11`
+  - target time: `3:50:00`
+  - long run: Sunday
+  - rest days: Wednesday and Saturday
+  - terrain: Rolling
+- open review through production `ai-first-plan-blueprint-v1`
+- confirm/save only after review shows coherent 29-week plan truth
+- verify no mutation before confirm and exactly one active plan after confirm
+- verify persisted proof:
+  - `plan_cycles.source_kind = ai_first_plan_blueprint_v1`
+  - persisted row count matches reviewed row count
+  - persisted date range matches the reviewed horizon
+  - fixed rest days remain rest-only
+  - preferred long-run day is preserved where expected
+  - rich fields are present on non-rest rows
+  - confirm does not call OpenAI or regenerate a different plan
+- save routine screenshots under
+  `qa-artifacts/screenshots/YYYY-MM-DD/first-plan-confirm-save-exactness/`
+- reference debug artifacts textually; do not commit routine screenshots
+
+Explicit non-goals:
+
+- do not validate the non-live `ai-first-plan-envelope-v1` foundation again
+- do not treat `ai-first-plan-envelope-v1` as production
+- do not start envelope production adoption
+- do not change frontend/backend behavior
+- do not implement fixes
+- do not resolve the Monday-after-long-run training-quality follow-up in this QA slice
+
 ## QA Matrix
 
 Required end-to-end scenarios:
@@ -765,17 +1371,20 @@ Required end-to-end scenarios:
    - valid combinations keep rest days empty and long run preferred when possible
 
 10. Schedule edit after creation:
-   - create AI-authored plan
-   - use active-plan same-frequency schedule reflow
-   - expected: content/rich fields/segments preserved while dates move
+
+- create AI-authored plan
+- use active-plan same-frequency schedule reflow
+- expected: content/rich fields/segments preserved while dates move
 
 11. Blueprint unavailable:
-   - OpenAI timeout/mock invalid output
-   - expected: non-mutating retry/failure metadata and no reviewed/saved `structured_authoring_v1` plan
+
+- OpenAI timeout/mock invalid output
+- expected: non-mutating retry/failure metadata and no reviewed/saved `structured_authoring_v1` plan
 
 12. Tamper safety:
-   - modify reviewed draft before confirm
-   - expected: confirm blocks
+
+- modify reviewed draft before confirm
+- expected: confirm blocks
 
 QA evidence must include screenshots for calendar and workout detail pages, especially mid-cycle marathon/ultra weeks where repetition risk is highest.
 
@@ -856,83 +1465,10 @@ Keep long term:
 
 ## Next Recommended Role
 
-RUNNING COACH
+QA
 
 ## Suggested Next Step
 
-Run visual/product-quality review of saved `ai_first_plan_blueprint_v1` marathon-balanced and balanced-half plans before broad rollout. Use only saved plans where `sourceStatus` is `ai_authored` or `repaired_ai_draft`, `fallbackReason` is `null`, and persisted rows retain rich fields.
-
-## Exact RUNNING COACH Prompt For Visual Review
-
-```text
-ROLE: RUNNING COACH
-
-TASK:
-Review saved AI-blueprint first-plan output for runner-facing coaching quality before rollout.
-
-STAGE:
-RUNNING COACH visual/product-quality review
-
-PLAN:
-docs/plans/active/2026-05-26-ai-authored-first-plan-pipeline.md
-
-CONTEXT:
-The backend release gate for blueprint-only structured first-plan creation is QA-green. Deterministic `structured_authoring_v1` no longer leaks into successful structured first-plan drafts. Invalid/timeout blueprint attempts fail non-mutatingly with `ai_first_plan_blueprint_unavailable`, and confirm rejects non-blueprint reviewed drafts.
-
-Validated live marathon-balanced proof:
-- sourceKind: ai_first_plan_blueprint_v1
-- sourceStatus: repaired_ai_draft
-- fallbackReason: null
-- validationIssueCount: 0
-- deterministicFallbackBoundary.used: false
-- confirmOpenAiRequestCount: 0
-- saved plan_cycles.source_kind: ai_first_plan_blueprint_v1
-- reviewed row count: 112
-- persisted row count: 112
-- all persisted rich fields present on all rows
-- first 8 weeks included marathon_steady_specificity, controlled_tempo_session, long_run_with_steady_finish, easy_run_with_strides, cutback_long_run, and long_aerobic_run
-
-GOAL:
-Decide whether saved blueprint-authored plans are runner-facing good enough for controlled rollout, or whether there is a concrete coaching/product-quality issue that should block rollout.
-
-REQUIRED READING:
-1. AGENTS.md
-2. docs/plans/active/2026-05-26-ai-authored-first-plan-pipeline.md
-3. docs/current-system.md
-4. docs/current-product.md
-5. docs/current-state.md
-
-SCOPE:
-- Review saved-mode calendar and workout detail output from blueprint-created marathon-balanced and balanced-half plans.
-- Use only saved plans with:
-  - source_kind: ai_first_plan_blueprint_v1
-  - sourceStatus: ai_authored or repaired_ai_draft
-  - fallbackReason: null
-- Inspect mid-cycle weeks, not only Week 1.
-- Confirm whether visible workout variety, long-run progression, cutback/taper rhythm, quality cadence, segment detail, and metric honesty feel coach-credible.
-- Treat screenshots as visual evidence; routine screenshots should live in qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/ unless explicitly promoted as permanent evidence.
-
-QUESTIONS TO ANSWER:
-1. Do the saved plans read as coach-authored week-by-week plans rather than slot-filled schedules?
-2. Are marathon-balanced and balanced-half plans visibly distinct and goal-appropriate?
-3. Are quality sessions regular enough without unsafe density?
-4. Do long runs progress and cut back credibly?
-5. Do workout detail pages carry enough segment structure and execution guidance?
-6. Is metric guidance honest, including default HR labels and pace gates?
-7. Is any issue concrete enough to block rollout, or is it backlog polish?
-
-WHAT NOT TO DO:
-- Do not reopen backend implementation without a concrete coaching finding.
-- Do not accept deterministic_fallback or structured_authoring_v1 as blueprint proof.
-- Do not weaken HR, pace, rest-day, hard-day, persistence, or review/confirm gates.
-- Do not request Voice or refresh changes in this review.
-
-OUTPUT FORMAT:
-1. Task
-2. Stage
-3. Current coaching quality
-4. Evidence reviewed
-5. Findings
-6. Rollout recommendation
-7. Blockers
-```
+Run focused confirm/save exactness QA for the successful 29-week first-plan review path. Keep this
+separate from production envelope adoption and the non-blocking Monday-after-long-run policy
+follow-up.

@@ -25,7 +25,32 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - critical flow testing
 - regression verification
 - UI + data outcome checks
+- CLI, build, lint, script, fixture, and browser validation needed to prove the assigned QA scope
+- local/dev-only test data setup and cleanup when the QA task explicitly requires disposable fixtures
 - QA documentation artifacts, including test matrices, scenario files, regression checklists, and validation reports
+
+## QA Execution Authority
+
+QA is allowed and expected to execute validation work directly.
+
+- If the current task is addressed to QA, QA must treat it as a direct validation assignment, not as
+  an orchestration request.
+- QA may run repository commands needed for validation, including lint, build, test, typecheck,
+  doctrine scripts, smoke scripts, fixture scripts, and targeted CLI checks named by the handoff.
+- QA may open and use the built-in Codex browser, Safari fallback, local app sessions, dev servers,
+  screenshots, and local artifact folders when the task needs browser or visual proof.
+- QA may inspect source code, logs, debug artifacts, generated local artifacts, and safe local/test
+  database state to explain why behavior passed or failed.
+- QA may create, reset, or delete disposable local/test fixtures only when the task explicitly scopes
+  that fixture work and the environment is local/dev/test, not production.
+- QA may create and edit QA-owned docs and reports for validation evidence.
+- QA must not implement product fixes, edit product code, change schemas, run migrations, or mutate
+  production data. If a defect is found, QA reports it with repro/evidence and returns
+  `Verdict: Failed`.
+- QA must not hand off validation back to another role merely because commands, browser checks, or
+  scripts are required. Running validation is QA's job.
+- QA must not cite orchestration-agent restrictions as a reason to avoid testing. Those restrictions
+  do not apply to QA validation execution.
 
 ## QA Documentation Authority
 
@@ -39,6 +64,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - test the real affected scope
 - report failures with repro steps and severity
 - verify data outcomes where relevant
+- run the validation commands/scripts/builds named in the handoff when feasible, and report exact
+  failures instead of skipping them silently
+- inspect debug artifacts/logs/source when needed to explain a validation failure
 - use the built-in Codex app/browser testing environment first whenever it can cover browser QA
 - use Computer Use with Safari only when Safari-specific verification is required or the built-in browser cannot cover the task
 - include a `Browser Path Preflight` line in every browser QA report before results
@@ -54,6 +82,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - skip the built-in Codex app/browser and go straight to Safari without a concrete reason
 - submit a browser QA report without `Browser Path Preflight`
 - use Chrome for browser testing or verification unless Safari is genuinely blocked and the fallback is stated explicitly in the report
+- refuse to run validation commands simply because they are CLI/build/script based
+- pass validation back to BACKEND/FRONTEND unless the task requires an implementation fix, missing
+  fixture capability, unsafe mutation, or access QA does not have
 
 ## Browser Policy
 

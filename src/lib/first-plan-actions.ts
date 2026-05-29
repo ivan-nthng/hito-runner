@@ -61,6 +61,12 @@ const structuredFirstPlanDraftGenerationDebugSchema = z
     abortFired: z.boolean(),
     openAiElapsedMs: z.number().int().nonnegative().nullable(),
     promptCharEstimate: z.number().int().nonnegative().nullable(),
+    responseStatus: z.string().trim().min(1).max(80).nullable().optional(),
+    responseIncompleteReason: z.string().trim().min(1).max(120).nullable().optional(),
+    inputTokens: z.number().int().nonnegative().nullable().optional(),
+    outputTokens: z.number().int().nonnegative().nullable().optional(),
+    totalTokens: z.number().int().nonnegative().nullable().optional(),
+    outputTextChars: z.number().int().nonnegative().nullable().optional(),
     reasoningEffortSent: z.boolean(),
   })
   .strict();
@@ -100,6 +106,30 @@ const structuredFirstPlanBlueprintTraceSchema = z
         preferredLongRunDay: z.string().trim().min(1).max(16).nullable(),
       })
       .strict(),
+    blueprintCompleteness: z
+      .object({
+        expectedWeekCount: z.number().int().min(1).max(52),
+        actualWeekCount: z.number().int().min(0).max(52),
+        expectedRequiredSlotCount: z.number().int().min(1).max(364),
+        actualAuthoredWorkoutCount: z.number().int().min(0).max(364),
+        missingWeekNumbers: z.array(z.number().int().min(1).max(52)).max(24),
+        firstMissingRequiredDates: z.array(z.string().trim().min(1).max(32)).max(12),
+      })
+      .strict()
+      .optional(),
+    blueprintHorizonStrategy: z
+      .object({
+        requestedHorizonWeeks: z.number().int().min(1).max(52),
+        aiAuthoredHorizonWeeks: z.number().int().min(1).max(52),
+        backendExtendedWeeks: z.number().int().min(0).max(52),
+        promptRequiredSlotCount: z.number().int().min(1).max(364),
+        finalRequiredSlotCount: z.number().int().min(1).max(364),
+        promptCharEstimateBefore: z.number().int().nonnegative().nullable(),
+        promptCharEstimateAfter: z.number().int().nonnegative().nullable(),
+        finalWorkoutCount: z.number().int().nonnegative().nullable(),
+      })
+      .strict()
+      .optional(),
     requiredCadenceSlots: z
       .array(
         z
@@ -918,6 +948,10 @@ function classifyStructuredDraftFailureLayer(
     return "openai_timeout";
   }
 
+  if (fallbackReason.includes("incomplete")) {
+    return "blueprint_incomplete";
+  }
+
   if (fallbackReason.includes("schema") || fallbackReason.includes("non_json")) {
     return "openai_schema";
   }
@@ -1085,8 +1119,14 @@ function summarizeStructuredFirstPlanSetup(input: StructuredFirstPlanOnboardingI
       terrainFocus: "terrainFocus" in input.goal ? input.goal.terrainFocus : null,
       targetTimePresent: "targetTime" in input.goal ? Boolean(input.goal.targetTime) : false,
       targetDatePresent: "targetDate" in input.goal ? Boolean(input.goal.targetDate) : false,
+      targetDate: input.goal.targetDate ?? null,
     },
-    strengthPreference: input.strengthPreference,
+    schedule: {
+      startDate: input.schedule?.startDate ?? null,
+      targetDate: input.schedule?.targetDate ?? null,
+      targetDatePresent: Boolean(input.schedule?.targetDate ?? input.goal.targetDate),
+    },
+    strengthPreference: input.strength?.preference ?? null,
     comment: {
       present: Boolean(input.comment?.trim()),
       chars: input.comment?.trim().length ?? 0,
@@ -1255,6 +1295,12 @@ function sanitizeStructuredDraftGenerationDebug(
     abortFired: debug.abortFired,
     openAiElapsedMs: debug.openAiElapsedMs,
     promptCharEstimate: debug.promptCharEstimate,
+    responseStatus: debug.responseStatus,
+    responseIncompleteReason: debug.responseIncompleteReason,
+    inputTokens: debug.inputTokens,
+    outputTokens: debug.outputTokens,
+    totalTokens: debug.totalTokens,
+    outputTextChars: debug.outputTextChars,
     reasoningEffortSent: debug.reasoningEffortSent,
   });
 }

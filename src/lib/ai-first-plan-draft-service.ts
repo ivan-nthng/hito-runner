@@ -3,12 +3,22 @@ import {
   normalizeAiFirstPlanDraftToTrainingPlan,
   type AiFirstPlanBlueprintTraceMetadata,
   type AiFirstPlanDraftMetadata,
+  type AiFirstPlanDraftNormalizationResult,
 } from "@/lib/ai-first-plan-draft-authoring";
+import type { NormalizationIssue } from "@/lib/ai-first-plan-blueprint-schema";
 import {
   buildAiFirstPlanBlueprintTrace,
   buildAiFirstPlanBlueprintPrompt,
   normalizeAiFirstPlanBlueprintToTrainingPlan,
 } from "@/lib/ai-first-plan-blueprint-authoring";
+import {
+  attachBlueprintHorizonTrace,
+  buildAiFirstPlanBlueprintHorizonTrace,
+  extendAiFirstPlanBlueprintPlanToRequestedHorizon,
+  resolveAiFirstPlanBlueprintHorizonStrategy,
+  type AiFirstPlanBlueprintHorizonStrategy,
+  type AiFirstPlanBlueprintHorizonTraceMetadata,
+} from "@/lib/ai-first-plan-blueprint-horizon";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import { serverEnv } from "@/lib/supabase/env";
 import {
@@ -29,12 +39,21 @@ const DEFAULT_AI_FIRST_PLAN_CONTRACT = "blueprint";
 
 type OpenAiResponseEnvelope = {
   id?: string;
+  status?: string;
   output_text?: string;
   output?: Array<{
     content?: Array<{
       text?: string;
     }>;
   }>;
+  incomplete_details?: {
+    reason?: string;
+  };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
   error?: {
     message?: string;
   };
@@ -87,6 +106,12 @@ export interface AiFirstPlanDraftDebugMetadata {
   systemPromptChars: number | null;
   userPromptChars: number | null;
   responseSchemaChars: number | null;
+  responseStatus: string | null;
+  responseIncompleteReason: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  outputTextChars: number | null;
   reasoningEffortSent: boolean;
 }
 
@@ -158,6 +183,15 @@ export async function generateAiFirstPlanDraftPreview({
   const startedAt = Date.now();
   const useDeterministicFallback =
     allowDeterministicFallback ?? contractMode !== DEFAULT_AI_FIRST_PLAN_CONTRACT;
+  const blueprintHorizonStrategy =
+    contractMode === "blueprint"
+      ? resolveAiFirstPlanBlueprintHorizonStrategy({
+          authoringInput,
+          today,
+          referenceExample,
+        })
+      : null;
+  const openAiAuthoringInput = blueprintHorizonStrategy?.openAiAuthoringInput ?? authoringInput;
 
   if (!apiKey) {
     return fallbackOrUnavailable({
@@ -174,6 +208,7 @@ export async function generateAiFirstPlanDraftPreview({
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
         contractMode,
       }),
+      blueprintHorizonStrategy,
     });
   }
 
@@ -181,7 +216,7 @@ export async function generateAiFirstPlanDraftPreview({
     const response = await requestOpenAiFirstPlanDraft({
       apiKey,
       model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-      authoringInput,
+      authoringInput: openAiAuthoringInput,
       referenceExample,
       today,
       timeoutMs,
@@ -190,6 +225,10 @@ export async function generateAiFirstPlanDraftPreview({
       fetchImpl,
     });
     const rawOutput = extractStructuredOutputText(response.body, response.debug);
+    const responseDebug = {
+      ...response.debug,
+      outputTextChars: rawOutput.length,
+    };
     const parsedOutput = safeParseJson(rawOutput);
 
     if (!parsedOutput) {
@@ -201,7 +240,8 @@ export async function generateAiFirstPlanDraftPreview({
         responseId: response.body.id ?? null,
         startedAt,
         allowDeterministicFallback: useDeterministicFallback,
-        debug: { ...response.debug, requestPhase: "fallback_after_validation" },
+        debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
+        blueprintHorizonStrategy,
       });
     }
 
@@ -209,7 +249,11 @@ export async function generateAiFirstPlanDraftPreview({
       contractMode === "blueprint"
         ? normalizeAiFirstPlanBlueprintToTrainingPlan({
             blueprint: parsedOutput,
-            authoringInput,
+            authoringInput: openAiAuthoringInput,
+            deterministicSupportAuthoringInput:
+              blueprintHorizonStrategy && blueprintHorizonStrategy.backendExtendedWeeks > 0
+                ? authoringInput
+                : undefined,
           })
         : normalizeAiFirstPlanDraftToTrainingPlan({
             draft: parsedOutput,
@@ -226,37 +270,68 @@ export async function generateAiFirstPlanDraftPreview({
         startedAt,
         fallbackMetadata: normalized.fallback,
         allowDeterministicFallback: useDeterministicFallback,
-        debug: { ...response.debug, requestPhase: "fallback_after_validation" },
+        debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
+        blueprintHorizonStrategy,
+      });
+    }
+
+    const finalized =
+      contractMode === "blueprint" && blueprintHorizonStrategy
+        ? finalizeBlueprintHorizonPlan({
+            normalized,
+            authoringInput,
+            blueprintHorizonStrategy,
+            responseDebug,
+          })
+        : normalized;
+
+    if (!finalized.ok) {
+      return fallbackOrUnavailable({
+        authoringInput,
+        reason: finalized.reason,
+        issues: finalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
+        model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+        responseId: response.body.id ?? null,
+        startedAt,
+        fallbackMetadata: finalized.fallbackMetadata,
+        allowDeterministicFallback: useDeterministicFallback,
+        debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
+        blueprintHorizonStrategy,
       });
     }
 
     return {
       ok: true,
       authoringInput,
-      canonicalPlan: normalized.canonicalPlan,
+      canonicalPlan: finalized.canonicalPlan,
       metadata: {
-        ...normalized.metadata,
+        ...finalized.metadata,
         fallbackReason: null,
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
         responseId: response.body.id ?? null,
         elapsedMs: Date.now() - startedAt,
-        validationIssueCount: normalized.metadata.validationIssues.length,
-        debug: { ...response.debug, requestPhase: "normalized" },
+        validationIssueCount: finalized.metadata.validationIssues.length,
+        debug: { ...responseDebug, requestPhase: "normalized" },
         blueprintTrace:
           contractMode === "blueprint"
             ? enrichAiFirstPlanBlueprintTrace({
-                trace: normalized.metadata.blueprintTrace ?? null,
+                trace: finalized.metadata.blueprintTrace ?? null,
                 authoringInput,
-                canonicalPlan: normalized.canonicalPlan,
-                sourceStatus: normalized.metadata.status,
+                canonicalPlan: finalized.canonicalPlan,
+                sourceStatus: finalized.metadata.status,
                 fallbackReason: null,
-                issues: normalized.metadata.validationIssues,
-                repairs: normalized.metadata.repairs,
+                issues: finalized.metadata.validationIssues,
+                repairs: finalized.metadata.repairs,
                 model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
                 elapsedMs: Date.now() - startedAt,
-                debug: { ...response.debug, requestPhase: "normalized" },
+                debug: { ...responseDebug, requestPhase: "normalized" },
+                blueprintHorizonStrategy: buildAiFirstPlanBlueprintHorizonTrace({
+                  strategy: blueprintHorizonStrategy,
+                  promptCharEstimateAfter: responseDebug.promptCharEstimate,
+                  finalWorkoutCount: finalized.canonicalPlan.planned_workouts.length,
+                }),
               })
-            : (normalized.metadata.blueprintTrace ?? null),
+            : (finalized.metadata.blueprintTrace ?? null),
       },
     };
   } catch (error) {
@@ -279,6 +354,7 @@ export async function generateAiFirstPlanDraftPreview({
               model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
               contractMode,
             }),
+      blueprintHorizonStrategy,
     });
   }
 }
@@ -320,6 +396,71 @@ function resolveStructuredAuthoringInput(
       issues: [boundedErrorMessage(error, "Structured first-plan input failed validation.")],
     };
   }
+}
+
+function finalizeBlueprintHorizonPlan({
+  normalized,
+  authoringInput,
+  blueprintHorizonStrategy,
+  responseDebug,
+}: {
+  normalized: Extract<AiFirstPlanDraftNormalizationResult, { ok: true }>;
+  authoringInput: StructuredFirstPlanAuthoringInput;
+  blueprintHorizonStrategy: AiFirstPlanBlueprintHorizonStrategy;
+  responseDebug: AiFirstPlanDraftDebugMetadata;
+}):
+  | {
+      ok: true;
+      canonicalPlan: TrainingPlanV2;
+      metadata: AiFirstPlanDraftMetadata;
+    }
+  | {
+      ok: false;
+      reason: string;
+      issues: NormalizationIssue[];
+      fallbackMetadata: AiFirstPlanDraftMetadata;
+    } {
+  const extended = extendAiFirstPlanBlueprintPlanToRequestedHorizon({
+    canonicalPlan: normalized.canonicalPlan,
+    fullAuthoringInput: authoringInput,
+    strategy: blueprintHorizonStrategy,
+  });
+
+  if (!extended.ok) {
+    return {
+      ok: false,
+      reason: extended.reason,
+      issues: extended.issues,
+      fallbackMetadata: {
+        ...normalized.metadata,
+        blueprintTrace: attachBlueprintHorizonTrace({
+          trace: normalized.metadata.blueprintTrace ?? null,
+          strategy: blueprintHorizonStrategy,
+          promptCharEstimateAfter: responseDebug.promptCharEstimate,
+          finalWorkoutCount: null,
+        }),
+      },
+    };
+  }
+
+  const repairs = [...normalized.metadata.repairs, ...extended.repairs];
+  const status = repairs.length > 0 ? "repaired_ai_draft" : normalized.metadata.status;
+
+  return {
+    ok: true,
+    canonicalPlan: extended.canonicalPlan,
+    metadata: {
+      ...normalized.metadata,
+      status,
+      repairs,
+      blueprintTrace: attachBlueprintHorizonTrace({
+        trace: normalized.metadata.blueprintTrace ?? null,
+        strategy: blueprintHorizonStrategy,
+        promptCharEstimateAfter: responseDebug.promptCharEstimate,
+        finalWorkoutCount: extended.canonicalPlan.planned_workouts.length,
+      }),
+    },
+  };
 }
 
 async function requestOpenAiFirstPlanDraft({
@@ -420,6 +561,14 @@ async function requestOpenAiFirstPlanDraft({
         requestPhase: "response_parsed",
         abortFired,
         openAiElapsedMs: Date.now() - requestStartedAt,
+        responseStatus: typeof body.status === "string" ? body.status : null,
+        responseIncompleteReason:
+          typeof body.incomplete_details?.reason === "string"
+            ? body.incomplete_details.reason
+            : null,
+        inputTokens: normalizeTokenCount(body.usage?.input_tokens),
+        outputTokens: normalizeTokenCount(body.usage?.output_tokens),
+        totalTokens: normalizeTokenCount(body.usage?.total_tokens),
       };
 
       if (!response.ok) {
@@ -532,8 +681,20 @@ function buildRequestDebug({
     systemPromptChars,
     userPromptChars,
     responseSchemaChars,
+    responseStatus: null,
+    responseIncompleteReason: null,
+    inputTokens: null,
+    outputTokens: null,
+    totalTokens: null,
+    outputTextChars: null,
     reasoningEffortSent: supportsReasoningEffort(model),
   };
+}
+
+function normalizeTokenCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.round(value))
+    : null;
 }
 
 function supportsReasoningEffort(model: string) {
@@ -555,6 +716,7 @@ function fallbackOrUnavailable({
   startedAt: number;
   fallbackMetadata?: AiFirstPlanDraftMetadata;
   debug: AiFirstPlanDraftDebugMetadata;
+  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonStrategy | null;
 }):
   | Extract<AiFirstPlanDraftPreviewResult, { ok: true }>
   | Extract<
@@ -580,6 +742,7 @@ function unavailableAiFirstPlanDraft({
   startedAt,
   fallbackMetadata,
   debug,
+  blueprintHorizonStrategy,
 }: {
   authoringInput: StructuredFirstPlanAuthoringInput;
   reason: string;
@@ -589,6 +752,7 @@ function unavailableAiFirstPlanDraft({
   startedAt: number;
   fallbackMetadata?: AiFirstPlanDraftMetadata;
   debug: AiFirstPlanDraftDebugMetadata;
+  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonStrategy | null;
 }): Extract<
   AiFirstPlanDraftPreviewResult,
   {
@@ -615,6 +779,11 @@ function unavailableAiFirstPlanDraft({
         model,
         elapsedMs,
         debug,
+        blueprintHorizonStrategy: buildAiFirstPlanBlueprintHorizonTrace({
+          strategy: blueprintHorizonStrategy ?? null,
+          promptCharEstimateAfter: debug.promptCharEstimate,
+          finalWorkoutCount: null,
+        }),
       })
     : (fallbackMetadata?.blueprintTrace ?? null);
 
@@ -648,6 +817,7 @@ function deterministicFallback({
   startedAt,
   fallbackMetadata,
   debug,
+  blueprintHorizonStrategy,
 }: {
   authoringInput: StructuredFirstPlanAuthoringInput;
   reason: string;
@@ -657,6 +827,7 @@ function deterministicFallback({
   startedAt: number;
   fallbackMetadata?: AiFirstPlanDraftMetadata;
   debug: AiFirstPlanDraftDebugMetadata;
+  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonStrategy | null;
 }): Extract<AiFirstPlanDraftPreviewResult, { ok: true }> {
   const canonicalPlan = buildStructuredAuthoringPlan(authoringInput);
   const validationIssues = issues
@@ -677,6 +848,11 @@ function deterministicFallback({
           model,
           elapsedMs,
           debug,
+          blueprintHorizonStrategy: buildAiFirstPlanBlueprintHorizonTrace({
+            strategy: blueprintHorizonStrategy ?? null,
+            promptCharEstimateAfter: debug.promptCharEstimate,
+            finalWorkoutCount: canonicalPlan.planned_workouts.length,
+          }),
         })
       : (fallbackMetadata?.blueprintTrace ?? null);
 
@@ -720,6 +896,7 @@ function buildUnavailableBlueprintTrace({
   model,
   elapsedMs,
   debug,
+  blueprintHorizonStrategy,
 }: {
   trace: AiFirstPlanBlueprintTraceMetadata | null;
   authoringInput: StructuredFirstPlanAuthoringInput;
@@ -730,6 +907,7 @@ function buildUnavailableBlueprintTrace({
   model: string;
   elapsedMs: number;
   debug: AiFirstPlanDraftDebugMetadata;
+  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonTraceMetadata;
 }): AiFirstPlanBlueprintTraceMetadata {
   const baseTrace =
     trace ??
@@ -756,6 +934,7 @@ function buildUnavailableBlueprintTrace({
       used: false,
       reason,
     },
+    ...(blueprintHorizonStrategy ? { blueprintHorizonStrategy } : {}),
   };
 }
 
@@ -770,6 +949,7 @@ function enrichAiFirstPlanBlueprintTrace({
   model,
   elapsedMs,
   debug,
+  blueprintHorizonStrategy,
 }: {
   trace: AiFirstPlanDraftPreviewMetadata["blueprintTrace"];
   authoringInput: StructuredFirstPlanAuthoringInput;
@@ -781,6 +961,7 @@ function enrichAiFirstPlanBlueprintTrace({
   model: string;
   elapsedMs: number;
   debug: AiFirstPlanDraftDebugMetadata;
+  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonTraceMetadata;
 }) {
   const baseTrace =
     trace ??
@@ -807,7 +988,50 @@ function enrichAiFirstPlanBlueprintTrace({
       used: sourceStatus === "deterministic_fallback",
       reason: fallbackReason,
     },
+    normalizedCanonicalWeeks: groupCanonicalIdentityTraceByWeek(canonicalPlan.planned_workouts),
+    finalReviewedPlanIdentityCounts: countCanonicalWorkoutField(
+      canonicalPlan.planned_workouts,
+      "workout_identity",
+    ),
+    finalReviewedPlanFamilyCounts: countCanonicalWorkoutField(
+      canonicalPlan.planned_workouts,
+      "workout_family",
+    ),
+    finalReviewedPlanIconCounts: countCanonicalWorkoutField(
+      canonicalPlan.planned_workouts,
+      "calendar_icon_key",
+    ),
+    ...(blueprintHorizonStrategy ? { blueprintHorizonStrategy } : {}),
   };
+}
+
+function groupCanonicalIdentityTraceByWeek(workouts: TrainingPlanV2["planned_workouts"]) {
+  const byWeek = new Map<number, TrainingPlanV2["planned_workouts"]>();
+
+  for (const workout of workouts) {
+    byWeek.set(workout.week_number, [...(byWeek.get(workout.week_number) ?? []), workout]);
+  }
+
+  return [...byWeek.entries()]
+    .sort(([left], [right]) => left - right)
+    .slice(0, 52)
+    .map(([weekNumber, weekWorkouts]) => ({
+      weekNumber,
+      identities: weekWorkouts.map((workout) => workout.workout_identity ?? "unknown").slice(0, 7),
+      families: weekWorkouts.map((workout) => workout.workout_family ?? "unknown").slice(0, 7),
+      icons: weekWorkouts.map((workout) => workout.calendar_icon_key ?? "unknown").slice(0, 7),
+    }));
+}
+
+function countCanonicalWorkoutField(
+  workouts: TrainingPlanV2["planned_workouts"],
+  field: "workout_identity" | "workout_family" | "calendar_icon_key",
+) {
+  return workouts.reduce<Record<string, number>>((counts, workout) => {
+    const value = workout[field] ?? "unknown";
+    counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
 }
 
 function issuesToTraceIssues(issues: string[], fallbackCode: string) {

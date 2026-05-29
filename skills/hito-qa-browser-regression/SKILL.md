@@ -17,6 +17,25 @@ Verify Hito behavior with real browser evidence and honest coverage.
 - Do not edit product code, migrations, implementation plans, product briefs, design specs, or role instructions through this skill unless ARCHITECT explicitly assigns that docs-maintenance task.
 - QA docs must describe implemented behavior, expected validation, and coverage gaps; they must not invent new product requirements.
 
+## QA Execution Authority
+
+- QA owns validation execution. If the task is addressed to QA, run the validation rather than
+  returning another handoff prompt.
+- QA may run the validation tooling needed to prove the assigned scope: lint, build, test, typecheck,
+  doctrine scripts, smoke scripts, fixture scripts, targeted CLI commands, browser checks, local app
+  sessions, and screenshot capture.
+- QA may inspect source, logs, debug artifacts, generated local artifacts, and safe local/test data to
+  explain pass/fail results.
+- QA may create, reset, or delete disposable local/test fixtures only when the QA task explicitly
+  requires fixture work and the environment is local/dev/test.
+- QA must not implement product fixes, edit product code, change schemas, run migrations, or mutate
+  production data.
+- If validation tooling is required by the prompt, run it when feasible and report exact output or
+  bounded failure details. Do not return a handoff prompt just because the validation uses CLI,
+  browser, build, scripts, or local fixtures.
+- Do not cite orchestration-agent execution limits as a reason to skip QA work; those limits do not
+  apply to the QA role while executing validation.
+
 ## Browser Policy
 
 - Use the built-in Codex app/browser testing environment first whenever it can cover the task.
@@ -51,12 +70,13 @@ Verify Hito behavior with real browser evidence and honest coverage.
 1. Read the active plan, implementation summary, and QA expectations.
 2. Write the browser path preflight before opening or navigating any external browser.
 3. Identify the smallest end-to-end scope that proves the change.
-4. Test admin/auth blocking separately from happy path when relevant.
-5. Verify data outcomes for any mutation.
-6. Source-verify any branch that cannot be safely exercised.
-7. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
-8. Report exact failures with repro steps.
-9. End with a verdict.
+4. Run the CLI/build/script checks named by the handoff when they are relevant and feasible.
+5. Test admin/auth blocking separately from happy path when relevant.
+6. Verify data outcomes for any mutation.
+7. Source-verify any branch that cannot be safely exercised.
+8. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
+9. Report exact failures with repro steps.
+10. End with a verdict.
 
 ## Hito-Specific Checks
 

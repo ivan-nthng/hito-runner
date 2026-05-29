@@ -193,6 +193,15 @@ const goalSchema = z
     }
   });
 
+const scheduleSchema = z
+  .object({
+    startDate: isoDateSchema.optional().nullable(),
+    targetDate: isoDateSchema.optional().nullable(),
+  })
+  .strict()
+  .optional()
+  .nullable();
+
 const strengthSchema = z
   .object({
     preference: z.enum(["none", "mobility", "strength_mobility"]).optional().nullable(),
@@ -207,11 +216,25 @@ export const structuredFirstPlanOnboardingInputSchema = z
     benchmark: benchmarkSchema,
     availability: availabilitySchema,
     goal: goalSchema,
+    schedule: scheduleSchema,
     strength: strengthSchema,
     execution: executionSchema,
     comment: z.string().trim().max(600).optional().nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.schedule?.startDate &&
+      value.schedule.targetDate &&
+      diffDaysIso(value.schedule.targetDate, value.schedule.startDate) < 6
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["schedule", "targetDate"],
+        message: "Choose a target date at least 7 days after the plan start date.",
+      });
+    }
+  });
 
 export type StructuredFirstPlanOnboardingInput = z.output<
   typeof structuredFirstPlanOnboardingInputSchema
@@ -289,11 +312,14 @@ export function buildStructuredFirstPlanAuthoringInput(
     preferredLongRunDay,
     input.availability.runningDaysPerWeek,
   );
-  const startDate = deriveStartDateForTrainingWeekdays(preferredRunningDays);
+  const startDate =
+    input.schedule?.startDate ?? deriveStartDateForTrainingWeekdays(preferredRunningDays);
   const terrainFocus = normalizeTerrainFocus(input.goal);
   const execution = normalizeFirstPlanExecutionMode(input.execution);
   const targetDate =
-    input.goal.goalStyle === "target_time" ? (input.goal.targetDate ?? null) : null;
+    input.goal.goalStyle === "target_time"
+      ? (input.schedule?.targetDate ?? input.goal.targetDate ?? null)
+      : null;
   const authoringInput = {
     goal: {
       goalType: input.goal.goalDistance,

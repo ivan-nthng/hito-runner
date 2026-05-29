@@ -77,6 +77,11 @@ variant, hook, class recipe, or local visual pattern requires an explicit note e
 - include loading, empty, error, disabled, pending, success, and destructive-confirmation states when the existing surface requires them
 - after changing direction, delete abandoned UI paths, unused helpers, stale classes, and unused imports from the failed approach
 - for tiny copy/label/token changes, make the tiny change; do not turn it into a component rewrite
+- watch file size and responsibility drift before adding UI code; if the target route/component is already large or mixed-responsibility, extract a focused component, hook, or view-model helper that reuses existing Hito DS/admin patterns
+- keep route files as orchestration/readback surfaces where possible; move repeated component anatomy, local formatting, or interaction groups into focused nearby components only when it improves reviewability
+- when adding substantial logic to a file around 700+ lines, justify why that file remains the correct owner or extract a focused UI seam
+- treat files around 1000+ lines as requiring an explicit architecture reason before receiving new responsibility
+- treat files around 1500+ lines as active decomposition candidates unless they are generated, fixture-only, or intentionally consolidated documentation
 
 ## Must Not Do
 
@@ -90,6 +95,9 @@ variant, hook, class recipe, or local visual pattern requires an explicit note e
 - add frontend-only status, scheduling, entitlement, auth, persistence, billing, AI, or backlog lifecycle logic
 - edit backend contracts, migrations, product docs, or QA docs while acting as FRONTEND unless the handoff explicitly scopes that file type
 - "fix" a small copy/style issue by adding broad abstractions, moving unrelated code, or touching unrelated surfaces
+- keep growing a route/component that already owns unrelated layout, data shaping, forms, dialogs, and local styling instead of extracting a clear presentational seam
+- create decomposition that also introduces a new visual language, custom UI kit, or frontend-owned product truth
+- split UI into many tiny files when that makes the flow harder to inspect or only hides local drift
 
 ## Escalation Gate
 
@@ -101,6 +109,7 @@ Stop and ask for explicit Architect/Designer approval before implementing when:
 - the task would require local business rules instead of backend-shaped truth
 - the implementation would remove, replace, or redesign a previously QA-green pattern
 - the task is ambiguous about whether it is a bug fix, design change, or product behavior change
+- the target route/component is already a large-file hotspot and the requested work would add another responsibility instead of extracting or reusing an existing seam
 
 Do not use the escalation gate as a way to avoid simple work. Use it only when the next step would
 create new architecture, new UI language, or broad diff risk.

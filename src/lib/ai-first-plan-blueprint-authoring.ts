@@ -42,9 +42,11 @@ export { buildAiFirstPlanBlueprintTrace } from "@/lib/ai-first-plan-blueprint-tr
 export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   blueprint,
   authoringInput,
+  deterministicSupportAuthoringInput,
 }: {
   blueprint: unknown;
   authoringInput: StructuredAuthoringInput;
+  deterministicSupportAuthoringInput?: StructuredAuthoringInput;
 }): AiFirstPlanBlueprintNormalizationResult {
   const parsedBlueprint = aiFirstPlanBlueprintSchema.safeParse(blueprint);
 
@@ -78,8 +80,10 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   validateBlueprintShell(parsedBlueprint.data, context, issues);
 
   if (issues.length > 0) {
+    const reason = blueprintShellValidationFailureReason(issues);
+
     return failedAiBlueprintNormalization(
-      "ai_first_plan_blueprint_validation_failed",
+      reason,
       issues,
       buildAiFirstPlanBlueprintTrace({
         authoringInput,
@@ -87,14 +91,16 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
         normalizedWorkouts: null,
         sourceStatus: "blueprint_unavailable",
         sourceKind: "ai_first_plan_blueprint_v1",
-        fallbackReason: "ai_first_plan_blueprint_validation_failed",
+        fallbackReason: reason,
         issues,
         repairs,
       }),
     );
   }
 
-  const deterministicPlan = buildStructuredAuthoringPlan(authoringInput);
+  const deterministicPlan = buildStructuredAuthoringPlan(
+    deterministicSupportAuthoringInput ?? authoringInput,
+  );
   const deterministicByDate = new Map(
     deterministicPlan.planned_workouts.map((workout) => [workout.date, workout]),
   );
@@ -218,4 +224,10 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
       }),
     },
   };
+}
+
+function blueprintShellValidationFailureReason(issues: NormalizationIssue[]) {
+  return issues.some((issue) => issue.code.startsWith("incomplete_blueprint"))
+    ? "ai_first_plan_blueprint_incomplete"
+    : "ai_first_plan_blueprint_validation_failed";
 }

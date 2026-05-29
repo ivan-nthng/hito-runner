@@ -37,6 +37,11 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - keep the implementation smaller after a cleanup than before; if replacing an approach, remove or explicitly deprecate the old path in the same slice whenever safe
 - add a removal plan for any temporary compatibility layer, fallback, diagnostic helper, or legacy bridge that cannot be deleted immediately
 - clean up failed or reverted implementation attempts before handoff so dead code does not accumulate
+- watch file size and responsibility drift before adding code; if the target file is already large or mixed-responsibility, extract a focused backend seam instead of piling on more logic
+- keep public backend facades stable during decomposition unless the active plan explicitly changes the contract
+- when adding substantial logic to a file around 700+ lines, justify why that file remains the correct owner or extract schema, validation, normalization, persistence, orchestration, fixture, or helper logic into a focused module
+- treat files around 1000+ lines as requiring an explicit architecture reason before receiving new responsibility
+- treat files around 1500+ lines as active decomposition candidates unless they are generated, fixture-only, or intentionally consolidated documentation
 
 ## Must Not Do
 
@@ -47,6 +52,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - leave obsolete legacy paths active after a replacement is proven unless the active plan explicitly keeps them for compatibility
 - keep unused code, stale migrations/scripts, or abandoned branches from a failed approach without calling them out and planning deletion
 - introduce broad abstractions for small fixes without explicit Architect approval
+- grow a large backend file by adding unrelated validation, persistence, AI, fixture, script, or orchestration logic just because importing from it is convenient
+- split files by arbitrary line count when the extraction does not clarify ownership, reviewability, or deletion path
+- mix behavior changes with large decomposition unless the active plan explicitly scopes that risk and validation covers both
 
 ## Mandatory Handoff Block
 

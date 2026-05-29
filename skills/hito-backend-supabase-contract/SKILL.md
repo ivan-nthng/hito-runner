@@ -46,6 +46,16 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 - Prefer existing canonical entities and server-action patterns over parallel models.
 - In the final report, call out when the diff stayed intentionally minimal or when a larger diff was unavoidable.
 
+## Large File Decomposition Gate
+
+- Before adding substantial backend logic, check whether the target file is already large or mixed-responsibility.
+- If a file is roughly 700+ lines and the change adds a new responsibility, either extract a focused seam or explicitly justify why that file remains the correct owner.
+- Files around 1000+ lines should not receive new responsibility without an architecture reason in the plan or final report.
+- Files around 1500+ lines are active decomposition candidates unless they are generated, fixture-only, or intentionally consolidated documentation.
+- Extract by stable backend responsibility: schema/types, validation, normalization, persistence, orchestration, metrics/policy, AI prompt/schema, fixtures, or script assertions.
+- Keep public facades stable during decomposition unless the active plan explicitly changes the import contract.
+- Do not split by arbitrary line count, and do not combine broad decomposition with behavior changes unless the active plan explicitly scopes both.
+
 ## Hito Backend Rules
 
 - Supabase canonical truth must not be bypassed by local fallback truth.

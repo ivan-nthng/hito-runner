@@ -40,6 +40,7 @@ export interface StructuredConstructorState {
   goalDistance: GoalDistance;
   goalStyle: GoalStyle;
   targetTime: string;
+  startDate: string;
   targetDate: string;
   terrainFocus: TerrainFocus;
   watchAccess: WatchAccess;
@@ -160,6 +161,7 @@ export function buildStructuredInput({
   goalDistance,
   goalStyle,
   targetTime,
+  startDate,
   targetDate,
   terrainFocus,
   watchAccess,
@@ -214,6 +216,7 @@ export function buildStructuredInput({
 
   const trimmed5kTime = recent5kTime.trim();
   const trimmedTargetTime = targetTime.trim();
+  const trimmedStartDate = startDate.trim();
   const trimmedTargetDate = targetDate.trim();
   const trimmedComment = comment.trim();
 
@@ -223,6 +226,25 @@ export function buildStructuredInput({
 
   if (goalStyle === "target_time" && !trimmedTargetTime) {
     return { ok: false, error: "Target time is required when goal style is target time." };
+  }
+
+  if (!isIsoDateInput(trimmedStartDate)) {
+    return { ok: false, error: "Use YYYY-MM-DD for the plan start date." };
+  }
+
+  if (trimmedTargetDate && !isIsoDateInput(trimmedTargetDate)) {
+    return { ok: false, error: "Use YYYY-MM-DD for the target date." };
+  }
+
+  if (
+    goalStyle === "target_time" &&
+    trimmedTargetDate &&
+    diffIsoCalendarDays(trimmedTargetDate, trimmedStartDate) < 6
+  ) {
+    return {
+      ok: false,
+      error: "Target date must be at least 7 days after the plan start date.",
+    };
   }
 
   return {
@@ -247,6 +269,10 @@ export function buildStructuredInput({
         goalStyle,
         terrainFocus,
         targetTime: goalStyle === "target_time" ? trimmedTargetTime : null,
+        targetDate: goalStyle === "target_time" ? trimmedTargetDate || null : null,
+      },
+      schedule: {
+        startDate: trimmedStartDate,
         targetDate: goalStyle === "target_time" ? trimmedTargetDate || null : null,
       },
       execution: {
@@ -353,6 +379,15 @@ export function buildVoiceSupplementFromConstructorState({
   return supplement;
 }
 
+export function todayIsoDateInput() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export function deriveRunningDaysPerWeek(fixedRestDays: WeekdayName[]) {
   const allowedDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
 
@@ -392,6 +427,7 @@ export function isStructuredConstructorReady({
   maxRunningDaysPerWeek,
   goalStyle,
   targetTime,
+  startDate,
 }: Pick<
   StructuredConstructorState,
   | "age"
@@ -404,6 +440,7 @@ export function isStructuredConstructorReady({
   | "maxRunningDaysPerWeek"
   | "goalStyle"
   | "targetTime"
+  | "startDate"
 >) {
   const profileComplete =
     requiredNumber(age, "Age", { min: 13, max: 100, integer: true }).ok &&
@@ -421,9 +458,15 @@ export function isStructuredConstructorReady({
     runningDaysPerWeek >= 1 &&
     runningDaysPerWeek <= WEEKDAY_OPTIONS.length - fixedRestDays.length;
   const targetComplete = goalStyle !== "target_time" || Boolean(targetTime.trim());
+  const hasStartDate = Boolean(startDate.trim());
 
   return (
-    profileComplete && benchmarkComplete && hasTrainingDay && runningDayCountValid && targetComplete
+    profileComplete &&
+    benchmarkComplete &&
+    hasTrainingDay &&
+    runningDayCountValid &&
+    targetComplete &&
+    hasStartDate
   );
 }
 
@@ -464,6 +507,31 @@ function parseDurationSeconds(value: string) {
   }
 
   return hours * 3600 + minutes * 60 + seconds;
+}
+
+function isIsoDateInput(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [yearPart, monthPart, dayPart] = value.split("-");
+  const year = Number(yearPart);
+  const month = Number(monthPart);
+  const day = Number(dayPart);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return false;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
+}
+
+function diffIsoCalendarDays(a: string, b: string) {
+  return Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
 }
 
 export function formatTerrainFocus(terrainFocus: NonNullable<TerrainFocus>) {

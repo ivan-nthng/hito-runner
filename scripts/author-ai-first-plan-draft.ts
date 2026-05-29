@@ -14,6 +14,9 @@ import {
   AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
   type AiFirstPlanBlueprint,
 } from "../src/lib/ai-first-plan-blueprint-authoring";
+import { buildMockAiFirstPlanEnvelope } from "../src/lib/ai-first-plan-envelope-policy";
+import { expandAiFirstPlanEnvelopeToTrainingPlan } from "../src/lib/ai-first-plan-envelope-expand";
+import { buildAiFirstPlanEnvelopeTrace } from "../src/lib/ai-first-plan-envelope-trace";
 import type { TrainingPlanV2 } from "../src/lib/imported-plan";
 import { resolveCanonicalWorkoutModel } from "../src/lib/rich-workout-model";
 import {
@@ -25,15 +28,22 @@ import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
 } from "../src/lib/structured-plan-authoring";
+import { resolveAiFirstPlanBlueprintHorizonStrategy } from "../src/lib/ai-first-plan-blueprint-horizon";
 import { addDaysIso, type Step, type StepPrescription } from "../src/lib/training";
 
 type ParsedArgs = Record<string, string | true>;
-type ScriptMode = "mock" | "mock_invalid" | "mock_timeout" | "live";
+type ScriptMode = "mock" | "mock_invalid" | "mock_partial" | "mock_timeout" | "live";
+type ScriptContractMode = AiFirstPlanGenerationContract | "envelope";
 type FixtureKind =
   | "one_week_smoke"
   | "compact_smoke"
   | "balanced_half"
+  | "five_k_short"
+  | "ten_k_short"
   | "marathon_balanced"
+  | "marathon_target_long"
+  | "ultra_trail"
+  | "mountain_trail"
   | "full_half"
   | "identity_coverage";
 
@@ -110,6 +120,20 @@ const maxOutputTokens = parsePositiveIntegerOption(options["max-output-tokens"])
 const authoringInput = resolveAuthoringInput(input, inputKind);
 const includeCoachSample = hasFlag(options, "coach-sample");
 const includeBlueprintTrace = hasFlag(options, "trace-blueprint");
+const includeEnvelopeTrace = contractMode === "envelope" || hasFlag(options, "trace-envelope");
+
+if (contractMode === "envelope") {
+  runEnvelopeContractAndExit({
+    mode,
+    fixtureKind,
+    inputKind,
+    referenceIncluded: Boolean(referenceExample),
+    authoringInput,
+    includeEnvelopeTrace,
+  });
+  process.exit(0);
+}
+
 const fetchImpl =
   mode === "live"
     ? undefined
@@ -256,9 +280,14 @@ function resolveAuthoringInput(input: unknown, inputKind: AiFirstPlanDraftServic
 function buildMockOpenAiFetch(
   mode: Exclude<ScriptMode, "live">,
   authoringInput: StructuredFirstPlanAuthoringInput,
-  contractMode: AiFirstPlanGenerationContract,
+  contractMode: Exclude<ScriptContractMode, "envelope">,
   fixtureKind: FixtureKind,
 ) {
+  const requestAuthoringInput =
+    contractMode === "blueprint"
+      ? resolveAiFirstPlanBlueprintHorizonStrategy({ authoringInput }).openAiAuthoringInput
+      : authoringInput;
+
   if (mode === "mock_timeout") {
     return (async () => new Promise<Response>(() => undefined)) as typeof fetch;
   }
@@ -281,18 +310,186 @@ function buildMockOpenAiFetch(
       );
     }
 
+    if (mode === "mock_partial") {
+      const blueprint = buildMockAiFirstPlanBlueprint(
+        requestAuthoringInput,
+        buildStructuredAuthoringPlan(requestAuthoringInput),
+      );
+
+      return openAiFixtureResponse("mock-partial-ai-first-plan", {
+        ...blueprint,
+        weeks: blueprint.weeks.slice(0, Math.min(5, blueprint.weeks.length)),
+      });
+    }
+
     return openAiFixtureResponse(
       "mock-ai-first-plan",
       contractMode === "blueprint"
         ? fixtureKind === "identity_coverage"
-          ? buildMockAiFirstPlanIdentityCoverageBlueprint(authoringInput)
+          ? buildMockAiFirstPlanIdentityCoverageBlueprint(requestAuthoringInput)
           : buildMockAiFirstPlanBlueprint(
-              authoringInput,
-              buildStructuredAuthoringPlan(authoringInput),
+              requestAuthoringInput,
+              buildStructuredAuthoringPlan(requestAuthoringInput),
             )
         : buildMockAiFirstPlanDraft(authoringInput, buildStructuredAuthoringPlan(authoringInput)),
     );
   }) as typeof fetch;
+}
+
+function runEnvelopeContractAndExit({
+  mode,
+  fixtureKind,
+  inputKind,
+  referenceIncluded,
+  authoringInput,
+  includeEnvelopeTrace,
+}: {
+  mode: ScriptMode;
+  fixtureKind: FixtureKind;
+  inputKind: AiFirstPlanDraftServiceInputKind;
+  referenceIncluded: boolean;
+  authoringInput: StructuredFirstPlanAuthoringInput;
+  includeEnvelopeTrace: boolean;
+}) {
+  const envelope =
+    mode === "mock_invalid"
+      ? buildInvalidMockEnvelope()
+      : buildMockAiFirstPlanEnvelope(authoringInput);
+  const result =
+    mode === "live" || mode === "mock_timeout" || mode === "mock_partial"
+      ? ({
+          ok: false,
+          reason:
+            mode === "live"
+              ? "ai_first_plan_envelope_invalid"
+              : "ai_first_plan_envelope_expansion_failed",
+          issues: [
+            {
+              code:
+                mode === "live" ? "envelope_non_live_contract" : "envelope_mock_mode_not_supported",
+              message:
+                mode === "live"
+                  ? "ai-first-plan-envelope-v1 is non-live foundation only in this slice."
+                  : "Envelope proof supports mock-openai and mock-invalid only.",
+            },
+          ],
+        } as const)
+      : expandAiFirstPlanEnvelopeToTrainingPlan({ envelope, authoringInput });
+  const sizeComparison = buildEnvelopeSizeComparison(envelope, authoringInput);
+  const envelopeTrace = includeEnvelopeTrace
+    ? buildAiFirstPlanEnvelopeTrace({
+        envelope,
+        authoringInput,
+        result,
+        sizeComparison,
+      })
+    : undefined;
+
+  if (!result.ok) {
+    console.log(
+      JSON.stringify(
+        {
+          ok: false,
+          mode,
+          contractMode: "envelope",
+          inputKind,
+          fixture: fixtureKind,
+          referenceIncluded,
+          reason: result.reason,
+          issues: result.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
+          sourceKind: "ai_first_plan_envelope_v1",
+          sourceStatus: "envelope_unavailable",
+          fallbackReason: result.reason,
+          validationIssueCount: result.issues.length,
+          envelopeTrace,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        mode,
+        contractMode: "envelope",
+        inputKind,
+        fixture: fixtureKind,
+        referenceIncluded,
+        persisted: false,
+        planName: result.canonicalPlan.plan_name,
+        schemaVersion: result.canonicalPlan.schema_version,
+        sourceKind: result.canonicalPlan.source_kind,
+        sourceStatus: result.metadata.sourceStatus,
+        fallbackReason: null,
+        validationIssueCount: result.metadata.validationIssueCount,
+        validationIssues: result.metadata.validationIssues,
+        repairs: result.metadata.repairs,
+        workoutCount: result.canonicalPlan.planned_workouts.length,
+        weekCount: countWeeks(result.canonicalPlan),
+        sampleWeeks: buildSampleWeeks(result.canonicalPlan),
+        envelopeTrace,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+function buildInvalidMockEnvelope() {
+  return {
+    schemaVersion: "ai-first-plan-envelope-v1",
+    planName: "Invalid mock planning envelope",
+    goal: { family: "m", style: "tt" },
+    horizonWeeks: 29,
+    weeklyRhythm: {
+      runDays: 5,
+      longRunDay: "we",
+      qualityFrequency: "w",
+      specialtyFrequency: "w",
+      supportBias: "easy",
+    },
+    longRunProgression: {
+      mode: "specific",
+      cutbackEveryWeeks: 4,
+      taperWeeks: 3,
+      peakIntent: "Invalid envelope intentionally violates rest and cadence safety.",
+    },
+    qualityEmphasis: { primary: "marathon", secondary: ["race"] },
+    terrainSupport: { terrain: "roll", support: "mob", downhillCaution: false },
+    metricGuidance: "mixed",
+    phases: [],
+    reviewAssumptions: [],
+  };
+}
+
+function buildEnvelopeSizeComparison(
+  envelope: unknown,
+  authoringInput: StructuredFirstPlanAuthoringInput,
+) {
+  const horizonStrategy = resolveAiFirstPlanBlueprintHorizonStrategy({
+    authoringInput,
+    referenceExample: null,
+  });
+  const fullBlueprint = buildMockAiFirstPlanBlueprint(
+    authoringInput,
+    buildStructuredAuthoringPlan(authoringInput),
+  );
+  const boundedBlueprint = buildMockAiFirstPlanBlueprint(
+    horizonStrategy.openAiAuthoringInput,
+    buildStructuredAuthoringPlan(horizonStrategy.openAiAuthoringInput),
+  );
+
+  return {
+    envelopeOutputChars: JSON.stringify(envelope).length,
+    blueprintFullOutputChars: JSON.stringify(fullBlueprint).length,
+    blueprintBoundedOutputChars: JSON.stringify(boundedBlueprint).length,
+    blueprintPromptCharEstimateBefore: horizonStrategy.promptCharEstimateBefore,
+    blueprintPromptCharEstimateAfter: horizonStrategy.promptCharEstimateAfter,
+  };
 }
 
 function buildMockAiFirstPlanBlueprint(
@@ -1150,6 +1347,13 @@ function buildBlueprintTraceOutput({
       elapsedMs: trace.elapsedMs,
       requestPhase: result.metadata.debug.requestPhase,
       abortFired: result.metadata.debug.abortFired,
+      openAiElapsedMs: result.metadata.debug.openAiElapsedMs,
+      responseStatus: result.metadata.debug.responseStatus,
+      responseIncompleteReason: result.metadata.debug.responseIncompleteReason,
+      inputTokens: result.metadata.debug.inputTokens,
+      outputTokens: result.metadata.debug.outputTokens,
+      totalTokens: result.metadata.debug.totalTokens,
+      outputTextChars: result.metadata.debug.outputTextChars,
     },
     requiredCadenceByWeek: trace.requiredCadenceSlots.map((slot) => ({
       weekNumber: slot.weekNumber,
@@ -1159,6 +1363,8 @@ function buildBlueprintTraceOutput({
       identityOptions: slot.identityOptions,
       purpose: slot.purpose,
     })),
+    blueprintCompleteness: trace.blueprintCompleteness ?? null,
+    blueprintHorizonStrategy: trace.blueprintHorizonStrategy ?? null,
     authoredBlueprintIdentitiesByWeek: trace.authoredBlueprintWeeks.map((week) => ({
       weekNumber: week.weekNumber,
       phase: week.phase,
@@ -1236,6 +1442,13 @@ function buildBlueprintUnavailableTraceOutput({
       elapsedMs: trace.elapsedMs,
       requestPhase: result.metadata.debug.requestPhase,
       abortFired: result.metadata.debug.abortFired,
+      openAiElapsedMs: result.metadata.debug.openAiElapsedMs,
+      responseStatus: result.metadata.debug.responseStatus,
+      responseIncompleteReason: result.metadata.debug.responseIncompleteReason,
+      inputTokens: result.metadata.debug.inputTokens,
+      outputTokens: result.metadata.debug.outputTokens,
+      totalTokens: result.metadata.debug.totalTokens,
+      outputTextChars: result.metadata.debug.outputTextChars,
     },
     requiredCadenceByWeek: trace.requiredCadenceSlots.map((slot) => ({
       weekNumber: slot.weekNumber,
@@ -1245,6 +1458,8 @@ function buildBlueprintUnavailableTraceOutput({
       identityOptions: slot.identityOptions,
       purpose: slot.purpose,
     })),
+    blueprintCompleteness: trace.blueprintCompleteness ?? null,
+    blueprintHorizonStrategy: trace.blueprintHorizonStrategy ?? null,
     authoredBlueprintIdentitiesByWeek: trace.authoredBlueprintWeeks.map((week) => ({
       weekNumber: week.weekNumber,
       phase: week.phase,
@@ -1483,6 +1698,26 @@ function buildDefaultAuthoringInput(fixtureKind: FixtureKind) {
     return buildMarathonBalancedAuthoringInput();
   }
 
+  if (fixtureKind === "marathon_target_long") {
+    return buildMarathonTargetLongAuthoringInput();
+  }
+
+  if (fixtureKind === "five_k_short") {
+    return buildShortRoadPerformanceAuthoringInput("5k");
+  }
+
+  if (fixtureKind === "ten_k_short") {
+    return buildShortRoadPerformanceAuthoringInput("10k");
+  }
+
+  if (fixtureKind === "ultra_trail") {
+    return buildUltraTrailAuthoringInput();
+  }
+
+  if (fixtureKind === "mountain_trail") {
+    return buildMountainTrailAuthoringInput();
+  }
+
   return {
     goal: {
       goalType: "half_marathon",
@@ -1529,6 +1764,194 @@ function buildDefaultAuthoringInput(fixtureKind: FixtureKind) {
       strengthOrMobilityInterest: "mobility",
       indoorTreadmillOk: false,
       notes: "Ops smoke fixture for AI-authored first-plan draft validation.",
+    },
+    execution: {
+      watchAccess: "watch_or_app",
+      guidancePreference: "mixed",
+    },
+  } satisfies StructuredFirstPlanAuthoringInput;
+}
+
+function buildShortRoadPerformanceAuthoringInput(goalType: "5k" | "10k") {
+  const goalLabel = goalType === "5k" ? "5K · Balanced" : "10K · Balanced";
+
+  return {
+    goal: {
+      goalType,
+      goalLabel,
+      goalStyle: "balanced",
+      targetTime: null,
+      targetEventName: null,
+    },
+    schedule: {
+      startDate: "2026-05-29",
+      targetDate: null,
+      preparationHorizonWeeks: 8,
+    },
+    runnerProfile: {
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 4,
+      baselineLongRunKm: null,
+      baselineLongRunDurationMin: 55,
+      age: 36,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "mixed",
+    },
+    currentLevel: {
+      recentResultSummary: "Recent 5K benchmark supports broad training guidance.",
+      recentRaceResults: [],
+      recent5kPaceSecondsPerKm: 330,
+      currentEasyPaceRange: null,
+      currentTrainingLoadSummary: null,
+    },
+    availability: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Saturday"],
+      unavailableDays: ["Wednesday", "Friday", "Sunday"],
+      maxRunningDaysPerWeek: 4,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Saturday",
+    },
+    constraints: {
+      injuryConstraints: [],
+      hardConstraints: [],
+    },
+    preferences: {
+      preferredWorkoutMix: "balanced",
+      terrainFocus: "standard",
+      strengthOrMobilityInterest: "mobility",
+      indoorTreadmillOk: false,
+      notes: "Short road-performance envelope fixture.",
+    },
+    execution: {
+      watchAccess: "watch_or_app",
+      guidancePreference: "mixed",
+    },
+  } satisfies StructuredFirstPlanAuthoringInput;
+}
+
+function buildUltraTrailAuthoringInput() {
+  return {
+    ...buildMountainTrailAuthoringInput(),
+    goal: {
+      goalType: "ultra_marathon",
+      goalLabel: "Ultra · Trail durability",
+      goalStyle: "balanced",
+      targetTime: null,
+      targetEventName: null,
+    },
+    preferences: {
+      preferredWorkoutMix: "long_run_focus",
+      terrainFocus: "mountain",
+      strengthOrMobilityInterest: "mobility",
+      indoorTreadmillOk: false,
+      notes: "Ultra envelope fixture with time-on-feet durability.",
+    },
+  } satisfies StructuredFirstPlanAuthoringInput;
+}
+
+function buildMountainTrailAuthoringInput() {
+  return {
+    goal: {
+      goalType: "mountain_running",
+      goalLabel: "Mountain running · Balanced",
+      goalStyle: "balanced",
+      targetTime: null,
+      targetEventName: null,
+    },
+    schedule: {
+      startDate: "2026-05-29",
+      targetDate: null,
+      preparationHorizonWeeks: 10,
+    },
+    runnerProfile: {
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunKm: null,
+      baselineLongRunDurationMin: 75,
+      age: 36,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "rpe",
+    },
+    currentLevel: {
+      recentResultSummary: null,
+      recentRaceResults: [],
+      recent5kPaceSecondsPerKm: null,
+      currentEasyPaceRange: null,
+      currentTrainingLoadSummary: null,
+    },
+    availability: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      unavailableDays: ["Wednesday", "Sunday"],
+      maxRunningDaysPerWeek: 5,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Saturday",
+    },
+    constraints: {
+      injuryConstraints: [],
+      hardConstraints: [],
+    },
+    preferences: {
+      preferredWorkoutMix: "balanced",
+      terrainFocus: "mountain",
+      strengthOrMobilityInterest: "mobility",
+      indoorTreadmillOk: false,
+      notes: "Mountain/trail envelope fixture with terrain control.",
+    },
+    execution: {
+      watchAccess: "unknown",
+      guidancePreference: "effort",
+    },
+  } satisfies StructuredFirstPlanAuthoringInput;
+}
+
+function buildMarathonTargetLongAuthoringInput() {
+  return {
+    goal: {
+      goalType: "marathon",
+      goalLabel: "Marathon · Target-time long horizon",
+      goalStyle: "target_time",
+      targetTime: "3:50:00",
+      targetEventName: "Target marathon plan",
+    },
+    schedule: {
+      startDate: "2026-05-29",
+      targetDate: "2026-12-11",
+      preparationHorizonWeeks: null,
+    },
+    runnerProfile: {
+      experienceLevel: "new_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunKm: null,
+      baselineLongRunDurationMin: 60,
+      age: 36,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "mixed",
+    },
+    currentLevel: {
+      recentResultSummary: null,
+      recentRaceResults: [],
+      recent5kPaceSecondsPerKm: null,
+      currentEasyPaceRange: null,
+      currentTrainingLoadSummary: null,
+    },
+    availability: {
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Sunday"],
+      unavailableDays: ["Wednesday", "Saturday"],
+      maxRunningDaysPerWeek: 5,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Sunday",
+    },
+    constraints: {
+      injuryConstraints: [],
+      hardConstraints: [],
+    },
+    preferences: {
+      preferredWorkoutMix: "balanced",
+      terrainFocus: "rolling",
+      strengthOrMobilityInterest: "mobility",
+      indoorTreadmillOk: false,
+      notes:
+        "Long-horizon target-date fixture for bounded AI-authored blueprint plus backend extension.",
     },
     execution: {
       watchAccess: "watch_or_app",
@@ -1815,6 +2238,10 @@ function resolveMode(options: ParsedArgs): ScriptMode {
     return "mock_timeout";
   }
 
+  if (hasFlag(options, "mock-partial")) {
+    return "mock_partial";
+  }
+
   if (hasFlag(options, "mock-invalid")) {
     return "mock_invalid";
   }
@@ -1836,8 +2263,12 @@ function parseInputKind(value: string | true | undefined): AiFirstPlanDraftServi
   return "structured_authoring";
 }
 
-function parseContractMode(value: string | true | undefined): AiFirstPlanGenerationContract {
+function parseContractMode(value: string | true | undefined): ScriptContractMode {
   const normalized = stringOption(value);
+
+  if (normalized === "envelope") {
+    return "envelope";
+  }
 
   if (normalized === "blueprint") {
     return "blueprint";
@@ -1848,7 +2279,7 @@ function parseContractMode(value: string | true | undefined): AiFirstPlanGenerat
   }
 
   if (normalized) {
-    throw new Error("--contract must be blueprint or strict-draft.");
+    throw new Error("--contract must be blueprint, envelope, or strict-draft.");
   }
 
   return "blueprint";
@@ -1869,12 +2300,36 @@ function parseFixtureKind(value: string | true | undefined): FixtureKind {
     return "balanced_half";
   }
 
+  if (normalized === "five-k-short" || normalized === "five_k_short" || normalized === "5k-short") {
+    return "five_k_short";
+  }
+
+  if (normalized === "ten-k-short" || normalized === "ten_k_short" || normalized === "10k-short") {
+    return "ten_k_short";
+  }
+
   if (normalized === "marathon-balanced" || normalized === "marathon_balanced") {
     return "marathon_balanced";
   }
 
+  if (
+    normalized === "marathon-target-long" ||
+    normalized === "marathon_target_long" ||
+    normalized === "long-marathon-target"
+  ) {
+    return "marathon_target_long";
+  }
+
   if (normalized === "full-half" || normalized === "full_half") {
     return "full_half";
+  }
+
+  if (normalized === "ultra-trail" || normalized === "ultra_trail") {
+    return "ultra_trail";
+  }
+
+  if (normalized === "mountain-trail" || normalized === "mountain_trail") {
+    return "mountain_trail";
   }
 
   if (normalized === "identity-coverage" || normalized === "identity_coverage") {
@@ -1883,7 +2338,7 @@ function parseFixtureKind(value: string | true | undefined): FixtureKind {
 
   if (normalized) {
     throw new Error(
-      "--fixture must be one-week-smoke, compact-smoke, balanced-half, marathon-balanced, full-half, or identity-coverage.",
+      "--fixture must be one-week-smoke, compact-smoke, balanced-half, five-k-short, ten-k-short, marathon-balanced, marathon-target-long, ultra-trail, mountain-trail, full-half, or identity-coverage.",
     );
   }
 
@@ -1949,20 +2404,25 @@ function printHelp() {
     [
       "Usage:",
       "  npm run author-ai-first-plan-draft -- --mock-openai",
+      "  npm run author-ai-first-plan-draft -- --mock-partial --contract blueprint --trace-blueprint",
+      "  npm run author-ai-first-plan-draft -- --mock-openai --contract envelope --fixture marathon-target-long",
+      "  npm run author-ai-first-plan-draft -- --mock-invalid --contract envelope",
       "  npm run author-ai-first-plan-draft -- --mock-invalid",
       "  npm run author-ai-first-plan-draft -- --mock-timeout --timeout-ms 20",
       "  OPENAI_PLAN_MODEL=gpt-4.1-mini npm run author-ai-first-plan-draft -- --live --contract blueprint --fixture compact-smoke --no-reference --timeout-ms 120000 --max-output-tokens 8000",
       "  OPENAI_PLAN_MODEL=gpt-4.1-mini npm run author-ai-first-plan-draft -- --live --contract blueprint --fixture marathon-balanced --no-reference --timeout-ms 120000 --max-output-tokens 12000 --trace-blueprint",
+      "  npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --fixture marathon-target-long --trace-blueprint",
       "",
       "Options:",
       "  --live                         Use the real OpenAI Responses API.",
       "  --mock-openai                  Use deterministic mock OpenAI output. This is the default.",
       "  --mock-invalid                 Use invalid mock output and verify blueprint-unavailable failure.",
+      "  --mock-partial                 Simulate truncated partial blueprint output and verify incomplete-blueprint failure.",
       "  --mock-timeout                 Simulate a hung OpenAI request and verify blueprint-unavailable failure.",
       "  --input-file <path>            JSON structured authoring input or onboarding input.",
       "  --input-kind <kind>            structured_authoring or structured_onboarding.",
-      "  --contract <kind>              blueprint (default) or strict-draft diagnostic.",
-      "  --fixture <kind>               one-week-smoke, compact-smoke, balanced-half, marathon-balanced, full-half, or identity-coverage when no input file is supplied.",
+      "  --contract <kind>              blueprint (default), envelope non-live proof, or strict-draft diagnostic.",
+      "  --fixture <kind>               one-week-smoke, compact-smoke, balanced-half, five-k-short, ten-k-short, marathon-balanced, marathon-target-long, ultra-trail, mountain-trail, full-half, or identity-coverage when no input file is supplied.",
       "  --reference-file <path>        Optional rich reference JSON for prompt style guidance.",
       "  --no-reference                 Omit reference-style guidance for compact live latency smoke.",
       "  --timeout-ms <number>          Bounded OpenAI timeout. Default: 45000.",

@@ -96,7 +96,14 @@ QA validation / <specific checkpoint>
 
 <browser requirement or backend-only reason browser is not used>
 
-5. Validation coverage
+5. QA Execution Authority
+
+QA must execute this validation directly. Run the required CLI/build/script/browser/dev-server/local
+fixture checks needed to prove the scope. Do not return another handoff prompt merely because the
+validation uses commands, browser tooling, screenshots, local artifacts, or disposable local/test
+fixtures. Do not edit product code or implement fixes; report failures with evidence.
+
+6. Validation coverage
 
 Read/inspect:
 - <file>
@@ -104,21 +111,36 @@ Read/inspect:
 Run:
 - <command>
 
-6. Required behavior proof
+7. Required behavior proof
 
 <exact invariants, counts, statuses, and boundaries to verify>
 
-7. Report format
+8. Report format
 
 Return:
 1. Task
 2. Stage
 3. Browser Path Preflight
-4. Validation coverage
-5. Issues found
-6. Coverage gaps
-7. Verdict: Passed or Failed
+4. QA Execution Authority
+5. Validation coverage
+6. Issues found
+7. Coverage gaps
+8. Verdict: Passed or Failed
 ```
+
+QA handoff wording rule:
+
+- Do not write that the current role cannot perform QA inside the user-facing handoff shell or
+  inside the QA prompt.
+- Do not write variants such as "this orchestration role cannot run browser/CLI QA", "I cannot run
+  QA here", or "the correct step is QA because this role is forbidden to validate".
+- In `Where we are`, write the positive state instead: `Ready for direct QA validation.`
+- In `What we do next`, write the positive action instead: `Hand this to QA to execute the
+  validation directly using the required safe testing tools.`
+- Do not imply QA should pass validation to another agent because commands, scripts, browser checks,
+  dev servers, screenshots, or local/test fixtures are needed.
+- The exact QA prompt should explicitly say that QA may do anything necessary for testing within
+  safe local/dev/test validation boundaries, while not implementing product fixes.
 
 ## Output
 

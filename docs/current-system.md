@@ -193,10 +193,10 @@
   adds `runner_profiles.training_preferences jsonb` for bounded runner-level training defaults using plan-preference-compatible keys such as `blocked_days`, `preferred_long_run_day`, and `max_running_days_per_week`
 - `supabase/migrations/20260528190000_admin_capture_backlog.sql`
   adds the first admin capture backlog storage foundation:
-  RLS-enabled `admin_capture_items` and `admin_capture_assets` tables plus a private `admin-capture-assets` bucket; no public policies are added, so runner/public clients cannot directly read or write backlog truth and all current access goes through admin-verified service-role server seams
+  RLS-enabled `admin_capture_items` storage for text/metadata capture truth; the earlier unused screenshot asset table is removed by `supabase/migrations/20260601110000_remove_admin_capture_assets.sql`, and the empty `admin-capture-assets` bucket is removed through the Supabase Storage API because direct storage catalog deletion is not allowed, so runner/public clients cannot directly read or write backlog truth and all current access goes through admin-verified service-role server seams
 - `scripts/validate-admin-capture-backlog.ts`
   owns the backend proof harness for the capture backlog:
-  the default deterministic mode verifies admin create/list/read/update, non-admin rejection, deterministic prompt generation, archived-list behavior, and metadata redaction; `--live-supabase` / `npm run validate-admin-capture-backlog:live` probes the linked Supabase project for table and bucket availability, service-role operations, publishable-key RLS blocking, and disposable-row cleanup without printing secrets
+  the default deterministic mode verifies admin create/list/read/update, non-admin rejection, deterministic prompt generation, archived-list behavior, and metadata redaction; `--live-supabase` / `npm run validate-admin-capture-backlog:live` probes the linked Supabase project for item-table availability, absence of the retired asset table/bucket, service-role operations, publishable-key RLS blocking, and disposable-row cleanup without printing secrets
 
 ## State And Lifecycle Rules
 

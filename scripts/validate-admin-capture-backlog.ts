@@ -11,7 +11,7 @@ import {
   updateAdminCaptureItemNoteForDependencies,
   type AdminCaptureDependencies,
   type AdminCaptureRepository,
-  type AdminCaptureRowWithAssets,
+  type AdminCaptureRow,
 } from "../src/lib/admin-capture.server";
 import { updateAdminCaptureItemTriageForDependencies } from "../src/lib/admin-capture.server";
 import type { AdminCaptureResult } from "../src/lib/admin-capture";
@@ -26,11 +26,11 @@ type LiveProbeStep = {
 };
 
 class MemoryAdminCaptureRepository implements AdminCaptureRepository {
-  #items = new Map<string, AdminCaptureRowWithAssets>();
+  #items = new Map<string, AdminCaptureRow>();
 
-  async createItem(input: ItemInsert): Promise<AdminCaptureRowWithAssets> {
+  async createItem(input: ItemInsert): Promise<AdminCaptureRow> {
     const now = "2026-05-28T12:00:00.000Z";
-    const row: AdminCaptureRowWithAssets = {
+    const row: AdminCaptureRow = {
       id: input.id ?? randomUUID(),
       item_type: input.item_type,
       status: input.status ?? "new",
@@ -53,7 +53,6 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
       created_at: input.created_at ?? now,
       updated_at: input.updated_at ?? now,
       archived_at: input.archived_at ?? null,
-      admin_capture_assets: [],
     };
 
     this.#items.set(row.id, row);
@@ -69,7 +68,7 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
     itemType?: string | null;
     priority?: string | null;
     targetRole?: string | null;
-  }): Promise<AdminCaptureRowWithAssets[]> {
+  }): Promise<AdminCaptureRow[]> {
     const search = input.search?.toLowerCase() ?? null;
 
     return Array.from(this.#items.values())
@@ -90,18 +89,18 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
       .slice(0, input.limit);
   }
 
-  async getItem(id: string): Promise<AdminCaptureRowWithAssets | null> {
+  async getItem(id: string): Promise<AdminCaptureRow | null> {
     return this.#items.get(id) ?? null;
   }
 
-  async updateItem(id: string, patch: ItemUpdate): Promise<AdminCaptureRowWithAssets | null> {
+  async updateItem(id: string, patch: ItemUpdate): Promise<AdminCaptureRow | null> {
     const existing = this.#items.get(id);
 
     if (!existing) {
       return null;
     }
 
-    const updated: AdminCaptureRowWithAssets = {
+    const updated: AdminCaptureRow = {
       ...existing,
       archived_at: patch.archived_at === undefined ? existing.archived_at : patch.archived_at,
       item_type: patch.item_type ?? existing.item_type,
@@ -384,8 +383,8 @@ async function runLiveSupabaseProbe() {
   const steps: LiveProbeStep[] = [];
 
   await probeTableExists(serviceClient, "admin_capture_items", steps);
-  await probeTableExists(serviceClient, "admin_capture_assets", steps);
-  await probePrivateBucket(serviceClient, steps);
+  await probeLegacyTableAbsent(serviceClient, "admin_capture_assets", steps);
+  await probeLegacyBucketAbsent(serviceClient, steps);
 
   const schemaReady = steps.every((step) => step.ok);
   let createdItemId: string | null = null;
@@ -623,7 +622,7 @@ async function runLiveSupabaseProbe() {
 
 async function probeTableExists(
   client: ReturnType<typeof createClient<Database>>,
-  table: "admin_capture_items" | "admin_capture_assets",
+  table: "admin_capture_items",
   steps: LiveProbeStep[],
 ) {
   const error = await retryPostgrestSchemaProbe(async () => {
@@ -638,18 +637,44 @@ async function probeTableExists(
   });
 }
 
-async function probePrivateBucket(
+async function probeLegacyTableAbsent(
+  client: ReturnType<typeof createClient<Database>>,
+  table: string,
+  steps: LiveProbeStep[],
+) {
+  const untypedClient = client as unknown as ReturnType<typeof createClient>;
+  const error = await retryPostgrestSchemaProbe(async () => {
+    const result = await untypedClient.from(table).select("id").limit(1);
+    return result.error;
+  });
+
+  steps.push({
+    name: `${table}_legacy_absent`,
+    ok: error?.code === "PGRST205",
+    detail:
+      error?.code === "PGRST205"
+        ? "legacy asset table is absent from service-role PostgREST"
+        : error
+          ? classifySupabaseError(error)
+          : "legacy asset table still exists",
+  });
+}
+
+async function probeLegacyBucketAbsent(
   client: ReturnType<typeof createClient<Database>>,
   steps: LiveProbeStep[],
 ) {
   const { data, error } = await client.storage.getBucket("admin-capture-assets");
 
   steps.push({
-    name: "admin_capture_assets_bucket_exists_private",
-    ok: !error && data?.public === false,
-    detail: error
-      ? classifySupabaseError(error)
-      : `bucket exists with public=${String(data?.public)}`,
+    name: "admin_capture_assets_bucket_legacy_absent",
+    ok: Boolean(error) && /not found/i.test(error.message),
+    detail:
+      error && /not found/i.test(error.message)
+        ? "legacy admin-capture-assets bucket is absent"
+        : error
+          ? classifySupabaseError(error)
+          : `legacy bucket still exists with public=${String(data?.public)}`,
   });
 }
 
@@ -746,7 +771,7 @@ function classifySupabaseError(error: { code?: string; message?: string; statusC
   }
 
   if (/bucket not found/i.test(message) || code === "404") {
-    return "bucket_missing: admin-capture-assets is not available";
+    return "bucket_missing";
   }
 
   if (/row-level security|permission denied|not authorized|jwt|rls/i.test(message)) {

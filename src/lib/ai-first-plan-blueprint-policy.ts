@@ -1,6 +1,12 @@
 import { addDaysIso, diffDaysIso, weekdayLong } from "@/lib/training";
 import type { StructuredAuthoringInput } from "@/lib/ai-first-plan-blueprint-schema";
 import { type AuthoredWorkoutIdentity, weekdayIndex } from "@/lib/ai-first-plan-blueprint-taxonomy";
+import {
+  resolveSupportedIntensityCadence,
+  resolveSupportedSpecificityIdentityOptions,
+  shouldScheduleSupportedIntensityWeek,
+  shouldUseLongRunSteadyFinishAsSpecificStimulus,
+} from "@/lib/structured-plan-authoring-policy";
 
 export type GoalFamilyPolicyKey =
   | "beginner_consistency"
@@ -404,14 +410,19 @@ export function buildRequiredCadenceSlots(
     }
 
     const weekStart = addDaysIso(authoringInput.schedule.startDate, weekIndex * 7);
+    const slotWeekday =
+      preferredLongRunDay &&
+      shouldUseLongRunSteadyFinishAsSpecificStimulus(authoringInput, weekNumber)
+        ? preferredLongRunDay
+        : cadenceWeekday;
     const cadenceDate = Array.from({ length: 7 }, (_day, dayIndex) =>
       addDaysIso(weekStart, dayIndex),
-    ).find((date) => weekdayLong(date) === cadenceWeekday);
+    ).find((date) => weekdayLong(date) === slotWeekday);
 
     if (cadenceDate) {
       slots.set(weekNumber, {
         date: cadenceDate,
-        weekday: cadenceWeekday,
+        weekday: slotWeekday,
         kind: policy.cadence.kind,
         identityOptions: cadenceIdentityOptionsForGoal(authoringInput, policy, weekNumber),
         purpose: cadencePurposeForGoal(authoringInput, policy, weekNumber),
@@ -448,6 +459,16 @@ export function isGoalFamilyCadencePlan(
   authoringInput: StructuredAuthoringInput,
   policy: GoalFamilyIdentityPolicy,
 ) {
+  const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput);
+
+  if (supportedIntensityCadence.applies) {
+    if (supportedIntensityCadence.frequency === "none") {
+      return false;
+    }
+
+    return Boolean(resolveGoalFamilyCadenceWeekday(authoringInput, policy));
+  }
+
   if (policy.cadence.frequency === "none") {
     return false;
   }
@@ -504,6 +525,24 @@ function buildPromptGoalFamilyCadencePolicy(
   authoringInput: StructuredAuthoringInput,
   policy: GoalFamilyIdentityPolicy,
 ) {
+  const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput);
+
+  if (supportedIntensityCadence.applies) {
+    if (supportedIntensityCadence.frequency === "none") {
+      return {
+        kind: "none",
+        frequency: "none",
+        reason: supportedIntensityCadence.reason,
+      };
+    }
+
+    return {
+      kind: policy.cadence.kind,
+      frequency: supportedIntensityCadence.frequency,
+      reason: supportedIntensityCadence.reason,
+    };
+  }
+
   if (!isGoalFamilyCadencePlan(authoringInput, policy)) {
     return {
       kind: "none",
@@ -529,6 +568,16 @@ function shouldRequireGoalFamilyCadenceSlot(
   policy: GoalFamilyIdentityPolicy,
   weekNumber: number,
 ) {
+  const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput, weekNumber);
+
+  if (supportedIntensityCadence.applies) {
+    return shouldScheduleSupportedIntensityWeek(
+      authoringInput,
+      weekNumber,
+      supportedIntensityCadence,
+    );
+  }
+
   if (isBalancedHalfMarathonCadencePlan(authoringInput, policy)) {
     return weekNumber >= 2 && weekNumber % 2 === 0;
   }
@@ -580,6 +629,19 @@ function chooseGoalFamilyCadenceWeekday(
   return candidateOrder.find((weekday) => candidateWeekdays.includes(weekday)) ?? null;
 }
 
+function resolveGoalFamilyCadenceWeekday(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+) {
+  const fixedRestDays = new Set(authoringInput.availability.unavailableDays);
+  const runningDays = authoringInput.availability.preferredRunningDays.filter(
+    (day) => !fixedRestDays.has(day),
+  );
+  const preferredLongRunDay = authoringInput.availability.preferredLongRunDay ?? null;
+
+  return chooseGoalFamilyCadenceWeekday(policy, runningDays, preferredLongRunDay);
+}
+
 function scoreCadenceWeekdaySafety(weekday: string, preferredLongRunDay: string) {
   const weekdayOffset = forwardWeekdayOffset(preferredLongRunDay, weekday);
   const reverseOffset = forwardWeekdayOffset(weekday, preferredLongRunDay);
@@ -606,6 +668,18 @@ function cadenceIdentityOptionsForGoal(
   policy: GoalFamilyIdentityPolicy,
   weekNumber: number,
 ) {
+  const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput, weekNumber);
+
+  if (supportedIntensityCadence.applies) {
+    const supportedOptions = resolveSupportedSpecificityIdentityOptions(
+      authoringInput,
+      weekNumber,
+      supportedIntensityCadence,
+    );
+
+    return supportedOptions.filter((identity) => policy.allowedIdentities.has(identity));
+  }
+
   const isFinalTwoWeeks =
     weekNumber >= Math.max(1, resolveAuthoringHorizonWeeks(authoringInput) - 1);
 
@@ -647,6 +721,12 @@ function cadencePurposeForGoal(
   policy: GoalFamilyIdentityPolicy,
   weekNumber: number,
 ) {
+  const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput, weekNumber);
+
+  if (supportedIntensityCadence.applies) {
+    return `Beginner/recreational cadence ladder: ${supportedIntensityCadence.reason}`;
+  }
+
   const isFinalTwoWeeks =
     weekNumber >= Math.max(1, resolveAuthoringHorizonWeeks(authoringInput) - 1);
 

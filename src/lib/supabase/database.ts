@@ -8,56 +8,6 @@ export type Database = {
   };
   public: {
     Tables: {
-      admin_capture_assets: {
-        Row: {
-          asset_kind: string;
-          byte_size: number | null;
-          capture_item_id: string;
-          checksum: string | null;
-          created_at: string;
-          height: number | null;
-          id: string;
-          mime_type: string;
-          storage_bucket: string;
-          storage_path: string;
-          width: number | null;
-        };
-        Insert: {
-          asset_kind: string;
-          byte_size?: number | null;
-          capture_item_id: string;
-          checksum?: string | null;
-          created_at?: string;
-          height?: number | null;
-          id?: string;
-          mime_type: string;
-          storage_bucket: string;
-          storage_path: string;
-          width?: number | null;
-        };
-        Update: {
-          asset_kind?: string;
-          byte_size?: number | null;
-          capture_item_id?: string;
-          checksum?: string | null;
-          created_at?: string;
-          height?: number | null;
-          id?: string;
-          mime_type?: string;
-          storage_bucket?: string;
-          storage_path?: string;
-          width?: number | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "admin_capture_assets_capture_item_id_fkey";
-            columns: ["capture_item_id"];
-            isOneToOne: false;
-            referencedRelation: "admin_capture_items";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       admin_capture_items: {
         Row: {
           archived_at: string | null;

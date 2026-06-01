@@ -7,9 +7,18 @@ import { finalizeGeneratedWorkoutRows } from "@/lib/structured-plan-authoring-fi
 import {
   buildPreferenceNotes,
   compareWeekdays,
+  chooseSupportedIntensityWeekday,
+  findNextRunningWeekdayAfterLongRun,
+  findPreviousRunningWeekdayBeforeLongRun,
   isoWeekday,
   phaseForWeek,
+  resolveSupportedIntensityCadence,
   shouldAvoidQuality,
+  shouldUseBeginnerRunWalkAdaptation,
+  shouldUseCutbackSupportArchetype,
+  shouldUseGentleStridesSupport,
+  shouldUseRecoveryFirstAfterLongRun,
+  shouldUseTaperRecoverySupportArchetype,
   slugify,
 } from "@/lib/structured-plan-authoring-policy";
 import {
@@ -22,6 +31,8 @@ import {
   buildQualityWorkout,
 } from "@/lib/structured-plan-authoring-sequencing";
 import {
+  buildAerobicStridesWorkout,
+  buildCutbackAerobicWorkout,
   buildEasyWorkout,
   buildRestWorkout,
   buildSteadyWorkout,
@@ -155,12 +166,33 @@ function normalizeStructuredPlanAuthoringInput(
       ? parsed.availability.preferredLongRunDay
       : (limitedRunningDays.at(-1) ?? "Sunday");
   const otherRunDays = limitedRunningDays.filter((day) => day !== longRunDay);
+  const supportedIntensityCadence = resolveSupportedIntensityCadence(parsed);
+  const supportedIntensityDay = chooseSupportedIntensityWeekday({
+    normalized: parsed,
+    runningDays: limitedRunningDays,
+    longRunDay,
+    otherRunDays,
+  });
   const qualityDay =
-    otherRunDays.length >= 1 && !shouldAvoidQuality(parsed) ? otherRunDays[0] : null;
-  const steadyDay =
-    otherRunDays.length >= 2 && parsed.preferences.preferredWorkoutMix !== "easy_heavy"
-      ? otherRunDays[1]
+    otherRunDays.length >= 1 &&
+    (!shouldAvoidQuality(parsed) || supportedIntensityCadence.frequency !== "none")
+      ? (supportedIntensityDay ?? otherRunDays[0] ?? null)
       : null;
+  const steadyCandidates = otherRunDays.filter((day) => day !== qualityDay);
+  let steadyDay =
+    steadyCandidates.length >= 1 && parsed.preferences.preferredWorkoutMix !== "easy_heavy"
+      ? steadyCandidates[0]
+      : null;
+
+  if (steadyDay && shouldUseRecoveryFirstAfterLongRun(parsed)) {
+    steadyDay = chooseRecoverySafeSteadyDay({
+      currentSteadyDay: steadyDay,
+      longRunDay,
+      qualityDay,
+      runningDays: limitedRunningDays,
+      otherRunDays,
+    });
+  }
   const endDate = parsed.schedule.targetDate
     ? parsed.schedule.targetDate
     : addDaysIso(parsed.schedule.startDate, parsed.schedule.preparationHorizonWeeks! * 7 - 1);
@@ -184,6 +216,34 @@ function normalizeStructuredPlanAuthoringInput(
       steadyDay,
     },
   };
+}
+
+function chooseRecoverySafeSteadyDay({
+  currentSteadyDay,
+  longRunDay,
+  qualityDay,
+  runningDays,
+  otherRunDays,
+}: {
+  currentSteadyDay: NormalizedStructuredInput["availability"]["steadyDay"];
+  longRunDay: NormalizedStructuredInput["availability"]["longRunDay"];
+  qualityDay: NormalizedStructuredInput["availability"]["qualityDay"];
+  runningDays: NormalizedStructuredInput["availability"]["runningDays"];
+  otherRunDays: NormalizedStructuredInput["availability"]["runningDays"];
+}) {
+  const nextAfterLongRun = findNextRunningWeekdayAfterLongRun(runningDays, longRunDay);
+
+  if (currentSteadyDay !== nextAfterLongRun) {
+    return currentSteadyDay;
+  }
+
+  const previousBeforeLongRun = findPreviousRunningWeekdayBeforeLongRun(runningDays, longRunDay);
+  const candidates = otherRunDays.filter((day) => day !== qualityDay);
+  const nonAdjacentCandidate = candidates.find(
+    (day) => day !== nextAfterLongRun && day !== previousBeforeLongRun,
+  );
+
+  return nonAdjacentCandidate ?? candidates.find((day) => day !== nextAfterLongRun) ?? null;
 }
 
 function buildGeneratedWorkouts(normalized: NormalizedStructuredInput) {
@@ -216,7 +276,38 @@ function buildGeneratedWorkouts(normalized: NormalizedStructuredInput) {
       continue;
     }
 
+    if (
+      weekday === normalized.availability.steadyDay &&
+      shouldUseGentleStridesSupport({ normalized, weekNumber, phase, weekday })
+    ) {
+      workouts.push(
+        buildAerobicStridesWorkout({ workoutId, date, weekday, weekNumber, phase, normalized }),
+      );
+      continue;
+    }
+
     if (weekday === normalized.availability.steadyDay) {
+      if (shouldUseBeginnerRunWalkAdaptation(normalized, weekNumber)) {
+        workouts.push(
+          buildEasyWorkout({ workoutId, date, weekday, weekNumber, phase, normalized }),
+        );
+        continue;
+      }
+
+      if (shouldUseCutbackSupportArchetype(normalized, weekNumber)) {
+        workouts.push(
+          buildCutbackAerobicWorkout({ workoutId, date, weekday, weekNumber, phase, normalized }),
+        );
+        continue;
+      }
+
+      if (shouldUseTaperRecoverySupportArchetype({ normalized, weekNumber, phase })) {
+        workouts.push(
+          buildEasyWorkout({ workoutId, date, weekday, weekNumber, phase, normalized }),
+        );
+        continue;
+      }
+
       workouts.push(
         buildSteadyWorkout({ workoutId, date, weekday, weekNumber, phase, normalized }),
       );

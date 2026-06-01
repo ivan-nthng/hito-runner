@@ -19,10 +19,13 @@ import {
   type CanonicalMetricModeJson,
 } from "@/lib/rich-workout-model";
 import { normalizeExecutableStepInstructions, type Step } from "@/lib/training";
+import { shouldUseBeginnerRunWalkAdaptation } from "@/lib/structured-plan-authoring-policy";
 
 export type BuildBlueprintWorkoutSegments = (input: {
   workout: AiBlueprintWorkout;
   date: string;
+  weekNumber: number;
+  adaptationHorizonWeeks: number;
   totalDurationMin: number;
   context: AiFirstPlanBlueprintNormalizationContext;
   deterministicWorkout: CanonicalWorkout | null;
@@ -36,6 +39,7 @@ export function normalizeBlueprintWorkout({
   date,
   context,
   deterministicWorkout,
+  adaptationHorizonWeeks,
   repairs,
   issues,
   buildWorkoutSegments,
@@ -46,6 +50,7 @@ export function normalizeBlueprintWorkout({
   date: string;
   context: AiFirstPlanBlueprintNormalizationContext;
   deterministicWorkout: CanonicalWorkout | null;
+  adaptationHorizonWeeks: number;
   repairs: string[];
   issues: NormalizationIssue[];
   buildWorkoutSegments: BuildBlueprintWorkoutSegments;
@@ -72,10 +77,20 @@ export function normalizeBlueprintWorkout({
     workoutIdentity: resolved.workoutIdentity,
     calendarIconKey: resolved.calendarIconKey,
   } as AiBlueprintWorkout;
+  const useDeterministicAdaptationReadback =
+    deterministicWorkout &&
+    shouldUseBeginnerRunWalkAdaptation(
+      context.authoringInput,
+      week.weekNumber,
+      adaptationHorizonWeeks,
+    ) &&
+    hasRunWalkAdaptationSegments(deterministicWorkout);
   const segments = normalizeExecutableStepInstructions(
     buildWorkoutSegments({
       workout: canonicalWorkout,
       date,
+      weekNumber: week.weekNumber,
+      adaptationHorizonWeeks,
       totalDurationMin,
       context,
       deterministicWorkout,
@@ -113,13 +128,23 @@ export function normalizeBlueprintWorkout({
     calendar_icon_key: resolved.calendarIconKey,
     goal_context: normalizeBlueprintGoalContext(context.authoringInput, blueprint),
     metric_mode: buildWorkoutMetricMode(segments, context),
-    title: workout.title,
-    summary: workout.summary,
-    planned_rpe: workout.plannedRpe,
+    title: useDeterministicAdaptationReadback ? deterministicWorkout.title : workout.title,
+    summary: useDeterministicAdaptationReadback ? deterministicWorkout.summary : workout.summary,
+    planned_rpe: useDeterministicAdaptationReadback
+      ? Math.min(workout.plannedRpe, deterministicWorkout.planned_rpe ?? 4)
+      : workout.plannedRpe,
     estimated_fatigue: workout.estimatedFatigue,
     recovery_priority: workout.recoveryPriority,
     segments,
   };
+}
+
+function hasRunWalkAdaptationSegments(workout: CanonicalWorkout) {
+  return workout.segments.some((segment) => {
+    const target = segment.target as Record<string, unknown> | undefined;
+
+    return target?.intensity === "run_walk_adaptation";
+  });
 }
 
 export function buildRestWorkout({

@@ -10,7 +10,6 @@ import {
   buildVoiceSupplementFromConstructorState,
   isStructuredConstructorReady,
   resolveTerrainFocus,
-  todayIsoDateInput,
   type GoalDistance,
   type GoalStyle,
   type StrengthPreference,
@@ -78,7 +77,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [goalDistance, setGoalDistance] = useState<GoalDistance>("build_consistency");
   const [goalStyle, setGoalStyle] = useState<GoalStyle>("balanced");
   const [targetTime, setTargetTime] = useState("");
-  const [startDate, setStartDate] = useState(todayIsoDateInput);
+  const [startDate, setStartDate] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [terrainFocus, setTerrainFocus] = useState<TerrainFocus>("standard");
   const [watchAccess, setWatchAccess] =
@@ -300,25 +299,25 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   };
 
   const submitStructuredReview = async () => {
-    const inputResult = buildStructuredInput(effectiveConstructorState);
-
     setConstructorError(null);
     setStructuredDraftResult(null);
 
-    if (!inputResult.ok) {
-      setConstructorError(inputResult.error);
-      return;
-    }
-
-    setConstructorStatus("reviewing");
-    hitoToast.working({
-      id: STRUCTURED_REVIEW_TOAST_ID,
-      title: "Reviewing setup",
-      description: "Hito is preparing a draft review before anything is created.",
-    });
-
     try {
-      const result = await withStructuredReviewTimeout(
+      const inputResult = buildStructuredInput(effectiveConstructorState);
+
+      if (!inputResult.ok) {
+        setConstructorError(inputResult.error);
+        return;
+      }
+
+      setConstructorStatus("reviewing");
+      hitoToast.working({
+        id: STRUCTURED_REVIEW_TOAST_ID,
+        title: "Reviewing plan",
+        description: "Hito is preparing your full plan review before anything is created.",
+      });
+
+      const result = await withStructuredReviewTimeout(() =>
         generateStructuredFirstPlanDraftFn({
           data: inputResult.input,
         }),
@@ -343,8 +342,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
       hitoToast.success({
         id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Draft ready",
-        description: "Review what Hito will create before confirming.",
+        title: "Plan ready",
+        description: "Review your full plan before confirming.",
       });
     } catch (submitError) {
       const message =
@@ -370,7 +369,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     hitoToast.working({
       id: STRUCTURED_REVIEW_TOAST_ID,
       title: "Creating plan",
-      description: "Hito is creating the active plan from the reviewed setup.",
+      description: "Hito is creating the active plan from the reviewed plan.",
     });
 
     try {
@@ -595,26 +594,28 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   );
 }
 
-function withStructuredReviewTimeout<T>(promise: Promise<T>) {
+function withStructuredReviewTimeout<T>(run: () => Promise<T>) {
   return new Promise<T>((resolve, reject) => {
     const timeoutId = window.setTimeout(() => {
       reject(
         new Error(
-          "The review is taking longer than expected. No plan was created. Try Review setup again.",
+          "The review is taking longer than expected. No plan was created. Try Review plan again.",
         ),
       );
     }, STRUCTURED_REVIEW_TIMEOUT_MS);
 
-    promise.then(
-      (value) => {
-        window.clearTimeout(timeoutId);
-        resolve(value);
-      },
-      (error: unknown) => {
-        window.clearTimeout(timeoutId);
-        reject(error);
-      },
-    );
+    Promise.resolve()
+      .then(run)
+      .then(
+        (value) => {
+          window.clearTimeout(timeoutId);
+          resolve(value);
+        },
+        (error: unknown) => {
+          window.clearTimeout(timeoutId);
+          reject(error);
+        },
+      );
   });
 }
 
@@ -639,7 +640,7 @@ function structuredDraftResultMessage(result: StructuredFirstPlanDraftResult) {
     return result.correction.message;
   }
 
-  return "Review the draft before creating your plan.";
+  return "Review the plan before creating it.";
 }
 
 function formatIssue(path: (string | number)[], message: string) {

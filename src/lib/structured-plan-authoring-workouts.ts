@@ -13,14 +13,18 @@ import {
 import {
   buildRestGuidance,
   deriveEasySupportKind,
+  findNextRunningWeekdayAfterLongRun,
   isLimitedSharpeningSupport,
   isMountainSpecificPlan,
   roundToFive,
   shouldAvoidQuality,
+  shouldUseBeginnerRunWalkAdaptation,
+  shouldUseRecoveryFirstAfterLongRun,
 } from "@/lib/structured-plan-authoring-policy";
 import {
   buildCooldownSegment,
   buildEasyRunSegments,
+  buildRunWalkAdaptationSegments,
   buildSteadyRunSegments,
   buildWarmupSegment,
   splitSubstantialEnduranceDuration,
@@ -75,13 +79,23 @@ export function buildEasyWorkout({
   normalized,
 }: BuildWorkoutContext) {
   const easyDurationMin = deriveEasyDurationMin(normalized, weekNumber);
-  const technicalTrailExposure = isMountainSpecificPlan(normalized) && phase === "Base";
-  const supportKind = deriveEasySupportKind({
-    normalized,
-    weekNumber,
-    phase,
-    technicalTrailExposure,
-  });
+  const recoveryFirstAfterLongRun =
+    shouldUseRecoveryFirstAfterLongRun(normalized) &&
+    weekday ===
+      findNextRunningWeekdayAfterLongRun(
+        normalized.availability.runningDays,
+        normalized.availability.longRunDay,
+      );
+  const technicalTrailExposure =
+    !recoveryFirstAfterLongRun && isMountainSpecificPlan(normalized) && phase === "Base";
+  const supportKind = recoveryFirstAfterLongRun
+    ? "recovery"
+    : deriveEasySupportKind({
+        normalized,
+        weekNumber,
+        phase,
+        technicalTrailExposure,
+      });
   const sourceWorkoutType = technicalTrailExposure
     ? "technical_trail_easy"
     : supportKind === "recovery"
@@ -89,20 +103,34 @@ export function buildEasyWorkout({
       : supportKind === "cutback"
         ? "cutback_aerobic_run"
         : "easy_aerobic_run";
-  const title = technicalTrailExposure
-    ? "Technical trail easy run"
-    : supportKind === "recovery"
-      ? "Recovery jog"
+  const runWalkAdaptation =
+    !technicalTrailExposure && shouldUseBeginnerRunWalkAdaptation(normalized, weekNumber);
+  const title = runWalkAdaptation
+    ? supportKind === "recovery"
+      ? "Recovery run/walk"
       : supportKind === "cutback"
-        ? "Cutback aerobic run"
-        : "Easy aerobic run";
-  const summary = technicalTrailExposure
-    ? `${easyDurationMin} min easy running with low-risk trail or uneven-ground awareness.`
-    : supportKind === "recovery"
-      ? `${easyDurationMin} min very easy recovery running to absorb the block.`
+        ? "Cutback run/walk adaptation"
+        : "Run/walk adaptation"
+    : technicalTrailExposure
+      ? "Technical trail easy run"
+      : supportKind === "recovery"
+        ? "Recovery jog"
+        : supportKind === "cutback"
+          ? "Cutback aerobic run"
+          : "Easy aerobic run";
+  const summary = runWalkAdaptation
+    ? supportKind === "recovery"
+      ? `${easyDurationMin} min recovery run/walk to absorb the block.`
       : supportKind === "cutback"
-        ? `${easyDurationMin} min deliberately easy aerobic running for a lower-load week.`
-        : `${easyDurationMin} min comfortable aerobic running.`;
+        ? `${easyDurationMin} min lower-load run/walk adaptation.`
+        : `${easyDurationMin} min beginner-friendly run/walk adaptation.`
+    : technicalTrailExposure
+      ? `${easyDurationMin} min easy running with low-risk trail or uneven-ground awareness.`
+      : supportKind === "recovery"
+        ? `${easyDurationMin} min very easy recovery running to absorb the block.`
+        : supportKind === "cutback"
+          ? `${easyDurationMin} min deliberately easy aerobic running for a lower-load week.`
+          : `${easyDurationMin} min comfortable aerobic running.`;
 
   return {
     workout_id: workoutId,
@@ -115,13 +143,21 @@ export function buildEasyWorkout({
     title,
     summary,
     planned_rpe: 4,
-    segments: buildEasyRunSegments({
-      workoutId,
-      durationMin: easyDurationMin,
-      normalized,
-      technicalTrailExposure,
-      supportKind,
-    }),
+    segments: runWalkAdaptation
+      ? buildRunWalkAdaptationSegments({
+          workoutId,
+          durationMin: easyDurationMin,
+          normalized,
+          weekNumber,
+          role: supportKind === "recovery" ? "recovery" : "support",
+        })
+      : buildEasyRunSegments({
+          workoutId,
+          durationMin: easyDurationMin,
+          normalized,
+          technicalTrailExposure,
+          supportKind,
+        }),
   };
 }
 

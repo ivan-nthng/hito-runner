@@ -14,12 +14,17 @@ import {
   isHighAmbitionPlan,
   isLimitedSharpeningSupport,
   isMountainSpecificPlan,
+  resolveSupportedIntensityCadence,
+  resolveSupportedSpecificityIdentityOptions,
   roundToFive,
   roundToTenth,
   shouldAddLongRunSteadyFinish,
+  shouldScheduleSupportedIntensityWeek,
+  shouldUseBeginnerRunWalkAdaptation,
   shouldUseBaseStrides,
   shouldUseProgressionSpecificity,
 } from "@/lib/structured-plan-authoring-policy";
+import { buildRunWalkAdaptationSegments } from "@/lib/structured-plan-authoring-segments";
 import {
   buildAerobicStridesWorkout,
   buildClimbingSteadyWorkout,
@@ -72,6 +77,7 @@ export function buildLongRunWorkout({
   const taper = phase === "Taper";
   const mountainSpecific = isMountainSpecificPlan(normalized);
   const hasSteadyFinish = !mountainSpecific && shouldAddLongRunSteadyFinish(normalized, weekNumber);
+  const runWalkAdaptation = shouldUseBeginnerRunWalkAdaptation(normalized, weekNumber);
   const title = cutback
     ? "Cutback long run"
     : taper
@@ -80,7 +86,9 @@ export function buildLongRunWorkout({
         ? "Mountain long run time-on-feet"
         : hasSteadyFinish
           ? "Long run with steady finish"
-          : "Long aerobic run";
+          : runWalkAdaptation
+            ? "Long run/walk endurance"
+            : "Long aerobic run";
 
   return {
     workout_id: workoutId,
@@ -106,6 +114,7 @@ export function buildLongRunWorkout({
       cutback,
       taper,
       hasSteadyFinish,
+      runWalkAdaptation,
     ),
     planned_rpe: 5,
     segments: buildLongRunSegments({
@@ -116,6 +125,8 @@ export function buildLongRunWorkout({
       cutback,
       taper,
       hasSteadyFinish,
+      runWalkAdaptation,
+      weekNumber,
     }),
   };
 }
@@ -127,10 +138,19 @@ function buildLongRunSummary(
   cutback: boolean,
   taper: boolean,
   hasSteadyFinish: boolean,
+  runWalkAdaptation: boolean,
 ) {
   const loadLabel = normalized.runnerProfile.baselineLongRunKm
     ? `${distanceKm} km`
     : `${durationMin} min`;
+
+  if (runWalkAdaptation) {
+    if (cutback) {
+      return `${loadLabel} lower-load run/walk long run to absorb the block.`;
+    }
+
+    return `${loadLabel} run/walk long endurance with planned walk breaks and relaxed effort.`;
+  }
 
   if (cutback) {
     return `${loadLabel} lower-load long run to absorb the block.`;
@@ -159,6 +179,8 @@ function buildLongRunSegments({
   cutback,
   taper,
   hasSteadyFinish,
+  runWalkAdaptation,
+  weekNumber,
 }: {
   workoutId: string;
   normalized: NormalizedStructuredInput;
@@ -167,7 +189,19 @@ function buildLongRunSegments({
   cutback: boolean;
   taper: boolean;
   hasSteadyFinish: boolean;
+  runWalkAdaptation: boolean;
+  weekNumber: number;
 }) {
+  if (runWalkAdaptation) {
+    return buildRunWalkAdaptationSegments({
+      workoutId,
+      durationMin,
+      normalized,
+      weekNumber,
+      role: "long",
+    });
+  }
+
   if (!hasSteadyFinish) {
     const splitLongRun = buildLongAerobicSupportSegments({
       workoutId,
@@ -455,6 +489,19 @@ export function buildQualityWorkout({
   phase,
   normalized,
 }: BuildWorkoutContext) {
+  const supportedIntensityWorkout = buildSupportedIntensityCadenceWorkout({
+    workoutId,
+    date,
+    weekday,
+    weekNumber,
+    phase,
+    normalized,
+  });
+
+  if (supportedIntensityWorkout) {
+    return supportedIntensityWorkout;
+  }
+
   if (isCutbackWeek(weekNumber, normalized)) {
     return buildCutbackAerobicWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
   }
@@ -525,6 +572,53 @@ export function buildQualityWorkout({
   }
 
   return buildTimeIntervalsWorkout({ workoutId, date, weekday, weekNumber, phase, normalized });
+}
+
+function buildSupportedIntensityCadenceWorkout(context: BuildWorkoutContext) {
+  const cadence = resolveSupportedIntensityCadence(context.normalized, context.weekNumber);
+
+  if (!cadence.applies) {
+    return null;
+  }
+
+  if (isCutbackWeek(context.weekNumber, context.normalized)) {
+    return buildCutbackAerobicWorkout(context);
+  }
+
+  if (context.phase === "Taper") {
+    return buildTaperTuneupWorkout(context);
+  }
+
+  if (
+    cadence.frequency === "none" ||
+    !shouldScheduleSupportedIntensityWeek(context.normalized, context.weekNumber, cadence)
+  ) {
+    return buildEasyWorkout(context);
+  }
+
+  const specificityIdentity = resolveSupportedSpecificityIdentityOptions(
+    context.normalized,
+    context.weekNumber,
+    cadence,
+  )[0];
+
+  switch (specificityIdentity) {
+    case "half_marathon_threshold_durability":
+      return buildHalfMarathonThresholdWorkout(context);
+    case "marathon_steady_specificity":
+      return buildMarathonSteadySpecificityWorkout(context);
+    case "controlled_tempo_session":
+      return buildTempoWorkout(context);
+    case "progression_run":
+      return buildProgressionWorkout(context);
+    case "easy_run_with_strides":
+      return buildAerobicStridesWorkout(context);
+    case "race_pace_session":
+      return buildTempoWorkout(context);
+    case "long_run_with_steady_finish":
+    default:
+      return buildEasyWorkout(context);
+  }
 }
 
 function buildGoalFamilyQualityWorkout(context: BuildWorkoutContext) {

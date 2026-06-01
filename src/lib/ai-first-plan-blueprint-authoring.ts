@@ -24,6 +24,11 @@ import {
   validateBlueprintShell,
   validateNormalizedPlanDoctrine,
 } from "@/lib/ai-first-plan-blueprint-validation";
+import {
+  repairBeginnerRunWalkBlueprintAdaptation,
+  repairRecoveryFirstBlueprintSequencing,
+  repairSupportedIntensityBlueprintCadence,
+} from "@/lib/ai-first-plan-blueprint-repair";
 import { buildStructuredAuthoringPlan } from "@/lib/structured-plan-authoring";
 import { addDaysIso, weekdayLong } from "@/lib/training";
 
@@ -104,6 +109,7 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   const deterministicByDate = new Map(
     deterministicPlan.planned_workouts.map((workout) => [workout.date, workout]),
   );
+  const adaptationHorizonWeeks = deterministicPlan.preparation_horizon_weeks;
   const blueprintWorkouts = new Map<
     string,
     { week: AiBlueprintWeek; workout: AiBlueprintWorkout }
@@ -118,6 +124,28 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
       }
     }
   }
+
+  repairRecoveryFirstBlueprintSequencing({
+    blueprintWorkouts,
+    context,
+    repairs,
+  });
+  repairBeginnerRunWalkBlueprintAdaptation({
+    blueprintWorkouts,
+    context,
+    adaptationHorizonWeeks,
+    repairs,
+  });
+  repairSupportedIntensityBlueprintCadence({
+    blueprintWorkouts,
+    context,
+    repairs,
+  });
+  repairRecoveryFirstBlueprintSequencing({
+    blueprintWorkouts,
+    context,
+    repairs,
+  });
 
   const normalizedWorkouts: CanonicalWorkout[] = [];
   const totalDays = context.expectedHorizonWeeks * 7;
@@ -138,6 +166,7 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
             date,
             context,
             deterministicWorkout,
+            adaptationHorizonWeeks,
             repairs,
             issues,
             buildWorkoutSegments,

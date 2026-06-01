@@ -7,6 +7,11 @@ import {
   type SetStateAction,
 } from "react";
 import { EditableValueChip } from "@/components/ui/editable-value-chip";
+import {
+  HitoDateField,
+  HitoEditableDateChip,
+  HitoMaskedTimeField,
+} from "@/components/ui/hito-date-time-input";
 import { Icon } from "@/components/ui/icon";
 import {
   Dialog,
@@ -265,62 +270,32 @@ export function StructuredPlanConstructor({
             </OptionGrid>
           </Field>
 
-          <Field
-            label="Plan start date"
-            helper="Use YYYY-MM-DD. Hito builds the first week from this date."
-          >
-            <input
-              id="structured-plan-start-date"
-              name="schedule.startDate"
-              type="text"
-              inputMode="numeric"
-              autoComplete="off"
-              spellCheck={false}
-              aria-label="Plan start date"
-              value={state.startDate}
-              onChange={(event) => setState.setStartDate(event.target.value)}
-              placeholder="2026-05-29"
-              maxLength={10}
-              className={cn(
-                "hito-field hito-field-primary hito-field-md",
-                !state.startDate.trim() && "hito-field-feedback-error",
-              )}
-            />
-          </Field>
+          <HitoEditableDateChip
+            label="Plan Start Date"
+            value={state.startDate}
+            onChange={setState.setStartDate}
+            helper="Optional. Leave unset to let Hito choose the default start date."
+          />
+          <input type="hidden" name="schedule.startDate" value={state.startDate} />
 
           {showsTargetFields ? (
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Target time" helper="Required. Use 25:00 or 1:45:00.">
-                <input
-                  value={state.targetTime}
-                  onChange={(event) => setState.setTargetTime(event.target.value)}
-                  placeholder="1:45:00"
-                  required
-                  className={cn(
-                    "hito-field hito-field-primary hito-field-md",
-                    !state.targetTime.trim() && "hito-field-feedback-error",
-                  )}
-                />
-              </Field>
-              <Field
+              <HitoMaskedTimeField
+                id="structured-plan-target-time"
+                label="Target time"
+                value={state.targetTime}
+                onChange={setState.setTargetTime}
+                helper="Required. Type digits continuously: 35000 becomes 3:50:00."
+                error={!state.targetTime.trim() ? "Target time is required." : null}
+              />
+              <HitoDateField
+                id="structured-plan-target-date"
+                name="schedule.targetDate"
                 label="Target date"
-                helper="Optional. Use YYYY-MM-DD, at least 7 days after plan start."
-              >
-                <input
-                  id="structured-plan-target-date"
-                  name="schedule.targetDate"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label="Target date"
-                  value={state.targetDate}
-                  onChange={(event) => setState.setTargetDate(event.target.value)}
-                  placeholder="2026-12-11"
-                  maxLength={10}
-                  className="hito-field hito-field-primary hito-field-md"
-                />
-              </Field>
+                value={state.targetDate}
+                onChange={setState.setTargetDate}
+                helper="Optional. Pick from calendar or type YYYY-MM-DD."
+              />
             </div>
           ) : (
             <p className="hito-field-helper">
@@ -407,7 +382,7 @@ export function StructuredPlanConstructor({
               ) : null}
               {!constructorError && constructorStatus !== "finishing" ? (
                 <p className="hito-field-helper max-w-xl">
-                  Review your setup first. Nothing is created until you confirm the draft.
+                  Review your plan first. Nothing is created until you confirm it.
                 </p>
               ) : null}
             </div>
@@ -417,16 +392,17 @@ export function StructuredPlanConstructor({
               className="hito-button hito-button-primary hito-button-lg shrink-0"
             >
               {constructorStatus === "reviewing"
-                ? "Reviewing draft..."
+                ? "Reviewing plan..."
                 : constructorStatus === "finishing"
                   ? "Opening your plan..."
-                  : "Review setup"}
+                  : "Review plan"}
             </button>
           </div>
         </div>
         {isDraftReady ? (
           <StructuredDraftReadyReviewModal
             result={draftResult}
+            state={state}
             status={constructorStatus}
             isBusy={isBusy}
             onConfirmDraft={onConfirmDraft}
@@ -481,12 +457,14 @@ export function Field({
 
 function StructuredDraftReadyReviewModal({
   result,
+  state,
   status,
   isBusy,
   onConfirmDraft,
   onCancel,
 }: {
   result: StructuredDraftReady;
+  state: StructuredConstructorState;
   status: ConstructorStatus;
   isBusy: boolean;
   onConfirmDraft: () => void;
@@ -494,6 +472,9 @@ function StructuredDraftReadyReviewModal({
 }) {
   const review = result.review;
   const summary = result.draft.summary;
+  const longHorizonReviewCopy = getLongHorizonReviewCopy(result);
+  const durationLabel = summary.targetDate ? "Plan range" : "Plan length";
+  const reviewPlanName = getStructuredReviewPlanName(state);
 
   return (
     <Dialog
@@ -509,20 +490,17 @@ function StructuredDraftReadyReviewModal({
         overlayClassName="hito-product-dialog-overlay"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Review your setup</DialogTitle>
+          <DialogTitle className="hito-modal-title">Review your plan</DialogTitle>
           <DialogDescription className="hito-body max-w-2xl">
-            Nothing has been created yet. Confirm this setup to create your plan.
+            Nothing has been created yet. Review the full plan below, then confirm to create it.
           </DialogDescription>
         </DialogHeader>
 
         <div className="hito-row-group">
           <div className="hito-list-row items-start">
             <div className="min-w-0">
-              <p className="hito-list-row-title">Draft ready</p>
-              <p className="hito-list-row-copy">
-                Hito reviewed your answers and prepared a plan draft. The active plan is created
-                only after the next explicit confirmation.
-              </p>
+              <p className="hito-list-row-title">Plan ready</p>
+              <p className="hito-list-row-copy">{longHorizonReviewCopy}</p>
             </div>
             <span className="hito-status-pill" data-tone="success">
               Review
@@ -552,11 +530,8 @@ function StructuredDraftReadyReviewModal({
           <div className="hito-list-row items-start">
             <div className="grid gap-3">
               <p className="hito-form-label">Plan setup summary</p>
-              <StructuredReviewLine label="Plan" value={summary.planName} />
-              <StructuredReviewLine
-                label="Estimated horizon"
-                value={review.planShape.durationLabel}
-              />
+              <StructuredReviewLine label="Plan" value={reviewPlanName} />
+              <StructuredReviewLine label={durationLabel} value={review.planShape.durationLabel} />
               <StructuredReviewLine
                 label="Days per week"
                 value={`${review.planShape.runningDaysPerWeek}`}
@@ -681,6 +656,84 @@ function StructuredReviewLine({ label, value }: { label: string; value: string }
       <p className="hito-body-small text-muted-foreground">{value}</p>
     </div>
   );
+}
+
+function getLongHorizonReviewCopy(result: StructuredDraftReady) {
+  const backendExtendedWeeks =
+    result.generation.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks ?? 0;
+
+  if (backendExtendedWeeks > 0 && result.draft.summary.targetDate) {
+    return "This is your full plan through your goal date. Hito shapes the opening block with AI, then builds the remaining weeks with safe progression before you confirm.";
+  }
+
+  return "Hito reviewed your answers and prepared your full plan. The active plan is created only after the next explicit confirmation.";
+}
+
+const REVIEW_GOAL_LABELS: Record<GoalDistance, string> = {
+  build_consistency: "Consistency",
+  "5k": "5K",
+  "10k": "10K",
+  half_marathon: "Half Marathon",
+  marathon: "Marathon",
+  ultra_marathon: "Ultra Marathon",
+  mountain_running: "Mountain Running",
+};
+
+function getStructuredReviewPlanName(state: StructuredConstructorState) {
+  const goalLabel = REVIEW_GOAL_LABELS[state.goalDistance];
+
+  if (state.goalStyle === "target_time") {
+    const targetTimeLabel = formatReviewTargetTime(state.targetTime);
+    return targetTimeLabel
+      ? `${goalLabel} ${targetTimeLabel} Target Plan`
+      : `${goalLabel} Target Plan`;
+  }
+
+  if (state.goalDistance === "build_consistency") {
+    return "Consistency Plan";
+  }
+
+  const styleLabel = getReviewGoalStyleLabel(state.goalStyle);
+  return `${goalLabel} ${styleLabel} Plan`;
+}
+
+function getReviewGoalStyleLabel(goalStyle: Exclude<GoalStyle, "target_time">) {
+  if (goalStyle === "relaxed") {
+    return "Finish";
+  }
+
+  if (goalStyle === "ambitious") {
+    return "Ambitious";
+  }
+
+  return "Balanced";
+}
+
+function formatReviewTargetTime(value: string) {
+  const parts = value
+    .trim()
+    .split(":")
+    .map((part) => Number(part));
+
+  if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part))) {
+    return value.trim() || null;
+  }
+
+  const [hours, minutes, seconds] = parts;
+  const hasValidClockParts =
+    hours >= 0 && minutes >= 0 && minutes <= 59 && seconds >= 0 && seconds <= 59;
+
+  if (!hasValidClockParts) {
+    return value.trim() || null;
+  }
+
+  const minuteLabel = String(minutes).padStart(2, "0");
+
+  if (seconds === 0) {
+    return `${hours}:${minuteLabel}`;
+  }
+
+  return `${hours}:${minuteLabel}:${String(seconds).padStart(2, "0")}`;
 }
 
 function OptionGrid({ children }: { children: ReactNode }) {

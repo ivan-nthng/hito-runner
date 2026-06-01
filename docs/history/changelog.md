@@ -13,6 +13,10 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-01
+
+- Retired the unused admin capture screenshot storage seam: `/admin/capture` now treats `admin_capture_items` as the only current backlog storage truth, removes runtime joins/view-model fields for `admin_capture_assets`, adds a migration to drop the empty asset table, removes the empty private bucket through the Supabase Storage API, and updates the validation script to guard against the legacy asset path returning.
+
 ## 2026-05-28
 
 - Canonicalized real repo work items for the admin Backlog: actionable active plans, product briefs, and frontend specs now carry markdown-owned status/type/priority/role/task/stage/prompt metadata, import with human-readable task titles, and keep source paths as metadata instead of primary labels.

@@ -55,7 +55,7 @@ Architect / Backend / Frontend / QA
 
 ## Last Updated
 
-2026-05-28
+2026-06-01
 
 ## Context
 
@@ -73,6 +73,7 @@ This plan adds a new internal capture/backlog workflow alongside the existing ad
 Current implemented phase:
 
 - backend storage/admin capture contract is implemented and QA-proven
+- the unused screenshot asset storage seam is retired from the active backend contract; `admin_capture_items` is the only current Supabase backlog table
 - `/admin/capture` Backlog v1 is implemented and QA-passed
 - backend-owned backlog truth is the current source for the admin surface
 - Backend Slice 7 repo work-item import/refresh is implemented: an explicit ops script mirrors
@@ -143,7 +144,7 @@ V1 must not:
 
 ## Canonical Pipeline
 
-`admin-selected UI context -> browser capture normalization -> backend admin validation -> canonical admin_capture_items/admin_capture_assets storage -> admin backlog review -> deterministic copy-prompt generation -> manual Codex handoff`
+`admin-selected UI context -> browser capture normalization -> backend admin validation -> canonical admin_capture_items storage -> admin backlog review -> deterministic copy-prompt generation -> manual Codex handoff`
 
 For repo-authored work:
 
@@ -295,9 +296,9 @@ Required access checks:
 
 - cross-product capture admin probe requires admin auth
 - every loader/action/API for `/admin/capture` requires admin auth
-- capture save API requires admin auth before accepting metadata or files
+- capture save API requires admin auth before accepting metadata
 - prompt generation requires admin auth
-- asset download/read URLs require admin auth or short-lived signed private URLs generated only for admin sessions
+- any future asset download/read URL seam must require admin auth or short-lived signed private URLs generated only for admin sessions
 - normal runner auth, tester auth, and public sessions cannot list, read, create, update, or delete capture items
 
 Recommended implementation:
@@ -317,6 +318,31 @@ Important auth boundary:
 ## Storage Model
 
 Add backend-owned Supabase storage for capture backlog truth.
+
+Current cleanup decision, 2026-06-01:
+
+- `admin_capture_items` is the only implemented storage truth for admin Backlog items.
+- The unused screenshot asset table and private bucket were retired before screenshot upload shipped.
+- If screenshot capture returns later, it needs a fresh storage slice and migration instead of reusing a dormant legacy seam.
+
+Cleanup closeout evidence, 2026-06-01:
+
+- Linked Supabase project `dltfjwexyctmihclcjqj` (`hito-runn`) applied migration
+  `20260601110000_remove_admin_capture_assets`.
+- Pre-migration proof showed `admin_capture_items` existed with 117 rows,
+  `admin_capture_assets` existed with 0 rows, and storage bucket `admin-capture-assets` had 0
+  objects.
+- The empty private `admin-capture-assets` bucket was removed through the Supabase Storage API
+  before SQL dropped `public.admin_capture_assets`, because Supabase rejects direct SQL deletion
+  from `storage.buckets`.
+- Live validation proved `admin_capture_items` remains available, `admin_capture_assets` is absent
+  from PostgREST, bucket `admin-capture-assets` is absent, service-role create/list/read/update
+  still works, copy-prompt redaction works, manual note append works, repo-derived list/detail/copy
+  still works, repo-derived mutations remain rejected, publishable read/write remains blocked, and
+  disposable proof rows clean up.
+- `runner_entitlements` and `runner_capability_usage` were intentionally not removed; they are not
+  part of the admin capture asset cleanup.
+- No legacy compatibility seam remains for `admin_capture_assets`.
 
 ### Table: `admin_capture_items`
 
@@ -377,42 +403,12 @@ Suggested `priority` values:
 - `high`
 - `urgent`
 
-### Table: `admin_capture_assets`
+Screenshot asset storage:
 
-Suggested fields:
-
-- `id uuid primary key`
-- `capture_item_id uuid not null references admin_capture_items(id) on delete cascade`
-- `asset_kind text not null`
-- `storage_bucket text not null`
-- `storage_path text not null`
-- `mime_type text not null`
-- `width integer null`
-- `height integer null`
-- `byte_size integer null`
-- `checksum text null`
-- `created_at timestamptz not null default now()`
-
-Allowed `asset_kind` values:
-
-- `viewport_screenshot`
-- `full_page_screenshot`
-- `element_crop`
-
-### Storage Bucket
-
-Add one private Supabase bucket:
-
-- `admin-capture-assets`
-
-Rules:
-
-- private only
-- no public URLs
-- paths should include item id and asset kind, for example:
-  `admin-capture/{item_id}/viewport.png`
-- store screenshots as assets, not inline table blobs
-- avoid storing huge payloads in `metadata`
+- not implemented in the current backend contract
+- no `admin_capture_assets` table is part of the active model
+- no `admin-capture-assets` bucket is part of the active model
+- screenshots must not be stored inline in `metadata`
 
 ## Captured Context Contract
 
@@ -433,11 +429,9 @@ The browser should send a bounded payload:
 
 Screenshots:
 
-- `viewport_screenshot` is preferred v1 if feasible.
-- `element_crop` is preferred v1 if feasible.
-- `full_page_screenshot` is optional later unless the chosen browser capture library proves stable.
-
-Do not block the whole v1 if full-page capture is brittle. Save the item with textual/selector context and a clear `screenshot_unavailable` note instead.
+- deferred from the current backend contract
+- if they return, prefer a fresh, reviewed storage slice instead of dormant legacy tables
+- do not block item capture if screenshot capture is unavailable; save the item with textual/selector context instead
 
 ## Screenshot And Privacy Policy
 
@@ -461,13 +455,13 @@ Likely modules/routes:
 - `src/lib/admin-capture.ts`
   route-facing types and server functions for list/detail/update/copy prompt
 - `src/lib/admin-capture.server.ts`
-  server-only admin checks, Supabase reads/writes, storage writes, prompt shaping
+  server-only admin checks, Supabase reads/writes, prompt shaping
 - `src/routes/admin.capture.tsx`
   admin backlog route
 - `src/routes/api.admin.capture.items.tsx`
-  multipart capture-create endpoint if screenshots are uploaded as files
+  future multipart capture-create endpoint only if screenshots are reintroduced
 - `supabase/migrations/<timestamp>_admin_capture_backlog.sql`
-  tables, checks, indexes, private bucket setup if managed through migration
+  tables, checks, and indexes
 - `src/lib/supabase/database.ts`
   generated/updated database types after migration
 
@@ -476,9 +470,7 @@ Backend must:
 - verify admin before every operation
 - validate item type/status/priority/role
 - cap note, element text, selector, heading, URL, and metadata lengths
-- accept capture creation atomically enough that failed asset upload does not leave misleading `ready` screenshot state
-- store item metadata first, then upload assets and insert asset rows
-- return bounded errors such as `admin_required`, `invalid_payload`, `asset_upload_failed`, `capture_not_found`
+- return bounded errors such as `admin_required`, `invalid_payload`, `capture_not_found`
 - generate deterministic copy prompts from stored item truth without calling AI
 - never send items to Codex automatically
 
@@ -545,7 +537,7 @@ Forbidden:
 - frontend-owned backlog truth, prompt generation, status rules, priority rules, or role rules
 
 Backend remains the source of truth for capture items, quick notes, status, priority, target role,
-notes, assets, and deterministic prompt generation.
+notes, and deterministic prompt generation.
 
 Frontend owns interaction only:
 
@@ -1156,7 +1148,7 @@ Status: Implemented / backend QA proof complete
 
 Scope:
 
-- add migration for `admin_capture_items`, `admin_capture_assets`, and private bucket
+- add migration for `admin_capture_items`
 - add backend module types and validators
 - add admin-only list/detail/create/update/copy-prompt seams
 - add minimal server-side tests or deterministic helper checks where project patterns allow
@@ -1171,20 +1163,23 @@ Exit criteria:
 
 Implemented evidence:
 
-- `supabase/migrations/20260528190000_admin_capture_backlog.sql` adds RLS-enabled backlog tables and the private `admin-capture-assets` bucket.
+- `supabase/migrations/20260528190000_admin_capture_backlog.sql` added the first RLS-enabled backlog tables; `supabase/migrations/20260601110000_remove_admin_capture_assets.sql` retires the unused screenshot asset table, and the empty `admin-capture-assets` bucket is removed through the Supabase Storage API before screenshot upload shipped.
 - `src/lib/admin-capture.ts` and `src/lib/admin-capture.server.ts` expose admin-only availability, list, detail, create, triage, note update/append, and deterministic copy-prompt seams.
 - `scripts/validate-admin-capture-backlog.ts` proves admin create/list/read/update, non-admin rejection, deterministic prompt output, metadata redaction, and archived-item exclusion without requiring frontend implementation.
-- `npm run validate-admin-capture-backlog:live` probes the linked Supabase project and proves the tables and private bucket exist, service-role create/list/read/update works, publishable-key read/write is blocked, archived items are excluded from active lists, prompt metadata is redacted, and the disposable proof row is cleaned up.
+- `npm run validate-admin-capture-backlog:live` probes the linked Supabase project and proves the item table exists, the retired asset table/bucket are absent, service-role create/list/read/update works, publishable-key read/write is blocked, archived items are excluded from active lists, prompt metadata is redacted, and the disposable proof row is cleaned up.
+- Local cleanup validation passed with targeted ESLint, `npm run validate-admin-capture-backlog`,
+  `git diff --check`, and `npm run build` on rerun. The first build retry hit the existing
+  intermittent `.output` cleanup `ENOTEMPTY`; rerun passed cleanly.
 
-### Slice 2: Backend asset upload support
+### Slice 2: Deferred screenshot capture support
 
 Owner: BACKEND
 
 Scope:
 
-- add multipart endpoint or server action path for optional screenshot files
-- save screenshot assets to private bucket
-- insert asset rows linked to capture item
+- define a fresh screenshot storage model if capture assets become necessary
+- add multipart endpoint or server action path for optional screenshot files only after the model is approved
+- save screenshot assets to private storage with admin-only access
 - handle asset upload failure without losing the item note/context
 
 Exit criteria:

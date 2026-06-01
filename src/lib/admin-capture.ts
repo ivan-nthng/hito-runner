@@ -21,17 +21,11 @@ export const adminCaptureTargetRoles = [
   "prompt_engineer",
   "running_coach",
 ] as const;
-export const adminCaptureAssetKinds = [
-  "viewport_screenshot",
-  "full_page_screenshot",
-  "element_crop",
-] as const;
 
 export type AdminCaptureItemType = (typeof adminCaptureItemTypes)[number];
 export type AdminCaptureStatus = (typeof adminCaptureStatuses)[number];
 export type AdminCapturePriority = (typeof adminCapturePriorities)[number];
 export type AdminCaptureTargetRole = (typeof adminCaptureTargetRoles)[number];
-export type AdminCaptureAssetKind = (typeof adminCaptureAssetKinds)[number];
 
 export type AdminCaptureFailureReason =
   | "authentication_required"
@@ -46,19 +40,6 @@ export type AdminCaptureFailureReason =
   | "repo_derived_read_only"
   | "prompt_not_ready"
   | "prompt_generation_failed";
-
-export interface AdminCaptureAssetView {
-  id: string;
-  assetKind: AdminCaptureAssetKind;
-  storageBucket: string;
-  storagePath: string;
-  mimeType: string;
-  width: number | null;
-  height: number | null;
-  byteSize: number | null;
-  checksum: string | null;
-  createdAt: string;
-}
 
 export interface AdminCaptureItemView {
   id: string;
@@ -86,8 +67,6 @@ export interface AdminCaptureItemView {
   metadata: Json;
   source: "captured_ui" | "quick_note" | "repo_import";
   promptReady: boolean;
-  assetCount: number;
-  assets: AdminCaptureAssetView[];
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
@@ -122,7 +101,6 @@ export const adminCaptureItemTypeSchema = z.enum(adminCaptureItemTypes);
 export const adminCaptureStatusSchema = z.enum(adminCaptureStatuses);
 export const adminCapturePrioritySchema = z.enum(adminCapturePriorities);
 export const adminCaptureTargetRoleSchema = z.enum(adminCaptureTargetRoles);
-export const adminCaptureAssetKindSchema = z.enum(adminCaptureAssetKinds);
 
 const optionalTrimmedString = (max: number) =>
   z

@@ -9,11 +9,14 @@ import {
 } from "@/lib/ai-first-plan-blueprint-metrics";
 import { slugify } from "@/lib/ai-first-plan-blueprint-normalize";
 import type { AiFirstPlanBlueprintNormalizationContext } from "@/lib/ai-first-plan-blueprint-validation";
+import { shouldUseBeginnerRunWalkAdaptation } from "@/lib/structured-plan-authoring-policy";
 import type { Step, StepPrescription } from "@/lib/training";
 
 export function buildWorkoutSegments({
   workout,
   date,
+  weekNumber,
+  adaptationHorizonWeeks,
   totalDurationMin,
   context,
   deterministicWorkout,
@@ -21,11 +24,26 @@ export function buildWorkoutSegments({
 }: {
   workout: AiBlueprintWorkout;
   date: string;
+  weekNumber: number;
+  adaptationHorizonWeeks: number;
   totalDurationMin: number;
   context: AiFirstPlanBlueprintNormalizationContext;
   deterministicWorkout: CanonicalWorkout | null;
   repairs: string[];
 }): CanonicalSegment[] {
+  if (
+    shouldUseBeginnerRunWalkAdaptation(
+      context.authoringInput,
+      weekNumber,
+      adaptationHorizonWeeks,
+    ) &&
+    deterministicWorkout &&
+    isRunWalkAdaptableIdentity(workout.workoutIdentity) &&
+    hasRunWalkAdaptationSegments(deterministicWorkout)
+  ) {
+    return cloneDeterministicRunWalkSegments({ workout, date, deterministicWorkout });
+  }
+
   return buildIdentitySegmentSpecs(workout, totalDurationMin).map((spec, index) =>
     buildBlueprintSegment({
       workout,
@@ -37,6 +55,42 @@ export function buildWorkoutSegments({
       repairs,
     }),
   );
+}
+
+function isRunWalkAdaptableIdentity(workoutIdentity: string) {
+  return [
+    "easy_aerobic_run",
+    "recovery_jog",
+    "cutback_aerobic_run",
+    "steady_aerobic_run",
+    "long_aerobic_run",
+    "long_run_with_steady_finish",
+    "cutback_long_run",
+    "taper_long_run",
+  ].includes(workoutIdentity);
+}
+
+function hasRunWalkAdaptationSegments(workout: CanonicalWorkout) {
+  return workout.segments.some((segment) => {
+    const target = segment.target as Record<string, unknown> | undefined;
+
+    return target?.intensity === "run_walk_adaptation";
+  });
+}
+
+function cloneDeterministicRunWalkSegments({
+  workout,
+  date,
+  deterministicWorkout,
+}: {
+  workout: AiBlueprintWorkout;
+  date: string;
+  deterministicWorkout: CanonicalWorkout;
+}) {
+  return deterministicWorkout.segments.map((segment, index) => ({
+    ...segment,
+    segment_id: `${slugify(workout.workoutIdentity)}_${date}_seg_${index + 1}`,
+  }));
 }
 
 interface BlueprintSegmentSpec {

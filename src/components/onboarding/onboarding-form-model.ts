@@ -2,6 +2,7 @@ import type {
   StructuredFirstPlanOnboardingInput,
   StructuredFirstPlanOnboardingRequestInput,
 } from "@/lib/structured-first-plan-onboarding";
+import { isHitoIsoDate } from "@/components/ui/hito-date-time-utils";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { VoiceToPlanSupplement } from "@/lib/voice-to-plan-authoring";
 
@@ -228,16 +229,25 @@ export function buildStructuredInput({
     return { ok: false, error: "Target time is required when goal style is target time." };
   }
 
-  if (!isIsoDateInput(trimmedStartDate)) {
+  if (goalStyle === "target_time") {
+    const targetTimeSeconds = parseDurationSeconds(trimmedTargetTime);
+
+    if (targetTimeSeconds == null || targetTimeSeconds < 10 * 60 || targetTimeSeconds > 12 * 3600) {
+      return { ok: false, error: "Use a realistic target time like 3:50:00." };
+    }
+  }
+
+  if (trimmedStartDate && !isHitoIsoDate(trimmedStartDate)) {
     return { ok: false, error: "Use YYYY-MM-DD for the plan start date." };
   }
 
-  if (trimmedTargetDate && !isIsoDateInput(trimmedTargetDate)) {
+  if (trimmedTargetDate && !isHitoIsoDate(trimmedTargetDate)) {
     return { ok: false, error: "Use YYYY-MM-DD for the target date." };
   }
 
   if (
     goalStyle === "target_time" &&
+    trimmedStartDate &&
     trimmedTargetDate &&
     diffIsoCalendarDays(trimmedTargetDate, trimmedStartDate) < 6
   ) {
@@ -271,10 +281,14 @@ export function buildStructuredInput({
         targetTime: goalStyle === "target_time" ? trimmedTargetTime : null,
         targetDate: goalStyle === "target_time" ? trimmedTargetDate || null : null,
       },
-      schedule: {
-        startDate: trimmedStartDate,
-        targetDate: goalStyle === "target_time" ? trimmedTargetDate || null : null,
-      },
+      ...(trimmedStartDate || (goalStyle === "target_time" && trimmedTargetDate)
+        ? {
+            schedule: {
+              startDate: trimmedStartDate || null,
+              targetDate: goalStyle === "target_time" ? trimmedTargetDate || null : null,
+            },
+          }
+        : {}),
       execution: {
         watchAccess,
         guidancePreference,
@@ -379,15 +393,6 @@ export function buildVoiceSupplementFromConstructorState({
   return supplement;
 }
 
-export function todayIsoDateInput() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
 export function deriveRunningDaysPerWeek(fixedRestDays: WeekdayName[]) {
   const allowedDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
 
@@ -427,7 +432,6 @@ export function isStructuredConstructorReady({
   maxRunningDaysPerWeek,
   goalStyle,
   targetTime,
-  startDate,
 }: Pick<
   StructuredConstructorState,
   | "age"
@@ -440,7 +444,6 @@ export function isStructuredConstructorReady({
   | "maxRunningDaysPerWeek"
   | "goalStyle"
   | "targetTime"
-  | "startDate"
 >) {
   const profileComplete =
     requiredNumber(age, "Age", { min: 13, max: 100, integer: true }).ok &&
@@ -458,15 +461,9 @@ export function isStructuredConstructorReady({
     runningDaysPerWeek >= 1 &&
     runningDaysPerWeek <= WEEKDAY_OPTIONS.length - fixedRestDays.length;
   const targetComplete = goalStyle !== "target_time" || Boolean(targetTime.trim());
-  const hasStartDate = Boolean(startDate.trim());
 
   return (
-    profileComplete &&
-    benchmarkComplete &&
-    hasTrainingDay &&
-    runningDayCountValid &&
-    targetComplete &&
-    hasStartDate
+    profileComplete && benchmarkComplete && hasTrainingDay && runningDayCountValid && targetComplete
   );
 }
 
@@ -507,27 +504,6 @@ function parseDurationSeconds(value: string) {
   }
 
   return hours * 3600 + minutes * 60 + seconds;
-}
-
-function isIsoDateInput(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [yearPart, monthPart, dayPart] = value.split("-");
-  const year = Number(yearPart);
-  const month = Number(monthPart);
-  const day = Number(dayPart);
-
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
-    return false;
-  }
-
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return (
-    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
-  );
 }
 
 function diffIsoCalendarDays(a: string, b: string) {

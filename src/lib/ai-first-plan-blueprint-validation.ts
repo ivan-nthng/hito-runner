@@ -19,6 +19,14 @@ import {
   hardWorkoutFamilies,
   weekdayIndex,
 } from "@/lib/ai-first-plan-blueprint-taxonomy";
+import {
+  hasRaceSpecificMetricSupport,
+  isSupportedModerateIntensityIdentity,
+  isSupportedSpecificityIdentity,
+  resolveSupportedIntensityCadence,
+  shouldUseLongRunSteadyFinishAsSpecificStimulus,
+  shouldUseRecoveryFirstAfterLongRun,
+} from "@/lib/structured-plan-authoring-policy";
 import { addDaysIso, weekdayLong, type StepPrescription } from "@/lib/training";
 
 export function buildNormalizationContext(authoringInput: StructuredAuthoringInput) {
@@ -355,9 +363,21 @@ function validateGoalFamilyCadenceWeek(
     return date === requiredCadenceSlot.date;
   });
 
+  const supportedIntensityCadence = resolveSupportedIntensityCadence(
+    context.authoringInput,
+    week.weekNumber,
+  );
+  const cadenceCanBeRepaired =
+    supportedIntensityCadence.applies &&
+    cadenceWorkout &&
+    (isSupportedModerateIntensityIdentity(cadenceWorkout.workoutIdentity) ||
+      (requiredCadenceSlot.identityOptions.includes("long_run_with_steady_finish") &&
+        isBlueprintLongRunIntent(cadenceWorkout)));
+
   if (
     !cadenceWorkout ||
-    !requiredCadenceSlot.identityOptions.includes(cadenceWorkout.workoutIdentity)
+    (!cadenceCanBeRepaired &&
+      !requiredCadenceSlot.identityOptions.includes(cadenceWorkout.workoutIdentity))
   ) {
     issues.push({
       code: "missing_required_goal_family_cadence",
@@ -476,6 +496,8 @@ export function validateNormalizedPlanDoctrine(
     }
   }
 
+  validateSupportedSpecificityDoctrine(workouts, context, issues);
+
   const longRuns = workouts.filter(
     (workout) => workout.workout_family === "long" || workout.workout_type === "long_run",
   );
@@ -525,6 +547,67 @@ export function validateNormalizedPlanDoctrine(
       message: "Taper long runs must stay below the pre-taper long-run peak.",
     });
   }
+
+  validateRecoveryFirstAfterLongRuns(workouts, context, issues);
+}
+
+function validateSupportedSpecificityDoctrine(
+  workouts: CanonicalWorkout[],
+  context: AiFirstPlanBlueprintNormalizationContext,
+  issues: NormalizationIssue[],
+) {
+  const workoutsByWeek = new Map<number, CanonicalWorkout[]>();
+
+  for (const workout of workouts) {
+    const weekWorkouts = workoutsByWeek.get(workout.week_number) ?? [];
+    weekWorkouts.push(workout);
+    workoutsByWeek.set(workout.week_number, weekWorkouts);
+  }
+
+  for (const [weekNumber, weekWorkouts] of workoutsByWeek) {
+    const cadence = resolveSupportedIntensityCadence(context.authoringInput, weekNumber);
+
+    if (!cadence.applies || cadence.frequency === "none") {
+      continue;
+    }
+
+    const specificityWorkouts = weekWorkouts.filter((workout) =>
+      isSupportedSpecificityIdentity(workout.workout_identity),
+    );
+
+    if (specificityWorkouts.length > 1) {
+      issues.push({
+        code: "supported_specificity_density_too_high",
+        path: `weeks.${weekNumber}.plannedWorkouts`,
+        message: `Week ${weekNumber} has more than one beginner/recreational specificity stimulus.`,
+      });
+    }
+
+    if (
+      shouldUseLongRunSteadyFinishAsSpecificStimulus(context.authoringInput, weekNumber, cadence) &&
+      !specificityWorkouts.some(
+        (workout) => workout.workout_identity === "long_run_with_steady_finish",
+      )
+    ) {
+      issues.push({
+        code: "missing_long_run_steady_finish_specificity",
+        path: `weeks.${weekNumber}.plannedWorkouts`,
+        message: `Week ${weekNumber} should use the long run as the specific stimulus instead of adding midweek load.`,
+      });
+    }
+
+    if (
+      !hasRaceSpecificMetricSupport(context.authoringInput) &&
+      specificityWorkouts.some((workout) => workout.workout_identity === "race_pace_session")
+    ) {
+      issues.push({
+        code: "unsupported_race_pace_specificity",
+        path: `weeks.${weekNumber}.plannedWorkouts`,
+        message:
+          "Race-pace specificity requires usable benchmark, watch/app access, and pace or mixed guidance support.",
+      });
+    }
+  }
 }
 
 function isCutbackLongRun(workout: CanonicalWorkout) {
@@ -535,6 +618,65 @@ function isCutbackLongRun(workout: CanonicalWorkout) {
     /cutback|reduced/i.test(workout.title) ||
     /cutback/i.test(workout.summary)
   );
+}
+
+function validateRecoveryFirstAfterLongRuns(
+  workouts: CanonicalWorkout[],
+  context: AiFirstPlanBlueprintNormalizationContext,
+  issues: NormalizationIssue[],
+) {
+  if (
+    context.goalFamilyCadencePlan ||
+    !shouldUseRecoveryFirstAfterLongRun(context.authoringInput)
+  ) {
+    return;
+  }
+
+  const runningWorkouts = workouts
+    .filter((workout) => !isRestWorkout(workout))
+    .sort((left, right) => left.date.localeCompare(right.date));
+
+  for (let index = 0; index < runningWorkouts.length; index += 1) {
+    const longRun = runningWorkouts[index]!;
+
+    if (!isCanonicalLongRunWorkout(longRun)) {
+      continue;
+    }
+
+    const nextWorkout = runningWorkouts[index + 1] ?? null;
+
+    if (!nextWorkout || isRecoveryFirstWorkout(nextWorkout)) {
+      continue;
+    }
+
+    issues.push({
+      code: "post_long_run_recovery_first_violation",
+      path: `${nextWorkout.date}.workout_identity`,
+      message: `${nextWorkout.date} follows a long run on ${longRun.date}; low-support long-run-heavy first plans must use recovery_jog or easy_aerobic_run in the next running slot.`,
+    });
+  }
+}
+
+function isRestWorkout(workout: CanonicalWorkout) {
+  return workout.workout_family === "rest" || workout.workout_type === "rest";
+}
+
+function isCanonicalLongRunWorkout(workout: CanonicalWorkout) {
+  const identity = workout.workout_identity ?? workout.source_workout_type ?? "";
+
+  return (
+    workout.workout_family === "long" ||
+    workout.workout_type === "long_run" ||
+    identity === "hike_run_endurance" ||
+    identity === "mountain_long_run_time_on_feet" ||
+    identity === "ultra_time_on_feet_durability"
+  );
+}
+
+function isRecoveryFirstWorkout(workout: CanonicalWorkout) {
+  const identity = workout.workout_identity ?? workout.source_workout_type ?? "";
+
+  return identity === "recovery_jog" || identity === "easy_aerobic_run";
 }
 
 export function resolveBlueprintWorkoutDate(

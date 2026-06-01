@@ -23,6 +23,11 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  HitoDateField,
+  HitoEditableDateChip,
+  HitoMaskedTimeField,
+} from "@/components/ui/hito-date-time-input";
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
 import { hitoToast } from "@/components/ui/hito-toast";
 import {
@@ -588,6 +593,10 @@ function HitoDesignSystemPage() {
   const [inputRightIcon, setInputRightIcon] = useState(false);
   const [inputState, setInputState] = useState<InputState>("default");
   const [inputFeedback, setInputFeedback] = useState<InputFeedback>("neutral");
+  const [dateFieldDemo, setDateFieldDemo] = useState("2026-12-11");
+  const [editableDateDemo, setEditableDateDemo] = useState("");
+  const [boundedDateDemo, setBoundedDateDemo] = useState("2026-05-29");
+  const [timeFieldDemo, setTimeFieldDemo] = useState("3:50:00");
   const [colorTab, setColorTab] = useState<ColorTab>("semantic");
   const [iconPreviewSize, setIconPreviewSize] = useState<HitoIconSize>("md");
   const [tabStyle, setTabStyle] = useState<TabStyle>("enclosed");
@@ -2134,6 +2143,105 @@ function HitoDesignSystemPage() {
 
                     <div className="border-t border-hairline pt-5">
                       <div className="mb-4">
+                        <p className="hito-label">Date and time inputs</p>
+                        <p className="hito-caption mt-2 max-w-2xl">
+                          Date/time truth stays ISO or duration-shaped in state. Calendar selection,
+                          typed date entry, compact optional date chips, and masked time entry share
+                          the same Hito field rhythm. The date input is the picker trigger; the
+                          calendar icon is an inline affordance, not a separate adjacent button.
+                        </p>
+                      </div>
+                      <div className="hito-reference-list">
+                        <article className="hito-reference-row items-start">
+                          <div>
+                            <p className="hito-list-row-title">Date picker field</p>
+                            <p className="hito-caption mt-2">
+                              Use for required or visible dates such as target race day. The input
+                              stays controlled as YYYY-MM-DD, opens the calendar on focus or click,
+                              and remains typeable while the picker is open.
+                            </p>
+                          </div>
+                          <HitoDateField
+                            id="ds-date-field"
+                            label="Target date"
+                            value={dateFieldDemo}
+                            onChange={setDateFieldDemo}
+                            helper="Pick from calendar or type YYYY-MM-DD."
+                          />
+                        </article>
+                        <article className="hito-reference-row items-start">
+                          <div>
+                            <p className="hito-list-row-title">Date picker states</p>
+                            <p className="hito-caption mt-2">
+                              Error, disabled, and bounded date states stay in the same field-owned
+                              anatomy. Min/max boundaries disable calendar days without adding
+                              product scheduling rules.
+                            </p>
+                          </div>
+                          <div className="grid min-w-0 gap-4">
+                            <HitoDateField
+                              id="ds-date-field-invalid"
+                              label="Invalid typed date"
+                              value="2026-13-40"
+                              onChange={() => {}}
+                              error="Use YYYY-MM-DD."
+                            />
+                            <HitoDateField
+                              id="ds-date-field-disabled"
+                              label="Disabled date"
+                              value="2026-12-11"
+                              onChange={() => {}}
+                              disabled
+                              helper="Disabled fields do not open the picker."
+                            />
+                            <HitoDateField
+                              id="ds-date-field-bounded"
+                              label="Bounded date"
+                              value={boundedDateDemo}
+                              onChange={setBoundedDateDemo}
+                              minDate="2026-05-20"
+                              maxDate="2026-06-10"
+                              helper="Calendar dates outside May 20-Jun 10 are disabled."
+                            />
+                          </div>
+                        </article>
+                        <article className="hito-reference-row items-start">
+                          <div>
+                            <p className="hito-list-row-title">Optional date chip</p>
+                            <p className="hito-caption mt-2">
+                              Use for optional dates that should start compact, like first-plan
+                              start date. Empty state is an action; saved state is visible and
+                              editable.
+                            </p>
+                          </div>
+                          <HitoEditableDateChip
+                            label="Plan Start Date"
+                            value={editableDateDemo}
+                            onChange={setEditableDateDemo}
+                            helper="Optional date using the same picker primitive."
+                          />
+                        </article>
+                        <article className="hito-reference-row items-start">
+                          <div>
+                            <p className="hito-list-row-title">Masked time field</p>
+                            <p className="hito-caption mt-2">
+                              Use for race targets and durations. Continuous digits normalize while
+                              editing: 35000 becomes 3:50:00.
+                            </p>
+                          </div>
+                          <HitoMaskedTimeField
+                            id="ds-time-field"
+                            label="Target time"
+                            value={timeFieldDemo}
+                            onChange={setTimeFieldDemo}
+                            helper="Duration-shaped, backend-compatible value."
+                          />
+                        </article>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-hairline pt-5">
+                      <div className="mb-4">
                         <p className="hito-label">Avatar tile action</p>
                         <p className="hito-caption mt-2 max-w-2xl">
                           Settings avatar controls use one rectangular tile and a same-width action.
@@ -2368,8 +2476,8 @@ function HitoDesignSystemPage() {
                   <div className="hito-specimen-contract-row">
                     <p className="hito-micro-label">Variants</p>
                     <p className="hito-list-row-copy">
-                      Primary, secondary, textarea, icon-leading, icon-trailing, and editable value
-                      chip companion patterns.
+                      Primary, secondary, textarea, icon-leading, icon-trailing, editable value
+                      chips, date picker fields, optional date chips, and masked time fields.
                     </p>
                   </div>
                   <div className="hito-specimen-contract-row">

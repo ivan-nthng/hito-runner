@@ -2,8 +2,6 @@ import "@tanstack/react-start/server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  type AdminCaptureAssetKind,
-  type AdminCaptureAssetView,
   type AdminCaptureBacklogView,
   type AdminCaptureCopyPromptView,
   type AdminCaptureCreateInput,
@@ -48,17 +46,14 @@ const SECRET_METADATA_VALUE_PATTERN =
 type AdminCaptureItemRow = Database["public"]["Tables"]["admin_capture_items"]["Row"];
 type AdminCaptureItemInsert = Database["public"]["Tables"]["admin_capture_items"]["Insert"];
 type AdminCaptureItemUpdate = Database["public"]["Tables"]["admin_capture_items"]["Update"];
-type AdminCaptureAssetRow = Database["public"]["Tables"]["admin_capture_assets"]["Row"];
 
-export interface AdminCaptureRowWithAssets extends AdminCaptureItemRow {
-  admin_capture_assets?: AdminCaptureAssetRow[] | null;
-}
+export type AdminCaptureRow = AdminCaptureItemRow;
 
 export interface AdminCaptureRepository {
-  createItem(input: AdminCaptureItemInsert): Promise<AdminCaptureRowWithAssets>;
-  listItems(input: AdminCaptureListInput): Promise<AdminCaptureRowWithAssets[]>;
-  getItem(id: string): Promise<AdminCaptureRowWithAssets | null>;
-  updateItem(id: string, patch: AdminCaptureItemUpdate): Promise<AdminCaptureRowWithAssets | null>;
+  createItem(input: AdminCaptureItemInsert): Promise<AdminCaptureRow>;
+  listItems(input: AdminCaptureListInput): Promise<AdminCaptureRow[]>;
+  getItem(id: string): Promise<AdminCaptureRow | null>;
+  updateItem(id: string, patch: AdminCaptureItemUpdate): Promise<AdminCaptureRow | null>;
 }
 
 export interface AdminCaptureDependencies {
@@ -389,7 +384,6 @@ export function buildAdminCaptureCopyPrompt(
   const selectedElement =
     item.selectedElement.text || item.selectedElement.nearbyHeading || "No selected element";
   const selector = item.selectedElement.selector ?? item.selectedElement.domPath ?? "Not captured";
-  const screenshots = item.assetCount > 0 ? `${item.assetCount} stored asset(s)` : "Unavailable";
   const metadataSummary = summarizeMetadata(item.metadata);
   const repoSource = getRepoImportSource(item.metadata);
   const contextSummary = [
@@ -432,7 +426,7 @@ export function buildAdminCaptureCopyPrompt(
     `- Nearby heading: ${item.selectedElement.nearbyHeading ?? "Not captured"}`,
     `- Selector/DOM path: ${selector}`,
     `- Admin note: ${item.note}`,
-    `- Screenshots: ${screenshots}`,
+    "- Screenshot assets: Not supported in the current backend contract.",
     `- Metadata: ${metadataSummary}`,
     "",
     "CONSTRAINTS:",
@@ -534,19 +528,19 @@ export function createSupabaseAdminCaptureRepository(
       const { data, error } = await supabase
         .from("admin_capture_items")
         .insert(input)
-        .select("*, admin_capture_assets(*)")
+        .select("*")
         .single();
 
       if (error || !data) {
         throw new Error(error?.message ?? "Capture item insert failed.");
       }
 
-      return data as AdminCaptureRowWithAssets;
+      return data as AdminCaptureRow;
     },
     async listItems(input) {
       let query = supabase
         .from("admin_capture_items")
-        .select("*, admin_capture_assets(*)")
+        .select("*")
         .order("created_at", { ascending: false })
         .limit(input.limit);
 
@@ -591,12 +585,12 @@ export function createSupabaseAdminCaptureRepository(
         throw new Error(error.message);
       }
 
-      return (data ?? []) as AdminCaptureRowWithAssets[];
+      return (data ?? []) as AdminCaptureRow[];
     },
     async getItem(id) {
       const { data, error } = await supabase
         .from("admin_capture_items")
-        .select("*, admin_capture_assets(*)")
+        .select("*")
         .eq("id", id)
         .maybeSingle();
 
@@ -604,21 +598,21 @@ export function createSupabaseAdminCaptureRepository(
         throw new Error(error.message);
       }
 
-      return (data as AdminCaptureRowWithAssets | null) ?? null;
+      return (data as AdminCaptureRow | null) ?? null;
     },
     async updateItem(id, patch) {
       const { data, error } = await supabase
         .from("admin_capture_items")
         .update(patch)
         .eq("id", id)
-        .select("*, admin_capture_assets(*)")
+        .select("*")
         .maybeSingle();
 
       if (error) {
         throw new Error(error.message);
       }
 
-      return (data as AdminCaptureRowWithAssets | null) ?? null;
+      return (data as AdminCaptureRow | null) ?? null;
     },
   };
 }
@@ -639,8 +633,7 @@ async function requireCaptureAdmin(dependencies: AdminCaptureDependencies): Prom
   return access;
 }
 
-function mapItemView(row: AdminCaptureRowWithAssets): AdminCaptureItemView {
-  const assets = (row.admin_capture_assets ?? []).map(mapAssetView);
+function mapItemView(row: AdminCaptureRow): AdminCaptureItemView {
   const source = isRepoImportMetadata(row.metadata)
     ? "repo_import"
     : hasCapturedElementContext(row)
@@ -673,26 +666,9 @@ function mapItemView(row: AdminCaptureRowWithAssets): AdminCaptureItemView {
     metadata: row.metadata,
     source,
     promptReady: Boolean(row.target_role && row.note),
-    assetCount: assets.length,
-    assets,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     archivedAt: row.archived_at,
-  };
-}
-
-function mapAssetView(row: AdminCaptureAssetRow): AdminCaptureAssetView {
-  return {
-    id: row.id,
-    assetKind: row.asset_kind as AdminCaptureAssetKind,
-    storageBucket: row.storage_bucket,
-    storagePath: row.storage_path,
-    mimeType: row.mime_type,
-    width: row.width,
-    height: row.height,
-    byteSize: row.byte_size,
-    checksum: row.checksum,
-    createdAt: row.created_at,
   };
 }
 

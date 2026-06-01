@@ -1096,9 +1096,6 @@ function CaptureBacklogList({
                   <span>{formatDateTime(item.createdAt)}</span>
                   <span>{formatItemSource(item)}</span>
                   {repoSource.sourceType ? <span>{repoSource.sourceType}</span> : null}
-                  <span>
-                    {item.assetCount > 0 ? `${item.assetCount} screenshot` : "No screenshot"}
-                  </span>
                 </span>
               </button>
               <div className="flex min-w-0 flex-wrap items-center justify-start gap-1.5 md:justify-end">
@@ -1362,15 +1359,6 @@ function CaptureItemDetail({
             <DetailRow
               label="Nearby heading"
               value={item.selectedElement.nearbyHeading ?? "Not captured"}
-            />
-            <DetailRow
-              label="Screenshot paths"
-              value={
-                item.assets.length > 0
-                  ? item.assets.map((asset) => asset.storagePath).join(", ")
-                  : "No screenshot paths"
-              }
-              code={item.assets.length > 0}
             />
             <DetailRow label="Created by" value={item.createdByLabel ?? item.createdByUserId} />
           </div>

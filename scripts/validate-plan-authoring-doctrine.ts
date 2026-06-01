@@ -430,6 +430,43 @@ function assertNoSingleSegmentNonRestRows(
   );
 }
 
+function assertNoSingleSegmentNonRestWorkouts(plan: TrainingPlanV2, label: string) {
+  const singleSegmentWorkouts = nonRestWorkouts(plan)
+    .filter((workout) => workout.segments.length <= 1)
+    .map((workout) => `${workout.date}:${workoutIdentityLabel(workout)}`);
+
+  assert.deepEqual(
+    singleSegmentWorkouts,
+    [],
+    `${label}: non-rest workouts should not regress into one-block shells`,
+  );
+}
+
+function assertNoSingleSegmentNonRestWorkoutsThroughWeek(
+  plan: TrainingPlanV2,
+  label: string,
+  maxWeekNumber: number,
+) {
+  const singleSegmentWorkouts = nonRestWorkouts(plan)
+    .filter((workout) => workout.week_number <= maxWeekNumber && workout.segments.length <= 1)
+    .map((workout) => `${workout.date}:${workoutIdentityLabel(workout)}`);
+
+  assert.deepEqual(
+    singleSegmentWorkouts,
+    [],
+    `${label}: early non-rest workouts should not regress into one-block shells`,
+  );
+}
+
+function assertNoFakeMetricTargetRegression(plan: TrainingPlanV2, label: string) {
+  assert.equal(
+    hasTargetKey(plan, "pace_min_per_km_range"),
+    false,
+    `${label}: should not add fake pace targets`,
+  );
+  assertDefaultEstimatedHrGuidance(plan, label);
+}
+
 function assertStructuredCreatePersistsRichWorkoutTruth(
   input: StructuredFirstPlanOnboardingRequestInput,
   label: string,
@@ -505,6 +542,248 @@ function assertWeeklyLongRunDay(plan: TrainingPlanV2, expectedWeekday: WeekdayNa
       `${label}: week ${weekNumber} long run should land on ${expectedWeekday}`,
     );
   }
+}
+
+function assertRecoveryFirstAfterLongRuns(plan: TrainingPlanV2, label: string) {
+  const runningWorkouts = nonRestWorkouts(plan).sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
+
+  for (let index = 0; index < runningWorkouts.length; index += 1) {
+    const longRun = runningWorkouts[index]!;
+
+    if (!isLongRunLikeWorkout(longRun)) {
+      continue;
+    }
+
+    const nextWorkout = runningWorkouts[index + 1] ?? null;
+
+    if (!nextWorkout) {
+      continue;
+    }
+
+    const nextIdentity =
+      nextWorkout.workout_identity ?? nextWorkout.source_workout_type ?? nextWorkout.workout_type;
+
+    assert.ok(
+      nextIdentity === "recovery_jog" || nextIdentity === "easy_aerobic_run",
+      `${label}: ${nextWorkout.date} follows long run ${longRun.date} and must be recovery/easy, not ${nextIdentity}`,
+    );
+    assert.notEqual(
+      nextIdentity,
+      "steady_aerobic_run",
+      `${label}: next running slot after long run must not be steady_aerobic_run`,
+    );
+  }
+}
+
+function isLongRunLikeWorkout(workout: TrainingPlanV2["planned_workouts"][number]) {
+  const identity = workout.workout_identity ?? workout.source_workout_type ?? workout.workout_type;
+
+  return (
+    workout.workout_family === "long" ||
+    workout.workout_type === "long_run" ||
+    identity === "hike_run_endurance" ||
+    identity === "mountain_long_run_time_on_feet" ||
+    identity === "ultra_time_on_feet_durability"
+  );
+}
+
+function workoutIdentityLabel(workout: TrainingPlanV2["planned_workouts"][number]) {
+  return workout.workout_identity ?? workout.source_workout_type ?? workout.workout_type;
+}
+
+function assertLowSupportMarathonExtensionRichness({
+  plan,
+  extensionStartWeek,
+  label,
+}: {
+  plan: TrainingPlanV2;
+  extensionStartWeek: number;
+  label: string;
+}) {
+  const extensionWeeks = weekIdentitySequences(plan, extensionStartWeek);
+
+  assert.ok(extensionWeeks.length > 0, `${label}: expected backend-extended weeks`);
+  assert.ok(
+    extensionWeeks.some((week) => week.identities.includes("easy_run_with_strides")),
+    `${label}: extension should include gentle strides support when safely placed`,
+  );
+  assert.ok(
+    extensionWeeks.some((week) => week.identities.includes("cutback_aerobic_run")),
+    `${label}: extension should include cutback aerobic support in lower-load weeks`,
+  );
+  assert.ok(
+    extensionWeeks.some((week) => week.identities.includes("long_run_with_steady_finish")),
+    `${label}: extension should include safe long-run steady-finish variation`,
+  );
+  assert.ok(
+    extensionWeeks.some((week) => week.identities.includes("cutback_long_run")),
+    `${label}: extension should preserve cutback long-run archetypes`,
+  );
+  assert.ok(
+    extensionWeeks.some((week) => week.identities.includes("taper_long_run")),
+    `${label}: extension should preserve taper long-run archetypes`,
+  );
+
+  const uniqueSequences = new Set(extensionWeeks.map((week) => week.identities.join(" > ")));
+  assert.ok(
+    uniqueSequences.size >= 4,
+    `${label}: extension should use multiple safe week archetypes; saw ${Array.from(
+      uniqueSequences,
+    ).join(" | ")}`,
+  );
+  assert.ok(
+    longestRepeatedSequenceRun(extensionWeeks) <= 3,
+    `${label}: extension should not repeat the exact same non-rest identity sequence for too many consecutive weeks`,
+  );
+
+  const hardQualityIdentities = new Set([
+    "time_intervals",
+    "distance_intervals",
+    "5k_sharpening_repeats",
+    "10k_rhythm_intervals",
+    "controlled_tempo_session",
+    "half_marathon_threshold_durability",
+    "race_pace_session",
+    "marathon_steady_specificity",
+    "progression_run",
+    "rolling_hills_session",
+    "hill_repeats",
+  ]);
+  const hardQualityViolations = extensionWeeks.flatMap((week) =>
+    week.identities
+      .filter((identity) => hardQualityIdentities.has(identity))
+      .map((identity) => `week ${week.weekNumber}:${identity}`),
+  );
+
+  assert.deepEqual(
+    hardQualityViolations,
+    [],
+    `${label}: low-support marathon extension should not add hard intervals, tempo, hills, or marathon-specific quality by default`,
+  );
+}
+
+function assertBeginnerRunWalkAdaptation({
+  plan,
+  adaptationWeeks,
+  label,
+}: {
+  plan: TrainingPlanV2;
+  adaptationWeeks: number;
+  label: string;
+}) {
+  const earlyWorkouts = nonRestWorkouts(plan).filter(
+    (workout) => workout.week_number <= adaptationWeeks,
+  );
+  const runWalkWorkouts = earlyWorkouts.filter((workout) => hasRunWalkAdaptationMarker(workout));
+  const forbiddenEarlyIntensity = new Set([
+    "steady_aerobic_run",
+    "easy_run_with_strides",
+    "controlled_tempo_session",
+    "time_intervals",
+    "distance_intervals",
+    "5k_sharpening_repeats",
+    "10k_rhythm_intervals",
+    "half_marathon_threshold_durability",
+    "marathon_steady_specificity",
+    "race_pace_session",
+    "progression_run",
+    "taper_tuneup_run",
+  ]);
+  const forbiddenEarlyWorkouts = earlyWorkouts
+    .filter((workout) => forbiddenEarlyIntensity.has(workoutIdentityLabel(workout)))
+    .map((workout) => `${workout.date}:${workoutIdentityLabel(workout)}`);
+  const longRunAdaptationCount = earlyWorkouts.filter(
+    (workout) => isLongRunLikeWorkout(workout) && hasRunWalkAdaptationMarker(workout),
+  ).length;
+
+  assert.ok(earlyWorkouts.length > 0, `${label}: expected early non-rest workouts`);
+  assert.ok(
+    runWalkWorkouts.length >= Math.min(earlyWorkouts.length, adaptationWeeks * 2),
+    `${label}: expected run/walk adaptation markers in early weeks; summary=${JSON.stringify(
+      runWalkAdaptationSummary(plan, adaptationWeeks),
+    )}`,
+  );
+  assert.ok(
+    longRunAdaptationCount >= Math.min(adaptationWeeks, earlyWorkouts.length),
+    `${label}: early long-run slots should include run/walk endurance adaptation`,
+  );
+  assert.deepEqual(
+    forbiddenEarlyWorkouts,
+    [],
+    `${label}: early adaptation should not include steady, tempo, intervals, race, progression, or strides overload`,
+  );
+}
+
+function hasRunWalkAdaptationMarker(workout: TrainingPlanV2["planned_workouts"][number]) {
+  return (workout.segments as SegmentRecord[]).some((segment) => {
+    const target = segment.target as Record<string, unknown> | undefined;
+
+    return target?.intensity === "run_walk_adaptation";
+  });
+}
+
+function runWalkAdaptationSummary(plan: TrainingPlanV2, adaptationWeeks: number) {
+  return Array.from({ length: adaptationWeeks }, (_value, index) => {
+    const weekNumber = index + 1;
+    const workouts = nonRestWorkouts(plan).filter((workout) => workout.week_number === weekNumber);
+
+    return {
+      weekNumber,
+      identities: workouts.map(workoutIdentityLabel),
+      runWalkCount: workouts.filter(hasRunWalkAdaptationMarker).length,
+      postLongRunSamples: workouts
+        .filter((workout, workoutIndex) => {
+          const previousWorkout = workouts[workoutIndex - 1];
+
+          return previousWorkout ? isLongRunLikeWorkout(previousWorkout) : false;
+        })
+        .map(workoutIdentityLabel),
+    };
+  });
+}
+
+function weekIdentitySequences(plan: TrainingPlanV2, startWeek: number) {
+  const weeks = new Map<number, string[]>();
+
+  for (const workout of nonRestWorkouts(plan).sort((left, right) =>
+    left.date.localeCompare(right.date),
+  )) {
+    if (workout.week_number < startWeek) {
+      continue;
+    }
+
+    const identities = weeks.get(workout.week_number) ?? [];
+    identities.push(workoutIdentityLabel(workout));
+    weeks.set(workout.week_number, identities);
+  }
+
+  return Array.from(weeks.entries()).map(([weekNumber, identities]) => ({
+    weekNumber,
+    identities,
+  }));
+}
+
+function longestRepeatedSequenceRun(weeks: Array<{ identities: string[] }>) {
+  let longestRun = 0;
+  let currentRun = 0;
+  let previousSequence: string | null = null;
+
+  for (const week of weeks) {
+    const sequence = week.identities.join(" > ");
+
+    if (sequence === previousSequence) {
+      currentRun += 1;
+    } else {
+      previousSequence = sequence;
+      currentRun = 1;
+    }
+
+    longestRun = Math.max(longestRun, currentRun);
+  }
+
+  return longestRun;
 }
 
 function assertLongRunDoctrine(plan: TrainingPlanV2, minPeakKm: number) {
@@ -633,7 +912,8 @@ function assertPhaseSpecificity(plan: TrainingPlanV2) {
     identitiesByPhase.get("Specific")?.has("progression_run") ||
       identitiesByPhase.get("Specific")?.has("uphill_repeats") ||
       identitiesByPhase.get("Specific")?.has("climbing_steady_run") ||
-      identitiesByPhase.get("Specific")?.has("marathon_steady_specificity"),
+      identitiesByPhase.get("Specific")?.has("marathon_steady_specificity") ||
+      identitiesByPhase.get("Specific")?.has("long_run_with_steady_finish"),
     "Specific phase should affect workout selection",
   );
   assert.ok(
@@ -670,6 +950,9 @@ function assertRoadPerformanceQualityCadence(plan: TrainingPlanV2, label: string
     "half_marathon_threshold_durability",
     "race_pace_session",
     "taper_tuneup_run",
+    "progression_run",
+    "easy_run_with_strides",
+    "aerobic_strides",
   ]);
   const qualityWeeks = new Set(
     nonRestWorkouts(plan)
@@ -1707,7 +1990,17 @@ function assertRichCompatibilityMapping() {
 }
 
 function assertRichPersistenceReadback() {
-  const plan = buildPlan(buildRequest("half_marathon")).plan;
+  const plan = buildPlan(
+    buildRequest("half_marathon", {
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: null,
+      },
+    }),
+  ).plan;
   const seed = buildImportedPlanSeed(plan);
   const insertRows = buildPersistedWorkoutInsertRows(
     "00000000-0000-4000-8000-000000000901",
@@ -1842,7 +2135,17 @@ function persistedWorkoutRowsForSeed(seed: ImportedPlanSeed): PersistedPlannedWo
 }
 
 function assertRichImportExportRoundtrip() {
-  const plan = buildPlan(buildRequest("half_marathon")).plan;
+  const plan = buildPlan(
+    buildRequest("half_marathon", {
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: null,
+      },
+    }),
+  ).plan;
   const seed = buildImportedPlanSeed(plan);
   const persistedRows = persistedWorkoutRowsForSeed(seed);
   const exportPayload = buildActivePlanExportPayload({
@@ -2182,7 +2485,7 @@ function assertGoalFamilyWorkoutIdentity() {
   const fiveK = buildPlan(
     buildRequest("5k", {
       availability: {
-        runningDaysPerWeek: 4,
+        runningDaysPerWeek: 5,
         fixedRestDays: [...fixedRestDays],
         preferredLongRunDay: "Saturday",
       },
@@ -2199,12 +2502,16 @@ function assertGoalFamilyWorkoutIdentity() {
   const fiveKText = planSearchText(fiveK);
 
   assert.ok(
-    fiveKTypes.has("aerobic_strides") || fiveKTypes.has("5k_sharpening_repeats"),
-    "ambitious 5K should include safe short-rep or stride sharpening",
+    fiveKTypes.has("aerobic_strides") ||
+      fiveKTypes.has("progression_run") ||
+      fiveKTypes.has("5k_sharpening_repeats"),
+    "ambitious 5K should include safe short-rep, progression, or stride sharpening",
   );
   assert.ok(
-    /short controlled reps|relaxed strides|controlled faster running/.test(fiveKText),
-    "5K sharpening should use controlled faster-running cues",
+    /short controlled reps|relaxed strides|controlled faster running|progression|controlled steady/.test(
+      fiveKText,
+    ),
+    "5K sharpening should use controlled faster-running or progression cues",
   );
 
   const tenK = buildPlan(
@@ -2225,16 +2532,21 @@ function assertGoalFamilyWorkoutIdentity() {
   ).plan;
   const tenKTypes = sourceWorkoutTypes(tenK);
 
-  assert.ok(tenKTypes.has("10k_rhythm_intervals"), "10K should include rhythm intervals");
   assert.ok(
-    /rhythm|sustained quality/.test(planSearchText(tenK)),
-    "10K work should include rhythm or sustained-quality cues",
+    tenKTypes.has("10k_rhythm_intervals") ||
+      tenKTypes.has("controlled_tempo_session") ||
+      tenKTypes.has("progression_run"),
+    "10K should include rhythm, controlled tempo, or progression work",
+  );
+  assert.ok(
+    /rhythm|sustained quality|controlled tempo|progression/.test(planSearchText(tenK)),
+    "10K work should include rhythm, controlled-tempo, or progression cues",
   );
 
   const half = buildPlan(
     buildRequest("half_marathon", {
       availability: {
-        runningDaysPerWeek: 4,
+        runningDaysPerWeek: 5,
         fixedRestDays: [...fixedRestDays],
         preferredLongRunDay: "Saturday",
       },
@@ -2243,12 +2555,16 @@ function assertGoalFamilyWorkoutIdentity() {
   const halfTypes = sourceWorkoutTypes(half);
 
   assert.ok(
-    halfTypes.has("half_marathon_threshold_durability"),
-    "half marathon should include threshold/steady durability work",
+    halfTypes.has("half_marathon_threshold_durability") ||
+      halfTypes.has("controlled_tempo_session") ||
+      halfTypes.has("progression_run"),
+    "half marathon should include threshold, controlled tempo, or progression work",
   );
   assert.ok(
-    /threshold|steady durability|sustained aerobic strength/.test(planSearchText(half)),
-    "half marathon work should include threshold or steady durability cues",
+    /threshold|steady durability|sustained aerobic strength|controlled tempo|progression/.test(
+      planSearchText(half),
+    ),
+    "half marathon work should include threshold, controlled-tempo, or progression cues",
   );
 
   const marathon = buildPlan(
@@ -2266,8 +2582,9 @@ function assertGoalFamilyWorkoutIdentity() {
   const marathonText = planSearchText(marathon);
 
   assert.ok(
-    marathonTypes.has("marathon_steady_specificity"),
-    "marathon should include controlled steady specificity",
+    marathonTypes.has("marathon_steady_specificity") ||
+      marathonTypes.has("long_run_with_steady_finish"),
+    "marathon should include controlled steady or steady-finish long-run specificity",
   );
   assert.ok(
     /marathon-steady|marathon durability|familiar fueling|time-on-feet/.test(marathonText),
@@ -2395,6 +2712,16 @@ function assertBeginnerBuildConsistencyQualityCap() {
     plan,
     "beginner consistency plan with age but no personal HR zones",
   );
+  assertBeginnerRunWalkAdaptation({
+    plan,
+    adaptationWeeks: 3,
+    label: "beginner consistency plan",
+  });
+  assertFixedRestDayNames(plan, [...fixedRestDays], "beginner consistency plan");
+  assertWeeklyLongRunDay(plan, "Saturday", "beginner consistency plan");
+  assertRecoveryFirstAfterLongRuns(plan, "beginner consistency plan");
+  assertRichWorkoutContract(plan, "beginner consistency plan");
+  assertNoSingleSegmentNonRestWorkoutsThroughWeek(plan, "beginner consistency plan", 3);
 
   const weakSupportConsistency = buildPlan(
     buildRequest("build_consistency", {
@@ -2415,6 +2742,609 @@ function assertBeginnerBuildConsistencyQualityCap() {
     false,
     "build-consistency plans with no usable benchmark and no target-time pressure should stay conservative",
   );
+}
+
+function assertBeginnerRecreationalSupportedIntensityCadence() {
+  const beginnerFiveKAuthoringInput = buildPlan(
+    buildRequest("5k", {
+      benchmark: { fitnessLevel: "beginner" },
+      availability: {
+        runningDaysPerWeek: 5,
+        fixedRestDays: [...fixedRestDays],
+        preferredLongRunDay: "Saturday",
+      },
+      execution: { watchAccess: "none", guidancePreference: "effort" },
+    }),
+  ).authoringInput;
+  const beginnerFiveKPlan = buildStructuredAuthoringPlan(
+    structuredPlanAuthoringInputSchema.parse({
+      ...beginnerFiveKAuthoringInput,
+      schedule: {
+        ...beginnerFiveKAuthoringInput.schedule,
+        targetDate: null,
+        preparationHorizonWeeks: 12,
+      },
+    }),
+  );
+
+  assertBeginnerRunWalkAdaptation({
+    plan: beginnerFiveKPlan,
+    adaptationWeeks: 3,
+    label: "beginner 5K supported cadence",
+  });
+  assertNoForbiddenHardIntensity(
+    beginnerFiveKPlan,
+    "beginner 5K supported cadence should avoid hard intervals",
+  );
+  assertModerateTouchCadenceAtMostEveryTwoWeeks(beginnerFiveKPlan, "beginner 5K supported cadence");
+  assertModerateTouchIdentitiesWithin(
+    beginnerFiveKPlan,
+    ["easy_run_with_strides", "progression_run"],
+    "beginner 5K supported cadence",
+  );
+  assert.ok(
+    moderateTouchWeeks(beginnerFiveKPlan).some((weekNumber) => weekNumber > 3),
+    "beginner 5K supported cadence should introduce safe moderate support after adaptation",
+  );
+  assertFixedRestDayNames(beginnerFiveKPlan, [...fixedRestDays], "beginner 5K supported cadence");
+  assertWeeklyLongRunDay(beginnerFiveKPlan, "Saturday", "beginner 5K supported cadence");
+  assertRecoveryFirstAfterLongRuns(beginnerFiveKPlan, "beginner 5K supported cadence");
+  assertRichWorkoutContract(beginnerFiveKPlan, "beginner 5K supported cadence");
+  assertNoSingleSegmentNonRestWorkouts(beginnerFiveKPlan, "beginner 5K supported cadence");
+  assertNoFakeMetricTargetRegression(beginnerFiveKPlan, "beginner 5K supported cadence");
+
+  const recreationalHalfAuthoringInput = buildPlan(
+    buildRequest("half_marathon", {
+      availability: {
+        runningDaysPerWeek: 4,
+        fixedRestDays: [...fixedRestDays],
+        preferredLongRunDay: "Saturday",
+      },
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:00:00",
+        targetDate: null,
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+  ).authoringInput;
+  const recreationalHalfPlan = buildStructuredAuthoringPlan(
+    structuredPlanAuthoringInputSchema.parse({
+      ...recreationalHalfAuthoringInput,
+      runnerProfile: {
+        ...recreationalHalfAuthoringInput.runnerProfile,
+        baselineLongRunKm: null,
+        baselineLongRunDurationMin: 70,
+      },
+    }),
+  );
+
+  assertWeeklyModerateTouchCadence(
+    recreationalHalfPlan,
+    "recreational half target-time supported cadence",
+  );
+  assertModerateTouchIdentitiesWithin(
+    recreationalHalfPlan,
+    [
+      "controlled_tempo_session",
+      "half_marathon_threshold_durability",
+      "progression_run",
+      "easy_run_with_strides",
+    ],
+    "recreational half target-time supported cadence",
+  );
+  assertNoTwoQualityWeeks(recreationalHalfPlan, "recreational half target-time supported cadence");
+  assertFixedRestDayNames(
+    recreationalHalfPlan,
+    [...fixedRestDays],
+    "recreational half target-time supported cadence",
+  );
+  assertWeeklyLongRunDay(
+    recreationalHalfPlan,
+    "Saturday",
+    "recreational half target-time supported cadence",
+  );
+  assertRichWorkoutContract(
+    recreationalHalfPlan,
+    "recreational half target-time supported cadence",
+  );
+
+  const unsupportedTargetTimeMarathonResult = buildPlan(
+    buildRequest("marathon", {
+      benchmark: { fitnessLevel: "beginner" },
+      availability: {
+        runningDaysPerWeek: 5,
+        fixedRestDays: [...fixedRestDays],
+        preferredLongRunDay: "Saturday",
+      },
+      goal: {
+        goalDistance: "marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "3:50:00",
+        targetDate: null,
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+  );
+  const unsupportedTargetTimeMarathon = unsupportedTargetTimeMarathonResult.plan;
+
+  assertBeginnerRunWalkAdaptation({
+    plan: unsupportedTargetTimeMarathon,
+    adaptationWeeks: 4,
+    label: "beginner marathon target-time unsupported cadence",
+  });
+  assertNoIntervalsOrRacePace(
+    unsupportedTargetTimeMarathon,
+    "beginner marathon target-time unsupported cadence should not unlock intervals or race pace",
+  );
+  assertModerateTouchCadenceAtMostEveryTwoWeeks(
+    unsupportedTargetTimeMarathon,
+    "beginner marathon target-time unsupported cadence",
+  );
+  assertNoTwoQualityWeeks(
+    unsupportedTargetTimeMarathon,
+    "beginner marathon target-time unsupported cadence",
+  );
+  assertRecoveryFirstAfterLongRuns(
+    unsupportedTargetTimeMarathon,
+    "beginner marathon target-time unsupported cadence",
+  );
+  assert.equal(
+    hasTargetKey(unsupportedTargetTimeMarathon, "pace_min_per_km_range"),
+    false,
+    "beginner marathon target-time without benchmark must not unlock pace targets",
+  );
+
+  const blueprintAuthoringInput = structuredPlanAuthoringInputSchema.parse({
+    ...unsupportedTargetTimeMarathonResult.authoringInput,
+    schedule: {
+      ...unsupportedTargetTimeMarathonResult.authoringInput.schedule,
+      targetDate: null,
+      preparationHorizonWeeks: 8,
+    },
+  });
+  const overAuthoredBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
+    blueprintAuthoringInput,
+    { horizonWeeks: 8 },
+  );
+
+  for (const week of overAuthoredBlueprint.weeks) {
+    let changedOneWorkout = false;
+
+    for (const workout of week.plannedWorkouts) {
+      if (changedOneWorkout || workout.workoutFamily === "long" || workout.weekday !== "Tuesday") {
+        continue;
+      }
+
+      workout.workoutFamily = "race";
+      workout.workoutIdentity = "race_pace_session";
+      workout.calendarIconKey = "race";
+      workout.title = "Unsupported race-rhythm block";
+      workout.summary = "Doctrine fixture intentionally overstates beginner race specificity.";
+      workout.plannedRpe = 8;
+      workout.estimatedFatigue = "high";
+      workout.recoveryPriority = "high";
+      workout.segmentIntent = "race_tuneup";
+      workout.metricIntent = "pace_if_allowed";
+      changedOneWorkout = true;
+    }
+  }
+
+  const repairedBlueprint = normalizeAiFirstPlanBlueprintToTrainingPlan({
+    blueprint: overAuthoredBlueprint,
+    authoringInput: blueprintAuthoringInput,
+  });
+
+  assert.equal(
+    repairedBlueprint.ok,
+    true,
+    repairedBlueprint.ok
+      ? "beginner over-authored blueprint should normalize after bounded cadence repair"
+      : `beginner over-authored blueprint should repair: ${JSON.stringify(
+          repairedBlueprint.issues,
+        )}`,
+  );
+
+  if (repairedBlueprint.ok) {
+    assertNoIntervalsOrRacePace(
+      repairedBlueprint.canonicalPlan,
+      "beginner over-authored blueprint repair",
+    );
+    assertModerateTouchCadenceAtMostEveryTwoWeeks(
+      repairedBlueprint.canonicalPlan,
+      "beginner over-authored blueprint repair",
+    );
+    assert.ok(
+      repairedBlueprint.metadata.repairs.some((repair) =>
+        repair.includes("supported-intensity cadence changed"),
+      ),
+      "beginner over-authored blueprint should expose bounded cadence repair metadata",
+    );
+  }
+}
+
+function assertSupportedHalfMarathonMarathonSpecificity() {
+  const weakHalfBase = buildPlan(
+    buildRequest("half_marathon", {
+      benchmark: { kind: "unknown" },
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "2:10:00",
+        targetDate: null,
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+  ).authoringInput;
+  const weakHalfPlan = buildStructuredAuthoringPlan(
+    structuredPlanAuthoringInputSchema.parse({
+      ...weakHalfBase,
+      schedule: { ...weakHalfBase.schedule, targetDate: null, preparationHorizonWeeks: 12 },
+      runnerProfile: {
+        ...weakHalfBase.runnerProfile,
+        experienceLevel: "returning_runner",
+        baselineSessionsPerWeek: 3,
+        baselineLongRunKm: null,
+        baselineLongRunDurationMin: 65,
+      },
+      currentLevel: {
+        recentRaceResults: [],
+        recent5kPaceSecondsPerKm: null,
+        recentResultSummary: null,
+        currentEasyPaceRange: null,
+        currentTrainingLoadSummary: null,
+      },
+    }),
+  );
+
+  assertModerateTouchCadenceAtMostEveryTwoWeeks(
+    weakHalfPlan,
+    "beginner half target-time weak benchmark specificity",
+  );
+  assertModerateTouchIdentitiesWithin(
+    weakHalfPlan,
+    ["progression_run", "controlled_tempo_session", "easy_run_with_strides"],
+    "beginner half target-time weak benchmark specificity",
+  );
+  assertNoIntervalsOrRacePace(weakHalfPlan, "beginner half target-time weak benchmark specificity");
+
+  const recreationalHalfBase = buildPlan(
+    buildRequest("half_marathon", {
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "1:55:00",
+        targetDate: null,
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+  ).authoringInput;
+  const recreationalHalfPlan = buildStructuredAuthoringPlan(
+    structuredPlanAuthoringInputSchema.parse({
+      ...recreationalHalfBase,
+      schedule: {
+        ...recreationalHalfBase.schedule,
+        targetDate: null,
+        preparationHorizonWeeks: 12,
+      },
+      runnerProfile: {
+        ...recreationalHalfBase.runnerProfile,
+        experienceLevel: "consistent_runner",
+        baselineSessionsPerWeek: 4,
+        baselineLongRunKm: null,
+        baselineLongRunDurationMin: 70,
+      },
+    }),
+  );
+  const recreationalHalfTypes = sourceWorkoutTypes(recreationalHalfPlan);
+
+  assertWeeklyModerateTouchCadence(
+    recreationalHalfPlan,
+    "recreational half target-time usable benchmark specificity",
+  );
+  assert.ok(
+    recreationalHalfTypes.has("controlled_tempo_session") ||
+      recreationalHalfTypes.has("half_marathon_threshold_durability"),
+    "recreational half target-time should use controlled tempo or threshold durability",
+  );
+  assertNoTwoSpecificStimulusWeeks(
+    recreationalHalfPlan,
+    "recreational half target-time usable benchmark specificity",
+  );
+
+  const beginnerMarathonBase = buildPlan(
+    buildRequest("marathon", {
+      benchmark: { kind: "unknown" },
+      goal: {
+        goalDistance: "marathon",
+        goalStyle: "target_time",
+        terrainFocus: "standard",
+        targetTime: "3:50:00",
+        targetDate: null,
+      },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    }),
+  ).authoringInput;
+  const beginnerMarathonPlan = buildStructuredAuthoringPlan(
+    structuredPlanAuthoringInputSchema.parse({
+      ...beginnerMarathonBase,
+      schedule: {
+        ...beginnerMarathonBase.schedule,
+        targetDate: null,
+        preparationHorizonWeeks: 16,
+      },
+      runnerProfile: {
+        ...beginnerMarathonBase.runnerProfile,
+        experienceLevel: "returning_runner",
+        baselineSessionsPerWeek: 3,
+        baselineLongRunKm: null,
+        baselineLongRunDurationMin: 80,
+      },
+      currentLevel: {
+        recentRaceResults: [],
+        recent5kPaceSecondsPerKm: null,
+        recentResultSummary: null,
+        currentEasyPaceRange: null,
+        currentTrainingLoadSummary: null,
+      },
+    }),
+  );
+  const beginnerMarathonTypes = sourceWorkoutTypes(beginnerMarathonPlan);
+
+  assertModerateTouchCadenceAtMostEveryTwoWeeks(
+    beginnerMarathonPlan,
+    "beginner marathon target-time no-benchmark specificity",
+  );
+  assert.ok(
+    beginnerMarathonTypes.has("marathon_steady_specificity") ||
+      beginnerMarathonTypes.has("long_run_with_steady_finish"),
+    "beginner marathon target-time should use marathon steady or steady-finish long-run specificity",
+  );
+  assertNoIntervalsOrRacePace(
+    beginnerMarathonPlan,
+    "beginner marathon target-time no-benchmark specificity",
+  );
+  assert.equal(
+    hasTargetKey(beginnerMarathonPlan, "pace_min_per_km_range"),
+    false,
+    "beginner marathon target-time without benchmark should not emit numeric race pace",
+  );
+
+  const recreationalMarathonBase = buildPlan(
+    buildRequest("marathon", {
+      goal: {
+        goalDistance: "marathon",
+        goalStyle: "ambitious",
+        terrainFocus: "standard",
+        targetTime: null,
+        targetDate: null,
+      },
+    }),
+  ).authoringInput;
+  const recreationalMarathonPlan = buildStructuredAuthoringPlan(
+    structuredPlanAuthoringInputSchema.parse({
+      ...recreationalMarathonBase,
+      schedule: {
+        ...recreationalMarathonBase.schedule,
+        targetDate: null,
+        preparationHorizonWeeks: 18,
+      },
+      runnerProfile: {
+        ...recreationalMarathonBase.runnerProfile,
+        experienceLevel: "consistent_runner",
+        baselineSessionsPerWeek: 4,
+        baselineLongRunKm: null,
+        baselineLongRunDurationMin: 85,
+      },
+    }),
+  );
+  const recreationalMarathonTypes = sourceWorkoutTypes(recreationalMarathonPlan);
+
+  assert.ok(
+    recreationalMarathonTypes.has("marathon_steady_specificity"),
+    "recreational marathon improvement should include marathon steady specificity",
+  );
+  assert.ok(
+    recreationalMarathonTypes.has("controlled_tempo_session"),
+    "recreational marathon improvement can include occasional controlled tempo when supported",
+  );
+  assertNoTwoSpecificStimulusWeeks(
+    recreationalMarathonPlan,
+    "recreational marathon improvement specificity",
+  );
+  assertNoIntervalsOrRacePace(recreationalMarathonPlan, "recreational marathon improvement");
+
+  const experiencedMarathonPlan = buildStructuredAuthoringPlan(
+    structuredPlanAuthoringInputSchema.parse({
+      ...recreationalMarathonBase,
+      schedule: {
+        ...recreationalMarathonBase.schedule,
+        targetDate: null,
+        preparationHorizonWeeks: 18,
+      },
+      runnerProfile: {
+        ...recreationalMarathonBase.runnerProfile,
+        experienceLevel: "experienced_runner",
+        baselineSessionsPerWeek: 5,
+        baselineLongRunKm: null,
+        baselineLongRunDurationMin: 95,
+      },
+      currentLevel: {
+        ...recreationalMarathonBase.currentLevel,
+        currentTrainingLoadSummary: null,
+      },
+    }),
+  );
+
+  assert.ok(
+    specificStimulusWeeks(experiencedMarathonPlan).length >= 8,
+    "experienced-but-not-advanced marathon should allow weekly specificity",
+  );
+  assertNoTwoSpecificStimulusWeeks(
+    experiencedMarathonPlan,
+    "experienced-but-not-advanced marathon specificity",
+  );
+}
+
+function assertNoForbiddenHardIntensity(plan: TrainingPlanV2, label: string) {
+  const forbiddenHardIdentities = new Set([
+    "controlled_tempo_session",
+    "time_intervals",
+    "distance_intervals",
+    "5k_sharpening_repeats",
+    "10k_rhythm_intervals",
+    "half_marathon_threshold_durability",
+    "marathon_steady_specificity",
+    "race_pace_session",
+    "rolling_hills_session",
+    "hill_repeats",
+    "uphill_repeats",
+  ]);
+  const violations = nonRestWorkouts(plan)
+    .filter((workout) => forbiddenHardIdentities.has(workoutIdentityLabel(workout)))
+    .map((workout) => `${workout.date}:${workoutIdentityLabel(workout)}`);
+
+  assert.deepEqual(violations, [], `${label}: should not include hard interval/race identities`);
+}
+
+function assertNoIntervalsOrRacePace(plan: TrainingPlanV2, label: string) {
+  const forbiddenIdentities = new Set([
+    "time_intervals",
+    "distance_intervals",
+    "5k_sharpening_repeats",
+    "10k_rhythm_intervals",
+    "race_pace_session",
+  ]);
+  const violations = nonRestWorkouts(plan)
+    .filter((workout) => forbiddenIdentities.has(workoutIdentityLabel(workout)))
+    .map((workout) => `${workout.date}:${workoutIdentityLabel(workout)}`);
+
+  assert.deepEqual(violations, [], `${label}: should not include intervals or race-pace work`);
+}
+
+function assertModerateTouchCadenceAtMostEveryTwoWeeks(plan: TrainingPlanV2, label: string) {
+  const weeks = moderateTouchWeeks(plan);
+  const consecutiveWeeks = weeks.filter((weekNumber, index) => {
+    const previousWeek = weeks[index - 1];
+
+    return previousWeek != null && weekNumber - previousWeek < 2;
+  });
+
+  assert.deepEqual(
+    consecutiveWeeks,
+    [],
+    `${label}: moderate touches should not appear in consecutive weeks`,
+  );
+  assertNoTwoQualityWeeks(plan, label);
+}
+
+function assertWeeklyModerateTouchCadence(plan: TrainingPlanV2, label: string) {
+  const weeks = new Set(moderateTouchWeeks(plan));
+
+  for (const weekNumber of [1, 2, 3, 5, 6]) {
+    assert.ok(weeks.has(weekNumber), `${label}: expected moderate support in week ${weekNumber}`);
+  }
+
+  assertNoTwoQualityWeeks(plan, label);
+}
+
+function assertNoTwoQualityWeeks(plan: TrainingPlanV2, label: string) {
+  const moderateCountsByWeek = new Map<number, number>();
+
+  for (const workout of moderateTouchWorkouts(plan)) {
+    moderateCountsByWeek.set(
+      workout.week_number,
+      (moderateCountsByWeek.get(workout.week_number) ?? 0) + 1,
+    );
+  }
+
+  const overloadedWeeks = [...moderateCountsByWeek.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([weekNumber, count]) => `week ${weekNumber}:${count}`);
+
+  assert.deepEqual(overloadedWeeks, [], `${label}: should not create two-quality weeks`);
+}
+
+function assertModerateTouchIdentitiesWithin(
+  plan: TrainingPlanV2,
+  allowedIdentities: string[],
+  label: string,
+) {
+  const allowed = new Set(allowedIdentities);
+  const unexpected = moderateTouchWorkouts(plan)
+    .filter((workout) => !allowed.has(workoutIdentityLabel(workout)))
+    .map((workout) => `${workout.date}:${workoutIdentityLabel(workout)}`);
+
+  assert.deepEqual(unexpected, [], `${label}: moderate touches should use the safe ladder`);
+}
+
+function moderateTouchWeeks(plan: TrainingPlanV2) {
+  return [...new Set(moderateTouchWorkouts(plan).map((workout) => workout.week_number))].sort(
+    (left, right) => left - right,
+  );
+}
+
+function moderateTouchWorkouts(plan: TrainingPlanV2) {
+  const moderateIdentities = new Set([
+    "easy_run_with_strides",
+    "progression_run",
+    "controlled_tempo_session",
+    "time_intervals",
+    "distance_intervals",
+    "5k_sharpening_repeats",
+    "10k_rhythm_intervals",
+    "half_marathon_threshold_durability",
+    "marathon_steady_specificity",
+    "race_pace_session",
+    "rolling_hills_session",
+    "hill_repeats",
+    "uphill_repeats",
+  ]);
+
+  return nonRestWorkouts(plan).filter((workout) =>
+    moderateIdentities.has(workoutIdentityLabel(workout)),
+  );
+}
+
+function specificStimulusWeeks(plan: TrainingPlanV2) {
+  return [...new Set(specificStimulusWorkouts(plan).map((workout) => workout.week_number))].sort(
+    (left, right) => left - right,
+  );
+}
+
+function specificStimulusWorkouts(plan: TrainingPlanV2) {
+  const specificityIdentities = new Set([
+    "easy_run_with_strides",
+    "progression_run",
+    "controlled_tempo_session",
+    "half_marathon_threshold_durability",
+    "marathon_steady_specificity",
+    "race_pace_session",
+    "long_run_with_steady_finish",
+  ]);
+
+  return nonRestWorkouts(plan).filter((workout) =>
+    specificityIdentities.has(workoutIdentityLabel(workout)),
+  );
+}
+
+function assertNoTwoSpecificStimulusWeeks(plan: TrainingPlanV2, label: string) {
+  const countsByWeek = new Map<number, number>();
+
+  for (const workout of specificStimulusWorkouts(plan)) {
+    countsByWeek.set(workout.week_number, (countsByWeek.get(workout.week_number) ?? 0) + 1);
+  }
+
+  const overloadedWeeks = [...countsByWeek.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([weekNumber, count]) => `week ${weekNumber}:${count}`);
+
+  assert.deepEqual(overloadedWeeks, [], `${label}: should not create hidden two-specificity weeks`);
 }
 
 function assertMetricTargetPolicy() {
@@ -2658,10 +3588,10 @@ function buildAiFirstPlanDraftFixture(): AiFirstPlanDraft {
     },
     {
       family: "tempo",
-      identity: "half_marathon_threshold_durability",
+      identity: "controlled_tempo_session",
       icon: "tempo",
-      title: "Half marathon threshold durability",
-      summary: "Controlled threshold durability without forcing target pace.",
+      title: "Controlled tempo session",
+      summary: "Controlled tempo durability without forcing target pace.",
       mainType: "tempo_block",
       mainLabel: "Controlled threshold block",
       durationMin: 54,
@@ -2701,10 +3631,10 @@ function buildAiFirstPlanDraftFixture(): AiFirstPlanDraft {
     },
     {
       family: "long",
-      identity: "long_run_with_steady_finish",
+      identity: "long_aerobic_run",
       icon: "long",
-      title: "Long run with steady finish",
-      summary: "Aerobic long run with a short steady finish for target-time awareness.",
+      title: "Long aerobic run",
+      summary: "Aerobic long run that preserves durability without adding a second stimulus.",
       mainType: "main",
       mainLabel: "Long aerobic block",
       durationMin: 80,
@@ -2791,10 +3721,10 @@ function buildAiFirstPlanBlueprintFixture(): AiFirstPlanBlueprint {
     },
     {
       family: "tempo",
-      identity: "half_marathon_threshold_durability",
+      identity: "controlled_tempo_session",
       icon: "tempo",
-      title: "Half marathon threshold durability",
-      summary: "Controlled threshold durability without forcing target pace.",
+      title: "Controlled tempo session",
+      summary: "Controlled tempo durability without forcing target pace.",
       rpe: 6,
       fatigue: "medium_high",
       recovery: "medium",
@@ -2828,10 +3758,10 @@ function buildAiFirstPlanBlueprintFixture(): AiFirstPlanBlueprint {
     },
     {
       family: "long",
-      identity: "long_run_with_steady_finish",
+      identity: "long_aerobic_run",
       icon: "long",
-      title: "Long run with steady finish",
-      summary: "Aerobic long run with a short steady finish for target-time awareness.",
+      title: "Long aerobic run",
+      summary: "Aerobic long run that preserves durability without adding a second stimulus.",
       rpe: 5,
       fatigue: "medium_high",
       recovery: "high",
@@ -2858,6 +3788,22 @@ function buildAiFirstPlanBlueprintFixture(): AiFirstPlanBlueprint {
         return [];
       }
 
+      const effectiveTemplate =
+        weekNumber === 2 && template.identity === "controlled_tempo_session"
+          ? {
+              ...template,
+              family: "easy",
+              identity: "easy_aerobic_run",
+              icon: "easy",
+              title: "Easy aerobic run",
+              summary: "Easy taper support run that preserves freshness.",
+              rpe: 4,
+              fatigue: "low",
+              recovery: "medium",
+              segmentIntent: "easy_aerobic",
+              metricIntent: "mixed_if_allowed",
+            }
+          : template;
       const date = addDaysIso(startDate, (weekNumber - 1) * 7 + dayIndex);
 
       return [
@@ -2866,16 +3812,16 @@ function buildAiFirstPlanBlueprintFixture(): AiFirstPlanBlueprint {
           weekday: weekdayLong(
             date,
           ) as AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number]["weekday"],
-          workoutFamily: template.family,
-          workoutIdentity: template.identity,
-          calendarIconKey: template.icon,
-          title: template.title,
-          summary: template.summary,
-          plannedRpe: template.rpe,
-          estimatedFatigue: template.fatigue,
-          recoveryPriority: template.recovery,
-          segmentIntent: template.segmentIntent,
-          metricIntent: template.metricIntent,
+          workoutFamily: effectiveTemplate.family,
+          workoutIdentity: effectiveTemplate.identity,
+          calendarIconKey: effectiveTemplate.icon,
+          title: effectiveTemplate.title,
+          summary: effectiveTemplate.summary,
+          plannedRpe: effectiveTemplate.rpe,
+          estimatedFatigue: effectiveTemplate.fatigue,
+          recoveryPriority: effectiveTemplate.recovery,
+          segmentIntent: effectiveTemplate.segmentIntent,
+          metricIntent: effectiveTemplate.metricIntent,
         },
       ];
     }),
@@ -3313,10 +4259,12 @@ function buildGoalFamilyCadenceAuthoringInput({
     goalDistance === "ultra_marathon" || goalDistance === "mountain_running"
       ? 80
       : goalDistance === "marathon"
-        ? 70
-        : goalDistance === "build_consistency"
-          ? 35
-          : 55;
+        ? 75
+        : goalDistance === "half_marathon"
+          ? 65
+          : goalDistance === "build_consistency"
+            ? 35
+            : 55;
 
   return buildAiFirstPlanAuthoringInput({
     goal: {
@@ -3674,7 +4622,15 @@ function assertAiFirstPlanDraftContract() {
   }
 
   const noPaceAuthoringInput = buildAiFirstPlanAuthoringInput({
-    currentLevel: { recentRaceResults: [], recent5kPaceSecondsPerKm: null },
+    currentLevel: { recentRaceResults: [], recent5kPaceSecondsPerKm: 288 },
+    runnerProfile: {
+      age: 36,
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunDurationMin: 65,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "rpe",
+    },
     execution: { watchAccess: "none", guidancePreference: "effort" },
   });
   const unsupportedPaceNormalized = normalizeAiFirstPlanDraftToTrainingPlan({
@@ -3906,7 +4862,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "half_marathon_threshold_durability",
           "steady_aerobic_run",
           "recovery_jog",
-          "long_run_with_steady_finish",
+          "long_aerobic_run",
         ],
         [
           "easy_aerobic_run",
@@ -3927,11 +4883,11 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "race_pace_session",
           "steady_aerobic_run",
           "recovery_jog",
-          "long_run_with_steady_finish",
+          "long_aerobic_run",
         ],
         [
           "easy_aerobic_run",
-          "time_intervals",
+          "half_marathon_threshold_durability",
           "steady_aerobic_run",
           "recovery_jog",
           "long_aerobic_run",
@@ -3944,14 +4900,12 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "taper_long_run",
         ],
       ],
-      expected: ["half_marathon_threshold_durability", "race_pace_session"],
+      expected: ["half_marathon_threshold_durability", "controlled_tempo_session"],
       forbidden: ["5k_sharpening_repeats", "mountain_long_run_time_on_feet"],
       cadence: [
         "half_marathon_threshold_durability",
         "controlled_tempo_session",
-        "distance_intervals",
-        "race_pace_session",
-        "time_intervals",
+        "long_run_with_steady_finish",
         "taper_tuneup_run",
       ],
     },
@@ -3983,7 +4937,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "steady_aerobic_run",
           "steady_aerobic_run",
           "recovery_jog",
-          "cutback_long_run",
+          "long_aerobic_run",
         ],
         [
           "easy_aerobic_run",
@@ -4007,18 +4961,9 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "taper_long_run",
         ],
       ],
-      expected: [
-        "progression_run",
-        "controlled_tempo_session",
-        "half_marathon_threshold_durability",
-      ],
+      expected: ["progression_run", "long_run_with_steady_finish"],
       forbidden: ["5k_sharpening_repeats", "race_pace_session", "mountain_long_run_time_on_feet"],
-      cadence: [
-        "progression_run",
-        "controlled_tempo_session",
-        "half_marathon_threshold_durability",
-        "taper_tuneup_run",
-      ],
+      cadence: [],
     },
     {
       label: "marathon",
@@ -4027,18 +4972,12 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         goalStyle: "target_time",
         targetTime: "4:15:00",
         runningDays: fiveDay,
+        horizonWeeks: 12,
       }),
       weeks: [
         [
           "easy_aerobic_run",
           "marathon_steady_specificity",
-          "steady_aerobic_run",
-          "recovery_jog",
-          "long_run_with_steady_finish",
-        ],
-        [
-          "easy_aerobic_run",
-          "steady_aerobic_run",
           "steady_aerobic_run",
           "recovery_jog",
           "long_aerobic_run",
@@ -4048,6 +4987,13 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "controlled_tempo_session",
           "steady_aerobic_run",
           "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "marathon_steady_specificity",
+          "steady_aerobic_run",
+          "recovery_jog",
           "cutback_long_run",
         ],
         [
@@ -4055,7 +5001,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "steady_aerobic_run",
           "steady_aerobic_run",
           "recovery_jog",
-          "long_run_with_steady_finish",
+          "long_aerobic_run",
         ],
         [
           "easy_aerobic_run",
@@ -4071,8 +5017,50 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "recovery_jog",
           "taper_long_run",
         ],
+        [
+          "easy_aerobic_run",
+          "marathon_steady_specificity",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "steady_aerobic_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "cutback_long_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "marathon_steady_specificity",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "controlled_tempo_session",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "long_aerobic_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "taper_tuneup_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
+        [
+          "easy_aerobic_run",
+          "taper_tuneup_run",
+          "steady_aerobic_run",
+          "recovery_jog",
+          "taper_long_run",
+        ],
       ],
-      expected: ["marathon_steady_specificity", "long_run_with_steady_finish"],
+      expected: ["marathon_steady_specificity", "controlled_tempo_session"],
       forbidden: ["5k_sharpening_repeats", "10k_rhythm_intervals"],
       cadence: ["marathon_steady_specificity", "controlled_tempo_session", "taper_tuneup_run"],
     },
@@ -4400,7 +5388,7 @@ function assertMarathonCadenceAvoidsPostLongRunQuality() {
   const firstWeek = promptSlots[0]!;
   const sundayLongSlot = firstWeek.slots.find((slot) => slot.weekday === "Sunday");
   const mondaySlot = firstWeek.slots.find((slot) => slot.weekday === "Monday");
-  const qualitySlot = firstWeek.slots.find((slot) => slot.mustBeQuality);
+  const qualitySlot = promptSlots.flatMap((week) => week.slots).find((slot) => slot.mustBeQuality);
 
   assert.equal(sundayLongSlot?.mustBeLongRun, true, "Sunday should remain the long-run slot");
   assert.equal(
@@ -4503,13 +5491,21 @@ function assertAiFirstPlanBlueprintContract() {
   const blueprint = buildAiFirstPlanBlueprintFixture();
   const normalized = normalizeAiFirstPlanBlueprintToTrainingPlan({ blueprint, authoringInput });
 
-  assert.equal(normalized.ok, true, "valid compact AI first-plan blueprint should normalize");
+  assert.equal(
+    normalized.ok,
+    true,
+    normalized.ok
+      ? "valid compact AI first-plan blueprint should normalize"
+      : `valid compact AI first-plan blueprint should normalize: ${JSON.stringify(normalized.issues)}`,
+  );
 
   if (normalized.ok) {
     assert.equal(
       normalized.metadata.status,
       "ai_authored",
-      "valid AI first-plan blueprint should report ai_authored metadata",
+      `valid AI first-plan blueprint should report ai_authored metadata: ${JSON.stringify(
+        normalized.metadata.repairs,
+      )}`,
     );
     assert.equal(
       normalized.metadata.source,
@@ -4550,6 +5546,11 @@ function assertAiFirstPlanBlueprintContract() {
       startDate: "2026-06-01",
       targetDate: "2026-06-14",
       preparationHorizonWeeks: 2,
+    },
+    currentLevel: {
+      recentRaceResults: [],
+      recent5kPaceSecondsPerKm: 288,
+      currentTrainingLoadSummary: "Identity coverage fixture bypasses beginner cadence quota.",
     },
   });
   const identityBlueprint = buildAiFirstPlanBlueprintIdentityFixture();
@@ -4661,7 +5662,15 @@ function assertAiFirstPlanBlueprintContract() {
   }
 
   const noPaceAuthoringInput = buildAiFirstPlanAuthoringInput({
-    currentLevel: { recentRaceResults: [], recent5kPaceSecondsPerKm: null },
+    currentLevel: { recentRaceResults: [], recent5kPaceSecondsPerKm: 288 },
+    runnerProfile: {
+      age: 36,
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunDurationMin: 65,
+      recentInjuryRecoveryContext: null,
+      preferredEffortLanguage: "rpe",
+    },
     execution: { watchAccess: "none", guidancePreference: "effort" },
   });
   const unsupportedPaceNormalized = normalizeAiFirstPlanBlueprintToTrainingPlan({
@@ -4672,7 +5681,11 @@ function assertAiFirstPlanBlueprintContract() {
   assert.equal(
     unsupportedPaceNormalized.ok,
     true,
-    "AI first-plan blueprint normalizer should repair unsupported pace intent instead of failing",
+    unsupportedPaceNormalized.ok
+      ? "AI first-plan blueprint normalizer should repair unsupported pace intent instead of failing"
+      : `AI first-plan blueprint normalizer should repair unsupported pace intent instead of failing: ${JSON.stringify(
+          unsupportedPaceNormalized.issues,
+        )}`,
   );
 
   if (unsupportedPaceNormalized.ok) {
@@ -4815,7 +5828,15 @@ function assertAiFirstPlanEnvelopeContract() {
 
   const expanded = expandAiFirstPlanEnvelopeToTrainingPlan({ envelope, authoringInput });
 
-  assert.equal(expanded.ok, true, "valid AI first-plan envelope should expand canonically");
+  assert.equal(
+    expanded.ok,
+    true,
+    expanded.ok
+      ? "valid AI first-plan envelope should expand canonically"
+      : `valid AI first-plan envelope should expand canonically: ${JSON.stringify(
+          expanded.issues,
+        )}`,
+  );
 
   if (expanded.ok) {
     const plan = expanded.canonicalPlan;
@@ -5343,6 +6364,10 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
         targetTime: "3:50:00",
         targetDate: "2026-12-11",
       },
+      schedule: {
+        startDate: "2026-05-29",
+        targetDate: "2026-12-11",
+      },
       strength: { preference: "mobility" },
       execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
       comment: null,
@@ -5366,6 +6391,8 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
     boundedHorizonStrategy.openAiAuthoringInput,
     { horizonWeeks: boundedHorizonStrategy.aiAuthoredHorizonWeeks },
   );
+  const forcedPostLongRunSteady =
+    forceFirstPostLongRunBlueprintWorkoutToSteady(boundedHorizonBlueprint);
   const boundedHorizonResult = await generateStructuredFirstPlanDraftForUser(
     "doctrine-fixture-user",
     partialInput,
@@ -5432,12 +6459,95 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
       145,
       "long target-date structured review should include every required running slot",
     );
+    assertFixedRestDayNames(
+      boundedHorizonResult.draft.canonicalPlan,
+      ["Wednesday", "Saturday"],
+      "long target-date low-support marathon review",
+    );
+    assertWeeklyLongRunDay(
+      boundedHorizonResult.draft.canonicalPlan,
+      "Sunday",
+      "long target-date low-support marathon review",
+    );
+    assertRecoveryFirstAfterLongRuns(
+      boundedHorizonResult.draft.canonicalPlan,
+      "long target-date low-support marathon review",
+    );
+    assertRichWorkoutContract(
+      boundedHorizonResult.draft.canonicalPlan,
+      "long target-date low-support marathon review",
+    );
+    assertNoSingleSegmentNonRestWorkouts(
+      boundedHorizonResult.draft.canonicalPlan,
+      "long target-date low-support marathon review",
+    );
+    assertNoFakeMetricTargetRegression(
+      boundedHorizonResult.draft.canonicalPlan,
+      "long target-date low-support marathon review",
+    );
+    assertBeginnerRunWalkAdaptation({
+      plan: boundedHorizonResult.draft.canonicalPlan,
+      adaptationWeeks: 6,
+      label: "long target-date low-support marathon review",
+    });
+    assertLowSupportMarathonExtensionRichness({
+      plan: boundedHorizonResult.draft.canonicalPlan,
+      extensionStartWeek: boundedHorizonStrategy.aiAuthoredHorizonWeeks + 1,
+      label: "long target-date low-support marathon review",
+    });
+    assert.equal(
+      boundedHorizonResult.generation.blueprintTrace?.requiredCadenceSlots.length,
+      0,
+      "low-support marathon target-date review should keep cadence kind none",
+    );
+    assert.ok(
+      forcedPostLongRunSteady,
+      "doctrine fixture should force a post-long-run steady blueprint workout before repair",
+    );
+    assert.ok(
+      boundedHorizonResult.generation.repairs.some((repair) =>
+        repair.includes(`recovery-first sequencing changed steady_aerobic_run`),
+      ),
+      "post-long-run steady blueprint workout should be repaired before review",
+    );
     assert.equal(
       boundedHorizonResult.generation.blueprintTrace?.deterministicFallbackBoundary.used,
       false,
       "long target-date structured review must not use deterministic fallback",
     );
   }
+
+  const nonSundayLongRunAuthoringInput = structuredPlanAuthoringInputSchema.parse({
+    ...partialAuthoringInput,
+    schedule: {
+      ...partialAuthoringInput.schedule,
+      startDate: "2026-06-01",
+      targetDate: null,
+      preparationHorizonWeeks: 4,
+    },
+    availability: {
+      ...partialAuthoringInput.availability,
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Sunday"],
+      unavailableDays: ["Wednesday", "Saturday"],
+      preferredLongRunDay: "Tuesday",
+    },
+  });
+  const nonSundayLongRunPlan = buildStructuredAuthoringPlan(nonSundayLongRunAuthoringInput);
+
+  assertWeeklyLongRunDay(
+    nonSundayLongRunPlan,
+    "Tuesday",
+    "non-Sunday low-support marathon recovery sequencing fixture",
+  );
+  assertFixedRestDayNames(
+    nonSundayLongRunPlan,
+    ["Wednesday", "Saturday"],
+    "non-Sunday low-support marathon recovery sequencing fixture",
+  );
+  assertRecoveryFirstAfterLongRuns(
+    nonSundayLongRunPlan,
+    "non-Sunday low-support marathon recovery sequencing fixture",
+  );
 
   const partialBlueprint = {
     ...buildMinimalAiFirstPlanBlueprintForAuthoringInput(partialAuthoringInput, {
@@ -5853,6 +6963,46 @@ function buildMinimalAiFirstPlanBlueprintForAuthoringInput(
   };
 }
 
+function forceFirstPostLongRunBlueprintWorkoutToSteady(blueprint: AiFirstPlanBlueprint) {
+  const entries = blueprint.weeks
+    .flatMap((week) => week.plannedWorkouts.map((workout) => ({ week, workout })))
+    .filter((entry) => entry.workout.date)
+    .sort((left, right) => left.workout.date!.localeCompare(right.workout.date!));
+
+  for (let index = 0; index < entries.length; index += 1) {
+    const longRunEntry = entries[index]!;
+
+    if (longRunEntry.workout.workoutFamily !== "long") {
+      continue;
+    }
+
+    const nextEntry = entries[index + 1] ?? null;
+
+    if (!nextEntry) {
+      return null;
+    }
+
+    nextEntry.workout.workoutFamily = "steady";
+    nextEntry.workout.workoutIdentity = "steady_aerobic_run";
+    nextEntry.workout.calendarIconKey = "steady";
+    nextEntry.workout.title = "Steady aerobic run";
+    nextEntry.workout.summary =
+      "Deliberately inserted doctrine fixture violation after a long run.";
+    nextEntry.workout.plannedRpe = 5;
+    nextEntry.workout.estimatedFatigue = "medium";
+    nextEntry.workout.recoveryPriority = "medium";
+    nextEntry.workout.segmentIntent = "steady_aerobic";
+    nextEntry.workout.metricIntent = "mixed_if_allowed";
+
+    return {
+      longRunDate: longRunEntry.workout.date!,
+      repairedDate: nextEntry.workout.date!,
+    };
+  }
+
+  return null;
+}
+
 function dateForWeekdayInSevenDayWindow(startDate: string, weekday: WeekdayName) {
   for (let offset = 0; offset < 7; offset += 1) {
     const date = addDaysIso(startDate, offset);
@@ -5967,6 +7117,8 @@ assertSubstantialWorkoutIdentitiesAreStructured({
 });
 assertGoalFamilyWorkoutIdentity();
 assertBeginnerBuildConsistencyQualityCap();
+assertBeginnerRecreationalSupportedIntensityCadence();
+assertSupportedHalfMarathonMarathonSpecificity();
 assertMetricTargetPolicy();
 assertRichCompatibilityMapping();
 assertRichPersistenceReadback();
@@ -6069,9 +7221,12 @@ assertRichWorkoutContract(
     plan,
     "target-time half marathon without benchmark but with age",
   );
-  assert.ok(
-    sourceWorkoutTypes(plan).has("half_marathon_threshold_durability"),
-    "target-time half marathon should still include half-marathon threshold durability structure",
+  assert.equal(
+    sourceWorkoutTypes(plan).has("time_intervals") ||
+      sourceWorkoutTypes(plan).has("distance_intervals") ||
+      sourceWorkoutTypes(plan).has("race_pace_session"),
+    false,
+    "target-time half marathon without benchmark should not unlock intervals or race-pace work",
   );
   assertSupportRunRichness(plan, "target-time half marathon without benchmark");
   assertStructuredCreatePersistsRichWorkoutTruth(

@@ -5,6 +5,8 @@ import {
 import {
   buildDefaultEstimatedHrTarget,
   buildEasyTarget,
+  buildLongRunTarget,
+  buildRepeatRecoveryTarget,
   deriveBenchmarkPaceTargets,
 } from "@/lib/structured-plan-authoring-metrics";
 
@@ -130,6 +132,90 @@ export function buildEasyRunSegments({
       },
       duration_min: finishMin,
       target: buildEasyTarget(normalized, { hrBand: easyHrBand }),
+    },
+  ];
+}
+
+export function buildRunWalkAdaptationSegments({
+  workoutId,
+  durationMin,
+  normalized,
+  weekNumber,
+  role,
+}: {
+  workoutId: string;
+  durationMin: number;
+  normalized: NormalizedStructuredInput;
+  weekNumber: number;
+  role: "support" | "recovery" | "long";
+}) {
+  const warmupMin = role === "long" ? 8 : 5;
+  const cooldownMin = 5;
+  const runMin = weekNumber <= 1 ? 1 : weekNumber <= 3 ? 2 : 3;
+  const walkMin = weekNumber <= 2 ? 2 : weekNumber <= 4 ? 1.5 : 1;
+  const availableMin = Math.max(10, durationMin - warmupMin - cooldownMin);
+  const repeatCount = Math.max(4, Math.min(10, Math.floor(availableMin / (runMin + walkMin))));
+  const easyTarget = role === "long" ? buildLongRunTarget(normalized) : buildEasyTarget(normalized);
+
+  return [
+    {
+      segment_id: `${workoutId}_seg_1`,
+      sequence: 1,
+      segment_type: "warmup" as const,
+      label: role === "long" ? "Walk-first long-run opening" : "Walk-first adaptation opening",
+      guidance:
+        "Begin with brisk walking or the easiest possible shuffle. The goal is to arrive ready, not warmed up hard.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: warmupMin,
+      },
+      duration_min: warmupMin,
+      target: buildEasyTarget(normalized, { hrBand: role === "recovery" ? "recovery" : "easy" }),
+    },
+    {
+      segment_id: `${workoutId}_seg_2`,
+      sequence: 2,
+      segment_type: "interval_block" as const,
+      label: role === "long" ? "Run/walk endurance body" : "Run/walk adaptation set",
+      guidance:
+        "Alternate relaxed running with planned walk breaks. Walk before breathing or form falls apart; this is adaptation, not interval training.",
+      duration_min: availableMin,
+      prescription: {
+        mode: "repeats" as const,
+        repeat_count: repeatCount,
+        repeat_unit: {
+          mode: "time" as const,
+          duration_min: runMin,
+        },
+        recovery_unit: {
+          mode: "time" as const,
+          duration_min: walkMin,
+        },
+      },
+      target: {
+        ...easyTarget,
+        intensity: "run_walk_adaptation",
+        cue: "Run portions stay conversational; walk breaks are part of the plan.",
+      },
+      recovery_target: buildRepeatRecoveryTarget(normalized),
+    },
+    {
+      segment_id: `${workoutId}_seg_3`,
+      sequence: 3,
+      segment_type: "cooldown" as const,
+      label: "Walk-down finish",
+      guidance:
+        "Finish with easy walking or very easy jogging and stop while the body still feels under control.",
+      prescription: {
+        mode: "time" as const,
+        duration_min: cooldownMin,
+      },
+      duration_min: cooldownMin,
+      target: {
+        ...buildDefaultEstimatedHrTarget(normalized, role === "recovery" ? "recovery" : "easy"),
+        intensity: "walk_down_recovery",
+        cue: "Keep this easier than the run/walk body.",
+      },
     },
   ];
 }

@@ -3144,6 +3144,67 @@
     box-sizing: border-box;
   }
 
+  .hito-metadata-tag {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    gap: 0.35rem;
+    border: 1px solid color-mix(in oklch, var(--color-muted-foreground) 14%, transparent);
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklch, var(--color-foreground) 4%, transparent);
+    padding: 0.225rem 0.45rem;
+    color: color-mix(in oklch, var(--color-muted-foreground) 88%, transparent);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.1;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .hito-metadata-tag[data-interactive="true"] {
+    cursor: pointer;
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .hito-metadata-tag[data-interactive="true"]:hover {
+    border-color: color-mix(in oklch, var(--color-foreground) 22%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-metadata-tag[data-interactive="true"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
+  }
+
+  .hito-metadata-tag[data-tone="success"] {
+    border-color: color-mix(in oklch, var(--color-success) 22%, transparent);
+    background: color-mix(in oklch, var(--color-success) 7%, transparent);
+    color: var(--color-success);
+  }
+
+  .hito-metadata-tag[data-tone="warning"] {
+    border-color: color-mix(in oklch, var(--color-warn) 24%, transparent);
+    background: color-mix(in oklch, var(--color-warn) 7%, transparent);
+    color: var(--color-warn);
+  }
+
+  .hito-metadata-tag[data-tone="signal"],
+  .hito-metadata-tag[data-tone="rollout"] {
+    border-color: color-mix(in oklch, var(--color-signal) 18%, transparent);
+    background: color-mix(in oklch, var(--color-signal) 6%, transparent);
+    color: color-mix(in oklch, var(--color-signal) 72%, var(--color-muted-foreground));
+  }
+
+  .hito-metadata-tag[data-tone="muted"] {
+    border-color: color-mix(in oklch, var(--color-muted-foreground) 12%, transparent);
+    background: color-mix(in oklch, var(--color-muted-foreground) 4%, transparent);
+    color: color-mix(in oklch, var(--color-muted-foreground) 82%, transparent);
+  }
+
   @keyframes hito-backlog-detail-rise {
     from {
       opacity: 0;

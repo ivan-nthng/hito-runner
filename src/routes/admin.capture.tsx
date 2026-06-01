@@ -76,12 +76,17 @@ type RepoDerivedInfo = {
 };
 
 const STATUS_FILTERS: Array<{ value: CaptureStatusFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "new", label: "New" },
-  { value: "in_review", label: "In review" },
-  { value: "ready_for_codex", label: "Ready for Codex" },
+  { value: "all", label: "Active" },
   { value: "done", label: "Done" },
   { value: "archived", label: "Archived" },
+];
+
+const ACTIVE_CAPTURE_STATUSES: AdminCaptureStatus[] = ["new", "in_review", "ready_for_codex"];
+
+const EDITABLE_CAPTURE_STATUS_OPTIONS: Array<{ value: AdminCaptureStatus; label: string }> = [
+  { value: "new", label: "new" },
+  { value: "done", label: "done" },
+  { value: "archived", label: "archived" },
 ];
 
 const ADMIN_CAPTURE_NAV: Array<{
@@ -167,7 +172,12 @@ export const Route = createFileRoute("/admin/capture")({
       });
     }
 
-    return { result, countsResult };
+    return {
+      result: result.ok
+        ? { ...result, view: filterBacklogViewForStatus(result.view, search.status) }
+        : result,
+      countsResult,
+    };
   },
   pendingComponent: CapturePendingState,
   component: AdminCapturePage,
@@ -613,9 +623,7 @@ function CaptureStatusTabs({
           data-active={activeStatus === status.value ? "true" : undefined}
         >
           {status.label}
-          {status.value !== "all" ? (
-            <span className="hito-tab-badge">{counts[status.value]}</span>
-          ) : null}
+          <span className="hito-tab-badge">{countForStatusFilter(status.value, counts)}</span>
         </a>
       ))}
     </div>
@@ -1083,11 +1091,6 @@ function CaptureBacklogList({
               >
                 <span className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="hito-list-row-title truncate font-medium">{item.title}</span>
-                  {item.promptReady ? (
-                    <span className="hito-status-pill" data-tone="signal">
-                      Prompt ready
-                    </span>
-                  ) : null}
                 </span>
                 <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <code className="hito-technical-mono truncate">
@@ -1101,34 +1104,40 @@ function CaptureBacklogList({
               <div className="flex min-w-0 flex-wrap items-center justify-start gap-1.5 md:justify-end">
                 {readOnly ? (
                   <>
-                    <ReadOnlyMetadataPill
+                    <ReadOnlyMetadataTag
                       icon={repoMarkdownStatusIcon(repoSource)}
                       tone={repoMarkdownStatusTone(repoSource)}
                       value={formatRepoMarkdownStatus(repoSource, item)}
                     />
-                    <ReadOnlyMetadataPill
-                      value={formatMarkdownMetadataValue(repoSource.markdownType, item.itemType)}
+                    <ReadOnlyMetadataTag
+                      value={formatMarkdownMetadataValue(
+                        "type",
+                        repoSource.markdownType,
+                        item.itemType,
+                      )}
                     />
-                    <ReadOnlyMetadataPill
+                    <ReadOnlyMetadataTag
                       tone={
                         repoSource.markdownPriority ? markdownPriorityTone(repoSource) : undefined
                       }
                       value={formatMarkdownMetadataValue(
+                        "priority",
                         repoSource.markdownPriority,
                         item.priority,
                       )}
                     />
-                    <ReadOnlyMetadataPill
+                    <ReadOnlyMetadataTag
                       value={formatMarkdownMetadataValue(
+                        "role",
                         repoSource.markdownNextRole,
                         item.targetRole,
                       )}
                     />
                     {repoSource.missingRequiredFields.length > 0 ? (
-                      <ReadOnlyMetadataPill tone="warning" value="Missing metadata" />
+                      <ReadOnlyMetadataTag tone="warning" value="missing metadata" />
                     ) : null}
                     {repoSource.invalidRequiredFields.length > 0 ? (
-                      <ReadOnlyMetadataPill tone="warning" value="Invalid metadata" />
+                      <ReadOnlyMetadataTag tone="warning" value="invalid metadata" />
                     ) : null}
                   </>
                 ) : (
@@ -1137,12 +1146,9 @@ function CaptureBacklogList({
                       icon={statusIcon(item.status)}
                       label="Status"
                       value={item.status}
-                      displayValue={formatStatusLabel(item.status)}
+                      displayValue={formatStatusTagValue(item.status)}
                       tone={statusTone(item.status)}
-                      options={adminCaptureStatuses.map((status) => ({
-                        value: status,
-                        label: formatStatusLabel(status),
-                      }))}
+                      options={EDITABLE_CAPTURE_STATUS_OPTIONS}
                       onSelect={(status) =>
                         onUpdateTriage(item, { status: status as AdminCaptureStatus })
                       }
@@ -1150,7 +1156,7 @@ function CaptureBacklogList({
                     <MetadataMenu
                       label="Type"
                       value={item.itemType}
-                      displayValue={formatItemType(item.itemType)}
+                      displayValue={formatItemTypeTagValue(item.itemType)}
                       options={adminCaptureItemTypes.map((type) => ({
                         value: type,
                         label: formatItemType(type),
@@ -1162,7 +1168,7 @@ function CaptureBacklogList({
                     <MetadataMenu
                       label="Priority"
                       value={item.priority ?? ""}
-                      displayValue={item.priority ? formatPriority(item.priority) : "Unset"}
+                      displayValue={item.priority ? formatPriorityTagValue(item.priority) : "unset"}
                       tone={item.priority ? priorityTone(item.priority) : undefined}
                       options={[
                         { value: "", label: "Unset" },
@@ -1180,7 +1186,9 @@ function CaptureBacklogList({
                     <MetadataMenu
                       label="Target role"
                       value={item.targetRole ?? ""}
-                      displayValue={item.targetRole ? formatTargetRole(item.targetRole) : "No role"}
+                      displayValue={
+                        item.targetRole ? formatTargetRoleTagValue(item.targetRole) : "no role"
+                      }
                       options={[
                         { value: "", label: "No role" },
                         ...adminCaptureTargetRoles.map((role) => ({
@@ -1270,9 +1278,7 @@ function CaptureItemDetail({
         {repoSource.readOnly ? (
           <div className="grid gap-2 text-xs text-muted-foreground">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="hito-status-pill" data-tone="rollout">
-                Repo mirror
-              </span>
+              <ReadOnlyMetadataTag tone="rollout" value="repo mirror" />
               <span>Markdown is the source of truth. This item is read-only in Backlog.</span>
             </div>
             {repoSource.missingRequiredFields.length > 0 ? (
@@ -1288,20 +1294,28 @@ function CaptureItemDetail({
           <section className="grid gap-3 border-t border-hairline pt-4">
             <h4 className="hito-label text-foreground">Markdown metadata</h4>
             <div className="flex flex-wrap gap-2">
-              <ReadOnlyMetadataPill
+              <ReadOnlyMetadataTag
                 icon={repoMarkdownStatusIcon(repoSource)}
                 tone={repoMarkdownStatusTone(repoSource)}
                 value={formatRepoMarkdownStatus(repoSource, item)}
               />
-              <ReadOnlyMetadataPill
-                value={formatMarkdownMetadataValue(repoSource.markdownType, item.itemType)}
+              <ReadOnlyMetadataTag
+                value={formatMarkdownMetadataValue("type", repoSource.markdownType, item.itemType)}
               />
-              <ReadOnlyMetadataPill
+              <ReadOnlyMetadataTag
                 tone={repoSource.markdownPriority ? markdownPriorityTone(repoSource) : undefined}
-                value={formatMarkdownMetadataValue(repoSource.markdownPriority, item.priority)}
+                value={formatMarkdownMetadataValue(
+                  "priority",
+                  repoSource.markdownPriority,
+                  item.priority,
+                )}
               />
-              <ReadOnlyMetadataPill
-                value={formatMarkdownMetadataValue(repoSource.markdownNextRole, item.targetRole)}
+              <ReadOnlyMetadataTag
+                value={formatMarkdownMetadataValue(
+                  "role",
+                  repoSource.markdownNextRole,
+                  item.targetRole,
+                )}
               />
             </div>
           </section>
@@ -1495,9 +1509,7 @@ function DetailRow({ code, label, value }: { code?: boolean; label: string; valu
 function MetadataHint({ fields, label }: { fields: string[]; label: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="hito-status-pill" data-tone="warning">
-        {label}
-      </span>
+      <ReadOnlyMetadataTag tone="warning" value={formatMetadataTagValue(label)} />
       <span>{fields.map(formatMetadataFieldName).join(", ")}</span>
     </div>
   );
@@ -1525,8 +1537,8 @@ function MetadataMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="hito-status-pill cursor-pointer transition-colors hover:border-foreground/20"
-          data-icon="false"
+          className="hito-metadata-tag"
+          data-interactive="true"
           data-tone={tone}
           aria-label={`${label}: ${displayValue}`}
         >
@@ -1555,7 +1567,7 @@ function MetadataMenu({
   );
 }
 
-function ReadOnlyMetadataPill({
+function ReadOnlyMetadataTag({
   icon,
   tone,
   value,
@@ -1565,7 +1577,7 @@ function ReadOnlyMetadataPill({
   value: string;
 }) {
   return (
-    <span className="hito-status-pill" data-icon={icon ? "false" : undefined} data-tone={tone}>
+    <span className="hito-metadata-tag" data-tone={tone}>
       {icon ? <Icon name={icon} size="xs" aria-hidden="true" /> : null}
       {value}
     </span>
@@ -1645,6 +1657,35 @@ function buildCaptureHref(search: CaptureSearch, patch: Partial<CaptureSearch>) 
   return `/admin/capture?${params.toString()}`;
 }
 
+function filterBacklogViewForStatus(
+  view: AdminCaptureBacklogView,
+  status: CaptureStatusFilter,
+): AdminCaptureBacklogView {
+  if (status !== "all") {
+    return view;
+  }
+
+  const items = view.items.filter((item) => ACTIVE_CAPTURE_STATUSES.includes(item.status));
+
+  return {
+    ...view,
+    total: items.length,
+    shown: items.length,
+    items,
+  };
+}
+
+function countForStatusFilter(
+  status: CaptureStatusFilter,
+  counts: Record<AdminCaptureStatus, number>,
+) {
+  if (status === "all") {
+    return ACTIVE_CAPTURE_STATUSES.reduce((total, activeStatus) => total + counts[activeStatus], 0);
+  }
+
+  return counts[status];
+}
+
 function getActiveCaptureFilters(search: CaptureSearch) {
   const query = captureQueryText(search.q);
   const filters: Array<{
@@ -1696,11 +1737,9 @@ function getActiveCaptureFilters(search: CaptureSearch) {
 function statusTone(status: AdminCaptureStatus) {
   switch (status) {
     case "new":
-      return "rollout";
     case "in_review":
-      return "warning";
     case "ready_for_codex":
-      return "signal";
+      return "rollout";
     case "done":
       return "success";
     case "archived":
@@ -1711,11 +1750,9 @@ function statusTone(status: AdminCaptureStatus) {
 function statusIcon(status: AdminCaptureStatus): HitoIconName {
   switch (status) {
     case "new":
-      return "plus";
     case "in_review":
-      return "search";
     case "ready_for_codex":
-      return "sparkles";
+      return "plus";
     case "done":
       return "check";
     case "archived":
@@ -1783,10 +1820,10 @@ function formatRepoMarkdownStatus(repoSource: RepoDerivedInfo, item: AdminCaptur
   const markdownStatus = repoSource.markdownStatus ?? repoSource.workItemStatus;
 
   if (markdownStatus) {
-    return `Markdown: ${formatMarkdownMetadataValue(markdownStatus)}`;
+    return `status: ${formatMetadataTagValue(markdownStatus)}`;
   }
 
-  return item.status === "in_review" ? "Markdown: Backlog" : formatStatusLabel(item.status);
+  return `status: ${formatStatusTagValue(item.status)}`;
 }
 
 function repoMarkdownStatusTone(repoSource: RepoDerivedInfo) {
@@ -1818,12 +1855,16 @@ function markdownPriorityTone(repoSource: RepoDerivedInfo) {
   return priority === "urgent" || priority === "high" ? "warning" : undefined;
 }
 
-function formatMarkdownMetadataValue(value: string | null | undefined, fallback?: string | null) {
-  return formatMetadataLabel(value ?? fallback ?? "Unset");
+function formatMarkdownMetadataValue(
+  label: string,
+  value: string | null | undefined,
+  fallback?: string | null,
+) {
+  return `${label}: ${formatMetadataTagValue(value ?? fallback ?? "unset")}`;
 }
 
 function formatMetadataFieldName(value: string) {
-  return formatMetadataLabel(value.replace(/^markdown_/, ""));
+  return formatMetadataTagValue(value.replace(/^markdown_/, ""));
 }
 
 function formatMetadataLabel(value: string) {
@@ -1832,6 +1873,10 @@ function formatMetadataLabel(value: string) {
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatMetadataTagValue(value: string) {
+  return value.trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ").toLowerCase();
 }
 
 function normalizeMarkdownValue(value: string | null | undefined) {
@@ -1844,9 +1889,15 @@ function normalizeMarkdownValue(value: string | null | undefined) {
 }
 
 function parseCaptureStatus(value: unknown): CaptureStatusFilter {
-  return value === "all" || adminCaptureStatuses.includes(value as AdminCaptureStatus)
-    ? (value as CaptureStatusFilter)
-    : "new";
+  if (value === "done" || value === "archived" || value === "all") {
+    return value;
+  }
+
+  if (adminCaptureStatuses.includes(value as AdminCaptureStatus)) {
+    return "all";
+  }
+
+  return "all";
 }
 
 function parseNullableFilter<T extends string>(
@@ -1949,17 +2000,30 @@ function formatDateTime(value: string) {
 function formatStatusLabel(value: CaptureStatusFilter) {
   switch (value) {
     case "all":
-      return "All";
+      return "Active";
     case "new":
       return "New";
     case "in_review":
-      return "In review";
     case "ready_for_codex":
-      return "Ready for Codex";
+      return "Active";
     case "done":
       return "Done";
     case "archived":
       return "Archived";
+  }
+}
+
+function formatStatusTagValue(value: AdminCaptureStatus) {
+  switch (value) {
+    case "new":
+      return "new";
+    case "in_review":
+    case "ready_for_codex":
+      return "active";
+    case "done":
+      return "done";
+    case "archived":
+      return "archived";
   }
 }
 
@@ -1974,6 +2038,10 @@ function formatItemType(value: AdminCaptureItemType) {
   }
 }
 
+function formatItemTypeTagValue(value: AdminCaptureItemType) {
+  return formatMetadataTagValue(formatItemType(value));
+}
+
 function formatPriority(value: AdminCapturePriority) {
   switch (value) {
     case "low":
@@ -1985,6 +2053,10 @@ function formatPriority(value: AdminCapturePriority) {
     case "urgent":
       return "Urgent";
   }
+}
+
+function formatPriorityTagValue(value: AdminCapturePriority) {
+  return formatMetadataTagValue(formatPriority(value));
 }
 
 function formatTargetRole(value: AdminCaptureTargetRole) {
@@ -2006,4 +2078,8 @@ function formatTargetRole(value: AdminCaptureTargetRole) {
     case "running_coach":
       return "Running Coach";
   }
+}
+
+function formatTargetRoleTagValue(value: AdminCaptureTargetRole) {
+  return formatMetadataTagValue(formatTargetRole(value));
 }

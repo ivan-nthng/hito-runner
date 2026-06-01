@@ -88,6 +88,16 @@ Language rule:
 - Keep surrounding explanation, status, and commentary in Russian unless the user explicitly asks otherwise.
 - Do not mix Russian into execution prompts unless the user explicitly requests a Russian prompt.
 
+Exact next-role prompt recipient rule:
+
+- Every exact next-role prompt must begin by naming who the task is for.
+- The first line inside the prompt block must be `ROLE: <ROLE>`, for example `ROLE: FRONTEND`,
+  `ROLE: QA`, `ROLE: BACKEND`, `ROLE: ARCHITECT`, `ROLE: DESIGNER`, `ROLE: COPY`, or
+  `ROLE: RUNNING COACH`.
+- Do not start an exact handoff prompt with `Task`, `Stage`, context, or prose before the `ROLE:`
+  line.
+- After the `ROLE:` line, include the task and stage in the prompt body.
+
 One-prompt handoff rule:
 
 - Provide exactly one next-role prompt per response.

@@ -344,6 +344,38 @@ Cleanup closeout evidence, 2026-06-01:
   part of the admin capture asset cleanup.
 - No legacy compatibility seam remains for `admin_capture_assets`.
 
+Vercel build and admin availability recovery checkpoint, 2026-06-01:
+
+- QA passed after the Nitro output finalizer fix and linked Supabase asset-seam removal.
+- `npm run build` passed.
+- `npx vercel build --yes` passed.
+- The old Vercel failure did not recur:
+  `Expected staged Nitro build output is missing: /vercel/path0/node_modules/.nitro/vite/server-output`.
+- Vercel-mode artifacts existed:
+  - `.vercel/output/static`
+  - `.vercel/output/static/favicon.svg`
+  - `.vercel/output/static/templates/hito-training-plan-v2-template.json`
+  - `.vercel/output/functions/__server.func/index.mjs`
+  - `.vercel/output/config.json`
+  - `.vercel/output/nitro.json`
+- Vercel deployment inspection showed a newer production deployment in `Ready` state.
+- `npm run validate-admin-capture-backlog:live` returned `ok: true`.
+- `npm run validate-admin-capture-backlog` returned `ok: true`.
+- Live validation proved `admin_capture_items_exists`, `admin_capture_assets_legacy_absent`,
+  `admin_capture_assets_bucket_legacy_absent`, service-role create/list/read/update,
+  publishable-key read/write blocking, and cleanup.
+- Local browser/admin proof passed: unauthenticated `/admin/capture` required admin login,
+  authenticated admin landed on `/admin/capture?status=new&type=all&priority=all&role=all&q=`,
+  backlog counts loaded, `Capture load failed` and `Backlog unavailable` were not visible, and no
+  auth loop occurred after successful sign-in.
+- Screenshot evidence:
+  `qa-artifacts/screenshots/2026-06-01/admin-capture-vercel-build-recovery-qa/admin-capture-backlog-loaded.png`.
+- Non-blocking nuance: after local `npm run build` in a workspace that already had
+  `.vercel/output`, `.output/server/index.mjs` was not left in the final artifact snapshot even
+  though isolated local-mode finalizer execution recreated and validated it. This does not block
+  Vercel recovery or admin backlog recovery and should be tracked separately only if local `.output`
+  serve behavior becomes important.
+
 ### Table: `admin_capture_items`
 
 Suggested fields:

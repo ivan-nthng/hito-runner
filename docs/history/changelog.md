@@ -15,6 +15,12 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 
 ## 2026-06-01
 
+- Fixed and proved the Vercel Nitro output finalizer plus admin backlog recovery path: `npm run build`
+  and `npx vercel build --yes` now pass without the missing `.nitro/vite/server-output` failure,
+  Vercel output artifacts are present, a newer production deployment inspected as `Ready`, admin
+  capture live/local validators returned `ok: true`, and browser proof showed `/admin/capture`
+  loads for an authenticated admin without `Capture load failed`, `Backlog unavailable`, or an auth
+  loop.
 - Retired the unused admin capture screenshot storage seam: `/admin/capture` now treats `admin_capture_items` as the only current backlog storage truth, removes runtime joins/view-model fields for `admin_capture_assets`, adds a migration to drop the empty asset table, removes the empty private bucket through the Supabase Storage API, and updates the validation script to guard against the legacy asset path returning.
 
 ## 2026-05-28

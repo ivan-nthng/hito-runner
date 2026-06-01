@@ -3107,6 +3107,18 @@
     transition: color 160ms ease;
   }
 
+  .hito-backlog-row-summary {
+    min-width: min(24rem, 100%);
+  }
+
+  .hito-backlog-row-metadata {
+    flex: 0 1 auto;
+  }
+
+  .hito-backlog-row-action {
+    flex: 0 0 auto;
+  }
+
   .hito-backlog-list > article:hover,
   .hito-backlog-list > article:focus-within,
   .hito-backlog-list > article[data-expanded="true"] {
@@ -3180,6 +3192,16 @@
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
   }
 
+  .hito-metadata-tag[data-readonly="true"] {
+    cursor: default;
+    position: relative;
+  }
+
+  .hito-metadata-tag[data-readonly="true"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-muted-foreground) 16%, transparent);
+  }
+
   .hito-metadata-tag[data-tone="success"] {
     border-color: color-mix(in oklch, var(--color-success) 22%, transparent);
     background: color-mix(in oklch, var(--color-success) 7%, transparent);
@@ -3203,6 +3225,46 @@
     border-color: color-mix(in oklch, var(--color-muted-foreground) 12%, transparent);
     background: color-mix(in oklch, var(--color-muted-foreground) 4%, transparent);
     color: color-mix(in oklch, var(--color-muted-foreground) 82%, transparent);
+  }
+
+  @media (max-width: 767px) {
+    .hito-backlog-list .hito-list-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+      gap: 0.65rem 0.75rem;
+    }
+
+    .hito-backlog-row-summary {
+      grid-column: 1 / -1;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .hito-backlog-row-metadata {
+      grid-column: 1 / 2;
+      grid-row: 2;
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    .hito-backlog-row-action {
+      grid-column: 2;
+      grid-row: 2;
+      justify-self: end;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .hito-backlog-row-metadata {
+      grid-column: 1 / -1;
+    }
+
+    .hito-backlog-row-action {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      justify-self: start;
+    }
   }
 
   @keyframes hito-backlog-detail-rise {

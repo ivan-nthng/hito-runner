@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { HitoLogo } from "@/components/ui/hito-logo";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import {
   adminCaptureItemTypes,
   adminCapturePriorities,
@@ -1085,7 +1086,7 @@ function CaptureBacklogList({
             <div className="hito-list-row w-full items-start text-left">
               <button
                 type="button"
-                className="grid min-w-0 flex-1 gap-2 text-left"
+                className="hito-backlog-row-summary grid min-w-0 flex-1 gap-2 text-left"
                 aria-expanded={expanded}
                 onClick={() => setExpandedItemId(expanded ? null : item.id)}
               >
@@ -1101,43 +1102,52 @@ function CaptureBacklogList({
                   {repoSource.sourceType ? <span>{repoSource.sourceType}</span> : null}
                 </span>
               </button>
-              <div className="flex min-w-0 flex-wrap items-center justify-start gap-1.5 md:justify-end">
+              <div className="hito-backlog-row-metadata flex min-w-0 flex-wrap items-center justify-start gap-1.5 md:justify-end">
                 {readOnly ? (
                   <>
-                    <ReadOnlyMetadataTag
-                      icon={repoMarkdownStatusIcon(repoSource)}
+                    <HitoMetadataTag
+                      tooltip={readOnlyMetadataTooltip("status")}
                       tone={repoMarkdownStatusTone(repoSource)}
-                      value={formatRepoMarkdownStatus(repoSource, item)}
-                    />
-                    <ReadOnlyMetadataTag
-                      value={formatMarkdownMetadataValue(
-                        "type",
-                        repoSource.markdownType,
-                        item.itemType,
-                      )}
-                    />
-                    <ReadOnlyMetadataTag
+                    >
+                      {formatRepoMarkdownStatus(repoSource, item)}
+                    </HitoMetadataTag>
+                    <HitoMetadataTag tooltip={readOnlyMetadataTooltip("type")}>
+                      {formatMarkdownMetadataValue("type", repoSource.markdownType, item.itemType)}
+                    </HitoMetadataTag>
+                    <HitoMetadataTag
+                      tooltip={readOnlyMetadataTooltip("priority")}
                       tone={
                         repoSource.markdownPriority ? markdownPriorityTone(repoSource) : undefined
                       }
-                      value={formatMarkdownMetadataValue(
+                    >
+                      {formatMarkdownMetadataValue(
                         "priority",
                         repoSource.markdownPriority,
                         item.priority,
                       )}
-                    />
-                    <ReadOnlyMetadataTag
-                      value={formatMarkdownMetadataValue(
+                    </HitoMetadataTag>
+                    <HitoMetadataTag tooltip={readOnlyMetadataTooltip("role")}>
+                      {formatMarkdownMetadataValue(
                         "role",
                         repoSource.markdownNextRole,
                         item.targetRole,
                       )}
-                    />
+                    </HitoMetadataTag>
                     {repoSource.missingRequiredFields.length > 0 ? (
-                      <ReadOnlyMetadataTag tone="warning" value="missing metadata" />
+                      <HitoMetadataTag
+                        tone="warning"
+                        tooltip="This source task is missing required markdown metadata. Fix the source markdown, then refresh the backlog import."
+                      >
+                        missing metadata
+                      </HitoMetadataTag>
                     ) : null}
                     {repoSource.invalidRequiredFields.length > 0 ? (
-                      <ReadOnlyMetadataTag tone="warning" value="invalid metadata" />
+                      <HitoMetadataTag
+                        tone="warning"
+                        tooltip="This source task has invalid markdown metadata. Fix the source markdown, then refresh the backlog import."
+                      >
+                        invalid metadata
+                      </HitoMetadataTag>
                     ) : null}
                   </>
                 ) : (
@@ -1204,16 +1214,16 @@ function CaptureBacklogList({
                     />
                   </>
                 )}
-                <button
-                  type="button"
-                  className="hito-button hito-button-ghost hito-button-xs"
-                  aria-label={expanded ? "Collapse item" : "Open item"}
-                  aria-expanded={expanded}
-                  onClick={() => setExpandedItemId(expanded ? null : item.id)}
-                >
-                  <Icon name={expanded ? "chevron-up" : "chevron-down"} size="sm" />
-                </button>
               </div>
+              <button
+                type="button"
+                className="hito-button hito-button-ghost hito-button-xs hito-backlog-row-action"
+                aria-label={expanded ? "Collapse item" : "Open item"}
+                aria-expanded={expanded}
+                onClick={() => setExpandedItemId(expanded ? null : item.id)}
+              >
+                <Icon name={expanded ? "chevron-up" : "chevron-down"} size="sm" />
+              </button>
             </div>
             {expanded ? (
               <CaptureItemDetail
@@ -1278,7 +1288,12 @@ function CaptureItemDetail({
         {repoSource.readOnly ? (
           <div className="grid gap-2 text-xs text-muted-foreground">
             <div className="flex flex-wrap items-center gap-2">
-              <ReadOnlyMetadataTag tone="rollout" value="repo mirror" />
+              <HitoMetadataTag
+                tone="rollout"
+                tooltip="This item is mirrored from the repo. Change task truth in the source markdown, then refresh the backlog import."
+              >
+                repo mirror
+              </HitoMetadataTag>
               <span>Markdown is the source of truth. This item is read-only in Backlog.</span>
             </div>
             {repoSource.missingRequiredFields.length > 0 ? (
@@ -1294,29 +1309,28 @@ function CaptureItemDetail({
           <section className="grid gap-3 border-t border-hairline pt-4">
             <h4 className="hito-label text-foreground">Markdown metadata</h4>
             <div className="flex flex-wrap gap-2">
-              <ReadOnlyMetadataTag
-                icon={repoMarkdownStatusIcon(repoSource)}
+              <HitoMetadataTag
+                tooltip={readOnlyMetadataTooltip("status")}
                 tone={repoMarkdownStatusTone(repoSource)}
-                value={formatRepoMarkdownStatus(repoSource, item)}
-              />
-              <ReadOnlyMetadataTag
-                value={formatMarkdownMetadataValue("type", repoSource.markdownType, item.itemType)}
-              />
-              <ReadOnlyMetadataTag
+              >
+                {formatRepoMarkdownStatus(repoSource, item)}
+              </HitoMetadataTag>
+              <HitoMetadataTag tooltip={readOnlyMetadataTooltip("type")}>
+                {formatMarkdownMetadataValue("type", repoSource.markdownType, item.itemType)}
+              </HitoMetadataTag>
+              <HitoMetadataTag
+                tooltip={readOnlyMetadataTooltip("priority")}
                 tone={repoSource.markdownPriority ? markdownPriorityTone(repoSource) : undefined}
-                value={formatMarkdownMetadataValue(
+              >
+                {formatMarkdownMetadataValue(
                   "priority",
                   repoSource.markdownPriority,
                   item.priority,
                 )}
-              />
-              <ReadOnlyMetadataTag
-                value={formatMarkdownMetadataValue(
-                  "role",
-                  repoSource.markdownNextRole,
-                  item.targetRole,
-                )}
-              />
+              </HitoMetadataTag>
+              <HitoMetadataTag tooltip={readOnlyMetadataTooltip("role")}>
+                {formatMarkdownMetadataValue("role", repoSource.markdownNextRole, item.targetRole)}
+              </HitoMetadataTag>
             </div>
           </section>
         ) : null}
@@ -1509,7 +1523,12 @@ function DetailRow({ code, label, value }: { code?: boolean; label: string; valu
 function MetadataHint({ fields, label }: { fields: string[]; label: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <ReadOnlyMetadataTag tone="warning" value={formatMetadataTagValue(label)} />
+      <HitoMetadataTag
+        tone="warning"
+        tooltip={`${label} belongs to the source task. Fix the source markdown, then refresh the backlog import.`}
+      >
+        {formatMetadataTagValue(label)}
+      </HitoMetadataTag>
       <span>{fields.map(formatMetadataFieldName).join(", ")}</span>
     </div>
   );
@@ -1535,17 +1554,13 @@ function MetadataMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="hito-metadata-tag"
-          data-interactive="true"
-          data-tone={tone}
-          aria-label={`${label}: ${displayValue}`}
-        >
-          {icon ? <Icon name={icon} size="xs" aria-hidden="true" /> : null}
-          {displayValue}
-          <Icon name="chevron-down" size="xs" aria-hidden="true" />
-        </button>
+        <HitoMetadataTag asChild interactive tone={tone}>
+          <button type="button" aria-label={`${label}: ${displayValue}`}>
+            {icon ? <Icon name={icon} size="xs" aria-hidden="true" /> : null}
+            {displayValue}
+            <Icon name="chevron-down" size="xs" aria-hidden="true" />
+          </button>
+        </HitoMetadataTag>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="hito-shell-menu hito-data-table-column-menu w-56">
         <DropdownMenuLabel className="hito-micro-label">{label}</DropdownMenuLabel>
@@ -1567,21 +1582,19 @@ function MetadataMenu({
   );
 }
 
-function ReadOnlyMetadataTag({
-  icon,
-  tone,
-  value,
-}: {
-  icon?: HitoIconName;
-  tone?: string;
-  value: string;
-}) {
-  return (
-    <span className="hito-metadata-tag" data-tone={tone}>
-      {icon ? <Icon name={icon} size="xs" aria-hidden="true" /> : null}
-      {value}
-    </span>
-  );
+function readOnlyMetadataTooltip(kind: "status" | "type" | "priority" | "role" | undefined) {
+  switch (kind) {
+    case "status":
+      return "Status from backlog source. Change it in the source task or markdown, then refresh the backlog import.";
+    case "type":
+      return "Type from backlog source. Change it in the source task or markdown, then refresh the backlog import.";
+    case "priority":
+      return "Priority from backlog source. Change it in the source task or markdown, then refresh the backlog import.";
+    case "role":
+      return "Owner role from backlog source. Change it in the source task or markdown, then refresh the backlog import.";
+    default:
+      return null;
+  }
 }
 
 function SelectField({
@@ -1836,18 +1849,6 @@ function repoMarkdownStatusTone(repoSource: RepoDerivedInfo) {
       : status === "in_progress"
         ? "signal"
         : "rollout";
-}
-
-function repoMarkdownStatusIcon(repoSource: RepoDerivedInfo): HitoIconName {
-  const status = normalizeMarkdownValue(repoSource.markdownStatus ?? repoSource.workItemStatus);
-
-  return status === "completed"
-    ? "check"
-    : status === "closed" || status === "archived"
-      ? "file-text"
-      : status === "in_progress"
-        ? "sparkles"
-        : "plus";
 }
 
 function markdownPriorityTone(repoSource: RepoDerivedInfo) {

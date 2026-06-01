@@ -71,6 +71,13 @@ export interface AdminAuthSession {
   username: typeof ADMIN_USERNAME;
 }
 
+interface AdminAuthSessionResolutionOptions {
+  pathname?: string | null;
+  serverFnMeta?: {
+    filename?: string | null;
+  } | null;
+}
+
 export async function loginAdminForRequest(request: Request): Promise<Response> {
   return handleAdminLoginRequestForDependencies(request, await buildCurrentDependencies(request));
 }
@@ -222,8 +229,11 @@ async function buildCurrentDependencies(request: Request): Promise<AdminLoginDep
   };
 }
 
-export async function resolveAdminAuthSession(request: Request): Promise<AdminAuthSession | null> {
-  if (!isAdminRequestPath(request.url)) {
+export async function resolveAdminAuthSession(
+  request: Request,
+  options?: AdminAuthSessionResolutionOptions,
+): Promise<AdminAuthSession | null> {
+  if (!isAdminSessionEligibleRequest(request.url, options)) {
     return null;
   }
 
@@ -455,12 +465,42 @@ function signAdminSessionPayload(encodedPayload: string, secret: string) {
   return toBase64Url(createHmac("sha256", secret).update(encodedPayload).digest());
 }
 
-function isAdminRequestPath(requestUrl: string) {
+function isAdminSessionEligibleRequest(
+  requestUrl: string,
+  options?: AdminAuthSessionResolutionOptions,
+) {
+  return (
+    isAdminRequestPath(requestUrl) ||
+    isAdminRequestPath(options?.pathname ?? null) ||
+    isAdminServerFunction(options?.serverFnMeta?.filename)
+  );
+}
+
+function isAdminRequestPath(value: string | null) {
+  const pathname = parseRequestPathname(value);
+
+  return Boolean(pathname?.startsWith("/admin/") || pathname?.startsWith("/api/admin/"));
+}
+
+function isAdminServerFunction(filename: string | null | undefined) {
+  const normalizedFilename = filename?.replaceAll("\\", "/");
+
+  return (
+    normalizedFilename === "src/lib/admin-analytics.ts" ||
+    normalizedFilename === "src/lib/admin-capture.ts" ||
+    normalizedFilename === "src/lib/admin-local-test-accounts.ts"
+  );
+}
+
+function parseRequestPathname(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
   try {
-    const pathname = new URL(requestUrl).pathname;
-    return pathname.startsWith("/admin/") || pathname.startsWith("/api/admin/");
+    return new URL(value, "http://hito.local").pathname;
   } catch {
-    return false;
+    return null;
   }
 }
 

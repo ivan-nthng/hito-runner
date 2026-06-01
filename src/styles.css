@@ -4024,6 +4024,15 @@
     background: color-mix(in oklch, var(--color-success) 5%, transparent);
   }
 
+  .hito-calendar-mobile-row-prestart,
+  .hito-calendar-mobile-row-prestart:hover {
+    min-height: 3.75rem;
+    cursor: default;
+    border-color: color-mix(in oklch, var(--color-hairline) 78%, transparent);
+    background: color-mix(in oklch, var(--color-background) 34%, transparent);
+    box-shadow: none;
+  }
+
   .hito-calendar-mobile-date {
     display: grid;
     width: 3rem;

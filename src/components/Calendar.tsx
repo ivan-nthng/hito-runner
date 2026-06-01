@@ -46,6 +46,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
   const cells = useMemo(() => buildMonth(cursor), [cursor]);
   const mobileMonthDates = useMemo(() => buildMonthDays(cursor), [cursor]);
   const monthLabel = cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const preStartNote = getPreStartMonthNote(cursor, snapshot.planMeta?.startDate ?? null);
   const tooltipWorkout = tooltipAnchor
     ? (findWorkout(snapshot.workouts, tooltipAnchor.iso) ?? null)
     : null;
@@ -72,7 +73,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
 
   return (
     <div>
-      <div className="hito-section-header mb-6">
+      <div className={cn("hito-section-header", preStartNote ? "mb-3" : "mb-6")}>
         <div>
           <h1 className="hito-section-title text-4xl lg:text-5xl">{monthLabel}</h1>
         </div>
@@ -121,6 +122,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
           </button>
         </div>
       </div>
+      {preStartNote ? <p className="hito-caption mb-4">{preStartNote}</p> : null}
 
       {view === "month" ? (
         <>
@@ -228,11 +230,16 @@ function CalendarTooltipLayer({
 }
 
 function MobileMonthList({ dates, snapshot }: { dates: string[]; snapshot: TrainingSnapshot }) {
+  const preStartDates = dates.filter((iso) => isBeforePlanStart(iso, snapshot));
+  const visibleDates = dates.filter((iso) => !isBeforePlanStart(iso, snapshot));
+
   return (
     <div className="hito-calendar-mobile-list md:hidden">
-      {dates.map((iso) => {
+      {preStartDates.length > 0 ? <PreStartMobileRangeRow dates={preStartDates} /> : null}
+      {visibleDates.map((iso) => {
         const workout = findWorkout(snapshot.workouts, iso);
         const isToday = iso === snapshot.currentDate;
+        const isPlanStart = isPlanStartDate(iso, snapshot);
         const status = workout?.status ?? "rest";
         const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
         const hasWorkout = workout && workout.type !== "rest";
@@ -257,6 +264,7 @@ function MobileMonthList({ dates, snapshot }: { dates: string[]; snapshot: Train
               </div>
 
               <div className="min-w-0 flex-1">
+                {isPlanStart ? <PlanStartMarker className="mb-2" /> : null}
                 {identity ? (
                   <div
                     className="hito-micro-label inline-flex max-w-full min-w-0 items-center gap-1.5"
@@ -303,6 +311,20 @@ function MobileMonthList({ dates, snapshot }: { dates: string[]; snapshot: Train
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function PreStartMobileRangeRow({ dates }: { dates: string[] }) {
+  return (
+    <div
+      className="hito-calendar-mobile-row hito-calendar-mobile-row-prestart"
+      aria-label={`${formatPreStartRangeLabel(dates)} before plan starts`}
+    >
+      <div className="min-w-0">
+        <p className="hito-micro-label">{formatPreStartRangeLabel(dates)}</p>
+        <p className="hito-body-small mt-1 text-muted-foreground">Before plan starts</p>
+      </div>
     </div>
   );
 }
@@ -372,8 +394,13 @@ function DayCell({
   snapshot: TrainingSnapshot;
 }) {
   if (!iso) return <div className="aspect-[5/4] border-r border-b border-hairline" />;
+  if (isBeforePlanStart(iso, snapshot)) {
+    return <PreStartDayCell iso={iso} inMonth={inMonth} />;
+  }
+
   const workout = findWorkout(snapshot.workouts, iso);
   const isToday = iso === snapshot.currentDate;
+  const isPlanStart = isPlanStartDate(iso, snapshot);
   const status = workout?.status ?? "rest";
   const day = parseInt(iso.split("-")[2], 10);
   const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
@@ -404,7 +431,7 @@ function DayCell({
           "hover:bg-accent/40",
         )}
       >
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <div
               className={cn(
@@ -416,6 +443,7 @@ function DayCell({
             </div>
             {hasWorkout && <StatusMark status={status} />}
           </div>
+          {isPlanStart ? <PlanStartMarker /> : null}
         </div>
 
         {hasWorkout && (
@@ -467,6 +495,26 @@ function DayCell({
           <span className="hito-feedback-marker-dot" />
         </Link>
       )}
+    </div>
+  );
+}
+
+function PreStartDayCell({ iso, inMonth }: { iso: string; inMonth: boolean }) {
+  const day = parseInt(iso.split("-")[2], 10);
+
+  return (
+    <div className="relative">
+      <div
+        aria-label={`${formatDate(iso, { month: "short", day: "numeric" })} is before this plan starts`}
+        className={cn(
+          "aspect-[5/4] cursor-default border-r border-b border-hairline bg-foreground/[0.015] p-3",
+          !inMonth && "opacity-30",
+        )}
+      >
+        <div className="hito-technical-mono text-muted-foreground/70">
+          {String(day).padStart(2, "0")}
+        </div>
+      </div>
     </div>
   );
 }
@@ -594,8 +642,13 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
   return (
     <div className="grid grid-cols-1 border-b border-hairline md:grid-cols-7">
       {dates.map((iso) => {
+        if (isBeforePlanStart(iso, snapshot)) {
+          return <PreStartWeekCell key={iso} iso={iso} />;
+        }
+
         const workout = findWorkout(snapshot.workouts, iso);
         const isToday = iso === snapshot.currentDate;
+        const isPlanStart = isPlanStartDate(iso, snapshot);
         const meta = workout ? workoutTypeMeta(workout) : null;
         const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
         const status = workout?.status ?? "rest";
@@ -621,6 +674,7 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
                   <span className="hito-technical-mono">{iso.slice(8)}</span>
                 </div>
               </div>
+              {isPlanStart ? <PlanStartMarker className="mt-3 w-fit" /> : null}
               {hasWorkout && meta ? (
                 <>
                   <div className="hito-micro-label mt-3" style={{ color: meta.color }}>
@@ -656,6 +710,88 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
       })}
     </div>
   );
+}
+
+function PreStartWeekCell({ iso }: { iso: string }) {
+  return (
+    <div key={iso} className="relative">
+      <div
+        aria-label={`${formatDate(iso, { month: "short", day: "numeric" })} is before this plan starts`}
+        className="flex min-h-[170px] cursor-default flex-col border-b border-hairline bg-foreground/[0.015] p-4 md:border-r md:border-b-0"
+      >
+        <div className="hito-micro-label flex items-center justify-between">
+          <span>{weekdayShort(iso)}</span>
+          <span className="hito-technical-mono text-muted-foreground/70">{iso.slice(8)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanStartMarker({ className }: { className?: string }) {
+  return (
+    <span className={cn("hito-status-pill", className)} data-tone="signal" data-icon="false">
+      Plan starts
+    </span>
+  );
+}
+
+function isBeforePlanStart(iso: string, snapshot: TrainingSnapshot) {
+  const planStartDate = snapshot.planMeta?.startDate;
+  return Boolean(planStartDate && iso < planStartDate);
+}
+
+function isPlanStartDate(iso: string, snapshot: TrainingSnapshot) {
+  return Boolean(snapshot.planMeta?.startDate && iso === snapshot.planMeta.startDate);
+}
+
+function getPreStartMonthNote(cursor: Date, planStartDate: string | null) {
+  if (!planStartDate) {
+    return null;
+  }
+
+  const monthStart = monthBoundaryIso(cursor, 1);
+  const monthEnd = monthBoundaryIso(
+    cursor,
+    new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate(),
+  );
+  const startLabel = formatDate(planStartDate, { month: "short", day: "numeric" });
+
+  if (planStartDate > monthEnd) {
+    return `Plan starts ${startLabel}.`;
+  }
+
+  if (planStartDate <= monthStart) {
+    return null;
+  }
+
+  return `Plan starts ${startLabel}. Earlier days are outside this plan.`;
+}
+
+function monthBoundaryIso(cursor: Date, day: number) {
+  return new Date(cursor.getFullYear(), cursor.getMonth(), day).toISOString().slice(0, 10);
+}
+
+function formatPreStartRangeLabel(dates: string[]) {
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+
+  if (!first || !last) {
+    return "Before plan starts";
+  }
+
+  if (first === last) {
+    return formatDate(first, { month: "short", day: "numeric" });
+  }
+
+  if (first.slice(0, 7) === last.slice(0, 7)) {
+    return `${formatDate(first, { month: "short", day: "numeric" })}-${Number(last.slice(8))}`;
+  }
+
+  return `${formatDate(first, { month: "short", day: "numeric" })}-${formatDate(last, {
+    month: "short",
+    day: "numeric",
+  })}`;
 }
 
 function compactWorkoutSummary(workout: Workout) {

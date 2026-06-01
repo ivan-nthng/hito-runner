@@ -2,7 +2,7 @@
 
 ## Status
 
-not_started
+implemented / awaiting QA
 
 ## Type
 
@@ -14,7 +14,7 @@ medium
 
 ## Next Recommended Role
 
-DESIGNER
+QA
 
 ## Task
 
@@ -22,7 +22,7 @@ Design first-plan calendar pre-start rendering polish for partial first months.
 
 ## Stage
 
-DESIGNER audit / frontend calendar polish
+FRONTEND implementation / calendar pre-start days
 
 ## Exact Handoff Prompt
 
@@ -69,6 +69,15 @@ DESIGNER / FRONTEND / QA
 ## Last Updated
 
 2026-06-01
+
+## Implementation Notes
+
+- 2026-06-01: FRONTEND implemented the pre-start display state in `src/components/Calendar.tsx`
+  using `snapshot.planMeta?.startDate`. Month/week cells before the plan start now render as
+  date-only outside-plan cells with no workout/rest semantics, links, tooltips, status markers, or
+  feedback markers. The start date keeps normal workout/rest rendering and adds a compact `Plan
+  starts` marker. Narrow month view collapses consecutive pre-start dates into one quiet
+  `Before plan starts` range row.
 
 ## Context
 
@@ -120,4 +129,5 @@ changing canonical plan rows or schedule semantics.
 
 ## Suggested Next Step
 
-Run the DESIGNER audit described in the handoff prompt.
+Run QA browser proof for a partial first month, a normal in-plan month, week view, and narrow
+viewport.

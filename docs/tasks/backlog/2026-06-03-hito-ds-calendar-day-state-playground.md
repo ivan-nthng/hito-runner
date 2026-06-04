@@ -1,8 +1,8 @@
-# Hito DS Calendar Day State Playground
+# Hito DS Calendar And Workout Day State Playground Intake
 
 ## Status
 
-backlog
+completed
 
 ## Type
 
@@ -14,72 +14,47 @@ medium
 
 ## Next Recommended Role
 
-DESIGNER
+FRONTEND
 
 ## Task
 
-Define a Hito DS calendar-day state playground for desktop and mobile calendar day layouts.
+Converted backlog intake into the canonical Hito DS calendar/workout playground frontend spec.
 
 ## Stage
 
-DESIGNER backlog / design-system specimen spec
+ARCHITECT cleanup / converted to frontend spec
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: DESIGNER
+ROLE: FRONTEND
 
 TASK:
-Define a Hito DS calendar-day state playground for desktop and mobile calendar day layouts.
+Implement the canonical Hito DS calendar/workout day playground from the frontend spec.
 
 STAGE:
-DESIGNER spec / Hito DS calendar day specimen
+FRONTEND implementation / Hito DS calendar-workout playground
 
 CONTEXT:
 - Source path: docs/tasks/backlog/2026-06-03-hito-ds-calendar-day-state-playground.md
-- The product calendar already has desktop day cells and mobile day rows in `src/components/Calendar.tsx`.
-- `/hitoDS` already documents calendar type identity, feedback markers, selection controls, dropdowns, and date-picker primitives, but it does not yet provide a focused interactive specimen for a single calendar day across all states.
+- Canonical frontend spec: docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md
+- This backlog intake has been converted. Use the frontend spec as the source of truth.
+- The related first-plan/pre-start QA track remains separate and is archived at docs/plans/archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md.
 
 GOAL:
-Specify a `/hitoDS` calendar-day playground where the user can preview one calendar day on desktop and mobile and adjust its state through side controls such as radio buttons, toggles, and dropdowns.
-
-ARCHITECTURE FIT:
-- This is a design-system/spec task first, not product implementation.
-- The later frontend implementation must reuse existing Hito DS primitives and current calendar anatomy.
-- Do not create a new mini calendar UI kit.
-- Do not move schedule truth, workout identity truth, or status truth into `/hitoDS`; the playground is visual/specimen-only.
-
-SPEC REQUIREMENTS:
-- Define the specimen surface:
-  - desktop day cell preview
-  - mobile day row preview
-  - optional side-by-side or stacked responsive preview
-  - controls rail/sidebar for state selection
-- Define controls for at least:
-  - viewport mode: desktop / mobile / both
-  - date relation: in-month / out-of-month / today / plan start / pre-start
-  - content type: empty, rest, easy, recovery, steady, long, quality, interval, tempo, hill, trail, ultra/mountain
-  - workout status: planned, completed, skipped, partial if visible in the calendar contract
-  - feedback marker: none, has feedback, issue/attention if supported by current markers
-  - title length: short, normal, long wrapping/truncation stress
-  - glyph/family visibility
-  - plan-start marker visibility
-  - density or layout variant only if it is a DS exploration control, not a product behavior change
-- Define expected copy and labels for the playground.
-- Define which existing primitives/patterns FRONTEND must reuse.
-- Define which current calendar states should be considered canonical and which are only stress-test/demo states.
-- Define mobile and desktop no-overflow expectations.
+Implement the `/hitoDS` calendar/workout day playground described in the canonical frontend spec.
 
 FILES/SURFACES TO INSPECT:
+- `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`
 - `src/components/Calendar.tsx`
 - `src/routes/hitoDS.tsx`
 - `src/components/ui/radio-group.tsx`
 - `src/components/ui/dropdown-menu.tsx`
+- `src/components/ui/select.tsx`
 - `src/components/ui/icon.tsx`
 - existing Hito DS selection-control and calendar identity examples
 
 WHAT NOT TO TOUCH:
-- Do not implement product code in this design spec pass.
 - Do not change backend schedule semantics.
 - Do not change workout identity, status, feedback, or persistence rules.
 - Do not introduce a separate route outside `/hitoDS` unless Architect explicitly approves.
@@ -88,13 +63,11 @@ WHAT NOT TO TOUCH:
 OUTPUT:
 1. Task
 2. Stage
-3. Spec file created or updated
-4. Calendar states covered
-5. Control model
-6. Desktop and mobile layout guidance
-7. Hito DS reuse requirements
-8. Frontend handoff prompt
-9. Blockers
+3. Root cause
+4. Files changed
+5. What changed
+6. Validation results
+7. Blockers
 ```
 
 ## Severity
@@ -111,10 +84,17 @@ DESIGNER / FRONTEND
 
 ## User Report
 
-The user wants a design-system task for a single calendar day demo: one day from the calendar should
-be visible in `/hitoDS` for both desktop and mobile, with side controls using radio buttons,
-dropdowns, or similar controls to choose what exists in that day. The goal is to inspect all possible
-day states and potentially evaluate visual layout variants.
+The user wants a design-system task for a calendar/workout day demo: calendar days and workout-day
+states should be visible in `/hitoDS` for both desktop and mobile, with side controls using radio
+buttons, dropdowns, or similar controls to choose what exists in that day. The goal is to inspect all
+possible day states and evaluate visual layout variants centrally.
+
+2026-06-04 scope correction:
+
+- This is not primarily a first-plan pre-start task.
+- First-plan pre-start/outside-plan is only one optional example state.
+- Canonical implementation spec now lives at:
+  `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`.
 
 ## Evidence
 
@@ -132,19 +112,22 @@ No screenshot was attached for this backlog item.
 ## Observed Behavior
 
 Hito has live calendar day rendering in the product and several related DS examples, but there is no
-focused `/hitoDS` playground where a single calendar day can be previewed across desktop/mobile and
-state combinations.
+focused `/hitoDS` playground where calendar days and workout-day rows/cards can be previewed across
+desktop/mobile and state combinations.
 
 ## Expected Behavior
 
-Future `/hitoDS` should include a calendar-day playground that lets designers, frontend engineers,
-QA, and product quickly inspect:
+Future `/hitoDS` should include a calendar/workout day playground that lets designers, frontend
+engineers, QA, and product quickly inspect:
 
 - desktop calendar day cell
 - mobile calendar day row
 - empty/rest/workout days
 - today and plan-start states
-- pre-start and out-of-month states
+- selected/focused states
+- completed/partial/skipped states
+- feedback/evidence marker states
+- pre-start and out-of-month states as optional examples
 - planned/completed/skipped status treatment
 - feedback marker presence
 - workout identity glyph/color/label combinations
@@ -174,12 +157,12 @@ stress-test labels, or evaluate layout variants without navigating real plan dat
 
 ## Recommended Fix Direction
 
-Create a design spec first, then a frontend implementation slice that adds a `/hitoDS` calendar-day
-state playground using existing Hito DS controls and current calendar day anatomy.
+Use the canonical frontend spec, then implement a `/hitoDS` calendar/workout day state playground
+using existing Hito DS controls and current calendar day anatomy.
 
 Recommended approach:
 
-- Designer defines canonical states and controls.
+- Frontend implements from `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`.
 - Frontend implements the playground under `/hitoDS`, preferably by extracting a reusable presentational
   calendar-day specimen seam from current calendar anatomy if safe.
 - QA validates desktop/mobile states, no horizontal overflow, and that product calendar behavior is

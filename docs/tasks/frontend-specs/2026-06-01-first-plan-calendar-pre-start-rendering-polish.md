@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -14,44 +14,47 @@ medium
 
 ## Next Recommended Role
 
-QA
+ARCHITECT
 
 ## Task
 
-Validate saved-mode calendar rendering for days before the active plan start date.
+Keep saved-mode calendar pre-start rendering polish as completed historical source context.
 
 ## Stage
 
-QA validation
+ARCHITECT closeout / QA-passed historical spec
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: QA
+ROLE: ARCHITECT
 
 TASK:
-Validate saved-mode calendar rendering for days before the active plan start date.
+Use the completed saved-mode calendar pre-start rendering spec as historical source context only.
 
 STAGE:
-QA validation
+ARCHITECT reference / completed pre-start spec
 
 CONTEXT:
 - Source path: docs/tasks/frontend-specs/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md
-- Active plan: docs/plans/active/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md
+- Archived plan: docs/plans/archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md
 - QA evidence: docs/tasks/qa-reports/2026-05-30-long-horizon-first-plan-monthly-audit.md
-- Frontend implementation exists in `src/components/Calendar.tsx`.
-- Current snapshot truth includes `snapshot.planMeta?.startDate`.
+- Final QA passed for the narrow pre-start rendering polish track on 2026-06-04.
+- Generic Hito DS calendar/workout playground work remains separate:
+  docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md
 
 CONSTRAINTS:
-- Treat this as validation only.
-- Do not change backend plan generation, persisted rows, row counts, review/confirm, workout sequencing, or fixed rest-day semantics.
-- Pre-start dates are outside the active plan window, not planned rest days.
-- Reuse existing Hito DS calendar, typography, marker, muted, divider, and status primitives where possible.
-- Keep calendar navigation, month/week switching, workout links, completion markers, feedback markers, and normal in-plan rest days stable.
-- Do not edit product code.
+- Treat this spec as completed source context.
+- Do not reopen implementation from this spec unless a new concrete regression is found.
+- Do not merge this narrow pre-start behavior with the generic DS calendar/workout playground.
+- Do not change backend generation, persisted rows, row counts, review/confirm, workout sequencing, or fixed rest-day semantics from this completed spec.
 
 OUTPUT:
-Use the QA role output format.
+1. Task
+2. Stage
+3. Historical evidence referenced
+4. Current active owner, if any
+5. Blockers
 ```
 
 ## Owner
@@ -60,7 +63,7 @@ DESIGNER
 
 ## Last Updated
 
-2026-06-03
+2026-06-04
 
 ## Implementation Note
 
@@ -68,9 +71,24 @@ Moved to QA during the 2026-06-03 cleanup. The active implementation plan record
 implemented the pre-start display state; this spec now remains as source/design context for the QA
 browser proof.
 
+2026-06-04 scope correction: the general Hito DS calendar/workout day playground has been split out
+to `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`. This spec now
+remains only the first-plan / active-plan pre-start rendering validation source.
+
+2026-06-04 QA closeout: the narrow pre-start rendering task passed final QA and the implementation
+plan was archived to `docs/plans/archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md`.
+The built-in Codex browser was used first. A disposable saved-mode fixture with
+`plan.startDate = 2026-05-29` proved that May 2026 showed
+`Plan starts May 29. Earlier days are outside this plan.`, pre-start cells suppressed rest/workout
+semantics and links, week view used muted non-interactive cells, mobile collapsed `May 1-28` into
+`Before plan starts`, and narrow viewport stayed at `375` scroll width. CLI validation passed:
+`npm exec eslint -- src/components/Calendar.tsx`, `git diff --check`, and `npm run build`.
+Screenshot evidence: `qa-artifacts/screenshots/2026-06-04/calendar-pre-start-closeout/`.
+
 ## Related Sources
 
-- `docs/plans/active/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md`
+- `docs/plans/archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md`
+- `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`
 - `docs/tasks/qa-reports/2026-05-30-long-horizon-first-plan-monthly-audit.md`
 - `docs/current-product.md`
 - `docs/current-system.md`
@@ -120,6 +138,15 @@ Calendar date states should resolve in this order:
 For this slice, the required new state is only `before active plan start date`.
 
 Implementation should derive the state from `snapshot.planMeta?.startDate` and the cell date. If `planMeta` is missing, do not apply pre-start behavior.
+
+## Scope Correction
+
+General Hito DS calendar day, workout-day, result, feedback/evidence, mobile row, dense-grid, and
+interactive playground coverage is not owned by this first-plan pre-start spec. It is now tracked in:
+
+- `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`
+
+This pre-start spec keeps only the narrow rendering rule for days before the active plan start date.
 
 ## Pre-Start Day State
 
@@ -394,4 +421,4 @@ QA should verify:
 
 ## Blockers
 
-None for design.
+None. This narrow pre-start rendering spec is complete / QA-passed.

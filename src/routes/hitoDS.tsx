@@ -53,6 +53,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { CalendarWorkoutPlayground } from "@/components/hito-ds/calendar-workout-playground";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import { cn } from "@/lib/utils";
@@ -110,6 +111,7 @@ const NAV_GROUPS = [
       { id: "surfaces", label: "Composition" },
       { id: "async-actions", label: "Async toasts" },
       { id: "states", label: "States" },
+      { id: "calendar-workout-playground", label: "Calendar" },
       { id: "analytics", label: "Summary truth" },
       { id: "rows", label: "Rows" },
       { id: "shell", label: "Shell nav" },
@@ -3370,6 +3372,8 @@ function HitoDesignSystemPage() {
                 </article>
               </div>
             </section>
+
+            <CalendarWorkoutPlayground />
 
             <section id="analytics" className="ds-section">
               <SectionIntro

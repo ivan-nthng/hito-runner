@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+in_progress
 
 ## Type
 
@@ -14,43 +14,44 @@ medium
 
 ## Next Recommended Role
 
-FRONTEND
+QA
 
 ## Task
 
-Polish saved-mode calendar rendering for days before the active plan start date.
+Validate saved-mode calendar rendering for days before the active plan start date.
 
 ## Stage
 
-FRONTEND implementation
+QA validation
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: FRONTEND
+ROLE: QA
 
 TASK:
-Polish saved-mode calendar rendering for days before the active plan start date.
+Validate saved-mode calendar rendering for days before the active plan start date.
 
 STAGE:
-FRONTEND implementation
+QA validation
 
 CONTEXT:
 - Source path: docs/tasks/frontend-specs/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md
 - Active plan: docs/plans/active/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md
 - QA evidence: docs/tasks/qa-reports/2026-05-30-long-horizon-first-plan-monthly-audit.md
-- Current calendar surface: src/components/Calendar.tsx
-- Current snapshot truth includes snapshot.planMeta?.startDate.
+- Frontend implementation exists in `src/components/Calendar.tsx`.
+- Current snapshot truth includes `snapshot.planMeta?.startDate`.
 
 CONSTRAINTS:
-- Treat this as rendering polish only.
+- Treat this as validation only.
 - Do not change backend plan generation, persisted rows, row counts, review/confirm, workout sequencing, or fixed rest-day semantics.
 - Pre-start dates are outside the active plan window, not planned rest days.
 - Reuse existing Hito DS calendar, typography, marker, muted, divider, and status primitives where possible.
 - Keep calendar navigation, month/week switching, workout links, completion markers, feedback markers, and normal in-plan rest days stable.
+- Do not edit product code.
 
 OUTPUT:
-Use the project role output format.
+Use the QA role output format.
 ```
 
 ## Owner
@@ -59,7 +60,13 @@ DESIGNER
 
 ## Last Updated
 
-2026-06-01
+2026-06-03
+
+## Implementation Note
+
+Moved to QA during the 2026-06-03 cleanup. The active implementation plan records that FRONTEND
+implemented the pre-start display state; this spec now remains as source/design context for the QA
+browser proof.
 
 ## Related Sources
 

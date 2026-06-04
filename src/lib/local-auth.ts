@@ -47,6 +47,12 @@ export async function getLocalAuthAccounts(): Promise<LocalAuthAccountConfig[]> 
   }
 }
 
+export async function readLocalAuthAccountsFile(
+  filePath: string,
+): Promise<LocalAuthAccountConfig[]> {
+  return readAccountsFile(filePath);
+}
+
 export async function isLocalAuthBypassEnabled() {
   const accounts = await getLocalAuthAccounts();
   return accounts.length > 0;

@@ -1,5 +1,8 @@
 import { createMiddleware, createStart } from "@tanstack/react-start";
-import { resolveAdminAuthSession } from "@/lib/admin-auth-actions.server";
+import {
+  buildLoopbackAdminCanonicalRedirect,
+  resolveAdminAuthSession,
+} from "@/lib/admin-access.server";
 import { resolveLocalAuthSession } from "@/lib/local-auth";
 import { resolveRuntimeAppBaseUrl } from "@/lib/supabase/env";
 import { createRequestSupabaseClient, mergeResponseHeaders } from "@/lib/supabase/server";
@@ -7,6 +10,15 @@ import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
 
 const authMiddleware = createMiddleware().server(
   async ({ next, pathname, request, serverFnMeta }) => {
+    const loopbackAdminRedirect = buildLoopbackAdminCanonicalRedirect(request, {
+      pathname,
+      serverFnMeta,
+    });
+
+    if (loopbackAdminRedirect) {
+      return loopbackAdminRedirect;
+    }
+
     const appBaseUrl = resolveRuntimeAppBaseUrl({ requestUrl: request.url });
     const adminSession = await resolveAdminAuthSession(request, { pathname, serverFnMeta });
 
@@ -18,6 +30,11 @@ const authMiddleware = createMiddleware().server(
             email: adminSession.email,
             appBaseUrl,
             provider: "admin",
+            adminSession: {
+              label: adminSession.label,
+              source: adminSession.source,
+              runtimeClass: adminSession.runtimeClass,
+            },
           },
         },
       });

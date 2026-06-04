@@ -124,6 +124,36 @@ export type AiFirstPlanEnvelopeIssue = {
   path?: string;
 };
 
+export type AiFirstPlanEnvelopeSpecificityTrace = {
+  goalFamily: EnvelopeGoalFamilyCode;
+  primaryEmphasis: EnvelopeEmphasisCode | null;
+  secondaryEmphasis: EnvelopeEmphasisCode[];
+  phaseEmphasis: Array<{
+    phaseCode: EnvelopePhaseCode;
+    weeks: string;
+    emphasis: EnvelopeEmphasisCode[];
+  }>;
+  declaredCandidateWeekCount: number;
+  fulfilledIdentities: Array<{
+    weekNumber: number;
+    date: string;
+    phase: string;
+    fromIdentity: string;
+    toIdentity: string;
+    declaredEmphasis: EnvelopeEmphasisCode | null;
+    source: "already_fulfilled" | "backend_refinement";
+  }>;
+  safetyDowngrades: Array<{
+    weekNumber?: number;
+    reason: string;
+    message: string;
+  }>;
+  genericSupportCollapse: {
+    collapsedWeekCount: number;
+    sampleWeeks: number[];
+  };
+};
+
 export type AiFirstPlanEnvelopeExpansionResult =
   | {
       ok: true;
@@ -135,6 +165,7 @@ export type AiFirstPlanEnvelopeExpansionResult =
         validationIssueCount: number;
         repairs: string[];
         reviewAssumptions: string[];
+        specificityTrace: AiFirstPlanEnvelopeSpecificityTrace;
       };
     }
   | {

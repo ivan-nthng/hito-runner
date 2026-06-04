@@ -47,6 +47,11 @@ Create precise next-role prompts that preserve Hito decisions and avoid scope dr
 - The exact prompt must be self-contained and include its own expected output/report format.
 - Preserve canonical architecture rules from `AGENTS.md`.
 - Keep prompts execution-ready, not inspirational.
+- For BACKEND and FRONTEND implementation/debugging prompts, require root-cause investigation and
+  architecture-fit checks before the agent patches code.
+- Do not let BACKEND or FRONTEND prompts ask for symptom patches only. They must direct the agent to
+  find the canonical owner, reuse existing Hito seams, and fix the underlying cause when the slice can
+  safely cover it.
 
 ## Required Handoff Shell
 
@@ -69,17 +74,33 @@ The prompt inside `Exact prompt for that role` must:
 
 - be in English by default
 - target one role only
-- start with `Task`
+- start with `ROLE: <ROLE>`
+- include `Task`
 - include `Stage`
 - include context and scope
+- include `Root cause and architecture fit` for BACKEND or FRONTEND implementation/debugging prompts
 - list exact files/surfaces to inspect when relevant
 - list commands or browser policy when validation is required
 - include a precise output/report format
 - avoid optional second prompts or later-role prompts
 
+For BACKEND and FRONTEND prompts, `Root cause and architecture fit` must tell the agent to:
+
+- investigate source-of-truth, logs/state/data flow, and nearby ownership before changing code
+- distinguish the visible symptom from the underlying cause
+- reuse existing modules, contracts, validators, server actions, persistence seams, components, Hito
+  DS/admin/product patterns, and helpers before adding anything new
+- avoid parallel product systems, duplicate frontend/backend truth, one-off custom UI, broad
+  abstractions, or compatibility layers without removal plans
+- implement the smallest safe root-cause fix in the canonical owner, or explicitly report the
+  systemic follow-up if the real fix is outside the current slice
+- clean up dead code from failed or replaced attempts when safe
+
 For QA handoffs, use a numbered prompt shape:
 
 ```md
+ROLE: QA
+
 1. Task
 
 <exact validation task>

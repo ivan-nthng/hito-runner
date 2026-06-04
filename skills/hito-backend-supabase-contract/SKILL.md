@@ -27,6 +27,22 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 7. Update generated/local database types only when schema actually changes.
 8. Update permanent docs only for implemented behavior.
 
+## Root-Cause Backend Fix Gate
+
+- Backend bug fixes must start by naming the failing source-of-truth boundary: request parsing,
+  validation, normalization, canonical persistence, auth/admin/entitlement, AI context/contract,
+  import/export, lifecycle, or response/view-model shaping.
+- Do not patch only the downstream symptom. Trace upstream to the first incorrect backend owner and
+  fix that owner when the slice can safely cover it.
+- If the same bug can still occur through a nearby route, server function, script, import path, or
+  persistence seam, the fix is not done.
+- If the real problem is duplicated truth, a missing canonical contract, legacy compatibility drift,
+  or a repeated workaround, prefer a bounded consolidation over another local branch.
+- If the systemic fix is too large for the current slice, report it explicitly with a proposed owner
+  and do not present the symptom patch as the complete solution.
+- Final reports must state the root cause, the canonical backend owner changed, and which existing
+  seams were reused.
+
 ## Hard Reuse And Cleanup Gate
 
 - Existing backend owners, validators, server actions, persistence helpers, scripts, and canonical entities must be reused before adding new ones.

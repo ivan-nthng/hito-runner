@@ -19,6 +19,9 @@ import {
   type AiFirstPlanBlueprintHorizonStrategy,
   type AiFirstPlanBlueprintHorizonTraceMetadata,
 } from "@/lib/ai-first-plan-blueprint-horizon";
+import { buildAiFirstPlanEnvelopePrompt } from "@/lib/ai-first-plan-envelope-prompt";
+import { expandAiFirstPlanEnvelopeToTrainingPlan } from "@/lib/ai-first-plan-envelope-expand";
+import { buildAiFirstPlanEnvelopeTrace } from "@/lib/ai-first-plan-envelope-trace";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import { serverEnv } from "@/lib/supabase/env";
 import {
@@ -60,7 +63,7 @@ type OpenAiResponseEnvelope = {
 };
 
 export type AiFirstPlanDraftServiceInputKind = "structured_authoring" | "structured_onboarding";
-export type AiFirstPlanGenerationContract = "blueprint" | "strict_draft";
+export type AiFirstPlanGenerationContract = "blueprint" | "strict_draft" | "envelope";
 
 export interface GenerateAiFirstPlanDraftPreviewOptions {
   input: unknown;
@@ -91,7 +94,8 @@ export interface AiFirstPlanDraftDebugMetadata {
   contractMode: AiFirstPlanGenerationContract;
   responseSchemaMode:
     | "responses_json_schema_blueprint_strict"
-    | "responses_json_schema_draft_strict";
+    | "responses_json_schema_draft_strict"
+    | "responses_json_schema_envelope_strict";
   requestPhase:
     | "not_started"
     | "request_started"
@@ -116,8 +120,8 @@ export interface AiFirstPlanDraftDebugMetadata {
 }
 
 export interface AiFirstPlanDraftUnavailableMetadata {
-  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_draft_v1";
-  sourceStatus: "blueprint_unavailable" | "draft_unavailable";
+  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_draft_v1" | "ai_first_plan_envelope_v1";
+  sourceStatus: "blueprint_unavailable" | "draft_unavailable" | "envelope_unavailable";
   fallbackReason: string;
   model: string;
   responseId: string | null;
@@ -126,6 +130,7 @@ export interface AiFirstPlanDraftUnavailableMetadata {
   validationIssueCount: number;
   debug: AiFirstPlanDraftDebugMetadata;
   blueprintTrace?: AiFirstPlanBlueprintTraceMetadata | null;
+  envelopeTrace?: unknown;
 }
 
 export type AiFirstPlanDraftPreviewResult =
@@ -137,7 +142,10 @@ export type AiFirstPlanDraftPreviewResult =
     }
   | {
       ok: false;
-      reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_draft_unavailable";
+      reason:
+        | "ai_first_plan_blueprint_unavailable"
+        | "ai_first_plan_draft_unavailable"
+        | "ai_first_plan_envelope_unavailable";
       message: string;
       issues: string[];
       authoringInput: StructuredFirstPlanAuthoringInput;
@@ -181,8 +189,7 @@ export async function generateAiFirstPlanDraftPreview({
 
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
-  const useDeterministicFallback =
-    allowDeterministicFallback ?? contractMode !== DEFAULT_AI_FIRST_PLAN_CONTRACT;
+  const useDeterministicFallback = allowDeterministicFallback ?? contractMode === "strict_draft";
   const blueprintHorizonStrategy =
     contractMode === "blueprint"
       ? resolveAiFirstPlanBlueprintHorizonStrategy({
@@ -245,20 +252,14 @@ export async function generateAiFirstPlanDraftPreview({
       });
     }
 
-    const normalized =
-      contractMode === "blueprint"
-        ? normalizeAiFirstPlanBlueprintToTrainingPlan({
-            blueprint: parsedOutput,
-            authoringInput: openAiAuthoringInput,
-            deterministicSupportAuthoringInput:
-              blueprintHorizonStrategy && blueprintHorizonStrategy.backendExtendedWeeks > 0
-                ? authoringInput
-                : undefined,
-          })
-        : normalizeAiFirstPlanDraftToTrainingPlan({
-            draft: parsedOutput,
-            authoringInput,
-          });
+    const normalized = normalizeOpenAiFirstPlanContractOutput({
+      contractMode,
+      parsedOutput,
+      authoringInput,
+      openAiAuthoringInput,
+      blueprintHorizonStrategy,
+      responseDebug,
+    });
 
     if (!normalized.ok) {
       return fallbackOrUnavailable({
@@ -332,6 +333,7 @@ export async function generateAiFirstPlanDraftPreview({
                 }),
               })
             : (finalized.metadata.blueprintTrace ?? null),
+        envelopeTrace: finalized.metadata.envelopeTrace ?? null,
       },
     };
   } catch (error) {
@@ -396,6 +398,121 @@ function resolveStructuredAuthoringInput(
       issues: [boundedErrorMessage(error, "Structured first-plan input failed validation.")],
     };
   }
+}
+
+function normalizeOpenAiFirstPlanContractOutput({
+  contractMode,
+  parsedOutput,
+  authoringInput,
+  openAiAuthoringInput,
+  blueprintHorizonStrategy,
+  responseDebug,
+}: {
+  contractMode: AiFirstPlanGenerationContract;
+  parsedOutput: unknown;
+  authoringInput: StructuredFirstPlanAuthoringInput;
+  openAiAuthoringInput: StructuredFirstPlanAuthoringInput;
+  blueprintHorizonStrategy: AiFirstPlanBlueprintHorizonStrategy | null;
+  responseDebug: AiFirstPlanDraftDebugMetadata;
+}): AiFirstPlanDraftNormalizationResult {
+  if (contractMode === "blueprint") {
+    return normalizeAiFirstPlanBlueprintToTrainingPlan({
+      blueprint: parsedOutput,
+      authoringInput: openAiAuthoringInput,
+      deterministicSupportAuthoringInput:
+        blueprintHorizonStrategy && blueprintHorizonStrategy.backendExtendedWeeks > 0
+          ? authoringInput
+          : undefined,
+    });
+  }
+
+  if (contractMode === "envelope") {
+    const expanded = expandAiFirstPlanEnvelopeToTrainingPlan({
+      envelope: parsedOutput,
+      authoringInput,
+    });
+
+    if (!expanded.ok) {
+      return {
+        ok: false,
+        reason: expanded.reason,
+        issues: expanded.issues.map((issue) => ({
+          code: issue.code,
+          message: issue.message,
+          path: issue.path,
+        })),
+        fallback: {
+          status: "expanded_from_envelope",
+          source: "openai_ai_first_plan_envelope",
+          validationIssues: expanded.issues
+            .map((issue) => `${issue.code}: ${issue.message}`)
+            .slice(0, 12),
+          repairs: [],
+          reviewAssumptions: [],
+          metricPolicySummary:
+            "Envelope expansion failed before producing a reviewable canonical plan.",
+          envelopeTrace: buildAiFirstPlanEnvelopeTrace({
+            envelope: parsedOutput,
+            authoringInput,
+            result: expanded,
+            sizeComparison: buildAiFirstPlanEnvelopeServiceSizeComparison({
+              envelope: parsedOutput,
+              responseDebug,
+            }),
+          }),
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      canonicalPlan: expanded.canonicalPlan,
+      metadata: {
+        status: "expanded_from_envelope",
+        source: "openai_ai_first_plan_envelope",
+        validationIssues: expanded.metadata.validationIssues,
+        repairs: expanded.metadata.repairs,
+        reviewAssumptions: expanded.metadata.reviewAssumptions,
+        metricPolicySummary:
+          "Backend expanded compact envelope intent into canonical rows with existing metric gates.",
+        envelopeTrace: buildAiFirstPlanEnvelopeTrace({
+          envelope: parsedOutput,
+          authoringInput,
+          result: expanded,
+          sizeComparison: buildAiFirstPlanEnvelopeServiceSizeComparison({
+            envelope: parsedOutput,
+            responseDebug,
+          }),
+        }),
+      },
+    };
+  }
+
+  return normalizeAiFirstPlanDraftToTrainingPlan({
+    draft: parsedOutput,
+    authoringInput,
+  });
+}
+
+function buildAiFirstPlanEnvelopeServiceSizeComparison({
+  envelope,
+  responseDebug,
+}: {
+  envelope: unknown;
+  responseDebug: AiFirstPlanDraftDebugMetadata;
+}) {
+  return {
+    envelopePromptCharEstimate: responseDebug.promptCharEstimate,
+    envelopeSystemPromptChars: responseDebug.systemPromptChars,
+    envelopeUserPromptChars: responseDebug.userPromptChars,
+    envelopeResponseSchemaChars: responseDebug.responseSchemaChars,
+    envelopeOutputChars: JSON.stringify(envelope).length,
+    envelopeLiveOutputChars: responseDebug.outputTextChars,
+    blueprintFullOutputChars: null,
+    blueprintBoundedOutputChars: null,
+    blueprintPromptCharEstimateBefore: null,
+    blueprintPromptCharEstimateAfter: null,
+  };
 }
 
 function finalizeBlueprintHorizonPlan({
@@ -484,18 +601,12 @@ async function requestOpenAiFirstPlanDraft({
   contractMode: AiFirstPlanGenerationContract;
   fetchImpl: typeof fetch;
 }) {
-  const prompt =
-    contractMode === "blueprint"
-      ? buildAiFirstPlanBlueprintPrompt({
-          authoringInput,
-          today,
-          referenceExample,
-        })
-      : buildAiFirstPlanDraftPrompt({
-          authoringInput,
-          today,
-          referenceExample,
-        });
+  const prompt = buildOpenAiFirstPlanContractPrompt({
+    contractMode,
+    authoringInput,
+    today,
+    referenceExample,
+  });
   const controller = new AbortController();
   const requestStartedAt = Date.now();
   let abortFired = false;
@@ -546,8 +657,7 @@ async function requestOpenAiFirstPlanDraft({
           text: {
             format: {
               type: "json_schema",
-              name:
-                contractMode === "blueprint" ? "ai_first_plan_blueprint" : "ai_first_plan_draft",
+              name: responseSchemaNameForContract(contractMode),
               strict: true,
               schema: prompt.responseSchema,
             },
@@ -615,6 +725,52 @@ async function requestOpenAiFirstPlanDraft({
   });
 }
 
+function buildOpenAiFirstPlanContractPrompt({
+  contractMode,
+  authoringInput,
+  today,
+  referenceExample,
+}: {
+  contractMode: AiFirstPlanGenerationContract;
+  authoringInput: StructuredFirstPlanAuthoringInput;
+  today: string | undefined;
+  referenceExample: unknown;
+}) {
+  if (contractMode === "blueprint") {
+    return buildAiFirstPlanBlueprintPrompt({
+      authoringInput,
+      today,
+      referenceExample,
+    });
+  }
+
+  if (contractMode === "envelope") {
+    void today;
+    void referenceExample;
+
+    return buildAiFirstPlanEnvelopePrompt({
+      authoringInput,
+    });
+  }
+
+  return buildAiFirstPlanDraftPrompt({
+    authoringInput,
+    today,
+    referenceExample,
+  });
+}
+
+function responseSchemaNameForContract(contractMode: AiFirstPlanGenerationContract) {
+  switch (contractMode) {
+    case "blueprint":
+      return "ai_first_plan_blueprint";
+    case "envelope":
+      return "ai_first_plan_envelope";
+    case "strict_draft":
+      return "ai_first_plan_draft";
+  }
+}
+
 function buildNotStartedDebug({
   timeoutMs,
   maxOutputTokens,
@@ -667,10 +823,7 @@ function buildRequestDebug({
     timeoutMs,
     maxOutputTokens,
     contractMode,
-    responseSchemaMode:
-      contractMode === "blueprint"
-        ? "responses_json_schema_blueprint_strict"
-        : "responses_json_schema_draft_strict",
+    responseSchemaMode: responseSchemaModeForContract(contractMode),
     requestPhase,
     abortFired,
     openAiElapsedMs,
@@ -689,6 +842,19 @@ function buildRequestDebug({
     outputTextChars: null,
     reasoningEffortSent: supportsReasoningEffort(model),
   };
+}
+
+function responseSchemaModeForContract(
+  contractMode: AiFirstPlanGenerationContract,
+): AiFirstPlanDraftDebugMetadata["responseSchemaMode"] {
+  switch (contractMode) {
+    case "blueprint":
+      return "responses_json_schema_blueprint_strict";
+    case "envelope":
+      return "responses_json_schema_envelope_strict";
+    case "strict_draft":
+      return "responses_json_schema_draft_strict";
+  }
 }
 
 function normalizeTokenCount(value: unknown) {
@@ -723,7 +889,10 @@ function fallbackOrUnavailable({
       AiFirstPlanDraftPreviewResult,
       {
         ok: false;
-        reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_draft_unavailable";
+        reason:
+          | "ai_first_plan_blueprint_unavailable"
+          | "ai_first_plan_draft_unavailable"
+          | "ai_first_plan_envelope_unavailable";
       }
     > {
   if (allowDeterministicFallback) {
@@ -757,7 +926,10 @@ function unavailableAiFirstPlanDraft({
   AiFirstPlanDraftPreviewResult,
   {
     ok: false;
-    reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_draft_unavailable";
+    reason:
+      | "ai_first_plan_blueprint_unavailable"
+      | "ai_first_plan_draft_unavailable"
+      | "ai_first_plan_envelope_unavailable";
   }
 > {
   const validationIssues = issues
@@ -766,8 +938,9 @@ function unavailableAiFirstPlanDraft({
     .slice(0, 12);
   const elapsedMs = Date.now() - startedAt;
   const isBlueprint = debug.contractMode === "blueprint";
-  const sourceKind = isBlueprint ? "ai_first_plan_blueprint_v1" : "ai_first_plan_draft_v1";
-  const sourceStatus = isBlueprint ? "blueprint_unavailable" : "draft_unavailable";
+  const isEnvelope = debug.contractMode === "envelope";
+  const sourceKind = sourceKindForUnavailableContract(debug.contractMode);
+  const sourceStatus = sourceStatusForUnavailableContract(debug.contractMode);
   const blueprintTrace = isBlueprint
     ? buildUnavailableBlueprintTrace({
         trace: fallbackMetadata?.blueprintTrace ?? null,
@@ -789,7 +962,7 @@ function unavailableAiFirstPlanDraft({
 
   return {
     ok: false,
-    reason: isBlueprint ? "ai_first_plan_blueprint_unavailable" : "ai_first_plan_draft_unavailable",
+    reason: unavailableReasonForContract(debug.contractMode),
     message: "We could not create a safe AI-authored plan draft. Please retry.",
     issues: validationIssues,
     authoringInput,
@@ -804,8 +977,42 @@ function unavailableAiFirstPlanDraft({
       validationIssueCount: validationIssues.length,
       debug,
       blueprintTrace,
+      envelopeTrace: isEnvelope ? (fallbackMetadata?.envelopeTrace ?? null) : undefined,
     },
   };
+}
+
+function sourceKindForUnavailableContract(contractMode: AiFirstPlanGenerationContract) {
+  switch (contractMode) {
+    case "blueprint":
+      return "ai_first_plan_blueprint_v1" as const;
+    case "envelope":
+      return "ai_first_plan_envelope_v1" as const;
+    case "strict_draft":
+      return "ai_first_plan_draft_v1" as const;
+  }
+}
+
+function sourceStatusForUnavailableContract(contractMode: AiFirstPlanGenerationContract) {
+  switch (contractMode) {
+    case "blueprint":
+      return "blueprint_unavailable" as const;
+    case "envelope":
+      return "envelope_unavailable" as const;
+    case "strict_draft":
+      return "draft_unavailable" as const;
+  }
+}
+
+function unavailableReasonForContract(contractMode: AiFirstPlanGenerationContract) {
+  switch (contractMode) {
+    case "blueprint":
+      return "ai_first_plan_blueprint_unavailable" as const;
+    case "envelope":
+      return "ai_first_plan_envelope_unavailable" as const;
+    case "strict_draft":
+      return "ai_first_plan_draft_unavailable" as const;
+  }
 }
 
 function deterministicFallback({
@@ -1123,7 +1330,14 @@ function classifyAiFirstPlanDraftError(
 }
 
 function contractPrefix(contractMode: AiFirstPlanGenerationContract) {
-  return contractMode === "blueprint" ? "ai_first_plan_blueprint" : "ai_first_plan_draft";
+  switch (contractMode) {
+    case "blueprint":
+      return "ai_first_plan_blueprint";
+    case "envelope":
+      return "ai_first_plan_envelope";
+    case "strict_draft":
+      return "ai_first_plan_draft";
+  }
 }
 
 function boundedErrorMessage(error: unknown, fallback: string) {

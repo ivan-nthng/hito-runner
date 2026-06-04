@@ -36,7 +36,7 @@ STAGE:
 ARCHITECT plan
 
 CONTEXT:
-- Source path: docs/plans/active/2026-05-15-plan-export-pdf.md
+- Source path: docs/tasks/backlog/2026-05-15-plan-export-pdf.md
 - Markdown metadata is canonical for this repo-derived admin Backlog item.
 - Supabase mirrors this item for discovery and prompt copy only.
 
@@ -49,9 +49,11 @@ OUTPUT:
 Use the project role output format.
 ```
 
-Active Inventory Note
+Backlog Inventory Note
 
-Kept active during the 2026-05-25 inventory cleanup because JSON and Markdown export are shipped, while PDF export remains a discrete future slice.
+Moved from active plans to backlog during the 2026-06-03 cleanup because JSON and Markdown export
+are shipped, while PDF export remains a discrete future slice and is not an active implementation
+track.
 
 This should not be started by inertia. Pick it only when PRODUCT chooses plan-export PDF as the next product move.
 

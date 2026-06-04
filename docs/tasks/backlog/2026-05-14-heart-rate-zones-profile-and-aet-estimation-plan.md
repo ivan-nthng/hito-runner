@@ -36,7 +36,7 @@ STAGE:
 ARCHITECT plan
 
 CONTEXT:
-- Source path: docs/plans/active/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md
+- Source path: docs/tasks/backlog/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md
 - Markdown metadata is canonical for this repo-derived admin Backlog item.
 - Supabase mirrors this item for discovery and prompt copy only.
 
@@ -55,11 +55,12 @@ Architect / Backend
 
 ## Last Updated
 
-2026-05-25
+2026-06-03
 
-## Active Inventory Note
+## Backlog Inventory Note
 
-Kept active during the 2026-05-25 inventory cleanup because Hito still does not have runner-level HR-zone truth.
+Moved from active plans to backlog during the 2026-06-03 cleanup because Hito still does not have
+runner-level HR-zone truth, but this is not an active implementation track.
 
 This is not the next committed implementation slice. Treat it as a paused future physiology plan until PRODUCT/ARCHITECT explicitly prioritizes HR-zone work.
 

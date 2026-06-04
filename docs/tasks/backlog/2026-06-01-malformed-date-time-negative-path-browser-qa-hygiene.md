@@ -6,7 +6,7 @@ backlog
 
 ## Type
 
-qa
+context_capture
 
 ## Priority
 
@@ -23,6 +23,47 @@ Validate malformed date/time negative paths for structured first-plan onboarding
 ## Stage
 
 QA hygiene / browser negative-path validation
+
+## Exact Handoff Prompt
+
+```text
+ROLE: QA
+
+TASK:
+Validate malformed date/time negative paths for structured first-plan onboarding.
+
+STAGE:
+QA hygiene / browser negative-path validation
+
+CONTEXT:
+- Source path: docs/tasks/backlog/2026-06-01-malformed-date-time-negative-path-browser-qa-hygiene.md
+- This is optional QA hygiene, not a release blocker.
+- Valid Hito DS date/time input and long-horizon submit paths are already QA-passed.
+
+SCOPE:
+- Use the built-in Codex browser first when it can cover the flow.
+- Test malformed plan start date, malformed target date, malformed target time, and correction back to valid values.
+- Verify no stuck loading state.
+- Verify no plan/profile/workout/log mutation occurs before valid review/confirm.
+- Capture screenshots under `qa-artifacts/screenshots/YYYY-MM-DD/malformed-date-time-negative-path-qa/`.
+
+CONSTRAINTS:
+- Do not edit product code.
+- Do not run migrations.
+- Do not mutate production data.
+- Use only disposable local/test accounts if authentication is needed.
+
+OUTPUT:
+1. Task
+2. Stage
+3. Browser Path Preflight
+4. Scope tested
+5. Results
+6. Screenshot/artifact evidence
+7. Issues found
+8. Verdict
+9. Blockers
+```
 
 ## User Report
 
@@ -67,7 +108,7 @@ Known relevant surfaces:
 This is not a confirmed product bug. It is residual QA coverage from the first-plan date/time and
 submit-boundary release work.
 
-## Exact Handoff Prompt
+## Handoff Prompt Reference
 
 ```text
 ROLE: QA

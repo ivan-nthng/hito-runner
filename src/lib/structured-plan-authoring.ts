@@ -143,7 +143,7 @@ export function buildStructuredAuthoringPlan(input: StructuredPlanAuthoringInput
   });
 }
 
-function normalizeStructuredPlanAuthoringInput(
+export function normalizeStructuredPlanAuthoringInput(
   input: StructuredPlanAuthoringInput,
 ): NormalizedStructuredInput {
   const parsed = structuredPlanAuthoringInputSchema.parse(input);

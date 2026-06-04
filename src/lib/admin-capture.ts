@@ -37,6 +37,8 @@ export type AdminCaptureFailureReason =
   | "capture_load_failed"
   | "capture_create_failed"
   | "capture_update_failed"
+  | "capture_delete_failed"
+  | "quick_note_delete_only"
   | "repo_derived_read_only"
   | "prompt_not_ready"
   | "prompt_generation_failed";
@@ -86,6 +88,28 @@ export interface AdminCaptureCopyPromptView {
   generatedAt: string;
   prompt: string;
   contextSummary: string;
+}
+
+export interface AdminDebugCaptureCapabilityView {
+  generatedAt: string;
+  capability: "admin_debug_capture";
+  enabled: true;
+  capabilities: {
+    adminCapture: true;
+    adminDebugCapture: true;
+  };
+  authority: {
+    owner: "admin";
+    provider: "admin" | "supabase";
+    sessionSource: "deployed_password" | "local_fixture" | "supabase_app_metadata";
+    runtimeClass: "deployed" | "loopback";
+  };
+  identityBoundary: {
+    runnerAuthIgnored: true;
+    testerAuthIgnored: true;
+    productEntitlementsIgnored: true;
+    productRouteStateIgnored: true;
+  };
 }
 
 export type AdminCaptureResult<T> =
@@ -220,6 +244,12 @@ export const getAdminCaptureAvailability = createServerFn({ method: "GET" }).han
   },
 );
 
+export const getAdminDebugCaptureCapability = createServerFn({ method: "GET" }).handler(
+  async (): Promise<AdminCaptureResult<{ probe: AdminDebugCaptureCapabilityView }>> => {
+    return getAdminDebugCaptureCapabilityServer();
+  },
+);
+
 export const listAdminCaptureBacklog = createServerFn({ method: "GET" })
   .inputValidator((value: unknown) => adminCaptureListInputSchema.parse(value))
   .handler(async ({ data }): Promise<AdminCaptureResult<{ view: AdminCaptureBacklogView }>> => {
@@ -256,6 +286,12 @@ export const appendAdminCaptureItemNote = createServerFn({ method: "POST" })
     return appendAdminCaptureItemNoteServer(data);
   });
 
+export const deleteAdminCaptureQuickNote = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => adminCaptureItemIdInputSchema.parse(value))
+  .handler(async ({ data }): Promise<AdminCaptureResult<{ deletedId: string }>> => {
+    return deleteAdminCaptureQuickNoteServer(data);
+  });
+
 export const getAdminCaptureCopyPrompt = createServerFn({ method: "GET" })
   .inputValidator((value: unknown) => adminCaptureItemIdInputSchema.parse(value))
   .handler(
@@ -269,6 +305,13 @@ const getAdminCaptureAvailabilityServer = createServerOnlyFn(async () => {
     await import("@/lib/admin-capture.server");
 
   return getAdminCaptureAvailabilityForCurrentRequest();
+});
+
+const getAdminDebugCaptureCapabilityServer = createServerOnlyFn(async () => {
+  const { getAdminDebugCaptureCapabilityForCurrentRequest } =
+    await import("@/lib/admin-capture.server");
+
+  return getAdminDebugCaptureCapabilityForCurrentRequest();
 });
 
 const listAdminCaptureBacklogServer = createServerOnlyFn(async (input: AdminCaptureListInput) => {
@@ -313,6 +356,15 @@ const appendAdminCaptureItemNoteServer = createServerOnlyFn(
       await import("@/lib/admin-capture.server");
 
     return appendAdminCaptureItemNoteForCurrentRequest(input);
+  },
+);
+
+const deleteAdminCaptureQuickNoteServer = createServerOnlyFn(
+  async (input: AdminCaptureItemIdInput) => {
+    const { deleteAdminCaptureQuickNoteForCurrentRequest } =
+      await import("@/lib/admin-capture.server");
+
+    return deleteAdminCaptureQuickNoteForCurrentRequest(input);
   },
 );
 

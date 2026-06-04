@@ -29,6 +29,7 @@ import { Route as ApiPlanExportRouteImport } from './routes/api.plan.export'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api.auth.logout'
 import { Route as ApiAuthLocalLoginRouteImport } from './routes/api.auth.local-login'
 import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
+import { Route as ApiAdminAuthLogoutRouteImport } from './routes/api.admin.auth.logout'
 import { Route as ApiAdminAuthLoginRouteImport } from './routes/api.admin.auth.login'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -131,6 +132,11 @@ const ApiAuthConfirmRoute = ApiAuthConfirmRouteImport.update({
   path: '/api/auth/confirm',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminAuthLogoutRoute = ApiAdminAuthLogoutRouteImport.update({
+  id: '/api/admin/auth/logout',
+  path: '/api/admin/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminAuthLoginRoute = ApiAdminAuthLoginRouteImport.update({
   id: '/api/admin/auth/login',
   path: '/api/admin/auth/login',
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
+  '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -182,6 +189,7 @@ export interface FileRoutesByTo {
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
+  '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
+  '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
     | '/api/admin/auth/login'
+    | '/api/admin/auth/logout'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
     | '/api/admin/auth/login'
+    | '/api/admin/auth/logout'
   id:
     | '__root__'
     | '/'
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
     | '/api/admin/auth/login'
+    | '/api/admin/auth/logout'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -301,6 +313,7 @@ export interface RootRouteChildren {
   ApiWorkoutResultRemoveRoute: typeof ApiWorkoutResultRemoveRoute
   ApiWorkoutResultUploadRoute: typeof ApiWorkoutResultUploadRoute
   ApiAdminAuthLoginRoute: typeof ApiAdminAuthLoginRoute
+  ApiAdminAuthLogoutRoute: typeof ApiAdminAuthLogoutRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -445,6 +458,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthConfirmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/auth/logout': {
+      id: '/api/admin/auth/logout'
+      path: '/api/admin/auth/logout'
+      fullPath: '/api/admin/auth/logout'
+      preLoaderRoute: typeof ApiAdminAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/auth/login': {
       id: '/api/admin/auth/login'
       path: '/api/admin/auth/login'
@@ -477,6 +497,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkoutResultRemoveRoute: ApiWorkoutResultRemoveRoute,
   ApiWorkoutResultUploadRoute: ApiWorkoutResultUploadRoute,
   ApiAdminAuthLoginRoute: ApiAdminAuthLoginRoute,
+  ApiAdminAuthLogoutRoute: ApiAdminAuthLogoutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

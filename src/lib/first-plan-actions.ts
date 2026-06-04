@@ -5,6 +5,7 @@ import {
   createFirstPlanFromReviewedCanonicalPlanForUser,
 } from "@/lib/active-plan-persistence";
 import type {
+  AiFirstPlanGenerationContract,
   AiFirstPlanDraftDebugMetadata,
   AiFirstPlanDraftPreviewMetadata,
   AiFirstPlanDraftUnavailableMetadata,
@@ -44,10 +45,11 @@ const structuredFirstPlanDraftGenerationDebugSchema = z
   .object({
     timeoutMs: z.number().int().nonnegative(),
     maxOutputTokens: z.number().int().positive(),
-    contractMode: z.enum(["blueprint", "strict_draft"]),
+    contractMode: z.enum(["blueprint", "strict_draft", "envelope"]),
     responseSchemaMode: z.enum([
       "responses_json_schema_blueprint_strict",
       "responses_json_schema_draft_strict",
+      "responses_json_schema_envelope_strict",
     ]),
     requestPhase: z.enum([
       "not_started",
@@ -164,7 +166,7 @@ const structuredFirstPlanBlueprintTraceSchema = z
 
 const structuredFirstPlanDraftGenerationMetadataSchema = z
   .object({
-    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft"]),
+    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft", "expanded_from_envelope"]),
     sourceKind: z.string().trim().min(1),
     fallbackReason: z.string().trim().min(1).nullable(),
     repairs: z.array(z.string().trim().min(1)).max(12),
@@ -177,6 +179,7 @@ const structuredFirstPlanDraftGenerationMetadataSchema = z
     elapsedMs: z.number().int().nonnegative().nullable(),
     debug: structuredFirstPlanDraftGenerationDebugSchema.nullable(),
     blueprintTrace: structuredFirstPlanBlueprintTraceSchema.nullable().optional(),
+    envelopeTrace: z.unknown().nullable().optional(),
   })
   .strict();
 
@@ -203,8 +206,8 @@ export type StructuredFirstPlanDraftResult =
   | {
       ok: false;
       status: "draft_failed";
-      reason: "ai_first_plan_blueprint_unavailable";
-      code: "ai_first_plan_blueprint_unavailable";
+      reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
+      code: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
       message: string;
       generation: StructuredFirstPlanDraftFailureMetadata;
       safety: StructuredFirstPlanDraftSafety;
@@ -251,8 +254,8 @@ export type StructuredFirstPlanDraftGenerationMetadata = z.output<
 >;
 
 export interface StructuredFirstPlanDraftFailureMetadata {
-  sourceKind: "ai_first_plan_blueprint_v1";
-  sourceStatus: "blueprint_unavailable";
+  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_envelope_v1";
+  sourceStatus: "blueprint_unavailable" | "envelope_unavailable";
   fallbackReason: string;
   validationIssues: string[];
   validationIssueCount: number;
@@ -261,9 +264,16 @@ export interface StructuredFirstPlanDraftFailureMetadata {
   elapsedMs: number | null;
   debug: z.output<typeof structuredFirstPlanDraftGenerationDebugSchema> | null;
   blueprintTrace: AiFirstPlanDraftUnavailableMetadata["blueprintTrace"];
+  envelopeTrace?: AiFirstPlanDraftUnavailableMetadata["envelopeTrace"];
 }
 
+type StructuredFirstPlanInternalDraftContract = Extract<
+  AiFirstPlanGenerationContract,
+  "blueprint" | "envelope"
+>;
+
 export interface GenerateStructuredFirstPlanDraftOptions {
+  internalDraftContract?: StructuredFirstPlanInternalDraftContract;
   aiPreview?: Pick<
     GenerateAiFirstPlanDraftPreviewOptions,
     | "apiKey"
@@ -288,7 +298,7 @@ interface StructuredFirstPlanActionDebugContext {
 }
 
 interface StructuredFirstPlanAiPreviewDebugSummary {
-  contractMode: "blueprint";
+  contractMode: StructuredFirstPlanInternalDraftContract;
   model: string | null;
   timeoutMs: number | null;
   maxOutputTokens: number | null;
@@ -479,7 +489,10 @@ export async function generateStructuredFirstPlanDraftForUser(
   input: unknown,
   options: GenerateStructuredFirstPlanDraftOptions = {},
 ): Promise<StructuredFirstPlanDraftResult> {
-  const aiPreviewConfig = resolveStructuredFirstPlanAiPreviewConfig(options.aiPreview);
+  const aiPreviewConfig = resolveStructuredFirstPlanAiPreviewConfig(
+    options.aiPreview,
+    options.internalDraftContract,
+  );
   const parsed = parseStructuredFirstPlanDraftInput(input);
 
   if (!parsed.ok) {
@@ -499,7 +512,7 @@ export async function generateStructuredFirstPlanDraftForUser(
 
   try {
     const authoringInput = buildStructuredFirstPlanAuthoringInput(parsed.input);
-    const aiDraft = await generateFirstPlanBlueprintDraft(authoringInput, aiPreviewConfig.options);
+    const aiDraft = await generateFirstPlanStructuredDraft(authoringInput, aiPreviewConfig.options);
 
     if (!aiDraft.ok) {
       await writeStructuredFirstPlanActionDebugArtifact({
@@ -623,17 +636,18 @@ export async function confirmStructuredFirstPlanDraftForUser(
     const reviewedPlan = parsed.request.draft.canonicalPlan;
     const reviewedGeneration = parsed.request.draft.generation;
 
-    if (
-      reviewedPlan.source_kind !== "ai_first_plan_blueprint_v1" ||
-      reviewedGeneration.sourceKind !== "ai_first_plan_blueprint_v1" ||
-      !["ai_authored", "repaired_ai_draft"].includes(reviewedGeneration.sourceStatus)
-    ) {
+    const supportedReviewedDraft = resolveSupportedStructuredFirstPlanDraftSource({
+      sourceKind: reviewedPlan.source_kind,
+      generationSourceKind: reviewedGeneration.sourceKind,
+      sourceStatus: reviewedGeneration.sourceStatus,
+    });
+
+    if (!supportedReviewedDraft.ok) {
       return {
         ok: false,
         status: "blocked",
         reason: "invalid_draft",
-        message:
-          "This structured draft was not created by the supported AI blueprint path. Generate a fresh review before creating a plan.",
+        message: supportedReviewedDraft.message,
       };
     }
 
@@ -647,7 +661,7 @@ export async function confirmStructuredFirstPlanDraftForUser(
       reviewedPlan,
       profilePatch,
       buildPlanScopedStructuredAuthoringMetadata({
-        source: "ai_first_plan_blueprint",
+        source: supportedReviewedDraft.snapshotSource,
         authoringInput: rebuiltAuthoringInput,
         goalStyle: parsed.request.draft.input.goal.goalStyle,
         targetTime:
@@ -765,9 +779,11 @@ function buildStructuredCorrectionResult(error: unknown): StructuredFirstPlanCor
   };
 }
 
-async function generateFirstPlanBlueprintDraft(
+async function generateFirstPlanStructuredDraft(
   authoringInput: StructuredFirstPlanAuthoringInput,
-  aiPreviewOptions: GenerateStructuredFirstPlanDraftOptions["aiPreview"],
+  aiPreviewOptions: NonNullable<
+    ReturnType<typeof resolveStructuredFirstPlanAiPreviewConfig>["options"]
+  >,
 ): Promise<
   | {
       ok: true;
@@ -780,47 +796,62 @@ async function generateFirstPlanBlueprintDraft(
     }
 > {
   const { generateAiFirstPlanDraftPreview } = await import("@/lib/ai-first-plan-draft-service");
+  const contractMode = aiPreviewOptions?.contractMode ?? "blueprint";
   const result = await generateAiFirstPlanDraftPreview({
     input: authoringInput,
     inputKind: "structured_authoring",
-    contractMode: "blueprint",
+    contractMode,
+    allowDeterministicFallback: false,
     ...(aiPreviewOptions ?? {}),
   });
 
   if (!result.ok) {
     return {
       ok: false,
-      result: buildStructuredBlueprintUnavailableResult(result),
+      result: buildStructuredAiDraftUnavailableResult(result),
     };
   }
 
-  if (
-    result.canonicalPlan.source_kind !== "ai_first_plan_blueprint_v1" ||
-    result.metadata.status === "deterministic_fallback"
-  ) {
+  const supportedSource = resolveSupportedStructuredFirstPlanDraftSource({
+    sourceKind: result.canonicalPlan.source_kind,
+    generationSourceKind: result.canonicalPlan.source_kind,
+    sourceStatus: result.metadata.status,
+  });
+
+  if (!supportedSource.ok || result.metadata.status === "deterministic_fallback") {
+    const sourceKind =
+      contractMode === "envelope" ? "ai_first_plan_envelope_v1" : "ai_first_plan_blueprint_v1";
+    const sourceStatus =
+      contractMode === "envelope" ? "envelope_unavailable" : "blueprint_unavailable";
+    const reason =
+      contractMode === "envelope"
+        ? "ai_first_plan_envelope_unavailable"
+        : "ai_first_plan_blueprint_unavailable";
+
     return {
       ok: false,
-      result: buildStructuredBlueprintUnavailableResult({
+      result: buildStructuredAiDraftUnavailableResult({
         ok: false,
-        reason: "ai_first_plan_blueprint_unavailable",
+        reason,
         message: "We could not create a safe AI-authored plan draft. Please retry.",
         issues: [
-          "AI first-plan blueprint generation returned an unsupported deterministic fallback.",
+          "AI first-plan generation returned an unsupported deterministic fallback or source boundary.",
         ],
         authoringInput,
         metadata: {
-          sourceKind: "ai_first_plan_blueprint_v1",
-          sourceStatus: "blueprint_unavailable",
+          sourceKind,
+          sourceStatus,
           fallbackReason: "structured_authoring_v1_blocked",
           model: result.metadata.model,
           responseId: result.metadata.responseId,
           elapsedMs: result.metadata.elapsedMs,
           validationIssues: [
-            "AI first-plan blueprint generation returned an unsupported deterministic fallback.",
+            "AI first-plan generation returned an unsupported deterministic fallback or source boundary.",
           ],
           validationIssueCount: 1,
           debug: result.metadata.debug,
           blueprintTrace: result.metadata.blueprintTrace ?? null,
+          envelopeTrace: result.metadata.envelopeTrace ?? null,
         },
       }),
     };
@@ -835,6 +866,7 @@ async function generateFirstPlanBlueprintDraft(
 
 function resolveStructuredFirstPlanAiPreviewConfig(
   overrides: GenerateStructuredFirstPlanDraftOptions["aiPreview"] = {},
+  internalDraftContract: GenerateStructuredFirstPlanDraftOptions["internalDraftContract"] = "blueprint",
 ) {
   const defaults = {
     model: serverEnv.openAiFirstPlanModel ?? DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MODEL,
@@ -848,12 +880,12 @@ function resolveStructuredFirstPlanAiPreviewConfig(
     ),
     referenceExample: null,
   };
-  const options = { ...defaults, ...(overrides ?? {}) };
+  const options = { ...defaults, ...(overrides ?? {}), contractMode: internalDraftContract };
 
   return {
     options,
     summary: {
-      contractMode: "blueprint" as const,
+      contractMode: internalDraftContract,
       model: typeof options.model === "string" ? options.model : null,
       timeoutMs: typeof options.timeoutMs === "number" ? options.timeoutMs : null,
       maxOutputTokens: typeof options.maxOutputTokens === "number" ? options.maxOutputTokens : null,
@@ -882,6 +914,52 @@ function positiveIntegerEnv(value: string | null, fallback: number) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function resolveSupportedStructuredFirstPlanDraftSource({
+  sourceKind,
+  generationSourceKind,
+  sourceStatus,
+}: {
+  sourceKind: string | undefined;
+  generationSourceKind: string;
+  sourceStatus: StructuredFirstPlanDraftGenerationMetadata["sourceStatus"];
+}):
+  | {
+      ok: true;
+      snapshotSource: "ai_first_plan_blueprint" | "ai_first_plan_envelope";
+    }
+  | {
+      ok: false;
+      message: string;
+    } {
+  if (
+    sourceKind === "ai_first_plan_blueprint_v1" &&
+    generationSourceKind === "ai_first_plan_blueprint_v1" &&
+    ["ai_authored", "repaired_ai_draft"].includes(sourceStatus)
+  ) {
+    return {
+      ok: true,
+      snapshotSource: "ai_first_plan_blueprint",
+    };
+  }
+
+  if (
+    sourceKind === "ai_first_plan_envelope_v1" &&
+    generationSourceKind === "ai_first_plan_envelope_v1" &&
+    sourceStatus === "expanded_from_envelope"
+  ) {
+    return {
+      ok: true,
+      snapshotSource: "ai_first_plan_envelope",
+    };
+  }
+
+  return {
+    ok: false,
+    message:
+      "This structured draft was not created by a supported AI first-plan path. Generate a fresh review before creating a plan.",
+  };
+}
+
 function buildStructuredDraftGenerationMetadata(
   metadata: AiFirstPlanDraftPreviewMetadata,
   canonicalPlan: TrainingPlanV2,
@@ -900,13 +978,14 @@ function buildStructuredDraftGenerationMetadata(
     elapsedMs: metadata.elapsedMs,
     debug: sanitizeStructuredDraftGenerationDebug(metadata.debug),
     blueprintTrace: metadata.blueprintTrace ?? null,
+    envelopeTrace: metadata.envelopeTrace ?? null,
   });
 }
 
-function buildStructuredBlueprintUnavailableResult(result: {
+function buildStructuredAiDraftUnavailableResult(result: {
   issues: string[];
   message?: string;
-  reason: string;
+  reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable" | string;
   metadata?: AiFirstPlanDraftUnavailableMetadata;
 }): Extract<StructuredFirstPlanDraftResult, { ok: false }> {
   const validationIssues = (result.metadata?.validationIssues ?? result.issues)
@@ -914,15 +993,21 @@ function buildStructuredBlueprintUnavailableResult(result: {
     .filter(Boolean)
     .slice(0, 12);
 
+  const sourceKind = result.metadata?.sourceKind ?? "ai_first_plan_blueprint_v1";
+  const envelopeUnavailable = sourceKind === "ai_first_plan_envelope_v1";
+  const unavailableReason = envelopeUnavailable
+    ? "ai_first_plan_envelope_unavailable"
+    : "ai_first_plan_blueprint_unavailable";
+
   return {
     ok: false,
     status: "draft_failed",
-    reason: "ai_first_plan_blueprint_unavailable",
-    code: "ai_first_plan_blueprint_unavailable",
+    reason: unavailableReason,
+    code: unavailableReason,
     message: result.message ?? "We could not create a safe AI-authored plan draft. Please retry.",
     generation: {
-      sourceKind: "ai_first_plan_blueprint_v1",
-      sourceStatus: "blueprint_unavailable",
+      sourceKind,
+      sourceStatus: envelopeUnavailable ? "envelope_unavailable" : "blueprint_unavailable",
       fallbackReason: result.metadata?.fallbackReason ?? result.reason,
       validationIssues,
       validationIssueCount: result.metadata?.validationIssueCount ?? validationIssues.length,
@@ -933,6 +1018,7 @@ function buildStructuredBlueprintUnavailableResult(result: {
         ? sanitizeStructuredDraftGenerationDebug(result.metadata.debug)
         : null,
       blueprintTrace: result.metadata?.blueprintTrace ?? null,
+      envelopeTrace: result.metadata?.envelopeTrace ?? null,
     },
     safety: buildStructuredDraftSafety(),
   };
@@ -1276,6 +1362,8 @@ function sourceKindFromGenerationSource(source: AiFirstPlanDraftPreviewMetadata[
   switch (source) {
     case "openai_ai_first_plan_blueprint":
       return "ai_first_plan_blueprint_v1";
+    case "openai_ai_first_plan_envelope":
+      return "ai_first_plan_envelope_v1";
     case "openai_ai_first_plan_draft":
       return "ai_first_plan_draft_v1";
     case "deterministic_structured_generator":

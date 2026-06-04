@@ -3,7 +3,7 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nitro } from "nitro/vite";
 import type { PluginOption } from "vite";
-import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 const isDevServerCommand =
@@ -11,24 +11,7 @@ const isDevServerCommand =
   process.argv.some((argument) => argument === "dev" || argument === "serve");
 
 const nitroPublicOutputDir = resolve(process.cwd(), ".output/public");
-const nitroServerOutputDir = resolve(process.cwd(), ".output/server");
-const nitroStagedClientPublicDir = resolve(process.cwd(), "node_modules/.nitro/vite/public");
-const nitroStagedServerOutputDir = resolve(process.cwd(), "node_modules/.nitro/vite/server-output");
 const sourcePublicDir = resolve(process.cwd(), "public");
-
-function nitroPluginsWithoutMidBuildPrepare(): PluginOption[] {
-  return (nitro() as PluginOption[]).filter((plugin) => !isNitroPreparePlugin(plugin));
-}
-
-function isNitroPreparePlugin(plugin: PluginOption): boolean {
-  return Boolean(
-    plugin &&
-    typeof plugin === "object" &&
-    !Array.isArray(plugin) &&
-    "name" in plugin &&
-    plugin.name === "nitro:prepare",
-  );
-}
 
 function hitoNitroPublicAssetsVirtualRestore(): PluginOption {
   return {
@@ -58,20 +41,10 @@ function hitoNitroPublicAssetsVirtualRestore(): PluginOption {
   };
 }
 
-function hitoNitroPublicAssetsStabilizer(): PluginOption {
+function hitoNitroPublicAssetsRestore(): PluginOption {
   return {
-    name: "hito:nitro-public-assets-stabilizer",
+    name: "hito:nitro-public-assets-restore",
     apply: "build",
-    configEnvironment(_name, config) {
-      if (config.consumer !== "client") {
-        return;
-      }
-
-      // Keep generated client chunks out of Nitro's final output while Nitro is still preparing it.
-      config.build.outDir = nitroStagedClientPublicDir;
-      config.build.emptyOutDir = true;
-      config.build.copyPublicDir = false;
-    },
     buildStart: {
       order: "post",
       handler() {
@@ -82,62 +55,20 @@ function hitoNitroPublicAssetsStabilizer(): PluginOption {
         restoreNitroPublicAssets();
       },
     },
-    closeBundle: {
-      order: "post",
-      handler() {
-        if (this.environment.name !== "nitro") {
-          return;
-        }
-
-        stageNitroServerOutput();
-        restoreNitroPublicAssets();
-      },
-    },
-    buildApp: {
-      order: "post",
-      handler() {
-        restoreNitroBuildOutput();
-      },
-    },
   };
-}
-
-function stageNitroServerOutput(): void {
-  if (!existsSync(nitroServerOutputDir)) {
-    return;
-  }
-
-  rmSync(nitroStagedServerOutputDir, { recursive: true, force: true });
-  mkdirSync(nitroStagedServerOutputDir, { recursive: true });
-  cpSync(nitroServerOutputDir, nitroStagedServerOutputDir, { recursive: true });
-}
-
-function restoreNitroBuildOutput(): void {
-  restoreNitroPublicAssets();
-
-  if (existsSync(nitroStagedServerOutputDir)) {
-    mkdirSync(nitroServerOutputDir, { recursive: true });
-    cpSync(nitroStagedServerOutputDir, nitroServerOutputDir, { recursive: true });
-  }
 }
 
 function restoreNitroPublicAssets(): void {
   mkdirSync(nitroPublicOutputDir, { recursive: true });
 
-  for (const sourceDir of [nitroStagedClientPublicDir, sourcePublicDir]) {
-    if (existsSync(sourceDir)) {
-      cpSync(sourceDir, nitroPublicOutputDir, { recursive: true });
-    }
+  if (existsSync(sourcePublicDir)) {
+    cpSync(sourcePublicDir, nitroPublicOutputDir, { recursive: true });
   }
 }
 
 export default defineConfig({
   cloudflare: false,
-  plugins: [
-    hitoNitroPublicAssetsVirtualRestore(),
-    ...nitroPluginsWithoutMidBuildPrepare(),
-    hitoNitroPublicAssetsStabilizer(),
-  ],
+  plugins: [hitoNitroPublicAssetsVirtualRestore(), ...nitro(), hitoNitroPublicAssetsRestore()],
   vite: {
     nitro: isDevServerCommand
       ? {

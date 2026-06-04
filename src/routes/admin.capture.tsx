@@ -19,6 +19,7 @@ import {
   adminCaptureTargetRoles,
   appendAdminCaptureItemNote,
   createAdminCaptureItem,
+  deleteAdminCaptureQuickNote,
   getAdminCaptureCopyPrompt,
   listAdminCaptureBacklog,
   updateAdminCaptureItemTriage,
@@ -58,7 +59,7 @@ type QuickNoteState = {
 
 type MutationState = {
   itemId: string | null;
-  field: "triage" | "note" | "prompt" | null;
+  field: "triage" | "note" | "prompt" | "delete" | null;
   message: string | null;
   tone: "success" | "error" | null;
 };
@@ -192,6 +193,7 @@ function AdminCapturePage() {
   const updateTriageFn = useServerFn(updateAdminCaptureItemTriage);
   const appendNoteFn = useServerFn(appendAdminCaptureItemNote);
   const copyPromptFn = useServerFn(getAdminCaptureCopyPrompt);
+  const deleteQuickNoteFn = useServerFn(deleteAdminCaptureQuickNote);
   const [quickNote, setQuickNote] = useState<QuickNoteState>(initialQuickNoteState);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [appendNotes, setAppendNotes] = useState<Record<string, string>>({});
@@ -441,6 +443,58 @@ function AdminCapturePage() {
     }
   };
 
+  const deleteQuickNote = async (item: AdminCaptureItemView) => {
+    if (item.source !== "quick_note") {
+      setMutation({
+        itemId: item.id,
+        field: "delete",
+        message: "Only manual quick notes can be deleted.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (!window.confirm("Delete this quick note? This cannot be undone.")) {
+      return;
+    }
+
+    setMutation({ itemId: item.id, field: "delete", message: null, tone: null });
+
+    try {
+      const deleteResult = await deleteQuickNoteFn({
+        data: {
+          id: item.id,
+        },
+      });
+
+      if (!deleteResult.ok) {
+        setMutation({
+          itemId: item.id,
+          field: "delete",
+          message: formatCaptureMutationError(deleteResult),
+          tone: "error",
+        });
+        return;
+      }
+
+      setExpandedItemId(null);
+      setAppendNotes((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+      setMutation({ itemId: null, field: null, message: null, tone: null });
+      await router.invalidate();
+    } catch (error) {
+      setMutation({
+        itemId: item.id,
+        field: "delete",
+        message: error instanceof Error ? error.message : "Could not delete quick note.",
+        tone: "error",
+      });
+    }
+  };
+
   return (
     <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
       <div className="hito-workbench-shell [--hito-workbench-sidebar-width:240px]">
@@ -476,6 +530,13 @@ function AdminCapturePage() {
                 <Link to="/" className="hito-button hito-button-secondary hito-button-md">
                   Back to Hito
                 </Link>
+                <a
+                  href="/api/admin/auth/logout?next=%2Fadmin%2Fcapture"
+                  className="hito-button hito-button-ghost hito-button-md"
+                >
+                  <Icon name="logout" size="sm" />
+                  Sign out
+                </a>
               </div>
             </div>
             <AdminCaptureRouteRail />
@@ -513,6 +574,7 @@ function AdminCapturePage() {
                   setExpandedItemId={setExpandedItemId}
                   onAppendNote={appendNote}
                   onCopyPrompt={copyPrompt}
+                  onDeleteQuickNote={deleteQuickNote}
                   onUpdateTriage={updateTriage}
                 />
               </section>
@@ -1024,6 +1086,7 @@ function CaptureBacklogList({
   setExpandedItemId,
   onAppendNote,
   onCopyPrompt,
+  onDeleteQuickNote,
   onUpdateTriage,
 }: {
   appendNotes: Record<string, string>;
@@ -1038,6 +1101,7 @@ function CaptureBacklogList({
   setExpandedItemId: (id: string | null) => void;
   onAppendNote: (item: AdminCaptureItemView) => Promise<void>;
   onCopyPrompt: (item: AdminCaptureItemView) => Promise<void>;
+  onDeleteQuickNote: (item: AdminCaptureItemView) => Promise<void>;
   onUpdateTriage: (
     item: AdminCaptureItemView,
     patch: {
@@ -1238,6 +1302,7 @@ function CaptureBacklogList({
                   setAppendNotes((current) => ({ ...current, [item.id]: note }))
                 }
                 onCopyPrompt={() => onCopyPrompt(item)}
+                onDeleteQuickNote={() => onDeleteQuickNote(item)}
               />
             ) : null}
           </article>
@@ -1257,6 +1322,7 @@ function CaptureItemDetail({
   onAppendNote,
   onAppendNoteChange,
   onCopyPrompt,
+  onDeleteQuickNote,
 }: {
   appendNote: string;
   copyButtonLabel: string;
@@ -1267,6 +1333,7 @@ function CaptureItemDetail({
   onAppendNote: () => void;
   onAppendNoteChange: (note: string) => void;
   onCopyPrompt: () => void;
+  onDeleteQuickNote: () => void;
 }) {
   const currentMutation =
     mutation.itemId === item.id &&
@@ -1445,6 +1512,25 @@ function CaptureItemDetail({
               </button>
             </div>
           </details>
+        ) : null}
+
+        {item.source === "quick_note" ? (
+          <section className="grid gap-3 border-t border-hairline pt-4">
+            <div>
+              <h4 className="hito-label text-foreground">Quick note cleanup</h4>
+              <p className="hito-field-helper">
+                Delete only temporary manual notes after they are copied into a real task.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-sm justify-self-start"
+              onClick={onDeleteQuickNote}
+            >
+              <Icon name="x-circle" size="xs" />
+              Delete quick note
+            </button>
+          </section>
         ) : null}
       </div>
     </div>

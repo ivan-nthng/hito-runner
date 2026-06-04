@@ -2,9 +2,14 @@ import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import {
+  buildStaleRepoMirrorMetadata,
+  findStaleActiveRepoMirrorRows,
+} from "./import-repo-work-items-to-admin-backlog";
+import {
   appendAdminCaptureItemNoteForDependencies,
   createAdminCaptureItemForDependencies,
   createSupabaseAdminCaptureRepository,
+  deleteAdminCaptureQuickNoteForDependencies,
   getAdminCaptureCopyPromptForDependencies,
   getAdminCaptureItemForDependencies,
   listAdminCaptureBacklogForDependencies,
@@ -15,10 +20,11 @@ import {
 } from "../src/lib/admin-capture.server";
 import { updateAdminCaptureItemTriageForDependencies } from "../src/lib/admin-capture.server";
 import type { AdminCaptureResult } from "../src/lib/admin-capture";
-import type { Database } from "../src/lib/supabase/database";
+import type { Database, Json } from "../src/lib/supabase/database";
 
 type ItemInsert = Database["public"]["Tables"]["admin_capture_items"]["Insert"];
 type ItemUpdate = Database["public"]["Tables"]["admin_capture_items"]["Update"];
+type AdminCaptureItemRow = Database["public"]["Tables"]["admin_capture_items"]["Row"];
 type LiveProbeStep = {
   name: string;
   ok: boolean;
@@ -117,6 +123,10 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
 
     return updated;
   }
+
+  async deleteItem(id: string): Promise<boolean> {
+    return this.#items.delete(id);
+  }
 }
 
 const adminDependencies = (repository: AdminCaptureRepository): AdminCaptureDependencies => ({
@@ -126,6 +136,14 @@ const adminDependencies = (repository: AdminCaptureRepository): AdminCaptureDepe
       adminUserId: "hito-admin",
       adminLabel: "admin",
       provider: "admin",
+      sessionSource: "deployed_password",
+      runtimeClass: "deployed",
+      capabilities: {
+        adminAnalytics: true,
+        adminCapture: true,
+        adminDebugCapture: true,
+        localTestAccounts: false,
+      },
     },
   }),
   repository,
@@ -194,6 +212,14 @@ async function runDeterministicHarness() {
     assert.equal(nonAdminList.reason, "admin_required");
   }
 
+  const nonAdminDelete = await deleteAdminCaptureQuickNoteForDependencies(nonAdmin, {
+    id: created.item.id,
+  });
+  assert.equal(nonAdminDelete.ok, false);
+  if (!nonAdminDelete.ok) {
+    assert.equal(nonAdminDelete.reason, "admin_required");
+  }
+
   const listed = await mustOk(
     listAdminCaptureBacklogForDependencies(admin, {
       status: "new",
@@ -236,6 +262,36 @@ async function runDeterministicHarness() {
   assert.match(prompt.prompt.prompt, /api_key: \[redacted\]/);
   assert.match(prompt.prompt.prompt, /authHeader: \[redacted\]/);
   assert.doesNotMatch(prompt.prompt.prompt, /super-secret|Bearer abc/i);
+
+  const capturedDeleteRejected = await deleteAdminCaptureQuickNoteForDependencies(admin, {
+    id: created.item.id,
+  });
+  assert.equal(capturedDeleteRejected.ok, false);
+  if (!capturedDeleteRejected.ok) {
+    assert.equal(capturedDeleteRejected.reason, "quick_note_delete_only");
+  }
+
+  const disposableQuickNote = await mustOk(
+    createAdminCaptureItemForDependencies(admin, {
+      itemType: "context_capture",
+      title: "Disposable quick note delete proof",
+      note: "Delete me after deterministic quick-note proof.",
+      pageUrl: "hito://admin/quick-note-delete-proof",
+      route: "/admin/capture",
+      targetRole: "backend",
+      priority: "medium",
+      metadata: {
+        source: "deterministic_quick_note_delete_proof",
+      },
+    }),
+  );
+  assert.equal(disposableQuickNote.item.source, "quick_note");
+
+  const deletedQuickNote = await mustOk(
+    deleteAdminCaptureQuickNoteForDependencies(admin, { id: disposableQuickNote.item.id }),
+  );
+  assert.equal(deletedQuickNote.deletedId, disposableQuickNote.item.id);
+  assert.equal(await repository.getItem(disposableQuickNote.item.id), null);
 
   await mustOk(
     updateAdminCaptureItemTriageForDependencies(admin, {
@@ -332,6 +388,11 @@ async function runDeterministicHarness() {
       note: "Should not replace.",
     }),
   );
+  await mustRejectRepoDerivedMutation(
+    deleteAdminCaptureQuickNoteForDependencies(admin, {
+      id: repoDerivedRow.id,
+    }),
+  );
   const repoAfterRejectedMutations = await repository.getItem(repoDerivedRow.id);
   assert.equal(repoAfterRejectedMutations?.status, "ready_for_codex");
   assert.equal(repoAfterRejectedMutations?.item_type, "context_capture");
@@ -343,6 +404,8 @@ async function runDeterministicHarness() {
     "ROLE: BACKEND\n\nTASK:\nVerify imported markdown metadata.\n\nSTAGE:\nBACKEND validation",
   );
 
+  assertStaleRepoMirrorCleanupPolicy();
+
   console.log(
     JSON.stringify(
       {
@@ -353,10 +416,13 @@ async function runDeterministicHarness() {
           "non_admin_rejected",
           "deterministic_prompt",
           "metadata_redaction",
+          "quick_note_delete",
+          "non_quick_note_delete_rejected",
           "archived_excluded_from_active_list",
           "repo_derived_list_detail_copy",
           "repo_derived_markdown_prompt_copy",
           "repo_derived_read_only",
+          "stale_repo_mirror_cleanup_policy",
         ],
         promptLength: prompt.prompt.prompt.length,
       },
@@ -364,6 +430,100 @@ async function runDeterministicHarness() {
       2,
     ),
   );
+}
+
+function assertStaleRepoMirrorCleanupPolicy() {
+  const currentRepoRow = repoMirrorRow({
+    id: "11111111-1111-4111-8111-111111111111",
+    title: "Current repo mirror",
+    sourcePath: "docs/plans/active/current.md",
+    sourceType: "active_plan",
+  });
+  const staleRepoRow = repoMirrorRow({
+    id: "22222222-2222-4222-8222-222222222222",
+    title: "Stale repo mirror",
+    sourcePath: "docs/plans/active/stale.md",
+    sourceType: "active_plan",
+  });
+  const archivedStaleRepoRow = repoMirrorRow({
+    id: "33333333-3333-4333-8333-333333333333",
+    title: "Archived stale repo mirror",
+    sourcePath: "docs/plans/active/already-archived.md",
+    sourceType: "active_plan",
+    status: "archived",
+    archivedAt: "2026-06-02T12:00:00.000Z",
+  });
+  const quickNoteRow = repoMirrorRow({
+    id: "44444444-4444-4444-8444-444444444444",
+    title: "Manual quick note",
+    sourcePath: "docs/plans/active/stale.md",
+    sourceType: "active_plan",
+    importedFromRepo: false,
+  });
+  const capturedUiRow = {
+    ...quickNoteRow,
+    id: "55555555-5555-4555-8555-555555555555",
+    selector: "[data-testid='capture-proof']",
+    element_text: "Capture proof",
+  };
+  const currentSourceKeys = new Set(["active_plan:docs/plans/active/current.md"]);
+  const staleRows = findStaleActiveRepoMirrorRows(
+    [currentRepoRow, staleRepoRow, archivedStaleRepoRow, quickNoteRow, capturedUiRow],
+    currentSourceKeys,
+  );
+  const staleMetadata = buildStaleRepoMirrorMetadata(
+    staleRepoRow.metadata as Record<string, Json | undefined>,
+    "docs/plans/active/stale.md",
+    "active_plan",
+  ) as Record<string, unknown>;
+
+  assert.deepEqual(
+    staleRows.map((row) => row.id),
+    [staleRepoRow.id],
+  );
+  assert.equal(staleMetadata.stale_repo_mirror, true);
+  assert.equal(staleMetadata.stale_source_path, "docs/plans/active/stale.md");
+  assert.equal(staleMetadata.stale_source_type, "active_plan");
+  assert.equal(staleMetadata.stale_cleanup_action, "archived");
+}
+
+function repoMirrorRow(input: {
+  id: string;
+  title: string;
+  sourcePath: string;
+  sourceType: string;
+  importedFromRepo?: boolean;
+  status?: AdminCaptureItemRow["status"];
+  archivedAt?: string | null;
+}): AdminCaptureItemRow {
+  return {
+    id: input.id,
+    item_type: "context_capture",
+    status: input.status ?? "ready_for_codex",
+    priority: "medium",
+    target_role: "backend",
+    title: input.title,
+    note: "Repo mirror validation row.",
+    page_url: `hito://repo/${input.sourcePath}`,
+    route: null,
+    created_by_user_id: "repo-work-item-importer",
+    created_by_label: "Repo work item importer",
+    viewport_width: null,
+    viewport_height: null,
+    element_text: null,
+    selector: null,
+    dom_path: null,
+    nearby_heading: null,
+    bounding_rect: null,
+    metadata: {
+      imported_from_repo: input.importedFromRepo ?? true,
+      source_path: input.sourcePath,
+      source_type: input.sourceType,
+    },
+    created_at: "2026-06-03T12:00:00.000Z",
+    updated_at: "2026-06-03T12:00:00.000Z",
+    archived_at: input.archivedAt ?? null,
+  };
 }
 
 async function runLiveSupabaseProbe() {
@@ -475,6 +635,33 @@ async function runLiveSupabaseProbe() {
       detail: "manual quick-note/capture row note append still works",
     });
 
+    const deleteProof = await mustOk(
+      createAdminCaptureItemForDependencies(admin, {
+        itemType: "context_capture",
+        title: "Live quick note delete proof",
+        note: "Disposable live quick note delete proof.",
+        pageUrl: "hito://admin/live-delete-proof",
+        route: "/admin/capture",
+        targetRole: "backend",
+        priority: "medium",
+        metadata: {
+          source: "live_supabase_delete_probe",
+        },
+      }),
+    );
+    const deletedQuickNote = await mustOk(
+      deleteAdminCaptureQuickNoteForDependencies(admin, { id: deleteProof.item.id }),
+    );
+    const deletedReadback = await repository.getItem(deleteProof.item.id);
+    steps.push({
+      name: "service_delete_quick_note",
+      ok:
+        deleteProof.item.source === "quick_note" &&
+        deletedQuickNote.deletedId === deleteProof.item.id &&
+        deletedReadback === null,
+      detail: "service-role backend path deleted a disposable manual quick note",
+    });
+
     const repoDerivedRow = await repository.createItem({
       item_type: "context_capture",
       status: "ready_for_codex",
@@ -546,6 +733,9 @@ async function runLiveSupabaseProbe() {
       id: repoDerivedItemId,
       note: "Should not replace.",
     });
+    const repoDeleteBlocked = await deleteAdminCaptureQuickNoteForDependencies(admin, {
+      id: repoDerivedItemId,
+    });
     const repoAfterRejectedMutations = await repository.getItem(repoDerivedItemId);
     steps.push({
       name: "repo_derived_mutation_blocked",
@@ -553,6 +743,7 @@ async function runLiveSupabaseProbe() {
         isRepoReadOnlyRejection(repoTriageBlocked) &&
         isRepoReadOnlyRejection(repoAppendBlocked) &&
         isRepoReadOnlyRejection(repoUpdateNoteBlocked) &&
+        isRepoReadOnlyRejection(repoDeleteBlocked) &&
         repoAfterRejectedMutations?.status === "ready_for_codex" &&
         repoAfterRejectedMutations?.target_role === "backend" &&
         repoAfterRejectedMutations?.note ===
@@ -723,6 +914,21 @@ async function probePublishableAccessBlocked(
     detail: insertResult.error
       ? classifySupabaseError(insertResult.error)
       : "publishable client insert returned no row",
+  });
+
+  const deleteResult = await client
+    .from("admin_capture_items")
+    .delete()
+    .eq("id", serviceCreatedItemId)
+    .select("id")
+    .maybeSingle();
+
+  steps.push({
+    name: "publishable_delete_blocked",
+    ok: !deleteResult.data,
+    detail: deleteResult.error
+      ? classifySupabaseError(deleteResult.error)
+      : "publishable client could not delete service-created item",
   });
 }
 

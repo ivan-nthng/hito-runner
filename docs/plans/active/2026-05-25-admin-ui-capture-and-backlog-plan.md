@@ -14,39 +14,58 @@ high
 
 ## Next Recommended Role
 
-FRONTEND
+DESIGNER
 
 ## Task
 
-Render repo-derived admin Backlog rows as read-only while preserving manual quick-note editing.
+Define the admin capture-layer interaction spec.
 
 ## Stage
 
-FRONTEND implementation
+DESIGNER spec / route-spanning admin capture layer
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: FRONTEND
+ROLE: DESIGNER
 
 TASK:
-Render repo-derived admin Backlog rows as read-only while preserving manual quick-note editing.
+Define the admin capture-layer interaction spec for the route-spanning admin debug/capture overlay.
 
 STAGE:
-FRONTEND implementation
+DESIGNER spec / route-spanning admin capture layer
 
 CONTEXT:
 - Source path: docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md
-- Markdown metadata is canonical for this repo-derived admin Backlog item.
-- Supabase mirrors this item for discovery and prompt copy only.
+- Backend now exposes an admin-only `adminDebugCapture` capability probe through the canonical
+  `AdminAccessContext` resolver.
+- The future capture layer should work across accessible Hito routes, not only inside
+  `/admin/capture`.
+- `/admin/capture` remains the backlog/review queue.
+- The capture layer must stay admin-only, internal, and non-mutating until the admin explicitly
+  saves a bounded capture item.
 
 CONSTRAINTS:
-- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
-- Preserve Hito canonical architecture and current role boundaries.
-- Do not broaden scope beyond this work item.
+- Do not implement frontend or backend code.
+- Do not create a new mini design system.
+- Reuse Hito DS primitives and existing admin workbench patterns.
+- Do not design live editing, automatic Codex dispatch, or background agent execution.
+- Do not expose capture controls to normal runners/testers/signed-out visitors.
+- Treat screenshot capture as optional/future; the design must degrade to text/selector/context
+  capture if screenshots are unavailable.
 
 OUTPUT:
-Use the project role output format.
+1. Task
+2. Stage
+3. Product interaction model
+4. Launcher behavior
+5. Selection-mode behavior
+6. Capture panel anatomy
+7. Mobile/collision behavior
+8. Hito DS reuse rules
+9. Accessibility and privacy notes
+10. Frontend handoff requirements
+11. Blockers
 ```
 
 ## Owner
@@ -55,7 +74,7 @@ Architect / Backend / Frontend / QA
 
 ## Last Updated
 
-2026-06-01
+2026-06-03
 
 ## Context
 
@@ -97,6 +116,22 @@ Current implemented phase:
 - Backend Slice 10 actionable markdown cleanup is implemented: active plans, product briefs, and
   frontend specs now carry canonical metadata blocks, import with human-readable `Task` titles, and
   keep filename/source path as secondary metadata instead of primary Backlog labels
+- Backend stale repo-derived mirror cleanup is implemented and QA-passed: the importer reports active
+  repo-derived rows whose `metadata.source_path` no longer exists in approved import sources and
+  archives those stale mirrors only when explicitly run with `--archive-stale`
+- Frontend read-only metadata tag DS reuse is implemented and QA-passed: `/admin/capture` imports
+  shared `HitoMetadataTag`, repo-derived/backend-owned metadata renders as static read-only tags,
+  quick-note editable controls use explicit interactive mode, source-truth tooltips use shared
+  Tooltip, tabs are simplified to `Active`, `Done`, and `Archived`, and the old
+  `ReadOnlyMetadataTag` route-local component is gone
+- Backend quick-note delete contract is implemented: `/admin/capture` exposes a bounded admin-only
+  delete mutation for manual quick notes only, while repo-derived mirrors and captured UI records
+  remain non-deletable through the UI/server action
+- Admin auth/session consolidation is implemented and QA-passed: admin routes/server functions flow
+  through one `AdminAccessContext` resolver, local `/admin/login` issues signed admin-session
+  access, Supabase app-metadata admin remains deployed compatibility only, local Test Accounts
+  access is an admin capability, and the bounded `adminDebugCapture` capability probe is available
+  for future route-spanning capture-overlay work
 
 Important product correction:
 
@@ -108,7 +143,8 @@ Important product correction:
 - imported markdown work items in admin are for filtering, review, prompt copy, and discovery, not
   editing lifecycle attributes
 - admin quick notes are scratchpad/intake records; they can be appended to and copied into a proper
-  markdown backlog/task file, but they should not replace canonical repo tasks
+  markdown backlog/task file, then deleted from the admin UI when no longer needed, but they should
+  not replace canonical repo tasks
 
 ## Product Contract
 
@@ -314,6 +350,204 @@ Important auth boundary:
 - cross-product capture should therefore verify admin through an `/api/admin/capture/session` or equivalent admin API request, not by turning every product route into an admin route
 - normal product loaders should continue resolving normal runner/public state
 - capture overlay rendering must be an additive client-side layer, never a new source of product data truth
+
+## Canonical Admin Auth / Session Contract
+
+Decision date: 2026-06-01.
+
+Canonical pipeline:
+
+`request -> canonical admin eligibility -> canonical admin session resolver -> AdminAccessContext -> admin route/serverFn`
+
+Decision 1: Supabase metadata admin source.
+
+- Choose Option C.
+- Supabase app-metadata admin may remain as explicit deployed compatibility, but it must not be a
+  second local/admin fixture truth path.
+- Supabase `user_metadata`, raw user-editable metadata, or JWT-only user-editable claims must not be
+  admin authority.
+- If Supabase compatibility is kept, the shared resolver must verify it server-side through the
+  admin/service Supabase seam and accept only server-owned `app_metadata` values such as
+  `hito_admin === true` or `hito_role === "admin"`.
+- Local admin access should not depend on Supabase metadata.
+
+Decision 2: local `/admin/login` session format.
+
+- Choose Option A as the target contract.
+- Local `/admin/login` should verify the protected local admin fixture on loopback runtimes, then
+  issue only the signed admin session cookie (`hito_admin_session`) for admin surfaces.
+- `/admin/login` must not create a runner/product local auth session for admin access.
+- The signed admin session may carry enough bounded signed context to tell deployed-owner and
+  local-fixture admin sessions apart.
+- Local Test Accounts capability should be represented on `AdminAccessContext` as an explicit
+  capability, not inferred from a separate `hito_local_auth_session` provider path.
+
+Decision 3: logout contract.
+
+- Choose Option B.
+- Add an explicit `/api/admin/auth/logout` for admin surfaces.
+- Admin UI logout should use the admin logout route so it reliably clears `hito_admin_session`
+  without relying on runner/product logout semantics.
+- Generic `/api/auth/logout` may remain a broad/global compatibility logout, but admin surfaces
+  should not depend on it as their primary logout path.
+
+Canonical `AdminAccessContext` should expose:
+
+- stable admin id
+- admin label
+- session source, for example signed admin cookie, local fixture admin, or Supabase deployed
+  compatibility
+- runtime classification, including loopback/local vs deployed
+- capabilities, at minimum:
+  - `canAccessAdmin`
+  - `canManageLocalTestAccounts`
+  - `canUseAdminCapture`
+  - `canUseAdminAnalytics`
+
+Backend implementation requirements:
+
+- make `src/lib/admin-access.server.ts` the single resolver/facade for admin route and server
+  function access
+- remove or delegate duplicated private admin guards from `admin-analytics.server.ts`,
+  `admin-capture.server.ts`, and `admin-local-test-accounts.server.ts`
+- centralize TanStack `/_serverFn/...` eligibility in the shared resolver/facade
+- treat `localhost` and `127.0.0.1` as the same loopback class for local admin eligibility
+- preserve product runner auth and local tester auth behavior outside admin surfaces
+- preserve admin-only service-role access for Supabase admin reads/writes
+- return bounded `authentication_required`, `admin_required`, and `admin_unavailable` failures
+
+What not to do:
+
+- do not make Supabase metadata the primary local admin truth
+- do not read `user_metadata` for authorization decisions
+- do not keep local admin access on `hito_local_auth_session` once the signed admin session path is
+  available
+- do not add a new admin table or schema for this consolidation slice
+- do not change `/admin/capture` backlog semantics, repo-derived read-only behavior, or quick-note
+  lifecycle in this auth slice
+
+Backend Slice 11: canonical admin auth/session consolidation
+
+Owner: BACKEND
+
+Status: Implemented / browser QA passed locally
+
+Scope:
+
+- [x] make signed `hito_admin_session` the one admin session cookie for `/admin/login` in local and
+  deployed admin surfaces
+- [x] keep Supabase app-metadata admin only as explicit deployed compatibility inside the shared
+  resolver
+- [x] add or finish `AdminAccessContext` capabilities for admin capture, analytics, and local Test
+  Accounts
+- [x] add explicit `adminDebugCapture` capability for future route-spanning debug/capture tooling
+- [x] migrate admin analytics, admin capture, and local test-account server code to the shared
+  resolver/facade
+- [x] centralize admin route/serverFn eligibility and loopback host normalization
+- [x] add explicit admin logout route for admin surfaces
+- [x] keep generic runner/product logout behavior separate
+
+Exit criteria:
+
+- [x] `/admin/login` on loopback creates admin access through `hito_admin_session`, not a product
+  local auth session
+- [x] `/admin/capture`, `/admin/analytics`, and local Test Accounts all authorize through
+  `AdminAccessContext`
+- [x] local admin works on both `localhost` and `127.0.0.1`
+- [x] tester/product credentials are rejected from admin surfaces
+- [x] Supabase app-metadata admin compatibility works only when explicitly verified server-side
+- [x] Supabase `user_metadata` does not grant admin access
+- [x] admin logout clears admin session and does not depend on runner logout
+- [x] no auth loop occurs after successful admin sign-in
+
+Validation harness requirements:
+
+- dependency-level resolver tests or focused script coverage for:
+  - [x] unauthenticated/non-admin request scope rejection
+  - [x] signed admin cookie success
+  - [x] invalid/expired signed admin cookie
+  - [x] local fixture admin on `localhost`
+  - [x] local fixture admin on `127.0.0.1` canonicalization
+  - [x] encoded admin server-function eligibility
+  - [x] production hashed admin server-function eligibility
+  - [x] production hashed admin debug/capture probe eligibility
+  - [x] admin debug/capture probe rejects signed-out, runner, and tester contexts
+  - [x] mixed runner + admin browser context keeps product route identity separate from admin
+    debug/capture capability
+  - [x] runner logout does not own or clear admin debug/capture capability
+  - [x] Supabase app-metadata admin compatibility and user-metadata rejection
+  - [x] admin logout cookie clearing
+  - local tester denied
+  - Supabase `app_metadata` admin compatibility accepted when explicitly enabled/available
+  - Supabase non-admin denied
+  - Supabase `user_metadata` admin-looking values denied
+  - admin route eligibility
+  - admin serverFn eligibility
+  - production hashed admin serverFn eligibility
+  - non-admin serverFn/path denial
+- browser proof for:
+  - `/admin/login -> /admin/capture`
+  - reload `/admin/capture`
+  - `/admin/login -> /admin/analytics`
+  - local Test Accounts tab under admin context
+  - admin logout
+  - no auth loop
+
+Implementation note, 2026-06-01: browser QA exposed that TanStack Start client navigation calls
+admin server functions as `/_serverFn/<sha256 id>` in built mode, not only as dev JSON metadata.
+`admin-access.server.ts` now whitelists admin server functions by source file and generated
+production function id, keeping product server functions outside admin-session eligibility while
+allowing Backlog -> Analytics -> Backlog client navigation to stay authenticated.
+
+Implementation note, 2026-06-03: Backend now exposes an explicit `adminDebugCapture` capability on
+`AdminAccessContext` and a bounded `getAdminDebugCaptureCapability` server-function probe for the
+future route-spanning capture overlay. The probe returns only capability/authority boundary state,
+requires canonical admin access, does not require backlog storage to answer capability, and is
+validated to reject signed-out, runner, local tester, product-route, and `user_metadata`-only admin
+claims while accepting signed admin sessions and server-verified Supabase `app_metadata` admin
+compatibility.
+
+QA closeout evidence, 2026-06-03:
+
+- Verdict: Passed.
+- `AdminAccessContext.capabilities` includes `adminDebugCapture: true` while preserving
+  `adminCapture`, `adminAnalytics`, and `localTestAccounts`.
+- `getAdminDebugCaptureCapability` is exported through `createServerFn({ method: "GET" })`.
+- The probe is admin-owned, whitelisted for TanStack serverFn eligibility, and covered by the
+  hashed production serverFn id.
+- The probe does not depend on backlog storage and returns only bounded capability data.
+- The probe does not expose raw session ids, raw user ids, secrets, service keys, cookies, JWTs, or
+  raw Supabase objects.
+- Positive proof:
+  - signed admin cookie is accepted for admin route and admin serverFn access
+  - signed admin capability returns `capability: "admin_debug_capture"` and `enabled: true`
+  - returned capabilities include `adminCapture: true` and `adminDebugCapture: true`
+  - authority source/runtime is bounded
+  - identity-boundary booleans show runner/tester/product state is ignored
+  - Supabase `app_metadata` admin compatibility is accepted only where intended
+- Negative proof:
+  - signed-out probe returns bounded `authentication_required`
+  - local tester login/probe is denied with `admin_required`
+  - post-logout probe is denied
+  - non-admin product route and non-admin product serverFn are rejected
+  - invalid and expired signed admin cookies are rejected
+  - Supabase `user_metadata` admin-looking claims are rejected
+  - runner logout does not own the admin capability path
+- Regression proof:
+  - `node --import tsx scripts/validate-admin-auth-session.ts` passed
+  - `npm run validate-admin-capture-backlog` passed
+  - `npm run build` passed
+  - built-in browser login spot-check reached `/admin/capture`
+  - `Capture load failed` and `Backlog unavailable` were absent
+- Artifact:
+  - `qa-artifacts/screenshots/2026-06-03/admin-debug-capture-capability-qa/probe-runtime-proof.json`
+- existing admin backlog validation:
+  - `npm run validate-admin-capture-backlog`
+  - `npm run validate-admin-capture-backlog:live` if linked env is available
+- standard validation:
+  - targeted ESLint for touched admin/auth files
+  - `git diff --check`
+  - `npm run build`
 
 ## Storage Model
 
@@ -911,7 +1145,7 @@ Backend Slice 7: repo work-item import/refresh
 
 Owner: BACKEND
 
-Status: Implemented / backend import proof complete
+Status: Implemented / backend import and stale cleanup QA passed
 
 Scope:
 
@@ -936,12 +1170,19 @@ Scope:
 - [x] preserve admin-only access and service-role storage boundaries
 - [x] preserve manual status/priority/target-role triage on imported rows by default; pass
   `--refresh-triage` only when the repo import should intentionally re-own those fields
+- [x] detect stale active repo-derived mirrors by `metadata.source_path` against the current
+  approved repo import source set
+- [x] require explicit `--archive-stale` before stale mirror cleanup mutates Supabase
+- [x] keep stale mirror cleanup away from quick notes, captured UI rows, current repo-derived rows,
+  and markdown files
 
 Read-only correction note:
 
 - normal admin UI/API mutation seams now reject repo-derived row edits server-side
 - `--refresh-triage` remains an importer-only ops flag for intentionally re-owning mirrored
   status/type/priority/target-role metadata from markdown-derived import rules
+- `--archive-stale` remains an importer-only ops flag for marking stale repo-derived mirrors
+  archived when their markdown source path no longer exists
 
 Exit criteria:
 
@@ -951,6 +1192,50 @@ Exit criteria:
   duplicates
 - [x] archived/closed docs do not flood the active Backlog by default
 - [x] quick notes and visual capture items still work exactly as they do now
+- [x] stale repo-derived active mirrors can be dry-run reported, explicitly archived, and then
+  verified as `0` active stale mirrors
+
+Stale mirror cleanup proof, 2026-06-03:
+
+- `npm run import-admin-backlog-work-items -- --dry-run --archive-stale` initially reported
+  `staleActiveRepoMirrorCount: 6`, `staleRepoMirrorAction: would_archive`, `manualRowCountBefore:
+  0`, `duplicateCount: 0`, and `repoDerivedInReviewCount: 0`.
+- `npm run import-admin-backlog-work-items -- --archive-stale` archived those 6 stale mirrors and
+  reported `staleActiveRepoMirrorCountAfterCleanup: 0`, `staleRepoMirrorArchivedCount: 6`,
+  `manualRowCountBefore: 0`, `manualRowCountAfter: 0`, `duplicateCount: 0`, and
+  `repoDerivedInReviewCount: 0`.
+- A follow-up normal `npm run import-admin-backlog-work-items` reported
+  `staleActiveRepoMirrorCount: 0`, `duplicateCount: 0`, `repoDerivedInReviewCount: 0`, and manual
+  rows untouched.
+
+Stale mirror cleanup QA closeout, 2026-06-03:
+
+- QA verdict: passed.
+- `--archive-stale` is explicit in `scripts/import-repo-work-items-to-admin-backlog.ts`.
+- CLI execution is guarded behind `isMainModule()`, so helper imports are safe and do not auto-run
+  the importer.
+- Cleanup policy is bounded to repo-derived, valid `metadata.source_path`, valid
+  `metadata.source_type`, approved markdown import roots, non-archived rows, and source markdown
+  absent from the current approved repo scan.
+- Cleanup archives stale mirrors instead of deleting markdown and writes only bounded stale metadata
+  to affected stale mirrors.
+- Current normal dry-run reports `staleActiveRepoMirrorCount: 0`, `duplicateCount: 0`, and
+  `repoDerivedInReviewCount: 0`.
+- Current dry-run with `--archive-stale` reports `archiveStale: true`,
+  `staleRepoMirrorAction: would_archive`, `staleActiveRepoMirrorCount: 0`,
+  `staleActiveRepoMirrorCountAfterCleanup: 0`, `staleRepoMirrorArchivedCount: 0`,
+  `manualRowCountBefore: 0`, `manualRowCountAfter: 0`, `duplicateCount: 0`, and
+  `repoDerivedInReviewCount: 0`.
+- Live validator remains green. Quick notes, captured UI rows, and current repo-derived rows were not
+  affected.
+- Active Backlog UI loads successfully; `Capture load failed` and `Backlog unavailable` are absent.
+- Current important work remains discoverable, including Polar auto-sync, and the old stale active
+  path query returns no active item.
+- QA screenshots/artifacts are local-only under
+  `qa-artifacts/screenshots/2026-06-03/admin-backlog-stale-mirror-cleanup-qa/`.
+- Validation passed: targeted ESLint for the importer and validator, importer dry-run, importer
+  dry-run with `--archive-stale`, local validator, live validator, `git diff --check`, and
+  `npm run build`.
 
 Frontend follow-up after Backend Slice 7:
 
@@ -1029,6 +1314,8 @@ Frontend Slice 9: read-only admin Backlog correction
 
 Owner: FRONTEND
 
+Status: Implemented / QA-passed with shared Hito DS metadata tags
+
 Scope:
 
 - render repo-derived markdown rows as read-only work items
@@ -1037,6 +1324,33 @@ Scope:
 - keep prompt copy and context copy available
 - keep quick-note creation/append available as scratchpad intake
 - do not redesign the Backlog page or add new UI kits
+
+Implemented evidence:
+
+- Shared primitive exists at `src/components/ui/metadata-tag.tsx`.
+- `/admin/capture` imports and uses `HitoMetadataTag`; route-local `ReadOnlyMetadataTag` no longer
+  exists.
+- `HitoMetadataTag` supports read-only default rendering via `span`, explicit `interactive` mode,
+  tone support, and shared Tooltip integration from `src/components/ui/tooltip.tsx`.
+- Repo-derived/backend-owned tags render as read-only static tags with no chevrons, arrows,
+  plus/status icon, or dropdown-trigger semantics.
+- Quick-note editable controls use `HitoMetadataTag asChild interactive`.
+- Tooltip copy explains source truth and where metadata should be changed.
+- Workflow wording `Ready for Codex`, `Prompt ready`, and `In review` remains absent from the
+  current UI; tabs remain simplified as `Active`, `Done`, and `Archived`.
+- Mobile 375px layout wraps metadata tags below title/date/source metadata without horizontal
+  overflow.
+- Search/filter plus repo-derived open/detail/copy behavior still works, and `Capture load failed`
+  / `Backlog unavailable` were not visible.
+- Browser Path Preflight: built-in Codex browser was used first and covered the authenticated local
+  `/admin/capture` flow; Safari fallback was not needed.
+- Screenshot evidence:
+  `qa-artifacts/screenshots/2026-06-01/admin-backlog-metadata-tag-ds-qa/`
+  (`01-desktop-tooltip-proof.png`, `02-quick-note-interactive-controls.png`,
+  `03-desktop-readonly-tags.png`, `04-mobile-375-wrap-proof.png`).
+- Validation passed:
+  `npm exec eslint -- src/routes/admin.capture.tsx src/components/ui/metadata-tag.tsx src/lib/admin-capture.ts src/lib/admin-capture.server.ts`,
+  `git diff --check`, and `npm run build`.
 
 Exit criteria:
 
@@ -1091,9 +1405,7 @@ Route:
 
 Primary sections:
 
-- `New`
-- `In review`
-- `Ready for Codex`
+- `Active`
 - `Done`
 - `Archived`
 
@@ -1196,8 +1508,8 @@ Exit criteria:
 Implemented evidence:
 
 - `supabase/migrations/20260528190000_admin_capture_backlog.sql` added the first RLS-enabled backlog tables; `supabase/migrations/20260601110000_remove_admin_capture_assets.sql` retires the unused screenshot asset table, and the empty `admin-capture-assets` bucket is removed through the Supabase Storage API before screenshot upload shipped.
-- `src/lib/admin-capture.ts` and `src/lib/admin-capture.server.ts` expose admin-only availability, list, detail, create, triage, note update/append, and deterministic copy-prompt seams.
-- `scripts/validate-admin-capture-backlog.ts` proves admin create/list/read/update, non-admin rejection, deterministic prompt output, metadata redaction, and archived-item exclusion without requiring frontend implementation.
+- `src/lib/admin-capture.ts` and `src/lib/admin-capture.server.ts` expose admin-only availability, list, detail, create, triage, note update/append, quick-note-only delete, and deterministic copy-prompt seams.
+- `scripts/validate-admin-capture-backlog.ts` proves admin create/list/read/update, quick-note delete, non-admin delete rejection, non-quick-note delete rejection, deterministic prompt output, metadata redaction, and archived-item exclusion.
 - `npm run validate-admin-capture-backlog:live` probes the linked Supabase project and proves the item table exists, the retired asset table/bucket are absent, service-role create/list/read/update works, publishable-key read/write is blocked, archived items are excluded from active lists, prompt metadata is redacted, and the disposable proof row is cleaned up.
 - Local cleanup validation passed with targeted ESLint, `npm run validate-admin-capture-backlog`,
   `git diff --check`, and `npm run build` on rerun. The first build retry hit the existing
@@ -1391,8 +1703,11 @@ Required checks:
 - [ ] Route-spanning inspect/capture overlay is explicit, admin-verified, and activated through a floating launcher.
 - [ ] Capture can save bug, change request, and context capture items.
 - [x] Backlog can filter by status/type/role/route/date/search.
+- [x] Repo-derived Backlog metadata renders as read-only DS-backed tags.
 - [x] Copy prompt is deterministic and manual.
 - [x] QA validates `/admin/capture` v1 admin-only access, triage, copy prompt, responsive behavior, and no auto-dispatch.
+- [x] Admin auth/session uses one canonical `AdminAccessContext` resolver across admin surfaces.
+- [x] Backend admin debug/capture capability probe exists for future route-spanning overlay work.
 
 ## Exit Criteria
 
@@ -1406,62 +1721,71 @@ Required checks:
 
 ## Next Recommended Role
 
-FRONTEND
+DESIGNER
 
 ## Suggested Next Step
 
-Implement Frontend Slice 9: render repo-derived `/admin/capture` Backlog rows as read-only. The
-server now rejects repo-derived mutations, but the UI should avoid presenting editable triage/note
-controls for imported markdown mirrors while keeping list/detail/search/copy available.
+Define Slice 4: the admin capture-layer interaction spec. Backend capability probing is now
+QA-passed, so the next safe step is a design/spec pass for the route-spanning floating launcher,
+selection mode, capture panel, mobile/collision behavior, privacy boundaries, and Hito DS reuse
+before frontend implementation begins.
 
 Prompt:
 
 ```md
-ROLE: FRONTEND
+ROLE: DESIGNER
 
 TASK:
-Render repo-derived `/admin/capture` Backlog items as read-only.
+Define the admin capture-layer interaction spec for the route-spanning admin debug/capture overlay.
 
 STAGE:
-FRONTEND implementation
+DESIGNER spec / route-spanning admin capture layer
 
 PLAN:
 docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md
 
 CONTEXT:
-Backend Slice 7 added `npm run import-admin-backlog-work-items`, which mirrors markdown work items
-from the approved repo folders into `admin_capture_items` using `metadata.source_path`,
-`metadata.source_type`, `metadata.work_item_status`, and the canonical markdown metadata fields when
-present. Markdown remains canonical for repo-authored work, while Supabase remains canonical for
-admin-created quick notes and captures.
-
-Product correction:
-Imported markdown work items must not be editable in admin. Status/type/priority/target role/title/body
-for repo-authored work belongs in markdown, then flows into Supabase through import/refresh. The admin
-Backlog is a read/filter/open/copy surface for those items, not a second task editor.
+- Backend admin auth/session consolidation is implemented and QA-passed.
+- `AdminAccessContext.capabilities` includes `adminDebugCapture: true`.
+- `getAdminDebugCaptureCapability` is a bounded admin-owned capability probe for future
+  route-spanning capture overlay work.
+- `/admin/capture` remains the backlog/review queue; the capture layer itself should work across
+  accessible Hito product/admin/public/internal routes after admin verification.
+- The probe is independent from backlog storage and must be used only to decide whether the
+  overlay/launcher may appear.
 
 GOAL:
-Update the admin Backlog UI so repo-derived imported markdown rows are clearly read-only while
-admin-created quick notes and manual captures remain editable scratchpad rows.
+Create a concrete interaction spec for the admin floating launcher, element-selection mode, capture
+panel, mobile behavior, privacy boundaries, and DS reuse so FRONTEND can implement without inventing
+a route-local mini design system.
 
 REQUIREMENTS:
-- Use the existing backend-shaped `item.source === "repo_import"` signal.
-- Hide or disable status/type/priority/target-role/title/note mutation controls for repo-derived rows.
-- Show clear read-only copy: edit the markdown source file and refresh the mirror.
-- Keep list/detail/search/filter/copy prompt available for repo-derived rows.
-- Keep prompt generation available for repo-derived rows.
-- Keep quick-note creation and append available for admin scratchpad intake.
-- Do not write markdown files.
-- Do not add automatic two-way sync.
-- Do not change `/admin/capture` visual design.
-- Do not add screenshot upload, capture overlay, OpenAI, or Codex auto-dispatch.
+- Reuse Hito DS primitives and existing admin workbench patterns.
+- Do not create a new design-system layer or custom route-local UI kit.
+- Define when the floating launcher appears, how it is dismissed/minimized, and how it avoids
+  covering primary product actions.
+- Define how capture mode starts, cancels, highlights hover/selected elements, and handles elements
+  near viewport edges.
+- Define capture panel fields for type, note, optional priority/target role, route/component/context
+  metadata, and screenshot availability/failure states.
+- Define mobile/narrow viewport behavior and collision rules.
+- Define privacy copy for potentially sensitive captured text/screenshots.
+- Keep screenshot capture optional/future-friendly; text/selector/context capture must work without
+  screenshots.
+- Do not design live editing, code mutation, automatic Codex dispatch, background agent execution,
+  or public runner-facing bug reporting.
+- Do not change backend, frontend, Supabase schema, or product behavior in this spec slice.
 
 OUTPUT FORMAT:
 1. Task
 2. Stage
-3. Root cause
-4. Files changed
-5. What changed
-6. Validation results
-7. Blockers
+3. Interaction model
+4. Floating launcher spec
+5. Selection-mode spec
+6. Capture panel spec
+7. Mobile/collision behavior
+8. Hito DS reuse requirements
+9. Privacy/accessibility notes
+10. Frontend implementation handoff requirements
+11. Blockers
 ```

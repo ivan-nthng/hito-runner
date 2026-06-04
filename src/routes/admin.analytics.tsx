@@ -211,12 +211,18 @@ function AdminAnalyticsPage() {
                   sensitive payloads, production secrets, and broad user management.
                 </p>
               </div>
-              <Link
-                to="/"
-                className="hito-button hito-button-secondary hito-button-md self-start lg:self-center"
-              >
-                Back to Hito
-              </Link>
+              <div className="flex flex-wrap items-start gap-2 lg:items-center">
+                <Link to="/" className="hito-button hito-button-secondary hito-button-md">
+                  Back to Hito
+                </Link>
+                <a
+                  href="/api/admin/auth/logout?next=%2Fadmin%2Fanalytics"
+                  className="hito-button hito-button-ghost hito-button-md"
+                >
+                  <Icon name="logout" size="sm" />
+                  Sign out
+                </a>
+              </div>
             </div>
             <AdminSectionNav activeTab={activeTab} onChange={setActiveTab} variant="mobile" />
           </header>

@@ -78,7 +78,7 @@ export function PlanScheduleEditPanel({
   const regenerationResult = result?.ok && result.mode === "requires_regeneration" ? result : null;
 
   return (
-    <details className="hito-disclosure">
+    <details className="hito-disclosure hito-plan-schedule-edit">
       <summary className="hito-disclosure-summary">
         <span>Edit schedule</span>
         <Icon name="chevron-down" className="hito-disclosure-chevron" />

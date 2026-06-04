@@ -283,16 +283,18 @@ export interface AiFirstPlanBlueprintTraceMetadata {
 }
 
 export interface AiFirstPlanDraftMetadata {
-  status: "ai_authored" | "repaired_ai_draft" | "deterministic_fallback";
+  status: "ai_authored" | "repaired_ai_draft" | "expanded_from_envelope" | "deterministic_fallback";
   source:
     | "openai_ai_first_plan_draft"
     | "openai_ai_first_plan_blueprint"
+    | "openai_ai_first_plan_envelope"
     | "deterministic_structured_generator";
   validationIssues: string[];
   repairs: string[];
   reviewAssumptions: string[];
   metricPolicySummary: string;
   blueprintTrace?: AiFirstPlanBlueprintTraceMetadata | null;
+  envelopeTrace?: unknown;
 }
 
 export type AiFirstPlanDraftNormalizationResult =

@@ -18,6 +18,8 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - deterministic product truth comes before AI interpretation or recommendations
 - risky mutations require explicit review/confirm or confirmation boundaries
 - prefer reuse, deletion, and consolidation over new abstractions
+- bug fixes must target the observed root cause and canonical ownership seam, not only the visible
+  symptom
 
 ## Scope
 
@@ -46,6 +48,9 @@ clarifying question.
 - speak to the user in Russian by default, while writing exact execution prompts in English
 - keep status/explanation around the prompt in Russian unless the user explicitly asks otherwise
 - do not put Russian wording inside role prompts unless the user explicitly requests a Russian prompt
+- treat this file plus `AGENTS.md` as the canonical source for the Russian-user / English-prompt
+  language rule; do not create extra memory notes, ad-hoc markdown files, or parallel instruction
+  files for this rule
 - start orchestration/review/handoff responses with the owning plan/spec/doc file, then `Task`, `Stage`, `What we did`, `Where we are`, and `What we do next`
 - show existing plan/spec/doc files as clickable markdown links with absolute workspace paths; do not render the plan file as inline code/plain text
 - explicitly write `Plan file: none` when a task has no active plan/spec/doc
@@ -58,6 +63,13 @@ clarifying question.
 - put only the next role's prompt in that section
 - make the exact prompt self-contained enough that the next agent does not need this chat history
 - include the required report format inside the exact prompt
+- for every BACKEND or FRONTEND implementation/debug prompt, include an explicit root-cause and
+  architecture-fit requirement before implementation begins
+- require BACKEND and FRONTEND prompts to say which existing owners, components, modules, contracts,
+  or Hito DS/admin/product patterns must be inspected before adding anything new
+- require bug-fix prompts to ask the implementer to explain why the chosen fix resolves the
+  underlying cause; if the true cause is broader than the slice, the implementer must propose the
+  bounded systemic follow-up instead of landing a cosmetic workaround
 
 ## Must Not Do
 
@@ -68,6 +80,8 @@ clarifying question.
 - include two prompts, an optional QA prompt, or a later-role prompt in the same response
 - mix Russian into the exact execution prompt unless the user explicitly asked for a Russian prompt
 - put commentary, jokes, or status notes inside the exact execution prompt
+- create memory/ad-hoc note files to remember prompt-engineer language rules; update the canonical
+  instruction layer instead when the user explicitly asks for an instruction change
 
 ## Required Handoff Response Shape
 
@@ -91,6 +105,8 @@ Inside `Exact prompt for that role`, write one execution-ready prompt for one ro
 Use a numbered shape like this for QA prompts:
 
 ```md
+ROLE: QA
+
 1. Task
 
 <exact validation task>
@@ -153,13 +169,28 @@ QA prompt wording rule:
 
 For non-QA prompts, keep the same discipline:
 
-- start with `Task`
+- start with `ROLE: <ROLE>`
+- then `Task`
 - then `Stage`
 - then `Context`
 - then `Goal`
+- then `Root cause and architecture fit`
 - then exact files/scope/requirements
 - then validation
 - then output format
+
+For BACKEND and FRONTEND prompts, the `Root cause and architecture fit` section is mandatory and
+must include:
+
+- investigate from logs/state/data flow/source ownership before patching visible symptoms
+- identify the canonical owner that should change
+- reuse existing Hito architecture, contracts, modules, components, Hito DS/admin/product patterns,
+  validators, server actions, or persistence seams before creating new code
+- do not create a parallel product path, duplicate local truth, one-off UI kit, or workaround that
+  hides the real failure
+- if the bug indicates a systemic issue, implement the smallest safe systemic fix in scope or report
+  the required follow-up explicitly instead of shipping only a symptom patch
+- remove dead code from failed/replaced attempts when safe
 
 Do not replace this with loose prose.
 

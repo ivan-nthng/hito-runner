@@ -1,8 +1,5 @@
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
 import type {
   AdminAnalyticsExcludedUserRow,
   AdminAnalyticsFailureReason,
@@ -15,30 +12,16 @@ import {
   classifyAdminAnalyticsUser,
   type AdminUserClassificationInfo,
 } from "@/lib/admin-user-classification";
+import { requireAdminAccessForDependencies } from "@/lib/admin-access.server";
 import type { RequestAuthContext } from "@/lib/backend/auth";
+import { readLocalAuthAccountsFile } from "@/lib/local-auth";
 import type { Database } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { hasSupabaseServerEnv, isLoopbackRuntimeUrl, serverEnv } from "@/lib/supabase/env";
+import { hasSupabaseServerEnv, serverEnv } from "@/lib/supabase/env";
 
 const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 const PAGE_SIZE = 1000;
 const RECENT_LOG_WINDOW_DAYS = 30;
-
-const localAuthAccountSchema = z.object({
-  username: z.string().trim().min(1),
-  password: z.string().min(1),
-  email: z.string().trim().email().optional(),
-  userId: z.string().uuid().optional(),
-  role: z.enum(["admin", "tester"]).optional(),
-  displayName: z.string().trim().min(1).optional(),
-});
-
-const localAuthAccountsFileSchema = z.union([
-  z.array(localAuthAccountSchema),
-  z.object({
-    accounts: z.array(localAuthAccountSchema),
-  }),
-]);
 
 type PlanCycleRow = Pick<
   Database["public"]["Tables"]["plan_cycles"]["Row"],
@@ -108,6 +91,17 @@ export async function getAdminAnalyticsForCurrentRequest(): Promise<AdminAnalyti
 export async function getAdminAnalyticsForDependencies(
   dependencies: AdminAnalyticsDependencies,
 ): Promise<AdminAnalyticsResult> {
+  const adminAccess = await requireAdminAccessForDependencies({
+    auth: dependencies.auth,
+    runtimeUrl: dependencies.runtimeUrl,
+    localAuthBypassEnabled: dependencies.localAuthBypassEnabled,
+    supabase: dependencies.supabase,
+  });
+
+  if (!adminAccess.ok) {
+    return adminAccess;
+  }
+
   if (!dependencies.supabase) {
     return failure(
       "supabase_admin_unavailable",
@@ -117,12 +111,6 @@ export async function getAdminAnalyticsForDependencies(
 
   try {
     const authUsers = await listAuthUsersSafe(dependencies.supabase);
-    const adminAccess = await requireAdminAccess(dependencies, authUsers.users);
-
-    if (!adminAccess.ok) {
-      return adminAccess;
-    }
-
     const view = await buildAdminAnalyticsView(dependencies, authUsers);
 
     return {
@@ -343,58 +331,6 @@ async function buildAdminAnalyticsView(
       entitlements: realEntitlements,
     }),
   };
-}
-
-async function requireAdminAccess(
-  dependencies: AdminAnalyticsDependencies,
-  authUsers: AuthUserSummary[],
-): Promise<{ ok: true } | Extract<AdminAnalyticsResult, { ok: false }>> {
-  if (!dependencies.auth.userId) {
-    return failure("authentication_required", "Sign in as an admin to view analytics.");
-  }
-
-  if (dependencies.auth.provider === "admin") {
-    return { ok: true };
-  }
-
-  if (dependencies.auth.provider === "local") {
-    return requireLocalAdminAccess(dependencies);
-  }
-
-  const authUser = authUsers.find((user) => user.id === dependencies.auth.userId) ?? null;
-
-  if (!authUser) {
-    return failure("admin_unavailable", "Admin access could not be verified for this session.");
-  }
-
-  if (isSupabaseAdminUser(authUser)) {
-    return { ok: true };
-  }
-
-  return failure("admin_required", "Admin analytics are available only to admin sessions.");
-}
-
-async function requireLocalAdminAccess(
-  dependencies: AdminAnalyticsDependencies,
-): Promise<{ ok: true } | Extract<AdminAnalyticsResult, { ok: false }>> {
-  if (
-    !dependencies.localAuthBypassEnabled ||
-    !dependencies.runtimeUrl ||
-    !isLoopbackRuntimeUrl(dependencies.runtimeUrl)
-  ) {
-    return failure("admin_unavailable", "Local admin analytics are unavailable in this runtime.");
-  }
-
-  const accounts = await loadLocalAccounts(dependencies.accountsFilePath);
-  const adminAccount =
-    accounts.find((account) => account.userId === dependencies.auth.userId) ??
-    accounts.find((account) => account.email === dependencies.auth.email);
-
-  if (!adminAccount || adminAccount.role !== "admin") {
-    return failure("admin_required", "Admin analytics are available only to local admin sessions.");
-  }
-
-  return { ok: true };
 }
 
 async function listAuthUsersSafe(supabase: SupabaseClient<Database>) {
@@ -705,51 +641,20 @@ function buildCapabilityUsageCounts(rows: CapabilityUsageRow[]) {
 
 async function loadLocalAccounts(accountsFilePath: string): Promise<LocalAccountSummary[]> {
   try {
-    const raw = await readFile(accountsFilePath, "utf8");
-    const parsed = localAuthAccountsFileSchema.parse(JSON.parse(raw));
-    const rawAccounts = Array.isArray(parsed) ? parsed : parsed.accounts;
-
-    return rawAccounts.map((account) => {
-      const username = account.username.trim().toLowerCase();
-      const email = (account.email ?? `${username}@local.test`).trim().toLowerCase();
-      const role = account.role ?? (username === "ivan" ? "admin" : "tester");
-
-      return {
-        username,
-        email,
-        userId: account.userId ?? deriveUserId(username),
-        role,
-        displayName: account.displayName?.trim() || humanizeUsername(username),
-      };
-    });
+    return (await readLocalAuthAccountsFile(accountsFilePath)).map((account) => ({
+      username: account.username,
+      email: account.email,
+      userId: account.userId,
+      role: account.role,
+      displayName: account.displayName,
+    }));
   } catch {
     return [];
   }
 }
 
-function deriveUserId(username: string) {
-  const hash = createHash("sha256").update(username).digest("hex");
-
-  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(
-    17,
-    20,
-  )}-${hash.slice(20, 32)}`;
-}
-
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
-}
-
-function humanizeUsername(username: string) {
-  return username.charAt(0).toUpperCase() + username.slice(1);
-}
-
-function isSupabaseAdminUser(user: AuthUserSummary) {
-  return (
-    user.appMetadata.hito_admin === true ||
-    user.appMetadata.hito_role === "admin" ||
-    user.appMetadata.hito_local_role === "admin"
-  );
 }
 
 function countBy(values: string[]): AdminAnalyticsKeyCount[] {

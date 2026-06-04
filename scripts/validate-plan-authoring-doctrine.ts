@@ -79,6 +79,7 @@ import type { RunnerCoachContext } from "../src/lib/runner-coach-context";
 import {
   buildStructuredAuthoringPlan,
   structuredPlanAuthoringInputSchema,
+  type StructuredPlanAuthoringInput,
 } from "../src/lib/structured-plan-authoring";
 import { addDaysIso, deriveWorkoutRichModel, diffDaysIso, weekdayLong } from "../src/lib/training";
 import { parseVoiceToPlanConfirmRequest } from "../src/lib/voice-to-plan-authoring";
@@ -1038,7 +1039,7 @@ function assertRichAiDraftNormalizer() {
         targetTime: "2:00:00",
         targetDate: "2026-08-30",
       },
-      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+      execution: { watchAccess: "unknown", guidancePreference: "effort" },
     }),
   ).plan;
   const noAgeEffortOnlyPlan = buildPlanWithNoAge(
@@ -1051,7 +1052,7 @@ function assertRichAiDraftNormalizer() {
         targetTime: "2:00:00",
         targetDate: "2026-08-30",
       },
-      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+      execution: { watchAccess: "unknown", guidancePreference: "effort" },
     }),
   );
 
@@ -3552,6 +3553,122 @@ function buildLongHorizonMarathonAiFirstPlanAuthoringInput() {
   });
 }
 
+function buildShortRoadEnvelopeAuthoringInput(
+  goalType: "5k" | "10k",
+): StructuredPlanAuthoringInput {
+  const base = buildAiFirstPlanAuthoringInput();
+
+  return structuredPlanAuthoringInputSchema.parse({
+    ...base,
+    goal: {
+      goalType,
+      goalLabel: goalType === "5k" ? "5K balanced envelope" : "10K balanced envelope",
+      goalStyle: "balanced",
+      targetTime: null,
+      targetEventName: null,
+    },
+    schedule: {
+      startDate: "2026-05-29",
+      targetDate: null,
+      preparationHorizonWeeks: 8,
+    },
+    runnerProfile: {
+      ...base.runnerProfile,
+      age: 36,
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 4,
+      baselineLongRunKm: null,
+      baselineLongRunDurationMin: 55,
+      preferredEffortLanguage: "mixed",
+    },
+    currentLevel: {
+      ...base.currentLevel,
+      recentResultSummary: "Recent 5K benchmark supports broad training guidance.",
+      recentRaceResults: [],
+      recent5kPaceSecondsPerKm: 330,
+      currentEasyPaceRange: null,
+      currentTrainingLoadSummary: null,
+    },
+    availability: {
+      ...base.availability,
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Saturday"],
+      unavailableDays: ["Wednesday", "Friday", "Sunday"],
+      maxRunningDaysPerWeek: 4,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Saturday",
+    },
+    preferences: {
+      ...base.preferences,
+      preferredWorkoutMix: "balanced",
+      terrainFocus: "standard",
+      strengthOrMobilityInterest: "mobility",
+      indoorTreadmillOk: false,
+      notes: "Doctrine envelope road-specificity fixture.",
+    },
+    execution: {
+      watchAccess: "watch_or_app",
+      guidancePreference: "mixed",
+    },
+  });
+}
+
+function buildBalancedHalfEnvelopeAuthoringInput(): StructuredPlanAuthoringInput {
+  const base = buildAiFirstPlanAuthoringInput();
+
+  return structuredPlanAuthoringInputSchema.parse({
+    ...base,
+    goal: {
+      goalType: "half_marathon",
+      goalLabel: "Half marathon balanced envelope",
+      goalStyle: "balanced",
+      targetTime: null,
+      targetEventName: "Balanced half marathon plan",
+    },
+    schedule: {
+      startDate: "2026-06-01",
+      targetDate: "2026-07-12",
+      preparationHorizonWeeks: 6,
+    },
+    runnerProfile: {
+      ...base.runnerProfile,
+      age: 38,
+      experienceLevel: "consistent_runner",
+      baselineSessionsPerWeek: 5,
+      baselineLongRunKm: 11,
+      baselineLongRunDurationMin: null,
+      preferredEffortLanguage: "mixed",
+    },
+    currentLevel: {
+      ...base.currentLevel,
+      recentResultSummary: "Recent 5K time: 24:30.",
+      recentRaceResults: [{ distance: "5K", resultTime: "24:30", resultDate: null }],
+      recent5kPaceSecondsPerKm: 294,
+      currentEasyPaceRange: "6:25-7:20/km",
+      currentTrainingLoadSummary: null,
+    },
+    availability: {
+      ...base.availability,
+      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
+      unavailableDays: ["Wednesday", "Sunday"],
+      maxRunningDaysPerWeek: 5,
+      allowBackToBackDays: false,
+      preferredLongRunDay: "Saturday",
+    },
+    preferences: {
+      ...base.preferences,
+      preferredWorkoutMix: "balanced",
+      terrainFocus: "standard",
+      strengthOrMobilityInterest: "mobility",
+      indoorTreadmillOk: false,
+      notes: "Doctrine envelope balanced half-specificity fixture.",
+    },
+    execution: {
+      watchAccess: "watch_or_app",
+      guidancePreference: "mixed",
+    },
+  });
+}
+
 function buildAiFirstPlanDraftFixture(): AiFirstPlanDraft {
   const startDate = "2026-06-01";
   const goalContext = {
@@ -5969,6 +6086,98 @@ function assertAiFirstPlanEnvelopeContract() {
       "invalid AI first-plan envelope should report missing phases",
     );
   }
+
+  assertAiFirstPlanEnvelopeRoadSpecificityContract();
+}
+
+function assertAiFirstPlanEnvelopeRoadSpecificityContract() {
+  const cases: Array<{
+    label: string;
+    authoringInput: StructuredPlanAuthoringInput;
+    expectedIdentity: string;
+    expectedFulfilledMinimum: number;
+  }> = [
+    {
+      label: "AI envelope 5K road specificity",
+      authoringInput: buildShortRoadEnvelopeAuthoringInput("5k"),
+      expectedIdentity: "5k_sharpening_repeats",
+      expectedFulfilledMinimum: 2,
+    },
+    {
+      label: "AI envelope 10K road specificity",
+      authoringInput: buildShortRoadEnvelopeAuthoringInput("10k"),
+      expectedIdentity: "10k_rhythm_intervals",
+      expectedFulfilledMinimum: 2,
+    },
+    {
+      label: "AI envelope balanced half road specificity",
+      authoringInput: buildBalancedHalfEnvelopeAuthoringInput(),
+      expectedIdentity: "half_marathon_threshold_durability",
+      expectedFulfilledMinimum: 2,
+    },
+  ];
+
+  for (const { label, authoringInput, expectedIdentity, expectedFulfilledMinimum } of cases) {
+    const envelope = buildMockAiFirstPlanEnvelope(authoringInput);
+    const expanded = expandAiFirstPlanEnvelopeToTrainingPlan({ envelope, authoringInput });
+
+    assert.equal(
+      expanded.ok,
+      true,
+      expanded.ok
+        ? `${label}: envelope should expand`
+        : `${label}: envelope should expand: ${JSON.stringify(expanded.issues)}`,
+    );
+
+    if (!expanded.ok) {
+      continue;
+    }
+
+    const plan = expanded.canonicalPlan;
+    const identities = sourceWorkoutTypes(plan);
+
+    assertRichWorkoutContract(plan, label);
+    assert.ok(identities.has(expectedIdentity), `${label}: should include ${expectedIdentity}`);
+    assertNoTwoQualityWeeks(plan, label);
+
+    const specificityTrace = expanded.metadata.specificityTrace;
+    const fulfilled = specificityTrace.fulfilledIdentities.filter(
+      (entry) => entry.toIdentity === expectedIdentity,
+    );
+
+    assert.ok(
+      fulfilled.length >= expectedFulfilledMinimum,
+      `${label}: should prove declared envelope specificity was fulfilled`,
+    );
+
+    const trace = buildAiFirstPlanEnvelopeTrace({
+      envelope,
+      authoringInput,
+      result: expanded,
+      sizeComparison: {
+        envelopePromptCharEstimate: null,
+        envelopeSystemPromptChars: null,
+        envelopeUserPromptChars: null,
+        envelopeResponseSchemaChars: null,
+        envelopeOutputChars: JSON.stringify(envelope).length,
+        envelopeLiveOutputChars: null,
+        blueprintFullOutputChars: null,
+        blueprintBoundedOutputChars: null,
+        blueprintPromptCharEstimateBefore: null,
+        blueprintPromptCharEstimateAfter: null,
+      },
+    });
+    const traceValidation = trace.validation as {
+      specificityTrace?: { fulfilledIdentities: Array<{ toIdentity: string }> };
+    };
+
+    assert.ok(
+      traceValidation.specificityTrace?.fulfilledIdentities.some(
+        (entry) => entry.toIdentity === expectedIdentity,
+      ),
+      `${label}: trace should expose declared-to-fulfilled specificity mapping`,
+    );
+  }
 }
 
 function assertBlueprintIdentityExpansion(
@@ -6164,6 +6373,57 @@ async function assertAiFirstPlanDraftServiceContract() {
     );
   }
 
+  const envelopeAuthoringInput = buildBalancedHalfEnvelopeAuthoringInput();
+  const envelope = buildMockAiFirstPlanEnvelope(envelopeAuthoringInput);
+  const envelopeResult = await generateAiFirstPlanDraftPreview({
+    input: envelopeAuthoringInput,
+    inputKind: "structured_authoring",
+    apiKey: "test-openai-key",
+    model: "test-ai-first-plan-model",
+    contractMode: "envelope",
+    timeoutMs: 1_000,
+    fetchImpl: (async () =>
+      openAiFixtureResponse("ai-first-plan-envelope-valid", envelope)) as typeof fetch,
+  });
+
+  assert.equal(
+    envelopeResult.ok,
+    true,
+    "internal envelope service option should return a reviewable canonical result",
+  );
+
+  if (envelopeResult.ok) {
+    assert.equal(
+      envelopeResult.canonicalPlan.source_kind,
+      "ai_first_plan_envelope_v1",
+      "internal envelope service option should preserve envelope source kind",
+    );
+    assert.equal(
+      envelopeResult.metadata.status,
+      "expanded_from_envelope",
+      "internal envelope service option should expose expanded envelope status",
+    );
+    assert.equal(
+      envelopeResult.metadata.source,
+      "openai_ai_first_plan_envelope",
+      "internal envelope service option should expose envelope source metadata",
+    );
+    assert.equal(
+      envelopeResult.metadata.fallbackReason,
+      null,
+      "internal envelope service option should not use fallback on valid envelope output",
+    );
+    assert.equal(
+      envelopeResult.metadata.validationIssueCount,
+      0,
+      "internal envelope service option should pass canonical validation",
+    );
+    assert.ok(
+      envelopeResult.metadata.envelopeTrace,
+      "internal envelope service option should expose bounded envelope trace metadata",
+    );
+  }
+
   const invalidResult = await generateAiFirstPlanDraftPreview({
     input: authoringInput,
     inputKind: "structured_authoring",
@@ -6299,6 +6559,181 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
     );
     assertRichWorkoutContract(aiResult.draft.canonicalPlan, "structured first-plan AI draft");
     assertFixedRestDays(aiResult.draft.canonicalPlan);
+  }
+
+  const envelopeInput = parseStructuredFirstPlanOnboardingInput(
+    buildRequest("half_marathon", {
+      profile: { age: 38, weightKg: 72, heightCm: 178 },
+      benchmark: { kind: "recent_5k_time", recent5kTime: "24:30" },
+      availability: {
+        runningDaysPerWeek: 5,
+        fixedRestDays: ["Wednesday", "Sunday"],
+        preferredLongRunDay: "Saturday",
+      },
+      goal: {
+        goalDistance: "half_marathon",
+        goalStyle: "balanced",
+        terrainFocus: "standard",
+        targetTime: null,
+        targetDate: "2026-07-12",
+      },
+      schedule: {
+        startDate: "2026-06-01",
+        targetDate: "2026-07-12",
+      },
+      strength: { preference: "mobility" },
+      execution: { watchAccess: "unknown", guidancePreference: "effort" },
+      comment: null,
+    }),
+  );
+  const envelopeAuthoringInput = buildStructuredFirstPlanAuthoringInput(envelopeInput);
+  const envelope = buildMockAiFirstPlanEnvelope(envelopeAuthoringInput);
+  const envelopeDraft = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-fixture-user",
+    envelopeInput,
+    {
+      internalDraftContract: "envelope",
+      aiPreview: {
+        apiKey: "test-openai-key",
+        model: "test-ai-first-plan-model",
+        timeoutMs: 1_000,
+        fetchImpl: (async () =>
+          openAiFixtureResponse("structured-first-plan-envelope-valid", envelope)) as typeof fetch,
+      },
+    },
+  );
+
+  assert.equal(
+    envelopeDraft.ok,
+    true,
+    "explicit internal envelope structured first-plan option should return a draft",
+  );
+
+  if (envelopeDraft.ok && envelopeDraft.status === "draft_ready") {
+    assert.equal(
+      envelopeDraft.sourceKind,
+      "ai_first_plan_envelope_v1",
+      "explicit internal envelope draft should expose envelope source kind",
+    );
+    assert.equal(
+      envelopeDraft.generation.sourceStatus,
+      "expanded_from_envelope",
+      "explicit internal envelope draft should expose expanded envelope status",
+    );
+    assert.equal(
+      envelopeDraft.draft.canonicalPlan.source_kind,
+      "ai_first_plan_envelope_v1",
+      "explicit internal envelope draft should review canonical envelope plan truth",
+    );
+    assert.equal(
+      envelopeDraft.safety.doesNotMutatePlan,
+      true,
+      "explicit internal envelope draft generation must remain non-mutating",
+    );
+    assert.ok(
+      envelopeDraft.draft.draftToken.includes(":"),
+      "explicit internal envelope draft should include a signed reviewed-plan token",
+    );
+    assertRichWorkoutContract(
+      envelopeDraft.draft.canonicalPlan,
+      "explicit internal envelope structured draft",
+    );
+    assertFixedRestDayNames(
+      envelopeDraft.draft.canonicalPlan,
+      ["Wednesday", "Sunday"],
+      "explicit internal envelope structured draft",
+    );
+    assertWeeklyLongRunDay(
+      envelopeDraft.draft.canonicalPlan,
+      "Saturday",
+      "explicit internal envelope structured draft",
+    );
+    assertNoFakeMetricTargetRegression(
+      envelopeDraft.draft.canonicalPlan,
+      "explicit internal envelope structured draft",
+    );
+    assert.ok(
+      envelopeDraft.generation.envelopeTrace,
+      "explicit internal envelope draft should carry bounded envelope trace metadata",
+    );
+  }
+
+  const invalidEnvelopeDraft = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-fixture-user",
+    envelopeInput,
+    {
+      internalDraftContract: "envelope",
+      aiPreview: {
+        apiKey: "test-openai-key",
+        model: "test-ai-first-plan-model",
+        timeoutMs: 1_000,
+        fetchImpl: (async () =>
+          openAiFixtureResponse("structured-first-plan-envelope-invalid", {
+            ...envelope,
+            phases: [],
+          })) as typeof fetch,
+      },
+    },
+  );
+
+  assert.equal(
+    invalidEnvelopeDraft.ok,
+    false,
+    "invalid internal envelope structured first-plan option should fail bounded",
+  );
+
+  if (!invalidEnvelopeDraft.ok && invalidEnvelopeDraft.status === "draft_failed") {
+    assert.equal(
+      invalidEnvelopeDraft.reason,
+      "ai_first_plan_envelope_unavailable",
+      "invalid internal envelope draft should expose envelope unavailable reason",
+    );
+    assert.equal(
+      invalidEnvelopeDraft.generation.sourceKind,
+      "ai_first_plan_envelope_v1",
+      "invalid internal envelope draft should keep envelope source boundary",
+    );
+    assert.equal(
+      invalidEnvelopeDraft.generation.sourceStatus,
+      "envelope_unavailable",
+      "invalid internal envelope draft should expose unavailable envelope status",
+    );
+    assert.ok(
+      !("draft" in invalidEnvelopeDraft),
+      "invalid internal envelope draft must not include a reviewed-plan token",
+    );
+  }
+
+  const timedOutEnvelopeDraft = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-fixture-user",
+    envelopeInput,
+    {
+      internalDraftContract: "envelope",
+      aiPreview: {
+        apiKey: "test-openai-key",
+        model: "test-ai-first-plan-model",
+        timeoutMs: 5,
+        fetchImpl: (async () => new Promise<Response>(() => undefined)) as typeof fetch,
+      },
+    },
+  );
+
+  assert.equal(
+    timedOutEnvelopeDraft.ok,
+    false,
+    "timed-out internal envelope structured first-plan option should fail bounded",
+  );
+
+  if (!timedOutEnvelopeDraft.ok && timedOutEnvelopeDraft.status === "draft_failed") {
+    assert.equal(
+      timedOutEnvelopeDraft.generation.fallbackReason,
+      "ai_first_plan_envelope_timed_out",
+      "timed-out internal envelope draft should expose bounded timeout reason",
+    );
+    assert.ok(
+      !("draft" in timedOutEnvelopeDraft),
+      "timed-out internal envelope draft must not include a reviewed-plan token",
+    );
   }
 
   const invalidResult = await generateStructuredFirstPlanDraftForUser(

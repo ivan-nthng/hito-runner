@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+Complete / Closed / archived after blueprint and structured authoring decomposition milestones
 
 ## Type
 
@@ -14,16 +14,15 @@ medium
 
 ## Next Recommended Role
 
-ARCHITECT
+None
 
 ## Task
 
-Select the next plan-authoring engine cleanup target after closing the structured authoring
-decomposition milestone.
+Archived: blueprint and structured authoring decomposition milestones are complete.
 
 ## Stage
 
-ARCHITECT checkpoint / refactor milestone decision
+Complete / archived
 
 ## Exact Handoff Prompt
 
@@ -57,7 +56,14 @@ ARCHITECT / BACKEND / QA
 
 ## Last Updated
 
-2026-05-29
+2026-06-03
+
+## Archive Note
+
+Archived on 2026-06-03 during active-plan cleanup. The blueprint authoring facade decomposition and
+structured-plan-authoring decomposition milestones are complete with behavior-preservation evidence.
+The remaining doctrine-validator cleanup is now owned by the active optimization strike plan:
+`docs/plans/active/2026-05-29-hito-optimization-strike-plan.md`.
 
 ## Context
 
@@ -861,16 +867,12 @@ Each cleanup slice must prove:
 
 ## Next Recommended Role
 
-ARCHITECT
+None
 
 ## Suggested Next Step
 
-Stop extracting from `src/lib/structured-plan-authoring.ts` for now. The facade is small enough and
-further extraction would risk abstraction churn without deleting meaningful complexity.
-
-Run a separate architecture selection pass for the next cleanup target:
-`scripts/validate-plan-authoring-doctrine.ts`. That pass should choose one bounded doctrine-validator
-decomposition slice only if it improves reviewability without weakening coverage.
+No next step in this archived plan. Use the active optimization strike plan for doctrine-validator
+decomposition and legacy cleanup follow-through.
 
 ## Exact ARCHITECT Prompt For Doctrine Validator Cleanup Selection
 

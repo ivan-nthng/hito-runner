@@ -3,9 +3,14 @@ import {
   validateNormalizedPlanDoctrine,
 } from "@/lib/ai-first-plan-blueprint-validation";
 import { decodeAndValidateAiFirstPlanEnvelope } from "@/lib/ai-first-plan-envelope-decode";
+import {
+  applyAiFirstPlanEnvelopeSpecificity,
+  isEnvelopeGoalSpecificCadenceIdentity,
+} from "@/lib/ai-first-plan-envelope-specificity";
 import type {
   AiFirstPlanEnvelopeExpansionResult,
   AiFirstPlanEnvelopeIssue,
+  AiFirstPlanEnvelopeSpecificityTrace,
   CanonicalWorkout,
   StructuredAuthoringInput,
 } from "@/lib/ai-first-plan-envelope-schema";
@@ -69,6 +74,11 @@ export function expandAiFirstPlanEnvelopeToTrainingPlan({
     scaffoldWorkouts: scaffoldPlan.planned_workouts,
     context,
   });
+  const specificity = applyAiFirstPlanEnvelopeSpecificity({
+    workouts: scaffoldWorkouts,
+    envelope: decoded.envelope,
+    authoringInput,
+  });
   const candidatePlan = {
     ...scaffoldPlan,
     plan_id: `ai-first-plan-envelope-${slugify(authoringInput.goal.goalType)}-${authoringInput.schedule.startDate}`,
@@ -79,7 +89,7 @@ export function expandAiFirstPlanEnvelopeToTrainingPlan({
     ...(authoringInput.schedule.targetDate
       ? { target_date: authoringInput.schedule.targetDate }
       : {}),
-    planned_workouts: scaffoldWorkouts,
+    planned_workouts: specificity.workouts,
   };
   const issues: AiFirstPlanEnvelopeIssue[] = [];
 
@@ -116,8 +126,10 @@ export function expandAiFirstPlanEnvelopeToTrainingPlan({
       validationIssueCount: 0,
       repairs: [
         "Backend expanded compact envelope intent into canonical training-plan-v2 rows without OpenAI row-level workout authorship.",
+        ...buildSpecificityRepairNotes(specificity.trace),
       ],
       reviewAssumptions: decoded.envelope.reviewAssumptions,
+      specificityTrace: specificity.trace,
     },
   };
 }
@@ -185,6 +197,18 @@ function validateEnvelopeExpandedRows(
 
   validatePreferredLongRunDay(workouts, context, issues);
   validateRequiredCadenceSlots(workouts, context, issues);
+}
+
+function buildSpecificityRepairNotes(trace: AiFirstPlanEnvelopeSpecificityTrace) {
+  const fulfilledCount = trace.fulfilledIdentities.length;
+
+  if (fulfilledCount === 0) {
+    return [];
+  }
+
+  return [
+    `Backend matched compact envelope road specificity intent to ${fulfilledCount} canonical workout identity slot(s).`,
+  ];
 }
 
 function validateRichWorkoutFields(
@@ -285,7 +309,8 @@ function validateRequiredCadenceSlots(
 
       return (
         slot.identityOptions.some((option) => option === identity) ||
-        (slot.kind === "specialty" && ENVELOPE_SPECIALTY_CADENCE_IDENTITIES.has(identity))
+        (slot.kind === "specialty" && ENVELOPE_SPECIALTY_CADENCE_IDENTITIES.has(identity)) ||
+        isEnvelopeGoalSpecificCadenceIdentity(identity, context.authoringInput)
       );
     });
 

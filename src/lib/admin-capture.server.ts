@@ -17,6 +17,7 @@ import {
   type AdminCaptureStatus,
   type AdminCaptureTargetRole,
   type AdminCaptureTriageUpdateInput,
+  type AdminDebugCaptureCapabilityView,
 } from "@/lib/admin-capture";
 import type { AdminAccessContext, AdminAccessResult } from "@/lib/admin-access.server";
 import { requireAdminAccessForCurrentRequest } from "@/lib/admin-access.server";
@@ -54,6 +55,7 @@ export interface AdminCaptureRepository {
   listItems(input: AdminCaptureListInput): Promise<AdminCaptureRow[]>;
   getItem(id: string): Promise<AdminCaptureRow | null>;
   updateItem(id: string, patch: AdminCaptureItemUpdate): Promise<AdminCaptureRow | null>;
+  deleteItem(id: string): Promise<boolean>;
 }
 
 export interface AdminCaptureDependencies {
@@ -83,6 +85,12 @@ export async function getAdminCaptureAvailabilityForCurrentRequest(): Promise<
     ok: true,
     enabled: true,
   };
+}
+
+export async function getAdminDebugCaptureCapabilityForCurrentRequest(): Promise<
+  AdminCaptureResult<{ probe: AdminDebugCaptureCapabilityView }>
+> {
+  return getAdminDebugCaptureCapabilityForDependencies(await buildCurrentDependencies());
 }
 
 export async function listAdminCaptureBacklogForCurrentRequest(
@@ -121,10 +129,51 @@ export async function appendAdminCaptureItemNoteForCurrentRequest(
   return appendAdminCaptureItemNoteForDependencies(await buildCurrentDependencies(), input);
 }
 
+export async function deleteAdminCaptureQuickNoteForCurrentRequest(
+  input: AdminCaptureItemIdInput,
+): Promise<AdminCaptureResult<{ deletedId: string }>> {
+  return deleteAdminCaptureQuickNoteForDependencies(await buildCurrentDependencies(), input);
+}
+
 export async function getAdminCaptureCopyPromptForCurrentRequest(
   input: AdminCaptureItemIdInput,
 ): Promise<AdminCaptureResult<{ prompt: AdminCaptureCopyPromptView }>> {
   return getAdminCaptureCopyPromptForDependencies(await buildCurrentDependencies(), input);
+}
+
+export async function getAdminDebugCaptureCapabilityForDependencies(
+  dependencies: AdminCaptureDependencies,
+): Promise<AdminCaptureResult<{ probe: AdminDebugCaptureCapabilityView }>> {
+  const accessResult = await requireCaptureAdmin(dependencies);
+
+  if (!accessResult.ok) {
+    return accessResult;
+  }
+
+  return {
+    ok: true,
+    probe: {
+      generatedAt: dependencies.now?.().toISOString() ?? new Date().toISOString(),
+      capability: "admin_debug_capture",
+      enabled: true,
+      capabilities: {
+        adminCapture: accessResult.admin.capabilities.adminCapture,
+        adminDebugCapture: accessResult.admin.capabilities.adminDebugCapture,
+      },
+      authority: {
+        owner: "admin",
+        provider: accessResult.admin.provider,
+        sessionSource: accessResult.admin.sessionSource,
+        runtimeClass: accessResult.admin.runtimeClass,
+      },
+      identityBoundary: {
+        runnerAuthIgnored: true,
+        testerAuthIgnored: true,
+        productEntitlementsIgnored: true,
+        productRouteStateIgnored: true,
+      },
+    },
+  };
 }
 
 export async function listAdminCaptureBacklogForDependencies(
@@ -372,6 +421,58 @@ export async function getAdminCaptureCopyPromptForDependencies(
   }
 }
 
+export async function deleteAdminCaptureQuickNoteForDependencies(
+  dependencies: AdminCaptureDependencies,
+  input: AdminCaptureItemIdInput,
+): Promise<AdminCaptureResult<{ deletedId: string }>> {
+  const accessResult = await requireCaptureAdmin(dependencies);
+
+  if (!accessResult.ok) {
+    return accessResult;
+  }
+
+  if (!dependencies.repository) {
+    return failure(
+      "supabase_admin_unavailable",
+      "Supabase admin access is required before capture backlog can delete quick notes.",
+    );
+  }
+
+  try {
+    const existing = await dependencies.repository.getItem(input.id);
+
+    if (!existing) {
+      return failure("capture_not_found", "Capture item was not found.");
+    }
+
+    const source = getAdminCaptureRowSource(existing);
+
+    if (source === "repo_import") {
+      return repoDerivedReadOnlyFailure();
+    }
+
+    if (source !== "quick_note") {
+      return failure(
+        "quick_note_delete_only",
+        "Only manual quick notes can be deleted from Backlog.",
+      );
+    }
+
+    const deleted = await dependencies.repository.deleteItem(input.id);
+
+    if (!deleted) {
+      return failure("capture_not_found", "Capture item was not found.");
+    }
+
+    return {
+      ok: true,
+      deletedId: input.id,
+    };
+  } catch {
+    return failure("capture_delete_failed", "Quick note could not be deleted.");
+  }
+}
+
 export function buildAdminCaptureCopyPrompt(
   item: AdminCaptureItemView,
 ): AdminCaptureCopyPromptView {
@@ -614,6 +715,20 @@ export function createSupabaseAdminCaptureRepository(
 
       return (data as AdminCaptureRow | null) ?? null;
     },
+    async deleteItem(id) {
+      const { data, error } = await supabase
+        .from("admin_capture_items")
+        .delete()
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return Boolean(data);
+    },
   };
 }
 
@@ -634,11 +749,7 @@ async function requireCaptureAdmin(dependencies: AdminCaptureDependencies): Prom
 }
 
 function mapItemView(row: AdminCaptureRow): AdminCaptureItemView {
-  const source = isRepoImportMetadata(row.metadata)
-    ? "repo_import"
-    : hasCapturedElementContext(row)
-      ? "captured_ui"
-      : "quick_note";
+  const source = getAdminCaptureRowSource(row);
 
   return {
     id: row.id,
@@ -670,6 +781,18 @@ function mapItemView(row: AdminCaptureRow): AdminCaptureItemView {
     updatedAt: row.updated_at,
     archivedAt: row.archived_at,
   };
+}
+
+function getAdminCaptureRowSource(row: AdminCaptureItemRow): AdminCaptureItemView["source"] {
+  if (isRepoImportMetadata(row.metadata)) {
+    return "repo_import";
+  }
+
+  if (hasCapturedElementContext(row)) {
+    return "captured_ui";
+  }
+
+  return "quick_note";
 }
 
 function buildStatusCounts(items: AdminCaptureItemView[]): Record<AdminCaptureStatus, number> {

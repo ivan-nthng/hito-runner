@@ -2,7 +2,7 @@
 
 ## Status
 
-completed
+Complete / Closed / archived after Phase 1 and Phase 1A
 
 ## Type
 
@@ -14,15 +14,15 @@ low
 
 ## Next Recommended Role
 
-ARCHITECT
+None
 
 ## Task
 
-Keep the completed admin analytics plan available as historical product context.
+Archived: admin analytics Phase 1 and local Test Accounts Phase 1A are complete.
 
 ## Stage
 
-ARCHITECT closeout
+Complete / archived
 
 ## Exact Handoff Prompt
 
@@ -55,7 +55,14 @@ Architect / Backend / Frontend / QA
 
 ## Last Updated
 
-2026-05-25
+2026-06-03
+
+## Archive Note
+
+Archived on 2026-06-03 during active-plan cleanup. Phase 1 existing-truth admin analytics,
+Phase 1A local Test Accounts, and dedicated admin login were already complete and QA-green. Future
+event/failure instrumentation or internal issue backlog work should start from a new active plan only
+when a concrete ops need proves it is worth doing.
 
 ## Pause Note
 
@@ -75,9 +82,9 @@ The admin analytics backend now classifies users before aggregation: real-user p
 
 Further admin work should be demand-driven by concrete ops needs, recurring failures, or product-analysis gaps. Do not continue into dashboard polish, frontend-only metrics, `app_events`, `app_failures`, or `admin_issues` just because Phase 1 is complete.
 
-## Active Inventory Note
+## Historical Inventory Note
 
-Kept active during the 2026-05-25 inventory cleanup because Phase 2 event/failure instrumentation and Phase 3 internal issue backlog remain future roadmap inside this same admin/ops plan.
+Kept active during the 2026-05-25 inventory cleanup because Phase 2 event/failure instrumentation and Phase 3 internal issue backlog remained possible future roadmap. Archived during the 2026-06-03 cleanup because no immediate admin analytics implementation slice remains active.
 
 No immediate admin implementation slice is recommended.
 
@@ -870,8 +877,10 @@ Phase 3 exit:
 
 ## Next Recommended Role
 
-ARCHITECT
+None
 
 ## Suggested Next Step
 
-Pause admin work after the completed Phase 1 and Phase 1A milestone. Resume with Phase 2 `app_events` / `app_failures` only when a concrete ops need, recurring failure pattern, or product-analysis gap proves that existing-truth analytics are no longer enough.
+No next step in this archived plan. Start a new active plan for Phase 2 `app_events` /
+`app_failures` only when a concrete ops need, recurring failure pattern, or product-analysis gap
+proves that existing-truth analytics are no longer enough.

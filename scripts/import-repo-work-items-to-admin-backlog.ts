@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import type { Database, Json } from "../src/lib/supabase/database";
 
@@ -49,6 +50,13 @@ const IMPORT_METADATA_COMPARE_KEYS = [
   "source_status_text",
   "source_owner",
   "source_last_updated",
+  "stale_repo_mirror",
+  "stale_source_path",
+  "stale_source_type",
+  "stale_detected_at",
+  "stale_cleanup_action",
+  "stale_cleanup_version",
+  "stale_cleanup_reason",
 ] as const;
 
 type SourceType =
@@ -125,6 +133,11 @@ type ImportStats = {
   skipped: number;
   duplicateCount: number;
   repoDerivedInReviewCount: number;
+  staleActiveRepoMirrorCount: number;
+  staleActiveRepoMirrorCountAfterCleanup: number | null;
+  staleRepoMirrorAction: "not_checked" | "reported" | "would_archive" | "archived";
+  staleRepoMirrorArchivedCount: number;
+  staleRepoMirrorExamples: StaleRepoMirrorExample[];
   manualRowCountBefore: number | null;
   manualRowCountAfter: number | null;
   examples: Record<string, ExampleItem | null>;
@@ -142,6 +155,15 @@ type MissingMetadataExample = {
   sourcePath: string;
   missingRequiredFields: CanonicalMarkdownField[];
   invalidRequiredFields: CanonicalMarkdownField[];
+};
+
+type StaleRepoMirrorExample = {
+  id: string;
+  title: string | null;
+  sourcePath: string;
+  sourceType: string;
+  status: AdminStatus;
+  archivedAt: string | null;
 };
 
 type ParsedCanonicalMarkdown = {
@@ -168,7 +190,13 @@ const SOURCE_CONFIGS: SourceConfig[] = [
 const args = parseArgs(process.argv.slice(2));
 const generatedAt = new Date().toISOString();
 
-await main();
+if (isMainModule()) {
+  await main();
+}
+
+function isMainModule() {
+  return Boolean(process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href);
+}
 
 async function main() {
   const scan = await scanRepoWorkItems(process.cwd());
@@ -185,6 +213,11 @@ async function main() {
     skipped: args.dryRun ? items.length : 0,
     duplicateCount: 0,
     repoDerivedInReviewCount: countRepoDerivedInReviewItems(items),
+    staleActiveRepoMirrorCount: 0,
+    staleActiveRepoMirrorCountAfterCleanup: null,
+    staleRepoMirrorAction: args.archiveStale ? "would_archive" : "not_checked",
+    staleRepoMirrorArchivedCount: 0,
+    staleRepoMirrorExamples: [],
     manualRowCountBefore: null,
     manualRowCountAfter: null,
     examples: {
@@ -193,13 +226,31 @@ async function main() {
       frontendSpec: findExample(items, "frontend_spec"),
     },
   };
+  const currentSourceKeys = new Set(
+    items.map((item) => sourceKey(item.sourceType, item.sourcePath)),
+  );
 
   if (args.dryRun) {
+    if (args.archiveStale) {
+      const supabase = createServiceClient();
+      const existingRows = await loadAdminCaptureRows(supabase);
+      const staleRows = findStaleActiveRepoMirrorRows(existingRows, currentSourceKeys);
+
+      stats.manualRowCountBefore = countManualRows(existingRows);
+      stats.manualRowCountAfter = stats.manualRowCountBefore;
+      stats.duplicateCount = countImportedDuplicates(existingRows);
+      stats.repoDerivedInReviewCount = countRepoDerivedInReviewRows(existingRows);
+      stats.staleActiveRepoMirrorCount = staleRows.length;
+      stats.staleActiveRepoMirrorCountAfterCleanup = staleRows.length;
+      stats.staleRepoMirrorExamples = summarizeStaleRepoMirrorRows(staleRows);
+    }
+
     printReport({
       mode: "dry_run",
       ok: true,
       stats,
       refreshTriage: args.refreshTriage,
+      archiveStale: args.archiveStale,
       message: "Dry run scanned repo markdown and did not write Supabase.",
     });
     return;
@@ -219,20 +270,39 @@ async function main() {
     stats[action] += 1;
   }
 
+  const afterUpsertRows = await loadAdminCaptureRows(supabase);
+  const staleRows = findStaleActiveRepoMirrorRows(afterUpsertRows, currentSourceKeys);
+  stats.staleActiveRepoMirrorCount = staleRows.length;
+  stats.staleRepoMirrorExamples = summarizeStaleRepoMirrorRows(staleRows);
+  stats.staleRepoMirrorAction = args.archiveStale ? "archived" : "reported";
+
+  if (args.archiveStale) {
+    for (const row of staleRows) {
+      await archiveStaleRepoMirrorRow(supabase, row);
+      stats.staleRepoMirrorArchivedCount += 1;
+    }
+  }
+
   const afterRows = await loadAdminCaptureRows(supabase);
   stats.manualRowCountAfter = countManualRows(afterRows);
   stats.duplicateCount = countImportedDuplicates(afterRows);
   stats.repoDerivedInReviewCount = countRepoDerivedInReviewRows(afterRows);
+  stats.staleActiveRepoMirrorCountAfterCleanup = findStaleActiveRepoMirrorRows(
+    afterRows,
+    currentSourceKeys,
+  ).length;
 
   printReport({
     mode: "live_upsert",
     ok:
       stats.duplicateCount === 0 &&
       stats.repoDerivedInReviewCount === 0 &&
+      stats.staleActiveRepoMirrorCountAfterCleanup === 0 &&
       (stats.manualRowCountBefore === null ||
         stats.manualRowCountBefore === stats.manualRowCountAfter),
     stats,
     refreshTriage: args.refreshTriage,
+    archiveStale: args.archiveStale,
     message:
       "Repo markdown work items were mirrored into admin_capture_items. Markdown remains canonical.",
   });
@@ -240,6 +310,7 @@ async function main() {
   if (
     stats.duplicateCount > 0 ||
     stats.repoDerivedInReviewCount > 0 ||
+    stats.staleActiveRepoMirrorCountAfterCleanup !== 0 ||
     (stats.manualRowCountBefore !== null &&
       stats.manualRowCountBefore !== stats.manualRowCountAfter)
   ) {
@@ -617,6 +688,98 @@ function readRequiredFieldArray(input: Json | undefined): CanonicalMarkdownField
 
 function countManualRows(rows: ExistingRow[]) {
   return rows.filter((row) => normalizeMetadata(row.metadata).imported_from_repo !== true).length;
+}
+
+export function findStaleActiveRepoMirrorRows(
+  rows: ExistingRow[],
+  currentSourceKeys: ReadonlySet<string>,
+) {
+  return rows.filter((row) => {
+    const metadata = normalizeMetadata(row.metadata);
+    const sourcePath = typeof metadata.source_path === "string" ? metadata.source_path : null;
+    const sourceType = typeof metadata.source_type === "string" ? metadata.source_type : null;
+
+    if (metadata.imported_from_repo !== true || !sourcePath || !sourceType) {
+      return false;
+    }
+
+    if (!isApprovedMarkdownSourcePath(sourcePath) || !isSourceType(sourceType)) {
+      return false;
+    }
+
+    if (row.status === "archived" || row.archived_at) {
+      return false;
+    }
+
+    return !currentSourceKeys.has(sourceKey(sourceType, sourcePath));
+  });
+}
+
+async function archiveStaleRepoMirrorRow(
+  supabase: ReturnType<typeof createServiceClient>,
+  row: ExistingRow,
+) {
+  const metadata = normalizeMetadata(row.metadata);
+  const sourcePath = typeof metadata.source_path === "string" ? metadata.source_path : null;
+  const sourceType = typeof metadata.source_type === "string" ? metadata.source_type : null;
+  const patch: ItemUpdate = {
+    status: "archived",
+    archived_at: row.archived_at ?? generatedAt,
+    metadata: buildStaleRepoMirrorMetadata(metadata, sourcePath, sourceType),
+  };
+  const { error } = await supabase.from("admin_capture_items").update(patch).eq("id", row.id);
+
+  if (error) {
+    throw new Error(
+      `Could not archive stale repo mirror ${sourcePath ?? row.id}: ${error.message}`,
+    );
+  }
+}
+
+export function buildStaleRepoMirrorMetadata(
+  metadata: Record<string, Json | undefined>,
+  sourcePath: string | null,
+  sourceType: string | null,
+): Json {
+  return {
+    ...metadata,
+    stale_repo_mirror: true,
+    stale_source_path: sourcePath ?? undefined,
+    stale_source_type: sourceType ?? undefined,
+    stale_detected_at: generatedAt,
+    stale_cleanup_action: "archived",
+    stale_cleanup_version: IMPORT_VERSION,
+    stale_cleanup_reason: "metadata.source_path no longer exists in approved repo import sources",
+    refreshed_at: typeof metadata.refreshed_at === "string" ? metadata.refreshed_at : generatedAt,
+  } as Json;
+}
+
+function summarizeStaleRepoMirrorRows(rows: ExistingRow[]): StaleRepoMirrorExample[] {
+  return rows.slice(0, 12).map((row) => {
+    const metadata = normalizeMetadata(row.metadata);
+
+    return {
+      id: row.id,
+      title: row.title,
+      sourcePath: typeof metadata.source_path === "string" ? metadata.source_path : "unknown",
+      sourceType: typeof metadata.source_type === "string" ? metadata.source_type : "unknown",
+      status: row.status as AdminStatus,
+      archivedAt: row.archived_at,
+    };
+  });
+}
+
+function isApprovedMarkdownSourcePath(sourcePath: string) {
+  return (
+    sourcePath.endsWith(".md") &&
+    SOURCE_CONFIGS.some(
+      (source) => sourcePath === source.root || sourcePath.startsWith(`${source.root}/`),
+    )
+  );
+}
+
+function isSourceType(value: string): value is SourceType {
+  return SOURCE_CONFIGS.some((source) => source.type === value);
 }
 
 function isUnchanged(existing: ExistingRow, patch: ItemUpdate) {
@@ -1315,6 +1478,7 @@ function parseArgs(rawArgs: string[]) {
   return {
     dryRun: rawArgs.includes("--dry-run"),
     refreshTriage: rawArgs.includes("--refresh-triage"),
+    archiveStale: rawArgs.includes("--archive-stale"),
   };
 }
 
@@ -1341,6 +1505,7 @@ function printReport(report: {
   ok: boolean;
   stats: ImportStats;
   refreshTriage: boolean;
+  archiveStale: boolean;
   message: string;
 }) {
   console.log(
@@ -1350,6 +1515,7 @@ function printReport(report: {
         mode: report.mode,
         importVersion: IMPORT_VERSION,
         refreshTriage: report.refreshTriage,
+        archiveStale: report.archiveStale,
         message: report.message,
         scanned: report.stats.discoveredBySourceType,
         eligible: report.stats.eligibleBySourceType,
@@ -1360,6 +1526,12 @@ function printReport(report: {
           skipped: report.stats.skipped,
           duplicateCount: report.stats.duplicateCount,
           repoDerivedInReviewCount: report.stats.repoDerivedInReviewCount,
+          staleActiveRepoMirrorCount: report.stats.staleActiveRepoMirrorCount,
+          staleActiveRepoMirrorCountAfterCleanup:
+            report.stats.staleActiveRepoMirrorCountAfterCleanup,
+          staleRepoMirrorAction: report.stats.staleRepoMirrorAction,
+          staleRepoMirrorArchivedCount: report.stats.staleRepoMirrorArchivedCount,
+          staleRepoMirrorExamples: report.stats.staleRepoMirrorExamples,
           manualRowCountBefore: report.stats.manualRowCountBefore,
           manualRowCountAfter: report.stats.manualRowCountAfter,
         },

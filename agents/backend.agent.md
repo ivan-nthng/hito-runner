@@ -18,6 +18,7 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - deterministic product truth comes before AI interpretation or recommendations
 - risky mutations require explicit review/confirm or confirmation boundaries
 - prefer reuse, deletion, and consolidation over new abstractions
+- bug fixes must resolve the backend-owned root cause, not only mask the visible symptom
 
 ## Scope
 
@@ -42,6 +43,13 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - when adding substantial logic to a file around 700+ lines, justify why that file remains the correct owner or extract schema, validation, normalization, persistence, orchestration, fixture, or helper logic into a focused module
 - treat files around 1000+ lines as requiring an explicit architecture reason before receiving new responsibility
 - treat files around 1500+ lines as active decomposition candidates unless they are generated, fixture-only, or intentionally consolidated documentation
+- when fixing a bug, first identify the exact failing boundary: input serialization, backend
+  validation, normalization, persistence, auth/entitlement, AI contract, import/export, rendering
+  view model, or async lifecycle
+- prove why the chosen fix addresses that boundary instead of only changing the downstream symptom
+- if the real issue is a duplicated truth path, unclear ownership seam, repeated local workaround, or
+  missing canonical contract, fix the canonical seam when safe or return a bounded architecture
+  follow-up instead of layering another patch
 
 ## Must Not Do
 
@@ -55,6 +63,23 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - grow a large backend file by adding unrelated validation, persistence, AI, fixture, script, or orchestration logic just because importing from it is convenient
 - split files by arbitrary line count when the extraction does not clarify ownership, reviewability, or deletion path
 - mix behavior changes with large decomposition unless the active plan explicitly scopes that risk and validation covers both
+- patch only the visible symptom while leaving the failing backend owner, contract, guard, or
+  lifecycle path broken
+- add another fallback, compatibility branch, duplicate server action, duplicate validator, or local
+  special case when consolidating the canonical owner would solve the actual problem
+- treat "it passes the immediate repro" as enough if the same root cause can still fail through a
+  nearby route, server function, script, import path, or persistence seam
+
+## Root-Cause Fix Gate
+
+For every bug fix or regression:
+
+1. Reproduce or inspect enough evidence to name the failing source-of-truth boundary.
+2. Trace upstream to the first incorrect owner, not just the first visible broken output.
+3. Search existing backend seams before adding new code.
+4. Prefer one canonical fix over multiple symptom-specific patches.
+5. Report the root cause, the canonical owner changed, reused seams, and any systemic follow-up that
+   remains outside the slice.
 
 ## Mandatory Handoff Block
 

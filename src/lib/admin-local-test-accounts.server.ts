@@ -11,10 +11,11 @@ import type {
   DeleteAdminLocalTestAccountResult,
 } from "@/lib/admin-local-test-accounts";
 import { classifyAdminAnalyticsUser } from "@/lib/admin-user-classification";
+import { requireAdminAccessForDependencies } from "@/lib/admin-access.server";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database";
-import { hasSupabaseServerEnv, isLoopbackRuntimeUrl, serverEnv } from "@/lib/supabase/env";
+import { hasSupabaseServerEnv, serverEnv } from "@/lib/supabase/env";
 
 const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 const PAGE_SIZE = 200;
@@ -197,36 +198,32 @@ async function buildCurrentDependencies(): Promise<AdminLocalTestAccountDependen
 async function requireLocalAdminAccess(
   dependencies: AdminLocalTestAccountDependencies,
 ): Promise<{ ok: true } | Extract<AdminLocalTestAccountsResult, { ok: false }>> {
-  if (
-    !dependencies.localAuthBypassEnabled ||
-    !dependencies.runtimeUrl ||
-    !isLoopbackRuntimeUrl(dependencies.runtimeUrl)
-  ) {
+  const adminAccess = await requireAdminAccessForDependencies({
+    auth: dependencies.auth,
+    runtimeUrl: dependencies.runtimeUrl,
+    localAuthBypassEnabled: dependencies.localAuthBypassEnabled,
+    supabase: null,
+  });
+
+  if (!adminAccess.ok) {
+    if (
+      adminAccess.reason === "authentication_required" ||
+      adminAccess.reason === "admin_required"
+    ) {
+      return failure(adminAccess.reason, adminAccess.message);
+    }
+
     return failure(
       "local_test_accounts_unavailable",
       "Local test accounts are available only in the local auth bypass runtime.",
     );
   }
 
-  if (!dependencies.auth.userId || dependencies.auth.provider !== "local") {
+  if (!adminAccess.admin.capabilities.localTestAccounts) {
     return failure(
-      "authentication_required",
-      "Sign in as the local admin to manage test accounts.",
+      "local_test_accounts_unavailable",
+      "Local test accounts are available only to the local admin fixture.",
     );
-  }
-
-  const loaded = await loadLocalAccountsSafe(dependencies.accountsFilePath);
-
-  if (!loaded.ok) {
-    return loaded;
-  }
-
-  const adminAccount =
-    loaded.accounts.find((account) => account.userId === dependencies.auth.userId) ??
-    loaded.accounts.find((account) => account.email === dependencies.auth.email);
-
-  if (!adminAccount || adminAccount.role !== "admin") {
-    return failure("admin_required", "Only the protected local admin can manage test accounts.");
   }
 
   return { ok: true };

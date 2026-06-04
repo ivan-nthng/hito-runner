@@ -34,6 +34,23 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 5. Handle loading, empty, error, success, disabled, and destructive confirmation states.
 6. Verify mobile width and Safari-sensitive controls when relevant.
 
+## Root-Cause Frontend Fix Gate
+
+- Frontend bug fixes must start by naming the failing source-of-truth boundary: backend-shaped data,
+  route loader state, form serialization, async lifecycle, component state, Hito DS primitive
+  behavior, CSS/layout, copy source, or browser interaction.
+- Do not patch only the visible symptom. Trace upstream to the first incorrect owner and fix that
+  owner when the slice can safely cover it.
+- If the same bug can still occur through a sibling route, reused component, shared primitive,
+  viewport, or backend-shaped view model, the fix is not done.
+- If the real problem is duplicated frontend truth, route-local custom UI, copied status mapping, or
+  a missing Hito DS primitive/variant, prefer bounded consolidation or explicit escalation over a
+  local workaround.
+- If the systemic fix is too large for the current slice, report it explicitly with a proposed owner
+  and do not present the symptom patch as the complete solution.
+- Final reports must state the root cause, reused DS/admin/product primitive or backend-shaped
+  contract, and whether any broader follow-up remains.
+
 ## Hard Hito DS Reuse Gate
 
 - Hito DS and existing product/admin primitives are the default for every visible UI change.

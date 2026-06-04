@@ -11,30 +11,34 @@ import {
   type AdminLoginResult,
 } from "@/lib/admin-auth-actions";
 import {
-  appendLocalAuthSessionCookie,
+  clearLocalAuthSessionCookie,
   getLocalAuthAccounts,
   verifyLocalAuthCredentials,
   type LocalAuthAccountConfig,
 } from "@/lib/local-auth";
 import { isDevOnlyLocalAuthRuntime, serverEnv } from "@/lib/supabase/env";
 
-const ADMIN_USERNAME = "admin";
-const ADMIN_SESSION_COOKIE = "hito_admin_session";
+export const ADMIN_USERNAME = "admin";
+export const ADMIN_SESSION_COOKIE = "hito_admin_session";
 const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 const ADMIN_SESSION_USER_ID = "hito-admin";
+const LOCAL_FIXTURE_ADMIN_SESSION_SECRET = "hito-local-admin-session-dev-only-secret-2026-06-01";
 const MIN_PASSWORD_HASH_ITERATIONS = 100_000;
 const MAX_PASSWORD_HASH_ITERATIONS = 1_000_000;
 const pbkdf2 = promisify(pbkdf2Callback);
+
+export type AdminSessionSource = "deployed_password" | "local_fixture";
+export type AdminRuntimeClass = "deployed" | "loopback";
 
 type AdminLoginVerificationResult =
   | (Extract<AdminLoginResult, { ok: true }> & {
       session:
         | {
-            kind: "local";
+            kind: "local_fixture";
             account: LocalAuthAccountConfig;
           }
         | {
-            kind: "deployed";
+            kind: "deployed_password";
             username: typeof ADMIN_USERNAME;
           };
     })
@@ -69,13 +73,9 @@ export interface AdminAuthSession {
   userId: string;
   email: null;
   username: typeof ADMIN_USERNAME;
-}
-
-interface AdminAuthSessionResolutionOptions {
-  pathname?: string | null;
-  serverFnMeta?: {
-    filename?: string | null;
-  } | null;
+  label: string;
+  source: AdminSessionSource;
+  runtimeClass: AdminRuntimeClass;
 }
 
 export async function loginAdminForRequest(request: Request): Promise<Response> {
@@ -83,6 +83,23 @@ export async function loginAdminForRequest(request: Request): Promise<Response> 
 }
 
 export const loginLocalAdminForRequest = loginAdminForRequest;
+
+export function logoutAdminForRequest(request: Request): Response {
+  const url = new URL(request.url);
+  const next = sanitizeAdminRedirectPath(url.searchParams.get("next"));
+  const responseHeaders = new Headers();
+  const loginUrl = new URL(ADMIN_LOGIN_PATH, url.origin);
+
+  loginUrl.searchParams.set("next", next);
+  clearAdminAuthSessionCookie(responseHeaders, request);
+  clearLocalAuthSessionCookie(responseHeaders, request);
+  responseHeaders.set("location", loginUrl.toString());
+
+  return new Response(null, {
+    status: 302,
+    headers: responseHeaders,
+  });
+}
 
 export async function handleAdminLoginRequestForDependencies(
   request: Request,
@@ -93,11 +110,7 @@ export async function handleAdminLoginRequestForDependencies(
   const responseHeaders = new Headers();
 
   if (result.ok) {
-    if (result.session.kind === "local") {
-      await appendLocalAuthSessionCookie(responseHeaders, request, result.session.account);
-    } else {
-      appendAdminAuthSessionCookie(responseHeaders, request, result.session.username, dependencies);
-    }
+    appendAdminAuthSessionCookie(responseHeaders, request, result.session, dependencies);
 
     responseHeaders.set("location", new URL(result.redirectTo, request.url).toString());
 
@@ -174,7 +187,7 @@ export async function verifyAdminLoginForDependencies(
     ok: true,
     redirectTo,
     session: {
-      kind: "deployed",
+      kind: "deployed_password",
       username: ADMIN_USERNAME,
     },
   };
@@ -209,11 +222,19 @@ async function verifyLocalFixtureAdminLogin(
     );
   }
 
+  if (!validateAdminSessionSecret(dependencies.deployedAdmin.sessionSecret).ok) {
+    return failure(
+      "admin_config_invalid",
+      "Admin login is not configured for this runtime.",
+      redirectTo,
+    );
+  }
+
   return {
     ok: true,
     redirectTo,
     session: {
-      kind: "local",
+      kind: "local_fixture",
       account: credentials.account,
     },
   };
@@ -225,23 +246,12 @@ async function buildCurrentDependencies(request: Request): Promise<AdminLoginDep
     accounts: await getLocalAuthAccounts(),
     verifyCredentials: (identifier, password) =>
       verifyLocalAuthCredentials(identifier, password, request.url),
-    deployedAdmin: readDeployedAdminConfigFromEnv(),
+    deployedAdmin: readDeployedAdminConfigForRequest(request),
   };
 }
 
-export async function resolveAdminAuthSession(
-  request: Request,
-  options?: AdminAuthSessionResolutionOptions,
-): Promise<AdminAuthSession | null> {
-  if (!isAdminSessionEligibleRequest(request.url, options)) {
-    return null;
-  }
-
-  const config = validateDeployedAdminConfig({
-    username: ADMIN_USERNAME,
-    passwordHash: readServerEnv("HITO_ADMIN_PASSWORD_HASH"),
-    sessionSecret: readServerEnv("HITO_ADMIN_SESSION_SECRET"),
-  });
+export async function resolveAdminAuthSession(request: Request): Promise<AdminAuthSession | null> {
+  const config = validateAdminSessionSecret(readAdminSessionSecretForRequest(request));
 
   if (!config.ok) {
     return null;
@@ -254,26 +264,49 @@ export async function resolveAdminAuthSession(
     return null;
   }
 
-  const payload = verifyAdminSessionToken(sessionCookie.value, config.config.sessionSecret);
+  const payload = verifyAdminSessionToken(sessionCookie.value, config.sessionSecret);
 
   if (!payload || payload.sub !== ADMIN_USERNAME) {
     return null;
   }
 
+  const source = normalizeAdminSessionSource(payload.source);
+  const runtimeClass = normalizeAdminRuntimeClass(payload.runtimeClass, source);
+
+  if (source === "local_fixture" && runtimeClass !== "loopback") {
+    return null;
+  }
+
   return {
-    userId: ADMIN_SESSION_USER_ID,
+    userId: normalizeAdminSessionUserId(payload.adminUserId, source),
     email: null,
     username: ADMIN_USERNAME,
+    label: normalizeAdminSessionLabel(payload.label, source),
+    source,
+    runtimeClass,
   };
+}
+
+export function clearAdminAuthSessionCookie(headers: Headers, request: Request) {
+  headers.append(
+    "set-cookie",
+    serializeCookieHeader(ADMIN_SESSION_COOKIE, "", {
+      httpOnly: true,
+      maxAge: 0,
+      path: "/",
+      sameSite: "lax",
+      secure: new URL(request.url).protocol === "https:",
+    }),
+  );
 }
 
 function appendAdminAuthSessionCookie(
   headers: Headers,
   request: Request,
-  username: typeof ADMIN_USERNAME,
+  session: Extract<AdminLoginVerificationResult, { ok: true }>["session"],
   dependencies: Pick<AdminLoginDependencies, "deployedAdmin">,
 ) {
-  const config = validateDeployedAdminConfig(dependencies.deployedAdmin);
+  const config = validateAdminSessionSecret(dependencies.deployedAdmin.sessionSecret);
 
   if (!config.ok) {
     return;
@@ -281,6 +314,9 @@ function appendAdminAuthSessionCookie(
 
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = issuedAt + ADMIN_SESSION_MAX_AGE_SECONDS;
+  const isLocalFixture = session.kind === "local_fixture";
+  const adminUserId = isLocalFixture ? session.account.userId : ADMIN_SESSION_USER_ID;
+  const label = isLocalFixture ? session.account.displayName || session.account.username : "admin";
 
   headers.append(
     "set-cookie",
@@ -289,11 +325,15 @@ function appendAdminAuthSessionCookie(
       signAdminSessionToken(
         {
           v: 1,
-          sub: username,
+          sub: ADMIN_USERNAME,
           iat: issuedAt,
           exp: expiresAt,
+          source: isLocalFixture ? "local_fixture" : "deployed_password",
+          runtimeClass: isLocalFixture ? "loopback" : "deployed",
+          adminUserId,
+          label,
         },
-        config.config.sessionSecret,
+        config.sessionSecret,
       ),
       {
         httpOnly: true,
@@ -304,6 +344,24 @@ function appendAdminAuthSessionCookie(
       },
     ),
   );
+}
+
+function validateAdminSessionSecret(secret: string | null):
+  | {
+      ok: true;
+      sessionSecret: string;
+    }
+  | {
+      ok: false;
+    } {
+  if (!secret || secret.length < 32) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    sessionSecret: secret,
+  };
 }
 
 function validateDeployedAdminConfig(config: DeployedAdminConfig):
@@ -334,12 +392,20 @@ function validateDeployedAdminConfig(config: DeployedAdminConfig):
   };
 }
 
-function readDeployedAdminConfigFromEnv(): DeployedAdminConfig {
+function readDeployedAdminConfigForRequest(request: Request): DeployedAdminConfig {
   return {
     username: ADMIN_USERNAME,
     passwordHash: readServerEnv("HITO_ADMIN_PASSWORD_HASH"),
-    sessionSecret: readServerEnv("HITO_ADMIN_SESSION_SECRET"),
+    sessionSecret: readAdminSessionSecretForRequest(request),
   };
+}
+
+function readAdminSessionSecretForRequest(request: Request): string | null {
+  return readServerEnv("HITO_ADMIN_SESSION_SECRET") ?? readLocalFixtureSessionSecret(request);
+}
+
+function readLocalFixtureSessionSecret(request: Request) {
+  return isDevOnlyLocalAuthRuntime(request.url) ? LOCAL_FIXTURE_ADMIN_SESSION_SECRET : null;
 }
 
 function readServerEnv(name: string): string | null {
@@ -415,6 +481,10 @@ interface AdminSessionPayload {
   sub: typeof ADMIN_USERNAME;
   iat: number;
   exp: number;
+  source?: AdminSessionSource;
+  runtimeClass?: AdminRuntimeClass;
+  adminUserId?: string;
+  label?: string;
 }
 
 function signAdminSessionToken(payload: AdminSessionPayload, secret: string) {
@@ -461,47 +531,45 @@ function verifyAdminSessionToken(value: string, secret: string): AdminSessionPay
   }
 }
 
+function normalizeAdminSessionSource(value: AdminSessionPayload["source"]): AdminSessionSource {
+  return value === "local_fixture" ? "local_fixture" : "deployed_password";
+}
+
+function normalizeAdminRuntimeClass(
+  value: AdminSessionPayload["runtimeClass"],
+  source: AdminSessionSource,
+): AdminRuntimeClass {
+  if (value === "loopback" || value === "deployed") {
+    return value;
+  }
+
+  return source === "local_fixture" ? "loopback" : "deployed";
+}
+
+function normalizeAdminSessionUserId(
+  value: AdminSessionPayload["adminUserId"],
+  source: AdminSessionSource,
+) {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  return source === "local_fixture" ? "hito-local-admin" : ADMIN_SESSION_USER_ID;
+}
+
+function normalizeAdminSessionLabel(
+  value: AdminSessionPayload["label"],
+  source: AdminSessionSource,
+) {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  return source === "local_fixture" ? "Local admin" : "admin";
+}
+
 function signAdminSessionPayload(encodedPayload: string, secret: string) {
   return toBase64Url(createHmac("sha256", secret).update(encodedPayload).digest());
-}
-
-function isAdminSessionEligibleRequest(
-  requestUrl: string,
-  options?: AdminAuthSessionResolutionOptions,
-) {
-  return (
-    isAdminRequestPath(requestUrl) ||
-    isAdminRequestPath(options?.pathname ?? null) ||
-    isAdminServerFunction(options?.serverFnMeta?.filename)
-  );
-}
-
-function isAdminRequestPath(value: string | null) {
-  const pathname = parseRequestPathname(value);
-
-  return Boolean(pathname?.startsWith("/admin/") || pathname?.startsWith("/api/admin/"));
-}
-
-function isAdminServerFunction(filename: string | null | undefined) {
-  const normalizedFilename = filename?.replaceAll("\\", "/");
-
-  return (
-    normalizedFilename === "src/lib/admin-analytics.ts" ||
-    normalizedFilename === "src/lib/admin-capture.ts" ||
-    normalizedFilename === "src/lib/admin-local-test-accounts.ts"
-  );
-}
-
-function parseRequestPathname(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return new URL(value, "http://hito.local").pathname;
-  } catch {
-    return null;
-  }
 }
 
 function decodeBase64Url(value: string) {

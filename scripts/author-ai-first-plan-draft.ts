@@ -15,8 +15,6 @@ import {
   type AiFirstPlanBlueprint,
 } from "../src/lib/ai-first-plan-blueprint-authoring";
 import { buildMockAiFirstPlanEnvelope } from "../src/lib/ai-first-plan-envelope-policy";
-import { expandAiFirstPlanEnvelopeToTrainingPlan } from "../src/lib/ai-first-plan-envelope-expand";
-import { buildAiFirstPlanEnvelopeTrace } from "../src/lib/ai-first-plan-envelope-trace";
 import type { TrainingPlanV2 } from "../src/lib/imported-plan";
 import { resolveCanonicalWorkoutModel } from "../src/lib/rich-workout-model";
 import {
@@ -33,7 +31,7 @@ import { addDaysIso, type Step, type StepPrescription } from "../src/lib/trainin
 
 type ParsedArgs = Record<string, string | true>;
 type ScriptMode = "mock" | "mock_invalid" | "mock_partial" | "mock_timeout" | "live";
-type ScriptContractMode = AiFirstPlanGenerationContract | "envelope";
+type ScriptContractMode = AiFirstPlanGenerationContract;
 type FixtureKind =
   | "one_week_smoke"
   | "compact_smoke"
@@ -92,6 +90,7 @@ const TRACE_LONG_RUN_IDENTITIES = new Set<string>([
 
 const DEFAULT_REFERENCE_FILE =
   "/Users/ivan/Downloads/ivan_half_marathon_training_plan_v2_full_2026-05-05.json";
+const DEFAULT_ENVELOPE_LIVE_MODEL = "gpt-4.1-mini";
 type BlueprintWorkout = AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number];
 type MockCadenceSpec = {
   family: BlueprintWorkout["workoutFamily"];
@@ -122,22 +121,18 @@ const includeCoachSample = hasFlag(options, "coach-sample");
 const includeBlueprintTrace = hasFlag(options, "trace-blueprint");
 const includeEnvelopeTrace = contractMode === "envelope" || hasFlag(options, "trace-envelope");
 
-if (contractMode === "envelope") {
-  runEnvelopeContractAndExit({
-    mode,
-    fixtureKind,
-    inputKind,
-    referenceIncluded: Boolean(referenceExample),
-    authoringInput,
-    includeEnvelopeTrace,
-  });
-  process.exit(0);
-}
-
 const fetchImpl =
   mode === "live"
     ? undefined
     : buildMockOpenAiFetch(mode, authoringInput, contractMode, fixtureKind);
+const model =
+  mode === "live" && contractMode === "envelope"
+    ? (readRequiredEnv("OPENAI_FIRST_PLAN_MODEL") ??
+      readRequiredEnv("OPENAI_PLAN_MODEL") ??
+      DEFAULT_ENVELOPE_LIVE_MODEL)
+    : mode === "live"
+      ? undefined
+      : "mock-ai-first-plan-draft-model";
 
 const result = await generateAiFirstPlanDraftPreview({
   input,
@@ -147,7 +142,7 @@ const result = await generateAiFirstPlanDraftPreview({
   maxOutputTokens,
   contractMode,
   apiKey: mode === "live" ? undefined : "mock-openai-key",
-  model: mode === "live" ? undefined : "mock-ai-first-plan-draft-model",
+  model,
   fetchImpl,
 });
 
@@ -182,6 +177,10 @@ if (!result.ok) {
                 inputKind,
                 referenceIncluded: Boolean(referenceExample),
               })
+            : undefined,
+        envelopeTrace:
+          includeEnvelopeTrace && contractMode === "envelope" && "metadata" in result
+            ? result.metadata.envelopeTrace
             : undefined,
       },
       null,
@@ -226,6 +225,10 @@ if (!result.ok) {
                 inputKind,
                 referenceIncluded: Boolean(referenceExample),
               })
+            : undefined,
+        envelopeTrace:
+          includeEnvelopeTrace && contractMode === "envelope"
+            ? result.metadata.envelopeTrace
             : undefined,
         coachSample: includeCoachSample
           ? buildCoachSample(result.canonicalPlan, COACH_SAMPLE_IDENTITIES)
@@ -280,7 +283,7 @@ function resolveAuthoringInput(input: unknown, inputKind: AiFirstPlanDraftServic
 function buildMockOpenAiFetch(
   mode: Exclude<ScriptMode, "live">,
   authoringInput: StructuredFirstPlanAuthoringInput,
-  contractMode: Exclude<ScriptContractMode, "envelope">,
+  contractMode: ScriptContractMode,
   fixtureKind: FixtureKind,
 ) {
   const requestAuthoringInput =
@@ -302,15 +305,24 @@ function buildMockOpenAiFetch(
               planName: "Invalid mock AI first plan blueprint",
               weeks: [],
             }
-          : {
-              schemaVersion: AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
-              planName: "Invalid mock AI first plan",
-              weeks: [],
-            },
+          : contractMode === "envelope"
+            ? buildInvalidMockEnvelope()
+            : {
+                schemaVersion: AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
+                planName: "Invalid mock AI first plan",
+                weeks: [],
+              },
       );
     }
 
     if (mode === "mock_partial") {
+      if (contractMode === "envelope") {
+        return openAiFixtureResponse(
+          "mock-partial-ai-first-plan-envelope",
+          buildPartialMockEnvelope(authoringInput),
+        );
+      }
+
       const blueprint = buildMockAiFirstPlanBlueprint(
         requestAuthoringInput,
         buildStructuredAuthoringPlan(requestAuthoringInput),
@@ -331,112 +343,17 @@ function buildMockOpenAiFetch(
               requestAuthoringInput,
               buildStructuredAuthoringPlan(requestAuthoringInput),
             )
-        : buildMockAiFirstPlanDraft(authoringInput, buildStructuredAuthoringPlan(authoringInput)),
+        : contractMode === "envelope"
+          ? buildMockAiFirstPlanEnvelope(authoringInput)
+          : buildMockAiFirstPlanDraft(authoringInput, buildStructuredAuthoringPlan(authoringInput)),
     );
   }) as typeof fetch;
 }
 
-function runEnvelopeContractAndExit({
-  mode,
-  fixtureKind,
-  inputKind,
-  referenceIncluded,
-  authoringInput,
-  includeEnvelopeTrace,
-}: {
-  mode: ScriptMode;
-  fixtureKind: FixtureKind;
-  inputKind: AiFirstPlanDraftServiceInputKind;
-  referenceIncluded: boolean;
-  authoringInput: StructuredFirstPlanAuthoringInput;
-  includeEnvelopeTrace: boolean;
-}) {
-  const envelope =
-    mode === "mock_invalid"
-      ? buildInvalidMockEnvelope()
-      : buildMockAiFirstPlanEnvelope(authoringInput);
-  const result =
-    mode === "live" || mode === "mock_timeout" || mode === "mock_partial"
-      ? ({
-          ok: false,
-          reason:
-            mode === "live"
-              ? "ai_first_plan_envelope_invalid"
-              : "ai_first_plan_envelope_expansion_failed",
-          issues: [
-            {
-              code:
-                mode === "live" ? "envelope_non_live_contract" : "envelope_mock_mode_not_supported",
-              message:
-                mode === "live"
-                  ? "ai-first-plan-envelope-v1 is non-live foundation only in this slice."
-                  : "Envelope proof supports mock-openai and mock-invalid only.",
-            },
-          ],
-        } as const)
-      : expandAiFirstPlanEnvelopeToTrainingPlan({ envelope, authoringInput });
-  const sizeComparison = buildEnvelopeSizeComparison(envelope, authoringInput);
-  const envelopeTrace = includeEnvelopeTrace
-    ? buildAiFirstPlanEnvelopeTrace({
-        envelope,
-        authoringInput,
-        result,
-        sizeComparison,
-      })
-    : undefined;
+function readRequiredEnv(name: string) {
+  const value = process.env[name];
 
-  if (!result.ok) {
-    console.log(
-      JSON.stringify(
-        {
-          ok: false,
-          mode,
-          contractMode: "envelope",
-          inputKind,
-          fixture: fixtureKind,
-          referenceIncluded,
-          reason: result.reason,
-          issues: result.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
-          sourceKind: "ai_first_plan_envelope_v1",
-          sourceStatus: "envelope_unavailable",
-          fallbackReason: result.reason,
-          validationIssueCount: result.issues.length,
-          envelopeTrace,
-        },
-        null,
-        2,
-      ),
-    );
-    return;
-  }
-
-  console.log(
-    JSON.stringify(
-      {
-        ok: true,
-        mode,
-        contractMode: "envelope",
-        inputKind,
-        fixture: fixtureKind,
-        referenceIncluded,
-        persisted: false,
-        planName: result.canonicalPlan.plan_name,
-        schemaVersion: result.canonicalPlan.schema_version,
-        sourceKind: result.canonicalPlan.source_kind,
-        sourceStatus: result.metadata.sourceStatus,
-        fallbackReason: null,
-        validationIssueCount: result.metadata.validationIssueCount,
-        validationIssues: result.metadata.validationIssues,
-        repairs: result.metadata.repairs,
-        workoutCount: result.canonicalPlan.planned_workouts.length,
-        weekCount: countWeeks(result.canonicalPlan),
-        sampleWeeks: buildSampleWeeks(result.canonicalPlan),
-        envelopeTrace,
-      },
-      null,
-      2,
-    ),
-  );
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function buildInvalidMockEnvelope() {
@@ -466,29 +383,17 @@ function buildInvalidMockEnvelope() {
   };
 }
 
-function buildEnvelopeSizeComparison(
-  envelope: unknown,
-  authoringInput: StructuredFirstPlanAuthoringInput,
-) {
-  const horizonStrategy = resolveAiFirstPlanBlueprintHorizonStrategy({
-    authoringInput,
-    referenceExample: null,
-  });
-  const fullBlueprint = buildMockAiFirstPlanBlueprint(
-    authoringInput,
-    buildStructuredAuthoringPlan(authoringInput),
-  );
-  const boundedBlueprint = buildMockAiFirstPlanBlueprint(
-    horizonStrategy.openAiAuthoringInput,
-    buildStructuredAuthoringPlan(horizonStrategy.openAiAuthoringInput),
-  );
+function buildPartialMockEnvelope(authoringInput: StructuredFirstPlanAuthoringInput) {
+  const envelope = buildMockAiFirstPlanEnvelope(authoringInput);
 
   return {
-    envelopeOutputChars: JSON.stringify(envelope).length,
-    blueprintFullOutputChars: JSON.stringify(fullBlueprint).length,
-    blueprintBoundedOutputChars: JSON.stringify(boundedBlueprint).length,
-    blueprintPromptCharEstimateBefore: horizonStrategy.promptCharEstimateBefore,
-    blueprintPromptCharEstimateAfter: horizonStrategy.promptCharEstimateAfter,
+    ...envelope,
+    planName: "Partial mock planning envelope",
+    phases: envelope.phases.slice(0, 1).map((phase) => ({
+      ...phase,
+      endWeek: Math.min(phase.endWeek, Math.max(1, envelope.horizonWeeks - 1)),
+    })),
+    reviewAssumptions: ["Partial mock envelope intentionally omits full phase coverage."],
   };
 }
 

@@ -171,6 +171,34 @@ Goal:
 
 Prevent 4000-line modules by decomposing before the codebase hardens around them.
 
+## 2.56) Root-Cause Fix Discipline (Mandatory)
+
+Bug fixes must solve the underlying failure, not only the visible symptom.
+
+All implementation agents must:
+
+- identify the failing source-of-truth boundary before patching:
+  backend validation, normalization, persistence, auth/entitlement, AI contract, import/export,
+  route loader state, form serialization, async lifecycle, shared component behavior, Hito DS
+  primitive behavior, or rendering view model
+- trace upstream to the first incorrect owner, not just the first visible broken output
+- reuse existing canonical modules, contracts, validators, server actions, persistence seams,
+  components, Hito DS primitives, admin/product patterns, and helpers before adding new code
+- prefer one canonical fix over multiple route-local or symptom-specific patches
+- avoid new fallback branches, compatibility layers, duplicate local truth, one-off UI, or broad
+  abstractions unless they remove a larger failure mode and have a removal plan
+- clean up dead code from failed or replaced approaches when safe
+- report the root cause, canonical owner changed, reused seams, validation evidence, and any
+  systemic follow-up that remains outside the current slice
+
+Frontend and backend prompts must include this expectation explicitly. If the true root cause is
+outside the current role or slice, the agent must say so and propose the bounded next owner instead
+of presenting a symptom patch as complete.
+
+Goal:
+
+Stop recurring bugs from becoming a pile of local fixes.
+
 ## 2.6) Canonical Hito Architecture Approach (Mandatory)
 
 Every agent must preserve one canonical Hito architecture. Do not create parallel product systems

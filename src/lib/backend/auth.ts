@@ -5,6 +5,11 @@ export interface RequestAuthContext {
   email: string | null;
   appBaseUrl: string | null;
   provider: "preview" | "supabase" | "local" | "admin";
+  adminSession?: {
+    label: string;
+    source: "deployed_password" | "local_fixture";
+    runtimeClass: "deployed" | "loopback";
+  };
 }
 
 export function getRequestAuthContext(): RequestAuthContext {

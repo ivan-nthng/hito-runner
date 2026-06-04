@@ -2,7 +2,7 @@
 
 ## Status
 
-implemented / awaiting QA
+in_progress
 
 ## Type
 
@@ -18,48 +18,64 @@ QA
 
 ## Task
 
-Design first-plan calendar pre-start rendering polish for partial first months.
+Validate first-plan calendar pre-start rendering polish for partial first months.
 
 ## Stage
 
-FRONTEND implementation / calendar pre-start days
+QA validation / calendar pre-start days
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: DESIGNER
+ROLE: QA
 
 TASK:
-Design first-plan calendar pre-start rendering polish for partial first months.
+Validate first-plan calendar pre-start rendering polish for partial first months.
 
 STAGE:
-DESIGNER audit / frontend calendar polish
+QA validation / calendar pre-start days
 
 CONTEXT:
 - Source path: docs/plans/active/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md
 - The completed production blueprint wave is archived at docs/plans/archive/2026-05-26-ai-authored-first-plan-pipeline.md.
-- QA's long-horizon monthly audit found that May calendar looked noisy because pre-start rest placeholders appeared before the actual plan start date `2026-05-29`.
-- This is a visual/readability issue, not a backend persistence or schedule-semantics bug.
+- Frontend implemented the pre-start display state in `src/components/Calendar.tsx` using
+  `snapshot.planMeta?.startDate`.
+- Month/week cells before plan start should render as date-only outside-plan cells with no workout
+  or rest semantics, links, tooltips, status markers, or feedback markers.
+- Narrow month view should collapse consecutive pre-start dates into one quiet `Before plan starts`
+  range row.
 
 GOAL:
-Define how the calendar should render days before a plan starts in the first partial month.
+Validate that pre-start calendar dates no longer look like planned rest days and that normal in-plan
+calendar behavior remains stable.
 
 REQUIREMENTS:
-- Reuse existing Hito DS calendar/shell primitives and styles.
-- Decide whether pre-start cells should be hidden, muted, labelled, or omitted.
-- Preserve actual persisted workout rows and backend schedule semantics.
-- Keep current calendar navigation, hover, tooltip, and saved-mode workout links stable unless the design explicitly requires a focused frontend slice.
-- Do not implement code in this design pass.
+- Use built-in Codex browser first unless blocked.
+- Test a partial first month where plan start is near month end.
+- Test a normal full in-plan month.
+- Test week view.
+- Test narrow/mobile layout.
+- Verify pre-start dates do not show `Rest`, rest glyphs, workout labels, links, tooltips, status
+  markers, or feedback markers.
+- Verify actual plan start date and in-plan rest/workout dates still render normally.
+- Store routine screenshots under
+  `qa-artifacts/screenshots/YYYY-MM-DD/first-plan-calendar-pre-start-polish-qa/`.
+- Do not edit product code.
+- Do not run migrations.
 
 OUTPUT:
 1. Task
 2. Stage
-3. Design recommendation
-4. States to render
-5. What not to change
-6. Frontend implementation notes
-7. QA expectations
-8. Blockers
+3. Browser Path Preflight
+4. Scope tested
+5. Partial first-month evidence
+6. Full in-plan month evidence
+7. Week-view evidence
+8. Narrow/mobile evidence
+9. Issues found
+10. Screenshot/artifact evidence
+11. Verdict
+12. Blockers
 ```
 
 ## Owner
@@ -68,7 +84,7 @@ DESIGNER / FRONTEND / QA
 
 ## Last Updated
 
-2026-06-01
+2026-06-03
 
 ## Implementation Notes
 

@@ -2323,6 +2323,51 @@
     padding-top: 0.875rem;
   }
 
+  .hito-plan-schedule-edit,
+  .hito-plan-schedule-edit .hito-disclosure-body,
+  .hito-plan-schedule-edit .hito-row-group,
+  .hito-plan-schedule-edit .hito-list-row,
+  .hito-plan-schedule-edit .hito-choice-toggle-group {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .hito-plan-schedule-edit .hito-list-row > :first-child {
+    min-width: 0;
+  }
+
+  .hito-plan-schedule-edit .hito-list-row-copy,
+  .hito-plan-schedule-edit .hito-body-small,
+  .hito-plan-schedule-edit .hito-field-helper {
+    overflow-wrap: anywhere;
+  }
+
+  .hito-plan-schedule-edit .hito-list-row .hito-status-pill,
+  .hito-plan-schedule-edit .hito-list-row .hito-button {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+
+  @media (max-width: 480px) {
+    .hito-plan-schedule-edit .hito-list-row {
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .hito-plan-schedule-edit .hito-list-row > :first-child {
+      flex: 1 1 100%;
+    }
+
+    .hito-plan-schedule-edit .hito-choice-toggle-group {
+      gap: 0.45rem;
+    }
+
+    .hito-plan-schedule-edit .hito-choice-toggle-sm {
+      padding-inline: 0.625rem;
+    }
+  }
+
   .hito-button {
     display: inline-flex;
     align-items: center;
@@ -3499,17 +3544,27 @@
   .hito-metric {
     display: grid;
     justify-items: center;
+    min-width: 0;
+    max-width: 100%;
     gap: 0.35rem;
     text-align: center;
   }
 
+  .hito-metric > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .hito-metric-value {
+    min-width: 0;
+    max-width: 100%;
     font-family: var(--font-mono);
     font-size: 1rem;
     font-variant-numeric: tabular-nums;
     font-weight: 500;
     line-height: 1.1;
     color: var(--color-foreground);
+    overflow-wrap: anywhere;
   }
 
   .hito-metric-label {

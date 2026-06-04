@@ -36,7 +36,7 @@ STAGE:
 ARCHITECT plan
 
 CONTEXT:
-- Source path: docs/plans/active/2026-05-18-voice-to-plan-authoring-plan.md
+- Source path: docs/tasks/backlog/2026-05-18-voice-to-plan-authoring-plan.md
 - Markdown metadata is canonical for this repo-derived admin Backlog item.
 - Supabase mirrors this item for discovery and prompt copy only.
 
@@ -55,11 +55,13 @@ Backend / Frontend / QA
 
 ## Last Updated
 
-2026-05-25
+2026-06-03
 
-## Active Inventory Note
+## Backlog Inventory Note
 
-Kept active during the 2026-05-25 inventory cleanup because the transcript-text review/confirm path is implemented, but the original voice/audio transport scope remains intentionally unfinished.
+Moved from active plans to backlog during the 2026-06-03 cleanup because the transcript-text
+review/confirm path is implemented, but the original voice/audio transport scope remains
+intentionally unfinished and is not an active implementation track.
 
 Do not continue this by inertia. Start only when PRODUCT chooses real audio dictation as the next slice.
 

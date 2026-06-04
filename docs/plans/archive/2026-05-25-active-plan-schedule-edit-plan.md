@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+closed
 
 ## Type
 
@@ -14,39 +14,41 @@ high
 
 ## Next Recommended Role
 
-QA
+ARCHITECT
 
 ## Task
 
-Validate active-plan schedule edit preview and apply behavior.
+Archived: active-plan schedule edit first release is complete and QA-passed.
 
 ## Stage
 
-QA validation
+Complete / archived
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: QA
+ROLE: ARCHITECT
 
 TASK:
-Validate active-plan schedule edit preview and apply behavior.
+Keep the archived active-plan schedule edit first release available as historical product context.
 
 STAGE:
-QA validation
+Complete / archived
 
 CONTEXT:
-- Source path: docs/plans/active/2026-05-25-active-plan-schedule-edit-plan.md
+- Source path: docs/plans/archive/2026-05-25-active-plan-schedule-edit-plan.md
 - Markdown metadata is canonical for this repo-derived admin Backlog item.
 - Supabase mirrors this item for discovery and prompt copy only.
+- The first release is complete and QA-passed. Do not reopen this archived plan unless a new
+  concrete product bug is found.
 
 CONSTRAINTS:
-- Edit this markdown file, not the admin Backlog mirror, when task truth changes.
+- Edit this markdown file, not the admin Backlog mirror, if historical metadata changes.
 - Preserve Hito canonical architecture and current role boundaries.
-- Do not broaden scope beyond this work item.
+- Keep residual future ideas in backlog items rather than reopening this completed release plan.
 
 OUTPUT:
-Use the project role output format.
+No active implementation handoff.
 ```
 
 ## Owner
@@ -55,7 +57,98 @@ ARCHITECT / BACKEND / FRONTEND / QA
 
 ## Last Updated
 
-2026-05-25
+2026-06-03
+
+## Archive Note
+
+Archived on 2026-06-03 after final QA passed the active-plan schedule edit first release.
+
+Production state:
+
+- `Open plan` exposes `Edit schedule`.
+- Same-running-count schedule changes use backend-owned `schedule_reflow` review/apply.
+- Frequency-change boundaries return `requires_regeneration`.
+- Apply mutates only reviewed future workout dates and active-plan schedule preferences.
+- Workout content, rich fields, runner-level defaults, protected history, and fixed rest-day
+  invariants are preserved.
+- Mobile schedule edit overflow at `375px` is fixed.
+
+Residual follow-ups were split into backlog-only items and are not release blockers:
+
+- `docs/tasks/backlog/2026-06-03-json-import-long-run-remapping-placement-helper.md`
+- `docs/tasks/backlog/2026-06-03-active-plan-schedule-save-default-preferences.md`
+- `docs/tasks/backlog/2026-06-03-built-in-browser-runner-login-instability.md`
+- `docs/tasks/backlog/2026-06-03-git-diff-check-worktree-hang.md`
+
+No production envelope, frontend redesign, migration, or active-plan implementation was reopened in
+this closeout.
+
+## 2026-06-03 Final QA Pass
+
+Final QA verdict: passed.
+
+Evidence recorded:
+
+- build/runtime root-cause issue was fixed and did not reproduce
+- `npm run build` passed twice
+- local build-output integrity passed with `local ok: mjsFiles=168, relativeMjsImports=2144`
+- Vercel build passed with `npx vercel build --yes`
+- Vercel integrity passed with `vercel ok: mjsFiles=166, relativeMjsImports=2143`
+- fresh local runtimes from `.output/server/index.mjs` returned healthy `/login` and `/progress`
+- `Open plan` exposed `Edit schedule`
+- same-count preview returned `schedule_reflow`
+- apply succeeded from the reviewed preview path
+- changed workouts: `4`
+- unchanged workouts: `4`
+- `contentChangedCount = 0`
+- `fixedRestViolationCount = 0`
+- `runnerPrefUnchanged = true`
+- `planPrefsChanged = true`
+- frequency-change boundary returned `requires_regeneration`
+- mobile overflow proof passed:
+  - `innerWidth: 375`
+  - `scrollWidth: 375`
+  - `bodyScrollWidth: 375`
+  - `hasHorizontalOverflow: false`
+  - `dialogClientWidth/dialogScrollWidth: 373/373`
+  - `scheduleClientWidth/scheduleScrollWidth: 325/325`
+- disposable tester cleanup returned residual counts to zero
+
+QA artifacts are local-only under:
+
+- `qa-artifacts/screenshots/2026-06-03/active-plan-schedule-edit-final-qa/`
+- `qa-artifacts/screenshots/2026-06-03/active-plan-schedule-edit-final-qa/apply-compare-summary.json`
+
+Non-blocking QA notes:
+
+- the built-in browser opened the local page but could not complete runner login and showed
+  `Something went wrong`; Safari fallback in the existing Safari session completed browser proof
+- `git diff --check` was attempted by QA but timed out/hung in the worktree
+- these notes did not block the verdict because build/runtime/integrity/browser proof passed through
+  other safe local/dev paths
+
+## 2026-06-03 Frontend Mobile Overflow Fix
+
+QA passed the active-plan schedule edit functional behavior and isolated the remaining closeout
+blocker to the `Open plan -> Edit schedule` mobile layout at `375 x 812`.
+
+Frontend implemented a scoped layout fix for the schedule edit panel:
+
+- schedule rows now allow text content to shrink and wrap inside the dialog
+- narrow rows with status pills or actions wrap instead of forcing a wider intrinsic row
+- long preview/regeneration copy wraps safely without changing backend schedule semantics
+
+This blocker is resolved by the final QA pass recorded above.
+
+## 2026-06-03 Build Runtime Closeout Blocker
+
+Schedule-edit functional behavior had already passed, but release-style closeout was blocked by
+local/Vercel build-output instability after successful builds could leave incomplete or
+self-inconsistent generated artifacts.
+
+Backend consolidated the build-output contract so local `npm run build` owns `.output/`, Vercel
+builds own `.vercel/output/`, and postbuild validates the final generated output instead of
+copying staged Nitro server bundles. Schedule-edit product behavior remains unchanged.
 
 ## Context
 
@@ -410,6 +503,8 @@ Status: Implemented 2026-05-25.
 - [x] classify `schedule_reflow` vs `requires_regeneration`
 - [x] add fixture coverage for moved days, long-run placement, protected history, fixed rest-day proof, rich-field preservation, and frequency-change warning
 - [ ] wire JSON import long-run remapping into the same placement helper in a later backend slice
+  - moved to backlog:
+    `docs/tasks/backlog/2026-06-03-json-import-long-run-remapping-placement-helper.md`
 
 ### Slice 2: Backend Apply Contract
 
@@ -425,7 +520,9 @@ Status: Slice 2B implemented 2026-05-25.
 - [x] replace guarded update plus rollback with one transaction-backed Supabase RPC for atomic workout-date and plan-preference persistence
 - [x] add fixture coverage proving failed apply leaves workout dates and plan preferences unchanged
 - [ ] optionally save runner defaults only after the later explicit opt-in slice
-- [ ] add route/UI integration after the frontend `Edit schedule` panel exists
+  - moved to backlog:
+    `docs/tasks/backlog/2026-06-03-active-plan-schedule-save-default-preferences.md`
+- [x] add route/UI integration after the frontend `Edit schedule` panel exists
 
 ### Slice 3: Frontend `Edit Schedule` Panel
 
@@ -444,10 +541,14 @@ Status: Implemented 2026-05-25.
 
 ### Slice 4: QA Closeout
 
-- run browser flow on disposable active plan
-- verify no mutation before apply
-- verify same-count reflow and frequency-change refresh boundary
-- verify Settings default opt-in behavior
+Status: Complete / QA-passed 2026-06-03.
+
+- [x] run browser flow on disposable active plan
+- [x] verify same-count reflow and reviewed apply behavior
+- [x] verify frequency-change refresh boundary
+- [x] verify runner Settings defaults remain unchanged in the first release
+- [x] verify mobile `Open plan` dialog has no horizontal overflow
+- [x] verify disposable tester cleanup
 
 ## Exit Criteria
 
@@ -461,8 +562,9 @@ Status: Implemented 2026-05-25.
 
 ## Next Recommended Role
 
-QA
+ARCHITECT
 
 ## Suggested Next Step
 
-Run browser QA for the `Open plan` -> `Edit schedule` preview/apply flow with a disposable active-plan tester.
+No active next step in this archived release plan. Use the backlog items listed in the archive note
+for future scoped follow-ups.

@@ -35,6 +35,8 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - deterministic product truth comes before AI interpretation or recommendations
 - risky mutations require explicit review/confirm or confirmation boundaries
 - prefer reuse, deletion, and consolidation over new abstractions
+- UI bug fixes must trace the frontend/backend source-of-truth boundary and resolve the root cause,
+  not only hide the visible glitch
 
 ## Scope
 
@@ -82,6 +84,14 @@ variant, hook, class recipe, or local visual pattern requires an explicit note e
 - when adding substantial logic to a file around 700+ lines, justify why that file remains the correct owner or extract a focused UI seam
 - treat files around 1000+ lines as requiring an explicit architecture reason before receiving new responsibility
 - treat files around 1500+ lines as active decomposition candidates unless they are generated, fixture-only, or intentionally consolidated documentation
+- when fixing a UI bug, first identify whether the root cause is backend-shaped data, route loader
+  state, form serialization, async lifecycle, component state, Hito DS primitive behavior, CSS/layout,
+  copy source, or browser interaction
+- prove why the chosen fix addresses that root cause instead of only hiding the downstream visual
+  symptom
+- if the real issue is a missing backend contract, duplicate frontend truth, route-local custom UI
+  system, or design-system gap, fix the canonical seam when safe or escalate with a bounded
+  Architect/Designer/BACKEND follow-up instead of shipping a local workaround
 
 ## Must Not Do
 
@@ -98,6 +108,12 @@ variant, hook, class recipe, or local visual pattern requires an explicit note e
 - keep growing a route/component that already owns unrelated layout, data shaping, forms, dialogs, and local styling instead of extracting a clear presentational seam
 - create decomposition that also introduces a new visual language, custom UI kit, or frontend-owned product truth
 - split UI into many tiny files when that makes the flow harder to inspect or only hides local drift
+- patch only the visible UI symptom while leaving the failing data source, form boundary, async
+  lifecycle, DS primitive, or backend contract broken
+- add frontend-only guards, duplicate status mapping, copied formatting rules, or local data
+  transformations when the backend-shaped view model or shared helper should own the truth
+- create a one-off component/style workaround when fixing or reusing the existing Hito DS/admin
+  primitive would solve the underlying issue
 
 ## Escalation Gate
 
@@ -110,9 +126,23 @@ Stop and ask for explicit Architect/Designer approval before implementing when:
 - the implementation would remove, replace, or redesign a previously QA-green pattern
 - the task is ambiguous about whether it is a bug fix, design change, or product behavior change
 - the target route/component is already a large-file hotspot and the requested work would add another responsibility instead of extracting or reusing an existing seam
+- the bug's root cause appears to be backend-shaped data, persistence, auth, lifecycle, or another
+  cross-surface contract rather than the local component itself
 
 Do not use the escalation gate as a way to avoid simple work. Use it only when the next step would
 create new architecture, new UI language, or broad diff risk.
+
+## Root-Cause Fix Gate
+
+For every UI bug or regression:
+
+1. Reproduce or inspect enough evidence to name the failing source-of-truth boundary.
+2. Trace upstream to the first incorrect owner, not just the first visible broken pixel/string.
+3. Search nearby components, Hito DS, admin/product patterns, and backend-shaped view models before
+   adding new UI code.
+4. Prefer one canonical fix over route-local patches.
+5. Report the root cause, reused primitive/pattern/contract, and any systemic follow-up that remains
+   outside the slice.
 
 ## Required Final Evidence
 

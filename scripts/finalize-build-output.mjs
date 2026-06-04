@@ -1,10 +1,13 @@
 import { cpSync, existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  validateLocalBuildOutput,
+  validateVercelBuildOutput,
+} from "./validate-build-output-integrity.mjs";
 
 const rootDir = process.cwd();
 
 const stagedPublicDir = resolve(rootDir, "node_modules/.nitro/vite/public");
-const stagedServerDir = resolve(rootDir, "node_modules/.nitro/vite/server-output");
 const sourcePublicDir = resolve(rootDir, "public");
 const outputPublicDir = resolve(rootDir, ".output/public");
 const outputServerDir = resolve(rootDir, ".output/server");
@@ -15,7 +18,6 @@ const vercelFunctionDir = resolve(vercelOutputDir, "functions/__server.func");
 const vercelNitroManifest = resolve(vercelOutputDir, "nitro.json");
 const vercelConfig = resolve(vercelOutputDir, "config.json");
 
-const localRequiredSources = [stagedPublicDir, stagedServerDir];
 const localRequiredOutputs = [
   resolve(outputPublicDir, "favicon.svg"),
   resolve(outputPublicDir, "templates/hito-training-plan-v2-template.json"),
@@ -46,21 +48,16 @@ function shouldFinalizeVercelOutput() {
 }
 
 function finalizeLocalOutput() {
-  for (const sourceDir of localRequiredSources) {
-    if (!existsSync(sourceDir)) {
-      throw new Error(`Expected staged Nitro build output is missing: ${sourceDir}`);
-    }
-  }
-
   copyDirectory(stagedPublicDir, outputPublicDir);
   copyDirectory(sourcePublicDir, outputPublicDir);
-  copyDirectory(stagedServerDir, outputServerDir);
 
   for (const outputPath of localRequiredOutputs) {
     if (!existsSync(outputPath)) {
       throw new Error(`Expected finalized Nitro build artifact is missing: ${outputPath}`);
     }
   }
+
+  validateLocalBuildOutput({ rootDir });
 }
 
 function finalizeVercelOutput() {
@@ -71,6 +68,8 @@ function finalizeVercelOutput() {
       throw new Error(`Expected finalized Vercel build artifact is missing: ${outputPath}`);
     }
   }
+
+  validateVercelBuildOutput({ rootDir });
 }
 
 function copyDirectory(sourceDir, destinationDir) {

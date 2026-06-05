@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -14,98 +14,57 @@ medium
 
 ## Next Recommended Role
 
-FRONTEND
+ARCHITECT
 
 ## Task
 
-Correct the `/hitoDS` calendar/workout playground visual direction after user review failed.
+Closed: `/hitoDS` calendar/workout playground accepted after final QA.
 
 ## Stage
 
-FRONTEND implementation / DS calendar-workout playground simplification
+Complete / QA-passed
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: FRONTEND
+ROLE: ARCHITECT
 
 TASK:
-Correct `/hitoDS#calendar-workout-playground` so it becomes one native Hito DS playground instead of a stack of nested specimen cards.
+Use the completed `/hitoDS` calendar/workout playground spec as historical design-system evidence.
 
 STAGE:
-FRONTEND implementation / DS calendar-workout playground simplification
+ARCHITECT reference / completed DS calendar-workout playground
 
 CONTEXT:
 - Source path: docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md
 - Converted backlog intake: docs/tasks/backlog/2026-06-03-hito-ds-calendar-day-state-playground.md
 - Related narrow pre-start QA track: docs/plans/archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md
 - Future manual workout authoring backlog: docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md
-- The current implementation covered states, but user visual review failed.
-- The failure is visual/systemic: the playground reads as nested custom cards/panels, not as a real Hito DS reference for calendar/workout day anatomy.
-- Prior QA evidence proves state coverage only. It does not approve the current visual direction.
-- Architecture audit found no dangerous cross-import yet: `/hitoDS` does not import the real
-  `Calendar.tsx`, and the product calendar does not import playground components or specimen data.
-- The current risk is visual/anatomy drift and oversized duplicated presentation logic, not a live
-  schedule-truth leak.
-- The playground remains specimen-only: no CRUD, recurrence, backend mutation, persistence, generation, or product route wiring.
+- The corrected implementation is accepted and QA-passed.
+- `HitoCalendarDayCell` and `HitoWorkoutDayRow` are the shared visual source of truth.
+- Product calendar maps real backend/snapshot/workout truth into display props.
+- `/hitoDS` maps local controls/specimen state into the same display props.
+- The shared components remain presentational and do not own routes, persistence, server actions,
+  manual workout mutations, raw `TrainingSnapshot`, or raw `Workout`.
+- Future manual workout affordances remain visual/specimen-only until the separate manual workout
+  authoring architecture defines product behavior.
 
 GOAL:
-Rebuild the playground direction around one controlled DS playground: a compact always-available control area plus one main preview area that looks like the real Hito calendar/workout day UI.
+Do not reopen this spec unless a concrete DS/product calendar regression is found.
 
-REQUIREMENTS:
-- Preserve the component boundary:
-  - `src/components/Calendar.tsx` remains the product schedule renderer for backend-shaped
-    `TrainingSnapshot` truth.
-  - `/hitoDS#calendar-workout-playground` remains a static specimen/playground with local specimen
-    state and sample data.
-  - Product calendar must not import playground components, playground data, or future manual-action
-    specimen states.
-  - The playground must not import `Calendar.tsx`, `TrainingSnapshot`, product route loaders, workout
-    mutation actions, or persistence helpers.
-- Remove the current direction that creates many nested cards, framed panels, decorative borders, or fake specimen wrappers.
-- Do not show desktop, mobile, dense grid, and contract tiles as a stack of separate card-like panels.
-- Use one main preview area. The user should switch between desktop and mobile preview modes instead of scanning multiple decorative specimens.
-- Keep controls always reachable. Controls may move from a side rail to a top strip/collapsible control region on smaller screens, but they must not become hover-only.
-- Controls must use existing Hito DS controls only: existing choice toggles, select/dropdown, input sizing, buttons, icon buttons, menu triggers, tokens, typography, spacing, radius, and border rules.
-- Do not introduce local/custom controls, fake select styling, or a separate backlog/calendar UI kit.
-- Preserve state coverage:
-  - desktop view and mobile view
-  - base day state: workout, rest, empty, outside month, pre-start/outside plan
-  - workout identity/type
-  - result/evidence/feedback markers
-  - future authoring affordance: add, more menu, edit, copied, paste target, recurring, protected
-  - density/title stress only where it helps expose real layout breakage
-- The preview must reuse the real calendar/workout visual grammar: open calendar grid, hairline rhythm, mobile row rhythm, restrained markers, workout glyph semantics, and low-card Hito DS language.
-- Do not hide content problems with `overflow:hidden`. Long titles must clamp/wrap by explicit rules, and markers/labels must not overlap.
-- On narrow screens, do not force a cramped 7-column desktop grid if the cell content cannot fit. Use the mobile/list preview mode.
-- Keep future manual-workout states visual-only. Do not imply product behavior is implemented.
-- Do not change product calendar wiring, backend mutations, generation, persistence, row counts, or schedule semantics.
-- If extracting a shared primitive, extract only a pure presentational seam with primitive props
-  such as date label, glyph, display title, visual state, and marker presence. The shared primitive
-  must not accept `TrainingSnapshot`, `Workout`, route `Link` destinations, server actions,
-  persistence objects, specimen-only future actions, or mutation callbacks.
-- If no clean pure seam emerges during the visual simplification, keep product and playground
-  renderers separate and reuse only shared Hito DS primitives/classes.
-- Reusable CSS classes must be generic and documented as DS/product primitives. Playground-only
-  classes should be clearly specimen/playground-scoped; product-only classes must not be renamed as
-  global DS primitives unless they are deliberately made reusable.
-
-VALIDATION:
-- Run targeted lint/type checks for touched frontend files.
-- Run `git diff --check`.
-- Browser-check `/hitoDS#calendar-workout-playground` in the built-in Codex browser.
-- Verify no page-level horizontal overflow at roughly 375px.
-- Capture before/after screenshots for the corrected section.
-- Confirm `/hitoDS` still frames this as specimen-only and not shipped manual workout behavior.
+CONSTRAINTS:
+- Keep product calendar backend truth, links, tooltips, and feedback routing product-owned.
+- Keep `/hitoDS` specimen-only.
+- Do not describe manual workout CRUD/copy/paste/recurrence as implemented product behavior.
+- Do not add route, persistence, server action, generation, row-count, or schedule-semantics changes
+  from this completed spec.
 
 OUTPUT:
 1. Task
 2. Stage
-3. Root cause
-4. Files changed
-5. What changed
-6. Validation results
-7. Blockers
+3. Historical evidence referenced
+4. Boundary preserved
+5. Blockers
 ```
 
 ## Owner
@@ -114,12 +73,47 @@ FRONTEND / DESIGN SYSTEM
 
 ## Last Updated
 
-2026-06-04
+2026-06-05
+
+## Final QA Acceptance Evidence
+
+2026-06-05 closeout after final QA pass:
+
+- Verdict: Passed.
+- Browser Path Preflight: built-in Codex browser was used first; Safari fallback was not needed.
+- `/hitoDS#calendar-workout-playground` passed desktop, intermediate, and `375px` checks.
+- No visible `More` text appears in cells or mobile rows.
+- Occupied activity actions use icon-only ellipsis with
+  `aria-label="More activity actions"`.
+- The more-action wrapper is absolutely positioned and does not participate in slot layout.
+- Empty day shows compact `Add` placeholder and no more action.
+- Result marker aligns with the date/header row: `centerDeltaY: 0`.
+- Narrow viewport proof passed: `innerWidth: 375`, `scrollWidth: 375`,
+  `bodyScrollWidth: 375`.
+- Product calendar source smoke confirmed no fake manual action props are passed from
+  `src/components/Calendar.tsx`; product links/tooltips/feedback routing remain product-owned.
+- Product saved-mode live browser smoke stayed out of scope because local `/` was unauthenticated.
+- CLI passed: targeted ESLint, `git diff --check`, and `npm run build`.
+- Screenshot folder:
+  `qa-artifacts/screenshots/2026-06-04/calendar-slot-action-marker-final-qa/`.
+
+Accepted component boundary:
+
+- `src/components/ui/hito-calendar-day.tsx` owns the shared presentational visual seam through
+  `HitoCalendarDayCell` and `HitoWorkoutDayRow`.
+- `src/components/Calendar.tsx` maps real backend-shaped `TrainingSnapshot` / `Workout` truth into
+  display props and remains responsible for product links, tooltips, feedback routing, and schedule
+  semantics.
+- `src/components/hito-ds/calendar-workout-playground.tsx` maps local controls and static specimen
+  state into the same display props.
+- The shared component must stay presentational and must not own routes, persistence, server
+  actions, manual workout mutations, raw `TrainingSnapshot`, raw `Workout`, recurrence, copy/paste,
+  or backend schedule truth.
 
 ## Prior QA State-Coverage Evidence
 
-This evidence remains useful, but it is not visual approval. The current implementation is reopened
-because user visual review failed the playground direction.
+This evidence remains useful as the first state-coverage pass. The later final QA acceptance above
+approves the corrected visual direction and shared presentational component boundary.
 
 - Verdict: Passed.
 - Browser Path Preflight: built-in Codex browser was used first and validated
@@ -144,7 +138,7 @@ because user visual review failed the playground direction.
   `git diff --check`, and `npm run build`.
 - Screenshot folder: `qa-artifacts/screenshots/2026-06-04/hito-ds-calendar-workout-playground/`.
 
-## Current Implementation Visual Failure
+## Resolved Visual Direction Failure
 
 User visual review failed the current `/hitoDS#calendar-workout-playground` implementation on
 2026-06-04.
@@ -168,26 +162,27 @@ Observed issues:
   even though they are visual-only stress states.
 - The visual structure risks hiding layout failures by placing specimens inside forgiving wrappers.
 
-This implementation should be treated as visually rejected until the corrected model below is
-implemented and reviewed.
+This failure is now resolved by the accepted implementation and final QA evidence recorded above.
 
 ## Component Boundary Audit
 
-2026-06-04 ARCHITECT audit result: the current implementation is visually rejected, but the
-dependency direction is not currently corrupted.
+2026-06-05 final acceptance result: the shared visual seam is accepted, and dependency direction is
+still bounded.
 
 Current dependency map:
 
-- `src/components/Calendar.tsx` imports `WorkoutGlyph`, `Icon`, `cn`, and backend-shaped training
-  helpers/types from `src/lib/training`; it owns real schedule rendering from `TrainingSnapshot`.
-- `src/components/hito-ds/calendar-workout-playground.tsx` imports `WorkoutGlyph`, `Icon`, Hito
-  `Select`, `cn`, and static specimen data from
-  `src/components/hito-ds/calendar-workout-playground-data.ts`.
+- `src/components/ui/hito-calendar-day.tsx` exports shared presentational
+  `HitoCalendarDayCell` and `HitoWorkoutDayRow`.
+- `src/components/Calendar.tsx` imports the shared visual seam, maps backend-shaped
+  `TrainingSnapshot` / `Workout` truth into display props, and owns real schedule rendering,
+  product links, tooltips, and feedback routing.
+- `src/components/hito-ds/calendar-workout-playground.tsx` imports the shared visual seam, Hito
+  `Select`, and static specimen data from `src/components/hito-ds/calendar-workout-playground-data.ts`.
 - `src/components/hito-ds/calendar-workout-playground-data.ts` imports only the `WorkoutGlyphKind`
   type from `src/lib/workout-glyph`.
 - `src/routes/hitoDS.tsx` imports and renders `CalendarWorkoutPlayground`.
 - No product route imports the playground component or playground data.
-- `/hitoDS` does not import the real `Calendar.tsx`.
+- `/hitoDS` does not import the real product `Calendar.tsx`.
 - Manual-workout future states exist only as specimen data/actions inside the playground; no product
   calendar behavior currently consumes them.
 
@@ -196,9 +191,8 @@ Canonical boundary:
 - Product calendar owns backend-shaped schedule truth, route links, tooltips, feedback destinations,
   pre-start behavior, workout/rest semantics, and rendering of persisted `TrainingSnapshot` data.
 - `/hitoDS` owns static specimen controls and static display states for design inspection only.
-- Shared Hito DS primitives may own only presentational atoms/anatomy: typography, surfaces,
-  buttons, select/dropdown controls, status markers, feedback markers, workout glyphs, date labels,
-  and optionally a pure calendar-cell/mobile-row shell.
+- `HitoCalendarDayCell` and `HitoWorkoutDayRow` own only the shared visual day-cell/mobile-row
+  anatomy after callers provide display props.
 - Shared primitives must not own business truth: no `TrainingSnapshot`, no `Workout` entity, no
   `findWorkout`, no route `Link`, no backend actions, no persistence, no recurrence, and no manual
   workout mutation semantics.
@@ -218,11 +212,10 @@ Shared primitive decision:
 
 - Do not extract the full product calendar into a DS component.
 - Do not make one component own both real schedule rendering and playground knobs.
-- A small shared presentational seam is allowed only if it reduces duplication without carrying
-  business truth. Acceptable candidates are marker/glyph/label atoms or a pure day-cell/mobile-row
-  shell that receives already-shaped display props.
-- If extraction would require passing product entities, route links, or mutation semantics into the
-  shared component, keep product `Calendar.tsx` and the `/hitoDS` specimen renderer separate.
+- The accepted shared seam is `HitoCalendarDayCell` / `HitoWorkoutDayRow`, which receives
+  already-shaped display props.
+- Product `Calendar.tsx` and the `/hitoDS` playground remain separate callers and must keep mapping
+  backend truth or specimen state outside the shared component.
 
 ## Corrected Playground Model
 
@@ -578,15 +571,18 @@ First-plan-specific details that stay out of this general DS playground:
 - Narrow viewport has no page-level horizontal overflow.
 - QA covers visual direction as well as state coverage.
 
-## QA Coverage Required After Correction
+## Final QA Coverage Passed
 
-The prior QA pass is now considered state-coverage evidence only. A new QA/design review pass should
-verify:
+The prior QA pass remains state-coverage evidence. The final QA pass accepted the corrected visual
+direction and slot/action marker behavior:
 
 - built-in browser path first
 - `/hitoDS` playground renders
-- the corrected section no longer looks like nested custom cards or a decorative specimen gallery
-- desktop and mobile preview modes are visible and controllable
+- desktop, intermediate, and 375px preview widths pass
+- occupied activity actions use icon-only ellipsis with accessible label
+- empty days show compact `Add` placeholder and no more action
+- result marker aligns with the date/header row
+- product calendar source does not pass fake manual action props
 - pre-start/outside-plan does not dominate the framing
 - title overflow/wrapping stress works
 - result and feedback/evidence states are secondary and readable

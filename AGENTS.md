@@ -329,6 +329,14 @@ Completion gate:
 - `docs/future-roadmap.md` is for not-yet-implemented direction only.
 - `docs/glossary.md` is the canonical term source.
 - Update affected permanent docs in the same change set after significant implementation changes.
+- `docs/history/changelog.md` is the canonical shipped-history source for `/changelog`.
+- Repo-derived Backlog markdown and Supabase Backlog mirrors are not a substitute for changelog
+  entries.
+- When closing or archiving completed implementation work, update `docs/history/changelog.md` with
+  concise dated shipped-history entries, or explicitly record why the completed item is not
+  changelog material.
+- Keep future plans, backlog-only intake, unimplemented specs, and reopened visual/specimen work out
+  of the changelog until they are complete and QA-passed.
 - When work completes, archive plans from `docs/plans/active/` to `docs/plans/archive/`.
 
 ## 6) Change Safety And Guardrails

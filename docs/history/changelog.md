@@ -13,6 +13,48 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-05
+
+- Accepted the shared Hito DS calendar/workout day component seam: product `Calendar.tsx` and
+  `/hitoDS#calendar-workout-playground` now both render through presentational
+  `HitoCalendarDayCell` / `HitoWorkoutDayRow` display props, with product links, tooltips, feedback
+  routing, backend schedule truth, and manual workout mutations kept outside the shared component;
+  final QA proved icon-only occupied-day actions, compact empty-day add state, aligned result
+  markers, no `375px` overflow, and no fake manual action props leaking from the product calendar.
+
+## 2026-06-04
+
+- Added exact review/confirm proof for the internal non-default `ai-first-plan-envelope-v1` draft
+  option: envelope draft creation remains non-mutating until explicit confirm, disposable confirm
+  persists `ai_first_plan_envelope_v1` rows that exactly match the reviewed expanded plan, duplicate
+  confirm is blocked, invalid/timeout/partial envelope failures are not confirmable, raw prompts and
+  full payloads are not persisted, and production structured onboarding still defaults to
+  `ai-first-plan-blueprint-v1` with no runner-facing envelope selector.
+- Fixed first-plan calendar pre-start rendering so dates before a plan start display as muted
+  outside-plan cells instead of rest/workout placeholders, with no rest labels, glyphs, status
+  markers, feedback markers, tooltips, or workout links before the start date; mobile now collapses
+  the pre-start range into a quiet `Before plan starts` row while in-plan rest and workout days keep
+  normal schedule semantics.
+
+## 2026-06-03
+
+- Added the admin debug/capture capability probe behind canonical admin access: `AdminAccessContext`
+  now exposes `adminDebugCapture`, the bounded server-function probe is whitelisted for TanStack
+  server-function eligibility, signed admin sessions can prove capability for future overlay work,
+  and signed-out, tester, product-route, invalid-cookie, expired-cookie, and `user_metadata`-only
+  admin-looking claims are rejected without exposing session ids, user ids, cookies, JWTs, secrets,
+  service keys, or raw Supabase objects.
+- Hardened stale repo-derived Backlog mirror cleanup: `npm run import-admin-backlog-work-items` now
+  reports stale active repo mirrors and only archives them through explicit `--archive-stale`, bounded
+  to repo-derived rows with valid source metadata from approved markdown roots, while quick notes,
+  captured UI rows, current repo-derived work, live validators, and active Backlog loading remain
+  intact.
+- Improved the active-plan schedule edit first release through final QA: `Open plan` exposes
+  `Edit schedule`, same-running-count changes use reviewed backend `schedule_reflow` apply,
+  frequency changes return `requires_regeneration`, only reviewed future workout dates and active-plan
+  schedule preferences mutate, fixed-rest/protected-history/content invariants are preserved, and
+  the mobile schedule edit layout no longer overflows at 375px.
+
 ## 2026-06-01
 
 - Fixed and proved the Vercel Nitro output finalizer plus admin backlog recovery path: `npm run build`
@@ -22,6 +64,74 @@ The public `/changelog` Highlights view is generated from the dated entries belo
   loads for an authenticated admin without `Capture load failed`, `Backlog unavailable`, or an auth
   loop.
 - Retired the unused admin capture screenshot storage seam: `/admin/capture` now treats `admin_capture_items` as the only current backlog storage truth, removes runtime joins/view-model fields for `admin_capture_assets`, adds a migration to drop the empty asset table, removes the empty private bucket through the Supabase Storage API, and updates the validation script to guard against the legacy asset path returning.
+- Updated `/admin/capture` repo-derived metadata tags to reuse the shared Hito DS
+  `HitoMetadataTag` primitive: markdown-owned status/type/priority/role tags now render as
+  read-only source-truth metadata with shared tooltip behavior, quick-note controls opt into
+  explicit interactive mode, route-local `ReadOnlyMetadataTag` is gone, simplified `Active` /
+  `Done` / `Archived` tabs remain, and desktop/mobile Backlog filtering/open/detail/copy behavior
+  stays intact.
+- Improved production first-plan generation by closing the `ai-first-plan-blueprint-v1` reliability
+  wave: bounded partial/timeout handling, long-horizon target-date review, date-control persistence,
+  29-week review/confirm/save exactness, review title source cleanup, recovery-first post-long-run
+  sequencing, phase-aware extension richness, beginner run/walk adaptation, beginner/recreational
+  cadence, and supported half/marathon specificity all passed QA while production still stays on the
+  blueprint contract and `ai-first-plan-envelope-v1` remains non-production.
+- Added supported half-marathon and marathon goal-specific specificity to first-plan generation:
+  supported half plans can progress through progression, controlled tempo, threshold durability, and
+  race-pace only when metric support exists; supported marathon plans use marathon steady
+  specificity, supported controlled tempo, and steady-finish long runs as appropriate; one
+  moderate/specific stimulus per week remains the cap, steady remains support-only, and unsupported
+  aggressive specificity is repaired or rejected.
+
+## 2026-05-31
+
+- Added a backend-owned beginner/recreational intensity cadence ladder for first-plan generation:
+  support evidence, adaptation state, caution flags, running days, durability, and spacing now choose
+  `none`, `every_two_weeks`, or `weekly` moderate work, target-time alone does not unlock aggressive
+  intensity, true new runners remain run/walk-first, steady stays support rather than a quality
+  trigger, and no two-quality weeks are introduced.
+
+## 2026-05-30
+
+- Improved first-plan coaching richness for long-horizon and beginner plans: low-support marathon
+  backend extension now uses phase-aware safe archetypes instead of a visibly mechanical tail, true
+  beginner or weak-support no-benchmark plans get early run/walk segment bodies in easy/recovery/
+  cutback/long-run slots, and safety caps preserve fixed rest days, preferred long-run placement,
+  metric gates, recovery-first sequencing, and bounded invalid/timeout/partial failure paths.
+- Fixed post-long-run sequencing for low-support long-run-heavy first plans: marathon, ultra, and
+  mountain running plans now identify the next actual running workout after a long run by sequence,
+  repair AI blueprint violations during normalization, reject remaining violations as
+  `post_long_run_recovery_first_violation`, align envelope expansion to the same policy, and keep
+  the next running slot recovery/easy instead of defaulting to steady or quality work.
+- Updated structured first-plan date/time controls and submit safety: onboarding now uses shared
+  Hito DS `HitoDateField`, `HitoEditableDateChip`, and `HitoMaskedTimeField` primitives, `/hitoDS`
+  documents the same date/time inputs, the review action wraps sync input building in safe
+  try/catch/timeout handling, and valid long-horizon setup reaches draft review without mutating
+  profile, plan, workout, or log rows before confirm.
+- Fixed first-plan review title source-of-truth so the review modal derives runner-facing display
+  titles from structured setup state instead of raw AI/generated plan names; long-horizon marathon
+  target-time review now shows `Marathon 3:50 Target Plan` and no longer exposes misleading
+  `16-Week`, `Opening Blueprint`, or `Base and Build Plan for New Runner` wording, without changing
+  backend generation or persisted plan names.
+
+## 2026-05-29
+
+- Added bounded long-horizon `ai-first-plan-blueprint-v1` authoring for target-date structured first
+  plans: OpenAI authors only the safe opening window, backend extends remaining weeks from validated
+  setup truth, final review opens only after full-horizon slot/rest/long-run validation, trace
+  metadata exposes requested/AI-authored/backend-extended week counts, and invalid, timeout, or
+  partial responses remain non-mutating with deterministic fallback disabled.
+- Fixed structured first-plan date persistence and exact long-horizon browser proof: controlled
+  plan-start and target-date fields now submit `schedule.startDate` and `schedule.targetDate`, the
+  2026-05-29 to 2026-12-11 marathon setup opened review as a 29-week / 203-row blueprint-backed
+  draft, and confirm/save proved exactly one active plan cycle with 203 persisted rows, 145 non-rest
+  rows, no Wednesday/Saturday workout leaks, Sunday long runs preserved, rich fields intact, and zero
+  OpenAI calls during confirm.
+- Added the non-live `ai-first-plan-envelope-v1` foundation beside the production blueprint path:
+  envelope schema/decode/expand/trace support can expand mock envelopes into canonical
+  `training-plan-v2` rows for ops comparison, invalid/live-unavailable envelope modes fail bounded,
+  production first-plan generation still uses `ai-first-plan-blueprint-v1`, and no envelope draft is
+  persisted or runner-facing.
 
 ## 2026-05-28
 

@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-06-04
+2026-06-05
 
 ## Where We Are Now
 
@@ -70,7 +70,11 @@ Active
   result, evidence, identity, and title-overflow states. Future manual workout states such as add,
   edit, copied source, paste target, repeats, protected, and fixed rest are visual specimens only and
   do not implement CRUD, recurrence, production route wiring, backend mutations, persistence,
-  generation, row-count, or schedule-semantics changes.
+  generation, row-count, or schedule-semantics changes. The accepted shared visual seam is
+  `HitoCalendarDayCell` / `HitoWorkoutDayRow`: product `Calendar.tsx` maps real
+  backend-shaped snapshot/workout truth into display props and keeps product links, tooltips, and
+  feedback routing, while `/hitoDS` maps local controls/specimen state into the same presentational
+  components.
 - Phase 3 architecture cleanup is now implemented through one canonical persisted richer-plan contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.

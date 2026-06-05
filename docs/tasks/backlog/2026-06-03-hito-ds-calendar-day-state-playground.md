@@ -18,11 +18,11 @@ ARCHITECT
 
 ## Task
 
-Close out the implemented Hito DS calendar/workout playground backlog intake after QA pass.
+Closed: Hito DS calendar/workout playground accepted after final QA.
 
 ## Stage
 
-ARCHITECT closeout / Hito DS calendar-workout playground
+Complete / QA-passed
 
 ## Exact Handoff Prompt
 
@@ -39,6 +39,7 @@ CONTEXT:
 - Source path: docs/tasks/backlog/2026-06-03-hito-ds-calendar-day-state-playground.md
 - Canonical frontend spec: docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md
 - This backlog intake has been converted and the canonical frontend spec is implemented / QA-passed.
+- Final QA accepted the shared visual seam after calendar slot action/marker fixes.
 - The related first-plan/pre-start QA track remains separate and is archived at docs/plans/archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md.
 - Future manual workout authoring remains separate:
   docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md
@@ -75,6 +76,34 @@ DESIGNER / FRONTEND
 2026-06-03
 
 ## QA Closeout Evidence
+
+2026-06-05: Final QA accepted the corrected shared calendar/workout day visual seam.
+
+- Built-in Codex browser was used first; Safari fallback was not needed.
+- `/hitoDS#calendar-workout-playground` passed desktop, intermediate, and `375px` checks.
+- No visible `More` text appears in cells or mobile rows.
+- Occupied activity actions use icon-only ellipsis with
+  `aria-label="More activity actions"`.
+- The more-action wrapper is absolute and does not participate in slot layout.
+- Empty day shows compact `Add` placeholder and no more action.
+- Result marker aligns with the date/header row: `centerDeltaY: 0`.
+- Mobile/narrow viewport had no horizontal overflow: `innerWidth: 375`, `scrollWidth: 375`,
+  `bodyScrollWidth: 375`.
+- Product calendar source smoke confirmed no fake manual action props are passed from
+  `src/components/Calendar.tsx`; product links/tooltips/feedback routing remain product-owned.
+- Product saved-mode live browser smoke remained out of scope because local `/` was unauthenticated.
+- Targeted ESLint, `git diff --check`, and `npm run build` passed.
+- Screenshot folder:
+  `qa-artifacts/screenshots/2026-06-04/calendar-slot-action-marker-final-qa/`.
+
+Accepted architecture boundary:
+
+- `HitoCalendarDayCell` and `HitoWorkoutDayRow` are the shared visual source of truth.
+- Product calendar maps real backend/snapshot/workout truth into display props.
+- `/hitoDS` maps controls/specimen state into the same display props.
+- The shared component stays presentational and must not own routes, persistence, server actions,
+  manual workout mutations, raw `TrainingSnapshot`, raw `Workout`, recurrence, copy/paste, or
+  backend schedule truth.
 
 2026-06-04: FRONTEND implemented `/hitoDS#calendar-workout-playground`, and QA passed the
 visual/specimen validation.

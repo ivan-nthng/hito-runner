@@ -1,14 +1,14 @@
-import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
+import type {
+  HitoCalendarDayBaseState,
+  HitoCalendarFeedbackState,
+  HitoCalendarWorkoutIdentity,
+} from "@/components/ui/hito-calendar-day";
 
-export type BaseDateState =
-  | "planned-workout"
-  | "planned-rest"
-  | "empty-no-plan"
-  | "outside-month"
-  | "outside-plan-pre-start";
+export type BaseDateState = HitoCalendarDayBaseState;
 export type InteractionOverlay = "none" | "today" | "selected" | "focused";
 export type ResultState = "none" | "completed" | "partial" | "skipped";
-export type FeedbackState = "none" | "evidence_attached" | "feedback_ready";
+export type FeedbackState = HitoCalendarFeedbackState;
+export type CalendarPreviewMode = "desktop" | "mobile";
 export type WorkoutIdentityKey =
   | "easy"
   | "recovery"
@@ -26,32 +26,20 @@ export type WorkoutIdentityKey =
   | "quality";
 export type TitleStress = "short" | "normal" | "long" | "extreme";
 export type DensityMode = "normal" | "dense";
-export type FutureActionState =
-  | "none"
-  | "add-workout"
-  | "more-menu"
-  | "editable"
-  | "copied-source"
-  | "paste-target"
-  | "recurring"
-  | "protected"
-  | "fixed-rest";
+export type FutureActionState = "none" | "add-activity" | "more-menu";
 
 export type Option<T extends string> = {
   value: T;
   label: string;
 };
 
-export type WorkoutIdentity = {
-  label: string;
-  short: string;
+export type WorkoutIdentity = HitoCalendarWorkoutIdentity & {
   family: "easy" | "long" | "quality" | "rest";
-  glyph: WorkoutGlyphKind;
-  color: string;
   defaultTitle: string;
 };
 
 export type CalendarPlaygroundState = {
+  viewMode: CalendarPreviewMode;
   baseState: BaseDateState;
   overlay: InteractionOverlay;
   result: ResultState;
@@ -62,12 +50,16 @@ export type CalendarPlaygroundState = {
   action: FutureActionState;
 };
 
+export const VIEW_MODE_OPTIONS: Array<Option<CalendarPreviewMode>> = [
+  { value: "desktop", label: "Desktop" },
+  { value: "mobile", label: "Mobile" },
+];
+
 export const BASE_STATE_OPTIONS: Array<Option<BaseDateState>> = [
-  { value: "planned-workout", label: "Workout" },
-  { value: "planned-rest", label: "Rest" },
-  { value: "empty-no-plan", label: "Empty" },
+  { value: "workout", label: "Workout" },
+  { value: "rest", label: "Rest" },
+  { value: "empty", label: "Empty" },
   { value: "outside-month", label: "Outside month" },
-  { value: "outside-plan-pre-start", label: "Pre-start" },
 ];
 
 export const OVERLAY_OPTIONS: Array<Option<InteractionOverlay>> = [
@@ -104,14 +96,8 @@ export const DENSITY_OPTIONS: Array<Option<DensityMode>> = [
 
 export const ACTION_OPTIONS: Array<Option<FutureActionState>> = [
   { value: "none", label: "None" },
-  { value: "add-workout", label: "Add workout" },
+  { value: "add-activity", label: "Add activity" },
   { value: "more-menu", label: "More menu" },
-  { value: "editable", label: "Editable" },
-  { value: "copied-source", label: "Copied source" },
-  { value: "paste-target", label: "Paste target" },
-  { value: "recurring", label: "Recurring" },
-  { value: "protected", label: "Protected" },
-  { value: "fixed-rest", label: "Fixed rest" },
 ];
 
 export const WORKOUT_IDENTITIES: Record<WorkoutIdentityKey, WorkoutIdentity> = {
@@ -239,22 +225,23 @@ export const WORKOUT_IDENTITY_OPTIONS: Array<Option<WorkoutIdentityKey>> = (
 export const DENSE_GRID_DAYS: Array<Partial<CalendarPlaygroundState> & { day: number }> = [
   { day: 27, baseState: "outside-month" },
   { day: 28, baseState: "outside-month" },
-  { day: 29, baseState: "outside-plan-pre-start", action: "fixed-rest" },
-  { day: 30, baseState: "planned-workout", identity: "easy", result: "completed" },
-  { day: 31, baseState: "planned-rest" },
-  { day: 1, baseState: "planned-workout", identity: "long", feedback: "evidence_attached" },
-  { day: 2, baseState: "empty-no-plan", action: "add-workout" },
-  { day: 3, baseState: "planned-workout", identity: "recovery", result: "partial" },
-  { day: 4, baseState: "planned-workout", identity: "steady" },
-  { day: 5, baseState: "planned-workout", identity: "tempo", action: "more-menu" },
-  { day: 6, baseState: "planned-rest", action: "fixed-rest" },
-  { day: 7, baseState: "planned-workout", identity: "intervals", feedback: "feedback_ready" },
-  { day: 8, baseState: "planned-workout", identity: "hills", result: "skipped" },
-  { day: 9, baseState: "planned-workout", identity: "trail", action: "recurring" },
+  { day: 29, baseState: "outside-month" },
+  { day: 30, baseState: "workout", identity: "easy", result: "completed" },
+  { day: 31, baseState: "rest" },
+  { day: 1, baseState: "workout", identity: "long", feedback: "evidence_attached" },
+  { day: 2, baseState: "empty", action: "add-activity" },
+  { day: 3, baseState: "workout", identity: "recovery", result: "partial" },
+  { day: 4, baseState: "workout", identity: "steady" },
+  { day: 5, baseState: "workout", identity: "tempo", action: "more-menu" },
+  { day: 6, baseState: "rest" },
+  { day: 7, baseState: "workout", identity: "intervals", feedback: "feedback_ready" },
+  { day: 8, baseState: "workout", identity: "hills", result: "skipped" },
+  { day: 9, baseState: "workout", identity: "trail", titleStress: "long" },
 ];
 
 export const DEFAULT_PLAYGROUND_STATE: CalendarPlaygroundState = {
-  baseState: "planned-workout",
+  viewMode: "desktop",
+  baseState: "workout",
   overlay: "today",
   result: "none",
   feedback: "feedback_ready",
@@ -275,10 +262,9 @@ export function getWorkoutTitle(workout: WorkoutIdentity, titleStress: TitleStre
 }
 
 export function getNonWorkoutTitle(baseState: BaseDateState) {
-  if (baseState === "planned-rest") return "Rest day";
-  if (baseState === "empty-no-plan") return "No workout planned";
+  if (baseState === "rest") return "Rest day";
+  if (baseState === "empty") return "No workout planned";
   if (baseState === "outside-month") return "Outside this month";
-  if (baseState === "outside-plan-pre-start") return "Before plan starts";
 
   return "Calendar day";
 }

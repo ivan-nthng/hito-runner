@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-06-01
+2026-06-04
 
 ## Where We Are Now
 
@@ -64,6 +64,13 @@ Active
   `/progress` keeps the same loader data, aggregate calculations, weekly-volume geometry, and recent-consistency geometry, but its chart section dividers, compact notes, planned/actual fills, and result-status fills now use Hito DS classes documented in `/hitoDS#analytics`.
 - The internal workbench responsive shell is implemented:
   `/hitoDS` and `/admin/analytics` now share Hito DS workbench shell, sidebar, sticky topbar, current-location, quick-link rail, and summary-grid classes so desktop keeps the left navigation while tablet/mobile switch to contained top navigation without page-level table or rail overflow.
+- The Hito DS calendar/workout playground is implemented:
+  `/hitoDS#calendar-workout-playground` provides static desktop month-cell, mobile workout-row, and
+  dense month-grid specimens across planned workout/rest, empty, outside-month, outside-plan,
+  result, evidence, identity, and title-overflow states. Future manual workout states such as add,
+  edit, copied source, paste target, repeats, protected, and fixed rest are visual specimens only and
+  do not implement CRUD, recurrence, production route wiring, backend mutations, persistence,
+  generation, row-count, or schedule-semantics changes.
 - Phase 3 architecture cleanup is now implemented through one canonical persisted richer-plan contract.
 - Phase 4 completion persistence and backend-derived week status are implemented.
 - Phase 5 frontend polish for login, onboarding, workout-save feedback, and route-level edge states is implemented.

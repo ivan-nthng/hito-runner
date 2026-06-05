@@ -14,60 +14,52 @@ medium
 
 ## Next Recommended Role
 
-FRONTEND
+ARCHITECT
 
 ## Task
 
-Converted backlog intake into the canonical Hito DS calendar/workout playground frontend spec.
+Close out the implemented Hito DS calendar/workout playground backlog intake after QA pass.
 
 ## Stage
 
-ARCHITECT cleanup / converted to frontend spec
+ARCHITECT closeout / Hito DS calendar-workout playground
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: FRONTEND
+ROLE: ARCHITECT
 
 TASK:
-Implement the canonical Hito DS calendar/workout day playground from the frontend spec.
+Use the completed Hito DS calendar/workout playground backlog intake as historical evidence only.
 
 STAGE:
-FRONTEND implementation / Hito DS calendar-workout playground
+ARCHITECT reference / completed Hito DS calendar-workout playground
 
 CONTEXT:
 - Source path: docs/tasks/backlog/2026-06-03-hito-ds-calendar-day-state-playground.md
 - Canonical frontend spec: docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md
-- This backlog intake has been converted. Use the frontend spec as the source of truth.
+- This backlog intake has been converted and the canonical frontend spec is implemented / QA-passed.
 - The related first-plan/pre-start QA track remains separate and is archived at docs/plans/archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md.
+- Future manual workout authoring remains separate:
+  docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md
 
 GOAL:
-Implement the `/hitoDS` calendar/workout day playground described in the canonical frontend spec.
-
-FILES/SURFACES TO INSPECT:
-- `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`
-- `src/components/Calendar.tsx`
-- `src/routes/hitoDS.tsx`
-- `src/components/ui/radio-group.tsx`
-- `src/components/ui/dropdown-menu.tsx`
-- `src/components/ui/select.tsx`
-- `src/components/ui/icon.tsx`
-- existing Hito DS selection-control and calendar identity examples
+Do not reopen this completed backlog intake unless a new concrete design-system regression is found.
 
 WHAT NOT TO TOUCH:
 - Do not change backend schedule semantics.
 - Do not change workout identity, status, feedback, or persistence rules.
-- Do not introduce a separate route outside `/hitoDS` unless Architect explicitly approves.
-- Do not create a new design-system layer or custom controls when existing Hito DS controls cover the job.
+- Do not describe visual-only manual-authoring specimen states as shipped manual workout product
+  functionality.
+- Do not create a new design-system layer or custom controls when existing Hito DS controls cover
+  the job.
 
 OUTPUT:
 1. Task
 2. Stage
-3. Root cause
-4. Files changed
-5. What changed
-6. Validation results
-7. Blockers
+3. Historical evidence referenced
+4. Current active owner, if any
+5. Blockers
 ```
 
 ## Severity
@@ -81,6 +73,32 @@ DESIGNER / FRONTEND
 ## Reported
 
 2026-06-03
+
+## QA Closeout Evidence
+
+2026-06-04: FRONTEND implemented `/hitoDS#calendar-workout-playground`, and QA passed the
+visual/specimen validation.
+
+- Built-in Codex browser was used first and validated
+  `http://127.0.0.1:8082/hitoDS#calendar-workout-playground`.
+- The section is reachable from `/hitoDS` Patterns.
+- The section is framed as `Specimen only`, `Static display only`, and
+  `No CRUD, recurrence, or production route wiring`.
+- Coverage passed for desktop month-cell specimen, mobile workout-row specimen, dense month-grid
+  stress specimen, planned workout/rest, empty day, outside-month, outside-plan/pre-start, today,
+  selected/focused, completed/partial/skipped, evidence/feedback marker, identity display, and title
+  overflow/wrapping.
+- Future manual-authoring states are visual/specimen-only and passed: `Add workout`, `More menu`,
+  `Editing`, `Copied source`, `Paste here`, `Repeats`, `Protected`, and `Fixed rest`.
+- Source proof showed static specimen data only and no server action/backend mutation/persistence
+  seam.
+- No new route-local CSS family was introduced; existing Hito DS primitives/classes were reused.
+- Narrow viewport proof passed: `innerWidth: 375`, `scrollWidth: 375`, `bodyScrollWidth: 375`,
+  `hasHorizontalOverflow: false`.
+- CLI passed:
+  `npm exec eslint -- src/routes/hitoDS.tsx src/components/hito-ds/calendar-workout-playground.tsx src/components/hito-ds/calendar-workout-playground-data.ts`,
+  `git diff --check`, and `npm run build`.
+- Screenshot folder: `qa-artifacts/screenshots/2026-06-04/hito-ds-calendar-workout-playground/`.
 
 ## User Report
 
@@ -157,16 +175,15 @@ stress-test labels, or evaluate layout variants without navigating real plan dat
 
 ## Recommended Fix Direction
 
-Use the canonical frontend spec, then implement a `/hitoDS` calendar/workout day state playground
-using existing Hito DS controls and current calendar day anatomy.
+Use the completed canonical frontend spec and implemented `/hitoDS` playground as the design-system
+reference for calendar/workout day states.
 
-Recommended approach:
+Completed approach:
 
-- Frontend implements from `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`.
-- Frontend implements the playground under `/hitoDS`, preferably by extracting a reusable presentational
-  calendar-day specimen seam from current calendar anatomy if safe.
-- QA validates desktop/mobile states, no horizontal overflow, and that product calendar behavior is
-  unchanged.
+- Frontend implemented from `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md`.
+- Frontend added the playground under `/hitoDS#calendar-workout-playground`.
+- QA validated desktop/mobile states, dense stress, visual-only manual-authoring states, and no
+  horizontal overflow.
 
 ## What Not To Touch
 
@@ -176,17 +193,15 @@ Recommended approach:
 - Do not add one-off controls outside existing Hito DS radio/dropdown/toggle primitives.
 - Do not expose this as a runner-facing feature.
 
-## Validation Expectations
+## Validation Result
 
-Future implementation should validate:
+Final QA validated:
 
 - `/hitoDS` renders the new playground.
 - Desktop preview covers the required day-cell states.
 - Mobile preview covers the required day-row states.
-- Side controls update the preview without page reload.
 - Narrow viewport has no horizontal overflow.
-- Existing product calendar still renders unchanged.
-- Targeted ESLint, `git diff --check`, and build pass if product code changes.
+- Targeted ESLint, `git diff --check`, and build passed.
 
 ## Blockers
 

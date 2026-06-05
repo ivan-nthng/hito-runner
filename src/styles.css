@@ -4160,8 +4160,87 @@
     padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 1024px) {
     .hito-calendar-mobile-list {
+      display: none;
+    }
+  }
+
+  .hito-calendar-grid-container {
+    container-type: inline-size;
+  }
+
+  .hito-calendar-grid-seven {
+    display: none;
+  }
+
+  .hito-calendar-grid-list {
+    display: grid;
+  }
+
+  .hito-calendar-grid {
+    display: grid;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    overflow: hidden;
+  }
+
+  .hito-calendar-grid > * {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .hito-calendar-grid > :nth-child(7n) {
+    border-right-width: 0;
+  }
+
+  .hito-calendar-grid > :nth-last-child(-n + 7) {
+    border-bottom-width: 0;
+  }
+
+  .hito-calendar-grid-heading {
+    min-width: 0;
+    border-right: 1px solid var(--color-hairline);
+    border-bottom: 1px solid var(--color-hairline);
+    padding: 0.5rem 0.75rem;
+  }
+
+  .hito-calendar-grid-month {
+    grid-template-rows: auto;
+    grid-auto-rows: minmax(8rem, 1fr);
+    align-items: stretch;
+  }
+
+  .hito-calendar-grid-month-dense {
+    grid-template-rows: auto;
+    grid-auto-rows: minmax(4.75rem, 1fr);
+  }
+
+  .hito-calendar-slot-placeholder {
+    min-height: 8rem;
+    border-right: 1px solid var(--color-hairline);
+    border-bottom: 1px solid var(--color-hairline);
+    background: transparent;
+  }
+
+  .hito-calendar-slot-placeholder-week {
+    min-height: 10.625rem;
+    border-bottom: 1px solid var(--color-hairline);
+  }
+
+  @media (min-width: 1024px) {
+    .hito-calendar-slot-placeholder-week {
+      border-right: 1px solid var(--color-hairline);
+      border-bottom: 0;
+    }
+  }
+
+  @container (min-width: 44rem) {
+    .hito-calendar-grid-seven {
+      display: block;
+    }
+
+    .hito-calendar-grid-list {
       display: none;
     }
   }
@@ -4202,8 +4281,8 @@
     background: color-mix(in oklch, var(--color-success) 5%, transparent);
   }
 
-  .hito-calendar-mobile-row-prestart,
-  .hito-calendar-mobile-row-prestart:hover {
+  .hito-calendar-mobile-row-muted,
+  .hito-calendar-mobile-row-muted:hover {
     min-height: 3.75rem;
     cursor: default;
     border-color: color-mix(in oklch, var(--color-hairline) 78%, transparent);
@@ -4226,6 +4305,12 @@
   .hito-calendar-mobile-date span {
     font-size: 0.625rem;
     letter-spacing: 0.12em;
+  }
+
+  .hito-calendar-mobile-date-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
   }
 
   .hito-calendar-mobile-date strong {

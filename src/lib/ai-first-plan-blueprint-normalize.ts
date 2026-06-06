@@ -12,6 +12,7 @@ import { mainLikeSegmentTypes } from "@/lib/ai-first-plan-blueprint-taxonomy";
 import type { AiFirstPlanBlueprintNormalizationContext } from "@/lib/ai-first-plan-blueprint-validation";
 import {
   canonicalFamilyToLegacyWorkoutType,
+  deriveExecutableModeFromSegments,
   normalizeCanonicalGoalContext,
   resolveCanonicalWorkoutModel,
   toCanonicalMetricModeJson,
@@ -127,7 +128,7 @@ export function normalizeBlueprintWorkout({
     workout_identity: resolved.workoutIdentity,
     calendar_icon_key: resolved.calendarIconKey,
     goal_context: normalizeBlueprintGoalContext(context.authoringInput, blueprint),
-    metric_mode: buildWorkoutMetricMode(segments, context),
+    metric_mode: buildWorkoutMetricMode(segments),
     title: useDeterministicAdaptationReadback ? deterministicWorkout.title : workout.title,
     summary: useDeterministicAdaptationReadback ? deterministicWorkout.summary : workout.summary,
     planned_rpe: useDeterministicAdaptationReadback
@@ -186,6 +187,7 @@ export function buildRestWorkout({
     goal_context: normalizeBlueprintGoalContext(context.authoringInput, null),
     metric_mode: toCanonicalMetricModeJson({
       guidance: "effort",
+      executableMode: "none",
       paceTargetsAllowed: false,
       hrTargetsAllowed: false,
       hrTargetSource: "effort_only",
@@ -288,37 +290,47 @@ export function phaseForWeek(blueprint: AiFirstPlanBlueprint, weekNumber: number
   return blueprint.weeks.find((week) => week.weekNumber === weekNumber)?.phase ?? "Base";
 }
 
-function buildWorkoutMetricMode(
-  segments: CanonicalSegment[],
-  context: AiFirstPlanBlueprintNormalizationContext,
-): CanonicalMetricModeJson {
+function buildWorkoutMetricMode(segments: CanonicalSegment[]): CanonicalMetricModeJson {
   const hasPace = segments.some((segment) => targetHasMetric(segment.target, "pace"));
-  const hasHr = segments.some((segment) => targetHasMetric(segment.target, "hr"));
+  const hasPersonalHr = segments.some(
+    (segment) =>
+      targetHasMetric(segment.target, "hr") &&
+      segment.target?.hr_target_source === "personal_hr_zone",
+  );
+  const executableMode =
+    hasPace && hasPersonalHr
+      ? "mixed_metric_executable"
+      : hasPace
+        ? "pace_executable"
+        : hasPersonalHr
+          ? "hr_executable"
+          : deriveExecutableModeFromSegments(segments);
   const guidance: CanonicalMetricGuidance = hasPace
-    ? hasHr
+    ? hasPersonalHr
       ? "mixed"
       : "pace"
-    : hasHr
+    : hasPersonalHr
       ? "heart_rate"
       : "effort";
 
   return toCanonicalMetricModeJson({
     guidance,
+    executableMode,
     paceTargetsAllowed: hasPace,
-    hrTargetsAllowed: hasHr,
-    hrTargetSource: hasHr ? "default_estimated_hr" : "effort_only",
-    hrTargetLabel: hasHr ? "Default HR guidance" : null,
-    hrTargetSourceNote: hasHr ? "Estimated from age, not personalized zones." : null,
+    hrTargetsAllowed: hasPersonalHr,
+    hrTargetSource: hasPersonalHr ? "personal_hr_zone" : "effort_only",
+    hrTargetLabel: null,
+    hrTargetSourceNote: null,
     reason:
-      hasPace && hasHr
-        ? "Pace guidance is gated by benchmark/watch truth, and HR guidance is age-estimated default guidance."
+      hasPace && hasPersonalHr
+        ? "Pace guidance is gated by benchmark/watch truth, and HR guidance uses personal HR-zone truth."
         : hasPace
           ? "Pace guidance is gated by benchmark/watch truth."
-          : hasHr
-            ? "HR guidance is a broad age-estimated default, not personalized zones."
-            : context.estimatedMaxHr
-              ? "Metric resolver keeps this workout effort-guided; default HR is not useful for this workout type."
-              : "Metric resolver keeps this workout effort-guided without numeric pace or HR targets.",
+          : hasPersonalHr
+            ? "HR guidance uses personal HR-zone truth."
+            : executableMode === "structure_only_executable"
+              ? "Workout is executable by numeric duration, distance, repeat, work, and recovery structure without pace or HR targets."
+              : "Workout requires correction because it lacks executable metric truth and executable numeric structure.",
   });
 }
 

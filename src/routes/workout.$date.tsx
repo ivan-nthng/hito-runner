@@ -5,9 +5,11 @@ import { CompletionPanel, WorkoutFeedbackPanel } from "@/components/CompletionPa
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  displayTargetEntries,
+  displayExecutableTargetEntries,
+  displayTargetSupportEntries,
   formatDistanceKm,
   formatDate,
+  formatDurationMin,
   primaryWorkoutTarget,
   WEEK_STATUS_META,
   type TrainingSnapshot,
@@ -102,10 +104,9 @@ function WorkoutPage() {
   const skippedCopy = skippedExplanationFor(workout, snapshot.source);
   const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
   const primaryTarget = primaryWorkoutTarget(workout);
-  const targetEntries = displayTargetEntries(primaryTarget);
-  const targetMetricKeys = new Set(["intensity", "hr_bpm_range", "pace_min_per_km_range", "pace"]);
-  const primaryTargetMetrics = targetEntries.filter((entry) => targetMetricKeys.has(entry.key));
-  const targetSupportEntries = targetEntries.filter((entry) => !targetMetricKeys.has(entry.key));
+  const primaryTargetMetrics = displayExecutableTargetEntries(primaryTarget, workout.metricMode);
+  const targetSupportEntries = displayTargetSupportEntries(primaryTarget);
+  const executionSummary = workoutExecutionSummary(workout);
   const identityRows = workoutIdentityRows(workout, meta.label);
   const goalRows = workoutGoalRows(workout);
   const metricRows = workoutMetricRows(workout);
@@ -252,36 +253,41 @@ function WorkoutPage() {
                 </SidebarSection>
               )}
 
-              {!isRestDay && primaryTarget && (
-                <SidebarSection title="Workout targets" tone="signal" titleVariant="strong">
-                  <div className="space-y-3">
-                    {primaryTargetMetrics.map((entry) => (
-                      <div
-                        key={entry.key}
-                        className="flex items-start justify-between gap-3 py-1 last:border-0"
-                      >
-                        <span className="hito-section-subtitle">{entry.label}</span>
-                        <span className="max-w-[11rem] text-xs text-right text-foreground/85">
-                          {entry.value}
-                        </span>
-                      </div>
-                    ))}
+              {!isRestDay &&
+                (executionSummary ||
+                  primaryTargetMetrics.length > 0 ||
+                  targetSupportEntries.length > 0) && (
+                  <SidebarSection title="Execution" tone="signal" titleVariant="strong">
+                    <div className="space-y-3">
+                      {executionSummary && <ReadbackRow label="Mode" value={executionSummary} />}
 
-                    {targetSupportEntries.length > 0 ? (
-                      <div className="border-t border-hairline pt-4 space-y-4">
-                        {targetSupportEntries.map((entry) => (
-                          <div key={entry.key}>
-                            <p className="hito-section-subtitle">{entry.label}</p>
-                            <p className="mt-1 text-xs leading-relaxed text-foreground/82">
-                              {entry.value}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </SidebarSection>
-              )}
+                      {primaryTargetMetrics.map((entry) => (
+                        <div
+                          key={entry.key}
+                          className="flex items-start justify-between gap-3 py-1 last:border-0"
+                        >
+                          <span className="hito-section-subtitle">{entry.label}</span>
+                          <span className="max-w-[11rem] text-xs text-right text-foreground/85">
+                            {entry.value}
+                          </span>
+                        </div>
+                      ))}
+
+                      {targetSupportEntries.length > 0 ? (
+                        <div className="border-t border-hairline pt-4 space-y-4">
+                          {targetSupportEntries.map((entry) => (
+                            <div key={entry.key}>
+                              <p className="hito-section-subtitle">{entry.label}</p>
+                              <p className="mt-1 text-xs leading-relaxed text-foreground/82">
+                                {entry.value}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </SidebarSection>
+                )}
 
               {!isRestDay && metricRows.length > 0 && (
                 <SidebarSection title="Metric mode" muted>
@@ -436,7 +442,7 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
 
 function Overview({ workout }: { workout: Workout }) {
   const restAssignment = restAssignmentFor(workout);
-  const segmentReadbacks = segmentGuidanceReadbacks(workout);
+  const segmentReadbacks = segmentInstructionReadbacks(workout);
 
   if (workout.type === "rest") {
     return (
@@ -474,7 +480,7 @@ function Overview({ workout }: { workout: Workout }) {
       <IntervalsViz workout={workout} />
 
       <div>
-        <h3 className="hito-label">Segment guidance</h3>
+        <h3 className="hito-label">Segment instructions</h3>
         {segmentReadbacks.length > 0 ? (
           <ol className="hito-row-group mt-4">
             {segmentReadbacks.map((segment) => (
@@ -680,63 +686,114 @@ function workoutMetricRows(workout: Workout): Array<{ label: string; value: stri
   }
 
   return [
+    { label: "Executable mode", value: humanizeSnakeCase(metricMode.executableMode) },
     { label: "Guidance", value: humanizeSnakeCase(metricMode.guidance) },
-    { label: "Pace targets", value: metricMode.paceTargetsAllowed ? "Allowed" : "Not provided" },
+    {
+      label: "Pace targets",
+      value: metricMode.paceTargetsAllowed ? "Backend supplied" : "Not supplied",
+    },
     {
       label: "HR targets",
-      value: metricMode.hrTargetsAllowed ? "Allowed" : "Not provided",
+      value: metricMode.hrTargetsAllowed
+        ? "Personal zones supplied"
+        : metricMode.hrTargetSource === "default_estimated_hr"
+          ? "Advisory only"
+          : "Not supplied",
     },
+    metricMode.hrTargetLabel ? { label: "HR readback", value: metricMode.hrTargetLabel } : null,
+    metricMode.hrTargetSourceNote
+      ? { label: "HR note", value: metricMode.hrTargetSourceNote }
+      : null,
     metricMode.reason ? { label: "Reason", value: metricMode.reason } : null,
   ].filter((row): row is { label: string; value: string } => row != null);
 }
 
-type SegmentGuidanceReadback = {
+function workoutExecutionSummary(workout: Workout): string | null {
+  switch (workout.metricMode.executableMode) {
+    case "pace_executable":
+      return "Pace executable";
+    case "hr_executable":
+      return "Personal HR executable";
+    case "mixed_metric_executable":
+      return "Pace + personal HR executable";
+    case "structure_only_executable":
+      return "Executable structure";
+    case "correction_required":
+      return "Correction required";
+    case "effort_only":
+      return "Readable guidance only";
+    case "none":
+      return "No execution targets";
+    case "unknown":
+      return "Unknown";
+    default:
+      return null;
+  }
+}
+
+type SegmentInstructionReadback = {
   key: string;
   index: number;
   label: string;
   entries: Array<{ label: string; value: string }>;
 };
 
-function segmentGuidanceReadbacks(workout: Workout): SegmentGuidanceReadback[] {
+function segmentInstructionReadbacks(workout: Workout): SegmentInstructionReadback[] {
   const readbacks = workout.steps.flatMap((step, stepIndex) =>
-    segmentGuidanceReadbacksForStep(step, `${stepIndex}`, stepIndex + 1),
+    segmentInstructionReadbacksForStep(step, workout.metricMode, `${stepIndex}`, stepIndex + 1),
   );
 
   return readbacks.map((readback, index) => ({ ...readback, index: index + 1 }));
 }
 
-function segmentGuidanceReadbacksForStep(
+function segmentInstructionReadbacksForStep(
   step: Workout["steps"][number],
+  metricMode: Workout["metricMode"],
   key: string,
   displayIndex: number,
-): SegmentGuidanceReadback[] {
+): SegmentInstructionReadback[] {
   if (step.repeats && step.work) {
-    const parent = buildSegmentGuidanceReadback(step, key, displayIndex);
+    const parent = buildSegmentInstructionReadback(step, metricMode, key, displayIndex);
     const children = [
-      buildSegmentGuidanceReadback(step.work, `${key}-work`, displayIndex),
+      buildSegmentInstructionReadback(step.work, metricMode, `${key}-work`, displayIndex),
       step.recovery
-        ? buildSegmentGuidanceReadback(step.recovery, `${key}-recovery`, displayIndex)
+        ? buildSegmentInstructionReadback(
+            step.recovery,
+            metricMode,
+            `${key}-recovery`,
+            displayIndex,
+          )
         : null,
-    ].filter((item): item is SegmentGuidanceReadback => item != null);
+    ].filter((item): item is SegmentInstructionReadback => item != null);
 
-    return [parent, ...children].filter((item): item is SegmentGuidanceReadback => item != null);
+    return [parent, ...children].filter((item): item is SegmentInstructionReadback => item != null);
   }
 
-  const readback = buildSegmentGuidanceReadback(step, key, displayIndex);
+  const readback = buildSegmentInstructionReadback(step, metricMode, key, displayIndex);
 
   return readback ? [readback] : [];
 }
 
-function buildSegmentGuidanceReadback(
+function buildSegmentInstructionReadback(
   step: Workout["steps"][number],
+  metricMode: Workout["metricMode"],
   key: string,
   displayIndex: number,
-): SegmentGuidanceReadback | null {
-  const entries = [
-    readGuidanceEntry("Guidance", step.guidance),
-    readGuidanceEntry("Cue", step.target?.cue),
-    readGuidanceEntry("Hint", step.target?.hint),
-  ].filter((entry): entry is { label: string; value: string } => entry != null);
+): SegmentInstructionReadback | null {
+  const entries = dedupeReadbackEntries(
+    [
+      ...segmentStructureEntries(step),
+      ...displayExecutableTargetEntries(step.target, metricMode).map((entry) => ({
+        label: entry.label,
+        value: entry.value,
+      })),
+      readGuidanceEntry("Guidance", step.guidance),
+      ...displayTargetSupportEntries(step.target).map((entry) => ({
+        label: entry.label,
+        value: entry.value,
+      })),
+    ].filter((entry): entry is { label: string; value: string } => entry != null),
+  );
 
   if (entries.length === 0) {
     return null;
@@ -748,6 +805,93 @@ function buildSegmentGuidanceReadback(
     label: step.label?.trim() || humanizeSnakeCase(step.segment_type || step.type || "Segment"),
     entries,
   };
+}
+
+function segmentStructureEntries(
+  step: Workout["steps"][number],
+): Array<{ label: string; value: string }> {
+  const entries: Array<{ label: string; value: string }> = [];
+  const prescription = step.prescription;
+
+  if (prescription?.mode === "time" && isPositiveNumber(prescription.duration_min)) {
+    entries.push({ label: "Duration", value: formatDurationMin(prescription.duration_min) });
+  }
+
+  if (prescription?.mode === "distance" && isPositiveNumber(prescription.distance_km)) {
+    entries.push({ label: "Distance", value: `${formatDistanceKm(prescription.distance_km)} km` });
+  }
+
+  if (prescription?.mode === "repeats") {
+    const repeatCount = prescription.repeat_count ?? step.repeats;
+
+    if (isPositiveNumber(repeatCount)) {
+      entries.push({ label: "Repeats", value: `${repeatCount}x` });
+    }
+
+    const work = describeUnitPrescription(prescription.repeat_unit);
+    const recovery = describeUnitPrescription(prescription.recovery_unit);
+
+    if (work) {
+      entries.push({ label: "Work", value: work });
+    }
+
+    if (recovery) {
+      entries.push({ label: "Recovery", value: recovery });
+    }
+  }
+
+  if (!entries.some((entry) => entry.label === "Duration") && isPositiveNumber(step.duration_min)) {
+    entries.push({ label: "Duration", value: formatDurationMin(step.duration_min) });
+  }
+
+  if (!entries.some((entry) => entry.label === "Distance") && isPositiveNumber(step.distance_km)) {
+    entries.push({ label: "Distance", value: `${formatDistanceKm(step.distance_km)} km` });
+  }
+
+  if (!entries.some((entry) => entry.label === "Repeats") && isPositiveNumber(step.repeats)) {
+    entries.push({ label: "Repeats", value: `${step.repeats}x` });
+  }
+
+  return entries;
+}
+
+function describeUnitPrescription(
+  unit:
+    | { mode: "time" | "distance" | "none"; duration_min?: number; distance_km?: number }
+    | undefined,
+) {
+  if (!unit || typeof unit !== "object") {
+    return null;
+  }
+
+  if (unit.mode === "time" && isPositiveNumber(unit.duration_min)) {
+    return formatDurationMin(unit.duration_min);
+  }
+
+  if (unit.mode === "distance" && isPositiveNumber(unit.distance_km)) {
+    return `${formatDistanceKm(unit.distance_km)} km`;
+  }
+
+  return null;
+}
+
+function isPositiveNumber(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function dedupeReadbackEntries(entries: Array<{ label: string; value: string }>) {
+  const seen = new Set<string>();
+
+  return entries.filter((entry) => {
+    const key = `${entry.label}:${entry.value}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
 }
 
 function readGuidanceEntry(label: string, value: unknown) {

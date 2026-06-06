@@ -723,7 +723,14 @@ function resolveHalfMarathonSpecificityOptions(
   cadence: SupportedIntensityCadencePolicy,
 ): readonly SupportedSpecificityIdentity[] {
   const phase = phaseForWeek(weekNumber, resolveStructuredHorizonWeeks(normalized));
-  const raceRhythm = hasRaceSpecificMetricSupport(normalized);
+  const metricTruth = hasRaceSpecificMetricSupport(normalized);
+  const raceRhythm = metricTruth;
+
+  if (!metricTruth) {
+    return phase === "Taper"
+      ? ["easy_run_with_strides", "progression_run"]
+      : ["progression_run", "easy_run_with_strides"];
+  }
 
   if (phase === "Base") {
     return cadence.frequency === "weekly"

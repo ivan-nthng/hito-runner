@@ -825,6 +825,60 @@ export function displayTargetEntries(target: StepTarget | undefined) {
   return entries;
 }
 
+const EXECUTABLE_TARGET_ENTRY_KEYS = new Set([
+  "hr_bpm_range",
+  "pace_min_per_km_range",
+  "pace",
+  "cadence_spm_range",
+  "rpe",
+  "intensity",
+  "label",
+]);
+
+const SUPPORT_TARGET_ENTRY_KEYS = new Set(["cue", "hint", "source_note", "coaching_hint"]);
+
+export function displayExecutableTargetEntries(
+  target: StepTarget | undefined,
+  metricMode?: Pick<CanonicalMetricMode, "paceTargetsAllowed" | "hrTargetsAllowed"> | null,
+) {
+  const hasBlockedHrTarget =
+    Boolean(target?.hr_bpm_range ?? target?.hr_bpm) &&
+    metricMode != null &&
+    !metricMode.hrTargetsAllowed;
+
+  return displayTargetEntries(target).filter((entry) => {
+    if (!EXECUTABLE_TARGET_ENTRY_KEYS.has(entry.key)) {
+      return false;
+    }
+
+    if (entry.key === "label" && hasBlockedHrTarget) {
+      return false;
+    }
+
+    if (isPaceTargetEntry(entry.key) && metricMode && !metricMode.paceTargetsAllowed) {
+      return false;
+    }
+
+    if (isHrTargetEntry(entry.key) && metricMode && !metricMode.hrTargetsAllowed) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+export function displayTargetSupportEntries(target: StepTarget | undefined) {
+  return displayTargetEntries(target).filter((entry) => SUPPORT_TARGET_ENTRY_KEYS.has(entry.key));
+}
+
+function isPaceTargetEntry(key: string) {
+  return key === "pace" || key === "pace_min_per_km_range";
+}
+
+function isHrTargetEntry(key: string) {
+  return key === "hr_bpm_range";
+}
+
 export function normalizeExecutableStepInstructions(steps: Step[]): Step[] {
   return steps.map((step) => normalizeExecutableStepInstruction(step));
 }

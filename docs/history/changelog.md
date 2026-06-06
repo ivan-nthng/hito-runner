@@ -15,6 +15,12 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 
 ## 2026-06-05
 
+- Hardened generated workout target truth for structured plan authoring: new generated non-rest
+  workouts now resolve through explicit executable modes, `structure_only_executable` requires
+  numeric duration/distance/repeat/recovery anatomy, pace targets require execution support plus
+  validated pace truth instead of target time alone, executable HR targets require personal HR-zone
+  truth, and age-estimated HR remains advisory/readback-only; frontend readback cleanup remains the
+  next slice for removing vague visible copy where executable target data exists.
 - Accepted the shared Hito DS calendar/workout day component seam: product `Calendar.tsx` and
   `/hitoDS#calendar-workout-playground` now both render through presentational
   `HitoCalendarDayCell` / `HitoWorkoutDayRow` display props, with product links, tooltips, feedback

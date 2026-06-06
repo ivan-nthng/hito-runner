@@ -736,15 +736,22 @@ function buildMetricPolicyReview(input: StructuredFirstPlanOnboardingInput) {
   const execution = normalizeFirstPlanExecutionMode(input.execution);
   const hasBenchmark = input.benchmark.kind !== "unknown";
   const hasAge = typeof input.profile.age === "number";
+  const hasWatchExecution = execution.watchAccess === "watch_or_app";
 
   if (
-    execution.watchAccess === "watch_or_app" &&
+    hasWatchExecution &&
     (execution.guidancePreference === "pace" || execution.guidancePreference === "mixed") &&
     hasBenchmark
   ) {
     return hasAge
       ? "Broad pace targets may appear where the recent 5K benchmark supports them; HR guidance, when shown, is an age-estimated default and not personalized zones."
       : "Broad pace targets may appear where the recent 5K benchmark supports them.";
+  }
+
+  if (hasWatchExecution) {
+    return hasAge
+      ? "Workout structure can use executable duration, distance, repeat, work, and recovery targets; age-estimated HR, if shown, is advisory readback only."
+      : "Workout structure can use executable duration, distance, repeat, work, and recovery targets; pace or HR targets require backend-supported metric truth.";
   }
 
   if (execution.guidancePreference === "heart_rate") {
@@ -754,8 +761,8 @@ function buildMetricPolicyReview(input: StructuredFirstPlanOnboardingInput) {
   }
 
   return hasAge
-    ? "Targets stay effort/cue based unless watch/app access and benchmark-supported pace guidance are available; broad default HR guidance may appear from age."
-    : "Targets stay effort/cue based unless watch/app access and benchmark-supported pace guidance are available.";
+    ? "Readable guidance remains non-executable until watch/app support and backend-supported metric truth are available; broad default HR guidance may appear from age as advisory readback only."
+    : "Readable guidance remains non-executable until watch/app support and backend-supported metric truth are available.";
 }
 
 function buildStructuredReviewAssumptions(
@@ -768,8 +775,8 @@ function buildStructuredReviewAssumptions(
   if (input.benchmark.kind === "unknown") {
     assumptions.push(
       typeof input.profile.age === "number"
-        ? "No recent 5K benchmark was supplied, so Hito keeps pace targets effort-based; any HR range shown is a broad age-estimated default."
-        : "No recent 5K benchmark was supplied, so Hito keeps numeric targets effort-based.",
+        ? "No recent 5K benchmark was supplied, so Hito omits pace targets; any HR range shown is broad age-estimated advisory readback."
+        : "No recent 5K benchmark was supplied, so Hito omits pace targets unless backend-supported metric truth is available.",
     );
   }
 

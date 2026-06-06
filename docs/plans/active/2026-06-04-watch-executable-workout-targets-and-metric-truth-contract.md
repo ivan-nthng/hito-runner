@@ -14,73 +14,73 @@ high
 
 ## Next Recommended Role
 
-BACKEND
+FRONTEND
 
 ## Task
 
-Implement the backend contract for watch-executable workout targets.
+Clean up runner-facing readback for watch-executable workout targets.
 
 ## Stage
 
-BACKEND implementation / watch-executable metric truth contract slice 1
+FRONTEND implementation / watch-executable target readback cleanup
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: BACKEND
+ROLE: FRONTEND
 
 TASK:
-Implement the backend contract for watch-executable workout targets, starting with explicit executable modes and metric-truth gating.
+Clean up runner-facing readback for watch-executable workout targets after backend Slice 1.
 
 STAGE:
-BACKEND implementation / watch-executable metric truth contract slice 1
+FRONTEND implementation / watch-executable target readback cleanup
 
 CONTEXT:
 - Source path: docs/plans/active/2026-06-04-watch-executable-workout-targets-and-metric-truth-contract.md
-- The user rejected effort-only ambiguity for workouts that are supposed to be executable.
-- Running Coach doctrine is complete.
-- Architect approved `structure_only_executable` as a backend-owned mode for timer/distance/repeat-based workouts where pace/HR truth is unavailable or inappropriate.
-- `structure_only_executable` is not `effort_only`; it requires numeric duration/distance/repeat structure and must never collapse into vague prose.
-- Pace targets require validated pace truth.
-- Personal HR targets require personal HR-zone truth.
+- BACKEND Slice 1 is implemented and QA-passed.
+- New generated non-rest workouts now resolve through explicit executable modes instead of vague effort-only happy-path output.
+- `structure_only_executable` means the workout has numeric duration/distance/repeat/recovery anatomy but no pace/HR target truth.
+- Pace targets require execution support plus validated pace truth.
 - Target time alone is not pace truth.
-- Age-estimated HR is not personal HR truth.
+- Executable HR targets require personal HR-zone truth.
+- Age-estimated HR is advisory/readback only, not executable HR target truth.
+- Legacy `effort_only`, `none`, and `unknown` remain readable for older rows/diagnostics, but are not normal new primary structured output.
 
 GOAL:
-Implement the first no-fake-precision backend slice that stops primary structured generation from treating `watchAccess: none|unknown`, `effort_only`, or vague cues as normal executable workout output.
+Make workout detail, calendar/today, export, and first-plan review/readback copy reflect backend executable target truth clearly, without asking runners to infer a structured workout from vague purpose copy when executable segment target data exists.
 
 SCOPE:
-- Add or model explicit backend executable modes:
-  - `pace_executable`
-  - `hr_executable`
-  - `mixed_metric_executable`
-  - `structure_only_executable`
-  - blocked/correction state when no executable mode is valid.
-- Keep old `effort_only`, `none`, and `unknown` readable for legacy rows/snapshots, but stop using them as normal new primary structured generation output.
-- Require explicit watch/app/export-style execution support before primary structured first-plan generation.
-- Update metric-mode resolver semantics so `structure_only_executable` is distinct from missing metric truth.
-- Update segment builders so allowed structure-only families still emit numeric duration/distance/repeat/recovery targets.
-- Update first-plan blueprint/envelope validation and repair so unsupported metric gaps are rejected or downgraded to allowed structure-only families.
-- Keep review/confirm, persistence, DB schema, frontend routes, and current public blueprint/envelope defaults unchanged unless a tiny backend view-model/copy field is required.
+- Inspect runner-facing readback surfaces that summarize or display planned workout targets:
+  - workout detail
+  - Today/home
+  - calendar compact readback/tooltips
+  - first-plan review copy
+  - JSON/Markdown export copy if visible labels still imply effort-only execution
+- Render backend-shaped executable mode/segment targets without inventing frontend target rules.
+- Prefer existing Hito DS primitives, existing workout structure rows, existing target formatting helpers, and shared display seams before adding new UI.
+- Replace or suppress vague "use workout purpose" / cue-only style copy only when canonical executable segment target data exists.
+- Preserve legacy rows that only have effort/cue-style data by labelling them honestly instead of pretending they have executable targets.
+- Keep backend generation, validation, persistence, DB schema, AI contracts, and review/confirm mutation behavior unchanged.
 
 REQUIREMENTS:
-- Do not rename `effort_only` locally and call it done.
-- Do not fix only runner-facing copy.
-- Do not introduce fake pace from target time alone.
-- Do not treat default age-estimated HR as personal HR target truth.
-- Do not add broad frontend redesign or watch/provider integration.
-- Reuse existing metric resolver, segment builders, blueprint/envelope validation, plan authoring snapshot, and rich workout model seams before adding new code.
-- If a file is already large, extract by a real seam instead of adding another responsibility inline.
-- Clean up dead/replaced code from failed approaches when safe.
+- Do not create local frontend metric truth.
+- Do not infer pace from target time.
+- Do not display age-estimated HR as a personal executable HR target.
+- Do not hide backend correction states behind generic errors.
+- Do not add a broad calendar/workout redesign.
+- Do not wire manual workout CRUD, watch-provider export, or new persistence.
+- Reuse existing shared Hito DS and workout readback components; avoid route-local one-off UI.
+- If the true issue is missing backend display data, report the exact backend seam instead of patching symptoms in copy.
 
 VALIDATION:
-- Run targeted ESLint for touched backend files and relevant authoring scripts.
-- Run doctrine validator.
-- Run first-plan blueprint mock valid/invalid/timeout/partial fixtures.
-- Run envelope mock matrix if envelope validation/expansion changes.
-- Run at least one fixture that proves structure-only executable output has numeric duration/distance/repeat structure and no fake pace/HR.
-- Run at least one fixture that proves unsupported tempo/threshold/race-pace/road-interval specificity blocks or downgrades correctly without vague effort-only output.
+- Run targeted ESLint for touched frontend/readback files.
 - Run `git diff --check`.
+- Run `npm run build`.
+- Use the built-in Codex browser first for relevant local UI proof when product surfaces changed.
+- Prove at least one structure-only executable workout shows numeric executable anatomy instead of vague purpose-only copy.
+- Prove at least one pace-target workout still shows pace only when backend target data exists.
+- Prove age-estimated HR is not presented as a personal executable HR target.
+- Prove legacy effort-only/readback rows remain readable if covered by touched surfaces.
 
 OUTPUT:
 1. Task
@@ -89,7 +89,7 @@ OUTPUT:
 4. Files changed
 5. What changed
 6. Validation results
-7. Behavior-preservation proof
+7. Readback proof
 8. Blockers
 ```
 
@@ -99,7 +99,7 @@ ARCHITECT / RUNNING COACH / BACKEND / FRONTEND / QA
 
 ## Last Updated
 
-2026-06-04
+2026-06-06
 
 ## Context
 
@@ -126,13 +126,14 @@ Known current seams:
 - `src/lib/first-plan-authoring-utils.ts` allows `watchAccess` values:
   `none`, `watch_or_app`, and `unknown`.
 - `src/lib/structured-first-plan-onboarding.ts` accepts optional execution mode and currently
-  reviews missing metric truth as effort/cue-based guidance.
+  returns bounded correction for primary structured generation when execution support is missing.
 - `src/lib/structured-plan-authoring-metrics.ts` allows pace targets only when watch/app plus
-  pace/mixed guidance plus recent 5K truth exist, but it can still emit effort-only workouts.
-- `src/lib/structured-plan-authoring-metrics.ts` can emit `default_estimated_hr` from profile age,
-  explicitly not personalized HR-zone truth.
+  pace/mixed guidance plus recent 5K truth exist; Slice 1 now separates executable modes from
+  legacy-readable effort-only states.
+- `src/lib/structured-plan-authoring-metrics.ts` may preserve age-estimated HR as advisory/readback
+  context only; it is not executable personal HR target truth.
 - `src/lib/rich-workout-model.ts` derives `metric_mode` from emitted target keys and can represent
-  `effort_only`.
+  legacy-readable `effort_only` without making it the normal new structured generation path.
 - `src/routes/workout.$date.tsx`, `src/components/TodayHero.tsx`, `src/components/Calendar.tsx`,
   `src/lib/plan-export.ts`, active-plan refresh, and first-plan draft paths all consume the same
   segment/metric truth after generation.
@@ -215,6 +216,79 @@ Legacy/readback compatibility:
 - diagnostics may still mention missing target truth
 - new primary structured generation should not produce vague effort-only non-rest workouts as the
   normal happy path
+
+## Backend Slice 1 Closeout
+
+Status: implemented and QA-passed on 2026-06-05.
+
+Accepted backend contract:
+
+- new generated non-rest workouts must resolve to explicit executable modes instead of vague
+  effort-only happy-path output
+- `structure_only_executable` requires numeric duration, distance, repeat, work, or recovery
+  anatomy and must never collapse into cue-only prose
+- pace targets require an execution surface plus validated pace truth
+- target time alone is goal context, not pace truth
+- executable HR targets require personal HR-zone truth
+- age-estimated HR may remain advisory/readback-only but is not executable HR target truth
+- legacy `effort_only`, `none`, and `unknown` remain readable for older rows and diagnostics, but
+  are not normal new primary structured output
+
+QA evidence recorded:
+
+- Browser Path Preflight: browser was not used because this was backend/service contract validation.
+- Targeted ESLint passed.
+- Doctrine validator passed.
+- Blueprint valid, invalid, timeout, and partial mocks passed.
+- Full envelope mock matrix passed.
+- Envelope invalid, timeout, and partial mocks passed.
+- Local in-memory target-time half-marathon harness with `watch_or_app` + `mixed`, age present, and
+  no recent 5K benchmark produced:
+  - `65` non-rest rows as `structure_only_executable`
+  - `26` rest rows as `none`
+  - `0` structure-only violations
+  - `0` single-segment non-rest rows
+  - cue-only segment derived `correction_required`
+- Repeat-oriented mountain harness proved `uphill_repeats`, `rolling_hills_session`, and
+  `controlled_downhill_durability` each had repeat count, time-based repeat unit, time-based
+  recovery unit, and `structure_only_executable`.
+- Target time alone emitted `0` pace targets without benchmark.
+- Age-estimated HR emitted `0` executable HR targets and `0` personal HR targets.
+- Blueprint default remained `ai_first_plan_blueprint_v1`.
+- Envelope remained internal/non-default.
+- `git diff --check` and `npm run build` passed.
+- No metric-truth contract issues were found.
+
+Non-slice QA observation:
+
+- Some envelope success traces still report recovery-first violation counts even though the
+  canonical validator passes. This is not a blocker for metric-truth Slice 1 and should be triaged
+  separately only if envelope trace semantics become a release gate.
+
+Changelog decision:
+
+- Slice 1 is shipped backend contract work and belongs in `docs/history/changelog.md`, with the
+  frontend readback cleanup recorded as the next visible follow-up rather than as completed UI.
+
+## Frontend Readback Cleanup Closeout
+
+Status: implemented on 2026-06-06; awaiting focused QA.
+
+Implemented behavior:
+
+- shared target readback now separates executable target entries from support/cue/source copy
+- workout detail foregrounds segment duration, distance, repeat, work, recovery, and backend-shaped
+  target entries before guidance/cue/hint
+- `structure_only_executable` reads as executable structure instead of vague effort-only guidance
+- calendar tooltip, Today hero, interval timeline, markdown export, and first-plan review copy no
+  longer promote cue-only/default-HR wording as executable target truth
+- HR targets render as executable only when `metricMode.hrTargetsAllowed` is true
+- age-estimated/default HR remains advisory readback only
+
+Next recommended role:
+
+- QA for focused readback validation on structure-only, pace-target, advisory-HR, and legacy
+  effort/readable rows.
 
 ## Metric Truth Contract
 
@@ -403,13 +477,15 @@ AI owns:
 2. ARCHITECT backend-scope decision:
    complete; `structure_only_executable` approved.
 3. BACKEND implementation slice 1:
-   add explicit executable modes and tighten first-plan/new-generation metric truth gates.
+   complete; explicit executable modes, first-plan execution-surface correction, no-fake pace/HR
+   truth gates, and structure-only numeric execution proof are implemented.
 4. BACKEND implementation slice 2:
-   update segment builders, blueprint validation/repair, envelope expansion/validation, and active
-   plan refresh regeneration behavior.
+   partially complete where required by slice 1; generated segment contracts, blueprint metric
+   normalization, and envelope metric validation now respect executable modes. Active-plan refresh
+   regeneration remains a separate follow-up if product scope requires regenerated future rows.
 5. FRONTEND implementation:
-   remove no/unknown execution defaults from primary setup, add missing-truth correction states, and
-   update workout detail/review copy to explain executable targets without asking runners to guess.
+   complete; workout detail, Today/calendar readback, export copy, and first-plan review copy now
+   explain executable targets without asking runners to guess from vague purpose copy.
 6. QA validation:
    prove first-plan, refresh, workout detail, export, and legacy-read compatibility.
 
@@ -422,8 +498,8 @@ Backend must evaluate:
 
 - whether `FIRST_PLAN_WATCH_ACCESS_VALUES` should keep `none` / `unknown` only for legacy readback
 - whether structured onboarding should require an executable target channel
-- whether `default_estimated_hr` should be removed from executable target emission and kept as
-  labelled advisory readback only
+- whether any route still presents age-estimated HR as executable target truth instead of labelled
+  advisory/readback-only context
 - whether `effort_only` remains valid only for legacy rows, rest rows, diagnostics, or future
   explicitly non-executable plan mode
 - how active-plan refresh handles older effort-only plans
@@ -435,6 +511,8 @@ Backend must evaluate:
 ### Slice 1: Execution Mode And Metric Resolver
 
 Owner: BACKEND.
+
+Status: complete on 2026-06-05.
 
 Scope:
 
@@ -453,9 +531,24 @@ Validation:
 - fixture with allowed run/walk/easy/long structure-only plan remains executable through numeric
   segment structure
 
+Implementation notes:
+
+- `rich-workout-model` now owns canonical executable modes:
+  `pace_executable`, `hr_executable`, `mixed_metric_executable`,
+  `structure_only_executable`, `correction_required`, plus legacy-readable `effort_only`,
+  `none`, and `unknown`.
+- `structured-plan-authoring-metrics` no longer treats age-estimated HR as personal HR target truth
+  and only unlocks pace targets from execution support plus backend pace benchmark truth.
+- Structured first-plan action parsing returns a bounded correction for missing watch/app execution
+  support before attempting AI generation.
+- Doctrine now asserts structure-only rows have numeric executable segment anatomy and that
+  age-estimated HR does not emit HR target ranges.
+
 ### Slice 2: Segment Builders And Family Eligibility
 
 Owner: BACKEND.
+
+Status: partially complete on 2026-06-05 for generated first-plan paths.
 
 Scope:
 
@@ -472,9 +565,19 @@ Validation:
 - forbidden families do not pass as structure-only
 - existing no-fake-pace/no-fake-personal-HR checks remain green
 
+Implementation notes:
+
+- Existing generated segment builders already emit numeric duration, distance, repeat, work, and
+  recovery structure for the validated structure-only families.
+- Unsupported road-specific half/10K specificity without metric truth is downgraded to
+  progression/strides-style support rather than tempo, threshold, race pace, or interval work.
+- Broader active-plan refresh regeneration policy is intentionally left out of this slice.
+
 ### Slice 3: Blueprint / Envelope / Refresh Enforcement
 
 Owner: BACKEND.
+
+Status: partially complete on 2026-06-05 for first-plan blueprint and non-live envelope paths.
 
 Scope:
 
@@ -491,23 +594,39 @@ Validation:
 - active-plan refresh doctrine remains green
 - no raw AI target truth bypasses backend validation
 
+Implementation notes:
+
+- Blueprint normalization and metric generation no longer emit default-estimated HR target ranges
+  and now stamp explicit executable modes on generated workout rows.
+- Non-live envelope expansion validation rejects HR target keys and missing executable modes, while
+  preserving the internal/non-default envelope contract.
+- Refresh regeneration enforcement remains a later backend slice if/when active-plan refresh scope
+  is reopened.
+
 ### Slice 4: Frontend / Copy / Readback Cleanup
 
 Owner: FRONTEND after backend.
 
+Status: next bounded follow-up.
+
 Scope:
 
-- remove primary setup defaults that imply unknown/no execution is normal
-- render backend corrections for missing executable target truth
-- update workout-detail/review copy so cues explain intent but never tell the runner to infer the
-  workout from purpose instead of executable instructions
+- render backend corrections for missing executable target truth without inventing frontend target
+  rules
+- update workout-detail, Today/home, calendar tooltip/readback, first-plan review, and export copy
+  so cues explain intent but never tell the runner to infer the workout from purpose when executable
+  segment targets exist
 - keep Hito DS target/readback primitives aligned with backend fields
+- preserve legacy effort/cue-only rows as readable legacy data without presenting them as the new
+  structured happy path
 
 Validation:
 
-- browser setup correction proof
-- workout-detail readback proof
-- no misleading no-watch/effort-only happy-path copy
+- browser setup correction proof if setup surfaces change
+- workout-detail readback proof for `structure_only_executable`
+- calendar/today compact readback proof where those surfaces summarize targets
+- export/readable plan proof if export labels are touched
+- no misleading no-watch/effort-only happy-path copy when executable target data exists
 
 ## Frontend Follow-Up Boundaries
 
@@ -561,11 +680,16 @@ QA must prove:
 ## Exit Criteria
 
 - Running Coach doctrine defines executable target rules. Complete.
-- Backend contract can distinguish executable, blocked, and legacy effort-only states.
+- Backend contract can distinguish executable, blocked, and legacy effort-only states. Complete for
+  first-plan/authoring generation paths.
 - Frontend setup no longer silently defaults to no/unknown execution for primary structured plans.
 - Workout detail and export can rely on canonical target truth.
 - QA can prove no fake pace, no fake personal HR, and no vague effort-only new structured plans.
+  Backend doctrine proof is complete; browser/frontend proof remains pending frontend work.
 
 ## Suggested Next Step
 
-Run the BACKEND implementation slice described in the handoff prompt.
+Run the next bounded FRONTEND readback cleanup now that QA accepted the backend contract: make
+workout detail, Today/home, calendar, first-plan review, and export copy display executable segment
+targets from backend-shaped data, while preserving legacy readability and avoiding any local metric
+truth invention.

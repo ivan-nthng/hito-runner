@@ -40,12 +40,6 @@ export function buildBlueprintSegmentTarget({
     );
   }
 
-  const defaultHrBand = defaultEstimatedHrBandForSegment(workout, segmentKind);
-
-  if (context.defaultHrAllowed && defaultHrBand) {
-    Object.assign(target, buildDefaultEstimatedHrTarget(context.estimatedMaxHr!, defaultHrBand));
-  }
-
   return target;
 }
 
@@ -170,74 +164,4 @@ function findDeterministicPaceTarget(
     );
 
   return segment?.target?.pace_min_per_km_range ?? segment?.target?.pace_range_min_km ?? null;
-}
-
-function defaultEstimatedHrBandForSegment(
-  workout: AiBlueprintWorkout,
-  segmentKind: BlueprintSegmentTargetRole,
-): DefaultEstimatedHrBand | null {
-  if (segmentKind === "cooldown") {
-    return "recovery";
-  }
-
-  if (segmentKind === "recovery") {
-    return "recovery";
-  }
-
-  if (segmentKind === "warmup") {
-    return "easy";
-  }
-
-  if (["intervals", "hills", "trail", "race"].includes(workout.workoutFamily)) {
-    return null;
-  }
-
-  if (workout.workoutFamily === "recovery") {
-    return "recovery";
-  }
-
-  if (workout.workoutFamily === "easy") {
-    return "easy";
-  }
-
-  if (workout.workoutFamily === "long") {
-    return "longAerobic";
-  }
-
-  if (workout.workoutFamily === "steady") {
-    return "steady";
-  }
-
-  if (workout.workoutFamily === "tempo") {
-    return "tempo";
-  }
-
-  return null;
-}
-
-type DefaultEstimatedHrBand = "recovery" | "easy" | "longAerobic" | "steady" | "tempo";
-
-const defaultEstimatedHrBands: Record<DefaultEstimatedHrBand, [number, number]> = {
-  recovery: [0.55, 0.65],
-  easy: [0.6, 0.72],
-  longAerobic: [0.6, 0.75],
-  steady: [0.7, 0.8],
-  tempo: [0.8, 0.88],
-};
-
-function buildDefaultEstimatedHrTarget(estimatedMaxHr: number, band: DefaultEstimatedHrBand) {
-  const [lowerPercent, upperPercent] = defaultEstimatedHrBands[band];
-
-  return {
-    hr_bpm_range: `${roundBpmToNearestFive(estimatedMaxHr * lowerPercent)}-${roundBpmToNearestFive(
-      estimatedMaxHr * upperPercent,
-    )} bpm`,
-    hr_target_source: "default_estimated_hr",
-    label: "Default HR guidance",
-    source_note: "Estimated from age, not personalized zones.",
-  };
-}
-
-function roundBpmToNearestFive(value: number) {
-  return Math.round(value / 5) * 5;
 }

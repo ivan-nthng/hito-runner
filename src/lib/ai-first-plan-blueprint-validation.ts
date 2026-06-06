@@ -60,7 +60,7 @@ export function buildNormalizationContext(authoringInput: StructuredAuthoringInp
     runningDays,
     paceTargetsAllowed,
     estimatedMaxHr,
-    defaultHrAllowed: Boolean(estimatedMaxHr),
+    defaultHrAllowed: false,
     lowSupportBuildConsistency,
     goalFamilyPolicy,
     goalFamilyCadencePlan,

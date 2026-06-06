@@ -11,6 +11,7 @@ import {
   CANONICAL_WORKOUT_IDENTITY_VALUES,
   HR_TARGET_SOURCE_VALUES,
   canonicalFamilyToLegacyWorkoutType,
+  deriveExecutableModeFromSegments,
   normalizeCanonicalGoalContext,
   resolveCanonicalWorkoutModel,
   toCanonicalMetricModeJson,
@@ -496,7 +497,7 @@ function buildNormalizationContext(authoringInput: StructuredAuthoringInput) {
     runningDays,
     paceTargetsAllowed,
     estimatedMaxHr,
-    defaultHrAllowed: Boolean(estimatedMaxHr),
+    defaultHrAllowed: false,
     lowSupportBuildConsistency,
   };
 }
@@ -722,7 +723,7 @@ function normalizeAiDraftWorkout({
             }),
           ),
         );
-  const metricMode = buildWorkoutMetricMode(segments, context);
+  const metricMode = buildWorkoutMetricMode(segments);
 
   return {
     workout_id: `ai-${slugify(workout.workoutIdentity)}-${workout.date}`,
@@ -995,119 +996,50 @@ function normalizeAiDraftTarget({
     repairs.push(`${workout.date}: replaced AI-supplied HR target on ${segment.label}.`);
   }
 
-  const defaultHrBand = defaultEstimatedHrBandForSegment(workout, segment);
-
-  if (context.defaultHrAllowed && defaultHrBand) {
-    Object.assign(target, buildDefaultEstimatedHrTarget(context.estimatedMaxHr!, defaultHrBand));
-  }
-
   return target;
 }
 
-function defaultEstimatedHrBandForSegment(
-  workout: AiDraftWorkout,
-  segment: AiDraftSegment,
-): DefaultEstimatedHrBand | null {
-  if (workout.workoutFamily === "rest") {
-    return null;
-  }
-
-  if (
-    ["intervals", "hills", "trail"].includes(workout.workoutFamily) &&
-    !["warmup", "cooldown", "recovery", "recovery_jog"].includes(segment.segmentType)
-  ) {
-    return null;
-  }
-
-  if (segment.segmentType === "cooldown" || segment.segmentType === "recovery") {
-    return "recovery";
-  }
-
-  if (segment.segmentType === "warmup") {
-    return "easy";
-  }
-
-  if (workout.workoutFamily === "recovery") {
-    return "recovery";
-  }
-
-  if (workout.workoutFamily === "easy") {
-    return "easy";
-  }
-
-  if (workout.workoutFamily === "long") {
-    return "longAerobic";
-  }
-
-  if (workout.workoutFamily === "steady") {
-    return "steady";
-  }
-
-  if (workout.workoutFamily === "tempo" && segment.segmentType === "tempo_block") {
-    return "tempo";
-  }
-
-  return null;
-}
-
-type DefaultEstimatedHrBand = "recovery" | "easy" | "longAerobic" | "steady" | "tempo";
-
-const defaultEstimatedHrBands: Record<DefaultEstimatedHrBand, [number, number]> = {
-  recovery: [0.55, 0.65],
-  easy: [0.6, 0.72],
-  longAerobic: [0.6, 0.75],
-  steady: [0.7, 0.8],
-  tempo: [0.8, 0.88],
-};
-
-function buildDefaultEstimatedHrTarget(estimatedMaxHr: number, band: DefaultEstimatedHrBand) {
-  const [lowerPercent, upperPercent] = defaultEstimatedHrBands[band];
-
-  return {
-    hr_bpm_range: `${roundBpmToNearestFive(estimatedMaxHr * lowerPercent)}-${roundBpmToNearestFive(
-      estimatedMaxHr * upperPercent,
-    )} bpm`,
-    hr_target_source: "default_estimated_hr",
-    label: "Default HR guidance",
-    source_note: "Estimated from age, not personalized zones.",
-  };
-}
-
-function roundBpmToNearestFive(value: number) {
-  return Math.round(value / 5) * 5;
-}
-
-function buildWorkoutMetricMode(
-  segments: CanonicalSegment[],
-  context: ReturnType<typeof buildNormalizationContext>,
-): CanonicalMetricModeJson {
+function buildWorkoutMetricMode(segments: CanonicalSegment[]): CanonicalMetricModeJson {
   const hasPace = segments.some((segment) => targetHasMetric(segment.target, "pace"));
-  const hasHr = segments.some((segment) => targetHasMetric(segment.target, "hr"));
+  const hasPersonalHr = segments.some(
+    (segment) =>
+      targetHasMetric(segment.target, "hr") &&
+      segment.target?.hr_target_source === "personal_hr_zone",
+  );
+  const executableMode =
+    hasPace && hasPersonalHr
+      ? "mixed_metric_executable"
+      : hasPace
+        ? "pace_executable"
+        : hasPersonalHr
+          ? "hr_executable"
+          : deriveExecutableModeFromSegments(segments);
   const guidance: CanonicalMetricGuidance = hasPace
-    ? hasHr
+    ? hasPersonalHr
       ? "mixed"
       : "pace"
-    : hasHr
+    : hasPersonalHr
       ? "heart_rate"
       : "effort";
 
   return toCanonicalMetricModeJson({
     guidance,
+    executableMode,
     paceTargetsAllowed: hasPace,
-    hrTargetsAllowed: hasHr,
-    hrTargetSource: hasHr ? "default_estimated_hr" : "effort_only",
-    hrTargetLabel: hasHr ? "Default HR guidance" : null,
-    hrTargetSourceNote: hasHr ? "Estimated from age, not personalized zones." : null,
+    hrTargetsAllowed: hasPersonalHr,
+    hrTargetSource: hasPersonalHr ? "personal_hr_zone" : "effort_only",
+    hrTargetLabel: null,
+    hrTargetSourceNote: null,
     reason:
-      hasPace && hasHr
-        ? "Pace guidance is gated by benchmark/watch truth, and HR guidance is age-estimated default guidance."
+      hasPace && hasPersonalHr
+        ? "Pace guidance is gated by benchmark/watch truth, and HR guidance uses personal HR-zone truth."
         : hasPace
           ? "Pace guidance is gated by benchmark/watch truth."
-          : hasHr
-            ? "HR guidance is a broad age-estimated default, not personalized zones."
-            : context.estimatedMaxHr
-              ? "Metric resolver keeps this workout effort-guided; default HR is not useful for this workout type."
-              : "Metric resolver keeps this workout effort-guided without numeric pace or HR targets.",
+          : hasPersonalHr
+            ? "HR guidance uses personal HR-zone truth."
+            : executableMode === "structure_only_executable"
+              ? "Workout is executable by numeric duration, distance, repeat, work, and recovery structure without pace or HR targets."
+              : "Workout requires correction because it lacks executable metric truth and executable numeric structure.",
   });
 }
 

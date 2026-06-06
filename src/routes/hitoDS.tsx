@@ -520,14 +520,14 @@ const TYPOGRAPHY_ROLES = [
     className: "hito-label",
     sample: "Current plan",
     use: "Micro orientation, never a substitute for a heading.",
-    spec: "Poppins · 0.6875rem · 500 · 0.18em · uppercase",
+    spec: "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
   },
   {
     role: "Form label",
     className: "hito-form-label",
     sample: "Start training",
     use: "Explicit ownership label for fields and controls.",
-    spec: "Poppins · 0.6875rem · 500 · 0.18em · uppercase",
+    spec: "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
   },
   {
     role: "Micro label",

@@ -56,6 +56,19 @@ export const CANONICAL_METRIC_GUIDANCE_VALUES = ["effort", "pace", "heart_rate",
 
 export type CanonicalMetricGuidance = (typeof CANONICAL_METRIC_GUIDANCE_VALUES)[number];
 
+export const CANONICAL_EXECUTABLE_MODE_VALUES = [
+  "pace_executable",
+  "hr_executable",
+  "mixed_metric_executable",
+  "structure_only_executable",
+  "correction_required",
+  "effort_only",
+  "none",
+  "unknown",
+] as const;
+
+export type CanonicalExecutableMode = (typeof CANONICAL_EXECUTABLE_MODE_VALUES)[number];
+
 export const HR_TARGET_SOURCE_VALUES = [
   "personal_hr_zone",
   "default_estimated_hr",
@@ -86,6 +99,7 @@ export interface CanonicalGoalContext {
 
 export interface CanonicalMetricMode {
   guidance: CanonicalMetricGuidance;
+  executableMode: CanonicalExecutableMode;
   paceTargetsAllowed: boolean;
   hrTargetsAllowed: boolean;
   hrTargetSource: HrTargetSource;
@@ -96,6 +110,7 @@ export interface CanonicalMetricMode {
 
 export interface CanonicalMetricModeJson {
   guidance: CanonicalMetricGuidance;
+  executable_mode: CanonicalExecutableMode;
   pace_targets_allowed: boolean;
   hr_targets_allowed: boolean;
   hr_target_source: HrTargetSource;
@@ -128,6 +143,16 @@ export interface WorkoutSegmentLike {
   label?: string | null;
   target?: Record<string, unknown> | null;
   recovery_target?: Record<string, unknown> | null;
+  prescription?: Record<string, unknown> | null;
+  duration_min?: number | null;
+  distance_km?: number | null;
+  repeat_count?: number | null;
+  work_distance_km?: number | null;
+  work_duration_min?: number | null;
+  work_duration_sec?: number | null;
+  recovery_distance_km?: number | null;
+  recovery_duration_min?: number | null;
+  recovery_duration_sec?: number | null;
   work?: WorkoutSegmentLike | null;
   recovery?: WorkoutSegmentLike | null;
 }
@@ -136,6 +161,7 @@ const FAMILY_VALUES = new Set<string>(CANONICAL_WORKOUT_FAMILY_VALUES);
 const IDENTITY_VALUES = new Set<string>(CANONICAL_WORKOUT_IDENTITY_VALUES);
 const ICON_VALUES = new Set<string>(CALENDAR_ICON_KEY_VALUES);
 const GUIDANCE_VALUES = new Set<string>(CANONICAL_METRIC_GUIDANCE_VALUES);
+const EXECUTABLE_MODE_VALUE_SET = new Set<string>(CANONICAL_EXECUTABLE_MODE_VALUES);
 const HR_TARGET_SOURCE_VALUE_SET = new Set<string>(HR_TARGET_SOURCE_VALUES);
 
 const identityFamilyMap: Record<CanonicalWorkoutIdentity, CanonicalWorkoutFamily> = {
@@ -290,10 +316,19 @@ export function normalizeCanonicalMetricMode(value: unknown): CanonicalMetricMod
   }
 
   const paceTargetsAllowed = readBoolean(record.paceTargetsAllowed, record.pace_targets_allowed);
-  const hrTargetsAllowed = readBoolean(record.hrTargetsAllowed, record.hr_targets_allowed);
+  const rawHrTargetsAllowed = readBoolean(record.hrTargetsAllowed, record.hr_targets_allowed);
   const hrTargetSource =
     normalizeHrTargetSource(record.hrTargetSource ?? record.hr_target_source) ??
-    (hrTargetsAllowed ? "personal_hr_zone" : "effort_only");
+    (rawHrTargetsAllowed ? "personal_hr_zone" : "effort_only");
+  const hrTargetsAllowed = rawHrTargetsAllowed && hrTargetSource === "personal_hr_zone";
+  const executableMode =
+    normalizeExecutableMode(record.executableMode ?? record.executable_mode) ??
+    inferExecutableModeFromMetricTruth({
+      paceTargetsAllowed,
+      hrTargetsAllowed,
+      hrTargetSource,
+      guidance,
+    });
   const hrTargetLabel =
     readString(record.hrTargetLabel, record.hr_target_label, record.label) ?? null;
   const hrTargetSourceNote =
@@ -302,6 +337,7 @@ export function normalizeCanonicalMetricMode(value: unknown): CanonicalMetricMod
 
   return {
     guidance,
+    executableMode,
     paceTargetsAllowed,
     hrTargetsAllowed,
     hrTargetSource,
@@ -316,6 +352,7 @@ export function toCanonicalMetricModeJson(
 ): CanonicalMetricModeJson {
   return {
     guidance: metricMode.guidance,
+    executable_mode: metricMode.executableMode,
     pace_targets_allowed: metricMode.paceTargetsAllowed,
     hr_targets_allowed: metricMode.hrTargetsAllowed,
     hr_target_source: metricMode.hrTargetSource,
@@ -387,58 +424,86 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
     segmentContainsTargetKeys(segment, ["hr_bpm_range", "hr_bpm"]),
   );
   const hrMetadata = hasHr ? deriveHrTargetMetadata(segments) : null;
+  const hasPersonalHr = hasHr && hrMetadata?.source === "personal_hr_zone";
+  const fallbackExecutableMode = deriveExecutableModeFromSegments(segments);
 
-  if (hasPace && hasHr) {
+  if (hasPace && hasPersonalHr) {
     return {
       guidance: "mixed",
+      executableMode: "mixed_metric_executable",
       paceTargetsAllowed: true,
       hrTargetsAllowed: true,
-      hrTargetSource: hrMetadata?.source ?? "personal_hr_zone",
+      hrTargetSource: "personal_hr_zone",
       hrTargetLabel: hrMetadata?.label ?? null,
       hrTargetSourceNote: hrMetadata?.sourceNote ?? null,
-      reason:
-        hrMetadata?.source === "default_estimated_hr"
-          ? "Workout includes explicit pace targets and default estimated heart-rate guidance."
-          : "Workout includes explicit pace and heart-rate targets.",
+      reason: "Workout includes explicit pace targets and personal heart-rate zone targets.",
     };
   }
 
   if (hasPace) {
     return {
       guidance: "pace",
+      executableMode: "pace_executable",
       paceTargetsAllowed: true,
       hrTargetsAllowed: false,
-      hrTargetSource: "effort_only",
-      hrTargetLabel: null,
-      hrTargetSourceNote: null,
-      reason: "Workout includes explicit pace targets.",
+      hrTargetSource: hrMetadata?.source ?? "effort_only",
+      hrTargetLabel: hrMetadata?.source === "default_estimated_hr" ? hrMetadata.label : null,
+      hrTargetSourceNote:
+        hrMetadata?.source === "default_estimated_hr" ? hrMetadata.sourceNote : null,
+      reason:
+        hrMetadata?.source === "default_estimated_hr"
+          ? "Workout includes pace targets; age-estimated HR is advisory only, not executable HR truth."
+          : "Workout includes explicit pace targets.",
     };
   }
 
-  if (hasHr) {
+  if (hasPersonalHr) {
     return {
       guidance: "heart_rate",
+      executableMode: "hr_executable",
       paceTargetsAllowed: false,
       hrTargetsAllowed: true,
-      hrTargetSource: hrMetadata?.source ?? "personal_hr_zone",
+      hrTargetSource: "personal_hr_zone",
       hrTargetLabel: hrMetadata?.label ?? null,
       hrTargetSourceNote: hrMetadata?.sourceNote ?? null,
-      reason:
-        hrMetadata?.source === "default_estimated_hr"
-          ? "Workout includes default estimated heart-rate guidance."
-          : "Workout includes explicit heart-rate targets.",
+      reason: "Workout includes explicit personal heart-rate zone targets.",
     };
   }
 
   return {
     guidance: "effort",
+    executableMode: fallbackExecutableMode,
     paceTargetsAllowed: false,
     hrTargetsAllowed: false,
-    hrTargetSource: "effort_only",
-    hrTargetLabel: null,
-    hrTargetSourceNote: null,
-    reason: "No numeric pace or heart-rate targets are present; use effort cues.",
+    hrTargetSource: hrMetadata?.source ?? "effort_only",
+    hrTargetLabel: hrMetadata?.source === "default_estimated_hr" ? hrMetadata.label : null,
+    hrTargetSourceNote:
+      hrMetadata?.source === "default_estimated_hr" ? hrMetadata.sourceNote : null,
+    reason:
+      fallbackExecutableMode === "structure_only_executable"
+        ? "Workout has executable duration, distance, repeat, work, or recovery structure without pace or HR targets."
+        : "Workout is missing executable numeric metric truth and executable structure.",
   };
+}
+
+export function deriveExecutableModeFromSegments(
+  segments: WorkoutSegmentLike[],
+): CanonicalExecutableMode {
+  if (segments.length === 0) {
+    return "correction_required";
+  }
+
+  const executionSegments = flattenWorkoutSegments(segments).filter(
+    (segment) => !isNonRunningNoneSegment(segment),
+  );
+
+  if (executionSegments.length === 0) {
+    return "none";
+  }
+
+  return executionSegments.every(segmentHasExecutableNumericStructure)
+    ? "structure_only_executable"
+    : "correction_required";
 }
 
 function deriveHrTargetMetadata(segments: WorkoutSegmentLike[]) {
@@ -589,6 +654,7 @@ function inferWorkoutIdentity(
 function buildRestMetricMode(): CanonicalMetricMode {
   return {
     guidance: "effort",
+    executableMode: "none",
     paceTargetsAllowed: false,
     hrTargetsAllowed: false,
     hrTargetSource: "effort_only",
@@ -596,6 +662,108 @@ function buildRestMetricMode(): CanonicalMetricMode {
     hrTargetSourceNote: null,
     reason: "Rest day has no execution metric targets.",
   };
+}
+
+function inferExecutableModeFromMetricTruth({
+  paceTargetsAllowed,
+  hrTargetsAllowed,
+  hrTargetSource,
+  guidance,
+}: {
+  paceTargetsAllowed: boolean;
+  hrTargetsAllowed: boolean;
+  hrTargetSource: HrTargetSource;
+  guidance: CanonicalMetricGuidance;
+}): CanonicalExecutableMode {
+  if (paceTargetsAllowed && hrTargetsAllowed && hrTargetSource === "personal_hr_zone") {
+    return "mixed_metric_executable";
+  }
+
+  if (paceTargetsAllowed) {
+    return "pace_executable";
+  }
+
+  if (hrTargetsAllowed && hrTargetSource === "personal_hr_zone") {
+    return "hr_executable";
+  }
+
+  return guidance === "effort" ? "effort_only" : "unknown";
+}
+
+function flattenWorkoutSegments(segments: WorkoutSegmentLike[]): WorkoutSegmentLike[] {
+  return segments.flatMap((segment) => [
+    segment,
+    ...(segment.work ? flattenWorkoutSegments([segment.work]) : []),
+    ...(segment.recovery ? flattenWorkoutSegments([segment.recovery]) : []),
+  ]);
+}
+
+function isNonRunningNoneSegment(segment: WorkoutSegmentLike) {
+  const segmentType = normalizeToken(segment.segment_type ?? segment.type);
+  const mode = normalizeToken(segment.prescription?.mode);
+
+  return (
+    mode === "none" &&
+    ["rest", "fueling", "mobility", "mobility_optional", "activation", "drills"].includes(
+      segmentType ?? "",
+    )
+  );
+}
+
+function segmentHasExecutableNumericStructure(segment: WorkoutSegmentLike): boolean {
+  const prescription = segment.prescription;
+  const mode = normalizeToken(prescription?.mode);
+
+  if (mode === "time") {
+    return positiveNumber(prescription?.duration_min) || positiveNumber(segment.duration_min);
+  }
+
+  if (mode === "distance") {
+    return positiveNumber(prescription?.distance_km) || positiveNumber(segment.distance_km);
+  }
+
+  if (mode === "repeats") {
+    return (
+      positiveNumber(prescription?.repeat_count ?? segment.repeat_count) &&
+      unitPrescriptionHasExecutableStructure(prescription?.repeat_unit) &&
+      unitPrescriptionHasExecutableStructure(prescription?.recovery_unit)
+    );
+  }
+
+  return (
+    positiveNumber(segment.duration_min) ||
+    positiveNumber(segment.distance_km) ||
+    (positiveNumber(segment.repeat_count) &&
+      (positiveNumber(segment.work_distance_km) ||
+        positiveNumber(segment.work_duration_min) ||
+        positiveNumber(segment.work_duration_sec)) &&
+      (positiveNumber(segment.recovery_distance_km) ||
+        positiveNumber(segment.recovery_duration_min) ||
+        positiveNumber(segment.recovery_duration_sec)))
+  );
+}
+
+function unitPrescriptionHasExecutableStructure(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const unit = value as Record<string, unknown>;
+  const mode = normalizeToken(unit.mode);
+
+  if (mode === "time") {
+    return positiveNumber(unit.duration_min);
+  }
+
+  if (mode === "distance") {
+    return positiveNumber(unit.distance_km);
+  }
+
+  return false;
+}
+
+function positiveNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function buildLegacySemanticText(title: string, steps: WorkoutSegmentLike[]) {
@@ -679,6 +847,12 @@ function normalizeMetricGuidance(value: unknown): CanonicalMetricGuidance | null
   const token = normalizeToken(value);
 
   return token && GUIDANCE_VALUES.has(token) ? (token as CanonicalMetricGuidance) : null;
+}
+
+function normalizeExecutableMode(value: unknown): CanonicalExecutableMode | null {
+  const token = normalizeToken(value);
+
+  return token && EXECUTABLE_MODE_VALUE_SET.has(token) ? (token as CanonicalExecutableMode) : null;
 }
 
 function segmentContainsTargetKeys(segment: WorkoutSegmentLike, keys: string[]): boolean {

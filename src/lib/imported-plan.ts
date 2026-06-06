@@ -6,6 +6,7 @@ import {
 } from "@/lib/training";
 import {
   CALENDAR_ICON_KEY_VALUES,
+  CANONICAL_EXECUTABLE_MODE_VALUES,
   CANONICAL_METRIC_GUIDANCE_VALUES,
   CANONICAL_WORKOUT_FAMILY_VALUES,
   CANONICAL_WORKOUT_IDENTITY_VALUES,
@@ -173,6 +174,7 @@ const v2WorkoutGoalContextSchema = z
 const v2WorkoutMetricModeSchema = z
   .object({
     guidance: z.enum(CANONICAL_METRIC_GUIDANCE_VALUES),
+    executable_mode: z.enum(CANONICAL_EXECUTABLE_MODE_VALUES).optional(),
     pace_targets_allowed: z.boolean(),
     hr_targets_allowed: z.boolean(),
     hr_target_source: z.enum(HR_TARGET_SOURCE_VALUES).optional(),

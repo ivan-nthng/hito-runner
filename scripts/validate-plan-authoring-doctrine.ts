@@ -39,6 +39,7 @@ import {
 } from "../src/lib/plan-export";
 import {
   canonicalFamilyToLegacyWorkoutType,
+  deriveExecutableModeFromSegments,
   resolveCanonicalWorkoutModel,
   type CalendarIconKey,
   type CanonicalWorkoutFamily,
@@ -223,36 +224,16 @@ function hrTargetRecords(plan: TrainingPlanV2) {
   });
 }
 
-function assertDefaultEstimatedHrGuidance(plan: TrainingPlanV2, label: string) {
+function assertNoDefaultEstimatedHrTargets(plan: TrainingPlanV2, label: string) {
   const hrTargets = hrTargetRecords(plan);
 
-  assert.ok(hrTargets.length > 0, `${label}: expected default estimated HR guidance`);
+  assert.deepEqual(hrTargets, [], `${label}: age-estimated HR must not emit HR target ranges`);
 
-  for (const target of hrTargets) {
+  for (const workout of plan.planned_workouts) {
     assert.equal(
-      target.hr_target_source,
-      "default_estimated_hr",
-      `${label}: HR target should identify default estimated source`,
-    );
-    assert.equal(target.label, "Default HR guidance", `${label}: HR label should be bounded`);
-    assert.equal(
-      target.source_note,
-      "Estimated from age, not personalized zones.",
-      `${label}: HR source note should avoid personalization claims`,
-    );
-  }
-
-  const hrMetricModes = plan.planned_workouts
-    .map((workout) => workout.metric_mode)
-    .filter((metricMode) => metricMode?.hr_targets_allowed);
-
-  assert.ok(hrMetricModes.length > 0, `${label}: metric_mode should expose HR-enabled workouts`);
-
-  for (const metricMode of hrMetricModes) {
-    assert.equal(
-      metricMode?.hr_target_source,
-      "default_estimated_hr",
-      `${label}: metric_mode should expose default estimated HR source`,
+      workout.metric_mode?.hr_targets_allowed,
+      false,
+      `${label}: metric_mode must not claim HR targets without personal zone truth`,
     );
   }
 }
@@ -271,6 +252,46 @@ function assertEffortOnlyHrGuidance(plan: TrainingPlanV2, label: string) {
       workout.metric_mode?.hr_target_source,
       "effort_only",
       `${label}: metric_mode should identify effort-only HR policy`,
+    );
+  }
+}
+
+function assertStructureOnlyExecutableContract(plan: TrainingPlanV2, label: string) {
+  for (const workout of plan.planned_workouts) {
+    assert.ok(workout.metric_mode, `${label}: metric_mode should be present`);
+
+    if (workout.workout_type === "rest") {
+      assert.equal(
+        workout.metric_mode?.executable_mode,
+        "none",
+        `${label}: rest rows should expose executable_mode=none`,
+      );
+      continue;
+    }
+
+    const derivedExecutableMode = deriveExecutableModeFromSegments(workout.segments);
+
+    if (
+      workout.metric_mode?.pace_targets_allowed === true ||
+      workout.metric_mode?.hr_targets_allowed === true
+    ) {
+      assert.notEqual(
+        workout.metric_mode?.executable_mode,
+        "structure_only_executable",
+        `${label}: metric-target rows should not be mislabeled structure-only`,
+      );
+      continue;
+    }
+
+    assert.equal(
+      derivedExecutableMode,
+      "structure_only_executable",
+      `${label}: non-metric rows need numeric duration, distance, repeat, work, and recovery structure`,
+    );
+    assert.equal(
+      workout.metric_mode?.executable_mode,
+      "structure_only_executable",
+      `${label}: non-metric generated rows should be structure-only executable`,
     );
   }
 }
@@ -351,6 +372,21 @@ function assertSupportRunRichness(plan: TrainingPlanV2, label: string) {
           targetKeys(segment).includes("hint") ||
           targetKeys(segment).includes("intensity"),
         `${label}: ${sourceWorkoutType} segment should include target cue, hint, or intensity`,
+      );
+    }
+    assert.ok(
+      workout.metric_mode.executable_mode,
+      `${label}: metric_mode should expose executable_mode`,
+    );
+    if (
+      workout.workout_type !== "rest" &&
+      workout.metric_mode.pace_targets_allowed !== true &&
+      workout.metric_mode.hr_targets_allowed !== true
+    ) {
+      assert.equal(
+        workout.metric_mode.executable_mode,
+        deriveExecutableModeFromSegments(workout.segments),
+        `${label}: structure-only executable mode should match numeric segment structure`,
       );
     }
   }
@@ -465,7 +501,7 @@ function assertNoFakeMetricTargetRegression(plan: TrainingPlanV2, label: string)
     false,
     `${label}: should not add fake pace targets`,
   );
-  assertDefaultEstimatedHrGuidance(plan, label);
+  assertNoDefaultEstimatedHrTargets(plan, label);
 }
 
 function assertStructuredCreatePersistsRichWorkoutTruth(
@@ -1125,9 +1161,9 @@ function assertRichAiDraftNormalizer() {
   );
 
   if (fakeHrWithDefaultNormalized.ok) {
-    assertDefaultEstimatedHrGuidance(
+    assertNoDefaultEstimatedHrTargets(
       fakeHrWithDefaultNormalized.canonicalPlan,
-      "AI rich draft normalization with default estimated HR",
+      "AI rich draft normalization with age but no personal HR zones",
     );
     assert.equal(
       JSON.stringify(fakeHrWithDefaultNormalized.canonicalPlan).includes("150-160"),
@@ -1988,6 +2024,16 @@ function assertRichCompatibilityMapping() {
     "Default HR guidance",
     "metric-mode fallback should preserve default HR label",
   );
+  assert.equal(
+    defaultHrMetricMode.hrTargetsAllowed,
+    false,
+    "metric-mode fallback must not treat default HR source as personal HR target truth",
+  );
+  assert.equal(
+    defaultHrMetricMode.executableMode,
+    "correction_required",
+    "metric-mode fallback without numeric structure should request correction instead of effort-only execution",
+  );
 }
 
 function assertRichPersistenceReadback() {
@@ -2709,7 +2755,7 @@ function assertBeginnerBuildConsistencyQualityCap() {
     false,
     "beginner consistency plan without watch/benchmark support should not emit pace targets",
   );
-  assertDefaultEstimatedHrGuidance(
+  assertNoDefaultEstimatedHrTargets(
     plan,
     "beginner consistency plan with age but no personal HR zones",
   );
@@ -3412,9 +3458,9 @@ function assertMetricTargetPolicy() {
   );
 
   for (const plan of [supportedPace, buildPlan(buildRequest("marathon")).plan, mountainPlan]) {
-    assertDefaultEstimatedHrGuidance(
+    assertNoDefaultEstimatedHrTargets(
       plan,
-      "age-supported plan without personal HR zones should use default estimated HR",
+      "age-supported plan without personal HR zones should not emit default HR targets",
     );
   }
 
@@ -3453,10 +3499,12 @@ function assertMetricTargetPolicy() {
     )
     .filter((segment) => targetHasHr(segment.target as Record<string, unknown> | undefined));
 
-  assert.ok(
-    sustainedTempoHrTargets.length > 0,
-    "sustained tempo/threshold blocks should receive broad default estimated HR guidance when age exists",
+  assert.deepEqual(
+    sustainedTempoHrTargets,
+    [],
+    "sustained tempo/threshold blocks must not receive age-estimated HR ranges without personal zones",
   );
+  assertStructureOnlyExecutableContract(halfPlan, "half-marathon metric-truth executable contract");
 }
 
 function buildAiFirstPlanAuthoringInput(
@@ -3813,10 +3861,10 @@ function buildAiFirstPlanDraftFixture(): AiFirstPlanDraft {
     },
     reviewAssumptions: [
       "Target-time work is included only where benchmark support allows pace guidance.",
-      "Default HR guidance, if shown, is estimated from age and not personalized zones.",
+      "HR targets require personal zone truth; age-estimated HR is not executable target truth.",
     ],
     metricPolicySummary:
-      "Pace is gated by watch/app plus recent benchmark truth; HR is default estimated only.",
+      "Pace is gated by watch/app plus recent benchmark truth; HR requires personal zones.",
     weeks,
   };
 }
@@ -3963,7 +4011,7 @@ function buildAiFirstPlanBlueprintFixture(): AiFirstPlanBlueprint {
       "Backend expands compact workout intent into canonical segments and metric truth.",
     ],
     metricPolicySummary:
-      "AI supplies metric intent only; backend applies pace gates and default estimated HR policy.",
+      "AI supplies metric intent only; backend applies pace and personal HR truth gates.",
     weeks,
   };
 }
@@ -4072,7 +4120,7 @@ function buildAiFirstPlanBlueprintIdentityFixture(): AiFirstPlanBlueprint {
       "AI supplies no numeric metric truth; backend owns pace and HR policy.",
     ],
     metricPolicySummary:
-      "AI supplies metric intent only; backend applies pace gates and default estimated HR policy.",
+      "AI supplies metric intent only; backend applies pace and personal HR truth gates.",
     weeks: weeks.map((week, weekIndex) => ({
       weekNumber: weekIndex + 1,
       phase: week.phase,
@@ -4252,7 +4300,7 @@ function buildAiFirstPlanBlueprintMissingIdentityFixture(): AiFirstPlanBlueprint
       "AI supplies no numeric metric truth; backend owns pace and HR policy.",
     ],
     metricPolicySummary:
-      "AI supplies metric intent only; backend applies pace gates and default estimated HR policy.",
+      "AI supplies metric intent only; backend applies pace and personal HR truth gates.",
     weeks: weeks.map((week, weekIndex) => ({
       weekNumber: weekIndex + 1,
       phase: week.phase,
@@ -4700,9 +4748,9 @@ function assertAiFirstPlanDraftContract() {
     );
     assertRichWorkoutContract(normalized.canonicalPlan, "AI first-plan normalized output");
     assertFixedRestDays(normalized.canonicalPlan);
-    assertDefaultEstimatedHrGuidance(
+    assertNoDefaultEstimatedHrTargets(
       normalized.canonicalPlan,
-      "AI first-plan default estimated HR",
+      "AI first-plan age-estimated HR exclusion",
     );
     assert.equal(
       hasTargetKey(normalized.canonicalPlan, "pace_min_per_km_range"),
@@ -5636,9 +5684,9 @@ function assertAiFirstPlanBlueprintContract() {
     );
     assertRichWorkoutContract(normalized.canonicalPlan, "AI first-plan blueprint output");
     assertFixedRestDays(normalized.canonicalPlan);
-    assertDefaultEstimatedHrGuidance(
+    assertNoDefaultEstimatedHrTargets(
       normalized.canonicalPlan,
-      "AI first-plan blueprint default estimated HR",
+      "AI first-plan blueprint age-estimated HR exclusion",
     );
     assert.equal(
       hasTargetKey(normalized.canonicalPlan, "pace_min_per_km_range"),
@@ -6559,6 +6607,55 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
     );
     assertRichWorkoutContract(aiResult.draft.canonicalPlan, "structured first-plan AI draft");
     assertFixedRestDays(aiResult.draft.canonicalPlan);
+    assertStructureOnlyExecutableContract(
+      aiResult.draft.canonicalPlan,
+      "structured first-plan AI draft executable contract",
+    );
+  }
+
+  const missingExecutionSurfaceResult = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-fixture-user",
+    {
+      ...input,
+      execution: { watchAccess: "unknown", guidancePreference: "effort" },
+    },
+    {
+      aiPreview: {
+        apiKey: "test-openai-key",
+        model: "test-ai-first-plan-model",
+        timeoutMs: 1_000,
+        fetchImpl: (async () => {
+          throw new Error("missing execution support should stop before OpenAI");
+        }) as typeof fetch,
+      },
+    },
+  );
+
+  assert.equal(
+    missingExecutionSurfaceResult.ok,
+    true,
+    "missing execution surface should return a bounded correction result",
+  );
+  assert.equal(
+    missingExecutionSurfaceResult.status,
+    "correction_required",
+    "missing execution surface should not enter AI draft generation",
+  );
+
+  if (
+    missingExecutionSurfaceResult.ok &&
+    missingExecutionSurfaceResult.status === "correction_required"
+  ) {
+    assert.equal(
+      missingExecutionSurfaceResult.reason,
+      "missing_executable_target_support",
+      "missing execution surface should expose the executable target support reason",
+    );
+    assert.deepEqual(
+      missingExecutionSurfaceResult.correction.fields,
+      ["execution.watchAccess"],
+      "missing execution surface correction should point at watch access",
+    );
   }
 
   const envelopeInput = parseStructuredFirstPlanOnboardingInput(
@@ -6582,7 +6679,7 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract() {
         targetDate: "2026-07-12",
       },
       strength: { preference: "mobility" },
-      execution: { watchAccess: "unknown", guidancePreference: "effort" },
+      execution: { watchAccess: "watch_or_app", guidancePreference: "effort" },
       comment: null,
     }),
   );
@@ -7363,7 +7460,7 @@ function buildMinimalAiFirstPlanBlueprintForAuthoringInput(
       "Backend expands compact workout intent into canonical segments and metric truth.",
     ],
     metricPolicySummary:
-      "AI supplies metric intent only; backend applies pace gates and default estimated HR policy.",
+      "AI supplies metric intent only; backend applies pace and personal HR truth gates.",
     weeks: Array.from({ length: horizonWeeks }, (_value, weekIndex) => ({
       weekNumber: weekIndex + 1,
       phase: weekIndex === 0 ? "Base" : "Build",
@@ -7461,7 +7558,7 @@ for (const goalDistance of [
   const { plan } = buildPlan(buildRequest(goalDistance));
 
   assertFixedRestDays(plan);
-  assertDefaultEstimatedHrGuidance(plan, `${goalDistance} with age but no personal HR zones`);
+  assertNoDefaultEstimatedHrTargets(plan, `${goalDistance} with age but no personal HR zones`);
   assert.equal(
     hasTargetKey(plan, "pace_min_per_km_range"),
     true,
@@ -7592,7 +7689,7 @@ assertRichWorkoutContract(
     false,
     "saved half marathon without benchmark should stay effort-only",
   );
-  assertDefaultEstimatedHrGuidance(
+  assertNoDefaultEstimatedHrTargets(
     halfBalancedNoBenchmark,
     "saved half marathon without benchmark but with age",
   );
@@ -7652,7 +7749,7 @@ assertRichWorkoutContract(
     false,
     "target-time half marathon without benchmark must stay effort-only even with watch/app mixed guidance",
   );
-  assertDefaultEstimatedHrGuidance(
+  assertNoDefaultEstimatedHrTargets(
     plan,
     "target-time half marathon without benchmark but with age",
   );
@@ -7730,7 +7827,7 @@ assertRichWorkoutContract(
     false,
     "low-support balanced marathon without benchmark/watch support should not emit pace targets",
   );
-  assertDefaultEstimatedHrGuidance(
+  assertNoDefaultEstimatedHrTargets(
     plan,
     "low-support balanced marathon with age but no personal HR zones",
   );

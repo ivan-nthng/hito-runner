@@ -25,6 +25,7 @@ import {
   getNonWorkoutTitle,
   getWorkoutTitle,
   type CalendarPlaygroundState,
+  type FutureActionState,
   type Option,
   type WorkoutIdentity,
 } from "./calendar-workout-playground-data";
@@ -394,7 +395,7 @@ function buildDesktopGridState(
     return state;
   }
 
-  return {
+  const mergedState: CalendarPlaygroundState = {
     ...DEFAULT_PLAYGROUND_STATE,
     viewMode: state.viewMode,
     overlay: "none",
@@ -405,6 +406,11 @@ function buildDesktopGridState(
     density: "normal",
     ...dayState,
   };
+
+  return {
+    ...mergedState,
+    action: resolveSpecimenAction(mergedState.baseState, state.action, dayState.action),
+  };
 }
 
 function buildMobilePreviewState(
@@ -414,7 +420,7 @@ function buildMobilePreviewState(
 ): CalendarPlaygroundState {
   if (index === 1) return state;
 
-  return {
+  const mergedState: CalendarPlaygroundState = {
     ...DEFAULT_PLAYGROUND_STATE,
     viewMode: state.viewMode,
     overlay: "none",
@@ -424,6 +430,11 @@ function buildMobilePreviewState(
     titleStress: "short",
     density: "normal",
     ...dayState,
+  };
+
+  return {
+    ...mergedState,
+    action: resolveSpecimenAction(mergedState.baseState, state.action, dayState.action),
   };
 }
 
@@ -439,7 +450,7 @@ function buildDenseGridState(
     };
   }
 
-  return {
+  const mergedState: CalendarPlaygroundState = {
     ...DEFAULT_PLAYGROUND_STATE,
     viewMode: state.viewMode,
     overlay: "none",
@@ -450,6 +461,29 @@ function buildDenseGridState(
     density: "dense",
     ...dayState,
   };
+
+  return {
+    ...mergedState,
+    action: resolveSpecimenAction(mergedState.baseState, state.action, dayState.action),
+  };
+}
+
+function resolveSpecimenAction(
+  baseState: CalendarPlaygroundState["baseState"],
+  requestedAction: FutureActionState,
+  explicitAction?: FutureActionState,
+): FutureActionState {
+  if (explicitAction) return explicitAction;
+
+  if (requestedAction === "more-menu" && (baseState === "workout" || baseState === "rest")) {
+    return "more-menu";
+  }
+
+  if (requestedAction === "add-activity" && baseState === "empty") {
+    return "add-activity";
+  }
+
+  return "none";
 }
 
 function getNonWorkoutAwareTitle(state: CalendarPlaygroundState, workout: WorkoutIdentity) {

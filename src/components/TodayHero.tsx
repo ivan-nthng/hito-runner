@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/ui/icon";
 import {
+  displayExecutableTargetEntries,
   feedbackMarkerMeta,
   formatDistanceKm,
   formatDate,
@@ -25,41 +26,15 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   const km = workoutDistanceKm(workout);
   const duration = workoutDuration(workout);
   const target = primaryWorkoutTarget(workout);
-  const primaryTarget =
-    typeof target?.hr_bpm_range === "string"
-      ? target.hr_bpm_range
-      : typeof target?.hr_bpm === "string"
-        ? target.hr_bpm
-        : typeof target?.pace_min_per_km_range === "string"
-          ? target.pace_min_per_km_range
-          : typeof target?.pace_range_min_km === "string"
-            ? target.pace_range_min_km
-            : typeof target?.pace === "string"
-              ? target.pace
-              : typeof target?.intensity === "string"
-                ? target.intensity
-                : null;
-  const paceValue =
-    typeof target?.pace_min_per_km_range === "string"
-      ? target.pace_min_per_km_range
-      : typeof target?.pace_range_min_km === "string"
-        ? target.pace_range_min_km
-        : typeof target?.pace === "string"
-          ? target.pace
-          : null;
-  const paceHint =
-    typeof target?.hint === "string"
-      ? target.hint
-      : typeof target?.cue === "string"
-        ? target.cue
-        : paceValue
-          ? null
-          : "Keep the effort relaxed";
+  const targetEntries = displayExecutableTargetEntries(target, workout.metricMode);
+  const primaryTarget = targetEntries[0] ?? null;
+  const paceTarget = targetEntries.find(
+    (entry) => entry.key === "pace_min_per_km_range" || entry.key === "pace",
+  );
+  const structureOnly = workout.metricMode.executableMode === "structure_only_executable";
   const workoutSupportText = isRestDay
     ? "Keep the day light unless a small recovery assignment is actually planned."
-    : [workout.notes ?? "Keep the effort smooth and let the session carry the day.", paceHint]
-        .filter(Boolean)
-        .join(" · ");
+    : (workout.notes?.trim() ?? "Open the workout for segment-by-segment instructions.");
 
   const tomorrowDate = new Date(`${snapshot.currentDate}T00:00:00`);
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -94,8 +69,13 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
               <div className="hito-metric-row mt-8 max-w-3xl">
                 {km != null && <Metric label="Distance" value={formatDistanceKm(km)} unit="km" />}
                 {duration > 0 && <Metric label="Duration" value={`${duration}`} unit="min" />}
-                {primaryTarget && <Metric label="Target" value={primaryTarget} />}
-                {paceValue && <Metric label="Pace" value={paceValue} />}
+                {primaryTarget && (
+                  <Metric label={primaryTarget.label} value={primaryTarget.value} />
+                )}
+                {!primaryTarget && structureOnly && <Metric label="Structure" value="Segments" />}
+                {paceTarget && paceTarget.key !== primaryTarget?.key && (
+                  <Metric label="Pace" value={paceTarget.value} />
+                )}
               </div>
             </>
           ) : (

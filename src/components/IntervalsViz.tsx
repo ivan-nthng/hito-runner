@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { Workout, Step, StepTarget } from "@/lib/training";
 import {
-  displayTargetEntries,
+  displayExecutableTargetEntries,
+  displayTargetSupportEntries,
   formatDistanceKm,
   formatDurationMin,
   segmentColorMeta,
@@ -77,6 +78,7 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
             block={activeBlock}
             color={activeColors.color}
             leftPercent={activePosition}
+            metricMode={workout.metricMode}
           />
         )}
       </div>
@@ -111,7 +113,7 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
                 </div>
                 {b.target && (
                   <div className="hito-caption mt-0.5 space-x-3">
-                    {displayTargetEntries(b.target).map((entry) => (
+                    {displayExecutableTargetEntries(b.target, workout.metricMode).map((entry) => (
                       <span key={entry.key}>
                         <span className="opacity-60">{entry.label}:</span>{" "}
                         <span className="text-foreground/80">{entry.value}</span>
@@ -193,18 +195,17 @@ function SegmentTooltip({
   color,
   align,
   leftPercent,
+  metricMode,
 }: {
   block: Block;
   color: string;
   align: "left" | "center" | "right";
   leftPercent: number;
+  metricMode: Workout["metricMode"];
 }) {
-  const entries = displayTargetEntries(block.target);
-  const priorityEntries = entries
-    .filter((entry) =>
-      ["intensity", "hr_bpm_range", "pace_min_per_km_range", "pace", "hint"].includes(entry.key),
-    )
-    .slice(0, 3);
+  const priorityEntries = displayExecutableTargetEntries(block.target, metricMode).slice(0, 3);
+  const supportEntries =
+    priorityEntries.length > 0 ? [] : displayTargetSupportEntries(block.target).slice(0, 1);
 
   return (
     <span
@@ -223,9 +224,9 @@ function SegmentTooltip({
         <span className="hito-tooltip-title">{block.title}</span>
       </span>
       <span className="hito-tooltip-meta mt-1 block font-mono-num">{block.metric}</span>
-      {priorityEntries.length > 0 && (
+      {(priorityEntries.length > 0 || supportEntries.length > 0) && (
         <span className="hito-tooltip-meta mt-1.5 block space-y-0.5">
-          {priorityEntries.map((entry) => (
+          {[...priorityEntries, ...supportEntries].map((entry) => (
             <span key={entry.key} className="block">
               <span className="opacity-65">{entry.label}:</span> <span>{entry.value}</span>
             </span>

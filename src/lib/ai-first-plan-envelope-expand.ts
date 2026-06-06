@@ -240,18 +240,30 @@ function validateMetricGates(
   context: ReturnType<typeof buildNormalizationContext>,
   issues: AiFirstPlanEnvelopeIssue[],
 ) {
-  if (context.paceTargetsAllowed) {
-    return;
-  }
-
   const serialized = JSON.stringify(workout.segments).toLowerCase();
 
-  if (serialized.includes("pace_min_per_km_range")) {
+  if (!workout.metric_mode?.executable_mode) {
+    issues.push({
+      code: "envelope_executable_mode_missing",
+      path: `${workout.date}.metric_mode`,
+      message: "Expanded envelope rows must expose backend executable target mode.",
+    });
+  }
+
+  if (!context.paceTargetsAllowed && serialized.includes("pace_min_per_km_range")) {
     issues.push({
       code: "envelope_unsupported_pace_target",
       path: `${workout.date}.segments`,
       message:
         "Expanded envelope cannot introduce pace targets when backend gates do not allow them.",
+    });
+  }
+
+  if (serialized.includes("hr_bpm_range") || serialized.includes("hr_bpm")) {
+    issues.push({
+      code: "envelope_unsupported_hr_target",
+      path: `${workout.date}.segments`,
+      message: "Expanded envelope cannot introduce HR targets without personal HR-zone truth.",
     });
   }
 }

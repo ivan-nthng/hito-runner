@@ -5,7 +5,7 @@ import {
   FIRST_PLAN_GOAL_STYLE_VALUES,
   FIRST_PLAN_WATCH_ACCESS_VALUES,
 } from "@/lib/first-plan-authoring-utils";
-import type { HrTargetSource } from "@/lib/rich-workout-model";
+import type { CanonicalExecutableMode, HrTargetSource } from "@/lib/rich-workout-model";
 import { diffDaysIso, todayIso } from "@/lib/training";
 
 export const weekdayValues = [
@@ -199,9 +199,12 @@ export interface NormalizedStructuredInput extends StructuredPlanAuthoringInput 
 }
 
 export interface StructuredMetricMode {
+  executableSurfaceSupported: boolean;
+  executableMode: CanonicalExecutableMode;
   paceTargetsAllowed: boolean;
   heartRateTargetsAllowed: boolean;
   heartRateTargetSource: HrTargetSource;
+  defaultEstimatedHrAvailable: boolean;
   estimatedMaxHr: number | null;
   recent5kPaceSecondsPerKm: number | null;
 }

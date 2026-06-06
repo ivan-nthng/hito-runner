@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/hito-calendar-day";
 import { workoutGlyphKind } from "@/lib/workout-glyph";
 import {
-  displayTargetEntries,
+  displayExecutableTargetEntries,
   feedbackMarkerMeta,
   formatDistanceKm,
   workoutDuration,
@@ -469,6 +469,9 @@ function Tooltip({ workout }: { workout: Workout }) {
   const meta = workoutTypeMeta(workout);
   const status = workout.status;
   const target = primaryWorkoutTarget(workout);
+  const targetEntries = displayExecutableTargetEntries(target, workout.metricMode).slice(0, 2);
+  const showStructureOnly =
+    targetEntries.length === 0 && workout.metricMode.executableMode === "structure_only_executable";
 
   return (
     <div className="hito-tooltip w-72 max-w-72">
@@ -486,16 +489,20 @@ function Tooltip({ workout }: { workout: Workout }) {
         <Stat label="Duration" value={duration ? `${duration}′` : "—"} />
         <Stat label="Status" value={status} />
       </div>
-      {target && (
+      {(targetEntries.length > 0 || showStructureOnly) && (
         <div className="hito-caption mt-3 space-y-0.5 border-t border-hairline pt-3">
-          {displayTargetEntries(target)
-            .slice(0, 2)
-            .map((entry) => (
-              <div key={entry.key} className="flex justify-between gap-3">
-                <span className="hito-micro-label">{entry.label}</span>
-                <span className="text-foreground/80 truncate">{entry.value}</span>
-              </div>
-            ))}
+          {targetEntries.map((entry) => (
+            <div key={entry.key} className="flex justify-between gap-3">
+              <span className="hito-micro-label">{entry.label}</span>
+              <span className="text-foreground/80 truncate">{entry.value}</span>
+            </div>
+          ))}
+          {showStructureOnly && (
+            <div className="flex justify-between gap-3">
+              <span className="hito-micro-label">Structure</span>
+              <span className="text-foreground/80 truncate">Segment plan</span>
+            </div>
+          )}
         </div>
       )}
     </div>

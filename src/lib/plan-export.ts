@@ -1,6 +1,6 @@
 import type { Database } from "@/lib/supabase/database";
 import {
-  displayTargetEntries,
+  displayExecutableTargetEntries,
   deriveWorkoutRichModel,
   formatDate,
   formatDistanceKm,
@@ -189,6 +189,11 @@ export function renderPlanExportMarkdown(payload: ActivePlanExportPayload) {
       lines.push(`- Plan: ${metrics}`);
     }
 
+    const executionLine = formatExecutionLine(workout.metricMode);
+    if (executionLine) {
+      lines.push(`- Execution: ${executionLine}`);
+    }
+
     const targetLine = formatTargetLine(workout.primaryTarget);
     if (targetLine) {
       lines.push(`- Target: ${targetLine}`);
@@ -302,7 +307,7 @@ function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanE
     steps,
     displayDistanceKm: row.workout_type === "rest" ? null : explicitWorkoutDistanceKm(steps),
     displayDurationMin: row.workout_type === "rest" ? null : workoutDuration(workout),
-    primaryTarget: displayTargetEntries(primaryTarget),
+    primaryTarget: displayExecutableTargetEntries(primaryTarget, richWorkout.metricMode),
     primaryGuidance: findPrimaryGuidance(steps),
   };
 }
@@ -320,6 +325,7 @@ function toExportGoalContext(goalContext: CanonicalGoalContext) {
 function toExportMetricMode(metricMode: CanonicalMetricMode) {
   return {
     guidance: metricMode.guidance,
+    executable_mode: metricMode.executableMode,
     pace_targets_allowed: metricMode.paceTargetsAllowed,
     hr_targets_allowed: metricMode.hrTargetsAllowed,
     hr_target_source: metricMode.hrTargetSource,
@@ -519,6 +525,29 @@ function formatTargetLine(entries: ActivePlanExportWorkout["primaryTarget"]) {
   );
 
   return visibleEntries.map((entry) => `${entry.label}: ${entry.value}`).join("; ");
+}
+
+function formatExecutionLine(metricMode: CanonicalMetricMode) {
+  switch (metricMode.executableMode) {
+    case "pace_executable":
+      return "Pace-executable targets supplied by Hito.";
+    case "hr_executable":
+      return "Personal heart-rate targets supplied by Hito.";
+    case "mixed_metric_executable":
+      return "Pace and personal heart-rate targets supplied by Hito.";
+    case "structure_only_executable":
+      return "Executable duration, distance, repeat, work, or recovery structure; no pace or personal HR target.";
+    case "correction_required":
+      return "Correction required before this can be treated as watch-executable.";
+    case "effort_only":
+      return "Readable guidance only; no watch-executable target contract.";
+    case "none":
+      return "No execution targets.";
+    case "unknown":
+      return "Metric execution mode unknown.";
+    default:
+      return null;
+  }
 }
 
 function toExportWorkoutType(value: string) {

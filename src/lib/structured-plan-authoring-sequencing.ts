@@ -10,6 +10,7 @@ import {
 import {
   firstTaperWeek,
   getRecent5kPaceSecondsPerKm,
+  hasRaceSpecificMetricSupport,
   isCutbackWeek,
   isHighAmbitionPlan,
   isLimitedSharpeningSupport,
@@ -631,10 +632,12 @@ function buildGoalFamilyQualityWorkout(context: BuildWorkoutContext) {
         : buildFiveKSharpeningWorkout(context);
     case "10k":
       return isLimitedSharpeningSupport(normalized)
-        ? buildTempoWorkout(context)
+        ? buildProgressionWorkout(context)
         : buildTenKRhythmWorkout(context);
     case "half_marathon":
-      return buildHalfMarathonThresholdWorkout(context);
+      return hasRaceSpecificMetricSupport(normalized)
+        ? buildHalfMarathonThresholdWorkout(context)
+        : buildProgressionWorkout(context);
     case "marathon":
       return buildMarathonSteadySpecificityWorkout(context);
     case "ultra_marathon":

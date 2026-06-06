@@ -1389,12 +1389,12 @@
   }
 
   .hito-label {
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    line-height: 1;
-    text-transform: uppercase;
-    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    text-transform: none;
+    color: var(--color-foreground);
   }
 
   .hito-label-signal {
@@ -1528,12 +1528,12 @@
   }
 
   .hito-form-label {
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    line-height: 1;
-    text-transform: uppercase;
-    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    text-transform: none;
+    color: var(--color-foreground);
   }
 
   .hito-micro-label {

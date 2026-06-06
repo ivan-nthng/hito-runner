@@ -14,6 +14,10 @@ import type {
 import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
 import { importedPlanSchema, type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
+  normalizeFirstPlanExecutionMode,
+  type FirstPlanWatchAccess,
+} from "@/lib/first-plan-authoring-utils";
+import {
   buildStructuredFirstPlanAuthoringInput,
   buildStructuredFirstPlanDraftReview,
   buildStructuredFirstPlanDraftSummary,
@@ -234,7 +238,7 @@ export interface StructuredFirstPlanCorrectionRequired {
   ok: true;
   status: "correction_required";
   sourceKind: "structured_constructor";
-  reason: "invalid_structured_input";
+  reason: "invalid_structured_input" | "missing_executable_target_support";
   correction: {
     message: string;
     fields: string[];
@@ -735,9 +739,37 @@ function parseStructuredFirstPlanDraftInput(input: unknown):
     };
   }
 
+  const execution = normalizeFirstPlanExecutionMode(result.data.execution);
+
+  if (execution.watchAccess !== "watch_or_app") {
+    return {
+      ok: false,
+      result: buildStructuredExecutionSupportCorrectionResult(execution.watchAccess),
+    };
+  }
+
   return {
     ok: true,
     input: result.data,
+  };
+}
+
+function buildStructuredExecutionSupportCorrectionResult(
+  watchAccess: FirstPlanWatchAccess,
+): StructuredFirstPlanCorrectionRequired {
+  return {
+    ok: true,
+    status: "correction_required",
+    sourceKind: "structured_constructor",
+    reason: "missing_executable_target_support",
+    correction: {
+      message:
+        watchAccess === "none"
+          ? "Structured first plans need watch/app-style execution support before Hito can create executable duration, distance, repeat, work, and recovery targets."
+          : "Choose watch/app execution support before generating a structured plan. Hito can create structure-only executable targets without pace or HR truth, but it still needs an execution surface.",
+      fields: ["execution.watchAccess"],
+    },
+    safety: buildStructuredDraftSafety(),
   };
 }
 

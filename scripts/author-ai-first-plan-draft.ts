@@ -5,11 +5,7 @@ import {
   type AiFirstPlanGenerationContract,
   type AiFirstPlanDraftServiceInputKind,
 } from "../src/lib/ai-first-plan-draft-service";
-import {
-  AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
-  type AiFirstPlanDraft,
-  type AiFirstPlanBlueprintTraceMetadata,
-} from "../src/lib/ai-first-plan-draft-authoring";
+import type { AiFirstPlanBlueprintTraceMetadata } from "../src/lib/ai-first-plan-draft-authoring";
 import {
   AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
   type AiFirstPlanBlueprint,
@@ -27,7 +23,7 @@ import {
   structuredPlanAuthoringInputSchema,
 } from "../src/lib/structured-plan-authoring";
 import { resolveAiFirstPlanBlueprintHorizonStrategy } from "../src/lib/ai-first-plan-blueprint-horizon";
-import { addDaysIso, type Step, type StepPrescription } from "../src/lib/training";
+import { addDaysIso, type StepPrescription } from "../src/lib/training";
 
 type ParsedArgs = Record<string, string | true>;
 type ScriptMode = "mock" | "mock_invalid" | "mock_partial" | "mock_timeout" | "live";
@@ -108,7 +104,7 @@ if (hasFlag(options, "help")) {
 
 const mode = resolveMode(options);
 const inputKind = parseInputKind(options["input-kind"]);
-const contractMode = parseContractMode(options.contract);
+const contractMode = parseContractModeOrExit(options.contract);
 const fixtureKind = parseFixtureKind(options.fixture);
 const input = await readInput(options, inputKind, fixtureKind);
 const referenceExample = hasFlag(options, "no-reference")
@@ -299,19 +295,13 @@ function buildMockOpenAiFetch(
     if (mode === "mock_invalid") {
       return openAiFixtureResponse(
         "mock-invalid-ai-first-plan",
-        contractMode === "blueprint"
-          ? {
+        contractMode === "envelope"
+          ? buildInvalidMockEnvelope()
+          : {
               schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
               planName: "Invalid mock AI first plan blueprint",
               weeks: [],
-            }
-          : contractMode === "envelope"
-            ? buildInvalidMockEnvelope()
-            : {
-                schemaVersion: AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
-                planName: "Invalid mock AI first plan",
-                weeks: [],
-              },
+            },
       );
     }
 
@@ -336,16 +326,14 @@ function buildMockOpenAiFetch(
 
     return openAiFixtureResponse(
       "mock-ai-first-plan",
-      contractMode === "blueprint"
-        ? fixtureKind === "identity_coverage"
+      contractMode === "envelope"
+        ? buildMockAiFirstPlanEnvelope(authoringInput)
+        : fixtureKind === "identity_coverage"
           ? buildMockAiFirstPlanIdentityCoverageBlueprint(requestAuthoringInput)
           : buildMockAiFirstPlanBlueprint(
               requestAuthoringInput,
               buildStructuredAuthoringPlan(requestAuthoringInput),
-            )
-        : contractMode === "envelope"
-          ? buildMockAiFirstPlanEnvelope(authoringInput)
-          : buildMockAiFirstPlanDraft(authoringInput, buildStructuredAuthoringPlan(authoringInput)),
+            ),
     );
   }) as typeof fetch;
 }
@@ -933,245 +921,6 @@ function cadenceSpec(
   title: string,
 ) {
   return { family, identity, icon, title };
-}
-
-function buildMockAiFirstPlanDraft(
-  authoringInput: StructuredFirstPlanAuthoringInput,
-  plan: TrainingPlanV2,
-): AiFirstPlanDraft {
-  const workoutsByWeek = new Map<number, TrainingPlanV2["planned_workouts"]>();
-
-  for (const workout of plan.planned_workouts) {
-    const week = workout.week_number;
-    workoutsByWeek.set(week, [...(workoutsByWeek.get(week) ?? []), workout]);
-  }
-
-  return {
-    schemaVersion: AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION,
-    planName: `Mock AI ${plan.plan_name}`,
-    generatedFor: plan.generated_for ?? "Hito runner",
-    goal: {
-      goalType: authoringInput.goal.goalType,
-      goalLabel: authoringInput.goal.goalLabel,
-      goalStyle: authoringInput.goal.goalStyle ?? null,
-      targetTime: authoringInput.goal.targetTime ?? null,
-      targetDate: authoringInput.schedule.targetDate ?? null,
-    },
-    startDate: authoringInput.schedule.startDate,
-    targetDate: authoringInput.schedule.targetDate ?? null,
-    preparationHorizonWeeks: plan.preparation_horizon_weeks,
-    planPreferences: {
-      preferredRunningDays: authoringInput.availability.preferredRunningDays,
-      fixedRestDays: authoringInput.availability.unavailableDays,
-      preferredLongRunDay: authoringInput.availability.preferredLongRunDay ?? null,
-      maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
-    },
-    reviewAssumptions: [
-      "Mock AI first-plan draft keeps fixed rest days, running frequency, and metric gates intact.",
-    ],
-    metricPolicySummary:
-      "Mock draft leaves numeric pace/HR truth to backend normalization and deterministic gates.",
-    weeks: [...workoutsByWeek.entries()].map(([weekNumber, workouts]) => ({
-      weekNumber,
-      phase: normalizePhase(workouts[0]?.phase),
-      theme: `Mock week ${weekNumber} theme`,
-      microcycleIntent: "Keep a coach-readable rhythm without changing runner constraints.",
-      cutbackWeek: workouts.some((workout) => /cutback/i.test(workout.source_workout_type ?? "")),
-      taperWeek: workouts.some((workout) => /taper/i.test(workout.phase)),
-      plannedWorkouts: workouts.map((workout) => buildMockAiDraftWorkout(authoringInput, workout)),
-    })),
-  };
-}
-
-function buildMockAiDraftWorkout(
-  authoringInput: StructuredFirstPlanAuthoringInput,
-  workout: TrainingPlanV2["planned_workouts"][number],
-): AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number] {
-  const resolved = resolveCanonicalWorkoutModel({
-    workoutType: workout.workout_type,
-    sourceWorkoutType: workout.source_workout_type,
-    workoutFamily: workout.workout_family,
-    workoutIdentity: workout.workout_identity,
-    calendarIconKey: workout.calendar_icon_key,
-    title: workout.title,
-    steps: workout.segments,
-  });
-
-  return {
-    date: workout.date,
-    weekday:
-      workout.weekday as AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["weekday"],
-    workoutFamily: resolved.workoutFamily,
-    workoutIdentity: resolved.workoutIdentity,
-    calendarIconKey: resolved.calendarIconKey,
-    title: `Mock AI ${workout.title}`,
-    summary: workout.summary ?? "Mock AI-authored workout with backend-safe structure.",
-    plannedRpe: workout.planned_rpe ?? (resolved.workoutFamily === "rest" ? 1 : 4),
-    estimatedFatigue: workout.estimated_fatigue ?? "low",
-    recoveryPriority: workout.recovery_priority ?? "medium",
-    goalContext: {
-      goalType: authoringInput.goal.goalType,
-      goalStyle: authoringInput.goal.goalStyle ?? null,
-      terrainFocus: authoringInput.preferences.terrainFocus ?? "standard",
-      targetDate: authoringInput.schedule.targetDate ?? null,
-      targetTime: authoringInput.goal.targetTime ?? null,
-    },
-    metricMode: {
-      guidance: workout.metric_mode?.guidance ?? "effort",
-      paceTargetsAllowed: workout.metric_mode?.pace_targets_allowed ?? false,
-      hrTargetsAllowed: false,
-      hrTargetSource: "effort_only",
-      hrTargetLabel: null,
-      hrTargetSourceNote: null,
-      reason: "Mock AI draft lets backend normalization own numeric metric truth.",
-    },
-    segments:
-      resolved.workoutFamily === "rest"
-        ? [buildMockRestSegment(workout)]
-        : buildMockRunningSegments(workout, resolved.workoutFamily),
-  };
-}
-
-function buildMockRestSegment(
-  workout: TrainingPlanV2["planned_workouts"][number],
-): AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["segments"][number] {
-  return {
-    segmentId: `${workout.workout_id}_mock_rest`,
-    segmentType: "rest",
-    label: "Rest",
-    sequence: 1,
-    prescription: emptyPrescription("none"),
-    guidance: "No running scheduled; keep the day genuinely restorative.",
-    target: emptyTarget(),
-  };
-}
-
-function buildMockRunningSegments(
-  workout: TrainingPlanV2["planned_workouts"][number],
-  family: string,
-): AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["segments"] {
-  const totalDuration = Math.max(30, estimateWorkoutDurationMin(workout));
-  const warmupDuration = Math.min(10, Math.max(6, Math.round(totalDuration * 0.2)));
-  const cooldownDuration = Math.min(8, Math.max(5, Math.round(totalDuration * 0.15)));
-  const mainDuration = Math.max(10, totalDuration - warmupDuration - cooldownDuration);
-
-  return [
-    buildMockSegment(workout, "warmup", 1, "Warmup", warmupDuration, "easy"),
-    buildMockSegment(
-      workout,
-      family === "tempo" ? "tempo_block" : family === "intervals" ? "interval_block" : "main",
-      2,
-      "Main work",
-      mainDuration,
-      family === "long" ? "durable aerobic effort" : "controlled effort",
-    ),
-    buildMockSegment(workout, "cooldown", 3, "Cooldown", cooldownDuration, "relaxed"),
-  ];
-}
-
-function buildMockSegment(
-  workout: TrainingPlanV2["planned_workouts"][number],
-  segmentType: "warmup" | "main" | "tempo_block" | "interval_block" | "cooldown",
-  sequence: number,
-  label: string,
-  durationMin: number,
-  intensity: string,
-): AiFirstPlanDraft["weeks"][number]["plannedWorkouts"][number]["segments"][number] {
-  return {
-    segmentId: `${workout.workout_id}_mock_${sequence}`,
-    segmentType,
-    label,
-    sequence,
-    prescription: {
-      mode: "time",
-      durationMin,
-      distanceKm: null,
-      repeatCount: null,
-      repeatUnit: null,
-      recoveryUnit: null,
-    },
-    guidance: `${label} with clear effort control and no invented metric precision.`,
-    target: {
-      ...emptyTarget(),
-      intensity,
-      cue: sequence === 2 ? "Keep the purpose obvious and sustainable." : "Stay relaxed.",
-      hint: sequence === 3 ? "Finish fresher than you started." : "Use breathing as the guide.",
-    },
-  };
-}
-
-function estimateWorkoutDurationMin(workout: TrainingPlanV2["planned_workouts"][number]) {
-  return workout.segments.reduce((total, segment) => total + estimateStepDurationMin(segment), 0);
-}
-
-function estimateStepDurationMin(step: Step) {
-  if (typeof step.duration_min === "number") {
-    return step.duration_min;
-  }
-
-  const prescription = step.prescription;
-
-  if (!prescription) {
-    return 0;
-  }
-
-  if (prescription.mode === "time" && prescription.duration_min) {
-    return prescription.duration_min;
-  }
-
-  if (prescription.mode === "distance" && prescription.distance_km) {
-    return prescription.distance_km * 6;
-  }
-
-  if (prescription.mode === "repeats" && prescription.repeat_count && prescription.repeat_unit) {
-    const work = estimatePrescriptionUnitDurationMin(prescription.repeat_unit);
-    const recovery = prescription.recovery_unit
-      ? estimatePrescriptionUnitDurationMin(prescription.recovery_unit)
-      : 0;
-
-    return prescription.repeat_count * (work + recovery);
-  }
-
-  return 0;
-}
-
-function estimatePrescriptionUnitDurationMin(unit: NonNullable<StepPrescription["repeat_unit"]>) {
-  if (unit.mode === "time" && unit.duration_min) {
-    return unit.duration_min;
-  }
-
-  if (unit.mode === "distance" && unit.distance_km) {
-    return unit.distance_km * 6;
-  }
-
-  return 0;
-}
-
-function emptyPrescription(mode: "time" | "distance" | "repeats" | "none") {
-  return {
-    mode,
-    durationMin: null,
-    distanceKm: null,
-    repeatCount: null,
-    repeatUnit: null,
-    recoveryUnit: null,
-  };
-}
-
-function emptyTarget() {
-  return {
-    intensity: null,
-    rpe: null,
-    cue: null,
-    hint: null,
-    paceMinPerKmRange: null,
-    pace: null,
-    hrBpmRange: null,
-    hrBpm: null,
-    hrTargetSource: null,
-    label: null,
-    sourceNote: null,
-  };
 }
 
 function openAiFixtureResponse(responseId: string, payload: unknown) {
@@ -2180,14 +1929,38 @@ function parseContractMode(value: string | true | undefined): ScriptContractMode
   }
 
   if (normalized === "strict-draft" || normalized === "strict_draft" || normalized === "draft") {
-    return "strict_draft";
+    throw new Error(
+      "--contract strict-draft was removed from this ops script; use blueprint or envelope.",
+    );
   }
 
   if (normalized) {
-    throw new Error("--contract must be blueprint, envelope, or strict-draft.");
+    throw new Error("--contract must be blueprint or envelope.");
   }
 
   return "blueprint";
+}
+
+function parseContractModeOrExit(value: string | true | undefined): ScriptContractMode {
+  try {
+    return parseContractMode(value);
+  } catch (error) {
+    console.error(
+      JSON.stringify(
+        {
+          ok: false,
+          reason: "unsupported_contract",
+          message:
+            error instanceof Error
+              ? error.message.slice(0, 240)
+              : "Unsupported first-plan draft contract.",
+        },
+        null,
+        2,
+      ),
+    );
+    process.exit(1);
+  }
 }
 
 function parseFixtureKind(value: string | true | undefined): FixtureKind {
@@ -2326,7 +2099,7 @@ function printHelp() {
       "  --mock-timeout                 Simulate a hung OpenAI request and verify blueprint-unavailable failure.",
       "  --input-file <path>            JSON structured authoring input or onboarding input.",
       "  --input-kind <kind>            structured_authoring or structured_onboarding.",
-      "  --contract <kind>              blueprint (default), envelope non-live proof, or strict-draft diagnostic.",
+      "  --contract <kind>              blueprint (default) or envelope non-live proof.",
       "  --fixture <kind>               one-week-smoke, compact-smoke, balanced-half, five-k-short, ten-k-short, marathon-balanced, marathon-target-long, ultra-trail, mountain-trail, full-half, or identity-coverage when no input file is supplied.",
       "  --reference-file <path>        Optional rich reference JSON for prompt style guidance.",
       "  --no-reference                 Omit reference-style guidance for compact live latency smoke.",

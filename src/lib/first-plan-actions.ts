@@ -49,10 +49,9 @@ const structuredFirstPlanDraftGenerationDebugSchema = z
   .object({
     timeoutMs: z.number().int().nonnegative(),
     maxOutputTokens: z.number().int().positive(),
-    contractMode: z.enum(["blueprint", "strict_draft", "envelope"]),
+    contractMode: z.enum(["blueprint", "envelope"]),
     responseSchemaMode: z.enum([
       "responses_json_schema_blueprint_strict",
-      "responses_json_schema_draft_strict",
       "responses_json_schema_envelope_strict",
     ]),
     requestPhase: z.enum([
@@ -1397,7 +1396,7 @@ function sourceKindFromGenerationSource(source: AiFirstPlanDraftPreviewMetadata[
     case "openai_ai_first_plan_envelope":
       return "ai_first_plan_envelope_v1";
     case "openai_ai_first_plan_draft":
-      return "ai_first_plan_draft_v1";
+      return "unsupported_ai_first_plan_draft_v1";
     case "deterministic_structured_generator":
       return "structured_authoring_v1";
   }

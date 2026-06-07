@@ -55,7 +55,7 @@ Architect / Backend
 
 ## Last Updated
 
-2026-06-03
+2026-06-06
 
 ## Backlog Inventory Note
 
@@ -63,6 +63,11 @@ Moved from active plans to backlog during the 2026-06-03 cleanup because Hito st
 runner-level HR-zone truth, but this is not an active implementation track.
 
 This is not the next committed implementation slice. Treat it as a paused future physiology plan until PRODUCT/ARCHITECT explicitly prioritizes HR-zone work.
+
+The 2026-06-06 watch-executable workout targets closeout reinforced this item as the canonical
+future track for personal HR-zone truth. The completed executable target contract intentionally
+keeps age-estimated/default HR advisory/readback-only and does not treat it as executable HR target
+truth.
 
 ## Next Action
 

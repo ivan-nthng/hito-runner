@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -14,82 +14,68 @@ high
 
 ## Next Recommended Role
 
-FRONTEND
+ARCHITECT
 
 ## Task
 
-Clean up runner-facing readback for watch-executable workout targets.
+Archive the completed watch-executable workout targets and metric truth contract plan.
 
 ## Stage
 
-FRONTEND implementation / watch-executable target readback cleanup
+ARCHITECT closeout / archived watch-executable metric truth plan
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: FRONTEND
+ROLE: ARCHITECT
 
 TASK:
-Clean up runner-facing readback for watch-executable workout targets after backend Slice 1.
+Decide whether to archive the watch-executable workout targets and metric truth contract plan or split residual follow-ups.
 
 STAGE:
-FRONTEND implementation / watch-executable target readback cleanup
+ARCHITECT decision / watch-executable metric truth plan closeout
 
 CONTEXT:
 - Source path: docs/plans/active/2026-06-04-watch-executable-workout-targets-and-metric-truth-contract.md
 - BACKEND Slice 1 is implemented and QA-passed.
-- New generated non-rest workouts now resolve through explicit executable modes instead of vague effort-only happy-path output.
-- `structure_only_executable` means the workout has numeric duration/distance/repeat/recovery anatomy but no pace/HR target truth.
-- Pace targets require execution support plus validated pace truth.
-- Target time alone is not pace truth.
-- Executable HR targets require personal HR-zone truth.
-- Age-estimated HR is advisory/readback only, not executable HR target truth.
-- Legacy `effort_only`, `none`, and `unknown` remain readable for older rows/diagnostics, but are not normal new primary structured output.
+- FRONTEND readback cleanup is implemented and QA-passed.
+- Generated non-rest workouts now resolve through explicit executable modes instead of vague effort-only happy-path output.
+- Frontend readback surfaces render backend-shaped executable target entries and keep cues/focus/RPE/source copy secondary.
+- `structure_only_executable` reads as numeric executable anatomy.
+- Pace targets require backend target data; target time alone is not pace truth.
+- Executable HR targets require personal HR-zone truth; age-estimated/default HR is advisory/readback-only.
+- Legacy `effort_only`, `none`, and `unknown` remain readable but do not produce preferred executable target entries.
+- Authenticated browser saved-mode UI smoke was blocked by no safe existing session/fixture; source/helper/build QA passed.
 
 GOAL:
-Make workout detail, calendar/today, export, and first-plan review/readback copy reflect backend executable target truth clearly, without asking runners to infer a structured workout from vague purpose copy when executable segment target data exists.
+Decide whether this plan's core objective is complete enough to archive, or whether residual work should be split into smaller follow-ups instead of keeping this active plan open.
 
-SCOPE:
-- Inspect runner-facing readback surfaces that summarize or display planned workout targets:
-  - workout detail
-  - Today/home
-  - calendar compact readback/tooltips
-  - first-plan review copy
-  - JSON/Markdown export copy if visible labels still imply effort-only execution
-- Render backend-shaped executable mode/segment targets without inventing frontend target rules.
-- Prefer existing Hito DS primitives, existing workout structure rows, existing target formatting helpers, and shared display seams before adding new UI.
-- Replace or suppress vague "use workout purpose" / cue-only style copy only when canonical executable segment target data exists.
-- Preserve legacy rows that only have effort/cue-style data by labelling them honestly instead of pretending they have executable targets.
-- Keep backend generation, validation, persistence, DB schema, AI contracts, and review/confirm mutation behavior unchanged.
+ASSESS:
+- whether all release-relevant backend/frontend/QA gates are complete
+- whether authenticated saved-mode UI smoke should become a small QA fixture task or remain optional hygiene
+- whether active-plan refresh regeneration policy belongs to a separate backend follow-up
+- whether HR-zone truth implementation belongs to a separate future plan
+- whether this plan should be archived now with residuals split out
 
 REQUIREMENTS:
-- Do not create local frontend metric truth.
-- Do not infer pace from target time.
-- Do not display age-estimated HR as a personal executable HR target.
-- Do not hide backend correction states behind generic errors.
-- Do not add a broad calendar/workout redesign.
-- Do not wire manual workout CRUD, watch-provider export, or new persistence.
-- Reuse existing shared Hito DS and workout readback components; avoid route-local one-off UI.
-- If the true issue is missing backend display data, report the exact backend seam instead of patching symptoms in copy.
+- Do not change product code.
+- Do not rerun QA unless a concrete evidence gap requires it.
+- Do not mark HR-zone implementation, watch-provider export, or active-plan refresh regeneration as complete unless separate evidence exists.
+- Do not keep this active plan open only for broad future ideas.
+- If archiving, update `docs/history/changelog.md` only for shipped implementation not already recorded.
 
 VALIDATION:
-- Run targeted ESLint for touched frontend/readback files.
-- Run `git diff --check`.
-- Run `npm run build`.
-- Use the built-in Codex browser first for relevant local UI proof when product surfaces changed.
-- Prove at least one structure-only executable workout shows numeric executable anatomy instead of vague purpose-only copy.
-- Prove at least one pace-target workout still shows pace only when backend target data exists.
-- Prove age-estimated HR is not presented as a personal executable HR target.
-- Prove legacy effort-only/readback rows remain readable if covered by touched surfaces.
+- If docs are changed, run targeted `git diff --check`.
+- If archive/backlog docs change, include active/archive/backlog/current docs in validation.
 
 OUTPUT:
 1. Task
 2. Stage
-3. Root cause
-4. Files changed
-5. What changed
-6. Validation results
-7. Readback proof
+3. Decision
+4. Rationale
+5. Plan changes
+6. Residual follow-ups
+7. Validation results
 8. Blockers
 ```
 
@@ -272,7 +258,7 @@ Changelog decision:
 
 ## Frontend Readback Cleanup Closeout
 
-Status: implemented on 2026-06-06; awaiting focused QA.
+Status: implemented and QA-passed on 2026-06-06.
 
 Implemented behavior:
 
@@ -285,10 +271,85 @@ Implemented behavior:
 - HR targets render as executable only when `metricMode.hrTargetsAllowed` is true
 - age-estimated/default HR remains advisory readback only
 
-Next recommended role:
+Accepted readback contract:
 
-- QA for focused readback validation on structure-only, pace-target, advisory-HR, and legacy
-  effort/readable rows.
+- frontend renders backend-shaped executable targets
+- frontend does not compute metric truth locally
+- cues, focus, RPE, purpose, and source copy are secondary support, not executable target truth
+- `structure_only_executable` is shown as numeric executable anatomy
+- legacy `effort_only`, `none`, and `unknown` modes remain readable but visibly distinct from
+  preferred executable targets
+
+QA evidence recorded:
+
+- Browser Path Preflight: built-in Codex browser was used first against `http://127.0.0.1:8082/`.
+- Browser loaded but was unauthenticated and showed login, so workout detail/calendar readback
+  surfaces were blocked by auth/no safe existing fixture.
+- Safari was not used because the blocker was auth/fixture state, not browser tooling.
+- Source inspection covered:
+  - `src/lib/training.ts`
+  - `src/routes/workout.$date.tsx`
+  - `src/components/TodayHero.tsx`
+  - `src/components/Calendar.tsx`
+  - `src/components/IntervalsViz.tsx`
+  - `src/lib/plan-export.ts`
+  - `src/lib/structured-first-plan-onboarding.ts`
+- Targeted ESLint passed.
+- `git diff --check` passed.
+- `npm run build` passed with existing warnings only.
+- Deterministic helper harness proved:
+  - `structure_only_executable` reads as executable numeric structure
+  - structure-only fixture included `duration: 42`, `repeatCount: 6`, `work: 2 min`, and
+    `recovery: 2 min`
+  - support cue was preserved separately
+  - blocked mode did not expose pace/HR executable entries
+  - pace-allowed mode exposed pace readback
+  - pace-only mode did not leak HR
+  - personal-HR-allowed mode exposed HR range
+  - default/age-estimated HR was not treated as executable HR target truth
+- Legacy `effort_only`, `none`, and `unknown` remain readable but do not produce preferred
+  executable target entries.
+
+Bounded coverage gap:
+
+- Authenticated browser saved-mode UI smoke was blocked by no safe existing session/fixture. This is
+  not a blocker for the source/helper/build QA pass, but it can become a small future QA fixture
+  task if release confidence requires a real saved-mode visual smoke.
+
+Changelog decision:
+
+- Frontend readback cleanup is shipped implementation and is recorded in `docs/history/changelog.md`
+  for 2026-06-06, with the authenticated saved-mode browser smoke gap kept explicit as
+  non-blocking QA fixture hygiene.
+
+## Final Closeout And Archive Decision
+
+Decision: archive this plan as complete on 2026-06-06.
+
+Rationale:
+
+- Running Coach doctrine, backend executable-mode contract, frontend readback cleanup, and
+  backend/service/source/helper/build QA are complete.
+- The current vertical slice achieved its objective: generated structured workouts now avoid vague
+  effort-only happy-path output, preserve fake-precision guardrails, and read back executable target
+  anatomy without frontend metric invention.
+- Remaining work is future/specialized and should not keep this plan active.
+
+Residual follow-ups split to backlog:
+
+- `docs/tasks/backlog/2026-06-06-authenticated-saved-mode-workout-readback-browser-smoke-fixture.md`
+- `docs/tasks/backlog/2026-06-06-active-plan-refresh-executable-target-regeneration-policy.md`
+- `docs/tasks/backlog/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md`
+- `docs/tasks/backlog/2026-06-06-provider-derived-pace-truth-implementation.md`
+- `docs/tasks/backlog/2026-06-06-watch-export-integration-polish.md`
+
+Final changelog status:
+
+- Shipped backend metric-truth contract was recorded in `docs/history/changelog.md` on 2026-06-05.
+- Shipped frontend executable target readback cleanup was recorded in `docs/history/changelog.md` on
+  2026-06-06.
+- No additional final-archive changelog entry is needed because archiving only records project state
+  and does not ship new behavior beyond the already recorded implementation.
 
 ## Metric Truth Contract
 
@@ -487,7 +548,8 @@ AI owns:
    complete; workout detail, Today/calendar readback, export copy, and first-plan review copy now
    explain executable targets without asking runners to guess from vague purpose copy.
 6. QA validation:
-   prove first-plan, refresh, workout detail, export, and legacy-read compatibility.
+   complete for backend/service/source/helper/build coverage. Authenticated saved-mode UI smoke is
+   a non-blocking fixture gap, not a release blocker for this closeout.
 
 ## Backend Follow-Up Boundaries
 
@@ -607,7 +669,7 @@ Implementation notes:
 
 Owner: FRONTEND after backend.
 
-Status: next bounded follow-up.
+Status: complete / QA-passed on 2026-06-06.
 
 Scope:
 
@@ -622,11 +684,14 @@ Scope:
 
 Validation:
 
-- browser setup correction proof if setup surfaces change
-- workout-detail readback proof for `structure_only_executable`
-- calendar/today compact readback proof where those surfaces summarize targets
-- export/readable plan proof if export labels are touched
-- no misleading no-watch/effort-only happy-path copy when executable target data exists
+- source/helper proof covered workout detail, calendar/today, interval timeline, export, and
+  first-plan review readback seams
+- deterministic helper harness proved `structure_only_executable`, pace, personal HR, blocked,
+  advisory/default HR, and legacy readable cases
+- browser setup/workout-detail saved-mode smoke was blocked by no safe authenticated session/fixture
+  and remains a non-blocking QA fixture gap
+- no misleading no-watch/effort-only happy-path copy remains in the covered readback helpers when
+  executable target data exists
 
 ## Frontend Follow-Up Boundaries
 
@@ -682,14 +747,17 @@ QA must prove:
 - Running Coach doctrine defines executable target rules. Complete.
 - Backend contract can distinguish executable, blocked, and legacy effort-only states. Complete for
   first-plan/authoring generation paths.
-- Frontend setup no longer silently defaults to no/unknown execution for primary structured plans.
-- Workout detail and export can rely on canonical target truth.
+- Frontend setup/readback no longer treats no/unknown execution or vague effort-only copy as normal
+  executable target truth in the covered source/helper seams. Complete for backend correction and
+  frontend readback source coverage.
+- Workout detail and export can rely on canonical target truth. Complete for source/helper/build
+  coverage.
 - QA can prove no fake pace, no fake personal HR, and no vague effort-only new structured plans.
-  Backend doctrine proof is complete; browser/frontend proof remains pending frontend work.
+  Complete for backend/service/source/helper/build coverage; authenticated saved-mode browser smoke
+  remains a non-blocking fixture gap.
 
 ## Suggested Next Step
 
-Run the next bounded FRONTEND readback cleanup now that QA accepted the backend contract: make
-workout detail, Today/home, calendar, first-plan review, and export copy display executable segment
-targets from backend-shaped data, while preserving legacy readability and avoiding any local metric
-truth invention.
+Run a final ARCHITECT closeout decision: archive this plan if the non-blocking authenticated
+saved-mode smoke gap and optional active-plan refresh regeneration policy can move to separate
+follow-ups, or split those residuals before archiving.

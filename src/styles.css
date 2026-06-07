@@ -657,6 +657,43 @@
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 20%, transparent);
   }
 
+  .hito-ds-jump-trigger {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    width: 100%;
+    justify-content: stretch;
+    text-align: left;
+  }
+
+  .hito-ds-jump-trigger-context {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-muted-foreground);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hito-ds-mobile-jump-nav {
+    border-top: 1px solid var(--color-hairline);
+    padding: 0 1.25rem 1rem;
+  }
+
+  .hito-ds-mobile-jump-panel {
+    max-height: min(70vh, 28rem);
+    overflow: auto;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-sidebar) 78%, var(--color-background));
+    padding: 0.55rem;
+    box-shadow: 0 18px 48px color-mix(in oklch, black 26%, transparent);
+  }
+
+  .hito-ds-mobile-jump-panel .hito-ds-sidebar-tree {
+    margin-top: 0;
+  }
+
   .hito-workbench-summary-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -689,18 +726,38 @@
     }
   }
 
+  .hito-ds-sidebar-tree {
+    display: grid;
+    gap: 0.2rem;
+    margin-top: 2.5rem;
+  }
+
+  .hito-ds-sidebar-group {
+    display: grid;
+    gap: 0.15rem;
+  }
+
   .hito-ds-sidebar-link {
     position: relative;
     display: flex;
+    width: 100%;
     align-items: center;
     gap: 0.625rem;
+    border: 0;
     border-radius: var(--radius-md);
+    background: transparent;
     padding: 0.5rem 0.75rem;
     color: color-mix(in oklch, var(--color-sidebar-foreground) 68%, transparent);
+    font: inherit;
+    text-align: left;
     transition:
       background-color 180ms ease,
       color 180ms ease,
       transform 180ms ease;
+  }
+
+  button.hito-ds-sidebar-link {
+    cursor: pointer;
   }
 
   .hito-ds-sidebar-link:hover,
@@ -736,6 +793,35 @@
     background: var(--color-signal);
     box-shadow: 0 0 0 0.25rem color-mix(in oklch, var(--color-signal) 14%, transparent);
     transform: scale(1.08);
+  }
+
+  .hito-ds-sidebar-link-label {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .hito-ds-sidebar-chevron {
+    flex: 0 0 auto;
+    color: color-mix(in oklch, var(--color-sidebar-foreground) 58%, transparent);
+    transition:
+      color 180ms ease,
+      transform 180ms ease;
+  }
+
+  .hito-ds-sidebar-link:hover .hito-ds-sidebar-chevron,
+  .hito-ds-sidebar-link:focus-visible .hito-ds-sidebar-chevron,
+  .hito-ds-sidebar-link[data-active="true"] .hito-ds-sidebar-chevron {
+    color: var(--color-sidebar-foreground);
+  }
+
+  .hito-ds-sidebar-children {
+    display: grid;
+    gap: 0.05rem;
+    padding: 0.1rem 0 0.35rem;
+  }
+
+  .hito-ds-sidebar-children[hidden] {
+    display: none;
   }
 
   .hito-ds-sidebar-child-link {
@@ -1223,8 +1309,8 @@
     align-items: start !important;
     background: linear-gradient(
       135deg,
-      color-mix(in oklch, var(--color-sidebar) 88%, transparent),
-      color-mix(in oklch, var(--color-background) 82%, transparent)
+      color-mix(in oklch, var(--color-surface-elevated) 88%, var(--color-sidebar) 12%),
+      color-mix(in oklch, var(--color-surface) 86%, var(--color-background) 14%)
     ) !important;
     color: var(--color-foreground) !important;
     box-shadow:
@@ -1329,11 +1415,11 @@
   .hito-toast-close,
   .hito-toast-dismiss-action {
     position: static !important;
-    display: grid !important;
-    width: 1.5rem !important;
-    height: 1.5rem !important;
+    width: 1.75rem !important;
+    min-width: 1.75rem !important;
+    height: 1.75rem !important;
+    min-height: 1.75rem !important;
     padding: 0 !important;
-    place-items: center !important;
     top: auto !important;
     right: auto !important;
     left: auto !important;
@@ -1341,9 +1427,9 @@
     align-self: start !important;
     justify-self: end !important;
     margin-left: 0.125rem !important;
-    border: 1px solid var(--color-hairline) !important;
-    border-radius: 999px !important;
-    background: color-mix(in oklch, var(--color-background) 64%, transparent) !important;
+    border: 0 !important;
+    border-radius: var(--radius-sm) !important;
+    background: transparent !important;
     color: var(--color-muted-foreground) !important;
     cursor: pointer !important;
     opacity: 1 !important;
@@ -1358,11 +1444,22 @@
 
   .hito-toast-close:hover,
   .hito-toast-dismiss-action:hover {
-    border-color: color-mix(in oklch, var(--color-foreground) 26%, transparent) !important;
-    background: color-mix(in oklch, var(--color-muted) 30%, transparent) !important;
+    background: color-mix(in oklch, var(--color-foreground) 7%, transparent) !important;
     color: var(--color-foreground) !important;
   }
 
+  .hito-toast-close:focus-visible,
+  .hito-toast-dismiss-action:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 24%, transparent) !important;
+  }
+
+  .hito-toast-close:active,
+  .hito-toast-dismiss-action:active {
+    background: color-mix(in oklch, var(--color-foreground) 10%, transparent) !important;
+  }
+
+  .hito-toast-close svg,
   .hito-toast-dismiss-action svg {
     pointer-events: none;
   }

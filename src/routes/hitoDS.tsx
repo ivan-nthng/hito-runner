@@ -125,6 +125,7 @@ const NAV_GROUPS = [
 ] as const;
 
 const SECTIONS = NAV_GROUPS.flatMap((group) => group.sections);
+const SECTION_ID_SET = new Set(SECTIONS.map((section) => section.id));
 
 type NavGroupId = (typeof NAV_GROUPS)[number]["id"];
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -581,7 +582,11 @@ const TYPOGRAPHY_ROLES = [
 ] as const;
 
 function HitoDesignSystemPage() {
-  const [activeSectionId, setActiveSectionId] = useState<SectionId>("overview");
+  const [activeSectionId, setActiveSectionId] = useState<SectionId>(() => getInitialSectionId());
+  const [expandedNavGroupIds, setExpandedNavGroupIds] = useState<Set<NavGroupId>>(
+    () => new Set([getNavGroupForSection(activeSectionId).id]),
+  );
+  const [mobileJumpOpen, setMobileJumpOpen] = useState(false);
   const [variant, setVariant] = useState<ButtonVariant>("primary");
   const [buttonTone, setButtonTone] = useState<ButtonTone>("default");
   const [size, setSize] = useState<ButtonSize>("lg");
@@ -634,6 +639,18 @@ function HitoDesignSystemPage() {
     SECTIONS.find((section) => section.id === activeSectionId) ?? activeNavGroup.sections[0];
 
   useEffect(() => {
+    setExpandedNavGroupIds((current) => {
+      if (current.has(activeNavGroup.id)) {
+        return current;
+      }
+
+      const next = new Set(current);
+      next.add(activeNavGroup.id);
+      return next;
+    });
+  }, [activeNavGroup.id]);
+
+  useEffect(() => {
     return () => {
       clearToastDemoTimer(toastDemoTimerRef);
       hitoToast.dismiss(HITO_DS_TOAST_ID);
@@ -645,10 +662,8 @@ function HitoDesignSystemPage() {
       return;
     }
 
-    const sectionIds = new Set<SectionId>(SECTIONS.map((section) => section.id));
     const getHashSection = (): SectionId | null => {
-      const hash = window.location.hash.replace("#", "");
-      return sectionIds.has(hash as SectionId) ? (hash as SectionId) : null;
+      return getSectionIdFromHash(window.location.hash);
     };
     const updateFromHash = () => {
       const hashSection = getHashSection();
@@ -665,7 +680,7 @@ function HitoDesignSystemPage() {
           .filter((entry) => entry.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
 
-        if (visibleEntry?.target.id && sectionIds.has(visibleEntry.target.id as SectionId)) {
+        if (visibleEntry?.target.id && SECTION_ID_SET.has(visibleEntry.target.id as SectionId)) {
           setActiveSectionId(visibleEntry.target.id as SectionId);
         }
       },
@@ -761,6 +776,29 @@ function HitoDesignSystemPage() {
     }
   };
 
+  const toggleNavGroup = (groupId: NavGroupId) => {
+    setExpandedNavGroupIds((current) => {
+      const next = new Set(current);
+
+      if (groupId === activeNavGroup.id) {
+        next.add(groupId);
+        return next;
+      }
+
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+
+      return next;
+    });
+  };
+
+  const closeMobileJump = () => {
+    setMobileJumpOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
       <div className="hito-workbench-shell">
@@ -770,41 +808,12 @@ function HitoDesignSystemPage() {
             <p className="hito-label mt-2">Component system</p>
           </div>
 
-          <nav className="mt-10 grid gap-4" aria-label="Hito DS sections">
-            <div className="grid gap-1">
-              {NAV_GROUPS.map((group) => {
-                const firstSection = group.sections[0];
-                const active = activeNavGroup.id === group.id;
-                return (
-                  <a
-                    key={group.id}
-                    href={`#${firstSection.id}`}
-                    data-active={active}
-                    className="hito-ds-sidebar-link hito-nav-text"
-                  >
-                    <span className="hito-ds-sidebar-link-marker" aria-hidden="true" />
-                    {group.label}
-                  </a>
-                );
-              })}
-            </div>
-
-            <div className="border-t border-hairline pt-3">
-              <p className="hito-micro-label mb-2">{activeNavGroup.label}</p>
-              <div className="grid gap-1">
-                {activeNavGroup.sections.map((section) => (
-                  <a
-                    key={section.id}
-                    href={`#${section.id}`}
-                    data-active={activeSectionId === section.id}
-                    className="hito-ds-sidebar-child-link"
-                  >
-                    {section.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </nav>
+          <HitoDsNestedNav
+            idPrefix="desktop"
+            activeSectionId={activeSectionId}
+            expandedGroupIds={expandedNavGroupIds}
+            onToggleGroup={toggleNavGroup}
+          />
 
           <div className="mt-10 border-t border-hairline pt-5">
             <p className="hito-label hito-label-signal">Rule</p>
@@ -816,32 +825,47 @@ function HitoDesignSystemPage() {
 
         <main className="hito-workbench-main">
           <div className="hito-workbench-topbar lg:hidden">
-            <div className="flex items-center justify-between gap-4 px-5 py-4">
-              <div className="hito-workbench-location">
-                <span className="hito-workbench-location-title">Hito DS</span>
-                <span className="hito-workbench-location-meta">
-                  <span>{activeNavGroup.label}</span>
-                  <span aria-hidden="true">/</span>
-                  <span>{activeSection.label}</span>
+            <div className="grid gap-3 px-5 py-4">
+              <div className="flex min-w-0 items-center justify-between gap-4">
+                <div className="hito-workbench-location">
+                  <span className="hito-workbench-location-title">Hito DS</span>
+                  <span className="hito-workbench-location-meta">
+                    <span>{activeNavGroup.label}</span>
+                    <span aria-hidden="true">/</span>
+                    <span>{activeSection.label}</span>
+                  </span>
+                </div>
+                <HitoLogoMark decorative className="text-foreground [--hito-logo-height:1.65rem]" />
+              </div>
+              <button
+                type="button"
+                className="hito-button hito-button-secondary hito-button-sm hito-ds-jump-trigger"
+                aria-expanded={mobileJumpOpen}
+                aria-controls="hito-ds-mobile-jump-nav"
+                onClick={() => setMobileJumpOpen((current) => !current)}
+              >
+                <span>Jump to section</span>
+                <span className="hito-ds-jump-trigger-context">
+                  {activeNavGroup.label} / {activeSection.label}
                 </span>
-              </div>
-              <HitoLogoMark decorative className="text-foreground [--hito-logo-height:1.65rem]" />
+                <Icon name={mobileJumpOpen ? "chevron-up" : "chevron-down"} size="xs" decorative />
+              </button>
             </div>
-            <nav className="hito-workbench-section-rail" aria-label="Hito DS quick links">
-              <div className="hito-workbench-quick-links">
-                {activeNavGroup.sections.map((section) => (
-                  <a
-                    key={section.id}
-                    href={`#${section.id}`}
-                    className="hito-workbench-quick-link"
-                    data-active={activeSectionId === section.id ? "true" : undefined}
-                    aria-current={activeSectionId === section.id ? "location" : undefined}
-                  >
-                    {section.label}
-                  </a>
-                ))}
+            <div
+              id="hito-ds-mobile-jump-nav"
+              className="hito-ds-mobile-jump-nav"
+              hidden={!mobileJumpOpen}
+            >
+              <div className="hito-ds-mobile-jump-panel">
+                <HitoDsNestedNav
+                  idPrefix="mobile"
+                  activeSectionId={activeSectionId}
+                  expandedGroupIds={expandedNavGroupIds}
+                  onToggleGroup={toggleNavGroup}
+                  onNavigate={closeMobileJump}
+                />
               </div>
-            </nav>
+            </div>
           </div>
 
           <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10 lg:py-10">
@@ -4008,6 +4032,111 @@ function getNavGroupForSection(sectionId: SectionId) {
   return (
     NAV_GROUPS.find((group) => group.sections.some((section) => section.id === sectionId)) ??
     NAV_GROUPS[0]
+  );
+}
+
+function getSectionIdFromHash(hash: string): SectionId | null {
+  const hashSectionId = hash.replace("#", "");
+  return SECTION_ID_SET.has(hashSectionId as SectionId) ? (hashSectionId as SectionId) : null;
+}
+
+function getInitialSectionId(): SectionId {
+  if (typeof window === "undefined") {
+    return "overview";
+  }
+
+  return getSectionIdFromHash(window.location.hash) ?? "overview";
+}
+
+function HitoDsNestedNav({
+  idPrefix,
+  activeSectionId,
+  expandedGroupIds,
+  onToggleGroup,
+  onNavigate,
+}: {
+  idPrefix: string;
+  activeSectionId: SectionId;
+  expandedGroupIds: ReadonlySet<NavGroupId>;
+  onToggleGroup: (groupId: NavGroupId) => void;
+  onNavigate?: () => void;
+}) {
+  const activeNavGroup = getNavGroupForSection(activeSectionId);
+
+  return (
+    <nav className="hito-ds-sidebar-tree" aria-label="Hito DS sections">
+      {NAV_GROUPS.map((group) => {
+        const groupActive = activeNavGroup.id === group.id;
+        const expanded = groupActive || expandedGroupIds.has(group.id);
+        const childrenId = `${idPrefix}-${group.id}-children`;
+
+        if (group.sections.length === 1) {
+          const section = group.sections[0];
+          const sectionActive = activeSectionId === section.id;
+
+          return (
+            <a
+              key={group.id}
+              href={`#${section.id}`}
+              data-active={sectionActive ? "true" : undefined}
+              className="hito-ds-sidebar-link hito-nav-text"
+              aria-current={sectionActive ? "location" : undefined}
+              onClick={onNavigate}
+            >
+              <span className="hito-ds-sidebar-link-marker" aria-hidden="true" />
+              <span className="hito-ds-sidebar-link-label">{group.label}</span>
+            </a>
+          );
+        }
+
+        return (
+          <div key={group.id} className="hito-ds-sidebar-group">
+            <button
+              type="button"
+              className="hito-ds-sidebar-link hito-nav-text"
+              data-active={groupActive ? "true" : undefined}
+              aria-expanded={expanded}
+              aria-controls={childrenId}
+              onClick={() => onToggleGroup(group.id)}
+            >
+              <span className="hito-ds-sidebar-link-marker" aria-hidden="true" />
+              <span className="hito-ds-sidebar-link-label">{group.label}</span>
+              <Icon
+                name={expanded ? "chevron-down" : "chevron-right"}
+                size="xs"
+                decorative
+                className="hito-ds-sidebar-chevron"
+              />
+            </button>
+
+            <div
+              id={childrenId}
+              className="hito-ds-sidebar-children"
+              role="group"
+              aria-label={`${group.label} sections`}
+              hidden={!expanded}
+            >
+              {group.sections.map((section) => {
+                const sectionActive = activeSectionId === section.id;
+
+                return (
+                  <a
+                    key={section.id}
+                    href={`#${section.id}`}
+                    data-active={sectionActive ? "true" : undefined}
+                    className="hito-ds-sidebar-child-link"
+                    aria-current={sectionActive ? "location" : undefined}
+                    onClick={onNavigate}
+                  >
+                    {section.label}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </nav>
   );
 }
 

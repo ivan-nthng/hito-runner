@@ -14,88 +14,66 @@ high
 
 ## Next Recommended Role
 
-BACKEND
+ARCHITECT
 
 ## Task
 
-Optimize the current Hito weak spots without reopening completed work by inertia.
+Start the preset-first first-plan architecture track after completing the duplicate blueprint
+authoring cleanup checkpoint.
 
 ## Stage
 
-BACKEND refactor / doctrine validator decomposition
+ARCHITECT checkpoint / optimization strike duplicate cleanup closeout
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: BACKEND
+ROLE: ARCHITECT
 
 TASK:
-Decompose the blueprint and first-plan release-gate section of `scripts/validate-plan-authoring-doctrine.ts`.
+Define the preset-first first-plan architecture from the backlog item after the optimization strike
+duplicate cleanup checkpoint is complete.
 
 STAGE:
-BACKEND refactor / no-behavior-change doctrine validator decomposition.
+ARCHITECT plan / preset-first no-plan onboarding and token-saving first-plan architecture
 
 PLAN:
-docs/plans/active/2026-05-29-hito-optimization-strike-plan.md
+docs/tasks/backlog/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md
 
 CONTEXT:
-Hito's next optimization pass should move faster than prior micro-slices, but still preserve safety.
-The largest immediate weak spot is the 6200+ line doctrine validator script. It is the main safety
-net for blueprint first-plan creation, deterministic compatibility, refresh, text/voice, import/export,
-and rich workout regression coverage, but it is now too large to review confidently.
-
-GOAL:
-Extract the AI first-plan blueprint / structured first-plan release-gate fixtures and assertions into
-focused script modules without changing behavior or reducing coverage.
-
-REQUIRED INSPECTION:
-- scripts/validate-plan-authoring-doctrine.ts
-- package.json
-- docs/plans/active/2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md
-- docs/plans/active/2026-05-29-hito-optimization-strike-plan.md
-
-SCOPE:
-- Create a small `scripts/plan-authoring-doctrine/` helper area if that is the cleanest shape.
-- Extract blueprint-first-plan fixtures/builders/assertions from `scripts/validate-plan-authoring-doctrine.ts`.
-- Keep the top-level command `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`
-  working exactly as before.
-- Preserve all existing assertions and fixture coverage.
-- Preserve blueprint-only structured first-plan release-gate checks:
-  - invalid/timeout blueprint attempts are non-mutating failures
-  - no `structured_authoring_v1` fallback leaks into structured first-plan success or failure paths
-  - confirm rejects non-blueprint reviewed drafts
-  - accepted blueprint plans persist exact reviewed canonical truth
-- Prefer one cohesive extraction over many tiny files, but do not move unrelated refresh/text/import
-  assertions in this slice unless they are required shared helpers.
+- The optimization strike cleanup phase completed Slice 1 doctrine release-gate extraction, Slice 2
+  legacy seam classification, Slice 3 strict nested draft demotion, and Slice 4 duplicate blueprint
+  authoring file deletion.
+- `src/lib/ai-first-plan-blueprint-authoring 2.ts` was deleted after source audit proved it was a
+  tracked stale duplicate.
+- Blueprint default behavior, envelope internal support, doctrine coverage, and build all remained
+  green.
+- No next high-risk stale/duplicate/legacy seam is currently identified for another immediate
+  optimization deletion slice.
+- The next highest-impact work is preset-first first-plan architecture, which can reduce OpenAI
+  token usage and AI-output fragility without waiting for manual workout CRUD.
 
 CONSTRAINTS:
-- No product code changes.
-- No DB schema changes.
-- No frontend/admin changes.
-- Do not delete assertions.
-- Do not reduce coverage.
-- Do not change generated plan behavior.
-- Do not weaken metric, HR, pace, rest-day, hard-day, refresh, or persistence safety gates.
-- Do not reintroduce deterministic structured first-plan fallback as a valid production result.
-
-VALIDATION:
-- `npm exec eslint -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/**/*.ts`
-- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
-- `npm run author-ai-first-plan-draft -- --mock-invalid --contract blueprint --trace-blueprint`
-- `npm run author-ai-first-plan-draft -- --mock-timeout --contract blueprint --timeout-ms 20 --trace-blueprint`
-- `git diff --check`
-- `npm run build` only if TypeScript/build wiring is touched enough to warrant it.
+- Do not reopen completed optimization cleanup without a concrete stale/high-risk seam.
+- Do not implement code in this architecture pass.
+- Do not change production first-plan behavior yet.
+- Do not make frontend own preset plan truth.
+- Do not block preset-first architecture on manual workout authoring.
+- Preserve blueprint/envelope safety gates, metric truth, and review/confirm boundaries.
 
 OUTPUT:
 1. Task
 2. Stage
-3. Root cause
-4. Files changed
-5. What changed
-6. Validation results
-7. Behavior-preservation proof
-8. Blockers
+3. Current first-plan architecture
+4. Preset source-of-truth decision
+5. Preset family inventory
+6. Custom authoring escape hatch
+7. Backend implementation slices
+8. Running Coach gate
+9. Frontend card/review implications
+10. Manual workout editing relationship
+11. QA strategy
+12. Blockers
 ```
 
 ## Owner
@@ -104,7 +82,7 @@ ARCHITECT / BACKEND / FRONTEND / QA / RUNNING COACH
 
 ## Last Updated
 
-2026-05-29
+2026-06-06
 
 ## Context
 
@@ -270,6 +248,8 @@ Rules:
 
 Owner: BACKEND
 
+Status: complete on 2026-06-06.
+
 Size: medium-large.
 
 Scope:
@@ -278,6 +258,27 @@ Scope:
 - keep the top-level command stable
 - preserve all blueprint-only release-gate assertions
 - no product behavior changes
+
+Implemented boundary:
+
+- Added `scripts/plan-authoring-doctrine/first-plan-release-gates.ts`.
+- Moved the AI first-plan service release gate, structured first-plan draft/review release gate,
+  long-horizon partial/timeout release gates, reviewed first-plan persistence exactness fixture, and
+  minimal blueprint builder used by those gates into the focused module.
+- Kept `scripts/validate-plan-authoring-doctrine.ts` as the stable command entrypoint.
+- Kept broader blueprint cadence/identity, envelope, rich workout, refresh, text/voice, and
+  import/export assertions in the main validator for now rather than creating a larger shared-helper
+  split in this slice.
+- Reduced the main validator from 8517 lines to 7261 lines while preserving the release-gate
+  assertions through a dependency-injected helper boundary.
+
+Validation evidence:
+
+- targeted ESLint passed for `scripts/validate-plan-authoring-doctrine.ts` and
+  `scripts/plan-authoring-doctrine/**/*.ts`
+- doctrine validator passed through the unchanged top-level command
+- blueprint mock valid/invalid/timeout/partial commands passed
+- `git diff --check` passed
 
 Why first:
 
@@ -289,6 +290,8 @@ Why first:
 
 Owner: ARCHITECT
 
+Status: complete on 2026-06-06.
+
 Scope:
 
 - classify strict draft, deterministic structured generator, text rich draft, voice seams, ops scripts,
@@ -296,17 +299,245 @@ Scope:
 - decide what can be deleted now, deleted after QA, or must remain
 - update the relevant active plans
 
+Source evidence inspected:
+
+- `docs/plans/active/2026-05-29-hito-optimization-strike-plan.md`
+- `scripts/validate-plan-authoring-doctrine.ts`
+- `scripts/plan-authoring-doctrine/first-plan-release-gates.ts`
+- `scripts/author-ai-first-plan-draft.ts`
+- `src/lib/ai-first-plan-draft-service.ts`
+- `src/lib/ai-first-plan-draft-authoring.ts`
+- `src/lib/ai-first-plan-blueprint-*`
+- `src/lib/ai-first-plan-envelope-*`
+- `src/lib/structured-plan-authoring*`
+- `src/lib/structured-first-plan-onboarding.ts`
+- `src/lib/first-plan-actions.ts`
+- `src/lib/openai-plan-authoring.ts`
+- `src/lib/rich-workout-draft-authoring.ts`
+- `src/lib/voice-to-plan-authoring.ts`
+- `src/lib/active-plan-refresh-actions.ts`
+- `src/lib/imported-plan.ts`
+- `src/lib/plan-export.ts`
+- `src/lib/plan-replacement-actions.ts`
+- `src/lib/training-api.ts`
+- `docs/current-system.md`
+- `docs/current-product.md`
+- `docs/current-state.md`
+- `docs/plans/archive/2026-05-26-ai-authored-first-plan-pipeline.md`
+
+Classification:
+
+| Seam | Classification bucket | Production runner flow today | Decision |
+| --- | --- | --- | --- |
+| `ai-first-plan-blueprint-v1` | production default | Yes. Structured first-plan review uses `generateStructuredFirstPlanDraft` / `confirmStructuredFirstPlanDraft` and accepts `ai_first_plan_blueprint_v1` with `ai_authored` or `repaired_ai_draft`. | Keep. Do not delete, weaken, or replace in this optimization strike. |
+| `ai-first-plan-envelope-v1` | internal/non-default supported path | Not public default. It is allowed only through explicit internal/server-owned `internalDraftContract: "envelope"` or ops commands, and public onboarding exposes no selector. | Keep. Do not promote to default here; production adoption remains separate. |
+| Strict nested AI draft path, `ai-first-plan-draft-v1` / `strict_draft` | ops/diagnostic path and first delete/demote candidate | No. The current visible structured first-plan action rejects unsupported sources and calls the service with deterministic fallback disabled. | Demote/delete first. It is the safest candidate because current docs and script help already call it diagnostic, and blueprint/envelope own the supported first-plan contracts. |
+| Deterministic structured authoring path, `structured-plan-authoring*` / `buildStructuredAuthoringPlan` | production support generator plus compatibility/readback path | Yes, for deterministic plan generation used by text, voice confirm rebuild, refresh drafts, blueprint/envelope scaffolds, import/export doctrine, and compatibility. No, as a successful structured first-plan AI fallback. | Keep. It is not legacy-deletable until every dependent product seam has another canonical generator. |
+| Text rich draft enrichment | production saved-mode text enrichment | Yes. Saved-mode text replacement opts into rich draft normalization after structured input extraction. | Keep. It is backend-owned enrichment with bounded fallback metadata. |
+| Voice-to-plan authoring | production runner flow | Yes. It is a Pro-gated non-mutating draft plus explicit confirm path and does not persist raw transcript text. | Keep. It depends on deterministic structured authoring and first-plan persistence boundaries. |
+| Active-plan refresh proposal/apply | production runner flow | Yes. Proposal may use OpenAI plus deterministic fallback; apply persists the signed reviewed draft and does not call OpenAI. | Keep. Not part of first-plan legacy deletion. |
+| JSON import/apply | production advanced fallback / migration path | Yes. It remains visible as demoted advanced import and saved-mode replacement path. | Keep. It is a user/tooling compatibility seam. |
+| Plan export/import roundtrip | production export/readback plus QA compatibility | Yes. Export/import roundtrip preserves rich fields and compact-only legacy rows derive readback identity. | Keep. It protects historical/imported plans and compatibility QA. |
+| Doctrine-only fixtures/builders | QA/doctrine-only fixture path | No direct product flow. They protect product contracts through `scripts/validate-plan-authoring-doctrine.ts` and extracted first-plan release gates. | Keep for now. Decompose further if reviewability becomes the bottleneck; do not delete before equivalent coverage exists. |
+| `author-ai-first-plan-draft` script blueprint/envelope modes | ops/diagnostic path | Non-mutating only. Script prints bounded metadata and does not persist plans. | Keep. They support blueprint release gates, envelope comparison, QA, and Running Coach samples. |
+| `author-ai-first-plan-draft` strict-draft mode | ops/diagnostic path and delete/demote candidate | No production flow. It can still exercise old full nested draft diagnostics. | First demotion target. Remove from routine script/service surfaces if safe, or retain behind clearer diagnostic-only guard with a later deletion gate. |
+| `structured_authoring_v1` compatibility/fallback references | legacy compatibility/readback path plus blocked first-plan fallback boundary | Compatibility/readback yes; successful structured first-plan AI fallback no. `first-plan-actions.ts` maps unsupported fallback to unavailable metadata with `structured_authoring_v1_blocked`. | Keep compatibility references, but keep first-plan fallback blocked. Do not delete until import/export/readback and refresh reconstruction are separately audited. |
+| Rich workout draft authoring and fallback metadata | production enrichment plus detectable fallback metadata | Yes, for saved-mode text and active-plan refresh enrichment. Fallback metadata is allowed only as detectable fallback to deterministic canonical truth. | Keep. Do not confuse rich-draft deterministic fallback metadata with first-plan fallback success. |
+
+Current production runner paths allowed today:
+
+- `ai-first-plan-blueprint-v1` for structured first-plan review/confirm.
+- Deterministic structured authoring for text, voice confirm rebuild, refresh draft construction,
+  import/export compatibility, and backend scaffold support.
+- Text rich draft enrichment and active-plan refresh rich draft enrichment, with bounded fallback
+  metadata.
+- Voice-to-plan draft/confirm.
+- Active-plan refresh proposal/apply.
+- JSON import/apply and plan export/import roundtrip.
+
+Internal/server-owned only:
+
+- `ai-first-plan-envelope-v1` through explicit `internalDraftContract: "envelope"` or ops commands.
+- Blueprint/envelope trace artifacts and service debug metadata.
+
+Ops/diagnostic only:
+
+- `npm run author-ai-first-plan-draft` script modes.
+- Saved blueprint visual proof helpers and coach sample output.
+- Strict nested draft comparison mode while it remains.
+
+QA/doctrine-only:
+
+- Doctrine fixtures/builders and extracted first-plan release gate helpers.
+- Mock invalid/timeout/partial blueprint/envelope fixtures.
+
+Compatibility/readback only:
+
+- Older compact-only `training-plan-v2` import/readback derivation.
+- `structured_authoring_v1` source readback where persisted/imported plans already carry that source.
+- Rich workout fallback metadata for text/refresh surfaces.
+
+Delete/demote candidate:
+
+- First candidate: strict nested AI draft path (`ai-first-plan-draft-v1` / `strict_draft`).
+- Reason: it is already documented as diagnostic, has worse prompt/output shape than blueprint or
+  envelope, is not the public first-plan default, and is the only classified seam whose removal can
+  reduce AI-contract complexity without touching current production runner behavior.
+
+Required validation gate before deleting or demoting strict draft:
+
+- Source audit of every `strict_draft`, `strict-draft`, `ai-first-plan-draft-v1`, and
+  `AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION` reference.
+- Doctrine validator remains green through the stable entrypoint.
+- Blueprint mock valid/invalid/timeout/partial remain green.
+- Envelope mock matrix or targeted envelope proof remains green.
+- Structured first-plan invalid/timeout still returns unavailable metadata with no
+  `structured_authoring_v1` fallback success.
+- If strict draft is retained, one explicit diagnostic proof must show it is not default and cannot
+  be mistaken for production readiness.
+- If strict draft is removed, CLI/help/negative-contract proof must show callers get a bounded
+  unsupported-contract result.
+- `git diff --check` and build/type validation if TypeScript wiring changes.
+
+Must not be touched yet:
+
+- `ai-first-plan-blueprint-v1` production default.
+- `ai-first-plan-envelope-v1` internal supported option.
+- Deterministic structured authoring generator.
+- Text rich draft, voice-to-plan, active-plan refresh, JSON import/apply, and plan export/import.
+- Doctrine fixtures unless equivalent coverage is moved, not deleted.
+- `structured_authoring_v1` compatibility/readback references needed by older persisted/imported
+  plans.
+
 ### Slice 3: First safe legacy deletion or demotion
 
 Owner: BACKEND
 
+Status: complete on 2026-06-06. Backend validation is accepted as sufficient for this internal
+cleanup gate; no browser QA is required because no runner-facing behavior changed.
+
 Scope:
 
-- implement exactly one deletion/demotion candidate from Slice 2
+- implement the strict nested AI draft deletion/demotion candidate from Slice 2
 - keep blueprint first-plan production behavior unchanged
 - prove no QA coverage loss
 
-### Slice 4: Blueprint product-quality evidence pass
+Implementation decision:
+
+- `strict_draft` was removed from the routine AI first-plan service contract and structured
+  first-plan action debug schema; the service now accepts only production-default `blueprint` and
+  internal/non-default `envelope`.
+- `npm run author-ai-first-plan-draft -- --contract strict-draft` now returns a bounded unsupported
+  contract error instead of running a production-looking diagnostic success path.
+- The strict nested `src/lib/ai-first-plan-draft-authoring.ts` module is retained for doctrine-only
+  schema/prompt/normalizer coverage until a later source audit proves full deletion is safe.
+- First-plan release gates keep blueprint/envelope service coverage; strict nested module coverage
+  stays in the top-level doctrine validator and no longer appears as a service readiness proof.
+
+Validation evidence:
+
+- Source audit confirmed remaining strict nested references are no longer routine first-plan
+  service/action/script selection.
+- Blueprint valid/invalid/timeout/partial proofs passed.
+- Envelope `balanced-half` mock proof passed.
+- Doctrine validator passed.
+- `npm run author-ai-first-plan-draft -- --contract strict-draft` returned bounded
+  `unsupported_contract` rather than a successful draft.
+- `npm run build` passed.
+- No `structured_authoring_v1` fallback success leak was reproduced.
+
+Closeout decision:
+
+- Mark strict nested draft demotion complete for this optimization strike slice.
+- Keep strict nested module-level doctrine coverage for now.
+- Full strict nested module deletion requires a later deletion audit and should not be bundled with
+  this completed demotion.
+
+Follow-up surfaced:
+
+- `src/lib/ai-first-plan-blueprint-authoring 2.ts` is a tracked duplicate-looking file with a space
+  in the filename.
+- Initial source inspection shows current imports target `src/lib/ai-first-plan-blueprint-authoring.ts`
+  rather than the ` 2.ts` file.
+- This should be audited in the next bounded backend cleanup slice before deletion.
+
+### Slice 4: Duplicate-looking blueprint authoring file audit
+
+Owner: BACKEND
+
+Status: complete / QA-passed on 2026-06-06.
+
+Scope:
+
+- audit `src/lib/ai-first-plan-blueprint-authoring 2.ts`
+- prove whether it is dead duplicate state or still owns hidden behavior
+- delete only if source evidence proves no runtime/script/doctrine/docs path depends on it
+- preserve blueprint default, envelope internal option, doctrine validator, and first-plan fallback
+  boundaries
+
+Initial source evidence:
+
+- `git ls-files` shows both `src/lib/ai-first-plan-blueprint-authoring.ts` and
+  `src/lib/ai-first-plan-blueprint-authoring 2.ts` are tracked.
+- The normal facade is about 262 lines; the duplicate-looking file is about 3456 lines.
+- Source search found current imports pointing at `ai-first-plan-blueprint-authoring.ts`, not the
+  ` 2.ts` file.
+
+Deletion decision:
+
+- Deleted `src/lib/ai-first-plan-blueprint-authoring 2.ts`.
+- Reason: exact filename references were limited to this active optimization plan, while runtime,
+  ops script, and doctrine imports all target the canonical facade without the ` 2` suffix.
+- No unique behavior was merged from the deleted file in this slice; if later history needs old
+  monolith details, git history remains the source.
+
+Closeout evidence:
+
+- BACKEND source audit proved `src/lib/ai-first-plan-blueprint-authoring 2.ts` was a tracked stale
+  duplicate:
+  - old 3456-line monolith
+  - current canonical facade is `src/lib/ai-first-plan-blueprint-authoring.ts`
+  - runtime, ops script, and doctrine imports point to the canonical facade
+  - exact duplicate filename references remain only in this optimization plan as cleanup evidence
+- No unique logic was merged from the duplicate.
+- Blueprint mock success still returned `ai_first_plan_blueprint_v1` / `repaired_ai_draft`.
+- Blueprint invalid, timeout, and partial mocks remained bounded `blueprint_unavailable`.
+- Envelope `balanced-half` smoke still returned `ai_first_plan_envelope_v1` /
+  `expanded_from_envelope`.
+- Doctrine validator passed.
+- Build passed.
+
+Behavior-preservation decision:
+
+- The duplicate cleanup is complete.
+- The production blueprint default remains untouched.
+- The internal/non-default envelope option remains untouched.
+- Strict nested draft remains demoted from routine service/action/script entrypoints.
+- No `structured_authoring_v1` first-plan fallback success was reintroduced.
+
+Validation gate:
+
+- source audit of imports/references before deletion
+- doctrine validator
+- blueprint valid/invalid/timeout/partial
+- envelope targeted proof
+- `git diff --check`
+- `npm run build`
+
+Optimization checkpoint decision:
+
+- Pause this optimization-strike cleanup phase after Slice 4.
+- Do not start another deletion/demotion slice unless a new concrete high-risk stale, duplicate, or
+  legacy seam is identified with source evidence.
+- Current remaining optimization work is future/backlog unless reprioritized:
+  - further doctrine validator extraction if reviewability becomes the next bottleneck
+  - first-plan latency/failure UX contract if user-facing wait/failure states become the next risk
+  - additional legacy seam deletion only after a source audit names a specific candidate
+- Recommended immediate next track is `First-Plan Preset Library And Custom Authoring Escape Hatch`
+  because it is higher product impact now: it can reduce first-plan OpenAI token usage and
+  AI-output fragility without weakening the completed blueprint/envelope safety gates.
+
+### Slice 5: Blueprint product-quality evidence pass
 
 Owner: QA, then RUNNING COACH
 
@@ -317,7 +548,7 @@ Scope:
 - Running Coach reviews only the coaching quality and runner-facing plan credibility
 - no SQL/script validation ownership by Running Coach
 
-### Slice 5: First-plan latency/failure UX contract
+### Slice 6: First-plan latency/failure UX contract
 
 Owner: ARCHITECT, then FRONTEND or BACKEND depending on decision
 
@@ -327,7 +558,7 @@ Scope:
 - preserve non-mutating failure behavior
 - no deterministic fallback success state
 
-### Slice 6: Admin Backlog DS/read-only compliance cleanup
+### Slice 7: Admin Backlog DS/read-only compliance cleanup
 
 Owner: FRONTEND
 
@@ -393,6 +624,8 @@ For backend plan-authoring slices:
 
 ## Suggested Next Step
 
-Start with Slice 1: a medium-large backend no-behavior-change decomposition of the blueprint
-first-plan release-gate section in the doctrine validator.
+Start the preset-first first-plan architecture track from
+`docs/tasks/backlog/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md`.
 
+Keep this optimization strike paused after duplicate cleanup unless a new concrete stale, duplicate,
+or legacy seam is identified with source evidence.

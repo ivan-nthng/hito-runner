@@ -1,9 +1,7 @@
-import {
-  buildAiFirstPlanDraftPrompt,
-  normalizeAiFirstPlanDraftToTrainingPlan,
-  type AiFirstPlanBlueprintTraceMetadata,
-  type AiFirstPlanDraftMetadata,
-  type AiFirstPlanDraftNormalizationResult,
+import type {
+  AiFirstPlanBlueprintTraceMetadata,
+  AiFirstPlanDraftMetadata,
+  AiFirstPlanDraftNormalizationResult,
 } from "@/lib/ai-first-plan-draft-authoring";
 import type { NormalizationIssue } from "@/lib/ai-first-plan-blueprint-schema";
 import {
@@ -63,7 +61,7 @@ type OpenAiResponseEnvelope = {
 };
 
 export type AiFirstPlanDraftServiceInputKind = "structured_authoring" | "structured_onboarding";
-export type AiFirstPlanGenerationContract = "blueprint" | "strict_draft" | "envelope";
+export type AiFirstPlanGenerationContract = "blueprint" | "envelope";
 
 export interface GenerateAiFirstPlanDraftPreviewOptions {
   input: unknown;
@@ -94,7 +92,6 @@ export interface AiFirstPlanDraftDebugMetadata {
   contractMode: AiFirstPlanGenerationContract;
   responseSchemaMode:
     | "responses_json_schema_blueprint_strict"
-    | "responses_json_schema_draft_strict"
     | "responses_json_schema_envelope_strict";
   requestPhase:
     | "not_started"
@@ -120,8 +117,8 @@ export interface AiFirstPlanDraftDebugMetadata {
 }
 
 export interface AiFirstPlanDraftUnavailableMetadata {
-  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_draft_v1" | "ai_first_plan_envelope_v1";
-  sourceStatus: "blueprint_unavailable" | "draft_unavailable" | "envelope_unavailable";
+  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_envelope_v1";
+  sourceStatus: "blueprint_unavailable" | "envelope_unavailable";
   fallbackReason: string;
   model: string;
   responseId: string | null;
@@ -142,10 +139,7 @@ export type AiFirstPlanDraftPreviewResult =
     }
   | {
       ok: false;
-      reason:
-        | "ai_first_plan_blueprint_unavailable"
-        | "ai_first_plan_draft_unavailable"
-        | "ai_first_plan_envelope_unavailable";
+      reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
       message: string;
       issues: string[];
       authoringInput: StructuredFirstPlanAuthoringInput;
@@ -189,7 +183,7 @@ export async function generateAiFirstPlanDraftPreview({
 
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
-  const useDeterministicFallback = allowDeterministicFallback ?? contractMode === "strict_draft";
+  const useDeterministicFallback = allowDeterministicFallback ?? false;
   const blueprintHorizonStrategy =
     contractMode === "blueprint"
       ? resolveAiFirstPlanBlueprintHorizonStrategy({
@@ -488,10 +482,8 @@ function normalizeOpenAiFirstPlanContractOutput({
     };
   }
 
-  return normalizeAiFirstPlanDraftToTrainingPlan({
-    draft: parsedOutput,
-    authoringInput,
-  });
+  const exhaustiveContract: never = contractMode;
+  return exhaustiveContract;
 }
 
 function buildAiFirstPlanEnvelopeServiceSizeComparison({
@@ -753,11 +745,10 @@ function buildOpenAiFirstPlanContractPrompt({
     });
   }
 
-  return buildAiFirstPlanDraftPrompt({
-    authoringInput,
-    today,
-    referenceExample,
-  });
+  const exhaustiveContract: never = contractMode;
+  void today;
+  void referenceExample;
+  return exhaustiveContract;
 }
 
 function responseSchemaNameForContract(contractMode: AiFirstPlanGenerationContract) {
@@ -766,8 +757,6 @@ function responseSchemaNameForContract(contractMode: AiFirstPlanGenerationContra
       return "ai_first_plan_blueprint";
     case "envelope":
       return "ai_first_plan_envelope";
-    case "strict_draft":
-      return "ai_first_plan_draft";
   }
 }
 
@@ -852,8 +841,6 @@ function responseSchemaModeForContract(
       return "responses_json_schema_blueprint_strict";
     case "envelope":
       return "responses_json_schema_envelope_strict";
-    case "strict_draft":
-      return "responses_json_schema_draft_strict";
   }
 }
 
@@ -889,10 +876,7 @@ function fallbackOrUnavailable({
       AiFirstPlanDraftPreviewResult,
       {
         ok: false;
-        reason:
-          | "ai_first_plan_blueprint_unavailable"
-          | "ai_first_plan_draft_unavailable"
-          | "ai_first_plan_envelope_unavailable";
+        reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
       }
     > {
   if (allowDeterministicFallback) {
@@ -926,10 +910,7 @@ function unavailableAiFirstPlanDraft({
   AiFirstPlanDraftPreviewResult,
   {
     ok: false;
-    reason:
-      | "ai_first_plan_blueprint_unavailable"
-      | "ai_first_plan_draft_unavailable"
-      | "ai_first_plan_envelope_unavailable";
+    reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
   }
 > {
   const validationIssues = issues
@@ -945,7 +926,7 @@ function unavailableAiFirstPlanDraft({
     ? buildUnavailableBlueprintTrace({
         trace: fallbackMetadata?.blueprintTrace ?? null,
         authoringInput,
-        sourceKind,
+        sourceKind: "ai_first_plan_blueprint_v1",
         reason,
         issues: validationIssues,
         repairs: fallbackMetadata?.repairs ?? [],
@@ -988,8 +969,6 @@ function sourceKindForUnavailableContract(contractMode: AiFirstPlanGenerationCon
       return "ai_first_plan_blueprint_v1" as const;
     case "envelope":
       return "ai_first_plan_envelope_v1" as const;
-    case "strict_draft":
-      return "ai_first_plan_draft_v1" as const;
   }
 }
 
@@ -999,8 +978,6 @@ function sourceStatusForUnavailableContract(contractMode: AiFirstPlanGenerationC
       return "blueprint_unavailable" as const;
     case "envelope":
       return "envelope_unavailable" as const;
-    case "strict_draft":
-      return "draft_unavailable" as const;
   }
 }
 
@@ -1010,8 +987,6 @@ function unavailableReasonForContract(contractMode: AiFirstPlanGenerationContrac
       return "ai_first_plan_blueprint_unavailable" as const;
     case "envelope":
       return "ai_first_plan_envelope_unavailable" as const;
-    case "strict_draft":
-      return "ai_first_plan_draft_unavailable" as const;
   }
 }
 
@@ -1107,7 +1082,7 @@ function buildUnavailableBlueprintTrace({
 }: {
   trace: AiFirstPlanBlueprintTraceMetadata | null;
   authoringInput: StructuredFirstPlanAuthoringInput;
-  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_draft_v1";
+  sourceKind: "ai_first_plan_blueprint_v1";
   reason: string;
   issues: string[];
   repairs: string[];
@@ -1335,8 +1310,6 @@ function contractPrefix(contractMode: AiFirstPlanGenerationContract) {
       return "ai_first_plan_blueprint";
     case "envelope":
       return "ai_first_plan_envelope";
-    case "strict_draft":
-      return "ai_first_plan_draft";
   }
 }
 

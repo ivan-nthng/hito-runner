@@ -37,12 +37,15 @@ ARCHITECT plan / manual workout authoring and schedule mutation model
 
 CONTEXT:
 - Source path: docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md
+- Related preset-first first-plan task:
+  docs/tasks/backlog/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md
 - The user wants runners to manually create and customize workouts:
   - if a day already has a workout, open it and edit it
   - if a day is empty, create a new workout
   - copy existing workouts and paste them onto new days
   - create repeated/recurring workouts
 - The Hito DS calendar/workout day playground should account for future add/edit/copy/recurring visual states, but this task is the product/backend architecture for the actual feature.
+- The preset-first first-plan task should start first because it can reduce AI token usage without waiting for manual workout CRUD. This manual authoring track should then make preset-generated workouts editable through the same canonical workout/segment values.
 
 GOAL:
 Design one canonical manual workout authoring pipeline that lets users safely create, edit, copy, paste, and repeat workouts without breaking active-plan truth, workout logs, Garmin evidence, fixed rest days, or refresh/import semantics.
@@ -51,6 +54,7 @@ ROOT CAUSE AND ARCHITECTURE FIT:
 - Current Hito can create plans, import plans, refresh plans, edit active-plan schedule placement, and log workout results, but it does not yet expose a safe manual planned-workout CRUD pipeline.
 - The correct owner is not route-local calendar UI. Backend must own validation, mutation safety, persistence, and lifecycle semantics.
 - Frontend should render backend-shaped draft/review states and call explicit mutation actions only after confirmation where needed.
+- Manual editing should operate on canonical workout identities, segment prescriptions, executable target values, cues, and metric-truth gates. It must not introduce a second workout model separate from preset-generated, imported, refreshed, or AI-authored workouts.
 
 REQUIRED ARCHITECTURE QUESTIONS:
 1. What is the canonical source for a manually created workout: `planned_workouts` row, plan-level patch, or a new authoring draft seam?
@@ -64,16 +68,27 @@ REQUIRED ARCHITECTURE QUESTIONS:
    - empty/no-plan dates
 3. Should manual edits mutate the active plan row in place, archive/replace the plan, or create versioned workout-level overrides?
 4. How should copy/paste preserve workout identity, segments, metric targets, notes, source metadata, and authoring metadata?
-5. How should recurring workouts be represented:
+5. How should manual editing expose canonical segment values:
+   - time
+   - distance
+   - repeats
+   - recovery
+   - pace when pace truth exists
+   - HR when personal HR-zone truth exists
+   - speed where product-supported
+   - cues
+   - intensity labels where allowed
+6. How should recurring workouts be represented:
    - one-time expansion into planned rows
    - recurrence rule metadata
    - reviewed batch mutation
    - separate template library
-6. How should fixed rest days, preferred long-run day, active-plan schedule preferences, and future refresh/import behavior interact with manual additions?
-7. What confirmation/review boundary is required for destructive or broad changes?
-8. What should happen when a manual edit conflicts with an existing workout/log/evidence-backed day?
-9. How should manual workouts be labelled in source metadata and exported JSON/Markdown?
-10. What belongs to Basic vs Pro, if entitlement applies?
+7. How should manual edits behave on preset-generated workouts from the first-plan preset library?
+8. How should fixed rest days, preferred long-run day, active-plan schedule preferences, and future refresh/import behavior interact with manual additions?
+9. What confirmation/review boundary is required for destructive or broad changes?
+10. What should happen when a manual edit conflicts with an existing workout/log/evidence-backed day?
+11. How should manual workouts be labelled in source metadata and exported JSON/Markdown?
+12. What belongs to Basic vs Pro, if entitlement applies?
 
 SCOPE:
 - Audit current persistence and action seams:
@@ -118,6 +133,13 @@ OUTPUT:
 
 high
 
+## Priority Rationale
+
+This is a maximum-priority follow-up track, but it should not block the first-plan preset library.
+The first implementation order should be preset-first architecture, then manual workout authoring,
+because presets can reduce AI token usage immediately while manual editing defines the broader
+workout mutation model.
+
 ## Owner
 
 ARCHITECT / BACKEND / FRONTEND / DESIGN SYSTEM / QA
@@ -138,6 +160,10 @@ The user wants runners to be able to manually create and customize workouts:
 The user also wants this future capability accounted for while building the Hito DS calendar/workout
 day playground, so calendar day states do not ignore future add/edit/copy/recurring affordances.
 
+This is a separate but linked maximum-priority track from the preset-first first-plan library. Presets
+should create rich canonical workouts first; this manual authoring track should later let runners
+edit those canonical workouts safely.
+
 ## Evidence
 
 Current source orientation:
@@ -153,6 +179,9 @@ Current source orientation:
   states, and feedback/evidence markers.
 - `docs/tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md` now tracks
   visual/specimen coverage for calendar/workout day states.
+- `docs/tasks/backlog/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md`
+  tracks the linked preset-first first-plan architecture that should start before manual CRUD
+  implementation.
 
 No implementation proof was run for this backlog item.
 
@@ -178,6 +207,8 @@ Future Hito should support a backend-owned manual workout authoring flow where a
 - copy a workout and paste it to another date
 - create a bounded repeated/recurring workout pattern
 - preserve or intentionally adjust workout identity, segments, metrics, and notes
+- edit preset-generated workouts through canonical values such as time, distance, repeats, recovery,
+  pace, HR, speed, cues, and intensity only where product and metric truth allow
 - avoid silent conflicts with logs, Garmin evidence, fixed rest days, active-plan refresh, import,
   export, and plan history
 
@@ -206,6 +237,9 @@ Manual workout authoring is a new mutation class. It cannot be safely added as a
 button because it touches canonical active-plan truth, history protection, copy/paste semantics,
 recurrence expansion, export/import compatibility, and future plan-refresh behavior.
 
+It also should not become the source of preset truth. Preset recipes should remain backend-owned
+plan-generation truth, while manual authoring edits already-created canonical workouts.
+
 ## Recommended Fix Direction
 
 Start with an ARCHITECT plan that defines the canonical mutation model before backend/frontend work.
@@ -218,6 +252,21 @@ Recommended bias:
 - logged/evidence-backed workouts are protected unless a clear review/confirm model is approved
 - recurrence should likely expand through a reviewed batch operation before persistence, unless a
   later architecture pass proves recurrence-rule storage is necessary
+- manual editing should reuse the same canonical workout identity, segment, executable-target, and
+  metric-truth model used by first-plan presets, imports, refreshes, and generated plans
+
+## Related High-Priority Track
+
+- `docs/tasks/backlog/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md`
+
+Sequencing decision:
+
+- start the first-plan preset library architecture first because it reduces AI token usage and can
+  ship without manual CRUD
+- keep this manual authoring architecture at maximum priority, but do not let it block the first
+  preset-library slice
+- once manual authoring is implemented, preset-generated workouts should become editable through the
+  same canonical workout/segment value model
 
 ## What Not To Touch
 

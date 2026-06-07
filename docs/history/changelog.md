@@ -13,6 +13,15 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-06
+
+- Cleaned up executable workout target readback so workout detail, Today/calendar summaries,
+  interval visualization, first-plan review copy, and plan export foreground backend-shaped
+  executable segment anatomy while keeping cues, focus, RPE, purpose/source copy, legacy
+  effort-only modes, and age-estimated/default HR visibly separate from executable target truth;
+  source/helper/build QA passed, with authenticated saved-mode browser smoke left as a small
+  non-blocking fixture gap.
+
 ## 2026-06-05
 
 - Hardened generated workout target truth for structured plan authoring: new generated non-rest

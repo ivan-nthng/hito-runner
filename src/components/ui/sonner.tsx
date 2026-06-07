@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "sonner";
-import { LoaderCircle, X } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
+import { Icon } from "@/components/ui/icon";
 import {
   dismissHitoWorkingToast,
   getWorkingToastSnapshot,
@@ -14,6 +14,7 @@ const Toaster = ({
   position = "top-center",
   closeButton = true,
   expand = false,
+  icons,
   visibleToasts = 1,
   toastOptions,
   ...props
@@ -26,6 +27,14 @@ const Toaster = ({
         expand={expand}
         visibleToasts={visibleToasts}
         className="hito-toaster group"
+        icons={{
+          close: <Icon name="close" size="xs" />,
+          error: <Icon name="x-circle" size="sm" />,
+          info: <Icon name="warning" size="sm" />,
+          loading: <Icon name="loader" size="sm" className="animate-spin" />,
+          success: <Icon name="check-circle" size="sm" />,
+          ...icons,
+        }}
         toastOptions={{
           ...toastOptions,
           closeButtonAriaLabel: "Dismiss notification",
@@ -35,7 +44,7 @@ const Toaster = ({
             description: "hito-toast-description",
             icon: "hito-toast-icon",
             loader: "hito-toast-loader",
-            closeButton: "hito-toast-close",
+            closeButton: "hito-toast-close hito-button hito-button-ghost hito-button-xs",
             actionButton: "hito-button hito-button-primary hito-button-xs",
             cancelButton: "hito-button hito-button-secondary hito-button-xs",
             info: "hito-toast-info",
@@ -79,7 +88,7 @@ function HitoWorkingToastViewport() {
       >
         <div className="hito-toast-custom-body">
           <div data-icon="" className="hito-toast-icon">
-            <LoaderCircle className="h-4 w-4 animate-spin" strokeWidth={1.8} />
+            <Icon name="loader" size="sm" className="animate-spin" />
           </div>
           <div data-content="">
             <div data-title="" className="hito-toast-title">
@@ -95,13 +104,13 @@ function HitoWorkingToastViewport() {
             type="button"
             data-hito-toast-dismiss=""
             data-hito-toast-id={String(toast.id)}
-            className="hito-toast-dismiss-action"
+            className="hito-toast-dismiss-action hito-button hito-button-ghost hito-button-xs"
             aria-label="Dismiss notification"
             onPointerDown={(event) => event.stopPropagation()}
             onMouseDown={(event) => event.stopPropagation()}
             onClick={() => dismissHitoWorkingToast(toast.id, { notify: true })}
           >
-            <X className="h-3.5 w-3.5" strokeWidth={1.8} />
+            <Icon name="close" size="xs" />
           </button>
         </div>
       </div>

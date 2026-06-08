@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-06-05
+2026-06-07
 
 ## Where We Are Now
 
@@ -99,6 +99,16 @@ Active
   successful plan creation now automatically opens a fresh saved-mode home request instead of leaving users stuck in the setup pending state.
 - The structured first-plan onboarding frontend slice is now implemented:
   the normal no-plan setup surface collects required age/weight/height, a bounded 5K benchmark or unknown state, fixed rest days through a compact weekday selector, compact execution preference, goal distance/style with ultra marathon and mountain running options, target time/date only for target-time goals, terrain only for marathon/ultra while mountain running implies mountain context, strength/mobility preference, and one optional `Comment`, then calls `generateStructuredFirstPlanDraft`; the review action stays in a sticky footer and remains disabled until required answers are complete, ready drafts show backend-owned runner/profile, goal, availability/rest-day, horizon, workout-mix, metric-policy, assumption, and safety copy, and only the explicit `Yes, create plan` action calls `confirmStructuredFirstPlanDraft`.
+- The Plan Preset vertical slice is implemented and QA-passed:
+  no-active-plan setup now exposes backend-owned Plan Preset cards for `10K Foundation`,
+  `Half Marathon Balanced`, and `Marathon Base`, with backend-shaped eligibility, duration,
+  start/end dates, workout mix, metric honesty, and fit summaries. The preset happy path avoids
+  OpenAI, opens a non-mutating review, and only `Create preset plan` persists exact reviewed
+  `training-plan-v2` rows through the existing active-plan persistence seam; final browser QA proved
+  the setup -> card -> review -> confirm -> saved active plan flow, exact `84`-row half-marathon
+  persistence, mobile no-overflow, Advanced custom separation, and cleanup of scoped QA records.
+  Manual workout creation/edit/copy/paste/recurrence, active-plan replacement/refresh from presets,
+  and additional preset families remain future backlog work.
 - The plan-authoring quality backend refinement has been hardened beyond the original slice 3:
   structured authoring accepts generation-only execution mode, uses an executable-mode resolver so numeric pace targets require execution support plus usable recent 5K truth, personal HR zones remain the only executable HR target truth, target time alone does not create pace targets, age-estimated HR remains advisory/readback-only, allowed non-pace/non-HR workouts use `structure_only_executable` numeric duration/distance/repeat/recovery anatomy instead of vague effort-only happy-path output, emits exact generated workout identity plus cutback/long-run steady-finish structure inside valid `training-plan-v2` workout data, and now adds goal-family long-run floors/peaks/ceilings, taper reductions aligned to the `Taper` phase boundary, Base/Build/Specific/Taper workout selection, runner-fit safety adjustments, target-time honesty assumptions for weak or aggressive benchmark support, long-distance review assumptions for low-support marathon/ultra/mountain contexts, mountain/trail-specific technical terrain/controlled descent/hike-run/time-on-feet doctrine without exact elevation prescriptions, sharper 5K/10K/half/marathon/ultra workout identities without changing hard-day frequency, a beginner/low-support `build_consistency` cap that keeps those plans out of tempo, interval, and race-like tune-up identities, richer opener/main/finish support-run structure for normal longer easy/steady/cutback/taper/long days, safe recovery/cutback identity variation for conservative low-support balanced plans, bounded plan-scoped authoring snapshots so refresh can preserve target-time, benchmark, execution-mode, rest-day, and metric-policy truth instead of degrading to legacy reconstruction, and rich canonical workout fields/mapping plus additive saved-mode persistence, import/export/template roundtrip, calendar/glyph rendering adoption, and workout/readback helpers that foreground backend-shaped executable target entries while keeping cues, focus, RPE, source copy, default/age-estimated HR, and legacy effort/cue-only rows secondary or legacy-readable.
 - The first OpenAI rich-workout draft backend slice is implemented behind text authoring only:
@@ -413,14 +423,20 @@ Active
 
 ## Current Active Stream
 
-Post-normalization stabilization:
-the visible interface is now treated as owned by shared Hito DS primitives, documented shell families, bounded gradient/overlay roles, and compact progress visualization chrome, while remaining non-DS geometry stays intentionally constrained to chart heights/widths, plotted lines, interval widths, SVG silhouettes, and marker coordinates.
+Plan Preset v1 is complete for no-active-plan creation:
+the product now has a backend-owned deterministic preset path for `10K Foundation`,
+`Half Marathon Balanced`, and `Marathon Base`, plus the existing Advanced custom program escape hatch
+for target-date/time and unusual cases. The next broad project stream is simplification and
+consolidation before adding more preset families or new mutation models.
 
 ## Next Recommended Steps
 
-1. QA + validate structured constructor generation, fixed rest-day preservation, terrain-focus output, and Advanced JSON regression in Safari.
-2. QA + verify that no-plan accounts read as one structured product path and that Advanced JSON remains discoverable without competing with onboarding.
-3. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use `/hitoDS` as the inspection surface before shipping new visual patterns.
+1. Start the Hito stack simplification strike after this Plan Preset archive if the team wants to
+   reduce framework/tool/code-path complexity before expanding product scope.
+2. Use backlog-only follow-ups for additional Plan Preset families, preset-based active-plan
+   replacement/refresh, and manual workout creation/edit/copy/paste/recurrence.
+3. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use
+   `/hitoDS` as the inspection surface before shipping new visual patterns.
 
 ## Canonical References
 

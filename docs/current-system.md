@@ -91,6 +91,16 @@
 - `src/lib/first-plan-actions.ts`
   owns the first-plan server-action layer for the structured constructor and transcript-backed voice-to-plan path:
   `completeStructuredFirstPlanOnboarding`, `generateStructuredFirstPlanDraft`, `confirmStructuredFirstPlanDraft`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public imports through `training-api.ts`; the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
+- `src/lib/plan-presets/` and `src/lib/plan-preset-actions.ts`
+  own the backend Plan Preset contract for no-active-plan creation:
+  eligibility, card view models, recipe mapping, program summary/date fields, metric honesty,
+  composition rules, non-mutating review drafts, backend-issued review token/checksum, and
+  preset confirm all stay server-owned. Current preset families are `10K Foundation`,
+  `Half Marathon Balanced`, and `Marathon Base`; the preset happy path does not call OpenAI, does
+  not add schema truth, and does not let the frontend compute eligibility, dates, workout mix,
+  metric truth, recipe rows, or persistence. `confirmPlanPresetDraft` rebuilds the draft
+  server-side, verifies the token/checksum, blocks active-plan conflicts, and creates the active
+  plan through `createFirstPlanFromReviewedCanonicalPlanForUser(...)`.
 - `src/lib/active-plan-persistence.ts`
   owns the shared imported-plan apply and active-plan persistence primitives used by first-plan creation and saved-mode flows:
   `applyImportedPlanForUser`, active-plan lookup, planned-workout/log readback with archived-log recovery, assigned-plan insertion including nullable rich workout family/identity/icon/goal-context/metric-mode columns, profile upsert during apply including structured first-plan training preference snapshots, optional bounded plan-scoped authoring metadata, and rollback of inserted plans now live there so first-plan actions no longer depend backward on `training-api.ts`
@@ -212,6 +222,14 @@
   if a user has no `runner_entitlements` row, the effective tier is `Pro`; an explicit active `basic` row can enforce the first limits, including one lifetime included `ai_plan_update`, while `voice_to_plan` and `garmin_ai_interpretation` are Pro-only capabilities
 - authenticated users without `runner_profile` are routed into setup on `/`
 - authenticated users with a saved profile but no active `plan_cycle` now also stay honestly in setup until a canonical creation path succeeds
+- Plan Presets are now a canonical no-active-plan creation path:
+  the setup surface can show backend-owned `10K Foundation`, `Half Marathon Balanced`, and
+  `Marathon Base` cards, each with backend-owned eligibility, duration, start/end date, workout mix,
+  metric honesty, and fit copy. Selecting a card opens a non-mutating review; only
+  `Create preset plan` calls the preset confirm action, which persists the exact reviewed
+  `training-plan-v2` rows through the existing active-plan persistence seam. Presets apply only when
+  there is no active plan and do not implement active-plan replacement, refresh, manual workout
+  authoring, or target-date preset behavior.
 - visible onboarding on `/` is now structured-first:
   authenticated users without setup answer the bounded first-plan constructor for required profile basics, progressive training preferences, bounded fitness-level benchmark context, execution preference, goal, conditional target/terrain context, strength/mobility support, and optional comment; the frontend calls `generateStructuredFirstPlanDraft` first, keeps `correction_required` inline near the form, opens a `Review your setup` modal only for `draft_ready`, and calls `confirmStructuredFirstPlanDraft` only from the modal `Yes, create plan` action
 - structured constructor review-before-create is now the visible manual onboarding path:

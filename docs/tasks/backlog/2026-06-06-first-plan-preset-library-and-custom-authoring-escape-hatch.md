@@ -1,8 +1,8 @@
-# First-Plan Preset Library And Custom Authoring Escape Hatch
+# Plan Preset Library And Custom Authoring Escape Hatch
 
 ## Status
 
-backlog
+completed
 
 ## Type
 
@@ -14,18 +14,21 @@ high
 
 ## Next Recommended Role
 
-ARCHITECT
+BACKLOG / ARCHITECT
 
 ## Task
 
-Define the architecture for a backend-owned first-plan preset library with a custom authoring escape
-hatch.
+Completed intake and implementation track for a backend-owned Plan Preset library with a custom
+authoring escape hatch.
 
 ## Stage
 
-ARCHITECT backlog / first-plan preset library and custom authoring architecture intake
+ARCHITECT closeout / Plan Preset final browser acceptance pass
 
 ## Exact Handoff Prompt
+
+This item is complete. The prompt below is preserved as historical intake context only; no active
+handoff remains.
 
 ```text
 ROLE: ARCHITECT
@@ -39,6 +42,9 @@ ARCHITECT plan / preset-first no-plan onboarding and token-saving first-plan arc
 
 SOURCE BACKLOG ITEM:
 docs/tasks/backlog/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md
+
+ARCHIVED PLAN:
+docs/plans/archive/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md
 
 RELATED BACKLOG ITEM:
 docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md
@@ -153,10 +159,43 @@ ARCHITECT / RUNNING COACH / BACKEND / FRONTEND / QA
 
 2026-06-06
 
+## Completion
+
+Completed on 2026-06-07.
+
+The backlog item was promoted into an active implementation plan, delivered through backend,
+frontend, persistence, remote Supabase smoke, and final browser acceptance slices, then archived.
+
+Implemented scope:
+
+- no-active-plan Plan Preset cards for `10K Foundation`, `Half Marathon Balanced`, and
+  `Marathon Base`
+- backend-owned eligibility, recipe mapping, program summary/date fields, metric honesty, review
+  draft, token/checksum, and confirm persistence
+- frontend rendering of backend-shaped card/review/confirm state without local recipe, metric,
+  date, or persistence truth
+- explicit Advanced custom program separation
+
+Not implemented by this item:
+
+- additional preset families
+- active-plan replacement/refresh from presets
+- manual workout creation/edit/copy/paste/recurrence
+- target-date preset behavior
+- OpenAI changes beyond preserving the existing Advanced custom path
+
 ## Related Work
 
+- Archived plan:
+  `docs/plans/archive/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md`
 - Manual workout creation/edit/copy/recurrence:
   `docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md`
+- Additional Plan Preset families:
+  `docs/tasks/backlog/2026-06-07-additional-plan-preset-families.md`
+- Plan Preset active-plan replacement/refresh:
+  `docs/tasks/backlog/2026-06-07-plan-preset-active-plan-replacement-refresh.md`
+- QA screenshot artifact reliability:
+  `docs/tasks/backlog/2026-06-07-qa-screenshot-artifact-reliability.md`
 - Future envelope rollout gate:
   `docs/tasks/backlog/2026-06-04-ai-first-plan-envelope-production-default-switch-gate.md`
 - Completed blueprint first-plan wave:
@@ -347,4 +386,12 @@ Future implementation should validate:
 
 ## Blockers
 
-Architecture and Running Coach preset-family decisions are required before implementation.
+None for this completed intake/implementation track.
+
+## Promotion
+
+Promoted to active plan on 2026-06-06 and archived as complete on 2026-06-07:
+
+- `docs/plans/archive/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md`
+
+Future execution owners are tracked in the follow-up backlog items.

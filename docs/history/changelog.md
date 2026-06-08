@@ -13,6 +13,16 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-07
+
+- Shipped Plan Presets for no-active-plan creation: runners can start from backend-owned
+  `10K Foundation`, `Half Marathon Balanced`, or `Marathon Base` cards with backend-shaped
+  eligibility, duration, start/end dates, workout mix, metric honesty, and fit summaries, review the
+  non-mutating draft, then create an exact canonical active plan through the existing persistence
+  seam. Final QA proved the browser setup -> card -> review -> confirm -> saved-plan flow, exact
+  half-marathon row persistence, mobile no-overflow, Advanced custom separation, and cleanup of
+  scoped QA records.
+
 ## 2026-06-06
 
 - Cleaned up executable workout target readback so workout detail, Today/calendar summaries,

@@ -69,6 +69,14 @@ export {
   type StructuredFirstPlanDraftResult,
 } from "@/lib/first-plan-actions";
 export {
+  confirmPlanPresetDraft,
+  getPlanPresetCards,
+  reviewPlanPresetDraft,
+  type PlanPresetCardsActionResult,
+  type PlanPresetConfirmActionResult,
+  type PlanPresetReviewDraftActionResult,
+} from "@/lib/plan-preset-actions";
+export {
   exportActivePlan,
   exportActivePlanForUser,
   type ExportActivePlanResult,

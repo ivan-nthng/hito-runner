@@ -54,6 +54,17 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - authenticated users without setup complete are gated into a compact structured first-plan constructor on `/`
 - the primary onboarding surface now collects required profile basics, one bounded fitness benchmark, fixed rest days, goal distance/style, conditional target and terrain context, strength/mobility preference, and one optional supporting comment before creating the first saved plan
 - if a signed-in user has no active saved plan yet, the app now stays honestly in that setup state instead of silently assigning a preview-derived plan
+- signed-in users with no active plan can now start from backend-owned Plan Preset cards for
+  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`; cards and review show
+  backend-shaped eligibility, duration, start/end dates, workout mix, metric honesty, and fit
+  reasons, then `Create preset plan` persists the exact reviewed canonical plan through the existing
+  active-plan seam
+- Plan Presets are reusable for any no-active-plan state, not only a runner's literal first plan:
+  they never silently replace an existing active plan, and active-plan replacement/refresh from a
+  preset remains separate future work
+- the Advanced custom program path remains separate and secondary for target date/time, unusual
+  constraints, injury/pain/caution, uncommon goals, and detailed comments; manual workout
+  creation/edit/copy/paste/recurrence is not implemented by the Plan Preset release
 - setup-required accounts now see `Create a Plan` in the home header where saved-mode accounts see `Open plan`
 - the backend now also supports one first-pass free-text authoring seam:
   one user message is turned into validated canonical plan data server-side through OpenAI before the saved weekly plan opens; the saved-mode text replacement action explicitly opts into a separate rich workout-structure draft after structured intent validates, but backend normalization remains the only path to persisted `training-plan-v2` truth and falls back to the deterministic generator if the draft is unsafe or malformed

@@ -88,6 +88,7 @@ interface StructuredPlanConstructorProps {
   onSubmit: () => void;
   onConfirmDraft: () => void;
   onBackToEdit: () => void;
+  planPresetPanel?: ReactNode;
 }
 
 export function StructuredPlanConstructor({
@@ -102,6 +103,7 @@ export function StructuredPlanConstructor({
   onSubmit,
   onConfirmDraft,
   onBackToEdit,
+  planPresetPanel,
 }: StructuredPlanConstructorProps) {
   const showsTargetFields = state.goalStyle === "target_time";
   const showsTerrainSelector =
@@ -373,6 +375,8 @@ export function StructuredPlanConstructor({
         {isCorrectionRequired ? <StructuredCorrectionNotice result={draftResult} /> : null}
         {draftResult && !draftResult.ok ? <StructuredReviewError result={draftResult} /> : null}
 
+        {planPresetPanel}
+
         <div className="hito-onboarding-submit-footer">
           <div className="hito-onboarding-submit-footer-inner">
             <div className="min-w-0">
@@ -382,20 +386,21 @@ export function StructuredPlanConstructor({
               ) : null}
               {!constructorError && constructorStatus !== "finishing" ? (
                 <p className="hito-field-helper max-w-xl">
-                  Review your plan first. Nothing is created until you confirm it.
+                  Advanced custom program is still available for complex setup. It reviews before
+                  anything is created.
                 </p>
               ) : null}
             </div>
             <button
               type="submit"
               disabled={isBusy || !isConstructorReady}
-              className="hito-button hito-button-primary hito-button-lg shrink-0"
+              className="hito-button hito-button-secondary hito-button-lg shrink-0"
             >
               {constructorStatus === "reviewing"
-                ? "Reviewing plan..."
+                ? "Reviewing custom..."
                 : constructorStatus === "finishing"
                   ? "Opening your plan..."
-                  : "Review plan"}
+                  : "Review advanced custom"}
             </button>
           </div>
         </div>

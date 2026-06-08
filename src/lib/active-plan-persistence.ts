@@ -175,7 +175,13 @@ export async function createAssignedPlanFromImportedSeed(
     .select("*");
 
   if (workoutInsert.error) {
+    await rollbackInsertedPlan(planInsert.data.id);
     throw new Error(workoutInsert.error.message);
+  }
+
+  if (!workoutInsert.data || workoutInsert.data.length !== importedSeed.workouts.length) {
+    await rollbackInsertedPlan(planInsert.data.id);
+    throw new Error("Planned workout persistence did not match the reviewed plan row count.");
   }
 
   return {

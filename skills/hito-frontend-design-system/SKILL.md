@@ -34,6 +34,20 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 5. Handle loading, empty, error, success, disabled, and destructive confirmation states.
 6. Verify mobile width and Safari-sensitive controls when relevant.
 
+## Designer Spec Depth Gate
+
+- If a Designer task is large, multi-state, cross-surface, visually nuanced, or would require a long
+  handoff prompt, create or update a detailed Markdown plan/spec before Frontend implementation.
+- Prefer `docs/tasks/frontend-specs/` for implementation-ready UI specs; use an active plan only
+  when the work is multi-slice, risky, or cross-role.
+- Do not compress complex design direction into a short chat answer. The document should be detailed
+  enough that Frontend can implement without inventing layout, state, or copy behavior.
+- Include user flow, screen anatomy, component/state inventory, Hito DS primitives to reuse,
+  backend-shaped view-model expectations, responsive/mobile behavior, empty/loading/error/review
+  states, edge cases, acceptance criteria, and validation expectations.
+- The more complex the feature, the more explicit the spec should be. Detail is preferred over
+  ambiguity when it prevents frontend guessing or route-local drift.
+
 ## Root-Cause Frontend Fix Gate
 
 - Frontend bug fixes must start by naming the failing source-of-truth boundary: backend-shaped data,

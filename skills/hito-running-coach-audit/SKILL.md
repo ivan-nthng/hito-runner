@@ -16,6 +16,7 @@ Verify that Hito's generated running plans and recommendations are credible, saf
 - Running Coach must not produce technical evidence by running SQL, Supabase queries, migrations, product scripts, browser QA, CLI validation, build checks, or database inspections.
 - Running Coach must not log into product/admin surfaces, create/delete test accounts, validate persistence, or prove auth/mutation/API behavior.
 - If the requested review lacks enough generated-plan evidence, Running Coach should state the missing evidence and hand off to QA or Backend. It should not self-test.
+- Running Coach may create or update markdown coaching artifacts when the requested output is too large for chat, such as plan matrices, workout inventories, doctrine tables, or backend-ready scenario contracts.
 
 ## Required Reading
 
@@ -28,6 +29,38 @@ For Hito plan-quality work, read:
 5. relevant generated plan fixture, prompt output, or product surface
 
 Only read product surfaces when they are provided as screenshots or reports unless the user explicitly asks Running Coach to inspect a visible artifact. Do not perform browser QA under this skill.
+
+## File Artifact Rule
+
+Use a markdown file instead of a chat wall when the coaching output is a large table, a multi-scenario matrix, a full training-plan inventory, or a backend-ready coaching contract.
+
+Target selection:
+
+- If the prompt gives a file path, write there.
+- If the artifact belongs to an active plan or spec, update that named plan/spec.
+- If no path is supplied, create `docs/tasks/running-coach/YYYY-MM-DD-<short-slug>.md`.
+
+For training-plan matrices, prefer a table with:
+
+- plan family or card
+- runner level
+- availability / days per week
+- duration or horizon
+- weekly rhythm
+- workout identity mix
+- progression and cutback shape
+- metric-truth mode
+- safety / recovery notes
+- required follow-up inputs
+- QA fixture expectations
+
+After writing an artifact, the chat response should be short: task, stage, artifact link, key decisions, next recommended role, and blockers. Do not paste the whole table back into chat.
+
+Artifact limits:
+
+- Markdown coaching artifacts are allowed.
+- Product code, migrations, scripts, styles, runtime data, Supabase state, browser QA artifacts, and implementation files remain forbidden.
+- Do not claim artifact content is implemented behavior until the relevant implementation and QA pass.
 
 ## Review Checklist
 

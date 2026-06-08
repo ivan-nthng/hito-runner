@@ -13,6 +13,11 @@ Keep Hito planning artifacts canonical, current, and easy for the next role to e
 
 Use `docs/plans/active/` for live work that still guides execution.
 
+When reporting, handing off, or summarizing plan work, render every referenced plan, task, backlog
+item, frontend spec, archive doc, QA report, or current-doc path as a clickable Markdown link with an
+absolute workspace path. Do not leave project document paths as plain relative text or inline-code
+only references.
+
 Every active plan should include:
 
 - Status

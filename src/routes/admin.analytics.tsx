@@ -2,7 +2,7 @@ import { Link, createFileRoute, redirect, useRouter } from "@tanstack/react-rout
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, type ReactNode } from "react";
 import {
-  AdminWorkspaceMobileNav,
+  AdminWorkspacePageHeader,
   AdminWorkspaceSidebar,
 } from "@/components/admin/AdminWorkspaceNav";
 import {
@@ -181,38 +181,12 @@ function AdminAnalyticsPage() {
         <AdminWorkspaceSidebar activeSection={activeTab} />
 
         <section className="hito-workbench-main">
-          <header className="hito-workbench-topbar">
-            <div className="flex flex-col gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
-              <div className="min-w-0">
-                <div className="hito-workbench-location lg:hidden">
-                  <span className="hito-workbench-location-title">Admin workspace</span>
-                  <span className="hito-workbench-location-meta">
-                    <span>{activeSection.label}</span>
-                  </span>
-                </div>
-                <p className="hito-micro-label">Admin workspace</p>
-                <h1 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-                  {activeSection.label}
-                </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {ADMIN_SECTION_DESCRIPTIONS[activeTab]}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-start gap-2 lg:items-center">
-                <Link to="/" className="hito-button hito-button-secondary hito-button-md">
-                  Back to Hito
-                </Link>
-                <a
-                  href="/api/admin/auth/logout?next=%2Fadmin%2Fanalytics"
-                  className="hito-button hito-button-ghost hito-button-md"
-                >
-                  <Icon name="logout" size="sm" />
-                  Sign out
-                </a>
-              </div>
-            </div>
-            <AdminWorkspaceMobileNav activeSection={activeTab} />
-          </header>
+          <AdminWorkspacePageHeader
+            activeSection={activeTab}
+            title={activeSection.label}
+            description={ADMIN_SECTION_DESCRIPTIONS[activeTab]}
+            action={activeTab === "users" ? <DisabledAddUserAction /> : undefined}
+          />
 
           <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
             <div>
@@ -229,6 +203,20 @@ function AdminAnalyticsPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function DisabledAddUserAction() {
+  return (
+    <button
+      type="button"
+      className="hito-button hito-button-secondary hito-button-md"
+      disabled
+      title="Future-safe placeholder. User creation is not implemented in this admin slice."
+    >
+      <Icon name="plus" size="xs" />
+      Add user
+    </button>
   );
 }
 

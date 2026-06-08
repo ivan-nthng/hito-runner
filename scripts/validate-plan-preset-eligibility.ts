@@ -1,21 +1,50 @@
 import assert from "node:assert/strict";
+import { assertPlanPresetAlgorithmicQualityGates } from "../src/lib/plan-presets/algorithmic-builder";
+import { buildPlanPresetReviewDraftContract } from "../src/lib/plan-presets/expand";
+import {
+  getPlanPresetLoadAdjustments,
+  getPlanPresetBuilderIoContracts,
+  getPlanPresetGoalContracts,
+  getPlanPresetIdentityPlacementRules,
+  getPlanPresetPhaseTemplates,
+  getPlanPresetProgramScenarios,
+  getPlanPresetProgressionMathRules,
+  getPlanPresetQualityGates,
+  getPlanPresetSegmentAnatomyTable,
+  getPlanPresetWeeklyArchetypes,
+  getPlanPresetWorkoutIdentityLibrary,
+  resolvePlanPresetProgramCsvPathForDiagnostics,
+  resolvePlanPresetProgram,
+  type PlanPresetProgramScenario,
+} from "../src/lib/plan-presets/program-data";
+import { PLAN_PRESET_RECIPES, getPlanPresetRecipe } from "../src/lib/plan-presets/recipes";
 import { resolvePlanPresetCards } from "../src/lib/plan-presets/resolver";
 import {
   PLAN_PRESET_CARD_STATE_VALUES,
+  planPresetEligibilityInputSchema,
   PLAN_PRESET_REASON_CODE_VALUES,
   PLAN_PRESET_RESULT_CODE_VALUES,
+  type PlanPresetCardId,
+  type PlanPresetCardRequestInput,
+  type PlanPresetRecipeFamilyId,
 } from "../src/lib/plan-presets/schema";
 import { validateTenKFoundationDrafts } from "./plan-presets/10k-foundation";
 import { validatePlanPresetConfirmPersistenceContract } from "./plan-presets/confirm-persistence";
 import { validateHalfMarathonBalancedDrafts } from "./plan-presets/half-marathon-balanced";
 import { validateMarathonBaseDrafts } from "./plan-presets/marathon-base";
 import { assertCardProgramSummary, baseInput, findCard } from "./plan-presets/helpers";
+import { addDaysIso } from "../src/lib/training";
 
 async function main() {
   validateSupportedSetup();
+  validateAdaptiveProgramSourceOfTruth();
+  validatePlanPresetProgramCsvRuntimeResolution();
   validateProgramSummaryCards();
   validateCustomRouting();
-  validateNeedsInfo();
+  validateWatchSupportAssumed();
+  validateProgressiveCardContract();
+  validateReviewReadyMatrixDraftCoverage();
+  validateAlgorithmicBuilderQualityProofs();
   validateMetricTruth();
   validateReasonCodeBounds();
   validateTenKFoundationDrafts();
@@ -24,6 +53,331 @@ async function main() {
   await validatePlanPresetConfirmPersistenceContract();
 
   console.log("Plan preset eligibility fixtures passed.");
+}
+
+function validateAlgorithmicBuilderQualityProofs() {
+  const tenKTwoDayInput = matrixInputForScenario({
+    familyId: "10k_foundation",
+    familyLabel: "10K Foundation",
+    runnerLevel: "beginner",
+    daysPerWeek: 2,
+    cardState: "recommended",
+    routeOutcome: "review_after_refinement",
+    durationMinWeeks: 0,
+    durationMaxWeeks: 0,
+    programBias: "",
+    moderateTouchCapPerWeek: 1,
+    longRunPolicy: "",
+    cutbackFrequency: "",
+    requiredCoreIdentities: [],
+    optionalIdentities: [],
+    forbiddenIdentities: [],
+    finalOutcomeRule: "",
+    requiredRefinementFields: [],
+    notes: "",
+  });
+  const tenKTwoDayDraft = buildPlanPresetReviewDraftContract({
+    cardId: "10k",
+    input: tenKTwoDayInput,
+  });
+  const tenKTwoDayDevelopmentCount = tenKTwoDayDraft.canonicalPlan.planned_workouts.filter(
+    (workout) =>
+      workout.workout_identity === "easy_run_with_strides" ||
+      workout.workout_identity === "progression_run" ||
+      workout.workout_identity === "10k_rhythm_intervals" ||
+      workout.workout_identity === "tenk_completion_or_checkpoint",
+  ).length;
+
+  assert.equal(tenKTwoDayDraft.reviewShape.daysPerWeek, 2);
+  assert.equal(tenKTwoDayDraft.reviewShape.rowCounts.nonRestRows, 38);
+  assert.ok(
+    tenKTwoDayDevelopmentCount >= 2,
+    "Expected 2-day 10K to preserve a recurring development motif.",
+  );
+  assertFinalOutcomeIdentity(tenKTwoDayDraft, "tenk_completion_or_checkpoint");
+
+  const halfDraft = buildPlanPresetReviewDraftContract({
+    cardId: "half_marathon",
+    input: baseInput,
+  });
+  assertFinalOutcomeIdentity(halfDraft, "half_readiness_marker");
+
+  const marathonInput = matrixInputForScenario({
+    familyId: "marathon_base",
+    familyLabel: "Marathon Base",
+    runnerLevel: "performance_focused",
+    daysPerWeek: 4,
+    cardState: "recommended",
+    routeOutcome: "review_after_refinement",
+    durationMinWeeks: 0,
+    durationMaxWeeks: 0,
+    programBias: "",
+    moderateTouchCapPerWeek: 1,
+    longRunPolicy: "",
+    cutbackFrequency: "",
+    requiredCoreIdentities: [],
+    optionalIdentities: [],
+    forbiddenIdentities: [],
+    finalOutcomeRule: "",
+    requiredRefinementFields: [],
+    notes: "",
+  });
+  const marathonDraft = buildPlanPresetReviewDraftContract({
+    cardId: "marathon",
+    input: marathonInput,
+  });
+  assertFinalOutcomeIdentity(marathonDraft, "base_endpoint_marker");
+
+  const tenKProgram = resolvePlanPresetProgram({
+    recipe: getPlanPresetRecipe("10k")!,
+    startDate: tenKTwoDayDraft.reviewShape.startDate,
+    runnerLevel: "beginner",
+    daysPerWeek: 2,
+    age: 36,
+    weightKg: 76,
+    heightCm: 180,
+  });
+  const supportOnlyPlan = {
+    ...tenKTwoDayDraft.canonicalPlan,
+    planned_workouts: tenKTwoDayDraft.canonicalPlan.planned_workouts.map((workout) =>
+      workout.workout_type === "rest"
+        ? workout
+        : {
+            ...workout,
+            workout_type: "easy" as const,
+            source_workout_type: "easy_aerobic_run",
+            workout_identity: "easy_aerobic_run" as const,
+            title: "Easy aerobic run",
+            summary: "Support-only tamper row.",
+          },
+    ),
+  };
+
+  assert.throws(
+    () =>
+      assertPlanPresetAlgorithmicQualityGates({
+        canonicalPlan: supportOnlyPlan,
+        program: tenKProgram,
+        daysPerWeek: 2,
+      }),
+    /quality gate|identity histogram|final outcome/i,
+    "Expected support-only 10K tamper to fail builder quality gates.",
+  );
+}
+
+function assertFinalOutcomeIdentity(
+  draft: ReturnType<typeof buildPlanPresetReviewDraftContract>,
+  expectedIdentity: string,
+) {
+  const finalWeek = draft.reviewShape.durationWeeks;
+  const finalIdentities = draft.canonicalPlan.planned_workouts
+    .filter((workout) => workout.week_number === finalWeek && workout.workout_type !== "rest")
+    .map((workout) => workout.workout_identity ?? workout.source_workout_type ?? null);
+
+  assert.ok(
+    finalIdentities.includes(expectedIdentity),
+    `Expected final week to include ${expectedIdentity}; got ${finalIdentities.filter(Boolean).join(", ")}.`,
+  );
+}
+
+function validatePlanPresetProgramCsvRuntimeResolution() {
+  for (const fileName of [
+    "preset-program-scenario-matrix.csv",
+    "preset-program-load-adjustments.csv",
+    "preset-workout-identity-library.csv",
+    "preset-goal-contract-matrix.csv",
+    "preset-phase-template-table.csv",
+    "preset-weekly-archetype-table.csv",
+    "preset-identity-placement-rules.csv",
+    "preset-segment-anatomy-table.csv",
+    "preset-progression-math-rules.csv",
+    "preset-quality-gates.csv",
+    "preset-builder-io-contract.csv",
+  ]) {
+    const resolvedPath = resolvePlanPresetProgramCsvPathForDiagnostics(fileName);
+
+    assert.equal(resolvedPath.endsWith(`/src/lib/plan-presets/${fileName}`), true);
+  }
+}
+
+function validateProgressiveCardContract() {
+  const emptyResult = resolvePlanPresetCards({});
+
+  assert.equal(emptyResult.cards.length, 3);
+  assert.equal(
+    emptyResult.cards.every((card) => card.state === "needs_more_info"),
+    true,
+  );
+  assert.equal(
+    emptyResult.cards.every((card) => card.disabledReason?.code === "missing_minimum_profile"),
+    true,
+  );
+  assert.equal(
+    emptyResult.cards.every((card) => card.reviewReady === false),
+    true,
+  );
+  assert.equal(
+    emptyResult.cards.every((card) =>
+      card.requiredMissingFields.includes("benchmark.fitnessLevel"),
+    ),
+    true,
+  );
+
+  const minimumProfile = progressiveInput({
+    profile: { age: 36, weightKg: 76, heightCm: 180 },
+    benchmark: { fitnessLevel: "running_regularly" },
+  });
+  const missingWeeklyDaysResult = resolvePlanPresetCards(minimumProfile);
+
+  assert.equal(
+    missingWeeklyDaysResult.cards.every((card) => card.state === "needs_more_info"),
+    true,
+  );
+  assert.equal(
+    missingWeeklyDaysResult.cards.every(
+      (card) => card.disabledReason?.code === "missing_weekly_days",
+    ),
+    true,
+  );
+  assert.equal(
+    missingWeeklyDaysResult.cards.every((card) =>
+      card.requiredMissingFields.includes("availability.runningDaysPerWeek"),
+    ),
+    true,
+  );
+  assert.equal(planPresetEligibilityInputSchema.safeParse(minimumProfile).success, false);
+
+  const twoDayResult = resolvePlanPresetCards(
+    progressiveInput({
+      availability: { runningDaysPerWeek: 2, fixedRestDays: [], preferredLongRunDay: "Saturday" },
+      benchmark: { fitnessLevel: "beginner" },
+    }),
+  );
+  assert.equal(findCard(twoDayResult, "10k").state, "not_ideal");
+  assert.equal(findCard(twoDayResult, "10k").resultCode, "not_ideal");
+  assert.equal(findCard(twoDayResult, "half_marathon").state, "unavailable");
+  assert.equal(findCard(twoDayResult, "marathon").state, "unavailable");
+
+  const threeDayBeginnerResult = resolvePlanPresetCards(
+    progressiveInput({
+      availability: { runningDaysPerWeek: 3, fixedRestDays: [], preferredLongRunDay: "Saturday" },
+      benchmark: { fitnessLevel: "beginner" },
+    }),
+  );
+  assert.equal(findCard(threeDayBeginnerResult, "10k").state, "recommended");
+  assert.equal(findCard(threeDayBeginnerResult, "half_marathon").state, "not_ideal");
+  assert.equal(findCard(threeDayBeginnerResult, "marathon").state, "unavailable");
+  assert.equal(findCard(threeDayBeginnerResult, "10k").reviewReady, false);
+  assert.ok(findCard(threeDayBeginnerResult, "10k").postSelectionRefinement);
+
+  const fourDayRegularResult = resolvePlanPresetCards(
+    progressiveInput({
+      availability: { runningDaysPerWeek: 4, fixedRestDays: [], preferredLongRunDay: "Saturday" },
+      benchmark: { fitnessLevel: "running_regularly" },
+    }),
+  );
+  assert.equal(findCard(fourDayRegularResult, "10k").state, "available");
+  assert.equal(findCard(fourDayRegularResult, "half_marathon").state, "recommended");
+  assert.equal(findCard(fourDayRegularResult, "marathon").state, "not_ideal");
+
+  const fiveDayPerformanceResult = resolvePlanPresetCards(
+    progressiveInput({
+      availability: { runningDaysPerWeek: 5, fixedRestDays: [], preferredLongRunDay: "Saturday" },
+      benchmark: { fitnessLevel: "performance_focused" },
+    }),
+  );
+  assert.equal(findCard(fiveDayPerformanceResult, "marathon").state, "recommended");
+  assert.equal(fiveDayPerformanceResult.recommendedCardId, "marathon");
+
+  const fixedRestConflictResult = resolvePlanPresetCards(
+    progressiveInput({
+      availability: {
+        runningDaysPerWeek: 5,
+        fixedRestDays: ["Monday", "Tuesday", "Wednesday"],
+        preferredLongRunDay: "Saturday",
+      },
+    }),
+  );
+  assert.equal(
+    fixedRestConflictResult.cards.every((card) => card.state === "unavailable"),
+    true,
+  );
+  assert.equal(
+    fixedRestConflictResult.cards.every(
+      (card) => card.disabledReason?.code === "fixed_rest_conflict",
+    ),
+    true,
+  );
+
+  const longRunConflictResult = resolvePlanPresetCards(
+    progressiveInput({
+      availability: {
+        runningDaysPerWeek: 4,
+        fixedRestDays: ["Saturday"],
+        preferredLongRunDay: "Saturday",
+      },
+    }),
+  );
+  assert.equal(
+    longRunConflictResult.cards.every((card) => card.state === "needs_more_info"),
+    true,
+  );
+  assert.equal(
+    longRunConflictResult.cards.every((card) => card.disabledReason?.code === "long_run_conflict"),
+    true,
+  );
+
+  const targetDateResult = resolvePlanPresetCards(
+    progressiveInput({
+      schedule: { startDate: "2026-06-08", targetDate: "2026-10-10" },
+    }),
+  );
+  assert.equal(
+    targetDateResult.cards.every((card) => card.state === "custom_fit"),
+    true,
+  );
+  assert.equal(targetDateResult.advancedCustom.reason?.code, "target_date_present");
+
+  const workoutRemovalResult = resolvePlanPresetCards(
+    progressiveInput({ comment: "Please remove long run workouts from the plan." }),
+  );
+  assert.equal(workoutRemovalResult.advancedCustom.reason?.code, "workout_type_removal_requested");
+  assert.equal(
+    workoutRemovalResult.cards.every((card) => card.state === "custom_fit"),
+    true,
+  );
+
+  const benchmarkPaceResult = resolvePlanPresetCards(
+    progressiveInput({
+      benchmark: { fitnessLevel: "custom", recent5kTime: "24:00" },
+      execution: { guidancePreference: "mixed" },
+    }),
+  );
+  assert.equal(benchmarkPaceResult.metricTruth.executableMode, "pace_executable");
+  assert.equal(benchmarkPaceResult.metricTruth.paceTargetsAllowed, true);
+}
+
+function progressiveInput(
+  overrides: Partial<PlanPresetCardRequestInput> = {},
+): PlanPresetCardRequestInput {
+  return {
+    profile: {
+      age: 36,
+      weightKg: 76,
+      heightCm: 180,
+      ...(overrides.profile ?? {}),
+    },
+    benchmark: {
+      fitnessLevel: "running_regularly",
+      ...(overrides.benchmark ?? {}),
+    },
+    availability: overrides.availability,
+    goal: overrides.goal,
+    execution: overrides.execution,
+    strength: overrides.strength,
+    schedule: overrides.schedule ?? { startDate: "2026-06-08" },
+    comment: overrides.comment,
+  };
 }
 
 function validateSupportedSetup() {
@@ -45,6 +399,110 @@ function validateSupportedSetup() {
   assert.equal(tenKCard.resultCode, "eligible_available");
 }
 
+function validateAdaptiveProgramSourceOfTruth() {
+  const scenarios = getPlanPresetProgramScenarios();
+  const loadAdjustments = getPlanPresetLoadAdjustments();
+  const identityLibrary = getPlanPresetWorkoutIdentityLibrary();
+  const goalContracts = getPlanPresetGoalContracts();
+  const phaseTemplates = getPlanPresetPhaseTemplates();
+  const weeklyArchetypes = getPlanPresetWeeklyArchetypes();
+  const identityPlacementRules = getPlanPresetIdentityPlacementRules();
+  const segmentAnatomy = getPlanPresetSegmentAnatomyTable();
+  const progressionMathRules = getPlanPresetProgressionMathRules();
+  const qualityGates = getPlanPresetQualityGates();
+  const builderIoContracts = getPlanPresetBuilderIoContracts();
+  const tenKRecipe = getPlanPresetRecipe("10k")!;
+  const halfRecipe = getPlanPresetRecipe("half_marathon")!;
+  const marathonRecipe = getPlanPresetRecipe("marathon")!;
+  const commonResolutionInput = {
+    startDate: "2026-06-08",
+    age: 36,
+    weightKg: 76,
+    heightCm: 180,
+  };
+
+  assert.equal(scenarios.length, 60);
+  assert.equal(loadAdjustments.length, 20);
+  assert.equal(identityLibrary.length, 19);
+  assert.equal(goalContracts.length, 50);
+  assert.equal(phaseTemplates.length, 76);
+  assert.equal(weeklyArchetypes.length, 20);
+  assert.equal(identityPlacementRules.length, 23);
+  assert.equal(segmentAnatomy.length, 57);
+  assert.equal(progressionMathRules.length, 14);
+  assert.equal(qualityGates.length, 17);
+  assert.equal(builderIoContracts.length, 30);
+  assert.equal(
+    scenarios.every((scenario) => scenario.durationMinWeeks <= scenario.durationMaxWeeks),
+    true,
+  );
+  assert.deepEqual(
+    new Set(scenarios.map((scenario) => scenario.familyId)),
+    new Set(PLAN_PRESET_RECIPES.map((recipe) => recipe.recipeFamilyId)),
+  );
+
+  const tenKTwoDay = resolvePlanPresetProgram({
+    recipe: tenKRecipe,
+    runnerLevel: "beginner",
+    daysPerWeek: 2,
+    ...commonResolutionInput,
+  });
+  const tenKThreeDay = resolvePlanPresetProgram({
+    recipe: tenKRecipe,
+    runnerLevel: "beginner",
+    daysPerWeek: 3,
+    ...commonResolutionInput,
+  });
+  const halfTwoDay = resolvePlanPresetProgram({
+    recipe: halfRecipe,
+    runnerLevel: "running_regularly",
+    daysPerWeek: 2,
+    ...commonResolutionInput,
+  });
+  const marathonTwoDay = resolvePlanPresetProgram({
+    recipe: marathonRecipe,
+    runnerLevel: "running_regularly",
+    daysPerWeek: 2,
+    ...commonResolutionInput,
+  });
+  const highConservatism = resolvePlanPresetProgram({
+    recipe: tenKRecipe,
+    runnerLevel: "beginner",
+    daysPerWeek: 3,
+    startDate: "2026-06-08",
+    age: 67,
+    weightKg: 96,
+    heightCm: 165,
+  });
+
+  assert.equal(tenKTwoDay.scenario.cardState, "available");
+  assert.equal(tenKTwoDay.durationWeeks > tenKThreeDay.durationWeeks, true);
+  assert.equal(halfTwoDay.scenario.cardState, "available");
+  assert.equal(halfTwoDay.durationWeeks > tenKThreeDay.durationWeeks, true);
+  assert.equal(marathonTwoDay.scenario.cardState, "unavailable");
+  assert.equal(highConservatism.durationWeeks > tenKThreeDay.durationWeeks, true);
+  assert.equal(
+    highConservatism.progressionConservatism === "high" ||
+      highConservatism.progressionConservatism === "maximum_preset",
+    true,
+  );
+  assert.equal(
+    /\b(weight|bmi|obese|overweight|underweight|medical)\b/i.test(
+      highConservatism.loadAdjustmentSummary,
+    ),
+    false,
+  );
+
+  for (const identity of identityLibrary) {
+    assert.equal(identity.targetModeWhenNoTruth, "structure_only_executable");
+    assert.equal(
+      identity.targetModeWhenPaceTruthExists.includes("target time alone"),
+      false,
+      `Identity ${identity.workoutIdentity} must not imply target-time pace truth.`,
+    );
+  }
+}
+
 function validateProgramSummaryCards() {
   const result = resolvePlanPresetCards({
     ...baseInput,
@@ -55,29 +513,184 @@ function validateProgramSummaryCards() {
   });
 
   assertCardProgramSummary(findCard(result, "10k"), {
-    durationWeeks: 10,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-08-16",
     daysPerWeek: 4,
     longRunDay: "Saturday",
     programFamily: "10K Foundation",
   });
   assertCardProgramSummary(findCard(result, "half_marathon"), {
-    durationWeeks: 12,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-08-30",
     daysPerWeek: 4,
     longRunDay: "Saturday",
     programFamily: "Half Marathon Balanced",
   });
   assertCardProgramSummary(findCard(result, "marathon"), {
-    durationWeeks: 16,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-09-27",
     daysPerWeek: 4,
     longRunDay: "Saturday",
     programFamily: "Marathon Base",
   });
+}
+
+function validateReviewReadyMatrixDraftCoverage() {
+  const failures: string[] = [];
+  const reviewReadyCards: string[] = [];
+  const keyCards = new Map<string, ReturnType<typeof findCard>>();
+
+  for (const scenario of getPlanPresetProgramScenarios()) {
+    const cardId = cardIdForScenario(scenario);
+    const input = matrixInputForScenario(scenario);
+    const result = resolvePlanPresetCards(input);
+    const card = findCard(result, cardId);
+    const key = `${scenario.familyId}/${scenario.runnerLevel}/${scenario.daysPerWeek}`;
+
+    if (!card.reviewReady) {
+      assert.equal(Object.hasOwn(card, "reviewToken"), false);
+      assert.equal(Object.hasOwn(card, "reviewChecksum"), false);
+      continue;
+    }
+
+    reviewReadyCards.push(key);
+
+    try {
+      const draft = buildPlanPresetReviewDraftContract({ cardId, input });
+
+      assert.equal(draft.reviewShape.durationWeeks, card.durationWeeks);
+      assert.equal(draft.reviewShape.rowCounts.weekCount, card.durationWeeks);
+      assert.equal(draft.reviewShape.rowCounts.calendarRows, card.durationWeeks * 7);
+      assert.equal(
+        draft.reviewShape.rowCounts.nonRestRows,
+        card.durationWeeks * scenario.daysPerWeek,
+      );
+      assert.equal(draft.sourceKind, "plan_preset_v1");
+      assert.equal(draft.source_kind, "plan_preset_v1");
+      assert.equal(draft.safety.doesNotCallOpenAi, true);
+      assert.equal(draft.safety.doesNotMutatePlan, true);
+      assert.equal(draft.safety.persistsNothing, true);
+    } catch (error) {
+      failures.push(`${key}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    if (
+      (scenario.familyId === "10k_foundation" && scenario.daysPerWeek === 2) ||
+      (scenario.familyId === "half_marathon_balanced" && scenario.daysPerWeek === 2) ||
+      (scenario.familyId === "marathon_base" &&
+        scenario.runnerLevel === "beginner" &&
+        scenario.daysPerWeek === 3)
+    ) {
+      keyCards.set(key, card);
+    }
+  }
+
+  assert.deepEqual(failures, []);
+  assert.equal(reviewReadyCards.length, 36);
+
+  assertKeyMatrixCard(keyCards, "10k_foundation/new_to_running/2", {
+    state: "recommended",
+    reviewReady: true,
+    durationWeeks: 21,
+  });
+  assertKeyMatrixCard(keyCards, "10k_foundation/beginner/2", {
+    state: "recommended",
+    reviewReady: true,
+    durationWeeks: 19,
+  });
+  assertKeyMatrixCard(keyCards, "10k_foundation/running_regularly/2", {
+    state: "recommended",
+    reviewReady: true,
+    durationWeeks: 17,
+  });
+  assertKeyMatrixCard(keyCards, "10k_foundation/performance_focused/2", {
+    state: "available",
+    reviewReady: true,
+    durationWeeks: 17,
+  });
+  assertKeyMatrixCard(keyCards, "half_marathon_balanced/running_regularly/2", {
+    state: "recommended",
+    reviewReady: true,
+    durationWeeks: 17,
+  });
+  assertKeyMatrixCard(keyCards, "half_marathon_balanced/performance_focused/2", {
+    state: "available",
+    reviewReady: true,
+    durationWeeks: 17,
+  });
+  assertKeyMatrixCard(keyCards, "marathon_base/beginner/3", {
+    state: "available",
+    reviewReady: true,
+    durationWeeks: 25,
+  });
+}
+
+function cardIdForScenario(scenario: PlanPresetProgramScenario): PlanPresetCardId {
+  return (
+    {
+      "10k_foundation": "10k",
+      half_marathon_balanced: "half_marathon",
+      marathon_base: "marathon",
+    } satisfies Record<PlanPresetRecipeFamilyId, PlanPresetCardId>
+  )[scenario.familyId];
+}
+
+function matrixInputForScenario(scenario: PlanPresetProgramScenario): PlanPresetCardRequestInput {
+  return {
+    ...baseInput,
+    benchmark: {
+      fitnessLevel: scenario.runnerLevel,
+    },
+    availability: {
+      runningDaysPerWeek: scenario.daysPerWeek,
+      fixedRestDays: ["Wednesday", "Sunday"],
+      preferredLongRunDay: "Saturday",
+    },
+    goal: goalForScenario(scenario),
+    schedule: {
+      startDate: "2026-06-08",
+      targetDate: null,
+    },
+  };
+}
+
+function goalForScenario(scenario: PlanPresetProgramScenario): PlanPresetCardRequestInput["goal"] {
+  if (scenario.familyId === "10k_foundation") {
+    return {
+      goalDistance: "10k",
+      goalStyle: "relaxed",
+      terrainFocus: "standard",
+    };
+  }
+
+  if (scenario.familyId === "half_marathon_balanced") {
+    return {
+      goalDistance: "half_marathon",
+      goalStyle: "balanced",
+      terrainFocus: "standard",
+    };
+  }
+
+  return {
+    goalDistance: "marathon",
+    goalStyle: "balanced",
+    terrainFocus: "standard",
+  };
+}
+
+function assertKeyMatrixCard(
+  cards: Map<string, ReturnType<typeof findCard>>,
+  key: string,
+  expected: {
+    state: "recommended" | "available";
+    reviewReady: true;
+    durationWeeks: number;
+  },
+) {
+  const card = cards.get(key);
+
+  assert.ok(card, `Expected matrix key card ${key}.`);
+  assert.equal(card.state, expected.state);
+  assert.equal(card.reviewReady, expected.reviewReady);
+  assert.equal(card.durationWeeks, expected.durationWeeks);
+  assert.equal(card.recipeId != null, true);
 }
 
 function validateCustomRouting() {
@@ -94,7 +707,10 @@ function validateCustomRouting() {
   assert.equal(targetDateHalfCard.state, "custom_fit");
   assert.ok(targetDateHalfCard.customReasonSummary);
   assert.equal(targetDateHalfCard.startDate, "2026-06-08");
-  assert.equal(targetDateHalfCard.estimatedEndDate, "2026-08-30");
+  assert.equal(
+    targetDateHalfCard.estimatedEndDate,
+    addDaysIso(targetDateHalfCard.startDate, targetDateHalfCard.durationWeeks * 7 - 1),
+  );
   assert.notEqual(targetDateHalfCard.estimatedEndDate, "2026-09-20");
 
   const targetTimeResult = resolvePlanPresetCards({
@@ -125,22 +741,37 @@ function validateCustomRouting() {
   assert.equal(findCard(injuryResult, "half_marathon").state, "custom_fit");
 }
 
-function validateNeedsInfo() {
-  const result = resolvePlanPresetCards({
+function validateWatchSupportAssumed() {
+  const omittedExecutionResult = resolvePlanPresetCards({
     ...baseInput,
-    execution: {
-      watchAccess: "unknown",
-      guidancePreference: "mixed",
-    },
+    execution: undefined,
   });
-  const halfCard = findCard(result, "half_marathon");
+  const omittedExecutionHalfCard = findCard(omittedExecutionResult, "half_marathon");
 
-  assert.equal(result.advancedCustom.recommended, false);
-  assert.equal(halfCard.state, "needs_more_info");
-  assert.equal(halfCard.resultCode, "needs_more_info");
-  assert.equal(halfCard.disabledReason?.code, "missing_watch_app_support");
-  assert.ok(halfCard.disabledReasonSummary);
-  assert.deepEqual(halfCard.requiredMissingFields, ["execution.watchAccess"]);
+  assert.equal(omittedExecutionResult.advancedCustom.recommended, false);
+  assert.equal(omittedExecutionHalfCard.state, "recommended");
+  assert.equal(omittedExecutionHalfCard.resultCode, "eligible_recommended");
+  assert.equal(omittedExecutionHalfCard.disabledReason, null);
+  assert.deepEqual(omittedExecutionHalfCard.requiredMissingFields, []);
+  assert.equal(omittedExecutionResult.metricTruth.executableMode, "structure_only_executable");
+
+  for (const watchAccess of ["unknown", "none"] as const) {
+    const result = resolvePlanPresetCards({
+      ...baseInput,
+      execution: {
+        watchAccess,
+        guidancePreference: "mixed",
+      },
+    });
+    const halfCard = findCard(result, "half_marathon");
+
+    assert.equal(result.advancedCustom.recommended, false);
+    assert.equal(halfCard.state, "recommended");
+    assert.equal(halfCard.resultCode, "eligible_recommended");
+    assert.equal(halfCard.disabledReason, null);
+    assert.deepEqual(halfCard.requiredMissingFields, []);
+    assert.equal(result.metricTruth.executableMode, "structure_only_executable");
+  }
 }
 
 function validateMetricTruth() {
@@ -160,6 +791,21 @@ function validateMetricTruth() {
   assert.equal(noBenchmarkResult.metricTruth.hrTargetsAllowed, false);
   assert.equal(noBenchmarkResult.metricTruth.defaultEstimatedHrAvailable, true);
   assert.equal(noBenchmarkResult.metricTruth.defaultEstimatedHrIsAdvisoryOnly, true);
+
+  const staleNoWatchResult = resolvePlanPresetCards({
+    ...baseInput,
+    benchmark: {
+      fitnessLevel: "beginner",
+    },
+    execution: {
+      watchAccess: "none",
+      guidancePreference: "pace",
+    },
+  });
+  assert.equal(staleNoWatchResult.metricTruth.executableMode, "structure_only_executable");
+  assert.equal(staleNoWatchResult.metricTruth.paceTargetsAllowed, false);
+  assert.equal(staleNoWatchResult.metricTruth.paceTruthSource, "none");
+  assert.equal(staleNoWatchResult.metricTruth.hrTargetsAllowed, false);
 
   const benchmarkResult = resolvePlanPresetCards({
     ...baseInput,
@@ -206,7 +852,7 @@ function validateReasonCodeBounds() {
     ...baseInput,
     availability: {
       ...baseInput.availability,
-      runningDaysPerWeek: 3,
+      runningDaysPerWeek: 1,
     },
   });
   const allowedStates = new Set(PLAN_PRESET_CARD_STATE_VALUES);
@@ -221,7 +867,11 @@ function validateReasonCodeBounds() {
       `Unexpected result code ${card.resultCode}`,
     );
 
-    for (const reason of [card.disabledReason, card.customRoutingReason]) {
+    for (const reason of [
+      card.disabledReason,
+      card.customRoutingReason,
+      card.postSelectionRefinement?.reason ?? null,
+    ]) {
       if (!reason) continue;
       assert.equal(
         allowedReasonCodes.has(reason.code),
@@ -232,8 +882,14 @@ function validateReasonCodeBounds() {
     }
   }
 
-  assert.equal(findCard(result, "half_marathon").state, "unavailable");
-  assert.equal(findCard(result, "half_marathon").disabledReason?.code, "insufficient_availability");
+  assert.equal(
+    result.cards.every((card) => card.state === "unavailable"),
+    true,
+  );
+  assert.equal(
+    result.cards.every((card) => card.disabledReason?.code === "insufficient_availability"),
+    true,
+  );
 }
 
 void main().catch((error) => {

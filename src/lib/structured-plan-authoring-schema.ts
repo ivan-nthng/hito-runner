@@ -65,7 +65,7 @@ export const structuredPlanAuthoringInputSchema = z
     schedule: z.object({
       startDate: isoDateSchema.default(todayIso()),
       targetDate: isoDateSchema.optional().nullable(),
-      preparationHorizonWeeks: z.number().int().min(1).max(24).optional().nullable(),
+      preparationHorizonWeeks: z.number().int().min(1).max(40).optional().nullable(),
     }),
     runnerProfile: z
       .object({

@@ -5,6 +5,7 @@ import type {
   PlanPresetCardViewModel,
   PlanPresetEligibilityRequestInput,
 } from "../../src/lib/plan-presets/schema";
+import { addDaysIso } from "../../src/lib/training";
 
 export type PlanPresetDraft = ReturnType<typeof buildPlanPresetReviewDraftContract>;
 
@@ -182,6 +183,18 @@ export function assertNoForbiddenIdentities(
   );
 }
 
+export function assertFinalWeekIdentity(draft: PlanPresetDraft, expectedIdentity: string) {
+  const finalWeek = draft.reviewShape.durationWeeks;
+  const finalIdentities = draft.canonicalPlan.planned_workouts
+    .filter((workout) => workout.week_number === finalWeek && workout.workout_type !== "rest")
+    .map((workout) => workout.workout_identity ?? workout.source_workout_type ?? null);
+
+  assert.ok(
+    finalIdentities.includes(expectedIdentity),
+    `Expected final week to include ${expectedIdentity}; got ${finalIdentities.filter(Boolean).join(", ")}.`,
+  );
+}
+
 export function assertAtMostOneSpecificTouchPerWeek(
   draft: PlanPresetDraft,
   isSpecificTouch: (identity: string | null) => boolean,
@@ -205,20 +218,27 @@ export function assertAtMostOneSpecificTouchPerWeek(
 export function assertCardProgramSummary(
   card: PlanPresetCardViewModel,
   expected: {
-    durationWeeks: number;
+    durationWeeks?: number;
     startDate: string;
-    estimatedEndDate: string;
+    estimatedEndDate?: string;
     daysPerWeek: number;
     longRunDay: string;
     programFamily: string;
   },
 ) {
-  assert.equal(card.durationWeeks, expected.durationWeeks);
+  if (typeof expected.durationWeeks === "number") {
+    assert.equal(card.durationWeeks, expected.durationWeeks);
+  }
+
   assert.equal(card.startDate, expected.startDate);
-  assert.equal(card.estimatedEndDate, expected.estimatedEndDate);
+  assert.equal(
+    card.estimatedEndDate,
+    expected.estimatedEndDate ?? addDaysIso(card.startDate, card.durationWeeks * 7 - 1),
+  );
   assert.equal(card.daysPerWeek, expected.daysPerWeek);
   assert.equal(card.longRunDay, expected.longRunDay);
   assert.equal(card.programFamily, expected.programFamily);
+  assert.ok(card.durationWeeks > 0);
   assert.ok(card.workoutMixSummary.length > 0);
   assert.ok(card.keyWorkoutTypes.length >= 3);
   assert.ok(card.metricModeSummary.length > 0);
@@ -229,20 +249,42 @@ export function assertCardProgramSummary(
 export function assertDraftProgramSummary(
   draft: PlanPresetDraft,
   expected: {
-    durationWeeks: number;
+    durationWeeks?: number;
     startDate: string;
-    estimatedEndDate: string;
+    estimatedEndDate?: string;
     daysPerWeek: number;
     longRunDay: string;
     programFamily: string;
   },
 ) {
-  assert.equal(draft.reviewShape.durationWeeks, expected.durationWeeks);
+  if (typeof expected.durationWeeks === "number") {
+    assert.equal(draft.reviewShape.durationWeeks, expected.durationWeeks);
+  }
+
   assert.equal(draft.reviewShape.startDate, expected.startDate);
-  assert.equal(draft.reviewShape.estimatedEndDate, expected.estimatedEndDate);
+  assert.equal(
+    draft.reviewShape.estimatedEndDate,
+    expected.estimatedEndDate ??
+      addDaysIso(draft.reviewShape.startDate, draft.reviewShape.durationWeeks * 7 - 1),
+  );
   assert.equal(draft.reviewShape.daysPerWeek, expected.daysPerWeek);
   assert.equal(draft.reviewShape.longRunDay, expected.longRunDay);
   assert.equal(draft.reviewShape.programFamily, expected.programFamily);
+  assert.equal(draft.reviewShape.horizonWeeks, draft.reviewShape.durationWeeks);
+  assert.equal(draft.reviewShape.rowCounts.weekCount, draft.reviewShape.durationWeeks);
+  assert.equal(draft.reviewShape.rowCounts.calendarRows, draft.reviewShape.durationWeeks * 7);
+  assert.equal(
+    draft.reviewShape.rowCounts.nonRestRows,
+    draft.reviewShape.durationWeeks * draft.reviewShape.daysPerWeek,
+  );
+  assert.equal(
+    draft.reviewShape.rowCounts.restRows,
+    draft.reviewShape.rowCounts.calendarRows - draft.reviewShape.rowCounts.nonRestRows,
+  );
+  assert.equal(
+    draft.canonicalPlan.planned_workouts.length,
+    draft.reviewShape.rowCounts.calendarRows,
+  );
   assert.equal(draft.reviewShape.disabledReasonSummary, null);
   assert.equal(draft.reviewShape.customReasonSummary, null);
   assert.ok(draft.reviewShape.workoutMixSummary.length > 0);
@@ -253,6 +295,29 @@ export function assertDraftProgramSummary(
   assert.ok(draft.reviewShape.weeklyRhythmSummary.includes(`${expected.daysPerWeek} runs/week`));
   assert.ok(draft.reviewShape.weeklyRhythmSummary.includes(expected.longRunDay));
   assert.deepEqual(draft.reviewShape.restDays, draft.reviewShape.fixedRestDays);
+}
+
+export function assertAdaptiveProgramMetadata(draft: PlanPresetDraft) {
+  const adaptiveProgram = draft.reviewShape.adaptiveProgram;
+
+  assert.ok(adaptiveProgram.scenarioId.length > 0);
+  assert.ok(adaptiveProgram.programBias.length > 0);
+  assert.ok(adaptiveProgram.finalOutcomeRule.length > 0);
+  assert.ok(adaptiveProgram.progressionConservatism.length > 0);
+  assert.ok(adaptiveProgram.impactLoadAdjustment.length > 0);
+  assert.ok(adaptiveProgram.longRunRampPolicy.length > 0);
+  assert.ok(adaptiveProgram.cutbackFrequency.length > 0);
+  assert.ok(adaptiveProgram.moderateTouchCapPerWeek <= 1);
+  assert.ok(adaptiveProgram.loadAdjustmentSummary.length > 0);
+  assert.ok(adaptiveProgram.loadAdjustmentSummary.includes("preset-phase-template-table.csv"));
+  assert.ok(adaptiveProgram.loadAdjustmentSummary.includes("preset-weekly-archetype-table.csv"));
+  assert.ok(adaptiveProgram.loadAdjustmentSummary.includes("preset-builder-io-contract.csv"));
+  assert.equal(
+    /\b(weight|bmi|obese|overweight|underweight|medical)\b/i.test(
+      adaptiveProgram.loadAdjustmentSummary,
+    ),
+    false,
+  );
 }
 
 export function buildTenKInput(

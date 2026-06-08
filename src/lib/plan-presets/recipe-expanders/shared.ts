@@ -270,6 +270,19 @@ export function summarizeIdentities(canonicalPlan: TrainingPlanV2) {
   );
 }
 
+export function hasLongRunInWeek(workouts: TrainingPlanV2["planned_workouts"], weekNumber: number) {
+  return workouts.some(
+    (workout) => workout.week_number === weekNumber && workout.workout_type === "long_run",
+  );
+}
+
+export function hasSafeSpecificCandidateInWeek(
+  workouts: TrainingPlanV2["planned_workouts"],
+  weekNumber: number,
+) {
+  return chooseSafeSpecificCandidateIndex(workouts, weekNumber) !== -1;
+}
+
 function chooseSafeSpecificCandidateIndex(
   workouts: TrainingPlanV2["planned_workouts"],
   weekNumber: number,

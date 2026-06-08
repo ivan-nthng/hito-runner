@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { buildPlanPresetReviewDraftContract } from "../../src/lib/plan-presets/expand";
 import {
   assertAtMostOneSpecificTouchPerWeek,
+  assertAdaptiveProgramMetadata,
   assertDraftRejected,
   assertDraftProgramSummary,
+  assertFinalWeekIdentity,
   assertHasPaceTargets,
   assertLongRunDayPreserved,
   assertNoForbiddenIdentities,
@@ -57,17 +59,15 @@ function validateHalfMarathonBalancedNoBenchmarkDraft() {
   assert.equal(draft.metricTruth.executableMode, "structure_only_executable");
   assert.equal(draft.metricTruth.paceTargetsAllowed, false);
   assert.equal(draft.metricTruth.hrTargetsAllowed, false);
-  assert.equal(draft.reviewShape.rowCounts.weekCount, 12);
-  assert.equal(draft.reviewShape.rowCounts.calendarRows, 84);
-  assert.equal(draft.reviewShape.rowCounts.nonRestRows, 48);
   assertDraftProgramSummary(draft, {
-    durationWeeks: 12,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-08-30",
     daysPerWeek: 4,
     longRunDay: "Saturday",
     programFamily: "Half Marathon Balanced",
   });
+  assertAdaptiveProgramMetadata(draft);
+  assert.equal(draft.reviewShape.adaptiveProgram.finalOutcomeRule.includes("half-readiness"), true);
+  assertFinalWeekIdentity(draft, "half_readiness_marker");
   assertNoFixedRestWorkoutLeaks(draft, ["Wednesday", "Sunday"]);
   assertLongRunDayPreserved(draft, "Saturday");
   assertPostLongRunNextRunRecoveryOrEasy(draft);
@@ -108,17 +108,14 @@ function validateHalfMarathonBalancedBenchmarkDraft() {
   assert.equal(draft.metricTruth.executableMode, "pace_executable");
   assert.equal(draft.metricTruth.paceTargetsAllowed, true);
   assert.equal(draft.metricTruth.hrTargetsAllowed, false);
-  assert.equal(draft.reviewShape.rowCounts.weekCount, 12);
-  assert.equal(draft.reviewShape.rowCounts.calendarRows, 84);
-  assert.equal(draft.reviewShape.rowCounts.nonRestRows, 60);
   assertDraftProgramSummary(draft, {
-    durationWeeks: 12,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-08-30",
     daysPerWeek: 5,
     longRunDay: "Saturday",
     programFamily: "Half Marathon Balanced",
   });
+  assertAdaptiveProgramMetadata(draft);
+  assertFinalWeekIdentity(draft, "half_readiness_marker");
   assertNoFixedRestWorkoutLeaks(draft, ["Wednesday", "Sunday"]);
   assertLongRunDayPreserved(draft, "Saturday");
   assertPostLongRunNextRunRecoveryOrEasy(draft);
@@ -167,14 +164,8 @@ function validateHalfMarathonBalancedIneligibleDrafts() {
       benchmark: {
         fitnessLevel: "beginner",
       },
-    }),
-    "half insufficient-base setup",
-  );
-  assertDraftRejected(
-    "half_marathon",
-    buildHalfMarathonInput({
       availability: {
-        runningDaysPerWeek: 3,
+        runningDaysPerWeek: 2,
         fixedRestDays: ["Wednesday", "Sunday"],
         preferredLongRunDay: "Saturday",
       },
@@ -238,6 +229,7 @@ function isHalfSpecificTouch(identity: string | null) {
     identity === "controlled_tempo_session" ||
     identity === "progression_run" ||
     identity === "half_marathon_threshold_durability" ||
+    identity === "half_readiness_marker" ||
     identity === "long_run_with_steady_finish"
   );
 }

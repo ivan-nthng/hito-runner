@@ -1,15 +1,22 @@
 import {
-  normalizeFirstPlanExecutionMode,
+  normalizeSupportedFirstPlanExecutionMode,
   type FirstPlanGoalDistance,
 } from "@/lib/first-plan-authoring-utils";
+import {
+  buildPlanPresetProgramSummaryFields,
+  type PlanPresetProgramSummaryContext,
+} from "@/lib/plan-presets/card-summary";
+import { resolvePlanPresetProgram } from "@/lib/plan-presets/program-data";
+import { resolveProgressivePlanPresetCards } from "@/lib/plan-presets/progressive-cards";
 import { PLAN_PRESET_RECIPES, getPlanPresetRecipe } from "@/lib/plan-presets/recipes";
 import {
+  planPresetCardInputSchema,
   planPresetEligibilityInputSchema,
   type PlanPresetCardId,
+  type PlanPresetCardRequestInput,
   type PlanPresetCardViewModel,
   type PlanPresetEligibilityResult,
   type PlanPresetMetricTruthSummary,
-  type PlanPresetProgramSummaryFields,
   type PlanPresetReason,
   type PlanPresetReasonCode,
   type PlanPresetRecipeSummary,
@@ -18,9 +25,8 @@ import {
   buildStructuredFirstPlanAuthoringInput,
   type StructuredFirstPlanOnboardingRequestInput,
 } from "@/lib/structured-first-plan-onboarding";
-import { addDaysIso } from "@/lib/training";
 import { deriveAvailableTrainingWeekdays } from "@/lib/runner-training-preferences";
-import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
+import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
 const supportedPresetGoalDistances = new Set<FirstPlanGoalDistance>([
   "10k",
@@ -36,32 +42,49 @@ const goalDistanceToCardId: Partial<Record<FirstPlanGoalDistance, PlanPresetCard
 
 type ParsedPlanPresetInput = ReturnType<typeof planPresetEligibilityInputSchema.parse>;
 
-type ProgramSummaryContext = {
-  startDate: string;
-  daysPerWeek: number;
-  longRunDay: WeekdayName;
+type ResolvePlanPresetCardsOptions = {
+  recommendationMode?: "goal_distance" | "neutral";
 };
 
 export function resolvePlanPresetCards(
-  rawInput: StructuredFirstPlanOnboardingRequestInput,
+  rawInput: StructuredFirstPlanOnboardingRequestInput | PlanPresetCardRequestInput,
+  options: ResolvePlanPresetCardsOptions = {},
 ): PlanPresetEligibilityResult {
-  const input = planPresetEligibilityInputSchema.parse(rawInput);
+  const resolvedInput = planPresetEligibilityInputSchema.safeParse(rawInput);
+
+  if (!resolvedInput.success) {
+    return resolveProgressivePlanPresetCards(planPresetCardInputSchema.parse(rawInput), options);
+  }
+
+  return resolveResolvedPlanPresetCards(resolvedInput.data, options);
+}
+
+function resolveResolvedPlanPresetCards(
+  input: ParsedPlanPresetInput,
+  options: ResolvePlanPresetCardsOptions = {},
+): PlanPresetEligibilityResult {
+  const recommendationMode = options.recommendationMode ?? "goal_distance";
   const baseAuthoringInput = buildStructuredFirstPlanAuthoringInput(input);
-  const programSummaryContext: ProgramSummaryContext = {
+  const programSummaryContext: PlanPresetProgramSummaryContext = {
     startDate: baseAuthoringInput.schedule.startDate,
     daysPerWeek: input.availability.runningDaysPerWeek,
     longRunDay: baseAuthoringInput.availability.preferredLongRunDay,
   };
-  const execution = normalizeFirstPlanExecutionMode(input.execution);
   const fixedRestDays = WEEKDAY_NAMES.filter((weekday) =>
     input.availability.fixedRestDays.includes(weekday),
   );
   const availableWeekdayCount = deriveAvailableTrainingWeekdays(fixedRestDays).length;
   const metricTruth = buildPresetMetricTruth(input);
-  const globalCustomReasons = buildGlobalCustomReasons(input);
-  const missingWatchSupport = execution.watchAccess !== "watch_or_app";
-  const unsupportedGoal = !supportedPresetGoalDistances.has(input.goal.goalDistance);
-  const recommendedCardId = goalDistanceToCardId[input.goal.goalDistance] ?? null;
+  const globalCustomReasons = buildGlobalCustomReasons(input, {
+    includeUnsupportedGoal: recommendationMode === "goal_distance",
+  });
+  const unsupportedGoal =
+    recommendationMode === "goal_distance" &&
+    !supportedPresetGoalDistances.has(input.goal.goalDistance);
+  const recommendedCardId =
+    recommendationMode === "goal_distance"
+      ? (goalDistanceToCardId[input.goal.goalDistance] ?? null)
+      : null;
   const firstCustomReason = globalCustomReasons[0] ?? null;
   const customRecommended = Boolean(firstCustomReason || unsupportedGoal);
   const cards = PLAN_PRESET_RECIPES.map((recipe) =>
@@ -80,7 +103,6 @@ export function resolvePlanPresetCards(
               "This goal is better handled by Advanced custom program in preset v1.",
             )
           : null),
-      missingWatchSupport,
     }),
   );
 
@@ -120,22 +142,38 @@ function buildPresetCard({
   programSummaryContext,
   recommendedCardId,
   firstCustomReason,
-  missingWatchSupport,
 }: {
   recipe: PlanPresetRecipeSummary;
   input: ParsedPlanPresetInput;
   availableWeekdayCount: number;
   metricTruth: PlanPresetMetricTruthSummary;
-  programSummaryContext: ProgramSummaryContext;
+  programSummaryContext: PlanPresetProgramSummaryContext;
   recommendedCardId: PlanPresetCardId | null;
   firstCustomReason: PlanPresetReason | null;
-  missingWatchSupport: boolean;
 }): PlanPresetCardViewModel {
-  const availabilityReason = resolveAvailabilityReason(recipe, input, availableWeekdayCount);
+  const program = resolvePlanPresetProgram({
+    recipe,
+    startDate: programSummaryContext.startDate,
+    runnerLevel: resolveInputRunnerLevel(input),
+    daysPerWeek: input.availability.runningDaysPerWeek,
+    age: input.profile.age,
+    weightKg: input.profile.weightKg,
+    heightCm: input.profile.heightCm,
+  });
+  const programSpecificSummaryContext = {
+    ...programSummaryContext,
+    durationWeeks: program.durationWeeks,
+  };
+  const availabilityReason = resolveAvailabilityReason({
+    recipe,
+    input,
+    availableWeekdayCount,
+    scenario: program.scenario,
+  });
 
   if (firstCustomReason) {
     return buildUnavailableLikeCard(recipe, {
-      programSummaryContext,
+      programSummaryContext: programSpecificSummaryContext,
       state: "custom_fit",
       resultCode: "custom_recommended",
       customRoutingReason: firstCustomReason,
@@ -143,37 +181,26 @@ function buildPresetCard({
     });
   }
 
-  if (missingWatchSupport) {
-    return buildUnavailableLikeCard(recipe, {
-      programSummaryContext,
-      state: "needs_more_info",
-      resultCode: "needs_more_info",
-      disabledReason: reason(
-        "missing_watch_app_support",
-        "Tell Hito whether a watch or app can execute structured targets before choosing a preset.",
-      ),
-      requiredMissingFields: ["execution.watchAccess"],
-      safetyMetricNote:
-        "Preset cards need watch/app execution support before Hito can produce watch-executable structured workouts.",
-    });
-  }
-
   if (availabilityReason) {
+    const state = program.scenario.cardState === "not_ideal" ? "not_ideal" : "unavailable";
+
     return buildUnavailableLikeCard(recipe, {
-      programSummaryContext,
-      state: "unavailable",
-      resultCode: "unavailable",
+      programSummaryContext: programSpecificSummaryContext,
+      state,
+      resultCode: state,
       disabledReason: availabilityReason,
       safetyMetricNote: metricTruth.notes[0] ?? recipe.metricPolicySummary,
     });
   }
 
-  const recommended = recipe.cardId === recommendedCardId;
+  const recommended =
+    recipe.cardId === recommendedCardId && program.scenario.cardState !== "not_ideal";
+  const state = recommended ? "recommended" : "available";
 
   return {
-    ...buildProgramSummaryFields({
+    ...buildPlanPresetProgramSummaryFields({
       recipe,
-      programSummaryContext,
+      programSummaryContext: programSpecificSummaryContext,
       metricModeSummary: metricTruth.notes[0] ?? recipe.metricPolicySummary,
       disabledReason: null,
       customRoutingReason: null,
@@ -182,7 +209,7 @@ function buildPresetCard({
     label: recipe.distanceLabel,
     distanceLabel: recipe.distanceLabel,
     familyLabel: recipe.familyLabel,
-    state: recommended ? "recommended" : "available",
+    state,
     resultCode: recommended ? "eligible_recommended" : "eligible_available",
     recipeFamilyId: recipe.recipeFamilyId,
     recipeId: recipe.recipeId,
@@ -193,6 +220,8 @@ function buildPresetCard({
     disabledReason: null,
     customRoutingReason: null,
     requiredMissingFields: [],
+    reviewReady: true,
+    postSelectionRefinement: null,
     reviewBeforeCreateRequired: true,
   };
 }
@@ -200,7 +229,7 @@ function buildPresetCard({
 function buildUnavailableLikeCard(
   recipe: PlanPresetRecipeSummary,
   overrides: Pick<PlanPresetCardViewModel, "state" | "resultCode" | "safetyMetricNote"> & {
-    programSummaryContext: ProgramSummaryContext;
+    programSummaryContext: PlanPresetProgramSummaryContext;
   } & Partial<
       Pick<
         PlanPresetCardViewModel,
@@ -210,9 +239,10 @@ function buildUnavailableLikeCard(
 ): PlanPresetCardViewModel {
   const disabledReason = overrides.disabledReason ?? null;
   const customRoutingReason = overrides.customRoutingReason ?? null;
+  const hasRecipeReference = overrides.state !== "unavailable" && overrides.state !== "custom_fit";
 
   return {
-    ...buildProgramSummaryFields({
+    ...buildPlanPresetProgramSummaryFields({
       recipe,
       programSummaryContext: overrides.programSummaryContext,
       metricModeSummary: overrides.safetyMetricNote,
@@ -225,76 +255,29 @@ function buildUnavailableLikeCard(
     familyLabel: recipe.familyLabel,
     state: overrides.state,
     resultCode: overrides.resultCode,
-    recipeFamilyId: null,
-    recipeId: null,
-    presetVersion: null,
+    recipeFamilyId: hasRecipeReference ? recipe.recipeFamilyId : null,
+    recipeId: hasRecipeReference ? recipe.recipeId : null,
+    presetVersion: hasRecipeReference ? recipe.presetVersion : null,
     commitmentSummary: recipe.commitmentSummary,
     fitSummary: recipe.fitSummary,
     safetyMetricNote: overrides.safetyMetricNote,
     disabledReason,
     customRoutingReason,
     requiredMissingFields: overrides.requiredMissingFields ?? [],
+    reviewReady: false,
+    postSelectionRefinement: null,
     reviewBeforeCreateRequired: true,
   };
 }
 
-function buildProgramSummaryFields({
-  recipe,
-  programSummaryContext,
-  metricModeSummary,
-  disabledReason,
-  customRoutingReason,
-}: {
-  recipe: PlanPresetRecipeSummary;
-  programSummaryContext: ProgramSummaryContext;
-  metricModeSummary: string;
-  disabledReason: PlanPresetReason | null;
-  customRoutingReason: PlanPresetReason | null;
-}): PlanPresetProgramSummaryFields {
-  return {
-    durationWeeks: recipe.defaultHorizonWeeks,
-    startDate: programSummaryContext.startDate,
-    estimatedEndDate: addDaysIso(
-      programSummaryContext.startDate,
-      recipe.defaultHorizonWeeks * 7 - 1,
-    ),
-    daysPerWeek: programSummaryContext.daysPerWeek,
-    longRunDay: programSummaryContext.longRunDay,
-    programFamily: recipe.programFamily,
-    workoutMixSummary: recipe.workoutMixSummary,
-    keyWorkoutTypes: [...recipe.keyWorkoutTypes],
-    metricModeSummary,
-    whyThisFits: recipe.fitSummary,
-    levelFitSummary: recipe.levelFitSummary,
-    disabledReasonSummary: disabledReason?.message ?? null,
-    customReasonSummary: customRoutingReason?.message ?? null,
-  };
-}
-
 function buildPresetMetricTruth(input: ParsedPlanPresetInput): PlanPresetMetricTruthSummary {
-  const execution = normalizeFirstPlanExecutionMode(input.execution);
+  const execution = normalizeSupportedFirstPlanExecutionMode(input.execution);
   const hasWatchExecution = execution.watchAccess === "watch_or_app";
   const hasRecent5k = input.benchmark.kind !== "unknown";
   const wantsPace =
     execution.guidancePreference === "pace" || execution.guidancePreference === "mixed";
   const paceTargetsAllowed = hasWatchExecution && hasRecent5k && wantsPace;
   const defaultEstimatedHrAvailable = typeof input.profile.age === "number";
-
-  if (!hasWatchExecution) {
-    return {
-      executableMode: "correction_required",
-      paceTargetsAllowed: false,
-      paceTruthSource: "none",
-      hrTargetsAllowed: false,
-      hrTargetSource: "effort_only",
-      defaultEstimatedHrAvailable,
-      defaultEstimatedHrIsAdvisoryOnly: true,
-      notes: [
-        "Watch/app support is required before preset workouts can be watch-executable.",
-        "No pace or HR target truth is inferred from profile fields.",
-      ],
-    };
-  }
 
   if (paceTargetsAllowed) {
     return {
@@ -329,7 +312,10 @@ function buildPresetMetricTruth(input: ParsedPlanPresetInput): PlanPresetMetricT
   };
 }
 
-function buildGlobalCustomReasons(input: ParsedPlanPresetInput) {
+function buildGlobalCustomReasons(
+  input: ParsedPlanPresetInput,
+  { includeUnsupportedGoal }: { includeUnsupportedGoal: boolean },
+) {
   const reasons: PlanPresetReason[] = [];
   const targetDate = input.schedule?.targetDate ?? input.goal.targetDate ?? null;
 
@@ -367,18 +353,24 @@ function buildGlobalCustomReasons(input: ParsedPlanPresetInput) {
     );
   }
 
-  if (!supportedPresetGoalDistances.has(input.goal.goalDistance)) {
+  if (includeUnsupportedGoal && !supportedPresetGoalDistances.has(input.goal.goalDistance)) {
     reasons.push(reason("unsupported_goal", "This goal is not exposed as a preset card in v1."));
   }
 
   return reasons;
 }
 
-function resolveAvailabilityReason(
-  recipe: PlanPresetRecipeSummary,
-  input: ParsedPlanPresetInput,
-  availableWeekdayCount: number,
-) {
+function resolveAvailabilityReason({
+  recipe,
+  input,
+  availableWeekdayCount,
+  scenario,
+}: {
+  recipe: PlanPresetRecipeSummary;
+  input: ParsedPlanPresetInput;
+  availableWeekdayCount: number;
+  scenario: ReturnType<typeof resolvePlanPresetProgram>["scenario"];
+}) {
   if (availableWeekdayCount < input.availability.runningDaysPerWeek) {
     return reason(
       "fixed_rest_conflict",
@@ -386,60 +378,32 @@ function resolveAvailabilityReason(
     );
   }
 
-  if (input.availability.runningDaysPerWeek < recipe.minRunningDaysPerWeek) {
+  if (scenario.cardState === "unavailable") {
     return reason(
-      "insufficient_availability",
-      `${recipe.distanceLabel} preset needs at least ${recipe.minRunningDaysPerWeek} running days per week.`,
+      input.availability.runningDaysPerWeek <= 1
+        ? "insufficient_availability"
+        : "level_too_low_for_family",
+      scenario.notes || `${recipe.distanceLabel} is not a supported preset fit for this setup.`,
     );
   }
 
-  if (input.availability.runningDaysPerWeek > recipe.maxRunningDaysPerWeek) {
+  if (scenario.routeOutcome === "advanced_custom") {
     return reason(
-      "insufficient_availability",
-      `${recipe.distanceLabel} preset supports up to ${recipe.maxRunningDaysPerWeek} running days per week.`,
-    );
-  }
-
-  if (recipe.cardId === "half_marathon" && !hasHalfMarathonBaseSupport(input)) {
-    return reason(
-      "recipe_not_available",
-      "Half marathon balanced preset v1 needs continuous-running support evidence; use Advanced custom program for this setup.",
-    );
-  }
-
-  if (recipe.cardId === "marathon" && !hasMarathonBaseSupport(input)) {
-    return reason(
-      "recipe_not_available",
-      "Marathon base preset v1 needs long-run tolerance support evidence; use Advanced custom program for this setup.",
+      scenario.cardState === "not_ideal" ? "recipe_not_available" : "level_too_low_for_family",
+      scenario.notes ||
+        `${recipe.distanceLabel} should use Advanced custom program for this setup.`,
     );
   }
 
   return null;
 }
 
-function hasHalfMarathonBaseSupport(input: ParsedPlanPresetInput) {
-  if (input.benchmark.kind !== "unknown") {
-    return true;
+function resolveInputRunnerLevel(input: ParsedPlanPresetInput) {
+  if ("fitnessLevel" in input.benchmark && input.benchmark.fitnessLevel) {
+    return input.benchmark.fitnessLevel;
   }
 
-  return (
-    "fitnessLevel" in input.benchmark &&
-    (input.benchmark.fitnessLevel === "running_regularly" ||
-      input.benchmark.fitnessLevel === "performance_focused")
-  );
-}
-
-function hasMarathonBaseSupport(input: ParsedPlanPresetInput) {
-  if (input.benchmark.kind !== "unknown") {
-    return true;
-  }
-
-  return (
-    "fitnessLevel" in input.benchmark &&
-    (input.benchmark.fitnessLevel === "performance_focused" ||
-      (input.benchmark.fitnessLevel === "running_regularly" &&
-        input.availability.runningDaysPerWeek >= 5))
-  );
+  return "running_regularly";
 }
 
 function hasInjuryOrPainSignal(comment: string) {

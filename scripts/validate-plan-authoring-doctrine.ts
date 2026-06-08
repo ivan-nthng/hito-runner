@@ -3431,17 +3431,20 @@ function assertMetricTargetPolicy() {
     "effort guidance should not emit pace targets even with a usable benchmark",
   );
 
+  const staleUnknownWatchPacePlan = buildPlan(
+    buildRequest("10k", {
+      execution: { watchAccess: "unknown", guidancePreference: "pace" },
+    }),
+  );
   assert.equal(
-    hasTargetKey(
-      buildPlan(
-        buildRequest("10k", {
-          execution: { watchAccess: "unknown", guidancePreference: "pace" },
-        }),
-      ).plan,
-      "pace_min_per_km_range",
-    ),
-    false,
-    "pace targets require known watch/app access",
+    staleUnknownWatchPacePlan.authoringInput.execution.watchAccess,
+    "watch_or_app",
+    "supported new-plan authoring should normalize stale unknown watch access server-side",
+  );
+  assert.equal(
+    hasTargetKey(staleUnknownWatchPacePlan.plan, "pace_min_per_km_range"),
+    true,
+    "usable recent 5K plus pace preference may emit pace targets after server-side watch/app normalization",
   );
 
   assert.equal(

@@ -9,6 +9,7 @@ import { buildPlanPresetReviewDraftContract } from "@/lib/plan-presets/expand";
 import { buildPlanPresetPersistenceMetadata } from "@/lib/plan-presets/persistence-metadata";
 import { resolvePlanPresetCards } from "@/lib/plan-presets/resolver";
 import {
+  planPresetCardInputSchema,
   planPresetEligibilityInputSchema,
   type PlanPresetCardId,
   type PlanPresetEligibilityResult,
@@ -101,7 +102,7 @@ export type PlanPresetConfirmActionResult =
     };
 
 export const getPlanPresetCards = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => planPresetEligibilityInputSchema.parse(value))
+  .inputValidator((value: unknown) => planPresetCardInputSchema.parse(value))
   .handler(async ({ data }): Promise<PlanPresetCardsActionResult> => {
     const userId = await requireNoActivePlanForPresetAction();
 
@@ -109,7 +110,7 @@ export const getPlanPresetCards = createServerFn({ method: "POST" })
       return userId.result;
     }
 
-    return resolvePlanPresetCards(data);
+    return resolvePlanPresetCards(data, { recommendationMode: "neutral" });
   });
 
 export const reviewPlanPresetDraft = createServerFn({ method: "POST" })

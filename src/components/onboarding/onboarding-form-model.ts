@@ -95,6 +95,35 @@ export const FITNESS_LEVEL_OPTIONS: {
   },
 ];
 
+export type PresetPrimaryFitnessLevel = Exclude<RunnerFitnessLevel, "custom">;
+
+export const PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS: {
+  value: PresetPrimaryFitnessLevel;
+  label: string;
+  copy: string;
+}[] = [
+  {
+    value: "new_to_running",
+    label: "New to running",
+    copy: "Start gently and build the habit first.",
+  },
+  {
+    value: "beginner",
+    label: "Beginner",
+    copy: "You run sometimes and want a steady base.",
+  },
+  {
+    value: "running_regularly",
+    label: "Running regularly",
+    copy: "You already run most weeks.",
+  },
+  {
+    value: "performance_focused",
+    label: "Performance focused",
+    copy: "You can handle more structured quality work.",
+  },
+];
+
 export const GOAL_DISTANCE_OPTIONS: { value: GoalDistance; label: string }[] = [
   { value: "build_consistency", label: "Build consistency" },
   { value: "5k", label: "5K" },
@@ -116,12 +145,6 @@ export const TERRAIN_OPTIONS: { value: TerrainFocus; label: string; copy: string
   { value: "standard", label: "Standard", copy: "Roads, paths, or usual mixed terrain." },
   { value: "rolling", label: "Rolling", copy: "Some hills are welcome." },
   { value: "mountain", label: "Mountain", copy: "Prepare for sustained climbs or descents." },
-];
-
-export const WATCH_ACCESS_OPTIONS: { value: WatchAccess; label: string; copy: string }[] = [
-  { value: "unknown", label: "Not sure yet", copy: "Hito will keep targets conservative." },
-  { value: "watch_or_app", label: "Watch or app", copy: "You can follow pace or workout targets." },
-  { value: "none", label: "No watch/app", copy: "Use effort cues instead of precise targets." },
 ];
 
 export const GUIDANCE_PREFERENCE_OPTIONS: {
@@ -165,7 +188,6 @@ export function buildStructuredInput({
   startDate,
   targetDate,
   terrainFocus,
-  watchAccess,
   guidancePreference,
   strengthPreference,
   comment,
@@ -290,7 +312,7 @@ export function buildStructuredInput({
           }
         : {}),
       execution: {
-        watchAccess,
+        watchAccess: "watch_or_app",
         guidancePreference,
       },
       strength: {
@@ -464,6 +486,24 @@ export function isStructuredConstructorReady({
 
   return (
     profileComplete && benchmarkComplete && hasTrainingDay && runningDayCountValid && targetComplete
+  );
+}
+
+export function normalizePresetPrimaryFitnessLevel(
+  value: RunnerFitnessLevel,
+): PresetPrimaryFitnessLevel {
+  return value === "custom" ? "running_regularly" : value;
+}
+
+export function isPresetPrimarySetupReady({
+  age,
+  weightKg,
+  heightCm,
+}: Pick<StructuredConstructorState, "age" | "weightKg" | "heightCm">) {
+  return (
+    requiredNumber(age, "Age", { min: 13, max: 100, integer: true }).ok &&
+    requiredNumber(weightKg, "Weight", { min: 30, max: 250, increment: 0.5 }).ok &&
+    requiredNumber(heightCm, "Height", { min: 120, max: 230, integer: true }).ok
   );
 }
 

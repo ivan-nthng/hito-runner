@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { buildPlanPresetReviewDraftContract } from "../../src/lib/plan-presets/expand";
 import {
   assertAtMostOneSpecificTouchPerWeek,
+  assertAdaptiveProgramMetadata,
   assertDraftRejected,
   assertDraftProgramSummary,
+  assertFinalWeekIdentity,
   assertHasPaceTargets,
   assertLongRunDayPreserved,
   assertNoForbiddenIdentities,
@@ -57,17 +59,15 @@ function validateMarathonBaseNoBenchmarkDraft() {
   assert.equal(draft.metricTruth.executableMode, "structure_only_executable");
   assert.equal(draft.metricTruth.paceTargetsAllowed, false);
   assert.equal(draft.metricTruth.hrTargetsAllowed, false);
-  assert.equal(draft.reviewShape.rowCounts.weekCount, 16);
-  assert.equal(draft.reviewShape.rowCounts.calendarRows, 112);
-  assert.equal(draft.reviewShape.rowCounts.nonRestRows, 64);
   assertDraftProgramSummary(draft, {
-    durationWeeks: 16,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-09-27",
     daysPerWeek: 4,
     longRunDay: "Saturday",
     programFamily: "Marathon Base",
   });
+  assertAdaptiveProgramMetadata(draft);
+  assert.equal(draft.reviewShape.adaptiveProgram.finalOutcomeRule.includes("base endpoint"), true);
+  assertFinalWeekIdentity(draft, "base_endpoint_marker");
   assertNoFixedRestWorkoutLeaks(draft, ["Wednesday", "Sunday"]);
   assertLongRunDayPreserved(draft, "Saturday");
   assertPostLongRunNextRunRecoveryOrEasy(draft);
@@ -108,17 +108,14 @@ function validateMarathonBaseBenchmarkDraft() {
   assert.equal(draft.metricTruth.executableMode, "pace_executable");
   assert.equal(draft.metricTruth.paceTargetsAllowed, true);
   assert.equal(draft.metricTruth.hrTargetsAllowed, false);
-  assert.equal(draft.reviewShape.rowCounts.weekCount, 16);
-  assert.equal(draft.reviewShape.rowCounts.calendarRows, 112);
-  assert.equal(draft.reviewShape.rowCounts.nonRestRows, 80);
   assertDraftProgramSummary(draft, {
-    durationWeeks: 16,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-09-27",
     daysPerWeek: 5,
     longRunDay: "Saturday",
     programFamily: "Marathon Base",
   });
+  assertAdaptiveProgramMetadata(draft);
+  assertFinalWeekIdentity(draft, "base_endpoint_marker");
   assertNoFixedRestWorkoutLeaks(draft, ["Wednesday", "Sunday"]);
   assertLongRunDayPreserved(draft, "Saturday");
   assertPostLongRunNextRunRecoveryOrEasy(draft);
@@ -167,28 +164,19 @@ function validateMarathonBaseIneligibleDrafts() {
       benchmark: {
         fitnessLevel: "beginner",
       },
+      availability: {
+        runningDaysPerWeek: 2,
+        fixedRestDays: ["Wednesday", "Sunday"],
+        preferredLongRunDay: "Saturday",
+      },
     }),
     "marathon insufficient long-run tolerance setup",
   );
   assertDraftRejected(
     "marathon",
     buildMarathonInput({
-      benchmark: {
-        fitnessLevel: "running_regularly",
-      },
       availability: {
-        runningDaysPerWeek: 4,
-        fixedRestDays: ["Wednesday", "Sunday"],
-        preferredLongRunDay: "Saturday",
-      },
-    }),
-    "marathon insufficient no-benchmark support setup",
-  );
-  assertDraftRejected(
-    "marathon",
-    buildMarathonInput({
-      availability: {
-        runningDaysPerWeek: 3,
+        runningDaysPerWeek: 2,
         fixedRestDays: ["Wednesday", "Sunday"],
         preferredLongRunDay: "Saturday",
       },
@@ -240,5 +228,9 @@ function assertNoTwoMarathonSpecificTouchWeeks(draft: PlanPresetDraft) {
 }
 
 function isMarathonSpecificTouch(identity: string | null) {
-  return identity === "marathon_steady_specificity" || identity === "long_run_with_steady_finish";
+  return (
+    identity === "marathon_steady_specificity" ||
+    identity === "long_run_with_steady_finish" ||
+    identity === "base_endpoint_marker"
+  );
 }

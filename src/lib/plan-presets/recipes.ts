@@ -14,7 +14,7 @@ export const PLAN_PRESET_RECIPES = [
     minRunningDaysPerWeek: 3,
     maxRunningDaysPerWeek: 5,
     defaultHorizonWeeks: 10,
-    commitmentSummary: "3-5 runs/week · conservative 10-week foundation",
+    commitmentSummary: "adaptive duration · conservative 10K foundation",
     fitSummary: "Good for building dependable 10K fitness without target-date pressure.",
     workoutMixSummary:
       "Easy/recovery running, gentle strides, steady support, and a long-run habit.",
@@ -41,7 +41,7 @@ export const PLAN_PRESET_RECIPES = [
     minRunningDaysPerWeek: 4,
     maxRunningDaysPerWeek: 5,
     defaultHorizonWeeks: 12,
-    commitmentSummary: "4-5 runs/week · balanced half-marathon base",
+    commitmentSummary: "adaptive duration · balanced half-marathon base",
     fitSummary: "Best for recreational runners who want durable aerobic progress.",
     workoutMixSummary:
       "Easy volume, progression/tempo support, threshold durability, and long-run finish work.",
@@ -69,7 +69,7 @@ export const PLAN_PRESET_RECIPES = [
     minRunningDaysPerWeek: 4,
     maxRunningDaysPerWeek: 5,
     defaultHorizonWeeks: 16,
-    commitmentSummary: "4-5 runs/week · base, durability, cutback, and taper",
+    commitmentSummary: "adaptive duration · base, durability, cutback, and taper",
     fitSummary: "For runners with enough weekly availability for a conservative marathon base.",
     workoutMixSummary:
       "Easy volume, marathon-steady durability, cutbacks, taper protection, and long-run specificity.",

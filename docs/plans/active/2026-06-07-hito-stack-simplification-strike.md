@@ -14,87 +14,95 @@ high
 
 ## Next Recommended Role
 
-ARCHITECT
+BACKEND
 
 ## Task
 
-Classify remaining dirty/untracked work after Admin Work Items and Admin shell implementation, then
-prepare safe commit groups before the next simplification slice.
+Demote strict nested ai-first-plan-draft-v1 out of product runtime ownership.
 
 ## Stage
 
-ARCHITECT maintenance / worktree commit hygiene and scope triage
+BACKEND cleanup / strict nested AI draft demotion.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: ARCHITECT
+ROLE: BACKEND
 
 Task:
-Execute Hito Stack Simplification Strike Slice 3B: worktree commit hygiene and remaining dirty-work
-triage.
+Execute Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime ownership.
 
 Stage:
-ARCHITECT maintenance / worktree commit hygiene and scope triage.
+BACKEND cleanup / strict nested AI draft demotion.
 
 PLAN:
-docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
+/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
 
 Context:
-- The goal is to reduce real Hito complexity without a broad rewrite.
-- Slice 3 made `/admin/capture` a Work items surface with repo work-item source filters and passed QA.
-- Slice 3A unified Admin shell/navigation across Overview, Funnel & Usage, Feedback,
-  AI & Entitlements, Users, Test accounts, and Work items and passed QA.
-- Plan Preset shipped work was already committed and pushed.
-- Remaining dirty/untracked work now includes instruction/skill updates, Admin Work Items/importer
-  implementation changes, Admin shell implementation changes, this active simplification plan, older
-  untracked active plans, and possibly local QA artifacts.
-- Before package-manager cleanup or product-code narrowing, commit scope must be classified so the
-  next slice does not inherit mixed worktree state.
-
-Required work:
-1. Inspect current `git status --short`.
-2. Inspect staged/unstaged/untracked files with `git diff --stat`, `git diff --name-status`,
-   `git ls-files --others --exclude-standard`, and targeted diffs as needed.
-3. Group changes into coherent commit candidates:
-   - Admin Work Items metadata/importer/Admin UI implementation
-   - Admin shell/navigation implementation
-   - Hito Stack Simplification Strike plan/docs
-   - agent/skill instruction updates
-   - older untracked active plan docs that need separate confirmation
-   - QA artifacts that should remain untracked unless explicitly promoted
-4. Do not stage or commit broad mixed work unless the scope is clear and intentional.
-5. If scope is clear, recommend exact staging commands and commit messages.
-6. If user explicitly approves committing in this pass, create only the approved scoped commit.
-7. Do not push unless the commit scope, branch, and remote are explicitly approved.
+- Backend Slice 6B for the deterministic Plan Preset algorithmic builder is implemented and
+  QA-passed.
+- The active simplification strike selected strict nested `ai-first-plan-draft-v1` as the first
+  safe plan-creation demotion gate.
+- `strict-draft` is already unsupported from routine ops-script selection.
+- The old strict nested prompt/schema/normalizer still lives under product runtime source at
+  `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/ai-first-plan-draft-authoring.ts`.
+- Product runtime still imports shared metadata/trace types from that same file, while strict nested
+  prompt/schema/normalizer behavior is only needed for historical doctrine coverage.
+- The goal is demotion/isolation, not broad deletion.
 
 Constraints:
-- No product behavior changes.
-- No `git reset --hard`.
-- No `git checkout --`.
-- No deleting source files.
-- No broad staging.
-- No live Backlog import.
-- No `--archive-stale`.
-- No push unless explicitly approved after commit scope review.
-- Any file references in the report must be clickable Markdown links with absolute workspace paths.
+- Do not touch Plan Preset runtime, builder CSV artifacts, resolver, review, confirm, persistence,
+  or frontend.
+- Do not weaken `ai_first_plan_blueprint_v1` default behavior.
+- Do not promote or change `ai_first_plan_envelope_v1`.
+- Do not remove `structured_authoring_v1` legacy readback/generator compatibility.
+- Do not change text authoring, voice-to-plan, active-plan refresh/apply, JSON import/apply, or
+  canonical persistence.
+- Do not run migrations or mutate Supabase.
+- Do not implement browser/UI changes.
 
-Validation:
+Required implementation:
+1. Extract shared AI first-plan metadata and blueprint trace types out of
+   `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/ai-first-plan-draft-authoring.ts`
+   into a small product-owned metadata/trace module.
+2. Update blueprint, envelope/service, first-plan action, and ops-script type imports to depend on
+   the new metadata module instead of the strict nested draft module.
+3. Move or isolate the strict nested `ai-first-plan-draft-v1` prompt/schema/normalizer into
+   doctrine-only ownership so
+   `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/scripts/validate-plan-authoring-doctrine.ts`
+   can still validate historical fixtures.
+4. Keep the stable doctrine validator entrypoint unchanged.
+5. Keep
+   `npm run author-ai-first-plan-draft -- --contract strict-draft`
+   bounded as `unsupported_contract`.
+6. Remove now-dead product-runtime source-kind branches only if source scans prove no runtime path
+   can emit them.
+
+Validation expected:
+- Source proof:
+  `rg "ai-first-plan-draft-authoring|ai-first-plan-draft-v1|strict_draft|strict-draft" src scripts package.json`
+- Product runtime import proof that strict nested prompt/schema/normalizer ownership is no longer
+  imported from runtime paths, while doctrine coverage remains.
+- `npm exec eslint -- src/lib/ai-first-plan-*.ts src/lib/first-plan-actions.ts scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/first-plan-release-gates.ts scripts/author-ai-first-plan-draft.ts`
+- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope`
+- `npm run author-ai-first-plan-draft -- --contract strict-draft`
+- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`
 - `git diff --check`
-- `git status --short --branch`
-- `git diff --cached --name-status` if anything is staged
-- `git diff --name-status`
-- no product build unless new source changes are made
+- `npm run build`
 
 Report:
 1. Task
 2. Stage
-3. Current git status
-4. Dirty/untracked groups
-5. Recommended commit groups
-6. Recommended staging commands
-7. Validation results
-8. Blockers
+3. Files inspected
+4. Files changed
+5. Demotion implemented
+6. Runtime import proof
+7. Doctrine coverage proof
+8. Behavior preservation proof
+9. Validation results
+10. Blockers
 ```
 
 ## Owner
@@ -1210,7 +1218,7 @@ ARCHITECT
 
 Status:
 
-Selected as the next simplification slice on 2026-06-08.
+Complete on 2026-06-08.
 
 Reason:
 
@@ -1253,7 +1261,1724 @@ Exit criteria:
 - unrelated/unconfirmed files remain unstaged
 - next simplification slice can start from a known worktree state
 
-### Slice 4: Package Manager Signal Cleanup
+Closeout result:
+
+- Admin Work Items metadata/importer/Admin UI implementation, Admin shell/navigation
+  implementation, and this simplification strike plan were committed together as
+  `5c79d23 Unify admin work items and admin shell`.
+- The scoped Admin simplification commit was pushed to `origin/main`.
+- Remaining dirty work is intentionally outside that commit:
+  agent/skill instruction updates plus older untracked active-plan docs that need separate
+  source-of-truth confirmation.
+
+### Slice 3C: Admin Shell Chrome, Account Menu, And Contextual Actions
+
+Owner:
+
+DESIGNER / FRONTEND
+
+Status:
+
+Implemented and QA-passed on 2026-06-08.
+
+Diagnosis:
+
+The unified Admin navigation is implemented and QA-passed, but the chrome still feels heavier than
+the Admin workspace needs:
+
+- The left brand stack currently separates logo, `Admin`, and `Admin workspace` in a way that makes
+  the sidebar header feel taller and more important than the navigation.
+- The right-side page header still uses a large workspace/banner slab with an `Admin workspace`
+  kicker, duplicating the sidebar identity.
+- Top-right actions currently include global shell utilities such as `Back to Hito` and `Sign out`,
+  which competes with section-specific actions.
+- Admin account actions have no dedicated account/menu home, unlike the runner app profile pattern.
+- Work items needs `Add quick note`, but that should be a contextual page action, not a global
+  debugger/capture entry.
+
+Selected Admin chrome model:
+
+- Sidebar owns Admin identity.
+- Content owns current section title, description, and contextual actions.
+- Account/profile actions live at the bottom of the sidebar.
+- The oversized right-side workspace banner is removed.
+- No route should create a separate shell identity after the unified navigation work.
+
+Sidebar brand treatment:
+
+- Logo and `Admin` should sit on the same baseline.
+- Use the Hito logo at a compact shell height, aligned visually with the `Admin` wordmark/title.
+- `Admin` uses the existing display/title treatment, but should not overpower nav items.
+- Optional subtitle below:
+  - `Admin workspace`
+  - micro-label / muted
+  - tighter tracking than the current screenshot if uppercase feels too loud
+  - no extra card/surface
+- Spacing:
+  - header block should be compact enough that the nav begins quickly
+  - brand row gap should feel intentional, not like logo + separate page title
+  - subtitle should sit close under the brand row and read as support copy
+
+Content header treatment:
+
+- Remove the oversized gray/right-side workspace slab.
+- Page header should be an open content header:
+  - section title
+  - one concise subtitle/description
+  - optional contextual action slot aligned to the right on desktop
+- Do not repeat `Admin workspace` as a kicker if the sidebar already owns that identity.
+- Use existing Hito page/section typography roles.
+- Keep enough breathing room, but no heavy banner, large background block, or duplicate shell label.
+- On mobile, the header can stack title, description, and action, but should stay compact.
+
+Contextual action slot rules:
+
+The top-right header slot is for current-section actions only.
+
+| Section | Header action |
+| --- | --- |
+| Work items | `Add quick note` |
+| Users | `Add user` as disabled/future-safe placeholder only if product wants the seam visible |
+| Test accounts | No primary action unless a real local tester action already exists |
+| Overview | Empty |
+| Funnel & Usage | Empty |
+| Feedback | Empty |
+| AI & Entitlements | Empty unless a real entitlement/admin action exists |
+
+Rules:
+
+- Use Hito DS button primitives.
+- Empty action slot should collapse; do not reserve visual chrome for absent actions.
+- Placeholder actions must be visibly disabled or labelled as future-safe; no fake active `Add user`.
+- `Back to Hito` is not a contextual section action.
+- `Sign out` is not a contextual section action.
+
+Admin account/menu rules:
+
+- Add a bottom-left sidebar account/profile control, similar to the runner app profile trigger.
+- It should show compact admin identity:
+  - avatar/fallback initials or admin icon
+  - display name or `Admin`
+  - email/role/supporting line if available
+- Use existing Hito dropdown/menu primitives and runner shell account-menu anatomy where possible:
+  `hito-shell-profile-trigger`, `hito-shell-menu`, `hito-shell-menu-item`,
+  `hito-shell-menu-separator`, `hito-menu-text`, and `hito-menu-meta`.
+- Menu actions:
+  - `Sign out`
+  - `Account settings` disabled/future-safe unless implemented
+  - `Invite admin` disabled/future-safe if shown
+  - `Manage admin profile` disabled/future-safe if shown
+- Do not create a new menu system.
+- If admin identity data is not available, use stable fallback copy:
+  - primary: `Admin`
+  - secondary: `Local operations`
+
+Future online debugger / capture-overlay compatibility:
+
+- `Add quick note` remains a lightweight Work items action.
+- It must not imply live product-page element capture, debugger mode, or automatic dispatch.
+- Leave room for a future global capture/debugger entry in the Admin account/sidebar utility zone.
+- Future debugger entry should be visually distinct from `Add quick note`, for example:
+  - sidebar account/menu item: `Open capture mode`
+  - or quiet sidebar utility below nav, not a Work items content action
+- Do not implement debugger/capture overlay in this slice.
+- Do not consume the future debugger conceptual slot with a route-local Work items button.
+
+Frontend implementation notes:
+
+- Reuse the shared Admin navigation introduced in Slice 3A.
+- Update both `/admin/analytics` and `/admin/capture`; do not refine only one route.
+- Prefer extracting a small shared Admin shell/header/account component if it prevents duplicated
+  chrome, but do not introduce a broad framework.
+- Reuse `HitoLogo`, existing shell/profile/menu CSS classes, and dropdown primitives.
+- Move sign-out out of the page-header action cluster and into the admin account menu.
+- Decide whether `Back to Hito` belongs in the admin account menu or as a quiet utility; it must not
+  compete with contextual actions.
+- Preserve Work items filters/search/status tabs inside Work items content.
+- Preserve admin auth, loaders, user/test account data, Work items importer/readback, and Supabase
+  behavior.
+
+What not to touch:
+
+- Do not redesign every admin content section.
+- Do not change Work Items importer/model.
+- Do not mutate Supabase.
+- Do not implement fake `Add user`.
+- Do not implement online debugger/capture overlay.
+- Do not add manual workout CRUD.
+- Do not create a new visual system outside Hito DS.
+- Do not remove useful section titles/descriptions; only remove the oversized workspace banner and
+  duplicate shell identity.
+
+Acceptance criteria:
+
+- Sidebar brand shows Hito logo and `Admin` on one baseline.
+- Sidebar subtitle is quiet and reads `Admin workspace` or equivalent concise copy.
+- Right-side oversized workspace/banner slab is gone.
+- Content headers show only section title, concise subtitle/description, and optional contextual
+  action slot.
+- Top-right contextual action slot shows `Add quick note` on Work items.
+- Users either shows no action or a disabled/future-safe `Add user` placeholder.
+- Sections without meaningful actions have no empty action chrome.
+- Sign out/account actions live in the bottom-left sidebar account menu.
+- Account menu uses Hito DS dropdown/menu/profile primitives.
+- `Add quick note` remains distinct from any future online debugger/capture overlay.
+- Desktop and mobile remain one Admin workspace with no horizontal overflow.
+- Existing routes, auth, data loading, Work items filters, and admin actions continue to work.
+
+Implementation and QA closeout:
+
+- Browser Path Preflight: built-in Codex browser was used first against `http://localhost:8082/`.
+- Safari fallback was not used.
+- Targeted ESLint passed.
+- `npm run validate-admin-capture-backlog` passed.
+- `git diff --check` passed.
+- `npm run build` passed with existing Vite, Radix, and TanStack warnings only.
+- Shared sidebar nav was verified across Work items, Overview, Users, Test accounts, and Funnel.
+- Desktop proof showed one active sidebar item per section.
+- Sidebar brand visually uses the Hito logo plus `Admin`, with quiet `Admin workspace` subtitle.
+- Bottom-left account menu uses Hito avatar/dropdown styling and exposes disabled
+  `Account settings`, `Back to Hito`, and `Sign out` href.
+- Page-header chrome no longer contains topbar `Back to Hito` or `Sign out`.
+- Work items header shows title/subtitle plus `Add quick note`.
+- Users shows disabled `Add user`.
+- Overview, Test accounts, and Funnel show no fake contextual action.
+- Route-local `Manual handoff`, `Admin surface`, and oversized right-side `Admin workspace` slab are
+  absent.
+- Work Items list/search/status/source filters still render.
+- `q=Plan` smoke worked.
+- Mobile `375px` proof showed no horizontal overflow.
+- QA artifacts were saved under `qa-artifacts/screenshots/2026-06-08/admin-chrome-refinement-qa/`.
+
+Closeout decision:
+
+Slice 3C is complete. Admin chrome now has the accepted shell identity separation: sidebar owns Admin
+identity, content owns section title/subtitle/contextual actions, and account actions live in the
+bottom-left sidebar menu. This does not start `/hitoDS`, preset-card polish, onboarding hierarchy, or
+manual workout work.
+
+### Slice 3D: Hito DS Playground Consistency Contract
+
+Owner:
+
+DESIGNER / FRONTEND
+
+Status:
+
+Implemented, QA-passed, and design-approved on 2026-06-08.
+
+Diagnosis:
+
+`/hitoDS` is still the correct reference surface, but the visual grammar has drifted:
+
+- The page has a stable section topology through `NAV_GROUPS`, but section bodies vary too much.
+- Some playgrounds use a shared specimen shell, while the calendar/workout playground and several
+  component examples use route-local structures.
+- The current modal/dialog playground screenshot shows the main failure clearly: a large framed
+  preview, framed content inside the preview, a separate framed controls panel, and more framed
+  rows below. The result reads as card soup rather than a calm Hito workbench.
+- Controls, preview, captions, and supporting contracts do not always occupy the same relative
+  positions across sections.
+- Explanatory paragraphs compete with the actual visual specimens. The page often explains instead
+  of demonstrating.
+- Footer/caption patterns are inconsistent: some sections use contracts, some use captions, some use
+  paragraphs, and some use nested helper rows.
+- Foundations, Components, Patterns, playgrounds, and any Live View/equivalent section can feel like
+  separate pages because the side layout, section rhythm, and specimen anatomy jump.
+
+Selected playground model:
+
+Use one consistent `/hitoDS` playground anatomy:
+
+1. Section header:
+   - section label
+   - title
+   - one concise purpose sentence
+   - optional small status pill only when it adds operational meaning, such as `Specimen only`
+2. Playground shell:
+   - one low-chrome workbench row/grid
+   - no nested dashboard cards
+   - no framed panel stack unless the component being demonstrated is itself a panel
+3. Preview/stage:
+   - desktop: left side
+   - owns the visual specimen
+   - should look like the real product/component context, not a decorative fake card
+4. Controls:
+   - desktop: right side
+   - always reachable
+   - use Hito DS fields, choice toggles, buttons, icon buttons, menus, disclosures, and status pills
+   - no route-local dropdown/input/button styling
+5. Footer/caption:
+   - one shared row below the playground shell
+   - explains what the specimen proves and what it does not imply
+   - replaces long prose and repeated local contract cards
+
+Controls and preview placement:
+
+- Desktop default: preview/stage left, controls right.
+- Reason: `/hitoDS` should first show the visual result, then expose controls as a workbench rail.
+- Controls may be sticky inside the section only if the current shell already supports it without
+  layout jump. Sticky behavior is optional, not a v1 requirement.
+- Intermediate widths may stack controls above preview only when a two-column layout would compress
+  the preview below useful fidelity.
+- Mobile/narrow default:
+  - section header
+  - compact controls
+  - preview
+  - caption/footer
+- Mobile controls can use a disclosure if there are many controls, but they must not be hover-only
+  or hidden behind unclear icons.
+- The preview must never force a cramped desktop 7-column grid when the content cannot fit. Calendar
+  specimens should switch to their mobile/list anatomy instead.
+
+Surface and border rules:
+
+- Bordered cards are rare.
+- Nested bordered cards are exceptional.
+- A playground may use at most one outer boundary when a boundary is needed for grouping.
+- Preview/stage surfaces should usually be open:
+  - light neutral stage
+  - dark neutral stage when demonstrating dark/overlay behavior
+  - subtle wash only when contrast is required
+  - divider-only separation when enough
+- A border is allowed when:
+  - the demonstrated component owns a border
+  - the stage needs a minimum boundary to separate from the page background
+  - a table/dialog/shell specimen requires an actual bounded context
+- A border is not allowed just to make every row or helper note feel like a card.
+- Cards are allowed only when demonstrating card/surface behavior or when a real product component
+  is card-shaped.
+- Component galleries should prefer open grids, rows, dividers, and spacing over boxed tiles.
+- Dense examples should use row grouping and section dividers instead of wrapping each option in its
+  own framed card.
+
+Typography and text reduction rules:
+
+- Each section gets one concise intro. Avoid repeating the same product philosophy in every section.
+- Playground explanatory copy should be reduced to visual proof plus small captions.
+- `Use for` / `Do not use for` should become compact caption/footer content, paired rows, or small
+  disclosure content, not large bordered blocks.
+- Status copy should stay small and operational:
+  - `Specimen only`
+  - `Static display`
+  - `Reference`
+- Do not overuse uppercase labels. Use existing Hito type roles and quiet support text.
+- If a state is visible in the preview, do not repeat it in a paragraph unless the boundary is
+  important, such as "visual only, not shipped CRUD."
+
+Footer/caption rules:
+
+- Every playground should use one shared footer/caption location below the preview/control shell.
+- Recommended content shape:
+  - `Proves:` one short phrase
+  - `Does not imply:` one short phrase
+  - optional `Used in:` only when source ownership matters
+- The caption/footer should use existing Hito caption/list-row copy roles.
+- Do not create a second footer inside the preview unless the previewed component itself has a
+  footer, such as a dialog.
+- Do not place the caption in a large card. Use divider, spacing, or a quiet row group.
+
+Navigation and sidebar stability rules:
+
+- Keep `NAV_GROUPS` as the source of section topology.
+- Do not invent a new `/hitoDS` nav framework or taxonomy in this slice.
+- Preserve the current parent/child nested model:
+  `Overview`, `Foundations`, `Components`, `Patterns`, and `Backlog` or future `Specs` only if a
+  later naming slice explicitly approves it.
+- Sidebar width, content left edge, active parent/child state, and jump-menu behavior should remain
+  stable when moving between Foundations, Components, Patterns, playgrounds, and Live View/equivalent
+  sections.
+- Active child state must be visible without creating a second separate subsection rail.
+- Deep links such as `/hitoDS#calendar-workout-playground` must continue to scroll to the section
+  and activate the correct group/child.
+- The section layout must not jump because one group uses a different header/sidebar/footer pattern.
+
+Implementation priorities:
+
+1. Normalize shared `/hitoDS` playground/specimen anatomy and class names first.
+2. Apply it to the highest-drift playgrounds:
+   - calendar/workout playground
+   - modal/dialog playground
+   - one dense component playground such as inputs/buttons or async toasts
+3. Reduce explanatory text and convert repeated contract cards into the shared caption/footer.
+4. Replace nested framed wrappers with open preview stages, dividers, or row groups.
+5. Verify the nested sidebar and mobile jump behavior remains stable across groups.
+6. After the first slice proves the grammar, continue section-by-section through Foundations,
+   Components, Patterns, and any Live View/equivalent section.
+
+First frontend slice:
+
+FRONTEND should implement the smallest useful proof slice:
+
+- Create or normalize shared `/hitoDS`-only playground anatomy using existing Hito DS primitives.
+- Keep the implementation small: a helper component and/or CSS classes are acceptable if they delete
+  repeated local structure, but do not create a new UI kit.
+- Migrate:
+  - calendar/workout playground
+  - modal/dialog playground
+  - one dense component playground
+- Preserve anchors, state controls, accessibility states, and existing component examples.
+- Do not touch product surfaces outside `/hitoDS`.
+
+Acceptance criteria:
+
+- `/hitoDS` playgrounds read as one workbench, not separate demo apps.
+- Preview/stage and controls use the same relative placement across playground sections.
+- The calendar/workout playground no longer reads as nested specimen cards.
+- The modal/dialog playground no longer presents a large fake card stack as the normal modal
+  reference.
+- Captions/footers use one shared pattern.
+- Explanatory text is shorter and visual examples are more prominent.
+- Borders are purposeful and minimal.
+- Section/sidebar layout does not jump between Foundations, Components, Patterns, playgrounds, and
+  Live View/equivalent sections.
+- Desktop, intermediate width, and 375px mobile render without horizontal overflow.
+- Deep links and active nested navigation continue to work.
+- Product components outside `/hitoDS` are unchanged.
+
+What not to touch:
+
+- Do not redesign product pages.
+- Do not change product component behavior outside `/hitoDS`.
+- Do not change backend/product data.
+- Do not remove accessibility/focus/disabled/error examples.
+- Do not add custom local controls where Hito DS controls already exist.
+- Do not introduce a separate playground framework.
+- Do not imply visual-only manual-workout or future authoring states are shipped behavior.
+
+Implementation closeout:
+
+- Added shared `HitoDsPlayground` anatomy.
+- Applied it to calendar/workout, modal/dialog, and async toast playgrounds.
+- Shared anatomy owns section header, neutral preview/stage, controls area, and footer/caption rows.
+- Desktop uses preview/stage left and controls right.
+- Mobile uses controls before preview where appropriate.
+- Caption rows use `Proves`, `Does not imply`, and `Used in`.
+- Borders were reduced to purposeful component chrome only.
+- `NAV_GROUPS`, section IDs, deep links, and active parent/child state were preserved.
+
+QA evidence:
+
+- Browser Path Preflight: built-in Codex browser was used first against
+  `http://localhost:8082/hitoDS`.
+- Safari fallback was not used.
+- Targeted ESLint passed.
+- `git diff --check` passed.
+- `npm run build` passed.
+- Calendar/workout, modals, and async-actions all use shared `HitoDsPlayground` anatomy.
+- DOM proof confirmed shared labels `Proves`, `Does not imply`, and `Used in`.
+- Modal controls and async toast interactions worked.
+- `#calendar-workout-playground` expands `Patterns` and marks `Calendar` active with
+  `aria-current="location"`.
+- Mobile `375px` proof showed no horizontal overflow.
+- QA artifacts were saved under
+  `qa-artifacts/screenshots/2026-06-08/hito-ds-playground-anatomy-qa/`.
+
+Design evidence:
+
+- Touched playgrounds now feel like one Hito DS workbench rather than unrelated demo-card surfaces.
+- Low-chrome stage removes card-inside-card feeling.
+- Captions replace long explanatory blocks.
+- Calendar, Modals, and Async toasts share anatomy while preserving context.
+- No design blockers remain.
+
+Technical hygiene note:
+
+- QA/design notes mentioned hydration mismatch console errors around `/hitoDS` active nav/SSR state.
+  This is a non-blocking technical hygiene issue for a later focused frontend cleanup or QA
+  regression slice. It did not block Slice 3D design acceptance or QA pass.
+
+Closeout decision:
+
+Slice 3D is complete for the shared playground anatomy proof slice. Further `/hitoDS` section-by-
+section normalization can continue later if new drift appears, but it is not the next active gate.
+
+### Slice 4: Watch-Required Onboarding Contract And Preset Hierarchy
+
+Owner:
+
+BACKEND first, then FRONTEND after backend contract QA.
+
+Status:
+
+Implemented and QA-passed on 2026-06-08.
+
+Designer closeout:
+
+The Plan Preset onboarding redesign direction is accepted:
+
+- Presets are the primary fast path.
+- Advanced custom is secondary.
+- Option B is selected: basic setup at the top, Plan Preset cards immediately below, and Advanced
+  custom as a secondary disclosure/button below cards.
+- Primary setup fields are age, height, weight, running level, and available running days per week.
+- Distance is selected through cards, not through the primary setup form.
+- Guidance style, target date/time, detailed comments, injury/caution, and unusual constraints move
+  to Advanced custom.
+- Preset cards should be bold hero cards with strong distance identity and backend-shaped
+  summary/date/workout-mix/metric/fit data.
+
+Product/system decision:
+
+Hito no longer supports "without watch/app" as a normal new-plan product option.
+
+This is a product/system contract change, not merely a hidden UI default:
+
+- remove user-facing watch ownership choice from primary Plan Preset onboarding
+- remove "no watch/app" as a selectable new-plan option
+- assume every supported new-plan creation flow has a watch/app execution surface
+- keep watch/app execution server-owned for Plan Presets and Advanced custom creation
+- keep metric truth separate from execution-surface truth
+
+Pre-implementation source audit findings:
+
+- [Plan Preset schema](../../../src/lib/plan-presets/schema.ts) previously included
+  `missing_watch_app_support` as a preset reason code.
+- [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts) previously computed
+  `missingWatchSupport` from `execution.watchAccess !== "watch_or_app"` and disables cards when
+  watch/app support is absent.
+- [First-plan authoring utils](../../../src/lib/first-plan-authoring-utils.ts) keep
+  `FIRST_PLAN_WATCH_ACCESS_VALUES = ["none", "watch_or_app", "unknown"]` for legacy/readback
+  compatibility, and previously used `watchAccess: "unknown"` as the new-plan default.
+- [Structured first-plan onboarding](../../../src/lib/structured-first-plan-onboarding.ts) previously
+  accepts optional `execution.watchAccess` and formats review copy for watch/app, no watch/app, or
+  unknown access.
+- [Onboarding form model](../../../src/components/onboarding/onboarding-form-model.ts) previously
+  exposes `WATCH_ACCESS_OPTIONS`, including `Not sure yet`, `Watch or app`, and `No watch/app`.
+- [Structured plan constructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx)
+  previously rendered a `Target tools` section and a `Guidance style` section in primary setup.
+- [Archived watch-executable contract](../archive/2026-06-04-watch-executable-workout-targets-and-metric-truth-contract.md)
+  already established that `none`, `unknown`, and `effort_only` should not be normal primary
+  structured output, while legacy rows remain readable.
+
+Watch-required contract:
+
+- Primary Plan Preset onboarding must not ask whether the runner has a watch or app.
+- Supported new-plan creation must assume `watch_or_app` before preset eligibility and metric-mode
+  resolution.
+- Plan Preset eligibility must not return `missing_watch_app_support` or require
+  `execution.watchAccess` as a missing field in the normal redesigned primary setup.
+- Advanced custom may expose guidance/style, target date/time, comments, and caution context, but it
+  must not expose a "without watch/app" option.
+- Backend-owned metric truth remains strict:
+  watch/app support does not create pace truth without backend-approved benchmark/provider truth.
+  watch/app support does not create executable HR truth without personal HR-zone truth.
+  target time alone is not pace truth.
+  age-estimated HR remains advisory/readback-only.
+  `structure_only_executable` remains valid when pace/HR truth is unavailable.
+
+Legacy compatibility decision:
+
+- Keep old `none`, `unknown`, and `effort_only` values readable for imported plans, persisted old
+  authoring snapshots, diagnostics, and historical QA fixtures.
+- Do not present `none` or `unknown` as selectable new-plan options.
+- Do not delete legacy readback compatibility in this slice.
+- If a stale caller submits explicit `none` or `unknown` into a current supported new-plan creation
+  action, backend must handle it boundedly without restoring a no-watch product path. The preferred
+  implementation is to normalize the supported new-plan boundary to server-owned `watch_or_app` and
+  record review/metric-policy copy that Hito assumes watch/app execution; if source audit proves
+  explicit rejection is safer for one legacy seam, document that exception and keep it out of
+  primary onboarding.
+
+Backend scope:
+
+- update execution-mode normalization/defaults for supported new-plan creation
+- update Plan Preset eligibility/card resolver so watch/app support is assumed and not a card
+  blocker
+- remove or demote `missing_watch_app_support` from new Plan Preset card behavior
+- preserve preset review/confirm/persistence exactness and `plan_preset_v1` metadata
+- preserve Advanced custom blueprint boundary and `ai_first_plan_blueprint_v1` behavior
+- keep legacy/import/readback parsers compatible enough for old saved rows and diagnostics
+- add fixtures proving the new contract
+
+Frontend follow-up scope after backend QA:
+
+- remove the primary `Target tools` section from setup
+- move `Guidance style`, target date/time, comments, injury/caution, and unusual constraints into
+  Advanced custom
+- make distance selection card-driven for Plan Presets
+- render backend-shaped card state, summary/date/mix/metric/fit truth only
+- do not compute eligibility, duration, metric truth, or workout mix locally
+- do not add 5K as a shipped preset card unless backend support exists first
+
+What not to touch:
+
+- do not weaken pace or HR gates
+- do not infer pace from watch/app presence alone
+- do not infer personal HR from age/height/weight/watch presence
+- do not remove legacy readback compatibility
+- do not touch Plan Preset confirm/persistence behavior
+- do not touch manual workout CRUD
+- do not add new preset families
+- do not add DB/schema changes
+- do not create a new visual system outside Hito DS
+
+Validation expectations:
+
+- targeted ESLint for changed backend/frontend files
+- Plan Preset harness proving 10K, Half Marathon, and Marathon cards remain available when primary
+  setup omits execution support
+- Plan Preset review draft harness proving no-benchmark presets remain `structure_only_executable`
+  with no fake pace/HR
+- metric fixture proving recent 5K truth can still unlock backend-gated pace where appropriate
+- structured custom/blueprint smoke proving Advanced custom remains separate and
+  `ai_first_plan_blueprint_v1` remains the custom production default
+- source proof that no frontend primary setup option still says `No watch/app`, `Not sure yet`, or
+  equivalent no-watch selection
+- `git diff --check`
+- `npm run build`
+
+Implementation note, 2026-06-08:
+
+- Added a supported-new-plan execution normalizer that keeps legacy `none`/`unknown` readable while
+  normalizing Plan Preset and structured first-plan creation to server-owned `watch_or_app`.
+- Removed `missing_watch_app_support` from the Plan Preset runtime reason-code contract and
+  eligibility blocker.
+- Updated Plan Preset and first-plan release-gate fixtures so stale omitted/`unknown`/`none`
+  execution input proves watch/app normalization instead of correction.
+- Removed the primary onboarding `Target tools` selectable options as the direct UI contract cleanup;
+  broader preset-first hierarchy redesign remains frontend follow-up.
+- Validation evidence is recorded in the Slice 4 backend closeout report for this run.
+
+QA closeout evidence:
+
+- Browser Path Preflight: built-in Codex browser was used first against `localhost:8082`.
+- Safari fallback was not used.
+- Targeted ESLint passed.
+- Plan Preset harness passed.
+- Doctrine validator passed.
+- Blueprint smoke passed.
+- `npm run validate-admin-capture-backlog` passed.
+- `git diff --check` passed.
+- `npm run build` passed.
+- Backend normalization forces `watch_or_app` for supported new-plan creation.
+- Omitted, stale `unknown`, and stale `none` watch inputs do not block eligible Plan Preset cards.
+- `missing_watch_app_support` is absent from the Plan Preset runtime contract.
+- Pace truth still requires benchmark truth.
+- HR executable targets remain unavailable without personal HR-zone truth.
+- Age-estimated HR remains advisory.
+- Target time without benchmark routes to Advanced custom instead of unlocking pace.
+- Legacy values remain readable but not selectable.
+- Primary onboarding UI no longer shows `Target tools`, `No watch/app`, `Not sure yet`, watch
+  ownership, or HR monitor ownership.
+- Preset cards render.
+- Review scaffold opens.
+- `Create preset plan` appears but was not clicked by scope.
+- `375px` mobile proof showed no horizontal overflow.
+- QA artifacts were saved under
+  `qa-artifacts/screenshots/2026-06-08/watch-required-onboarding-contract-qa/`.
+
+Closeout decision:
+
+Slice 4 is complete for the accepted watch-required contract. The remaining onboarding work is visual
+hierarchy and interaction architecture, not backend watch eligibility. Keep metric-truth gates,
+legacy readback compatibility, and Plan Preset confirm/persistence boundaries unchanged.
+
+### Slice 5: Progressive Plan Preset Cards And Post-Selection Preference Refinement
+
+Owner:
+
+BACKEND first, then FRONTEND after backend contract QA.
+
+Status:
+
+Backend Slice 5A is implemented and QA-passed on 2026-06-08. Frontend Slice 5B is implemented and
+QA-passed on 2026-06-08. Backend Slice 5C is selected as the next bounded cleanup slice for
+no-behavior-change progressive Plan Preset policy decomposition.
+
+Reason:
+
+The watch-required backend contract is ready, but the next product issue is not only visual
+hierarchy. The user clarified that Plan Preset cards should appear early, before every scheduling
+preference is known, so the runner first sees clear plan choices rather than a form filter.
+
+Current runtime still treats card loading as dependent on a fully structured setup-shaped input.
+That makes incomplete setup feel like a hard gate even when the correct product state is "show the
+cards, then refine preferences after selection."
+
+Source inspection findings:
+
+- [Plan Preset schema](../../../src/lib/plan-presets/schema.ts) currently aliases
+  `planPresetEligibilityInputSchema` to the full structured first-plan onboarding schema.
+- [Plan Preset schema](../../../src/lib/plan-presets/schema.ts) already includes
+  `needs_more_info`, but [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts)
+  mostly returns `recommended`, `available`, `custom_fit`, or `unavailable`.
+- [Onboarding gate](../../../src/components/OnboardingGate.tsx) gates card loading through
+  `isPresetPrimarySetupReady`.
+- [Onboarding form model](../../../src/components/onboarding/onboarding-form-model.ts) currently
+  makes preset basics require age, height, weight, and running days/week.
+- [Onboarding gate](../../../src/components/OnboardingGate.tsx) uses
+  `buildPlanPresetStructuredInput`, which still builds a full structured input and resets advanced
+  preferences for the preset path.
+- [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx) allows review only for
+  `recommended` and `available`, so `needs_more_info` requires an explicit post-selection
+  refinement decision.
+
+Progressive card model decision:
+
+- The minimum input to show cards is basic profile plus running level. Weekly running days may be
+  unknown initially if backend can return safe defaults.
+- Shipped preset families stay visible by default:
+  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
+- `unavailable` is reserved for true hard blockers, not incomplete setup.
+- Incomplete setup maps to `needs_more_info` or an equivalent backend-shaped soft state.
+- Running level influences recommendation strength and activation. It should not hide shipped cards
+  unless the runner's data clearly makes a card unsafe or inappropriate.
+- Weekly running days support three levels of truth:
+  backend default suggestion before user input, user-selected available days, and backend-selected
+  optimal rhythm when still unknown.
+- Long-run day and fixed-rest preferences move to post-selection refinement when needed.
+- Review draft becomes the boundary where missing preferences must be resolved before confirm.
+- Confirm/persistence remains unchanged.
+- Metric truth remains unchanged:
+  no fake pace from watch/app presence, no executable HR without personal HR-zone truth, and
+  `structure_only_executable` remains valid when pace/HR truth is missing.
+
+Backend ownership:
+
+- partial eligibility/card input contract
+- card state and recommendation truth
+- hard blocker vs soft signal decisions
+- default weekly rhythm suggestion
+- post-selection preference questions/options
+- start/end date and duration summaries
+- metric honesty and level-fit copy
+- review draft exactness
+- confirm metadata for selected card, resolved rhythm, rest/long-run preferences, summary fields,
+  and metric policy
+
+Frontend ownership:
+
+- render all backend-returned cards early
+- show recommendation, needs-preferences, and inactive states from backend view models
+- collect post-selection preferences
+- request backend recomputation/review when preferences change
+- render backend-shaped review and confirm states
+- never own schedule generation, eligibility computation, date math, metric truth, workout
+  templates, recipe rows, or persistence rules
+
+Post-selection preference refinement decision:
+
+- Selecting a card before all preferences are known should not immediately fail.
+- If the selected card needs more preference truth, the backend should return required refinement
+  prompts/options for weekly running days, long-run day, fixed rest days, or safe rhythm defaults.
+- Frontend should render those backend-shaped questions and resubmit for review.
+- A review draft token/checksum should only be issued after the selected preset has enough resolved
+  preference truth to expand exact canonical `training-plan-v2` rows.
+- Confirm remains the same explicit mutation boundary and must not accept unresolved preference state.
+
+Running Coach matrix normalization:
+
+The Running Coach scenario matrix is accepted as coaching foundation, but BACKEND must implement the
+normalized product contract below instead of copying coaching synonyms directly. The outdated
+"no watch/app truth -> correction required" row is explicitly rejected for new-plan creation because
+Slice 4 made watch/app execution a supported product assumption. Legacy no-watch/unknown values
+remain readable only; they are not selectable new-plan card inputs.
+
+Canonical card-state enum proposal:
+
+| State | Backend meaning | Allowed next action |
+| --- | --- | --- |
+| `recommended` | Best current fit from known inputs and shipped recipe support. | Open review if preference truth is resolved; otherwise open refinement first. |
+| `available` | Safe shipped option, not the strongest recommendation. | Open review if resolved; otherwise open refinement first. |
+| `needs_more_info` | Visible card that needs backend-declared preference/refinement answers before review. | Open refinement, not review token issuance. |
+| `not_ideal` | Selectable but de-emphasized because known inputs make it less suitable without making it unsafe. | Open refinement/review with warning copy from backend. |
+| `custom_fit` | Visible card state indicating Advanced custom is the better route for this setup. | Route to Advanced custom; no preset review token. |
+| `unavailable` | True hard blocker for the preset family. | No preset review; show backend reason. |
+
+Canonical reason-code proposal:
+
+| Reason code | Category | Meaning |
+| --- | --- | --- |
+| `missing_minimum_profile` | soft | Age/weight and/or height are missing or invalid before reliable card summaries can be shaped. |
+| `missing_running_level` | soft | Running level is missing; cards stay visible but cannot be recommended. |
+| `missing_weekly_days` | soft | Weekly running days are unknown; backend may show default rhythm suggestions and require refinement before review. |
+| `needs_rest_day_preferences` | soft | Fixed rest days are optional but useful before exact review expansion. |
+| `needs_long_run_preference` | soft | Long-run day is optional but useful before exact review expansion. |
+| `level_too_low_for_family` | hard or not-ideal | Known level makes the family unsafe/inappropriate or less ideal. |
+| `insufficient_availability` | hard | Explicit weekly days are below the family minimum. |
+| `excess_availability_for_recipe` | soft | Explicit weekly days exceed v1 recipe range; backend can cap or ask refinement if safe. |
+| `fixed_rest_conflict` | hard | Explicit rest days leave too few available run days or conflict with selected rhythm. |
+| `long_run_conflict` | hard | Preferred long-run day is explicitly blocked or impossible for selected rhythm. |
+| `target_date_present` | custom | Target-date plans use Advanced custom in preset v1. |
+| `target_time_present` | custom | Target-time plans use Advanced custom in preset v1. |
+| `material_comment_present` | custom | Detailed comments/unusual constraints route to Advanced custom. |
+| `injury_or_pain_signal` | custom | Injury, pain, rehab, or caution signals route to Advanced custom. |
+| `workout_type_removal_request` | custom | Requests to remove/ban key workout types route to Advanced custom or later manual editing. |
+| `metric_truth_insufficient_for_target` | custom | Target specificity requires benchmark/provider truth; target-time preset is not unlocked. |
+| `recipe_not_available` | hard | Shipped v1 recipe cannot safely support the known combination. |
+
+Backend-ready scenario matrix:
+
+| Input stage / scenario | 10K Foundation | Half Marathon Balanced | Marathon Base | Reason codes | Follow-up requirements | Default rhythm suggestion | Next allowed action |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| No minimum profile | `needs_more_info` | `needs_more_info` | `needs_more_info` | `missing_minimum_profile` | age, weight, height, running level | none until profile valid | collect basics |
+| Age + weight only | `needs_more_info` | `needs_more_info` | `needs_more_info` | `missing_minimum_profile`, `missing_running_level` | height and running level | none until profile valid | collect basics |
+| Age + weight + height, level missing | `needs_more_info` | `needs_more_info` | `needs_more_info` | `missing_running_level` | running level | neutral preview only | collect level |
+| New to running | `recommended` or `needs_more_info` if weekly rhythm unknown | `not_ideal` | `unavailable` | `missing_weekly_days`, `level_too_low_for_family` | weekly days before review; rest/long-run optional | 3 days/week, conservative run/walk rhythm | 10K refinement; Half de-emphasized; Marathon blocked |
+| Beginner | `recommended` or `needs_more_info` if weekly rhythm unknown | `not_ideal` until enough days/base truth | `unavailable` | `missing_weekly_days`, `level_too_low_for_family` | weekly days before review; rest/long-run optional | 3-4 days/week, foundation rhythm | 10K refinement; Half refinement if days/base support; Marathon blocked |
+| Running/recreational | `available` | `recommended` or `needs_more_info` if weekly rhythm unknown | `not_ideal` unless 5 days/week or benchmark/base support | `missing_weekly_days`, `level_too_low_for_family` when applicable | weekly days before review; long-run preference optional | 4 days/week; long run weekend fallback | 10K/Half refinement; Marathon refinement only if support exists |
+| Experienced/performance | `available` | `recommended` | `available` or `recommended` when availability supports it | `missing_weekly_days` if unknown | weekly days before review; long-run preference optional | 4-5 days/week depending family | refinement/review for all supported families |
+| Weekly days unknown after minimum profile | `needs_more_info` | `needs_more_info` | `needs_more_info` | `missing_weekly_days` | choose days/week or accept backend suggested rhythm | 10K 3, Half 4, Marathon 5 if level supports | open refinement, not review token |
+| 1 day/week explicit | `unavailable` | `unavailable` | `unavailable` | `insufficient_availability` | none for preset v1 | none | route to Advanced custom or future restart path |
+| 2 days/week explicit | `not_ideal` or `unavailable` by level | `unavailable` | `unavailable` | `insufficient_availability` | none if hard blocked; otherwise warning review only if recipe supports | 2-day foundation only if backend approves; otherwise none | 10K only if safe; otherwise Advanced custom |
+| 3 days/week explicit | `recommended` for beginner/foundation | `not_ideal` or `unavailable` by level/base support | `unavailable` | `level_too_low_for_family`, `insufficient_availability` | optional rest/long-run preference | 3-day foundation | 10K review/refinement; Half only if safe; Marathon blocked |
+| 4 days/week explicit | `available` | `recommended` | `not_ideal` by level/base support | `level_too_low_for_family` when applicable | optional rest/long-run preference | 4-day balanced rhythm | 10K/Half review/refinement; Marathon warning/refinement if safe |
+| 5 days/week explicit | `available` | `available` | `recommended` for experienced/performance or supported recreational | none or `level_too_low_for_family` | optional rest/long-run preference | 5-day marathon/base rhythm | review/refinement for supported families |
+| Fixed rest days leave too few open days | `unavailable` | `unavailable` | `unavailable` | `fixed_rest_conflict` | change rest days or weekly days | none | refinement only, no review token |
+| Preferred long-run day is blocked | `needs_more_info` | `needs_more_info` | `needs_more_info` | `long_run_conflict` | choose another long-run day or remove fixed-rest conflict | nearest safe weekend/latest-available fallback | refinement only, no review token |
+| No fixed rest day preference | `available` or current family state | current family state | current family state | none | optional rest-day preference | backend chooses rest days from safe rhythm | review can proceed if weekly days resolved |
+| No long-run day preference | current family state | current family state | current family state | none | optional long-run preference | Sunday, then Saturday, then latest safe available weekday | review can proceed if weekly days resolved |
+| Target date present | `custom_fit` | `custom_fit` | `custom_fit` | `target_date_present` | none for preset v1 | none | Advanced custom |
+| Target time present | `custom_fit` | `custom_fit` | `custom_fit` | `target_time_present`, optional `metric_truth_insufficient_for_target` | none for preset v1 | none | Advanced custom |
+| Material comment/unusual constraint | `custom_fit` | `custom_fit` | `custom_fit` | `material_comment_present` | none for preset v1 | none | Advanced custom |
+| Injury/pain/caution signal | `custom_fit` | `custom_fit` | `custom_fit` | `injury_or_pain_signal` | none for preset v1 | none | Advanced custom |
+| Benchmark missing | current family state | current family state | current family state | none | none unless target-time/custom route requested | structure-only executable metric mode | review can proceed without pace/HR targets |
+| Recent 5K benchmark present | current family state | current family state | current family state | none | none | pace-capable only when backend metric gates allow | review can include broad pace targets where allowed |
+| Workout-type removal request | `custom_fit` | `custom_fit` | `custom_fit` | `workout_type_removal_request` | none for preset v1 | none | Advanced custom or future manual editing |
+| No watch/app truth | current family state | current family state | current family state | none | none | watch/app assumed for supported new-plan creation | do not block; keep metric gates strict |
+
+Post-selection preference contract:
+
+| Selected family | Required before review token | Optional before review | Backend default/floating behavior | Review readiness |
+| --- | --- | --- | --- | --- |
+| `10K Foundation` | valid profile, running level, weekly days that satisfy recipe minimum, no hard blockers | fixed rest days, long-run day | suggest 3 days/week when unknown; choose safe rest days; long-run fallback Sunday/Saturday/latest available | issue review token only after weekly days are resolved |
+| `Half Marathon Balanced` | valid profile, running level/base support, weekly days that satisfy recipe minimum, no hard blockers | fixed rest days, long-run day, benchmark | suggest 4 days/week when unknown; long run weekend fallback; structure-only if no benchmark | issue review token only after weekly days/base support are resolved |
+| `Marathon Base` | valid profile, level/base support, explicit or backend-accepted 4-5 day rhythm, no hard blockers | fixed rest days, long-run day, benchmark | suggest 5 days/week for supported runners; conservative long-run fallback; no target-time specificity | issue review token only after marathon support and rhythm are resolved |
+
+Review/confirm metadata preservation:
+
+- selected `cardId`, recipe id, recipe version, source kind `plan_preset_v1`, and
+  `preset_recipe_expanded`
+- normalized input stage and resolved follow-up answers
+- resolved running days/week, fixed rest days, preferred or backend-selected long-run day, and
+  default rhythm source
+- duration weeks, start date, estimated end date, program family, workout mix, key workout types,
+  why-this-fits copy, level-fit copy, and metric mode summary
+- reason codes shown before review and whether they were resolved, accepted as warning, or routed to
+  Advanced custom
+- metric truth summary: benchmark source, pace permission, HR permission, advisory/default HR state,
+  and `structure_only_executable` vs pace-capable mode
+- row counts and canonical draft checksum/token metadata
+
+Backend Slice 5A scope:
+
+- Add or refactor a backend-owned partial Plan Preset card input contract.
+- Return visible cards for the three shipped preset families before all preferences are complete.
+- Use `needs_more_info` or equivalent soft state for incomplete preference requirements.
+- Preserve current review/confirm behavior for fully resolved inputs.
+- Add backend-shaped post-selection preference requirements for weekly running days, long-run day,
+  and rest-day preferences.
+- Preserve exact draft expansion and persistence when preferences are resolved.
+- Keep `getPlanPresetCards`, `reviewPlanPresetDraft`, and `confirmPlanPresetDraft` behavior stable
+  where possible; if additive contract changes are required, document them precisely.
+- Do not add frontend implementation in this slice.
+
+Implementation note, 2026-06-08:
+
+- Added `planPresetCardInputSchema` as the partial/discovery contract for Plan Preset cards while
+  keeping `planPresetEligibilityInputSchema` as the full resolved review/confirm contract.
+- `getPlanPresetCards` now accepts partial card input and routes partial/discovery requests through
+  `plan-presets/progressive-cards.ts`, returning visible shipped cards with `needs_more_info`,
+  `not_ideal`, `custom_fit`, or `unavailable` states plus backend-shaped post-selection refinement
+  requirements.
+- Shared card summary fields moved to `plan-presets/card-summary.ts` so resolved and progressive
+  cards do not duplicate duration/date/program-summary truth.
+- `reviewPlanPresetDraft` and `confirmPlanPresetDraft` still require fully resolved input and still
+  own review-token/checksum and exact row expansion boundaries.
+- Harness coverage was added for partial profile, missing weekly rhythm, 2/3/4/5-day state ladder,
+  fixed-rest conflict, long-run conflict, custom routing, and metric-truth preservation.
+
+QA closeout evidence, 2026-06-08:
+
+- Browser was not used because this was backend/source/harness validation only.
+- Source inspection covered Plan Preset schema/resolver/progressive-card/action/review seams, active
+  plan notes, onboarding panel readback label, and preset validation scripts.
+- Targeted ESLint passed.
+- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts` passed.
+- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts` passed.
+- Blueprint mock smoke passed and remained `ai_first_plan_blueprint_v1`.
+- `npm run validate-admin-capture-backlog` passed.
+- `git diff --check` passed.
+- `npm run build` passed.
+- Read-only progressive-state probe passed.
+- Partial card discovery works through `planPresetCardInputSchema`.
+- Empty/missing setup returns `needs_more_info`.
+- One-day availability returns `unavailable`.
+- 2/3/4/5-day scenarios produce bounded `not_ideal`, `available`, or `recommended`.
+- Progressive cards remain non-mutating with `sourceKind: plan_preset_v1`, `persisted: false`, and
+  safety flags.
+- Progressive recommended/available cards do not become review-ready until post-selection
+  preferences are provided.
+- Required refinement fields include goal distance/style/terrain and preferred long-run day, with
+  additional benchmark/fitness refinement where needed.
+- Partial card input cannot reach review draft expansion.
+- `reviewPlanPresetDraft` and `confirmPlanPresetDraft` still require full schemas,
+  token/checksum path, and server-owned canonical rebuild.
+- No-benchmark and stale no-watch inputs remain `structure_only_executable`.
+- Benchmark plus recent 5K can still become `pace_executable`.
+- Target time alone does not unlock pace.
+- HR remains non-executable/advisory without personal HR zones.
+- No frontend route, DB/schema, persistence, OpenAI, confirm behavior, manual workout behavior, or
+  new preset family was introduced.
+- No stale first-plan-preset runtime references were found.
+
+Maintainability follow-up:
+
+- [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts) is now about
+  `707` lines. This is not a Slice 5A blocker, but it crosses the 700-line hotspot threshold and
+  should be decomposed before adding more progressive states or new preset families.
+
+Closeout decision:
+
+Backend Slice 5A is complete for the progressive Plan Preset card contract. Frontend implementation
+is now unblocked for rendering backend-shaped progressive states and post-selection refinement, but
+it must not compute eligibility, schedule/rhythm, date, metric, recipe, review-readiness, or
+persistence truth locally.
+
+Frontend Slice 5B scope:
+
+- implement the preset-first hierarchy and bold hero card redesign using the new backend contract
+- call the progressive card endpoint with partial setup input
+- render all backend-returned shipped cards early
+- support states:
+  `recommended`, `available`, `needs_more_info`, `not_ideal`, `custom_fit`, and `unavailable`
+- show backend reason/refinement copy
+- allow selecting cards that need refinement only into a refinement step, not directly into review
+- collect backend-required post-selection preferences
+- request backend recomputation/review after preferences are resolved
+- only show review/create when backend returns review-ready/full review state
+- keep Advanced custom secondary and separate
+- keep review scaffold and `Create preset plan` behavior intact
+- preserve unavailable CTA polish:
+  no visible `Unavailable` badge, disabled CTA with tooltip reason
+- preserve no hidden selected default
+- preserve no `Recommended` badge if the current design decision remains to hide it
+- preserve mobile `375px` no-overflow
+- do not compute backend truth locally
+
+5K decision:
+
+- Do not show 5K as a shipped preset card because backend Plan Preset v1 supports only `10K
+  Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
+- If Frontend needs a visual placeholder for design balance, it must be clearly unavailable or
+  coming soon and must not route to review/confirm.
+- Prefer keeping unimplemented cards out of the primary shipped set unless the active plan is
+  explicitly widened.
+
+What not to touch:
+
+- do not add new preset families
+- do not claim 5K shipped unless backend exists
+- do not change Plan Preset persistence/confirm behavior
+- do not touch manual workout CRUD
+- do not add active-plan replacement/refresh
+- do not weaken metric-truth gates
+- do not run `--archive-stale`
+- do not start broad admin cleanup in this slice
+- do not convert progressive availability into a frontend-only card visibility patch
+
+Validation expectations:
+
+- targeted ESLint for changed frontend files in Frontend Slice 5B
+- `git diff --check`
+- `npm run build`
+- built-in Codex browser first against local onboarding
+- verify cards render from partial setup
+- verify all backend states and backend reason/refinement copy render
+- verify selecting `needs_more_info` or `not_ideal` cards opens refinement instead of direct review
+- verify review/create appears only after backend review-ready/full review state
+- verify unavailable CTA polish, no hidden selected default, no unwanted `Recommended` badge, and
+  mobile `375px` no-overflow
+- source proof that frontend consumes backend-shaped progressive Plan Preset data and does not
+  compute eligibility/rhythm/date/metric/review truth locally
+
+Frontend Slice 5B closeout evidence, 2026-06-08:
+
+- Built-in Codex Browser was used first against `http://localhost:8082/`; Safari was not used.
+- Targeted ESLint passed.
+- `npm run validate-admin-capture-backlog` passed.
+- `git diff --check` passed.
+- `npm run build` passed with existing Vite/Radix/TanStack warnings.
+- With only age, height, and weight entered and no weekly running days selected, all three shipped
+  cards appeared:
+  `10k`, `half_marathon`, and `marathon`.
+- Initial state had no selected card, no hidden selected default, no review scaffold, and no
+  `Create preset plan`.
+- Browser exercised `needs_more_info`, `available`, and `unavailable`; source coverage accounts for
+  all six backend states:
+  `recommended`, `available`, `needs_more_info`, `not_ideal`, `custom_fit`, and `unavailable`.
+- No visible `Recommended` badge appeared.
+- Selecting unresolved `10K` opened a distinct preferences panel, not review.
+- Refinement showed backend-provided reason/defaults, including `Use suggested defaults`.
+- Review/create stayed hidden until required preferences were resolved.
+- After resolving preferences, backend review returned a non-mutating scaffold with
+  `plan_preset_v1 · persisted false`, row counts, metric policy, assumptions, and enabled
+  `Create preset plan`.
+- QA did not click `Create preset plan`.
+- Source confirmed confirm payload includes only `cardId`, structured setup input, `reviewToken`,
+  and `reviewChecksum`; no client rows/workouts are sent.
+- With `1 day`, all cards became unavailable. No unavailable pill/badge appeared; CTA stayed as
+  `Review preset`, had `aria-disabled="true"`, was inert, and tooltip/focus copy used
+  backend-shaped reason text.
+- Advanced custom remains secondary and collapsed by default.
+- Frontend does not compute eligibility, recommendation, rhythm conflicts, metric policy, workout
+  mix, dates, rows, persistence, OpenAI behavior, active-plan replacement, or manual workout CRUD
+  locally.
+- No 5K preset card shipped.
+- Mobile `375px` had no horizontal overflow.
+- Artifacts:
+  `qa-artifacts/screenshots/2026-06-08/progressive-plan-preset-ui-qa/`.
+
+Frontend Slice 5B closeout decision:
+
+Frontend Slice 5B is complete for progressive Plan Preset card UI and post-selection refinement.
+It proves the frontend consumes backend-shaped progressive card/review contracts and preserves the
+review/confirm mutation boundary. The implementation track should not expand to new families,
+manual workout CRUD, active-plan replacement, or metric-truth changes.
+
+Legacy/stale audit findings, 2026-06-08:
+
+- No safe delete-now candidates were found.
+- No stale runtime/source hits were found for:
+  `first-plan-preset`, `first_plan_preset`, `FirstPlanPreset`, `firstPlanPreset`, or
+  `validate-first-plan-preset`.
+- `missing_watch_app_support` appears only in docs/history/active-plan context, not runtime.
+- Remaining compatibility seams are intentional and should stay:
+  full structured review/confirm path for exactness, readable legacy watch/no-watch compatibility,
+  and [Training API facade](../../../src/lib/training-api.ts) exports until a separate import-map
+  cleanup slice.
+- The main complexity is not stale code; it is concentrated progressive policy ownership.
+- [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts) is about
+  `707` lines and owns context building, metric truth, hard blocks, missing info,
+  fit/recommendation policy, refinement questions, and copy/reason messages.
+- Later frontend decomposition candidates:
+  [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx),
+  [Onboarding gate](../../../src/components/OnboardingGate.tsx), and
+  [Structured plan constructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx).
+
+Delete-now decision:
+
+There are no approved delete-now candidates after the legacy/stale audit. Cleanup should proceed by
+no-behavior-change decomposition of the progressive backend policy seam, not by deleting
+compatibility or review/confirm paths.
+
+Backend Slice 5C scope:
+
+- Slice name:
+  `Backend Slice 5C: no-behavior-change progressive Plan Preset policy decomposition`.
+- Immediate owner:
+  BACKEND.
+- Extract policy/metric/refinement ownership from
+  [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts).
+- Preserve exact card states:
+  `recommended`, `available`, `needs_more_info`, `not_ideal`, `custom_fit`, and `unavailable`.
+- Preserve exact reason codes, result codes, review readiness, required/optional refinement fields,
+  default summaries, metric truth, recommendation behavior, row counts, source metadata, and
+  harness behavior.
+- Keep `resolvePlanPresetCards(...)`, `reviewPlanPresetDraft`, and `confirmPlanPresetDraft`
+  behavior stable.
+- Keep the full structured review/confirm path intact for exactness.
+- Keep legacy watch/no-watch readback/input compatibility where it is intentionally normalized to
+  supported watch/app behavior.
+- Keep [Training API facade](../../../src/lib/training-api.ts) cleanup for Slice 8.
+- Add or adjust harness assertions proving output preservation.
+- Document what remains recipe-specific versus shared progressive card policy.
+
+Backend Slice 5C out of scope:
+
+- frontend decomposition
+- UX behavior changes
+- new preset families
+- 5K
+- confirm/persistence changes
+- DB/schema changes
+- OpenAI behavior
+- manual workout CRUD
+- active-plan replacement/refresh
+- metric-truth weakening
+
+Backend Slice 5C implementation note, 2026-06-08:
+
+- Decomposed progressive Plan Preset policy ownership without behavior changes.
+- [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts) remains the
+  card orchestration/view-model facade.
+- [Progressive Plan Preset context](../../../src/lib/plan-presets/progressive-context.ts) owns
+  partial setup normalization for progressive card resolution.
+- [Progressive Plan Preset metric truth](../../../src/lib/plan-presets/progressive-metric-truth.ts)
+  owns `pace_executable` versus `structure_only_executable` gating for progressive cards.
+- [Progressive Plan Preset policy](../../../src/lib/plan-presets/progressive-policy.ts) owns custom
+  routing, blockers, missing-info reasons, fit/recommendation policy, and refinement requirements.
+- Recipe-specific rows, review/confirm persistence, source metadata, and metric truth semantics were
+  preserved.
+
+### Slice 6: Rich Adaptive Plan Preset Training-Quality Reset
+
+Owner:
+
+ARCHITECT / RUNNING COACH / BACKEND.
+
+Status:
+
+Plan Preset program source-of-truth artifacts are QA-passed on 2026-06-08, and local Backend Slice 6
+work now consumes those artifacts in backend card/review expansion. Architect audit found this is not
+yet sufficient as the final deterministic algorithmic builder: the current source-of-truth still
+lacks phase, weekly-slot, identity-placement, segment-parameter, progression-math, and target-time
+doctrine contracts. Slice 6A is selected for source-of-truth gap closure before treating Backend
+Slice 6 implementation as final.
+
+Scope correction:
+
+- The Plan Preset quality issue applies to all shipped Plan Preset families unless proven otherwise:
+  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
+- Do not frame the quality failure as a 10K-only fix.
+- The exported `10K Foundation` rejection is evidence of the broader risk: plans can be safe while
+  still being too empty, support-heavy, template-like, and missing event-specific progression.
+- Existing fixed-duration fixtures for 10/12/16 weeks can remain regression references only until
+  the rich adaptive rebuild replaces them.
+- Existing 10/12/16 week fixture preservation must not remain the product target.
+- All shipped Plan Preset families require rich adaptive rebuild before more preset families are
+  added or current preset quality is treated as acceptable.
+
+Dynamic duration decision:
+
+Plan Preset duration must become backend-owned, dynamic, and explainable from:
+
+- distance/family
+- runner level
+- weekly running days
+- age
+- height
+- weight
+- body-size/load context
+- recent consistency or benchmark if available
+- optional fixed rest-day and long-run constraints
+- workout-type removal or unusual constraints, which may route to Advanced custom rather than preset
+  v1
+
+Rules:
+
+- Low weekly availability should extend duration where safe rather than forcing thin fixed-week
+  plans.
+- Higher load-risk context should slow progression, lower intensity density, add cutback/recovery,
+  or extend duration.
+- Lower load-risk context may allow normal progression, but must not create unsafe aggressive jumps.
+- Fixed 10/12/16 weeks are no longer sufficient as the product model.
+- Duration must be returned in backend-owned card and review summaries with a concise explanation of
+  why that duration fits.
+- Frontend must render the returned duration/start/end/fit summary and must not calculate duration
+  locally.
+
+Program source-of-truth artifacts:
+
+- [Plan Preset program source of truth](../../../src/lib/plan-presets/preset-program-source-of-truth.md)
+- [Plan Preset scenario matrix](../../../src/lib/plan-presets/preset-program-scenario-matrix.csv)
+- [Plan Preset load adjustments](../../../src/lib/plan-presets/preset-program-load-adjustments.csv)
+- [Plan Preset workout identity library](../../../src/lib/plan-presets/preset-workout-identity-library.csv)
+- [Plan Preset goal contract matrix](../../../src/lib/plan-presets/preset-goal-contract-matrix.csv)
+- [Plan Preset phase template table](../../../src/lib/plan-presets/preset-phase-template-table.csv)
+- [Plan Preset weekly archetype table](../../../src/lib/plan-presets/preset-weekly-archetype-table.csv)
+- [Plan Preset identity placement rules](../../../src/lib/plan-presets/preset-identity-placement-rules.csv)
+- [Plan Preset segment anatomy table](../../../src/lib/plan-presets/preset-segment-anatomy-table.csv)
+- [Plan Preset progression math rules](../../../src/lib/plan-presets/preset-progression-math-rules.csv)
+- [Plan Preset quality gates](../../../src/lib/plan-presets/preset-quality-gates.csv)
+- [Plan Preset builder I/O contract](../../../src/lib/plan-presets/preset-builder-io-contract.csv)
+
+Artifact QA closeout evidence, 2026-06-08:
+
+- Browser was not used because this was source/document/artifact validation only.
+- Source-of-truth markdown covers `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
+- Coverage includes eligibility, adaptive duration, recovery/cutback, long-run/rest-day rules,
+  metric truth, routing, and final outcome expectations.
+- Scenario matrix parsed cleanly with `60` data rows, no ragged rows, and no empty headers.
+- Scenario matrix covers all three families, runner levels, and `1`, `2`, `3`, `4`, `5` days/week.
+- Each family has `20` scenario rows.
+- Card states include `available`, `recommended`, `not_ideal`, and `unavailable`.
+- 2-day cards are not all unavailable: `4 available`, `3 not_ideal`, and `5 unavailable`.
+- Marathon remains stricter at low availability.
+- Load adjustments parsed cleanly with `20` data rows.
+- Load adjustment artifact uses neutral terms such as `load_context` and
+  `progression_conservatism`.
+- No body-shaming labels, medical claims, or injury inference from height/weight.
+- Workout identity library parsed cleanly with `19` data rows.
+- Workout identity library includes rich recovery, easy, strides, steady, cutback, progression,
+  tempo, interval, threshold, marathon-specific, long-run, steady-finish, and taper identities.
+- All workout identity rows include structured segment anatomy.
+- Builder-level artifacts now include `50` goal-contract rows, `76` phase-template rows, `20`
+  weekly-archetype rows, `23` identity-placement rows, `57` segment-anatomy rows, `14`
+  progression-math rows, `17` quality-gate rows, and `30` builder I/O contract rows.
+- Metric-truth rules are preserved.
+- No shipped 5K family appears.
+- No OpenAI happy-path generation, frontend-owned plan generation, DB/schema, or persistence
+  behavior is implied.
+- `git diff --check` passed for the four artifacts.
+- CSV parse/read checks passed.
+- `npm run validate-admin-capture-backlog` passed.
+
+Minor clarity issue decision:
+
+- QA noted that the source-of-truth already says presets must not rely on one fixed duration, but
+  did not explicitly name current fixed `10/12/16` week fixtures as no longer the product target.
+- This was fixed in the source-of-truth artifact before Backend Slice 6 so implementation does not
+  preserve fixed-duration fixtures as the target behavior.
+
+Algorithmic builder audit, 2026-06-08:
+
+Files inspected:
+
+- [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts)
+- [Plan Preset composition helpers](../../../src/lib/plan-presets/composition.ts)
+- [Plan Preset draft expansion facade](../../../src/lib/plan-presets/expand.ts)
+- [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts)
+- [Plan Preset progressive policy](../../../src/lib/plan-presets/progressive-policy.ts)
+- [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts)
+- [Plan Preset eligibility validator](../../../scripts/validate-plan-preset-eligibility.ts)
+- [Plan Preset program source of truth](../../../src/lib/plan-presets/preset-program-source-of-truth.md)
+- [Plan Preset scenario matrix](../../../src/lib/plan-presets/preset-program-scenario-matrix.csv)
+- [Plan Preset load adjustments](../../../src/lib/plan-presets/preset-program-load-adjustments.csv)
+- [Plan Preset workout identity library](../../../src/lib/plan-presets/preset-workout-identity-library.csv)
+
+Backend Slice 6B implementation verdict:
+
+- Current artifacts are sufficient for the shipped non-target-time Plan Preset builder scope:
+  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
+- Runtime reads all source-of-truth CSV artifacts through
+  [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts).
+- [Plan Preset draft expansion facade](../../../src/lib/plan-presets/expand.ts) now calls one
+  canonical deterministic builder instead of recipe-specific row expanders.
+- [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) owns phase
+  allocation, weekly archetype inheritance, slot-to-weekday mapping, identity resolution, final
+  outcome materialization, recurring cutback protection, quality gates, and canonical row assembly.
+- The previous active recipe-specific expanders for `10K Foundation`, `Half Marathon Balanced`, and
+  `Marathon Base` were deleted so there is no second active row-generation truth.
+- `recipe-expanders/shared.ts` remains as shared workout safety/counting helpers only; it no longer
+  owns per-family program composition.
+- Target-time preset doctrine remains future-gated and continues to route to Advanced custom.
+
+Canonical builder pipeline:
+
+| Layer | Owner | Input | Output | Source of truth needed | Validation requirement | Frontend must not guess |
+| --- | --- | --- | --- | --- | --- | --- |
+| Runner inputs | Frontend collects, backend validates | profile, level, availability, rest days, long-run preference, benchmark, goal intent | normalized setup truth | existing schema plus preset card contract | schema and card-state harness | eligibility, defaults, or metric truth |
+| Capability/load context | Backend | normalized setup truth | age/load/conservatism context | load-adjustment table plus thresholds | neutral labels, no medical/body-shaming copy | load risk, duration extension, progression safety |
+| Goal contract | Backend | distance, goal style, target time/date, benchmark truth | completion/base/performance/custom routing | `preset-goal-contract-matrix.csv` | target-time routes custom unless doctrine exists | target-time eligibility or ambition realism |
+| Duration model | Backend | goal contract, level, days/week, load context, benchmark/consistency | duration band and selected duration | scenario matrix plus progression bounds | adaptive duration assertions | duration or end date |
+| Phase architecture | Backend | selected duration, family, goal contract, conservatism | ordered phases with week ranges | `preset-phase-template-table.csv` | phase sequence, min/max phase length, cutback cadence | phase count or phase labels |
+| Weekly composition | Backend | phases, days/week, rest/long-run constraints | weekly archetypes and day slots | `preset-weekly-archetype-table.csv` | long-run placement, rest conflicts, specific-touch caps | weekly rhythm or slot ownership |
+| Workout identity placement | Backend | weekly slots, phase, family rules | identity assigned to each workout slot | `preset-identity-placement-rules.csv` | identity diversity, min/max frequency, forbidden context checks | identity mix or substitutions |
+| Segment anatomy | Backend | identity, level, phase, conservatism, metric mode | warmup/main/repeats/recovery/cooldown sectors | `preset-segment-anatomy-table.csv` | every non-rest row rich and executable | workout sectors or target structure |
+| Target-mode resolution | Backend | segment anatomy plus metric truth | structure-only, pace, or HR-capable targets | metric-truth contract plus future target-time doctrine | no fake pace/HR, no target-time pace without benchmark truth | pace/HR permission |
+| Canonical rows | Backend | resolved slots and segments | canonical `training-plan-v2` draft rows | runtime builder | row/metadata/review checksum exactness | row generation |
+| Review/confirm | Backend owns mutation, frontend renders | reviewed draft token/checksum | persisted active plan only on confirm | existing persistence seam | exact persistence, idempotency, rollback | persistence or duplicate guards |
+
+Source-of-truth artifacts now active:
+
+- [Plan Preset goal contract matrix](../../../src/lib/plan-presets/preset-goal-contract-matrix.csv)
+  covers completion/base/performance/custom routing, final outcomes, and target-time future gates.
+- [Plan Preset phase template table](../../../src/lib/plan-presets/preset-phase-template-table.csv)
+  covers ordered phases, phase ratios, minimum weeks, cutback cadence, and final phases.
+- [Plan Preset weekly archetype table](../../../src/lib/plan-presets/preset-weekly-archetype-table.csv)
+  covers days/week rhythms, long-run slots, support slots, and low-frequency patterns.
+- [Plan Preset identity placement rules](../../../src/lib/plan-presets/preset-identity-placement-rules.csv)
+  cover phase/family/level identity availability and substitutions.
+- [Plan Preset segment anatomy table](../../../src/lib/plan-presets/preset-segment-anatomy-table.csv)
+  covers workout anatomy ownership for supported identities and execution modes.
+- [Plan Preset progression math rules](../../../src/lib/plan-presets/preset-progression-math-rules.csv)
+  covers ramp, cutback, low-frequency milestone, and duration/progression constraints.
+- [Plan Preset quality gates](../../../src/lib/plan-presets/preset-quality-gates.csv) covers final
+  outcome, support-only rejection, identity diversity, and family-specific acceptance gates.
+
+Target-time policy decision:
+
+- Target-time Plan Presets remain out of scope now.
+- Existing resolver behavior that routes `goalStyle: target_time` / `targetTime` to Advanced custom
+  remains correct.
+- A future target-time preset path requires separate doctrine and backend gates before it can be
+  deterministic:
+  recent benchmark truth, realistic improvement bounds, target-distance projection, intensity
+  multiplier, duration extension, refusal/custom routing, and no pace target unless benchmark truth
+  supports it.
+- Target time alone must never create pace truth.
+
+AI usage policy:
+
+- Acceptable AI use:
+  offline doctrine drafting, workout library enrichment, coach review suggestions, copy
+  alternatives, and future Advanced custom generation behind review.
+- Not acceptable for the current preset happy path:
+  runtime unreviewed preset row generation, silent mutation, replacing deterministic safety gates,
+  inventing pace/HR truth, or bypassing source-of-truth validation.
+
+Slice 6A decision:
+
+`Slice 6A: Plan Preset algorithmic builder architecture and missing source-of-truth gap closure`.
+
+Decision:
+
+- Completed before Backend Slice 6B.
+- Source-of-truth artifacts now exist as markdown plus CSV inputs under
+  [Plan Preset source of truth](../../../src/lib/plan-presets/preset-program-source-of-truth.md).
+- Backend Slice 6B consumes these artifacts through
+  [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts) and the deterministic
+  [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts).
+- Remaining target-time preset doctrine is intentionally future-gated and routes to Advanced custom.
+
+Slice 6A artifact output:
+
+- phase template contract
+- weekly archetype / slot contract
+- identity placement frequency contract
+- segment anatomy parameter contract
+- progression math / low-frequency milestone contract
+- quality-gate contract
+- target-time doctrine marked future-gated, not shipped behavior
+
+Body-size/load factor decision:
+
+Introduce a backend-owned anthropometric load context for Plan Presets.
+
+Purpose:
+
+- Use age, height, and weight to moderate progression, weekly load, long-run ramp, impact exposure,
+  and intensity density.
+- Influence duration and progression conservatism.
+- Stay conservative and auditable.
+- Avoid medical claims, injury inference, or exact pace/HR truth.
+
+Neutral internal terms:
+
+- `bodyLoadFactor`
+- `impactLoadAdjustment`
+- `progressionConservatism`
+- `anthropometricLoadContext`
+
+Forbidden language:
+
+- Do not use insulting, moralizing, or body-shaming labels in code, UI, docs, or product copy.
+- Do not label runners as "bad", "heavy risk", "overweight", "obese", "fragile", or similar
+  product-facing judgments in this preset context.
+- Do not present the load context as diagnosis, injury prediction, or medical advice.
+
+Allowed runner-facing copy:
+
+- "We'll build this with a more gradual progression."
+- "This plan uses a conservative ramp to protect consistency."
+- "Your plan duration adapts to your current profile and weekly rhythm."
+- "Hito is using a steadier progression because this setup benefits from more recovery space."
+
+Architecture:
+
+- Backend owns formula, thresholds, caps, and explanation strings.
+- Frontend only renders backend-shaped explanation.
+- The policy must not infer injury from height/weight.
+- The policy must not create exact pace from body size.
+- The policy must not create personal HR targets from age/body size.
+- The policy must be testable through deterministic fixtures.
+
+Rich program doctrine across shipped families:
+
+Every shipped Plan Preset family must include:
+
+- family-specific workout identity mix
+- rich structured segments
+- meaningful progression
+- cutback/recovery cycles
+- final outcome logic
+- dynamic duration
+- level-specific variants
+- days/week variants
+- rest-day and long-run preference adaptation
+- metric-truth-preserving execution
+
+Avoid support-only plans dominated by easy/recovery/rest. Easy and recovery work are still required,
+but they must support a meaningful family-specific progression instead of replacing it.
+
+Required workout library for the rebuild:
+
+- recovery jog / recovery run-walk
+- easy aerobic run
+- easy run with strides
+- progression run
+- aerobic intervals
+- short intervals
+- tempo / threshold
+- cruise intervals
+- hills / hill strides / hill endurance
+- long aerobic run
+- long run with steady finish
+- cutback aerobic run
+- cutback long run
+- benchmark/test
+- race simulation / completion day
+- rest/recovery day
+- optional strength/cross-training notes if supported
+
+Family final outcome requirements:
+
+- `10K Foundation` must end with an explicit 10K completion/test/race-style simulation or a clear
+  coach-approved equivalent.
+- `Half Marathon Balanced` must end with a credible half-readiness marker or race-specific readiness
+  block.
+- `Marathon Base` must end with a clear durability/base endpoint and must not falsely claim full
+  race readiness unless the selected duration/progression supports it.
+
+Backend Slice 6B implementation decision:
+
+`Backend Slice 6B: Implement deterministic Plan Preset program builder pipeline`.
+
+Scope:
+
+- Rebuild all three shipped families, not just 10K:
+  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
+- Add dynamic duration model.
+- Add backend-owned body-size/load adjustment.
+- Add richer workout library usage.
+- Add days/week variants, including safe longer 2-day 10K support and narrow/conservative Half
+  support only where Running Coach approves it.
+- Keep Marathon stricter for low availability and higher load-risk contexts.
+- Add final outcome logic.
+- Preserve metric truth:
+  target time alone does not unlock pace, age/body size does not unlock HR, and
+  `structure_only_executable` remains valid without benchmark/provider truth.
+- Preserve review/confirm/persistence safety.
+- Update harness expectations away from fixed 10/12/16 row counts toward adaptive duration and
+  quality assertions.
+- Keep preset happy-path deterministic and backend-owned; do not use OpenAI to improvise preset
+  programs at runtime.
+- Implementation is complete locally and ready for QA validation; Slice 6A source-of-truth artifacts
+  are parsed by the runtime and harness.
+
+Backend Slice 6 QA expectations:
+
+- fixtures for short/light, average, and tall/heavier runners
+- fixtures for low, normal, and higher weekly availability
+- fixtures for beginner/recreational/performance levels
+- no-benchmark and recent-5K metric truth fixtures
+- fixed-rest and long-run preference fixtures
+- adaptive duration assertions rather than fixed 10/12/16 week assertions
+- family-specific identity mix assertions
+- non-rest rows have rich structured segments
+- support-only/easy-dominated plans are rejected
+- final outcome marker is present for every family
+- no fake pace/HR
+- no OpenAI call
+- no DB/schema change unless separately approved
+- review/confirm/source metadata behavior preserved
+
+Backend Slice 6 implementation note, 2026-06-08:
+
+- [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts) now owns parsing and
+  resolving the scenario matrix, load adjustments, and workout identity library into deterministic
+  program duration/load metadata.
+- [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts) and
+  [Plan Preset review expansion](../../../src/lib/plan-presets/expand.ts) now use adaptive
+  duration, estimated end date, scenario metadata, neutral impact-load context, progression
+  conservatism, cutback policy, and final-outcome metadata.
+- [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) now owns
+  generated workout rows for all shipped preset families through one CSV-backed builder pipeline.
+- The old recipe-specific row expanders for `10K Foundation`, `Half Marathon Balanced`, and
+  `Marathon Base` were deleted.
+- [Plan Preset composition](../../../src/lib/plan-presets/composition.ts) now owns safe
+  specific-touch placement so long-run steady-finish and midweek specificity do not collide in the
+  same week.
+- Plan Preset harness expectations were updated away from fixed `10/12/16` week and `70/84/112`
+  row-count truth toward adaptive duration formulas, source-matrix coverage, family outcome markers,
+  rich identities, metric truth, and review/confirm exactness.
+- [Build output finalization](../../../scripts/finalize-build-output.mjs) now copies and verifies
+  the Plan Preset program CSV artifacts into server output so runtime preset resolution does not
+  depend on an accidental source checkout in production.
+- Local validation passed:
+  targeted Plan Preset ESLint, Plan Preset harness, plan-authoring doctrine validator, blueprint
+  mock smoke, admin capture backlog validator, build-finalizer syntax/lint, `git diff --check`, and
+  `npm run build`.
+
+Backend Slice 6B final outcome identity fix, 2026-06-08:
+
+- QA found that final outcome rows were still emitting legacy identities:
+  `10k_rhythm_intervals`, `half_marathon_threshold_durability`, and
+  `long_run_with_steady_finish`.
+- [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) now
+  preserves the canonical builder I/O output identities in final generated rows:
+  `tenk_completion_or_checkpoint`, `half_readiness_marker`, and `base_endpoint_marker`.
+- [Plan Preset eligibility validator](../../../scripts/validate-plan-preset-eligibility.ts) and
+  per-recipe Plan Preset assertions now require exact final-week canonical identities instead of
+  accepting legacy identity/text substitutes.
+
+Backend Slice 6B QA closeout, 2026-06-08:
+
+Status:
+
+implemented and QA-passed.
+
+Evidence recorded:
+
+- Runtime now emits canonical final outcome markers:
+  `tenk_completion_or_checkpoint`, `half_readiness_marker`, and `base_endpoint_marker`.
+- Final marker rows have structured segment anatomy rather than text-only or legacy filler rows.
+- Harnesses require exact canonical final identities instead of accepting legacy substitutes.
+- Quality-gate proof passed for final outcome markers and family-specific builder expectations.
+- Metric truth remains strict:
+  no fake pace without benchmark truth and no executable HR without personal HR-zone truth.
+- Review/confirm boundary remains intact:
+  Plan Presets stay deterministic, reviewed before mutation, and persisted only through the existing
+  confirm path.
+- Blueprint/custom authoring smoke remains unaffected.
+- No frontend, DB/schema, persistence, OpenAI runtime generation, manual workout CRUD, target-time
+  preset support, new preset family, or active-plan replacement/refresh behavior changed.
+- Validation passed in QA:
+  targeted Plan Preset ESLint, Plan Preset harness, plan-authoring doctrine validator,
+  blueprint/custom authoring smoke, admin capture backlog validator, build-finalizer syntax check,
+  `git diff --check`, and `npm run build`.
+
+Minor source-text drift:
+
+- [Plan Preset quality gates CSV](../../../src/lib/plan-presets/preset-quality-gates.csv) still has
+  Half marker prose saying it may be threshold durability or a long-run specificity endpoint.
+- Runtime and harness truth now require exact canonical `half_readiness_marker`, so this is a
+  source-text/copy drift, not a runtime correctness blocker.
+- Decision:
+  non-blocking cleanup note. It should be fixed by a tiny BACKEND/COPY source-text cleanup when the
+  Plan Preset source artifacts are next touched, but it does not block Slice 6B closeout or the next
+  service-size cleanup gate.
+
+Slice 6 out of scope:
+
+- adding 5K as shipped
+- adding new preset families
+- using OpenAI for preset happy-path generation
+- weakening metric truth
+- body-shaming/internal insulting labels
+- medical claims
+- injury inference from weight/height
+- DB/schema changes unless separately proven necessary
+- confirm/persistence semantic changes
+- frontend changes
+- manual workout CRUD
+- active-plan replacement/refresh
+
+### Service Size Root-Cause Audit
+
+Date:
+
+2026-06-08.
+
+Snapshot:
+
+- Tracked repo markdown/code/data total is about `186,945` lines across counted `ts`, `tsx`, `mjs`,
+  `md`, `css`, `csv`, and `json` files.
+- Tracked plus currently untracked worktree files total is about `193,159` counted lines.
+- Runtime `src` code is about `84,677` lines.
+- Runtime `src` TypeScript/TSX is about `79,707` lines.
+- Scripts and validation harness code are about `21,662` lines.
+- Docs markdown/CSV are about `66,528` lines.
+- `package-lock.json` is about `11,693` lines and should not be counted as service complexity.
+
+Runtime/source hotspots:
+
+| Cluster | Approx lines | Diagnosis |
+| --- | ---: | --- |
+| plan authoring / AI blueprint / envelope / doctrine | `31,974` | biggest real ownership sprawl; many first-plan, AI, structured-authoring, and doctrine seams coexist |
+| Admin routes/importer/work items | `12,655` | admin surface and importer grew as operational tooling, not runner runtime |
+| Plan Presets | `7,422` | actively changing and currently in dirty worktree; not safe as first deletion target |
+| import/export/workout-result ingest | `6,069` | separate ingestion/export domain; requires source-of-truth audit before deletion |
+| active-plan refresh/replacement/schedule | `5,572` | legitimate but overlaps plan mutation/review ownership |
+| Hito DS route/playground | `5,664` | [Hito DS route](../../../src/routes/hitoDS.tsx) is a single large route-local demo owner |
+| global CSS | `4,970` | [styles](../../../src/styles.css) is a monolithic styling owner |
+
+Root cause:
+
+The line count is not primarily caused by one bad dependency or one accidental file. It grew because
+Hito added many correct-but-parallel seams before deleting older ones:
+
+- multiple plan creation paths remained after Plan Presets, blueprint, envelope, text, voice,
+  import/apply, and refresh/apply were added
+- validation scripts grew into multi-domain safety nets
+- Admin became both product surface and operations/backlog mirror
+- `/hitoDS` accumulated design-system demos inside one route owner
+- global CSS absorbed route/component concerns instead of being steadily tokenized/extracted
+- active/archive/backlog docs accumulated as useful history, but they inflate repo line count and
+  should be separated from runtime service complexity
+
+What is not the first fix:
+
+- Do not delete docs/archive just to lower the number.
+- Do not delete QA harnesses before replacing their safety coverage.
+- Do not delete Plan Preset builder work while it is dirty/in-flight.
+- Do not split files purely by line count if ownership would become less clear.
+- Do not treat `package-lock.json`, generated route tree, or historical docs as product bloat.
+
+Size-reduction strategy:
+
+1. Separate runtime source, scripts/harnesses, docs/history, generated/lockfiles, and active dirty
+   work in every future size report.
+2. Prefer deletion/demotion of stale plan-creation paths over abstraction.
+3. Pick one ownership seam per slice and require behavior-preservation validation.
+4. Add line-count budgets to hotspot files before adding responsibility:
+   around `700` lines needs justification or extraction, around `1000` lines needs architecture
+   reason, and around `1500` lines becomes an active decomposition candidate.
+5. Reduce code paths before shrinking UI polish files; plan generation owns the largest real
+   complexity cluster.
+
+First safe reduction slice:
+
+`ARCHITECT Slice: Plan-creation source map and deletion-gate selection`.
+
+Scope:
+
+- classify every plan creation/mutation/review path by production default, production non-default,
+  internal supported, ops/diagnostic, QA/doctrine fixture, legacy readback, or deletion/demotion
+  candidate
+- select exactly one stale/legacy seam for Backend deletion or demotion
+- define required validation before deletion
+- do not touch Plan Preset in-flight builder files
+- do not weaken blueprint default, review/confirm, persistence, or metric-truth behavior
+
+Second reduction slice:
+
+`BACKEND Slice: plan-authoring doctrine validator decomposition`.
+
+Scope:
+
+- decompose [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
+  by stable assertion ownership
+- keep the command entrypoint stable
+- preserve all assertions
+- do not use decomposition as a substitute for deleting stale plan-authoring paths
+
+Third reduction slice:
+
+`FRONTEND Slice: Hito DS route and CSS ownership audit`.
+
+Scope:
+
+- split route-local `/hitoDS` demo ownership only if it reduces route responsibility
+- classify [styles](../../../src/styles.css) into DS tokens, shared primitives, product route
+  styles, admin styles, and dead rules
+- delete only rules/components with source proof and visual QA
+
+### Slice 9: Plan-Creation Source Map And First Deletion Gate
+
+Status:
+
+architecture decision complete on 2026-06-08.
+
+Owner:
+
+ARCHITECT.
+
+Audit evidence:
+
+- Source/reference scans covered [first-plan actions](../../../src/lib/first-plan-actions.ts),
+  [AI first-plan draft service](../../../src/lib/ai-first-plan-draft-service.ts),
+  [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts),
+  [AI blueprint modules](../../../src/lib/ai-first-plan-blueprint-authoring.ts),
+  [AI envelope modules](../../../src/lib/ai-first-plan-envelope-expand.ts),
+  [structured authoring](../../../src/lib/structured-plan-authoring.ts),
+  [Plan Presets](../../../src/lib/plan-presets/),
+  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts),
+  [imported plan contract](../../../src/lib/imported-plan.ts),
+  [active plan persistence](../../../src/lib/active-plan-persistence.ts),
+  [text authoring](../../../src/lib/openai-plan-authoring.ts),
+  [voice authoring](../../../src/lib/voice-to-plan-authoring.ts),
+  [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts),
+  [plan replacement actions](../../../src/lib/plan-replacement-actions.ts),
+  [plan-authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts),
+  [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts), and
+  [Plan Preset harnesses](../../../scripts/plan-presets/).
+- `package.json` still exposes the stable ops commands:
+  `author-ai-first-plan-draft`, `seed-ai-first-plan-blueprint-proof`,
+  `author-plan-from-text`, `validate-admin-capture-backlog`, and
+  `import-admin-backlog-work-items`.
+- Reference proof showed the old strict nested `ai-first-plan-draft-v1` prompt/schema/normalizer
+  functions are used by [plan-authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts),
+  while product runtime imports from [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts)
+  are type/metadata dependencies for blueprint trace/result metadata.
+- `npm run author-ai-first-plan-draft -- --contract strict-draft` is already bounded as an
+  unsupported ops contract by the script parser; routine service/action/script paths expose only
+  blueprint or envelope draft contracts.
+
+Source map:
+
+| Path / seam | Current role | Evidence | Classification | Decision |
+| --- | --- | --- | --- | --- |
+| Plan Presets (`plan_preset_v1`) | canonical no-active-plan happy path | [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) review/confirm through [active plan persistence](../../../src/lib/active-plan-persistence.ts); [Onboarding gate](../../../src/components/OnboardingGate.tsx) calls preset server actions | product runtime | Keep; out of deletion scope while builder QA is in flight |
+| AI first-plan blueprint (`ai_first_plan_blueprint_v1`) | production advanced/custom first-plan draft path | [first-plan actions](../../../src/lib/first-plan-actions.ts) defaults to blueprint through [AI draft service](../../../src/lib/ai-first-plan-draft-service.ts) | production default for custom AI path | Keep; must not weaken default |
+| AI first-plan envelope (`ai_first_plan_envelope_v1`) | explicit internal non-default structured draft option | [first-plan actions](../../../src/lib/first-plan-actions.ts) accepts internal envelope contract; no public selector | internal supported path | Keep; no production promotion |
+| Strict nested AI draft (`ai-first-plan-draft-v1`) | historical full draft prompt/schema/normalizer | [doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) imports prompt/normalizer; runtime imports only shared type/metadata from the same file | QA/doctrine historical path plus stale runtime coupling | Selected first demotion gate |
+| Deterministic structured authoring (`structured_authoring_v1`) | deterministic canonical generator and legacy/readback source | [structured authoring](../../../src/lib/structured-plan-authoring.ts) feeds blueprint fallback scaffolds, envelope expansion, active refresh, voice/text paths, and doctrine fixtures | production support / legacy compatibility | Keep; do not reintroduce as successful first-plan fallback |
+| Text rich authoring | saved-mode text replacement path | [plan replacement actions](../../../src/lib/plan-replacement-actions.ts) calls [OpenAI text authoring](../../../src/lib/openai-plan-authoring.ts), then canonical persistence | production non-default path | Keep; audit later only after source map narrows |
+| Voice-to-plan | Pro transcript first-plan assist | [first-plan actions](../../../src/lib/first-plan-actions.ts) dynamically imports [voice authoring](../../../src/lib/voice-to-plan-authoring.ts) and preserves review/confirm | production non-default path | Keep |
+| Active-plan refresh/apply | explicit reviewed mutation for existing active plans | [training API facade](../../../src/lib/training-api.ts) binds server actions to [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts) | product runtime mutation path | Keep; not plan-creation deletion scope |
+| JSON import/apply and text replacement | advanced import/replacement fallback | [plan replacement actions](../../../src/lib/plan-replacement-actions.ts) and [imported plan contract](../../../src/lib/imported-plan.ts) feed [active plan persistence](../../../src/lib/active-plan-persistence.ts) | product runtime / migration support | Keep |
+| Active plan persistence | canonical create/apply owner | [active plan persistence](../../../src/lib/active-plan-persistence.ts) owns `applyImportedPlanForUser(...)` and `createFirstPlanFromReviewedCanonicalPlanForUser(...)` | canonical persistence | Never deletion target in this strike |
+| `author-ai-first-plan-draft` ops script | blueprint/envelope diagnostics and live/mock smoke | [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) calls the service and rejects strict-draft selection | ops/diagnostic path | Keep; later narrow only if diagnostics duplicate another command |
+| Doctrine validator | broad safety harness for authoring, refresh, rich drafts, blueprint/envelope, and legacy coverage | [plan-authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) is large but protects multiple contracts | QA harness | Decompose later; do not delete |
+| `training-api.ts` facade | compatibility server-action import map | [training API facade](../../../src/lib/training-api.ts) re-exports extracted owners for routes/components | legacy compatibility facade | Narrow later only after import-map proof |
+
+Candidate table:
+
+| Candidate | Why considered | Why not / risk | Gate decision |
+| --- | --- | --- | --- |
+| Demote strict nested `ai-first-plan-draft-v1` | It is the clearest historical first-plan authoring path: strict-draft is no longer selectable, and the prompt/normalizer are only doctrine-harness behavior | Shared metadata/trace types still live in the same runtime file, so raw deletion would break blueprint/envelope/runtime type imports | Approved as first demotion gate with type/metadata extraction first |
+| Delete/demote `structured_authoring_v1` references | Old source kind remains visible in several places | It remains deterministic generator/readback compatibility and must not become a first-plan success fallback | Forbidden for first gate |
+| Decompose `validate-plan-authoring-doctrine.ts` | 7k+ line hotspot | It is a safety harness, not runtime bloat; deletion would weaken QA | Later decomposition slice only |
+| Narrow `training-api.ts` re-exports | It is a broad compatibility facade | Route/serverFn import eligibility can break if narrowed too early | Later import-map slice |
+| Delete Plan Preset recipe/builder files | Current family code is large | Current Plan Preset builder is in-flight and user-visible creation depends on it | Forbidden for this gate |
+| Delete ops scripts | They are not product runtime | Blueprint/envelope live/mock diagnostics still provide release-gate proof | Keep for now |
+
+Selected deletion/demotion gate:
+
+`BACKEND Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime ownership`.
+
+Next owner:
+
+BACKEND.
+
+Scope approved for Slice 10A:
+
+- Extract shared AI first-plan metadata and blueprint trace types out of
+  [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) into a
+  small product-owned metadata/trace module.
+- Update blueprint, envelope/service, first-plan action, and ops-script type imports to depend on
+  that shared metadata module instead of the strict nested draft module.
+- Move or isolate the strict nested `ai-first-plan-draft-v1` prompt/schema/normalizer into
+  doctrine-only ownership so its validation value remains available to
+  [plan-authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) without
+  presenting it as a routine runtime authoring seam.
+- Preserve the stable doctrine validator entrypoint.
+- Preserve bounded `strict-draft` CLI rejection in
+  [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts).
+- Remove any now-dead product-runtime source-kind branch only after source scans prove no runtime
+  path can emit it.
+
+Explicitly out of scope for Slice 10A:
+
+- Plan Preset runtime, builder CSV artifacts, resolver, review, confirm, persistence, or frontend.
+- Blueprint default behavior, prompt, validation, repair, horizon extension, or smoke contract.
+- Envelope internal/non-default behavior or exact review/confirm proof.
+- `structured_authoring_v1` legacy readback, deterministic generator, or compatibility metadata.
+- Text authoring, voice-to-plan, active-plan refresh/apply, JSON import/apply, and canonical
+  persistence.
+- Browser QA, DB/schema changes, migrations, Supabase mutation, or frontend changes.
+
+Validation expected for Slice 10A:
+
+- Source proof:
+  `rg "ai-first-plan-draft-authoring|ai-first-plan-draft-v1|strict_draft|strict-draft" src scripts package.json`.
+- Import proof:
+  product runtime no longer imports strict nested prompt/schema/normalizer ownership, while doctrine
+  harness still can validate historical strict nested fixtures.
+- `npm exec eslint -- src/lib/ai-first-plan-*.ts src/lib/first-plan-actions.ts scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/first-plan-release-gates.ts scripts/author-ai-first-plan-draft.ts`.
+- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`.
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`.
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope`.
+- `npm run author-ai-first-plan-draft -- --contract strict-draft` must remain bounded
+  `unsupported_contract`.
+- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`.
+- `git diff --check`.
+- `npm run build`.
+
+### Slice 7: Package Manager Signal Cleanup
 
 Owner:
 
@@ -1265,7 +2990,7 @@ Scope:
 - remove mixed lockfile signal if safe
 - validate build if package metadata changes
 
-### Slice 5: `training-api.ts` Import Map And First Narrowing
+### Slice 8: `training-api.ts` Import Map And First Narrowing
 
 Owner:
 
@@ -1277,7 +3002,7 @@ Scope:
 - move one safe action group to direct owner imports
 - remove dead re-export only when no imports remain
 
-### Slice 6: Plan-Creation Path Classification
+### Slice 9: Plan-Creation Path Classification
 
 Owner:
 
@@ -1285,11 +3010,13 @@ ARCHITECT / BACKEND
 
 Scope:
 
-- classify all plan creation/mutation/review paths
-- select one deletion/demotion candidate
-- define exact validation gate
+- classification completed in `Slice 9: Plan-Creation Source Map And First Deletion Gate`
+- selected first gate is strict nested `ai-first-plan-draft-v1` demotion from product runtime
+  ownership
+- current Plan Preset builder QA gate is resolved, so this is the next approved service-size cleanup
+  step
 
-### Slice 7: First Code Deletion/Demotion
+### Slice 10: First Code Deletion/Demotion
 
 Owner:
 
@@ -1297,10 +3024,11 @@ BACKEND
 
 Scope:
 
-- delete or demote exactly one approved stale/legacy seam
+- execute `BACKEND Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime
+  ownership`
 - preserve blueprint, Plan Preset, review/confirm, persistence, and metric-truth behavior
 
-### Slice 8: Script/Validator Decomposition
+### Slice 11: Script/Validator Decomposition
 
 Owner:
 
@@ -1312,7 +3040,7 @@ Scope:
 - keep command stable
 - preserve assertions
 
-### Slice 9: Hito DS Wrapper Usage Audit
+### Slice 12: Hito DS Wrapper Usage Audit
 
 Owner:
 
@@ -1324,7 +3052,28 @@ Scope:
 - delete unused wrappers only with source proof
 - no UI redesign
 
-### Slice 10: Closeout
+Result, 2026-06-08:
+
+- Deleted unused stock shadcn UI wrappers from [UI primitives](../../../src/components/ui/) after
+  import proof showed no live product, admin, Hito DS, script, or package imports.
+- Deleted two confirmed-unused helper files:
+  [browser Supabase client](../../../src/lib/supabase/browser.ts) and
+  [workout result import archive helper](../../../src/lib/workout-result-import/archive.ts).
+- Removed only dependencies whose remaining source hits were package metadata or the deleted stock
+  wrappers, including unused form, command, carousel, OTP, resizable, chart, drawer, and unused
+  Radix primitive packages.
+- Preserved live Hito DS/product primitives such as dialog, dropdown menu, popover, select,
+  tooltip, sheet, skeleton, calendar, button, avatar, progress, metadata tag, and Hito-specific
+  date/time/toast/calendar-day components.
+- `package.json` and `package-lock.json` were updated through npm package-lock metadata sync.
+  `bun.lockb` was not regenerated in this environment because the Bun CLI was unavailable; the
+  separate package-manager-signal slice remains the right owner for deciding whether to remove or
+  canonicalize the Bun lockfile.
+- Validation for this slice: targeted ESLint for `src/components`, `src/lib`, and `package.json`,
+  Admin Backlog deterministic validator, import/dead-code proof scans, `git diff --check`, and
+  production build.
+
+### Slice 13: Closeout
 
 Owner:
 
@@ -1358,6 +3107,13 @@ Browser QA:
 - Safari fallback only when needed by QA policy
 - for Slice 3A, check both `/admin/analytics` and `/admin/capture` so the shared shell does not
   regress on either side
+- for Slice 3C, check both `/admin/analytics` and `/admin/capture` for sidebar brand baseline,
+  compact page headers, contextual actions, bottom-left admin account menu, mobile layout, and no
+  horizontal overflow
+- for Slice 3D, check `/hitoDS` across Overview, Foundations, Components, Patterns, modal/dialog
+  playground, calendar/workout playground, and any Live View/equivalent section; verify shared
+  playground anatomy, stable sidebar/nav behavior, reduced nested borders/cards, shared
+  captions/footers, reachable controls, preserved deep links, and 375px mobile no-overflow
 
 ## Risks
 
@@ -1372,6 +3128,17 @@ Browser QA:
   fixing Admin Backlog visibility.
 - Leaving Admin shell/helper copy route-local would keep Work items feeling like a separate app even
   after the unified work-item model is implemented.
+- Keeping global utilities in the page header would make contextual Admin actions unclear and could
+  conflict with future debugger/capture-overlay entry points.
+- Treating `/hitoDS` state coverage as visual approval would keep shipping heavy, nested specimen
+  layouts that contradict the product's low-card direction.
+- Creating a new playground framework instead of normalizing the existing Hito DS specimen/sidebar
+  seams would add another UI system to maintain.
+- Treating fixed 10/12/16 week Plan Preset fixtures as the product target would preserve
+  template-like, support-heavy plans and hide training-quality risk across all shipped preset
+  families.
+- Encoding body-size/load adjustment without Running Coach doctrine could create unsafe,
+  body-shaming, or medically suggestive product behavior.
 
 ## Exit Criteria
 
@@ -1381,6 +3148,14 @@ Browser QA:
   archived plans are distinguishable without duplicate wrapper markdown.
 - Admin analytics, users/test accounts, and Work items share one stable Admin shell/navigation
   contract with one selected item and one consistent helper pattern.
+- Admin chrome separates sidebar identity, page title/subtitle, contextual section actions, and
+  account/profile actions without oversized workspace banners or route-specific shell cards.
+- `/hitoDS` playgrounds share one workbench anatomy for section header, preview/stage, controls, and
+  caption/footer; they avoid nested card soup and preserve stable nested navigation.
+- No-watch/unknown execution support is no longer a normal new-plan onboarding option, while legacy
+  `none`, `unknown`, and `effort_only` readback remains bounded compatibility.
+- Plan Preset shipped-family quality is either rebuilt through the rich adaptive program model or
+  explicitly paused with current fixed-duration presets classified as insufficient quality.
 - Package-manager signal is singular and documented.
 - `training-api.ts` has fewer compatibility responsibilities or an explicit remaining-export map.
 - Plan creation paths are classified by production/internal/ops/QA/legacy/delete status.
@@ -1392,8 +3167,26 @@ Browser QA:
 ## Blockers
 
 - No blocker for Slice 1 docs/source-of-truth cleanup.
-- Product-code cleanup is blocked until Slice 3B classifies and stages/commits or explicitly
-  excludes remaining dirty/untracked work.
+- Product-code cleanup is no longer blocked by Admin simplification dirty work; Slice 3B committed
+  and pushed the scoped Admin simplification work.
+- Remaining dirty instruction/skill updates and older untracked active-plan docs must stay outside
+  watch-required implementation unless the user separately approves committing or resolving them.
 - Admin Backlog importer dry-run now completes cleanly after the stale PDF active file was removed.
   Live import was not run because the dry-run reported no required mirror changes.
 - Admin shell/navigation unification is implemented and QA-passed.
+- Slice 3C Admin chrome refinement is implemented and QA-passed.
+- Slice 3D `/hitoDS` playground consistency normalization is implemented, QA-passed, and
+  design-approved.
+- Backend Slice 6 card-to-review QA follow-up is implemented locally:
+  - fixed the resolver/review-builder contract gap where `reviewReady: true` cards could fail
+    `buildPlanPresetReviewDraftContract(...)`
+  - kept 2-day 10K supported with conservative recovery-first composition instead of unsafe forced
+    midweek specificity
+  - kept 2-day Half review-ready cases supported by using long-run steady-finish specificity rather
+    than placing controlled tempo on the protected post-long-run slot
+  - expanded structured preparation horizon validation to support the 25-week marathon beginner
+    preset scenario instead of silently truncating it
+  - added full source-matrix review-ready harness coverage: 36 review-ready scenarios, 0 draft-build
+    failures
+  - Plan Preset CSV artifacts are now resolved through source and packaged output candidates, with
+    build finalizer copy/validation retained for local and Vercel output

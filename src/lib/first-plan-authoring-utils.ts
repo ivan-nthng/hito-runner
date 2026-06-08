@@ -45,6 +45,11 @@ export const DEFAULT_FIRST_PLAN_EXECUTION_MODE: FirstPlanExecutionMode = {
   guidancePreference: "effort",
 };
 
+export const DEFAULT_SUPPORTED_FIRST_PLAN_EXECUTION_MODE: FirstPlanExecutionMode = {
+  watchAccess: "watch_or_app",
+  guidancePreference: "effort",
+};
+
 export function normalizeFirstPlanExecutionMode(
   value:
     | Partial<{
@@ -58,6 +63,22 @@ export function normalizeFirstPlanExecutionMode(
     watchAccess: value?.watchAccess ?? DEFAULT_FIRST_PLAN_EXECUTION_MODE.watchAccess,
     guidancePreference:
       value?.guidancePreference ?? DEFAULT_FIRST_PLAN_EXECUTION_MODE.guidancePreference,
+  };
+}
+
+export function normalizeSupportedFirstPlanExecutionMode(
+  value:
+    | Partial<{
+        watchAccess: FirstPlanWatchAccess | null;
+        guidancePreference: FirstPlanGuidancePreference | null;
+      }>
+    | null
+    | undefined,
+): FirstPlanExecutionMode {
+  return {
+    watchAccess: DEFAULT_SUPPORTED_FIRST_PLAN_EXECUTION_MODE.watchAccess,
+    guidancePreference:
+      value?.guidancePreference ?? DEFAULT_SUPPORTED_FIRST_PLAN_EXECUTION_MODE.guidancePreference,
   };
 }
 

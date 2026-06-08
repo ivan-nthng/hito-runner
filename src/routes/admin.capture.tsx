@@ -2,7 +2,7 @@ import { Link, createFileRoute, redirect, useRouter } from "@tanstack/react-rout
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  AdminWorkspaceMobileNav,
+  AdminWorkspacePageHeader,
   AdminWorkspaceSidebar,
 } from "@/components/admin/AdminWorkspaceNav";
 import {
@@ -505,47 +505,20 @@ function AdminCapturePage() {
         <AdminWorkspaceSidebar activeSection="work-items" />
 
         <section className="hito-workbench-main">
-          <header className="hito-workbench-topbar">
-            <div className="flex flex-col gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
-              <div className="min-w-0">
-                <div className="hito-workbench-location lg:hidden">
-                  <span className="hito-workbench-location-title">Admin workspace</span>
-                  <span className="hito-workbench-location-meta">
-                    <span>Work items</span>
-                    <span aria-hidden="true">/</span>
-                    <span>{formatStatusLabel(search.status)}</span>
-                  </span>
-                </div>
-                <p className="hito-micro-label">Admin workspace</p>
-                <h1 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-                  Work items
-                </h1>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  Review repo work items, active plans, specs, briefs, and admin notes for manual
-                  handoff.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-start gap-2 lg:items-center">
-                <QuickNotePanel
-                  quickNote={quickNote}
-                  setQuickNote={setQuickNote}
-                  onSubmit={submitQuickNote}
-                  variant="header"
-                />
-                <Link to="/" className="hito-button hito-button-secondary hito-button-md">
-                  Back to Hito
-                </Link>
-                <a
-                  href="/api/admin/auth/logout?next=%2Fadmin%2Fcapture"
-                  className="hito-button hito-button-ghost hito-button-md"
-                >
-                  <Icon name="logout" size="sm" />
-                  Sign out
-                </a>
-              </div>
-            </div>
-            <AdminWorkspaceMobileNav activeSection="work-items" />
-          </header>
+          <AdminWorkspacePageHeader
+            activeSection="work-items"
+            title="Work items"
+            description="Review repo work items, active plans, specs, briefs, and admin notes for manual handoff."
+            mobileMeta={formatStatusLabel(search.status)}
+            action={
+              <QuickNotePanel
+                quickNote={quickNote}
+                setQuickNote={setQuickNote}
+                onSubmit={submitQuickNote}
+                variant="header"
+              />
+            }
+          />
 
           <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
             {!result.ok ? (

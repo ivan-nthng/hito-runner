@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { Icon } from "@/components/ui/icon";
 import { HitoCalendarDayCell, HitoWorkoutDayRow } from "@/components/ui/hito-calendar-day";
+import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import {
   Select,
   SelectContent,
@@ -45,84 +46,30 @@ export function CalendarWorkoutPlayground() {
     };
 
   return (
-    <section id="calendar-workout-playground" className="ds-section">
-      <div className="hito-specimen-header">
-        <SectionIntroLite
-          label="Calendar playground"
-          title="Calendar and workout-day states."
-          body="Static DS specimens for month cells, mobile workout rows, result markers, evidence markers, density, title stress, and future manual authoring affordances."
-        />
-        <span className="hito-status-pill" data-tone="rollout">
-          Specimen only
-        </span>
-      </div>
-
-      <div className="hito-specimen">
-        <details className="hito-disclosure" open>
-          <summary className="hito-disclosure-summary">
-            <span>Playground controls</span>
-            <Icon name="chevron-down" className="hito-disclosure-chevron" />
-          </summary>
-          <div className="hito-disclosure-body">
-            <ControlsBody state={state} setField={setField} />
-          </div>
-        </details>
-
-        <article className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
-            <div className="min-w-0">
-              <p className="hito-micro-label">
-                {state.viewMode === "desktop" ? "Desktop preview" : "Mobile preview"}
-              </p>
-              <h3 className="hito-list-row-title mt-1">
-                {state.density === "dense" ? "Density stress" : "Controlled day state"}
-              </h3>
-              <p className="hito-list-row-copy mt-1 max-w-3xl">
-                One controlled calendar/workout preview. Future authoring affordances are visual
-                only and do not create, edit, copy, paste, repeat, or persist workouts.
-              </p>
-            </div>
-            <span className="hito-status-pill" data-tone="neutral" data-icon="false">
-              Static display only
-            </span>
-          </div>
-
-          <div className="mt-4 min-w-0">
-            {state.viewMode === "desktop" ? (
-              <DesktopCalendarPreview state={state} title={previewTitle} workout={workout} />
-            ) : (
-              <MobileCalendarPreview state={state} title={previewTitle} workout={workout} />
-            )}
-          </div>
-        </article>
-
-        <div className="hito-specimen-contract">
-          {[
-            {
-              label: "Use for",
-              body: "Calendar day anatomy, mobile workout-day rows, marker hierarchy, row-height stress, and visual-only future add/more affordance placeholders.",
-            },
-            {
-              label: "Do not use for",
-              body: "Schedule rules, workout mutation, copy/paste behavior, recurrence expansion, protected-history decisions, or persistence.",
-            },
-            {
-              label: "States",
-              body: "Workout, rest, empty, outside-month, today, selected, focus, completed, partial, skipped, evidence, feedback, occupied-day more placeholder, and empty-day add placeholder.",
-            },
-            {
-              label: "Used in",
-              body: "/hitoDS reference only. Product calendar remains owned by Calendar.tsx and backend-shaped plan/workout truth.",
-            },
-          ].map((row) => (
-            <div key={row.label} className="hito-specimen-contract-row">
-              <p className="hito-micro-label">{row.label}</p>
-              <p className="hito-list-row-copy">{row.body}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
+    <HitoDsPlayground
+      id="calendar-workout-playground"
+      label="Calendar playground"
+      title="Calendar and workout-day states."
+      body="Static DS specimens for day cells, mobile rows, result markers, evidence markers, density, and visual-only authoring affordances."
+      status="Specimen only"
+      statusTone="rollout"
+      controls={<ControlsBody state={state} setField={setField} />}
+      preview={<CalendarPreviewStage state={state} title={previewTitle} workout={workout} />}
+      caption={[
+        {
+          label: "Proves",
+          body: "Shared day-cell and mobile-row anatomy, marker hierarchy, density stress, and add/more affordance placement.",
+        },
+        {
+          label: "Does not imply",
+          body: "Workout creation, copy/paste, recurrence, protected-history decisions, schedule rules, or persistence.",
+        },
+        {
+          label: "Used in",
+          body: "Static /hitoDS reference plus the shared visual seam consumed by the product calendar.",
+        },
+      ]}
+    />
   );
 }
 
@@ -195,12 +142,38 @@ function ControlsBody({
   );
 }
 
-function SectionIntroLite({ label, title, body }: { label: string; title: string; body: string }) {
+function CalendarPreviewStage({
+  state,
+  title,
+  workout,
+}: {
+  state: CalendarPlaygroundState;
+  title: string;
+  workout: WorkoutIdentity;
+}) {
   return (
-    <div className="max-w-3xl">
-      <p className="hito-label">{label}</p>
-      <h2 className="hito-section-title mt-2">{title}</h2>
-      <p className="hito-support-copy mt-3">{body}</p>
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
+        <div className="min-w-0">
+          <p className="hito-label">
+            {state.viewMode === "desktop" ? "Desktop preview" : "Mobile preview"}
+          </p>
+          <h3 className="hito-list-row-title mt-1">
+            {state.density === "dense" ? "Density stress" : "Controlled day state"}
+          </h3>
+        </div>
+        <span className="hito-status-pill" data-tone="neutral" data-icon="false">
+          Static display only
+        </span>
+      </div>
+
+      <div className="mt-4 min-w-0">
+        {state.viewMode === "desktop" ? (
+          <DesktopCalendarPreview state={state} title={title} workout={workout} />
+        ) : (
+          <MobileCalendarPreview state={state} title={title} workout={workout} />
+        )}
+      </div>
     </div>
   );
 }

@@ -36,6 +36,7 @@ Create precise next-role prompts that preserve Hito decisions and avoid scope dr
 - Write the exact next-role execution prompt in English by default.
 - Do not mix Russian into execution prompts unless the user explicitly requests a Russian prompt.
 - Render existing `Plan file` values as clickable markdown links with absolute workspace paths, not inline code or plain text.
+- Render any referenced plan, task, backlog item, frontend spec, archive doc, QA report, or current-doc path as a clickable markdown link with an absolute workspace path.
 - Always name `Task` and `Stage`.
 - Do not assume the next agent remembers chat history.
 - Do not ask an agent to implement outside its role.

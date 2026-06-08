@@ -33,6 +33,8 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - keep scope bounded
 - prefer modular improvements over rewrites
 - protect the trusted output boundary of the project
+- render references to plans, tasks, backlog items, frontend specs, archive docs, QA reports, and
+  similar project documents as clickable Markdown links with absolute workspace paths
 - when handing work to QA, frame QA as the direct validation owner that may use safe CLI, browser,
   build, script, screenshot, fixture, and local/test tooling needed for the assigned scope
 

@@ -1,83 +1,21 @@
-import type { TrainingPlanV2 } from "@/lib/imported-plan";
+import {
+  buildPlanPresetAlgorithmicDraft,
+  validatePlanPresetAlgorithmicInput,
+} from "@/lib/plan-presets/algorithmic-builder";
 import { getPlanPresetRecipe } from "@/lib/plan-presets/recipes";
+import {
+  normalizeScenarioRunnerLevel,
+  resolvePlanPresetProgram,
+} from "@/lib/plan-presets/program-data";
 import {
   planPresetEligibilityInputSchema,
   type PlanPresetCardId,
   type PlanPresetEligibilityInput,
-  type PlanPresetRecipeId,
   type PlanPresetReviewDraftContract,
 } from "@/lib/plan-presets/schema";
 import { resolvePlanPresetCards } from "@/lib/plan-presets/resolver";
-import {
-  buildStructuredFirstPlanAuthoringInput,
-  type StructuredFirstPlanAuthoringInput,
-} from "@/lib/structured-first-plan-onboarding";
-import {
-  buildTenKFoundationAuthoringInput,
-  buildTenKFoundationCanonicalPlan,
-  TEN_K_FOUNDATION_GUARDRAIL_SUMMARY,
-  TEN_K_FOUNDATION_PRESET_ID,
-  validateTenKFoundationInput,
-} from "@/lib/plan-presets/recipe-expanders/10k-foundation";
-import {
-  buildHalfMarathonBalancedAuthoringInput,
-  buildHalfMarathonBalancedCanonicalPlan,
-  HALF_MARATHON_BALANCED_GUARDRAIL_SUMMARY,
-  HALF_MARATHON_BALANCED_PRESET_ID,
-  validateHalfMarathonBalancedInput,
-} from "@/lib/plan-presets/recipe-expanders/half-marathon-balanced";
-import {
-  buildMarathonBaseAuthoringInput,
-  buildMarathonBaseCanonicalPlan,
-  MARATHON_BASE_GUARDRAIL_SUMMARY,
-  MARATHON_BASE_PRESET_ID,
-  validateMarathonBaseInput,
-} from "@/lib/plan-presets/recipe-expanders/marathon-base";
+import { buildStructuredFirstPlanAuthoringInput } from "@/lib/structured-first-plan-onboarding";
 import { countRows, summarizeIdentities } from "@/lib/plan-presets/recipe-expanders/shared";
-
-type PlanPresetRecipeExpander = {
-  recipeId: PlanPresetRecipeId;
-  guardrailSummary: string;
-  validateInput: (input: PlanPresetEligibilityInput) => void;
-  buildAuthoringInput: (
-    sourceInput: StructuredFirstPlanAuthoringInput,
-    horizonWeeks: number,
-  ) => StructuredFirstPlanAuthoringInput;
-  buildCanonicalPlan: (authoringInput: StructuredFirstPlanAuthoringInput) => TrainingPlanV2;
-};
-
-const recipeExpanders = new Map<PlanPresetRecipeId, PlanPresetRecipeExpander>([
-  [
-    TEN_K_FOUNDATION_PRESET_ID,
-    {
-      recipeId: TEN_K_FOUNDATION_PRESET_ID,
-      guardrailSummary: TEN_K_FOUNDATION_GUARDRAIL_SUMMARY,
-      validateInput: validateTenKFoundationInput,
-      buildAuthoringInput: buildTenKFoundationAuthoringInput,
-      buildCanonicalPlan: buildTenKFoundationCanonicalPlan,
-    },
-  ],
-  [
-    HALF_MARATHON_BALANCED_PRESET_ID,
-    {
-      recipeId: HALF_MARATHON_BALANCED_PRESET_ID,
-      guardrailSummary: HALF_MARATHON_BALANCED_GUARDRAIL_SUMMARY,
-      validateInput: validateHalfMarathonBalancedInput,
-      buildAuthoringInput: buildHalfMarathonBalancedAuthoringInput,
-      buildCanonicalPlan: buildHalfMarathonBalancedCanonicalPlan,
-    },
-  ],
-  [
-    MARATHON_BASE_PRESET_ID,
-    {
-      recipeId: MARATHON_BASE_PRESET_ID,
-      guardrailSummary: MARATHON_BASE_GUARDRAIL_SUMMARY,
-      validateInput: validateMarathonBaseInput,
-      buildAuthoringInput: buildMarathonBaseAuthoringInput,
-      buildCanonicalPlan: buildMarathonBaseCanonicalPlan,
-    },
-  ],
-]);
 
 export function buildPlanPresetReviewDraftContract({
   cardId,
@@ -93,15 +31,7 @@ export function buildPlanPresetReviewDraftContract({
     throw new Error("Plan preset recipe is not available.");
   }
 
-  const expander = recipeExpanders.get(recipe.recipeId);
-
-  if (!expander) {
-    throw new Error(
-      "Plan preset draft expansion is currently implemented only for 10K Foundation, Half Marathon Balanced, and Marathon Base.",
-    );
-  }
-
-  expander.validateInput(parsedInput);
+  validatePlanPresetAlgorithmicInput({ recipe, input: parsedInput });
 
   const eligibility = resolvePlanPresetCards(parsedInput);
   const selectedCard = eligibility.cards.find((card) => card.cardId === cardId);
@@ -115,11 +45,22 @@ export function buildPlanPresetReviewDraftContract({
   }
 
   const baseAuthoringInput = buildStructuredFirstPlanAuthoringInput(parsedInput);
-  const authoringInput = expander.buildAuthoringInput(
-    baseAuthoringInput,
-    recipe.defaultHorizonWeeks,
-  );
-  const canonicalPlan = expander.buildCanonicalPlan(authoringInput);
+  const runnerLevel = resolveInputRunnerLevel(parsedInput);
+  const program = resolvePlanPresetProgram({
+    recipe,
+    startDate: baseAuthoringInput.schedule.startDate,
+    runnerLevel,
+    daysPerWeek: parsedInput.availability.runningDaysPerWeek,
+    age: parsedInput.profile.age,
+    weightKg: parsedInput.profile.weightKg,
+    heightCm: parsedInput.profile.heightCm,
+  });
+  const { authoringInput, canonicalPlan, diagnostics } = buildPlanPresetAlgorithmicDraft({
+    recipe,
+    sourceInput: baseAuthoringInput,
+    program,
+    runnerLevel: normalizeScenarioRunnerLevel(runnerLevel),
+  });
   const rowCounts = countRows(canonicalPlan);
 
   return {
@@ -137,7 +78,7 @@ export function buildPlanPresetReviewDraftContract({
       runningDaysPerWeek: parsedInput.availability.runningDaysPerWeek,
       fixedRestDays: parsedInput.availability.fixedRestDays,
       preferredLongRunDay: parsedInput.availability.preferredLongRunDay ?? null,
-      horizonWeeks: recipe.defaultHorizonWeeks,
+      horizonWeeks: selectedCard.durationWeeks,
       targetMode: "preset_no_target_date_or_time",
       metricPolicy: recipe.metricPolicySummary,
       durationWeeks: selectedCard.durationWeeks,
@@ -161,9 +102,21 @@ export function buildPlanPresetReviewDraftContract({
       restDays: parsedInput.availability.fixedRestDays,
       safetyAssumptions: [
         "Preset review is non-mutating until explicit confirm.",
-        "Backend recipe truth owns eligibility, metric policy, and row expansion.",
-        expander.guardrailSummary,
+        "Backend Plan Preset builder owns eligibility, metric policy, source-of-truth artifacts, and row expansion.",
+        `${recipe.programFamily} uses deterministic phase, archetype, identity, and segment-anatomy source-of-truth tables.`,
       ],
+      adaptiveProgram: {
+        scenarioId: `${program.scenario.familyId}_${program.scenario.runnerLevel}_${program.scenario.daysPerWeek}d`,
+        programBias: program.scenario.programBias,
+        finalOutcomeRule: program.goalContract.finalOutcomeRequired,
+        progressionConservatism: program.progressionConservatism,
+        impactLoadAdjustment: program.impactLoadContext,
+        longRunRampPolicy: program.longRunRampPolicy,
+        cutbackFrequency: program.cutbackFrequency,
+        moderateTouchCapPerWeek: program.moderateTouchCapPerWeek,
+        delaySharpWork: program.delaySharpWork,
+        loadAdjustmentSummary: `${program.loadAdjustmentSummary} Builder artifacts: ${diagnostics.sourceArtifactTables.join(", ")}. Phases: ${diagnostics.phaseNames.join(", ")}.`,
+      },
       rowCounts,
       identitySummary: summarizeIdentities(canonicalPlan),
     },
@@ -174,6 +127,14 @@ export function buildPlanPresetReviewDraftContract({
       confirmPathImplemented: true,
     },
   };
+}
+
+function resolveInputRunnerLevel(input: PlanPresetEligibilityInput) {
+  if ("fitnessLevel" in input.benchmark && input.benchmark.fitnessLevel) {
+    return input.benchmark.fitnessLevel;
+  }
+
+  return "running_regularly";
 }
 
 function buildWeeklyRhythmSummary({

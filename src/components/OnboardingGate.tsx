@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Icon } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
@@ -9,6 +9,7 @@ import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPla
 import {
   buildStructuredInput,
   buildVoiceSupplementFromConstructorState,
+  isPresetPrimarySetupReady,
   isStructuredConstructorReady,
   resolveTerrainFocus,
   type GoalDistance,
@@ -20,7 +21,7 @@ import {
   voiceResultMessage,
 } from "@/components/onboarding/onboarding-form-model";
 import { type ImportedPlan, validateImportedPlanJson } from "@/lib/imported-plan";
-import type { PlanPresetCardId } from "@/lib/plan-presets/schema";
+import type { PlanPresetCardId, PlanPresetCardRequestInput } from "@/lib/plan-presets/schema";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
@@ -61,6 +62,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
   const voiceTranscriptRef = useRef<HTMLTextAreaElement | null>(null);
   const presetConfirmInFlightRef = useRef(false);
+  const presetAutoLoadKeyRef = useRef<string | null>(null);
 
   const [age, setAge] = useState(() => (defaults?.age != null ? String(defaults.age) : ""));
   const [weightKg, setWeightKg] = useState(() =>
@@ -75,9 +77,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [fixedRestDays, setFixedRestDays] = useState<WeekdayName[]>(
     () => defaults?.trainingPreferences?.blocked_days ?? [],
   );
-  const [restDaysAnswered, setRestDaysAnswered] = useState(() =>
-    Boolean(defaults?.trainingPreferences),
-  );
+  const [restDaysAnswered, setRestDaysAnswered] = useState(true);
   const [maxRunningDaysPerWeek, setMaxRunningDaysPerWeek] = useState(() =>
     defaults?.trainingPreferences?.max_running_days_per_week != null
       ? String(defaults.trainingPreferences.max_running_days_per_week)
@@ -92,8 +92,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [startDate, setStartDate] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [terrainFocus, setTerrainFocus] = useState<TerrainFocus>("standard");
-  const [watchAccess, setWatchAccess] =
-    useState<StructuredConstructorState["watchAccess"]>("unknown");
+  const watchAccess: StructuredConstructorState["watchAccess"] = "watch_or_app";
   const [guidancePreference, setGuidancePreference] =
     useState<StructuredConstructorState["guidancePreference"]>("effort");
   const [strengthPreference, setStrengthPreference] = useState<StrengthPreference>("none");
@@ -110,6 +109,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     useState<PlanPresetReviewDraftActionResult | null>(null);
   const [presetConfirmResult, setPresetConfirmResult] =
     useState<PlanPresetConfirmActionResult | null>(null);
+  const [presetSelectedCardId, setPresetSelectedCardId] = useState<PlanPresetCardId | null>(null);
   const [presetReviewedCardId, setPresetReviewedCardId] = useState<PlanPresetCardId | null>(null);
   const [presetError, setPresetError] = useState<string | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState("");
@@ -157,6 +157,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     terrainFocus: resolveTerrainFocus(goalDistance, terrainFocus),
   };
   const isConstructorReady = isStructuredConstructorReady(constructorState);
+  const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
+  const presetCardInput = buildPlanPresetCardInput(effectiveConstructorState);
+  const presetDiscoveryKey = buildPlanPresetCardInputKey(presetCardInput);
 
   const validateJsonDraft = validateJsonDraftFactory({
     setJsonError,
@@ -169,33 +172,17 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   };
 
   useEffect(() => {
-    setPresetCardsResult(null);
+    presetAutoLoadKeyRef.current = null;
     setPresetReviewResult(null);
     setPresetConfirmResult(null);
     setPresetReviewedCardId(null);
     setPresetError(null);
     presetConfirmInFlightRef.current = false;
-  }, [
-    age,
-    weightKg,
-    heightCm,
-    fitnessLevel,
-    recent5kTime,
-    fixedRestDays,
-    restDaysAnswered,
-    maxRunningDaysPerWeek,
-    preferredLongRunDay,
-    goalDistance,
-    goalStyle,
-    targetTime,
-    startDate,
-    targetDate,
-    terrainFocus,
-    watchAccess,
-    guidancePreference,
-    strengthPreference,
-    comment,
-  ]);
+
+    if (!presetSelectedCardId) {
+      setPresetCardsResult(null);
+    }
+  }, [presetDiscoveryKey, presetSelectedCardId]);
 
   const clearStructuredReview = () => {
     setStructuredDraftResult(null);
@@ -415,19 +402,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     setPresetError(null);
     setPresetReviewResult(null);
     setPresetConfirmResult(null);
+    setPresetSelectedCardId(null);
     setPresetReviewedCardId(null);
 
     try {
-      const inputResult = buildStructuredInput(effectiveConstructorState);
-
-      if (!inputResult.ok) {
-        setPresetError(inputResult.error);
-        return;
-      }
-
       setPresetStatus("loading_cards");
       const result = await getPlanPresetCardsFn({
-        data: inputResult.input,
+        data: buildPlanPresetCardInput(effectiveConstructorState),
       });
 
       setPresetCardsResult(result);
@@ -444,14 +425,58 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }
   };
 
+  const autoLoadPlanPresetCards = useEffectEvent(() => {
+    void loadPlanPresetCards();
+  });
+
+  useEffect(() => {
+    if (
+      setupMode !== "quick" ||
+      !isPresetDiscoveryReady ||
+      presetStatus !== "idle" ||
+      presetCardsResult
+    ) {
+      return;
+    }
+
+    if (presetAutoLoadKeyRef.current === presetDiscoveryKey) {
+      return;
+    }
+
+    presetAutoLoadKeyRef.current = presetDiscoveryKey;
+    autoLoadPlanPresetCards();
+  }, [
+    setupMode,
+    isPresetDiscoveryReady,
+    presetStatus,
+    presetCardsResult,
+    presetDiscoveryKey,
+    autoLoadPlanPresetCards,
+  ]);
+
+  const selectPlanPresetForRefinement = (cardId: PlanPresetCardId) => {
+    setPresetError(null);
+    setPresetReviewResult(null);
+    setPresetConfirmResult(null);
+    setPresetReviewedCardId(null);
+    setPresetSelectedCardId(cardId);
+    window.requestAnimationFrame(() =>
+      structuredFormRef.current?.querySelector("[data-preset-refinement]")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      }),
+    );
+  };
+
   const reviewPlanPreset = async (cardId: PlanPresetCardId) => {
     setPresetError(null);
     setPresetReviewResult(null);
     setPresetConfirmResult(null);
     setPresetReviewedCardId(null);
+    setPresetSelectedCardId(cardId);
 
     try {
-      const inputResult = buildStructuredInput(effectiveConstructorState);
+      const inputResult = buildPlanPresetStructuredInput(effectiveConstructorState, cardId);
 
       if (!inputResult.ok) {
         setPresetError(inputResult.error);
@@ -502,7 +527,10 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     });
 
     try {
-      const inputResult = buildStructuredInput(effectiveConstructorState);
+      const inputResult = buildPlanPresetStructuredInput(
+        effectiveConstructorState,
+        presetReviewedCardId,
+      );
 
       if (!inputResult.ok) {
         presetConfirmInFlightRef.current = false;
@@ -734,7 +762,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             setStartDate,
             setTargetDate,
             setTerrainFocus,
-            setWatchAccess,
             setGuidancePreference,
             setStrengthPreference,
             setComment,
@@ -753,7 +780,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           onBackToEdit={() => {
             clearStructuredReview();
           }}
-          planPresetPanel={
+          planPresetPanel={({ openAdvancedCustom }) => (
             <PlanPresetPanel
               cardsResult={presetCardsResult}
               reviewResult={presetReviewResult}
@@ -761,10 +788,30 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
               error={presetError}
               status={presetStatus}
               isBusy={isBusy}
-              isConstructorReady={isConstructorReady}
+              isPresetDiscoveryReady={isPresetDiscoveryReady}
+              selectedCardId={presetSelectedCardId}
               reviewedCardId={presetReviewedCardId}
+              refinementState={{
+                fixedRestDays,
+                restDaysAnswered,
+                maxRunningDaysPerWeek,
+                preferredLongRunDay,
+                fitnessLevel,
+                recent5kTime,
+              }}
+              refinementSetters={{
+                setFixedRestDays,
+                setRestDaysAnswered,
+                setMaxRunningDaysPerWeek,
+                setPreferredLongRunDay,
+                setFitnessLevel,
+                setRecent5kTime,
+              }}
               onLoadCards={() => {
                 void loadPlanPresetCards();
+              }}
+              onSelectCard={(cardId) => {
+                selectPlanPresetForRefinement(cardId);
               }}
               onReviewCard={(cardId) => {
                 void reviewPlanPreset(cardId);
@@ -772,11 +819,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
               onConfirmReview={() => {
                 void confirmPlanPreset();
               }}
-              onUseAdvancedCustom={() => {
-                void submitStructuredReview();
-              }}
+              onUseAdvancedCustom={openAdvancedCustom}
             />
-          }
+          )}
         />
       )}
 
@@ -818,6 +863,135 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       </details>
     </section>
   );
+}
+
+const PLAN_PRESET_CARD_LIST_GOAL_DISTANCE: Extract<GoalDistance, "build_consistency"> =
+  "build_consistency";
+
+const PLAN_PRESET_CARD_GOAL_DISTANCE: Record<
+  PlanPresetCardId,
+  Extract<GoalDistance, "10k" | "half_marathon" | "marathon">
+> = {
+  "10k": "10k",
+  half_marathon: "half_marathon",
+  marathon: "marathon",
+};
+
+function buildPlanPresetCardInput(state: StructuredConstructorState): PlanPresetCardRequestInput {
+  const age = optionalPlanPresetNumber(state.age, { min: 13, max: 100, integer: true });
+  const weightKg = optionalPlanPresetNumber(state.weightKg, { min: 30, max: 250 });
+  const heightCm = optionalPlanPresetNumber(state.heightCm, { min: 120, max: 230, integer: true });
+  const runningDaysPerWeek = optionalPlanPresetNumber(state.maxRunningDaysPerWeek, {
+    min: 1,
+    max: 7,
+    integer: true,
+  });
+  const recent5kTime = state.recent5kTime.trim();
+  const targetTime = state.targetTime.trim();
+  const targetDate = state.targetDate.trim();
+  const startDate = state.startDate.trim();
+  const comment = state.comment.trim();
+
+  return {
+    profile: {
+      age,
+      weightKg,
+      heightCm,
+    },
+    benchmark: {
+      fitnessLevel: state.fitnessLevel,
+      recent5kTime: recent5kTime || null,
+    },
+    availability: {
+      runningDaysPerWeek,
+      fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
+      preferredLongRunDay: state.preferredLongRunDay || null,
+    },
+    goal: {
+      goalDistance: state.goalDistance,
+      goalStyle: state.goalStyle,
+      terrainFocus: state.terrainFocus,
+      targetTime: targetTime || null,
+      targetDate: targetDate || null,
+    },
+    execution: {
+      watchAccess: state.watchAccess,
+      guidancePreference: state.guidancePreference,
+    },
+    strength: {
+      preference: state.strengthPreference,
+    },
+    schedule: {
+      startDate: startDate || null,
+      targetDate: targetDate || null,
+    },
+    comment: comment || null,
+  };
+}
+
+function buildPlanPresetCardInputKey(input: PlanPresetCardRequestInput) {
+  return JSON.stringify(input);
+}
+
+function buildPlanPresetStructuredInput(
+  state: StructuredConstructorState,
+  cardId?: PlanPresetCardId,
+) {
+  return buildStructuredInput(buildPlanPresetConstructorState(state, cardId));
+}
+
+// Preset v1 still validates through structured setup input; cardId remains the preset authority.
+function buildPlanPresetConstructorState(
+  state: StructuredConstructorState,
+  cardId?: PlanPresetCardId,
+): StructuredConstructorState {
+  return {
+    ...state,
+    fitnessLevel: state.fitnessLevel,
+    recent5kPace: "",
+    goalDistance: cardId
+      ? PLAN_PRESET_CARD_GOAL_DISTANCE[cardId]
+      : PLAN_PRESET_CARD_LIST_GOAL_DISTANCE,
+    goalStyle: "balanced",
+    targetTime: "",
+    startDate: "",
+    targetDate: "",
+    terrainFocus: "standard",
+    guidancePreference: "effort",
+    strengthPreference: "none",
+    comment: "",
+  };
+}
+
+function optionalPlanPresetNumber(
+  value: string,
+  {
+    min,
+    max,
+    integer = false,
+  }: {
+    min: number;
+    max: number;
+    integer?: boolean;
+  },
+) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    return null;
+  }
+
+  if (integer && !Number.isInteger(parsed)) {
+    return null;
+  }
+
+  return parsed;
 }
 
 function withStructuredReviewTimeout<T>(run: () => Promise<T>) {

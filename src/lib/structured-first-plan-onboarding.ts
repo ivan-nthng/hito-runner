@@ -9,7 +9,7 @@ import {
   formatGoalStyle,
   guidancePreferenceToPreferredEffortLanguage,
   isRealIsoDate,
-  normalizeFirstPlanExecutionMode,
+  normalizeSupportedFirstPlanExecutionMode,
   parseDurationSeconds,
   parsePaceSecondsPerKm,
   pickEvenly,
@@ -296,10 +296,21 @@ export function parseStructuredFirstPlanOnboardingInput(value: unknown) {
   return result.data;
 }
 
-export function buildStructuredFirstPlanAuthoringInput(
+export function normalizeSupportedStructuredFirstPlanOnboardingInput(
   rawInput: StructuredFirstPlanOnboardingInput | StructuredFirstPlanOnboardingRequestInput,
 ) {
   const input = structuredFirstPlanOnboardingInputSchema.parse(rawInput);
+
+  return {
+    ...input,
+    execution: normalizeSupportedFirstPlanExecutionMode(input.execution),
+  };
+}
+
+export function buildStructuredFirstPlanAuthoringInput(
+  rawInput: StructuredFirstPlanOnboardingInput | StructuredFirstPlanOnboardingRequestInput,
+) {
+  const input = normalizeSupportedStructuredFirstPlanOnboardingInput(rawInput);
   const fixedRestDays = uniqueWeekdays(input.availability.fixedRestDays);
   const allowedWeekdays = deriveAvailableTrainingWeekdays(fixedRestDays);
   const preferredLongRunDay =
@@ -315,7 +326,7 @@ export function buildStructuredFirstPlanAuthoringInput(
   const startDate =
     input.schedule?.startDate ?? deriveStartDateForTrainingWeekdays(preferredRunningDays);
   const terrainFocus = normalizeTerrainFocus(input.goal);
-  const execution = normalizeFirstPlanExecutionMode(input.execution);
+  const execution = normalizeSupportedFirstPlanExecutionMode(input.execution);
   const targetDate =
     input.goal.goalStyle === "target_time"
       ? (input.schedule?.targetDate ?? input.goal.targetDate ?? null)
@@ -392,13 +403,15 @@ export function buildStructuredFirstPlanProfilePatch(
 }
 
 export function buildStructuredFirstPlanResultContext(input: StructuredFirstPlanOnboardingInput) {
+  const normalizedInput = normalizeSupportedStructuredFirstPlanOnboardingInput(input);
+
   return {
-    benchmarkKind: input.benchmark.kind,
-    hasComment: Boolean(input.comment?.trim()),
-    terrainFocus: normalizeTerrainFocus(input.goal),
-    execution: normalizeFirstPlanExecutionMode(input.execution),
-    fixedRestDays: uniqueWeekdays(input.availability.fixedRestDays),
-    runningDaysPerWeek: input.availability.runningDaysPerWeek,
+    benchmarkKind: normalizedInput.benchmark.kind,
+    hasComment: Boolean(normalizedInput.comment?.trim()),
+    terrainFocus: normalizeTerrainFocus(normalizedInput.goal),
+    execution: normalizedInput.execution,
+    fixedRestDays: uniqueWeekdays(normalizedInput.availability.fixedRestDays),
+    runningDaysPerWeek: normalizedInput.availability.runningDaysPerWeek,
   };
 }
 
@@ -421,6 +434,7 @@ export function buildStructuredFirstPlanDraftReview(
   canonicalPlan: TrainingPlanV2,
   authoringInput: StructuredFirstPlanAuthoringInput,
 ): StructuredFirstPlanDraftReview {
+  const reviewInput = normalizeSupportedStructuredFirstPlanOnboardingInput(input);
   const fixedRestDays = uniqueWeekdays(authoringInput.availability.unavailableDays);
   const horizonWeeks =
     authoringInput.schedule.preparationHorizonWeeks ??
@@ -429,13 +443,13 @@ export function buildStructuredFirstPlanDraftReview(
 
   return {
     runnerUnderstanding: {
-      profile: `${input.profile.age} years old, ${input.profile.weightKg} kg, ${input.profile.heightCm} cm.`,
-      benchmark: formatBenchmarkReview(input.benchmark),
+      profile: `${reviewInput.profile.age} years old, ${reviewInput.profile.weightKg} kg, ${reviewInput.profile.heightCm} cm.`,
+      benchmark: formatBenchmarkReview(reviewInput.benchmark),
       goal: authoringInput.goal.goalLabel,
       availability: `${authoringInput.availability.maxRunningDaysPerWeek} running day(s) per week${
         fixedRestDays.length ? `, fixed rest on ${fixedRestDays.join(", ")}` : ""
       }.`,
-      execution: formatExecutionReview(input),
+      execution: formatExecutionReview(reviewInput),
     },
     planShape: {
       durationLabel: authoringInput.schedule.targetDate
@@ -450,9 +464,9 @@ export function buildStructuredFirstPlanDraftReview(
       workoutCount: canonicalPlan.planned_workouts.length,
       longRunDay: authoringInput.availability.preferredLongRunDay ?? null,
       qualityRhythm: buildQualityRhythm(canonicalPlan, authoringInput),
-      metricPolicy: buildMetricPolicyReview(input),
+      metricPolicy: buildMetricPolicyReview(reviewInput),
     },
-    assumptions: buildStructuredReviewAssumptions(input, authoringInput),
+    assumptions: buildStructuredReviewAssumptions(reviewInput, authoringInput),
     safetyNotes: [
       "Nothing has been created yet.",
       "Creating the plan requires explicit confirmation.",
@@ -479,19 +493,17 @@ function formatBenchmarkReview(benchmark: StructuredFirstPlanOnboardingInput["be
 }
 
 function formatExecutionReview(input: StructuredFirstPlanOnboardingInput) {
-  const execution = normalizeFirstPlanExecutionMode(input.execution);
-  const watchLabel =
-    execution.watchAccess === "watch_or_app"
-      ? "watch or app available"
-      : execution.watchAccess === "none"
-        ? "no watch or app targets"
-        : "watch/app access unknown";
+  const execution = normalizeSupportedFirstPlanExecutionMode(input.execution);
 
-  return `${formatGuidancePreference(execution.guidancePreference)} guidance with ${watchLabel}.`;
+  return `${formatGuidancePreference(
+    execution.guidancePreference,
+  )} guidance with watch/app execution assumed.`;
 }
 
 function formatGuidancePreference(
-  preference: NonNullable<ReturnType<typeof normalizeFirstPlanExecutionMode>["guidancePreference"]>,
+  preference: NonNullable<
+    ReturnType<typeof normalizeSupportedFirstPlanExecutionMode>["guidancePreference"]
+  >,
 ) {
   switch (preference) {
     case "pace":
@@ -733,7 +745,7 @@ function hasReviewTargetTimePressure(authoringInput: StructuredFirstPlanAuthorin
 }
 
 function buildMetricPolicyReview(input: StructuredFirstPlanOnboardingInput) {
-  const execution = normalizeFirstPlanExecutionMode(input.execution);
+  const execution = normalizeSupportedFirstPlanExecutionMode(input.execution);
   const hasBenchmark = input.benchmark.kind !== "unknown";
   const hasAge = typeof input.profile.age === "number";
   const hasWatchExecution = execution.watchAccess === "watch_or_app";
@@ -770,7 +782,7 @@ function buildStructuredReviewAssumptions(
   authoringInput: StructuredFirstPlanAuthoringInput,
 ) {
   const assumptions = [];
-  const execution = normalizeFirstPlanExecutionMode(input.execution);
+  const execution = normalizeSupportedFirstPlanExecutionMode(input.execution);
 
   if (input.benchmark.kind === "unknown") {
     assumptions.push(

@@ -2,6 +2,8 @@ import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import type { NormalizedStructuredInput } from "@/lib/structured-plan-authoring-schema";
 import type { BuildWorkoutContext } from "@/lib/structured-plan-authoring-workouts";
 import {
+  hasLongRunInWeek,
+  hasSafeSpecificCandidateInWeek,
   replaceLongRunWithSteadyFinish,
   replaceSpecificWorkoutInWeek,
 } from "@/lib/plan-presets/recipe-expanders/shared";
@@ -76,25 +78,99 @@ export function applyPlanPresetCompositionSteps({
   normalized,
   recipeLabel,
   steps,
+  specificTouchIdentities,
 }: {
   workouts: TrainingPlanV2["planned_workouts"];
   normalized: NormalizedStructuredInput;
   recipeLabel: string;
   steps: readonly PlanPresetCompositionStep[];
+  specificTouchIdentities?: ReadonlySet<string>;
 }) {
   return steps.reduce<TrainingPlanV2["planned_workouts"]>((nextWorkouts, step) => {
+    const weekNumber = resolveSafeCompositionWeek({
+      workouts: nextWorkouts,
+      requestedWeekNumber: step.weekNumber,
+      stepKind: step.kind,
+      specificTouchIdentities,
+    });
+
     if (step.kind === "long_run_steady_finish") {
-      return replaceLongRunWithSteadyFinish(nextWorkouts, normalized, step.weekNumber, recipeLabel);
+      return replaceLongRunWithSteadyFinish(nextWorkouts, normalized, weekNumber, recipeLabel);
     }
 
     return replaceSpecificWorkoutInWeek(
       nextWorkouts,
       normalized,
-      step.weekNumber,
+      weekNumber,
       step.buildWorkout,
       step.label,
     );
   }, workouts);
+}
+
+function resolveSafeCompositionWeek({
+  workouts,
+  requestedWeekNumber,
+  stepKind,
+  specificTouchIdentities,
+}: {
+  workouts: TrainingPlanV2["planned_workouts"];
+  requestedWeekNumber: number;
+  stepKind: PlanPresetCompositionStep["kind"];
+  specificTouchIdentities?: ReadonlySet<string>;
+}) {
+  if (!specificTouchIdentities) {
+    return requestedWeekNumber;
+  }
+
+  const weekNumbers = Array.from(new Set(workouts.map((workout) => workout.week_number))).sort(
+    (left, right) => left - right,
+  );
+  const finalWeek = weekNumbers.at(-1) ?? requestedWeekNumber;
+  const candidateWeeks = weekNumbers
+    .filter((weekNumber) => weekNumber > 1 && weekNumber < finalWeek)
+    .sort(
+      (left, right) =>
+        Math.abs(left - requestedWeekNumber) - Math.abs(right - requestedWeekNumber) ||
+        left - right,
+    );
+
+  return (
+    candidateWeeks.find((weekNumber) =>
+      canApplyCompositionStepInWeek({
+        workouts,
+        weekNumber,
+        stepKind,
+        specificTouchIdentities,
+      }),
+    ) ?? requestedWeekNumber
+  );
+}
+
+function canApplyCompositionStepInWeek({
+  workouts,
+  weekNumber,
+  stepKind,
+  specificTouchIdentities,
+}: {
+  workouts: TrainingPlanV2["planned_workouts"];
+  weekNumber: number;
+  stepKind: PlanPresetCompositionStep["kind"];
+  specificTouchIdentities: ReadonlySet<string>;
+}) {
+  const alreadyHasSpecificTouch = workouts.some(
+    (workout) =>
+      workout.week_number === weekNumber &&
+      specificTouchIdentities.has(planPresetWorkoutIdentity(workout) ?? ""),
+  );
+
+  if (alreadyHasSpecificTouch) {
+    return false;
+  }
+
+  return stepKind === "long_run_steady_finish"
+    ? hasLongRunInWeek(workouts, weekNumber)
+    : hasSafeSpecificCandidateInWeek(workouts, weekNumber);
 }
 
 export function assertPlanPresetComposition(

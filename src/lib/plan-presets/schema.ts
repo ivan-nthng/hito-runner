@@ -1,22 +1,102 @@
+import { z } from "zod";
 import type { CanonicalExecutableMode, HrTargetSource } from "@/lib/rich-workout-model";
+import {
+  FIRST_PLAN_GOAL_DISTANCE_VALUES,
+  FIRST_PLAN_GOAL_STYLE_VALUES,
+  FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES,
+  FIRST_PLAN_TERRAIN_FOCUS_VALUES,
+  FIRST_PLAN_WATCH_ACCESS_VALUES,
+} from "@/lib/first-plan-authoring-utils";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
+import { FITNESS_LEVEL_VALUES } from "@/lib/runner-training-preferences";
 import {
   structuredFirstPlanOnboardingInputSchema,
   type StructuredFirstPlanAuthoringInput,
   type StructuredFirstPlanOnboardingInput,
   type StructuredFirstPlanOnboardingRequestInput,
 } from "@/lib/structured-first-plan-onboarding";
-import type { WeekdayName } from "@/lib/weekday-rest-invariants";
+import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
 
 export const planPresetEligibilityInputSchema = structuredFirstPlanOnboardingInputSchema;
 
+const weekdayNameSchema = z.enum(WEEKDAY_NAMES);
+
+export const planPresetCardInputSchema = z
+  .object({
+    profile: z
+      .object({
+        age: z.number().int().min(13).max(100).optional().nullable(),
+        weightKg: z.number().positive().max(300).optional().nullable(),
+        heightCm: z.number().positive().max(260).optional().nullable(),
+      })
+      .partial()
+      .optional()
+      .nullable(),
+    benchmark: z
+      .object({
+        fitnessLevel: z.enum(FITNESS_LEVEL_VALUES).optional().nullable(),
+        recent5kTime: z.string().trim().optional().nullable(),
+      })
+      .partial()
+      .optional()
+      .nullable(),
+    availability: z
+      .object({
+        runningDaysPerWeek: z.number().int().min(1).max(7).optional().nullable(),
+        fixedRestDays: z.array(weekdayNameSchema).max(6).optional().nullable(),
+        preferredLongRunDay: weekdayNameSchema.optional().nullable(),
+      })
+      .partial()
+      .optional()
+      .nullable(),
+    goal: z
+      .object({
+        goalDistance: z.enum(FIRST_PLAN_GOAL_DISTANCE_VALUES).optional().nullable(),
+        goalStyle: z.enum(FIRST_PLAN_GOAL_STYLE_VALUES).optional().nullable(),
+        terrainFocus: z.enum(FIRST_PLAN_TERRAIN_FOCUS_VALUES).optional().nullable(),
+        targetTime: z.string().trim().optional().nullable(),
+        targetDate: z.string().trim().optional().nullable(),
+      })
+      .partial()
+      .optional()
+      .nullable(),
+    execution: z
+      .object({
+        watchAccess: z.enum(FIRST_PLAN_WATCH_ACCESS_VALUES).optional().nullable(),
+        guidancePreference: z.enum(FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES).optional().nullable(),
+      })
+      .partial()
+      .optional()
+      .nullable(),
+    strength: z
+      .object({
+        preference: z.enum(["none", "mobility", "strength"]).optional().nullable(),
+      })
+      .partial()
+      .optional()
+      .nullable(),
+    schedule: z
+      .object({
+        startDate: z.string().trim().optional().nullable(),
+        targetDate: z.string().trim().optional().nullable(),
+      })
+      .partial()
+      .optional()
+      .nullable(),
+    comment: z.string().trim().optional().nullable(),
+  })
+  .strict();
+
 export type PlanPresetEligibilityInput = StructuredFirstPlanOnboardingInput;
 export type PlanPresetEligibilityRequestInput = StructuredFirstPlanOnboardingRequestInput;
+export type PlanPresetCardInput = z.output<typeof planPresetCardInputSchema>;
+export type PlanPresetCardRequestInput = z.input<typeof planPresetCardInputSchema>;
 
 export const PLAN_PRESET_CARD_STATE_VALUES = [
   "recommended",
   "available",
   "needs_more_info",
+  "not_ideal",
   "custom_fit",
   "unavailable",
 ] as const;
@@ -27,6 +107,7 @@ export const PLAN_PRESET_RESULT_CODE_VALUES = [
   "eligible_recommended",
   "eligible_available",
   "needs_more_info",
+  "not_ideal",
   "correction_required",
   "custom_recommended",
   "unavailable",
@@ -39,10 +120,15 @@ export const PLAN_PRESET_REASON_CODE_VALUES = [
   "target_time_present",
   "material_comment_present",
   "injury_or_pain_signal",
-  "missing_watch_app_support",
+  "workout_type_removal_requested",
+  "missing_minimum_profile",
+  "missing_weekly_days",
   "missing_required_profile",
   "insufficient_availability",
   "fixed_rest_conflict",
+  "long_run_conflict",
+  "level_too_low_for_family",
+  "excess_availability_for_recipe",
   "unsupported_goal",
   "metric_truth_insufficient_for_target",
   "recipe_not_available",
@@ -85,6 +171,14 @@ export interface PlanPresetRecipeSummary {
 export interface PlanPresetReason {
   code: PlanPresetReasonCode;
   message: string;
+}
+
+export interface PlanPresetPostSelectionRefinement {
+  requiredBeforeReview: boolean;
+  reason: PlanPresetReason | null;
+  requiredFields: string[];
+  optionalFields: string[];
+  defaultSummary: string[];
 }
 
 export interface PlanPresetMetricTruthSummary {
@@ -133,6 +227,8 @@ export interface PlanPresetCardViewModel extends PlanPresetProgramSummaryFields 
   disabledReason: PlanPresetReason | null;
   customRoutingReason: PlanPresetReason | null;
   requiredMissingFields: string[];
+  reviewReady: boolean;
+  postSelectionRefinement: PlanPresetPostSelectionRefinement | null;
   reviewBeforeCreateRequired: true;
 }
 
@@ -190,6 +286,18 @@ export interface PlanPresetReviewDraftContract {
     weeklyRhythmSummary: string;
     restDays: WeekdayName[];
     safetyAssumptions: string[];
+    adaptiveProgram: {
+      scenarioId: string;
+      programBias: string;
+      finalOutcomeRule: string;
+      progressionConservatism: string;
+      impactLoadAdjustment: string;
+      longRunRampPolicy: string;
+      cutbackFrequency: string;
+      moderateTouchCapPerWeek: number;
+      delaySharpWork: boolean;
+      loadAdjustmentSummary: string;
+    };
     rowCounts: {
       calendarRows: number;
       nonRestRows: number;

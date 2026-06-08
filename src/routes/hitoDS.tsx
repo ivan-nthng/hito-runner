@@ -54,6 +54,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { CalendarWorkoutPlayground } from "@/components/hito-ds/calendar-workout-playground";
+import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import { cn } from "@/lib/utils";
@@ -673,6 +674,7 @@ function HitoDesignSystemPage() {
     };
 
     updateFromHash();
+    const hashSyncTimer = window.setTimeout(updateFromHash, 120);
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -700,6 +702,7 @@ function HitoDesignSystemPage() {
     window.addEventListener("hashchange", updateFromHash);
 
     return () => {
+      window.clearTimeout(hashSyncTimer);
       observer.disconnect();
       window.removeEventListener("hashchange", updateFromHash);
     };
@@ -2987,7 +2990,7 @@ function HitoDesignSystemPage() {
               </div>
             </section>
 
-            <SpecimenSection
+            <HitoDsPlayground
               id="modals"
               label="Modals"
               title="Bounded panel, explicit body mode, reachable footer."
@@ -3047,22 +3050,14 @@ function HitoDesignSystemPage() {
                   />
                 </div>
               }
-              contract={[
+              caption={[
                 {
-                  label: "Use for",
+                  label: "Proves",
                   body: "Bounded tasks, review-before-apply flows, imports, body notes, active-plan management, and source-backed read-only explanations.",
                 },
                 {
-                  label: "Do not use for",
+                  label: "Does not imply",
                   body: "Global navigation, passive page sections, dashboard cards, or silent mutations. Use inline state when the task does not need interruption.",
-                },
-                {
-                  label: "Variants",
-                  body: "Body modes are content-fit and scroll-fill. Headers are compact or large. Footers can be none, actions, or note-actions.",
-                },
-                {
-                  label: "States",
-                  body: "Open overlay/content boundaries stay explicit for Safari stability; destructive scenarios are copy and button tone, not a separate window style.",
                 },
                 {
                   label: "Used in",
@@ -3078,77 +3073,19 @@ function HitoDesignSystemPage() {
                   ),
                 },
               ]}
-            >
-              <div className="mt-6 grid gap-5">
-                <div className="hito-reference-list">
-                  <ReferenceListRow
-                    label="Body mode"
-                    title="content-fit"
-                    body="Use for short dialogs. The body does not stretch just to manufacture height, so the footer sits directly after the task content."
-                  />
-                  <ReferenceListRow
-                    label="Body mode"
-                    title="scroll-fill"
-                    body="Use for long workflows. The bounded panel keeps the footer reachable while the middle region scrolls internally."
-                  />
-                  <ReferenceListRow
-                    label="Safari stable"
-                    title="Overlay and content state stay explicit"
-                    body="Open dialogs remain visible in viewport; closed overlays become transparent and non-blocking."
-                  />
-                </div>
+            />
 
-                <div className="grid gap-5 lg:grid-cols-2">
-                  <div className="hito-row-group">
-                    <ReferenceListRow
-                      label="Header"
-                      title="Compact or large"
-                      body="Compact fits short tasks. Large can carry one label, status pill, or short description for lifecycle-heavy dialogs."
-                    />
-                    <ReferenceListRow
-                      label="Header"
-                      title="Close stays on the right"
-                      body="The close affordance remains reachable and separate from primary task completion."
-                    />
-                  </div>
-                  <div className="hito-row-group">
-                    <ReferenceListRow
-                      label="Footer"
-                      title="No footer, actions, or note + actions"
-                      body="Read-only windows can omit the footer. Focused workflows use cancel + primary. One short note may explain save/apply context."
-                    />
-                    <ReferenceListRow
-                      label="Mutation"
-                      title="Explicit task completion"
-                      body="Keep current plan and Apply update are explicit choices, never silent mutation."
-                    />
-                  </div>
-                </div>
-              </div>
-            </SpecimenSection>
-
-            <section id="async-actions" className="ds-section">
-              <SectionIntro
-                label="Async action toasts"
-                title="Progress without taking over."
-                body="Use this pattern for long-running actions where the runner needs global progress and a short outcome, while validation, proposal review, and stale explanations stay inline."
-              />
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="hito-row-group">
-                  <div className="hito-list-row items-start">
-                    <div>
-                      <p className="hito-list-row-title">DS toast variants</p>
-                      <p className="hito-list-row-copy">
-                        Use these controls to render the real top-center Hito toast primitive. The
-                        dismiss control lives inside the toast anatomy, and the working variant is
-                        dismiss-only without cancelling server work.
-                      </p>
-                    </div>
-                    <span className="hito-status-pill" data-tone="signal">
-                      Primitive
-                    </span>
-                  </div>
-                  <div className="hito-list-row items-start">
+            <HitoDsPlayground
+              id="async-actions"
+              label="Async action toasts"
+              title="Progress without taking over."
+              body="Use this pattern for long-running actions that need global progress and a short outcome while validation and review stay inline."
+              status="Primitive"
+              statusTone="signal"
+              controls={
+                <div className="grid gap-5">
+                  <div className="grid gap-3">
+                    <p className="hito-label">Toast variant</p>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -3188,15 +3125,10 @@ function HitoDesignSystemPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="hito-list-row items-start">
-                    <div>
-                      <p className="hito-list-row-title">Resolve in place</p>
-                      <p className="hito-list-row-copy">
-                        These demos start with a working toast, then replace that same action-family
-                        toast id with success or error so older outcomes cannot mask the latest one.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-2">
+
+                  <div className="hito-section-divider grid gap-3 pt-4">
+                    <p className="hito-label">Resolve in place</p>
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         className="hito-button hito-button-ghost hito-button-sm"
@@ -3214,32 +3146,38 @@ function HitoDesignSystemPage() {
                     </div>
                   </div>
                 </div>
-
-                <article className="hito-surface-flat p-5">
-                  <p className="hito-label">Current demo state</p>
-                  <h3 className="hito-panel-title mt-3">
-                    {describeToastDemoState(toastDemoState).title}
-                  </h3>
-                  <p className="hito-support-copy mt-3">
-                    {describeToastDemoState(toastDemoState).description}
-                  </p>
-                </article>
-              </div>
-              <div className="hito-row-group mt-5">
-                <div className="hito-list-row items-start">
+              }
+              preview={
+                <div className="grid gap-4">
+                  <span className="hito-status-pill justify-self-start" data-tone="signal">
+                    Top-center toast
+                  </span>
                   <div>
-                    <p className="hito-list-row-title">V1 contract</p>
-                    <p className="hito-list-row-copy">
-                      Top-center, Safari-stable visible state, one active async toast, indeterminate
-                      progress, dismiss only, no cancel, and no fake percentages.
+                    <p className="hito-label">Current demo state</p>
+                    <h3 className="hito-panel-title mt-3">
+                      {describeToastDemoState(toastDemoState).title}
+                    </h3>
+                    <p className="hito-support-copy mt-3 max-w-xl">
+                      {describeToastDemoState(toastDemoState).description}
                     </p>
                   </div>
-                  <span className="hito-status-pill" data-tone="signal">
-                    Bounded
-                  </span>
                 </div>
-              </div>
-            </section>
+              }
+              caption={[
+                {
+                  label: "Proves",
+                  body: "One active async toast, DS-owned dismiss chrome, working-to-result replacement, and distinct info/success/error states.",
+                },
+                {
+                  label: "Does not imply",
+                  body: "Cancellation, fake percentages, mutation authority, or replacing inline validation/review states.",
+                },
+                {
+                  label: "Used in",
+                  body: "Global progress and outcome feedback for bounded async actions.",
+                },
+              ]}
+            />
 
             <section id="states" className="ds-section">
               <SectionIntro

@@ -29,16 +29,24 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 ### 2) Design Task
 
 - create an implementation-ready `.md` spec in `docs/tasks/frontend-specs/`
+- for any large, multi-state, cross-surface, or visually nuanced task, always create or update a
+  detailed plan/spec before handing work to Frontend
+- if the task needs a long prompt, many examples, many states, or nuanced layout/copy decisions,
+  do not compress it into a short response; write the full implementation-ready document
 
 ## Must Do
 
 - define `loading`, `empty`, `error`, and success/review states
+- make large specs as detailed as needed so Frontend can implement without guessing
+- include user flow, screen structure, responsive behavior, component/state inventory, copy intent,
+  data/view-model expectations, edge cases, and acceptance criteria
 - preserve established patterns unless change is justified
 - optimize for clarity and speed
 - design with existing Hito DS primitives, admin/product patterns, and documented component anatomy first
 - name the exact existing primitives/classes/patterns a frontend engineer should reuse
 - if a new primitive or visual pattern seems necessary, propose it explicitly with rationale before asking Frontend to build it
 - prefer simplifying existing surfaces over adding new visual systems
+- link the relevant plan/spec/task files explicitly in reports and handoffs
 
 ## Must Not Do
 

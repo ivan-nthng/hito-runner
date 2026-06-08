@@ -3,6 +3,8 @@ import { buildPlanPresetReviewDraftContract } from "../../src/lib/plan-presets/e
 import {
   assertDraftRejected,
   assertDraftProgramSummary,
+  assertAdaptiveProgramMetadata,
+  assertFinalWeekIdentity,
   assertHasPaceTargets,
   assertLongRunDayPreserved,
   assertNoForbiddenIdentities,
@@ -55,17 +57,15 @@ function validateDraftContractShape() {
   assert.equal(draftContract.presetVersion, "v1");
   assert.equal(draftContract.persisted, false);
   assert.equal(draftContract.canonicalPlan.source_kind, "plan_preset_v1");
-  assert.equal(draftContract.canonicalPlan.planned_workouts.length, 70);
-  assert.equal(draftContract.reviewShape.rowCounts.calendarRows, 70);
   assert.equal(draftContract.reviewShape.targetMode, "preset_no_target_date_or_time");
   assertDraftProgramSummary(draftContract, {
-    durationWeeks: 10,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-08-16",
     daysPerWeek: 3,
     longRunDay: "Saturday",
     programFamily: "10K Foundation",
   });
+  assertAdaptiveProgramMetadata(draftContract);
+  assert.equal(draftContract.reviewShape.adaptiveProgram.scenarioId, "10k_foundation_beginner_3d");
   assert.equal(draftContract.safety.doesNotCallOpenAi, true);
   assert.equal(draftContract.safety.doesNotMutatePlan, true);
   assert.equal(draftContract.safety.persistsNothing, true);
@@ -100,17 +100,15 @@ function validateTenKFoundationNoBenchmarkDraft() {
   assert.equal(draft.metricTruth.executableMode, "structure_only_executable");
   assert.equal(draft.metricTruth.paceTargetsAllowed, false);
   assert.equal(draft.metricTruth.hrTargetsAllowed, false);
-  assert.equal(draft.reviewShape.rowCounts.weekCount, 10);
-  assert.equal(draft.reviewShape.rowCounts.calendarRows, 70);
-  assert.equal(draft.reviewShape.rowCounts.nonRestRows, 30);
   assertDraftProgramSummary(draft, {
-    durationWeeks: 10,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-08-16",
     daysPerWeek: 3,
     longRunDay: "Saturday",
     programFamily: "10K Foundation",
   });
+  assertAdaptiveProgramMetadata(draft);
+  assert.equal(draft.reviewShape.adaptiveProgram.finalOutcomeRule.includes("10K"), true);
+  assertFinalWeekIdentity(draft, "tenk_completion_or_checkpoint");
   assertNoFixedRestWorkoutLeaks(draft, ["Wednesday", "Sunday"]);
   assertLongRunDayPreserved(draft, "Saturday");
   assertPostLongRunNextRunRecoveryOrEasy(draft);
@@ -148,17 +146,14 @@ function validateTenKFoundationBenchmarkDraft() {
   assert.equal(draft.metricTruth.executableMode, "pace_executable");
   assert.equal(draft.metricTruth.paceTargetsAllowed, true);
   assert.equal(draft.metricTruth.hrTargetsAllowed, false);
-  assert.equal(draft.reviewShape.rowCounts.weekCount, 10);
-  assert.equal(draft.reviewShape.rowCounts.calendarRows, 70);
-  assert.equal(draft.reviewShape.rowCounts.nonRestRows, 40);
   assertDraftProgramSummary(draft, {
-    durationWeeks: 10,
     startDate: "2026-06-08",
-    estimatedEndDate: "2026-08-16",
     daysPerWeek: 4,
     longRunDay: "Saturday",
     programFamily: "10K Foundation",
   });
+  assertAdaptiveProgramMetadata(draft);
+  assertFinalWeekIdentity(draft, "tenk_completion_or_checkpoint");
   assertNoFixedRestWorkoutLeaks(draft, ["Wednesday", "Sunday"]);
   assertLongRunDayPreserved(draft, "Saturday");
   assertPostLongRunNextRunRecoveryOrEasy(draft);
@@ -189,11 +184,20 @@ function validateStartDateRecomputesEndDateWithoutRowCountDrift() {
   });
 
   assert.equal(firstStart.reviewShape.startDate, "2026-06-08");
-  assert.equal(firstStart.reviewShape.estimatedEndDate, "2026-08-16");
   assert.equal(changedStart.reviewShape.startDate, "2026-06-15");
-  assert.equal(changedStart.reviewShape.estimatedEndDate, "2026-08-23");
-  assert.equal(firstStart.reviewShape.rowCounts.calendarRows, 70);
-  assert.equal(changedStart.reviewShape.rowCounts.calendarRows, 70);
+  assert.equal(
+    Date.parse(changedStart.reviewShape.estimatedEndDate) -
+      Date.parse(firstStart.reviewShape.estimatedEndDate),
+    7 * 24 * 60 * 60 * 1000,
+  );
+  assert.equal(
+    firstStart.reviewShape.rowCounts.calendarRows,
+    firstStart.reviewShape.durationWeeks * 7,
+  );
+  assert.equal(
+    changedStart.reviewShape.rowCounts.calendarRows,
+    changedStart.reviewShape.durationWeeks * 7,
+  );
   assert.equal(
     firstStart.reviewShape.rowCounts.nonRestRows,
     changedStart.reviewShape.rowCounts.nonRestRows,

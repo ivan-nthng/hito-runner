@@ -410,48 +410,52 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
     );
   }
 
-  const missingExecutionSurfaceResult = await generateStructuredFirstPlanDraftForUser(
+  const staleExecutionInput = {
+    ...input,
+    execution: { watchAccess: "unknown", guidancePreference: "effort" },
+  } satisfies StructuredFirstPlanOnboardingRequestInput;
+  const normalizedExecutionAuthoringInput =
+    buildStructuredFirstPlanAuthoringInput(staleExecutionInput);
+  const normalizedExecutionBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
+    normalizedExecutionAuthoringInput,
+  );
+  const normalizedExecutionResult = await generateStructuredFirstPlanDraftForUser(
     "doctrine-fixture-user",
-    {
-      ...input,
-      execution: { watchAccess: "unknown", guidancePreference: "effort" },
-    },
+    staleExecutionInput,
     {
       aiPreview: {
         apiKey: "test-openai-key",
         model: "test-ai-first-plan-model",
         timeoutMs: 1_000,
-        fetchImpl: (async () => {
-          throw new Error("missing execution support should stop before OpenAI");
-        }) as typeof fetch,
+        fetchImpl: (async () =>
+          openAiFixtureResponse(
+            "structured-first-plan-blueprint-watch-normalized",
+            normalizedExecutionBlueprint,
+          )) as typeof fetch,
       },
     },
   );
 
   assert.equal(
-    missingExecutionSurfaceResult.ok,
+    normalizedExecutionResult.ok,
     true,
-    "missing execution surface should return a bounded correction result",
+    "stale missing execution surface input should return a bounded draft result",
   );
   assert.equal(
-    missingExecutionSurfaceResult.status,
-    "correction_required",
-    "missing execution surface should not enter AI draft generation",
+    normalizedExecutionResult.status,
+    "draft_ready",
+    "stale missing execution surface input should normalize into supported blueprint generation",
   );
 
-  if (
-    missingExecutionSurfaceResult.ok &&
-    missingExecutionSurfaceResult.status === "correction_required"
-  ) {
+  if (normalizedExecutionResult.ok && normalizedExecutionResult.status === "draft_ready") {
     assert.equal(
-      missingExecutionSurfaceResult.reason,
-      "missing_executable_target_support",
-      "missing execution surface should expose the executable target support reason",
+      normalizedExecutionResult.draft.authoringInput.execution.watchAccess,
+      "watch_or_app",
+      "supported new-plan generation should normalize execution surface server-side",
     );
-    assert.deepEqual(
-      missingExecutionSurfaceResult.correction.fields,
-      ["execution.watchAccess"],
-      "missing execution surface correction should point at watch access",
+    assertStructureOnlyExecutableContract(
+      normalizedExecutionResult.draft.canonicalPlan,
+      "structured first-plan stale execution input normalized executable contract",
     );
   }
 

@@ -12,7 +12,7 @@ import {
   HitoEditableDateChip,
   HitoMaskedTimeField,
 } from "@/components/ui/hito-date-time-input";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type HitoIconName } from "@/components/ui/icon";
 import {
   Dialog,
   DialogContent,
@@ -28,17 +28,17 @@ import {
   GOAL_DISTANCE_OPTIONS,
   GOAL_STYLE_OPTIONS,
   ONBOARDING_TEXTAREA_CLASS,
+  PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS,
   STRENGTH_OPTIONS,
   TERRAIN_OPTIONS,
-  WATCH_ACCESS_OPTIONS,
   formatTerrainFocus,
+  normalizePresetPrimaryFitnessLevel,
   type GuidancePreference,
   type GoalDistance,
   type GoalStyle,
   type StrengthPreference,
   type StructuredConstructorState,
   type TerrainFocus,
-  type WatchAccess,
   type WeekdayName,
 } from "./onboarding-form-model";
 import type { StructuredFirstPlanDraftResult } from "@/lib/training-api";
@@ -75,7 +75,6 @@ interface StructuredPlanConstructorProps {
     setStartDate: (value: string) => void;
     setTargetDate: (value: string) => void;
     setTerrainFocus: (value: TerrainFocus) => void;
-    setWatchAccess: (value: WatchAccess) => void;
     setGuidancePreference: (value: GuidancePreference) => void;
     setStrengthPreference: (value: StrengthPreference) => void;
     setComment: (value: string) => void;
@@ -88,7 +87,7 @@ interface StructuredPlanConstructorProps {
   onSubmit: () => void;
   onConfirmDraft: () => void;
   onBackToEdit: () => void;
-  planPresetPanel?: ReactNode;
+  planPresetPanel?: ReactNode | ((actions: { openAdvancedCustom: () => void }) => ReactNode);
 }
 
 export function StructuredPlanConstructor({
@@ -110,15 +109,26 @@ export function StructuredPlanConstructor({
     state.goalDistance === "marathon" || state.goalDistance === "ultra_marathon";
   const impliedMountainTerrain = state.goalDistance === "mountain_running";
   const [activeEditableKey, setActiveEditableKey] = useState<ProfileBasicEditableKey | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(state.fitnessLevel);
   const isDraftReady = draftResult?.ok === true && draftResult.status === "draft_ready";
   const isCorrectionRequired =
     draftResult?.ok === true && draftResult.status === "correction_required";
+  const openAdvancedCustom = () => {
+    setAdvancedOpen(true);
+    window.requestAnimationFrame(() =>
+      formRef.current?.querySelector("[data-advanced-custom]")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      }),
+    );
+  };
 
   return (
     <form
       ref={formRef}
       noValidate
-      className="mt-8 grid gap-8 pb-28"
+      className="mt-6 grid gap-6 pb-28"
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (!isConstructorReady || isBusy || isDraftReady) {
@@ -131,8 +141,9 @@ export function StructuredPlanConstructor({
       <>
         <ConstructorSection
           eyebrow="01"
-          title="About you"
-          body="Add the basics Hito needs to size the plan."
+          title="Basic setup"
+          body="Profile basics unlock backend-owned Plan Preset cards; rhythm can be refined after selection."
+          divider={false}
         >
           <div className="hito-editable-value-chip-group">
             <EditableValueChip
@@ -176,234 +187,312 @@ export function StructuredPlanConstructor({
               unit="kg"
             />
           </div>
-        </ConstructorSection>
 
-        <ConstructorSection
-          eyebrow="02"
-          title="Your week"
-          body="Mark the days you want to keep as rest days."
-        >
-          <TrainingPreferenceFields
-            fixedRestDays={state.fixedRestDays}
-            onFixedRestDaysChange={setState.setFixedRestDays}
-            restDaysAnswered={state.restDaysAnswered}
-            onRestDaysAnsweredChange={setState.setRestDaysAnswered}
-            maxRunningDaysPerWeek={state.maxRunningDaysPerWeek}
-            onMaxRunningDaysPerWeekChange={setState.setMaxRunningDaysPerWeek}
-            preferredLongRunDay={state.preferredLongRunDay}
-            onPreferredLongRunDayChange={setState.setPreferredLongRunDay}
-            preferredLongRunMode="optional-any"
-            showFitnessBenchmark
-            fitnessLevel={state.fitnessLevel}
-            onFitnessLevelChange={(value) => {
-              setState.setFitnessLevel(value);
-              if (value !== "custom") {
-                setState.setRecent5kTime("");
-                setState.setRecent5kPace("");
-              }
-            }}
-            recent5kTime={state.recent5kTime}
-            onRecent5kTimeChange={setState.setRecent5kTime}
-          />
-        </ConstructorSection>
-
-        <ConstructorSection
-          eyebrow="03"
-          title="How you'll follow workouts"
-          body="Choose how Hito should phrase workout guidance."
-        >
-          <Field label="Target tools">
-            <div className="grid gap-2">
-              {WATCH_ACCESS_OPTIONS.map((option) => (
-                <OptionRow
+          <Field
+            label="Running level"
+            helper="Use Advanced custom below if you want to add a recent 5K benchmark."
+          >
+            <OptionGrid label="Running level">
+              {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
+                <OptionButton
                   key={option.value}
-                  active={state.watchAccess === option.value}
+                  active={primaryFitnessLevel === option.value}
+                  icon={fitnessLevelIcon(option.value)}
                   label={option.label}
                   copy={option.copy}
-                  onClick={() => setState.setWatchAccess(option.value)}
+                  onClick={() => {
+                    setState.setFitnessLevel(option.value);
+                    setState.setRecent5kTime("");
+                    setState.setRecent5kPace("");
+                  }}
                 />
               ))}
-            </div>
+            </OptionGrid>
           </Field>
 
-          <Field label="Guidance style">
-            <OptionGrid>
-              {GUIDANCE_PREFERENCE_OPTIONS.map((option) => (
+          <Field
+            label="Available running days per week"
+            helper="Optional before choosing. If you leave this open, the selected preset will ask for rhythm before review."
+          >
+            <OptionGrid label="Available running days per week">
+              {PRESET_RUNNING_DAY_OPTIONS.map((option) => (
                 <OptionButton
                   key={option.value}
-                  active={state.guidancePreference === option.value}
+                  active={state.maxRunningDaysPerWeek === option.value}
                   label={option.label}
                   copy={option.copy}
-                  onClick={() => setState.setGuidancePreference(option.value)}
+                  onClick={() => setState.setMaxRunningDaysPerWeek(option.value)}
                 />
               ))}
             </OptionGrid>
           </Field>
         </ConstructorSection>
 
-        <ConstructorSection
-          eyebrow="04"
-          title="What you're training for"
-          body="Pick the distance and how hard you want the plan to lean."
+        {typeof planPresetPanel === "function"
+          ? planPresetPanel({ openAdvancedCustom })
+          : planPresetPanel}
+
+        <details
+          className="hito-disclosure hito-section-divider pt-6"
+          data-advanced-custom
+          open={advancedOpen}
+          onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
         >
-          <Field label="Goal distance">
-            <OptionGrid>
-              {GOAL_DISTANCE_OPTIONS.map((option) => (
-                <OptionButton
-                  key={option.value}
-                  active={state.goalDistance === option.value}
-                  label={option.label}
-                  onClick={() => setState.setGoalDistance(option.value)}
-                />
-              ))}
-            </OptionGrid>
-          </Field>
+          <summary className="hito-disclosure-summary">
+            <span>
+              <span className="hito-body-small block text-foreground/90">
+                Need a custom program?
+              </span>
+              <span className="mt-1 block hito-helper">
+                Use Advanced for target dates, target times, injury or caution signals, unusual
+                goals, detailed constraints, or guidance preferences.
+              </span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-2">
+              <span className="hito-button hito-button-secondary hito-button-sm pointer-events-none">
+                {advancedOpen ? "Close Advanced custom" : "Open Advanced custom"}
+              </span>
+              <Icon name="chevron-down" className="hito-disclosure-chevron" />
+            </span>
+          </summary>
 
-          <Field label="Goal style">
-            <OptionGrid>
-              {GOAL_STYLE_OPTIONS.map((option) => (
-                <OptionButton
-                  key={option.value}
-                  active={state.goalStyle === option.value}
-                  label={option.label}
-                  onClick={() => setState.setGoalStyle(option.value)}
-                />
-              ))}
-            </OptionGrid>
-          </Field>
-
-          <HitoEditableDateChip
-            label="Plan Start Date"
-            value={state.startDate}
-            onChange={setState.setStartDate}
-            helper="Optional. Leave unset to let Hito choose the default start date."
-          />
-          <input type="hidden" name="schedule.startDate" value={state.startDate} />
-
-          {showsTargetFields ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <HitoMaskedTimeField
-                id="structured-plan-target-time"
-                label="Target time"
-                value={state.targetTime}
-                onChange={setState.setTargetTime}
-                helper="Required. Type digits continuously: 35000 becomes 3:50:00."
-                error={!state.targetTime.trim() ? "Target time is required." : null}
-              />
-              <HitoDateField
-                id="structured-plan-target-date"
-                name="schedule.targetDate"
-                label="Target date"
-                value={state.targetDate}
-                onChange={setState.setTargetDate}
-                helper="Optional. Pick from calendar or type YYYY-MM-DD."
-              />
-            </div>
-          ) : (
-            <p className="hito-field-helper">
-              Hito will estimate a realistic direction from your benchmark, availability, and goal
-              style. No target time is needed for this mode.
-            </p>
-          )}
-
-          {showsTerrainSelector && (
-            <Field label="Terrain focus">
-              <OptionGrid>
-                {TERRAIN_OPTIONS.map((option) => (
-                  <OptionButton
-                    key={option.value}
-                    active={state.terrainFocus === option.value}
-                    label={option.label}
-                    copy={option.copy}
-                    onClick={() => setState.setTerrainFocus(option.value)}
-                  />
-                ))}
-              </OptionGrid>
-            </Field>
-          )}
-
-          {impliedMountainTerrain && (
-            <div className="hito-row-group">
-              <div className="hito-list-row">
-                <div>
-                  <p className="hito-list-row-title">Mountain terrain</p>
+          <div className="hito-disclosure-body gap-8">
+            <div className="hito-surface-wash" data-tone="signal">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="hito-list-row-title">Advanced custom is secondary</p>
                   <p className="hito-list-row-copy">
-                    Mountain running uses mountain terrain context automatically.
+                    This path keeps the full review-before-create flow for target dates, target
+                    times, fixed rest constraints, terrain nuance, guidance preferences, and
+                    detailed comments.
                   </p>
                 </div>
-                <span className="hito-status-pill">Implied</span>
+                <button
+                  type="button"
+                  className="hito-button hito-button-secondary hito-button-sm shrink-0"
+                  onClick={() => {
+                    setAdvancedOpen(false);
+                    window.requestAnimationFrame(() =>
+                      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                    );
+                  }}
+                >
+                  Back to presets
+                </button>
               </div>
             </div>
-          )}
-        </ConstructorSection>
 
-        <ConstructorSection
-          eyebrow="05"
-          title="Extras"
-          body="Add light mobility or strength support if you want it."
-        >
-          <div className="grid gap-2">
-            {STRENGTH_OPTIONS.map((option) => (
-              <OptionRow
-                key={option.value}
-                active={state.strengthPreference === option.value}
-                label={option.label}
-                copy={option.copy}
-                onClick={() => setState.setStrengthPreference(option.value)}
-              />
-            ))}
-          </div>
-        </ConstructorSection>
-
-        <ConstructorSection
-          eyebrow="06"
-          title="Optional comment"
-          body="Add anything small Hito should keep in mind."
-        >
-          <label className="grid gap-2">
-            <span className="hito-form-label">Comment</span>
-            <textarea
-              rows={5}
-              value={state.comment}
-              onChange={(event) => setState.setComment(event.target.value)}
-              placeholder="Right knee discomfort, avoid intensity, prefer mornings, conservative plan..."
-              className={ONBOARDING_TEXTAREA_CLASS}
-            />
-          </label>
-        </ConstructorSection>
-
-        {isCorrectionRequired ? <StructuredCorrectionNotice result={draftResult} /> : null}
-        {draftResult && !draftResult.ok ? <StructuredReviewError result={draftResult} /> : null}
-
-        {planPresetPanel}
-
-        <div className="hito-onboarding-submit-footer">
-          <div className="hito-onboarding-submit-footer-inner">
-            <div className="min-w-0">
-              {constructorError ? <p className="hito-field-error">{constructorError}</p> : null}
-              {constructorStatus === "finishing" ? (
-                <p className="hito-field-success">Your plan is ready. Opening it now...</p>
-              ) : null}
-              {!constructorError && constructorStatus !== "finishing" ? (
-                <p className="hito-field-helper max-w-xl">
-                  Advanced custom program is still available for complex setup. It reviews before
-                  anything is created.
-                </p>
-              ) : null}
-            </div>
-            <button
-              type="submit"
-              disabled={isBusy || !isConstructorReady}
-              className="hito-button hito-button-secondary hito-button-lg shrink-0"
+            <ConstructorSection
+              eyebrow="A1"
+              title="Schedule constraints"
+              body="Use this only when preset availability is not enough."
             >
-              {constructorStatus === "reviewing"
-                ? "Reviewing custom..."
-                : constructorStatus === "finishing"
-                  ? "Opening your plan..."
-                  : "Review advanced custom"}
-            </button>
+              <TrainingPreferenceFields
+                fixedRestDays={state.fixedRestDays}
+                onFixedRestDaysChange={setState.setFixedRestDays}
+                restDaysAnswered={state.restDaysAnswered}
+                onRestDaysAnsweredChange={setState.setRestDaysAnswered}
+                maxRunningDaysPerWeek={state.maxRunningDaysPerWeek}
+                onMaxRunningDaysPerWeekChange={setState.setMaxRunningDaysPerWeek}
+                preferredLongRunDay={state.preferredLongRunDay}
+                onPreferredLongRunDayChange={setState.setPreferredLongRunDay}
+                preferredLongRunMode="optional-any"
+                showFitnessBenchmark
+                fitnessLevel={state.fitnessLevel}
+                onFitnessLevelChange={(value) => {
+                  setState.setFitnessLevel(value);
+                  if (value !== "custom") {
+                    setState.setRecent5kTime("");
+                    setState.setRecent5kPace("");
+                  }
+                }}
+                recent5kTime={state.recent5kTime}
+                onRecent5kTimeChange={setState.setRecent5kTime}
+              />
+            </ConstructorSection>
+
+            <ConstructorSection
+              eyebrow="A2"
+              title="Workout guidance"
+              body="Tune wording only when you need the custom path."
+            >
+              <Field label="Guidance style">
+                <OptionGrid label="Guidance style">
+                  {GUIDANCE_PREFERENCE_OPTIONS.map((option) => (
+                    <OptionButton
+                      key={option.value}
+                      active={state.guidancePreference === option.value}
+                      label={option.label}
+                      copy={option.copy}
+                      onClick={() => setState.setGuidancePreference(option.value)}
+                    />
+                  ))}
+                </OptionGrid>
+              </Field>
+            </ConstructorSection>
+
+            <ConstructorSection
+              eyebrow="A3"
+              title="Goal and timing"
+              body="Use Advanced when the plan needs a specific goal shape."
+            >
+              <Field label="Goal distance">
+                <OptionGrid label="Goal distance">
+                  {GOAL_DISTANCE_OPTIONS.map((option) => (
+                    <OptionButton
+                      key={option.value}
+                      active={state.goalDistance === option.value}
+                      label={option.label}
+                      onClick={() => setState.setGoalDistance(option.value)}
+                    />
+                  ))}
+                </OptionGrid>
+              </Field>
+
+              <Field label="Goal style">
+                <OptionGrid label="Goal style">
+                  {GOAL_STYLE_OPTIONS.map((option) => (
+                    <OptionButton
+                      key={option.value}
+                      active={state.goalStyle === option.value}
+                      label={option.label}
+                      onClick={() => setState.setGoalStyle(option.value)}
+                    />
+                  ))}
+                </OptionGrid>
+              </Field>
+
+              <HitoEditableDateChip
+                label="Plan Start Date"
+                value={state.startDate}
+                onChange={setState.setStartDate}
+                helper="Optional. Leave unset to let Hito choose the default start date."
+              />
+              <input type="hidden" name="schedule.startDate" value={state.startDate} />
+
+              {showsTargetFields ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <HitoMaskedTimeField
+                    id="structured-plan-target-time"
+                    label="Target time"
+                    value={state.targetTime}
+                    onChange={setState.setTargetTime}
+                    helper="Required. Type digits continuously: 35000 becomes 3:50:00."
+                    error={!state.targetTime.trim() ? "Target time is required." : null}
+                  />
+                  <HitoDateField
+                    id="structured-plan-target-date"
+                    name="schedule.targetDate"
+                    label="Target date"
+                    value={state.targetDate}
+                    onChange={setState.setTargetDate}
+                    helper="Optional. Pick from calendar or type YYYY-MM-DD."
+                  />
+                </div>
+              ) : (
+                <p className="hito-field-helper">
+                  Hito will estimate a realistic direction from your benchmark, availability, and
+                  goal style. No target time is needed for this mode.
+                </p>
+              )}
+
+              {showsTerrainSelector && (
+                <Field label="Terrain focus">
+                  <OptionGrid label="Terrain focus">
+                    {TERRAIN_OPTIONS.map((option) => (
+                      <OptionButton
+                        key={option.value}
+                        active={state.terrainFocus === option.value}
+                        label={option.label}
+                        copy={option.copy}
+                        onClick={() => setState.setTerrainFocus(option.value)}
+                      />
+                    ))}
+                  </OptionGrid>
+                </Field>
+              )}
+
+              {impliedMountainTerrain && (
+                <div className="hito-row-group">
+                  <div className="hito-list-row">
+                    <div>
+                      <p className="hito-list-row-title">Mountain terrain</p>
+                      <p className="hito-list-row-copy">
+                        Mountain running uses mountain terrain context automatically.
+                      </p>
+                    </div>
+                    <span className="hito-status-pill">Implied</span>
+                  </div>
+                </div>
+              )}
+            </ConstructorSection>
+
+            <ConstructorSection
+              eyebrow="A4"
+              title="Extras"
+              body="Add light mobility or strength support for a custom plan."
+            >
+              <div className="grid gap-2">
+                {STRENGTH_OPTIONS.map((option) => (
+                  <OptionRow
+                    key={option.value}
+                    active={state.strengthPreference === option.value}
+                    label={option.label}
+                    copy={option.copy}
+                    onClick={() => setState.setStrengthPreference(option.value)}
+                  />
+                ))}
+              </div>
+            </ConstructorSection>
+
+            <ConstructorSection
+              eyebrow="A5"
+              title="Detailed comment"
+              body="Add caution signals or constraints that should route through custom review."
+            >
+              <label className="grid gap-2">
+                <span className="hito-form-label">Comment</span>
+                <textarea
+                  rows={5}
+                  value={state.comment}
+                  onChange={(event) => setState.setComment(event.target.value)}
+                  placeholder="Right knee discomfort, avoid intensity, prefer mornings, conservative plan..."
+                  className={ONBOARDING_TEXTAREA_CLASS}
+                />
+              </label>
+            </ConstructorSection>
+
+            {isCorrectionRequired ? <StructuredCorrectionNotice result={draftResult} /> : null}
+            {draftResult && !draftResult.ok ? <StructuredReviewError result={draftResult} /> : null}
+
+            <div className="hito-onboarding-submit-footer">
+              <div className="hito-onboarding-submit-footer-inner">
+                <div className="min-w-0">
+                  {constructorError ? <p className="hito-field-error">{constructorError}</p> : null}
+                  {constructorStatus === "finishing" ? (
+                    <p className="hito-field-success">Your plan is ready. Opening it now...</p>
+                  ) : null}
+                  {!constructorError && constructorStatus !== "finishing" ? (
+                    <p className="hito-field-helper max-w-xl">
+                      Advanced custom reviews the setup before anything is created.
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="submit"
+                  disabled={isBusy || !isConstructorReady}
+                  className="hito-button hito-button-secondary hito-button-lg shrink-0"
+                >
+                  {constructorStatus === "reviewing"
+                    ? "Reviewing custom..."
+                    : constructorStatus === "finishing"
+                      ? "Opening your plan..."
+                      : "Review advanced custom"}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
         {isDraftReady ? (
           <StructuredDraftReadyReviewModal
             result={draftResult}
@@ -424,14 +513,21 @@ export function ConstructorSection({
   title,
   body,
   children,
+  divider = true,
 }: {
   eyebrow: string;
   title: string;
   body: string;
   children: ReactNode;
+  divider?: boolean;
 }) {
   return (
-    <section className="hito-section-divider grid gap-y-4 gap-x-0 pt-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-x-12 lg:gap-x-16">
+    <section
+      className={cn(
+        "grid gap-y-4 gap-x-0 md:grid-cols-[220px_minmax(0,1fr)] md:gap-x-12 lg:gap-x-16",
+        divider && "hito-section-divider pt-6",
+      )}
+    >
       <div>
         <p className="hito-micro-label">{eyebrow}</p>
         <h2 className="hito-panel-title mt-2">{title}</h2>
@@ -741,17 +837,31 @@ function formatReviewTargetTime(value: string) {
   return `${hours}:${minuteLabel}:${String(seconds).padStart(2, "0")}`;
 }
 
-function OptionGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{children}</div>;
+const PRESET_RUNNING_DAY_OPTIONS: { value: string; label: string; copy: string }[] = [
+  { value: "1", label: "1 day", copy: "Availability only" },
+  { value: "2", label: "2 days", copy: "Light availability" },
+  { value: "3", label: "3 days", copy: "Minimum preset rhythm" },
+  { value: "4", label: "4 days", copy: "Balanced rhythm" },
+  { value: "5", label: "5 days", copy: "More durable base" },
+];
+
+function OptionGrid({ children, label }: { children: ReactNode; label: string }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label={label}>
+      {children}
+    </div>
+  );
 }
 
 function OptionButton({
   active,
+  icon,
   label,
   copy,
   onClick,
 }: {
   active: boolean;
+  icon?: HitoIconName;
   label: string;
   copy?: string;
   onClick: () => void;
@@ -759,20 +869,40 @@ function OptionButton({
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={active}
       onClick={onClick}
       className={cn(
-        "hito-button hito-button-sm min-h-16 justify-start whitespace-normal text-left",
+        "hito-button hito-button-sm hito-onboarding-option-button min-h-16 justify-start whitespace-normal text-left",
         active ? "hito-button-primary" : "hito-button-secondary",
       )}
     >
-      <span>
-        <span className="block">{label}</span>
-        {copy ? (
-          <span className="mt-1 block text-xs normal-case tracking-normal">{copy}</span>
-        ) : null}
+      {icon ? (
+        <span className="hito-onboarding-option-icon" aria-hidden="true">
+          <Icon name={icon} size="sm" />
+        </span>
+      ) : null}
+      <span className="min-w-0">
+        <span className="hito-onboarding-option-title block">{label}</span>
+        {copy ? <span className="hito-onboarding-option-copy mt-1 block">{copy}</span> : null}
       </span>
     </button>
   );
+}
+
+function fitnessLevelIcon(value: RunnerFitnessLevel): HitoIconName {
+  switch (value) {
+    case "new_to_running":
+      return "sparkles";
+    case "beginner":
+      return "activity";
+    case "running_regularly":
+      return "check-circle";
+    case "performance_focused":
+      return "watch";
+    case "custom":
+      return "edit";
+  }
 }
 
 function OptionRow({

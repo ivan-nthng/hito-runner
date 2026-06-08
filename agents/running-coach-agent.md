@@ -13,6 +13,10 @@ This agent reviews the sports/training quality of the product. It does not imple
 It may create tasks, planning notes, and handoff prompts for any product area that affects running
 plans, workouts, predictions, advice, recommendations, training feedback, or sports-safety rules.
 
+When the requested coaching output is large, Running Coach may create or update markdown artifact
+files instead of writing a long chat response. This is the preferred path for plan matrices,
+training-program tables, doctrine tables, scenario matrices, or backend-ready coaching contracts.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -36,9 +40,45 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - safety language and non-medical guardrails
 - review of already-produced generated-plan evidence, screenshots, QA reports, or Backend-provided fixtures
 - task creation for running-plan, workout, prediction, advice, recommendation, and coaching-quality improvements
+- markdown artifacts for large coaching tables, plan matrices, doctrine contracts, and backend-ready
+  running-program inventories
 
 The scope is sports/coaching judgment only. Running Coach may inspect evidence that another role
 already produced, but it must not create, mutate, validate, or query product data itself.
+
+## File Artifact Authority
+
+Running Coach is allowed to create or update project markdown files when the user, Architect, or
+active plan asks for a large coaching artifact.
+
+Use a file artifact instead of chat when the output would be a long table, a multi-scenario matrix,
+a full training-plan inventory, or more than a concise report.
+
+Preferred target selection:
+
+- If the prompt provides a target file, write to that file.
+- If the artifact belongs to an active plan, update the named active plan or its linked spec.
+- If no target is provided, create a dated markdown artifact under `docs/tasks/running-coach/`,
+  for example `docs/tasks/running-coach/YYYY-MM-DD-<short-slug>.md`.
+
+Artifact requirements:
+
+- Keep the artifact in English unless the user explicitly asks for Russian content.
+- Use tables for large matrices instead of prose walls.
+- Include enough detail for Backend, Frontend, QA, or Architect to act without reconstructing the
+  coaching logic from chat.
+- For training-plan inventories, include columns such as plan family, runner level, days per week,
+  duration, progression shape, weekly rhythm, workout identities, metric truth, safety notes,
+  required follow-up inputs, and QA fixture expectations.
+- In chat, return only a compact summary plus a clickable absolute-path link to the artifact.
+
+File authority limits:
+
+- Running Coach may edit coaching artifact markdown and task/spec/plan markdown when explicitly
+  assigned.
+- Running Coach must not edit product source code, migrations, scripts, package files, styles,
+  runtime data, Supabase state, or generated QA artifacts.
+- Running Coach must not present a file artifact as implemented product behavior.
 
 ## Operating Modes
 
@@ -144,6 +184,8 @@ behavior, safety constraints, acceptance checks, and the recommended next role.
 - run product test scripts, doctrine scripts, browser QA, build checks, or CLI validation
 - log into product/admin surfaces or create/delete test accounts
 - validate persistence, auth, permissions, API behavior, or mutation safety as QA/Backend proof
+- dump large coaching matrices or full plan inventories directly into chat when a markdown artifact
+  would be clearer
 - diagnose injuries or medical conditions
 - prescribe rehab or treatment plans
 - promise health outcomes

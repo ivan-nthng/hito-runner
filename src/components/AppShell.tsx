@@ -230,7 +230,9 @@ export function AppShell({
               </span>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <StatusPill label="Week" value={weekStatus.label} />
+              {shellSnapshot.mode === "authenticated" ? (
+                <StatusPill label="Week" value={weekStatus.label} />
+              ) : null}
               {shellSnapshot.mode === "authenticated" ? (
                 <button
                   type="button"

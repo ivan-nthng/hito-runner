@@ -3,6 +3,13 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import {
+  adminRepoWorkItemSourceTypes,
+  getAdminRepoWorkItemMetadata,
+  type AdminRepoWorkItemKind,
+  type AdminRepoWorkItemLifecycle,
+  type AdminRepoWorkItemSourceType,
+} from "../src/lib/admin-work-items";
 import type { Database, Json } from "../src/lib/supabase/database";
 
 const IMPORT_VERSION = "repo-work-items-v1";
@@ -11,6 +18,8 @@ const IMPORTER_LABEL = "Repo work item importer";
 const MAX_NOTE_LENGTH = 3900;
 const MAX_TITLE_LENGTH = 160;
 const MAX_EXISTING_ROWS = 10_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
+const MIN_TIMEOUT_MS = 1_000;
 const CANONICAL_MARKDOWN_FIELDS = [
   "Status",
   "Type",
@@ -23,6 +32,11 @@ const CANONICAL_MARKDOWN_FIELDS = [
 const IMPORT_METADATA_COMPARE_KEYS = [
   "source_path",
   "source_type",
+  "work_item_kind",
+  "work_item_lifecycle",
+  "source_group",
+  "source_group_label",
+  "source_label",
   "import_version",
   "work_item_status",
   "work_item_status_source",
@@ -59,12 +73,7 @@ const IMPORT_METADATA_COMPARE_KEYS = [
   "stale_cleanup_reason",
 ] as const;
 
-type SourceType =
-  | "backlog_doc"
-  | "product_brief"
-  | "frontend_spec"
-  | "active_plan"
-  | "archived_plan";
+type SourceType = AdminRepoWorkItemSourceType;
 type AdminItemType = "bug" | "change_request" | "context_capture";
 type AdminStatus = "new" | "in_review" | "ready_for_codex" | "done" | "archived";
 type AdminPriority = "low" | "medium" | "high" | "urgent";
@@ -138,6 +147,11 @@ type ImportStats = {
   staleRepoMirrorAction: "not_checked" | "reported" | "would_archive" | "archived";
   staleRepoMirrorArchivedCount: number;
   staleRepoMirrorExamples: StaleRepoMirrorExample[];
+  eligibleBySourceGroup: Record<string, number>;
+  duplicateConceptDiagnostics: {
+    count: number;
+    examples: DuplicateConceptExample[];
+  };
   manualRowCountBefore: number | null;
   manualRowCountAfter: number | null;
   examples: Record<string, ExampleItem | null>;
@@ -147,6 +161,10 @@ type ExampleItem = {
   title: string;
   sourcePath: string;
   sourceType: SourceType;
+  workItemKind: AdminRepoWorkItemKind;
+  workItemLifecycle: AdminRepoWorkItemLifecycle;
+  sourceGroup: string;
+  sourceLabel: string;
   status: WorkItemStatus;
   targetRole: TargetRole;
 };
@@ -164,6 +182,17 @@ type StaleRepoMirrorExample = {
   sourceType: string;
   status: AdminStatus;
   archivedAt: string | null;
+};
+
+type DuplicateConceptExample = {
+  concept: string;
+  count: number;
+  items: Array<{
+    title: string;
+    sourcePath: string;
+    sourceType: SourceType;
+    sourceLabel: string;
+  }>;
 };
 
 type ParsedCanonicalMarkdown = {
@@ -189,17 +218,36 @@ const SOURCE_CONFIGS: SourceConfig[] = [
 
 const args = parseArgs(process.argv.slice(2));
 const generatedAt = new Date().toISOString();
+let currentPhase: { name: string; detail: string | null; startedAt: string } = {
+  name: "initializing",
+  detail: null,
+  startedAt: generatedAt,
+};
 
 if (isMainModule()) {
-  await main();
+  await runMain();
 }
 
 function isMainModule() {
   return Boolean(process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href);
 }
 
+async function runMain() {
+  const timeout = startImporterTimeout();
+
+  try {
+    await main();
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 async function main() {
+  setPhase("scan_repo_work_items", process.cwd());
   const scan = await scanRepoWorkItems(process.cwd());
+  setPhase("prepare_import_report", `${scan.items.length} eligible repo items`);
   const items = scan.items;
   const stats: ImportStats = {
     discoveredBySourceType: scan.discoveredBySourceType,
@@ -218,6 +266,11 @@ async function main() {
     staleRepoMirrorAction: args.archiveStale ? "would_archive" : "not_checked",
     staleRepoMirrorArchivedCount: 0,
     staleRepoMirrorExamples: [],
+    eligibleBySourceGroup: countBySourceGroup(items),
+    duplicateConceptDiagnostics: {
+      count: countDuplicateConcepts(items),
+      examples: findDuplicateConceptExamples(items),
+    },
     manualRowCountBefore: null,
     manualRowCountAfter: null,
     examples: {
@@ -232,8 +285,11 @@ async function main() {
 
   if (args.dryRun) {
     if (args.archiveStale) {
+      setPhase("create_supabase_client", "dry-run stale mirror check");
       const supabase = createServiceClient();
+      setPhase("load_existing_admin_capture_rows", "dry-run stale mirror check");
       const existingRows = await loadAdminCaptureRows(supabase);
+      setPhase("analyze_stale_repo_mirror_rows", "dry-run stale mirror check");
       const staleRows = findStaleActiveRepoMirrorRows(existingRows, currentSourceKeys);
 
       stats.manualRowCountBefore = countManualRows(existingRows);
@@ -256,13 +312,19 @@ async function main() {
     return;
   }
 
+  setPhase("create_supabase_client", "live import");
   const supabase = createServiceClient();
+  setPhase("load_existing_admin_capture_rows", "before live import");
   const beforeRows = await loadAdminCaptureRows(supabase);
   stats.manualRowCountBefore = countManualRows(beforeRows);
   const existingBySource = mapExistingImportedRows(beforeRows);
 
   for (const item of items) {
     const existing = existingBySource.get(sourceKey(item.sourceType, item.sourcePath));
+    setPhase(
+      existing ? "refresh_existing_admin_capture_item" : "create_admin_capture_item",
+      item.sourcePath,
+    );
     const action = existing
       ? await refreshExistingItem(supabase, existing, item)
       : await createImportedItem(supabase, item);
@@ -270,6 +332,7 @@ async function main() {
     stats[action] += 1;
   }
 
+  setPhase("load_existing_admin_capture_rows", "after live upsert");
   const afterUpsertRows = await loadAdminCaptureRows(supabase);
   const staleRows = findStaleActiveRepoMirrorRows(afterUpsertRows, currentSourceKeys);
   stats.staleActiveRepoMirrorCount = staleRows.length;
@@ -278,11 +341,13 @@ async function main() {
 
   if (args.archiveStale) {
     for (const row of staleRows) {
+      setPhase("archive_stale_repo_mirror_row", row.title ?? row.id);
       await archiveStaleRepoMirrorRow(supabase, row);
       stats.staleRepoMirrorArchivedCount += 1;
     }
   }
 
+  setPhase("load_existing_admin_capture_rows", "after stale cleanup");
   const afterRows = await loadAdminCaptureRows(supabase);
   stats.manualRowCountAfter = countManualRows(afterRows);
   stats.duplicateCount = countImportedDuplicates(afterRows);
@@ -324,8 +389,10 @@ async function scanRepoWorkItems(rootDir: string) {
   const items: RepoWorkItem[] = [];
 
   for (const source of SOURCE_CONFIGS) {
+    setPhase("collect_markdown_files", source.root);
     const files = await collectMarkdownFiles(path.join(rootDir, source.root));
     discoveredBySourceType[source.type] = files.length;
+    setPhase("normalize_markdown_source", `${source.root} (${files.length} files)`);
 
     for (const file of files) {
       const relativePath = normalizeSourcePath(path.relative(rootDir, file));
@@ -336,7 +403,9 @@ async function scanRepoWorkItems(rootDir: string) {
         continue;
       }
 
+      setPhase("read_markdown_file", relativePath);
       const content = await readFile(file, "utf8");
+      setPhase("normalize_markdown_file", relativePath);
       const normalized = await normalizeMarkdownFile(file, relativePath, source.type, content);
 
       if (!normalized) {
@@ -368,6 +437,7 @@ async function normalizeMarkdownFile(
     return null;
   }
 
+  setPhase("stat_markdown_file", sourcePath);
   const fileStat = await stat(file);
   const contentHash = createHash("sha256").update(content).digest("hex");
   const canonical = parseCanonicalMarkdown(content);
@@ -384,6 +454,7 @@ async function normalizeMarkdownFile(
     inferItemType(sourceType, `${title}\n${content}`);
   const priority = canonical.priority ?? "medium";
   const taskTitle = canonical.task ? firstMeaningfulLine(canonical.task) : null;
+  const sourceMetadata = getAdminRepoWorkItemMetadata(sourceType);
   const note = buildRepoMirrorNote({
     sourcePath,
     sourceType,
@@ -397,6 +468,11 @@ async function normalizeMarkdownFile(
   const metadata: RepoWorkItem["metadata"] = {
     source_path: sourcePath,
     source_type: sourceType,
+    work_item_kind: sourceMetadata.workItemKind,
+    work_item_lifecycle: sourceMetadata.workItemLifecycle,
+    source_group: sourceMetadata.sourceGroup,
+    source_group_label: sourceMetadata.sourceGroupLabel,
+    source_label: sourceMetadata.sourceLabel,
     imported_from_repo: true,
     import_version: IMPORT_VERSION,
     work_item_status: workItemStatus,
@@ -456,6 +532,7 @@ async function collectMarkdownFiles(directory: string): Promise<string[]> {
   let entries: Awaited<ReturnType<typeof readdir>>;
 
   try {
+    setPhase("readdir_markdown_directory", normalizeSourcePath(directory));
     entries = await readdir(directory, { withFileTypes: true });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -779,7 +856,7 @@ function isApprovedMarkdownSourcePath(sourcePath: string) {
 }
 
 function isSourceType(value: string): value is SourceType {
-  return SOURCE_CONFIGS.some((source) => source.type === value);
+  return adminRepoWorkItemSourceTypes.includes(value as SourceType);
 }
 
 function isUnchanged(existing: ExistingRow, patch: ItemUpdate) {
@@ -1450,6 +1527,78 @@ function countBySourceType(items: RepoWorkItem[]): Record<SourceType, number> {
   return counts;
 }
 
+function countBySourceGroup(items: RepoWorkItem[]): Record<string, number> {
+  const counts: Record<string, number> = {
+    backlog: 0,
+    active_plans: 0,
+    specs: 0,
+    briefs: 0,
+    archive: 0,
+  };
+
+  for (const item of items) {
+    const sourceGroup = item.metadata.source_group;
+
+    if (typeof sourceGroup === "string") {
+      counts[sourceGroup] = (counts[sourceGroup] ?? 0) + 1;
+    }
+  }
+
+  return counts;
+}
+
+function countDuplicateConcepts(items: RepoWorkItem[]) {
+  return findDuplicateConceptGroups(items).length;
+}
+
+function findDuplicateConceptExamples(items: RepoWorkItem[]): DuplicateConceptExample[] {
+  return findDuplicateConceptGroups(items)
+    .map(([concept, conceptItems]) => ({
+      concept,
+      count: conceptItems.length,
+      items: conceptItems.slice(0, 5).map((item) => ({
+        title: item.title,
+        sourcePath: item.sourcePath,
+        sourceType: item.sourceType,
+        sourceLabel: String(item.metadata.source_label ?? item.sourceType),
+      })),
+    }))
+    .slice(0, 8);
+}
+
+function findDuplicateConceptGroups(items: RepoWorkItem[]) {
+  const concepts = new Map<string, RepoWorkItem[]>();
+
+  for (const item of items) {
+    const concept = normalizeConceptKey(String(item.metadata.markdown_task ?? item.title));
+
+    if (!concept) {
+      continue;
+    }
+
+    const existing = concepts.get(concept) ?? [];
+    existing.push(item);
+    concepts.set(concept, existing);
+  }
+
+  return Array.from(concepts.entries()).filter(([, conceptItems]) => {
+    const distinctPaths = new Set(conceptItems.map((item) => item.sourcePath));
+    return distinctPaths.size > 1;
+  });
+}
+
+function normalizeConceptKey(input: string) {
+  const normalized = input
+    .toLowerCase()
+    .replace(/`[^`]+`/g, " ")
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+
+  return normalized.length >= 12 ? normalized.slice(0, 120) : null;
+}
+
 function findExample(items: RepoWorkItem[], sourceType: SourceType): ExampleItem | null {
   const item = items.find((candidate) => candidate.sourceType === sourceType);
 
@@ -1461,6 +1610,12 @@ function findExample(items: RepoWorkItem[], sourceType: SourceType): ExampleItem
     title: item.title,
     sourcePath: item.sourcePath,
     sourceType: item.sourceType,
+    workItemKind: String(item.metadata.work_item_kind ?? "backlog_item") as AdminRepoWorkItemKind,
+    workItemLifecycle: String(
+      item.metadata.work_item_lifecycle ?? "backlog",
+    ) as AdminRepoWorkItemLifecycle,
+    sourceGroup: String(item.metadata.source_group ?? "backlog"),
+    sourceLabel: String(item.metadata.source_label ?? item.sourceType),
     status: item.workItemStatus,
     targetRole: item.targetRole,
   };
@@ -1475,11 +1630,109 @@ function escapeRegExp(input: string) {
 }
 
 function parseArgs(rawArgs: string[]) {
+  const timeoutMs = parseTimeoutMs(
+    readOptionValue(rawArgs, "--timeout-ms") ?? process.env.ADMIN_BACKLOG_IMPORT_TIMEOUT_MS,
+  );
+
   return {
     dryRun: rawArgs.includes("--dry-run"),
     refreshTriage: rawArgs.includes("--refresh-triage"),
     archiveStale: rawArgs.includes("--archive-stale"),
+    debug: rawArgs.includes("--debug"),
+    timeoutMs,
   };
+}
+
+function readOptionValue(rawArgs: string[], option: string) {
+  const prefix = `${option}=`;
+  const inline = rawArgs.find((arg) => arg.startsWith(prefix));
+
+  if (inline) {
+    return inline.slice(prefix.length);
+  }
+
+  const index = rawArgs.indexOf(option);
+
+  return index >= 0 ? rawArgs[index + 1] : undefined;
+}
+
+function parseTimeoutMs(value: string | undefined) {
+  if (!value) {
+    return DEFAULT_TIMEOUT_MS;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  return Number.isFinite(parsed) && parsed >= MIN_TIMEOUT_MS ? parsed : DEFAULT_TIMEOUT_MS;
+}
+
+function startImporterTimeout() {
+  if (args.timeoutMs <= 0) {
+    return null;
+  }
+
+  const startedAtMs = Date.now();
+
+  return setTimeout(() => {
+    const diagnostic = JSON.stringify(
+      {
+        ok: false,
+        importVersion: IMPORT_VERSION,
+        mode: args.dryRun ? "dry_run" : "live_upsert",
+        message:
+          "Admin backlog importer exceeded its bounded timeout. No success was reported; inspect the phase fields to identify the hanging dependency.",
+        timeoutMs: args.timeoutMs,
+        elapsedMs: Date.now() - startedAtMs,
+        phase: currentPhase.name,
+        phaseDetail: currentPhase.detail,
+        phaseStartedAt: currentPhase.startedAt,
+        archiveStale: args.archiveStale,
+        refreshTriage: args.refreshTriage,
+        mutationSafety:
+          args.dryRun && !args.archiveStale
+            ? "dry-run markdown scan only; no Supabase mutation attempted"
+            : args.dryRun
+              ? "dry-run stale mirror check only; no Supabase mutation attempted"
+              : "live import may have started; inspect previous logs before retrying",
+      },
+      null,
+      2,
+    );
+    process.stderr.write(`${diagnostic}\n`, forceExitAfterTimeout);
+    setTimeout(forceExitAfterTimeout, 100).unref();
+  }, args.timeoutMs);
+}
+
+function forceExitAfterTimeout() {
+  process.exitCode = 1;
+
+  try {
+    process.kill(process.pid, "SIGTERM");
+  } catch {
+    process.exit(1);
+  }
+
+  setTimeout(() => {
+    try {
+      process.kill(process.pid, "SIGKILL");
+    } catch {
+      process.exit(1);
+    }
+  }, 500).unref();
+}
+
+function setPhase(name: string, detail: string | null = null) {
+  currentPhase = {
+    name,
+    detail,
+    startedAt: new Date().toISOString(),
+  };
+
+  if (args.debug) {
+    console.error(
+      `[admin-backlog-import] phase=${currentPhase.name} detail=${currentPhase.detail ?? ""}`,
+    );
+  }
 }
 
 function createServiceClient() {
@@ -1540,6 +1793,10 @@ function printReport(report: {
           invalidRequiredFieldCounts: report.stats.invalidRequiredFieldCounts,
           examples: report.stats.missingMetadataExamples,
           repoDerivedRowsNeverUseInReview: report.stats.repoDerivedInReviewCount === 0,
+        },
+        workItemMetadata: {
+          eligibleBySourceGroup: report.stats.eligibleBySourceGroup,
+          duplicateConceptDiagnostics: report.stats.duplicateConceptDiagnostics,
         },
         examples: report.stats.examples,
         idempotency: {

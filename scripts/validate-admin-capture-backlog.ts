@@ -19,6 +19,7 @@ import {
   type AdminCaptureRow,
 } from "../src/lib/admin-capture.server";
 import { updateAdminCaptureItemTriageForDependencies } from "../src/lib/admin-capture.server";
+import { getAdminRepoWorkItemMetadata } from "../src/lib/admin-work-items";
 import type { AdminCaptureResult } from "../src/lib/admin-capture";
 import type { Database, Json } from "../src/lib/supabase/database";
 
@@ -74,6 +75,7 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
     itemType?: string | null;
     priority?: string | null;
     targetRole?: string | null;
+    sourceGroup?: string;
   }): Promise<AdminCaptureRow[]> {
     const search = input.search?.toLowerCase() ?? null;
 
@@ -83,6 +85,18 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
       .filter((item) => !input.itemType || item.item_type === input.itemType)
       .filter((item) => !input.priority || item.priority === input.priority)
       .filter((item) => !input.targetRole || item.target_role === input.targetRole)
+      .filter((item) => {
+        if (!input.sourceGroup || input.sourceGroup === "all_work") {
+          return true;
+        }
+
+        return (
+          typeof item.metadata === "object" &&
+          item.metadata !== null &&
+          !Array.isArray(item.metadata) &&
+          item.metadata.source_group === input.sourceGroup
+        );
+      })
       .filter((item) => {
         if (!search) {
           return true;
@@ -204,6 +218,7 @@ async function runDeterministicHarness() {
 
   const nonAdminList = await listAdminCaptureBacklogForDependencies(nonAdmin, {
     status: "all",
+    sourceGroup: "all_work",
     includeArchived: true,
     limit: 50,
   });
@@ -223,6 +238,7 @@ async function runDeterministicHarness() {
   const listed = await mustOk(
     listAdminCaptureBacklogForDependencies(admin, {
       status: "new",
+      sourceGroup: "all_work",
       includeArchived: false,
       limit: 50,
     }),
@@ -303,6 +319,7 @@ async function runDeterministicHarness() {
   const activeAfterArchive = await mustOk(
     listAdminCaptureBacklogForDependencies(admin, {
       status: "all",
+      sourceGroup: "all_work",
       includeArchived: false,
       limit: 50,
     }),
@@ -312,6 +329,7 @@ async function runDeterministicHarness() {
   const archived = await mustOk(
     listAdminCaptureBacklogForDependencies(admin, {
       status: "archived",
+      sourceGroup: "all_work",
       includeArchived: false,
       limit: 50,
     }),
@@ -333,6 +351,7 @@ async function runDeterministicHarness() {
       imported_from_repo: true,
       source_path: "docs/plans/active/example.md",
       source_type: "active_plan",
+      ...repoMetadataForSourceType("active_plan"),
       work_item_status: "in_progress",
       markdown_status: "in_progress",
       markdown_type: "context_capture",
@@ -344,6 +363,7 @@ async function runDeterministicHarness() {
   const repoList = await mustOk(
     listAdminCaptureBacklogForDependencies(admin, {
       status: "all",
+      sourceGroup: "all_work",
       includeArchived: false,
       limit: 50,
       search: "Imported canonical markdown mirror",
@@ -351,11 +371,38 @@ async function runDeterministicHarness() {
   );
   assert.equal(repoList.view.items.length, 1);
   assert.equal(repoList.view.items[0]?.source, "repo_import");
+  assert.equal(repoList.view.items[0]?.repoWorkItem?.sourceLabel, "Active plan");
+  assert.equal(repoList.view.items[0]?.repoWorkItem?.sourceGroup, "active_plans");
+
+  const activePlanList = await mustOk(
+    listAdminCaptureBacklogForDependencies(admin, {
+      status: "all",
+      sourceGroup: "active_plans",
+      includeArchived: false,
+      limit: 50,
+      search: "Imported canonical markdown mirror",
+    }),
+  );
+  assert.equal(activePlanList.view.items.length, 1);
+  assert.equal(activePlanList.view.items[0]?.repoWorkItem?.sourceLabel, "Active plan");
+
+  const backlogSourceList = await mustOk(
+    listAdminCaptureBacklogForDependencies(admin, {
+      status: "all",
+      sourceGroup: "backlog",
+      includeArchived: false,
+      limit: 50,
+      search: "Imported canonical markdown mirror",
+    }),
+  );
+  assert.equal(backlogSourceList.view.items.length, 0);
 
   const repoDetail = await mustOk(
     getAdminCaptureItemForDependencies(admin, { id: repoDerivedRow.id }),
   );
   assert.equal(repoDetail.item.source, "repo_import");
+  assert.equal(repoDetail.item.repoWorkItem?.sourceLabel, "Active plan");
+  assert.equal(repoDetail.item.repoWorkItem?.workItemLifecycle, "active");
 
   const repoPrompt = await mustOk(
     getAdminCaptureCopyPromptForDependencies(admin, { id: repoDerivedRow.id }),
@@ -580,6 +627,7 @@ async function runLiveSupabaseProbe() {
     const listed = await mustOk(
       listAdminCaptureBacklogForDependencies(admin, {
         status: "new",
+        sourceGroup: "all_work",
         includeArchived: false,
         limit: 20,
         search: "Live Supabase capture proof",
@@ -677,6 +725,7 @@ async function runLiveSupabaseProbe() {
         imported_from_repo: true,
         source_path: "docs/plans/active/live-proof.md",
         source_type: "active_plan",
+        ...repoMetadataForSourceType("active_plan"),
         work_item_status: "in_progress",
         markdown_status: "in_progress",
         markdown_type: "context_capture",
@@ -689,6 +738,7 @@ async function runLiveSupabaseProbe() {
     const repoList = await mustOk(
       listAdminCaptureBacklogForDependencies(admin, {
         status: "all",
+        sourceGroup: "all_work",
         includeArchived: false,
         limit: 20,
         search: "Live repo-derived read-only proof",
@@ -701,7 +751,8 @@ async function runLiveSupabaseProbe() {
       name: "repo_derived_list_detail_search",
       ok:
         repoList.view.items.some((item) => item.id === repoDerivedItemId) &&
-        repoDetail.item.source === "repo_import",
+        repoDetail.item.source === "repo_import" &&
+        repoDetail.item.repoWorkItem?.sourceLabel === "Active plan",
       detail: "repo-derived item remains listable, searchable, and readable",
     });
 
@@ -760,6 +811,7 @@ async function runLiveSupabaseProbe() {
     const activeAfterArchive = await mustOk(
       listAdminCaptureBacklogForDependencies(admin, {
         status: "all",
+        sourceGroup: "all_work",
         includeArchived: false,
         limit: 20,
         search: "Live Supabase capture proof",
@@ -989,6 +1041,18 @@ function classifySupabaseError(error: { code?: string; message?: string; statusC
 
 function isRepoReadOnlyRejection(result: AdminCaptureResult<unknown>) {
   return !result.ok && result.reason === "repo_derived_read_only";
+}
+
+function repoMetadataForSourceType(sourceType: "active_plan") {
+  const metadata = getAdminRepoWorkItemMetadata(sourceType);
+
+  return {
+    work_item_kind: metadata.workItemKind,
+    work_item_lifecycle: metadata.workItemLifecycle,
+    source_group: metadata.sourceGroup,
+    source_group_label: metadata.sourceGroupLabel,
+    source_label: metadata.sourceLabel,
+  };
 }
 
 async function mustRejectRepoDerivedMutation(result: Promise<AdminCaptureResult<unknown>>) {

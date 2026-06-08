@@ -1,5 +1,12 @@
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { z } from "zod";
+import {
+  adminWorkItemSourceGroups,
+  type AdminRepoWorkItemKind,
+  type AdminRepoWorkItemLifecycle,
+  type AdminRepoWorkItemSourceType,
+  type AdminWorkItemSourceGroup,
+} from "@/lib/admin-work-items";
 import type { Json } from "@/lib/supabase/database";
 
 export const adminCaptureItemTypes = ["bug", "change_request", "context_capture"] as const;
@@ -26,6 +33,18 @@ export type AdminCaptureItemType = (typeof adminCaptureItemTypes)[number];
 export type AdminCaptureStatus = (typeof adminCaptureStatuses)[number];
 export type AdminCapturePriority = (typeof adminCapturePriorities)[number];
 export type AdminCaptureTargetRole = (typeof adminCaptureTargetRoles)[number];
+export type AdminCaptureSourceGroupFilter = AdminWorkItemSourceGroup;
+
+export interface AdminCaptureRepoWorkItemView {
+  sourcePath: string;
+  sourceType: AdminRepoWorkItemSourceType;
+  workItemKind: AdminRepoWorkItemKind;
+  workItemLifecycle: AdminRepoWorkItemLifecycle;
+  sourceGroup: Exclude<AdminWorkItemSourceGroup, "all_work">;
+  sourceGroupLabel: string;
+  sourceLabel: string;
+  workItemStatus: string | null;
+}
 
 export type AdminCaptureFailureReason =
   | "authentication_required"
@@ -68,6 +87,7 @@ export interface AdminCaptureItemView {
   };
   metadata: Json;
   source: "captured_ui" | "quick_note" | "repo_import";
+  repoWorkItem: AdminCaptureRepoWorkItemView | null;
   promptReady: boolean;
   createdAt: string;
   updatedAt: string;
@@ -125,6 +145,7 @@ export const adminCaptureItemTypeSchema = z.enum(adminCaptureItemTypes);
 export const adminCaptureStatusSchema = z.enum(adminCaptureStatuses);
 export const adminCapturePrioritySchema = z.enum(adminCapturePriorities);
 export const adminCaptureTargetRoleSchema = z.enum(adminCaptureTargetRoles);
+export const adminCaptureSourceGroupSchema = z.enum(adminWorkItemSourceGroups);
 
 const optionalTrimmedString = (max: number) =>
   z
@@ -193,6 +214,7 @@ export const adminCaptureListInputSchema = z.preprocess(
       itemType: adminCaptureItemTypeSchema.nullable().optional(),
       priority: adminCapturePrioritySchema.nullable().optional(),
       targetRole: adminCaptureTargetRoleSchema.nullable().optional(),
+      sourceGroup: adminCaptureSourceGroupSchema.default("all_work"),
       includeArchived: z.boolean().default(false),
       search: z.string().trim().max(120).nullable().optional(),
       limit: z.number().int().min(1).max(200).default(50),

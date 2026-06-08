@@ -21,6 +21,11 @@ import {
 } from "@/lib/admin-capture";
 import type { AdminAccessContext, AdminAccessResult } from "@/lib/admin-access.server";
 import { requireAdminAccessForCurrentRequest } from "@/lib/admin-access.server";
+import {
+  getAdminRepoWorkItemMetadata,
+  isAdminRepoWorkItemSourceType,
+  isAdminWorkItemSourceGroup,
+} from "@/lib/admin-work-items";
 import type { Database, Json } from "@/lib/supabase/database";
 import { hasSupabaseServerEnv } from "@/lib/supabase/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
@@ -47,6 +52,7 @@ const SECRET_METADATA_VALUE_PATTERN =
 type AdminCaptureItemRow = Database["public"]["Tables"]["admin_capture_items"]["Row"];
 type AdminCaptureItemInsert = Database["public"]["Tables"]["admin_capture_items"]["Insert"];
 type AdminCaptureItemUpdate = Database["public"]["Tables"]["admin_capture_items"]["Update"];
+type RepoWorkItemView = NonNullable<AdminCaptureItemView["repoWorkItem"]>;
 
 export type AdminCaptureRow = AdminCaptureItemRow;
 
@@ -665,6 +671,10 @@ export function createSupabaseAdminCaptureRepository(
         query = query.eq("target_role", input.targetRole);
       }
 
+      if (input.sourceGroup !== "all_work") {
+        query = query.eq("metadata->>source_group", input.sourceGroup);
+      }
+
       if (input.search) {
         const term = `%${sanitizeSearchTerm(input.search)}%`;
         query = query.or(
@@ -750,6 +760,7 @@ async function requireCaptureAdmin(dependencies: AdminCaptureDependencies): Prom
 
 function mapItemView(row: AdminCaptureRow): AdminCaptureItemView {
   const source = getAdminCaptureRowSource(row);
+  const repoWorkItem = mapRepoWorkItemView(row.metadata);
 
   return {
     id: row.id,
@@ -776,6 +787,7 @@ function mapItemView(row: AdminCaptureRow): AdminCaptureItemView {
     },
     metadata: row.metadata,
     source,
+    repoWorkItem,
     promptReady: Boolean(row.target_role && row.note),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -882,6 +894,11 @@ function stripRepoImportMetadata(input: unknown): Json {
   delete metadata.imported_from_repo;
   delete metadata.source_path;
   delete metadata.source_type;
+  delete metadata.work_item_kind;
+  delete metadata.work_item_lifecycle;
+  delete metadata.source_group;
+  delete metadata.source_group_label;
+  delete metadata.source_label;
   delete metadata.work_item_status;
   delete metadata.import_version;
   delete metadata.admin_capture_status;
@@ -927,6 +944,51 @@ function getRepoImportSource(metadata: Json) {
   return {
     sourcePath: sourcePath.slice(0, 300),
     sourceType: sourceType.slice(0, 80),
+    workItemStatus:
+      typeof metadata.work_item_status === "string" ? metadata.work_item_status.slice(0, 80) : null,
+  };
+}
+
+function mapRepoWorkItemView(metadata: Json): AdminCaptureItemView["repoWorkItem"] {
+  if (!isJsonObject(metadata) || metadata.imported_from_repo !== true) {
+    return null;
+  }
+
+  const sourcePath = typeof metadata.source_path === "string" ? metadata.source_path : null;
+  const sourceType = typeof metadata.source_type === "string" ? metadata.source_type : null;
+
+  if (!sourcePath || !sourceType || !isAdminRepoWorkItemSourceType(sourceType)) {
+    return null;
+  }
+
+  const fallback = getAdminRepoWorkItemMetadata(sourceType);
+  const sourceGroup =
+    typeof metadata.source_group === "string" &&
+    metadata.source_group !== "all_work" &&
+    isAdminWorkItemSourceGroup(metadata.source_group)
+      ? metadata.source_group
+      : fallback.sourceGroup;
+
+  return {
+    sourcePath: sourcePath.slice(0, 300),
+    sourceType,
+    workItemKind:
+      typeof metadata.work_item_kind === "string"
+        ? (metadata.work_item_kind as RepoWorkItemView["workItemKind"])
+        : fallback.workItemKind,
+    workItemLifecycle:
+      typeof metadata.work_item_lifecycle === "string"
+        ? (metadata.work_item_lifecycle as RepoWorkItemView["workItemLifecycle"])
+        : fallback.workItemLifecycle,
+    sourceGroup,
+    sourceGroupLabel:
+      typeof metadata.source_group_label === "string"
+        ? metadata.source_group_label.slice(0, 80)
+        : fallback.sourceGroupLabel,
+    sourceLabel:
+      typeof metadata.source_label === "string"
+        ? metadata.source_label.slice(0, 80)
+        : fallback.sourceLabel,
     workItemStatus:
       typeof metadata.work_item_status === "string" ? metadata.work_item_status.slice(0, 80) : null,
   };

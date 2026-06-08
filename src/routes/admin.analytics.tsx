@@ -2,6 +2,15 @@ import { Link, createFileRoute, redirect, useRouter } from "@tanstack/react-rout
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, type ReactNode } from "react";
 import {
+  AdminWorkspaceMobileNav,
+  AdminWorkspaceSidebar,
+} from "@/components/admin/AdminWorkspaceNav";
+import {
+  getAdminWorkspaceSection,
+  parseAdminAnalyticsSection,
+  type AdminAnalyticsSectionId,
+} from "@/components/admin/admin-workspace-nav-model";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -9,8 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { HitoLogo } from "@/components/ui/hito-logo";
-import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/icon";
 import {
   getAdminAnalytics,
   type AdminAnalyticsExcludedUserRow,
@@ -31,6 +39,9 @@ import type { AdminUserClassification } from "@/lib/admin-user-classification";
 import { APP_NAME } from "@/lib/app-config";
 
 export const Route = createFileRoute("/admin/analytics")({
+  validateSearch: (search: Record<string, unknown>): AdminAnalyticsSearch => ({
+    section: parseAdminAnalyticsSection(search.section ?? search.tab),
+  }),
   head: () => ({
     meta: [
       { title: `Admin analytics — ${APP_NAME}` },
@@ -44,16 +55,20 @@ export const Route = createFileRoute("/admin/analytics")({
   component: AdminAnalyticsPage,
 });
 
-type AdminTab = "overview" | "funnel" | "feedback" | "ai" | "users" | "test-accounts";
+type AdminTab = AdminAnalyticsSectionId;
 
-const ADMIN_SECTIONS: Array<{ key: AdminTab; label: string; icon: HitoIconName }> = [
-  { key: "overview", label: "Overview", icon: "activity" },
-  { key: "funnel", label: "Funnel & Usage", icon: "progress" },
-  { key: "feedback", label: "Feedback", icon: "watch" },
-  { key: "ai", label: "AI & Entitlements", icon: "sparkles" },
-  { key: "users", label: "Users", icon: "user" },
-  { key: "test-accounts", label: "Test accounts", icon: "shield-alert" },
-];
+type AdminAnalyticsSearch = {
+  section: AdminAnalyticsSectionId;
+};
+
+const ADMIN_SECTION_DESCRIPTIONS: Record<AdminTab, string> = {
+  overview: "Top-level admin readback from existing Hito product truth.",
+  funnel: "Activation, plan, and workout usage counts from canonical rows.",
+  feedback: "Garmin evidence and feedback pipeline readiness from backend-shaped truth.",
+  ai: "Entitlement rows, capability usage, and AI readback without exposing raw payloads.",
+  users: "Backend-classified real users, scoped to internal operational readback.",
+  "test-accounts": "Local and excluded QA accounts kept separate from real-user analytics.",
+};
 
 type DeleteState = {
   targetEmail: string | null;
@@ -156,59 +171,31 @@ const initialDeleteState: DeleteState = {
 
 function AdminAnalyticsPage() {
   const { analyticsResult, testAccountsResult } = Route.useLoaderData();
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
-  const activeSection =
-    ADMIN_SECTIONS.find((section) => section.key === activeTab) ?? ADMIN_SECTIONS[0];
+  const search = Route.useSearch();
+  const activeTab = search.section;
+  const activeSection = getAdminWorkspaceSection(activeTab);
 
   return (
     <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
       <div className="hito-workbench-shell [--hito-workbench-sidebar-width:240px]">
-        <aside className="hito-workbench-sidebar">
-          <div className="px-6 pb-10 pt-7">
-            <Link to="/" className="flex items-end gap-2">
-              <HitoLogo decorative className="[--hito-logo-height:1.35rem]" />
-              <span className="font-display text-xl leading-none tracking-tight">Admin</span>
-            </Link>
-            <p className="hito-micro-label mt-1">Local operations</p>
-          </div>
-
-          <AdminSectionNav activeTab={activeTab} onChange={setActiveTab} variant="sidebar" />
-
-          <div className="mt-auto p-4">
-            <div className="hito-row-group">
-              <div className="hito-list-row items-start">
-                <div className="min-w-0">
-                  <div className="hito-micro-label flex items-center gap-2">
-                    <Icon name="shield-alert" size="xs" className="text-signal" />
-                    Admin surface
-                  </div>
-                  <p className="hito-list-row-copy">
-                    Internal counts and local test-account tools without runner shell navigation.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
+        <AdminWorkspaceSidebar activeSection={activeTab} />
 
         <section className="hito-workbench-main">
           <header className="hito-workbench-topbar">
             <div className="flex flex-col gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
               <div className="min-w-0">
                 <div className="hito-workbench-location lg:hidden">
-                  <span className="hito-workbench-location-title">Admin analytics</span>
+                  <span className="hito-workbench-location-title">Admin workspace</span>
                   <span className="hito-workbench-location-meta">
-                    <span>Analytics sections</span>
-                    <span aria-hidden="true">/</span>
                     <span>{activeSection.label}</span>
                   </span>
                 </div>
+                <p className="hito-micro-label">Admin workspace</p>
                 <h1 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-                  Admin analytics
+                  {activeSection.label}
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  Internal operations summary from existing Hito truth. This surface avoids raw
-                  sensitive payloads, production secrets, and broad user management.
+                  {ADMIN_SECTION_DESCRIPTIONS[activeTab]}
                 </p>
               </div>
               <div className="flex flex-wrap items-start gap-2 lg:items-center">
@@ -224,7 +211,7 @@ function AdminAnalyticsPage() {
                 </a>
               </div>
             </div>
-            <AdminSectionNav activeTab={activeTab} onChange={setActiveTab} variant="mobile" />
+            <AdminWorkspaceMobileNav activeSection={activeTab} />
           </header>
 
           <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
@@ -265,55 +252,6 @@ async function loadAdminAnalyticsRouteData() {
   }
 
   return { analyticsResult, testAccountsResult };
-}
-
-function AdminSectionNav({
-  activeTab,
-  onChange,
-  variant,
-}: {
-  activeTab: AdminTab;
-  onChange: (tab: AdminTab) => void;
-  variant: "sidebar" | "mobile";
-}) {
-  const isSidebar = variant === "sidebar";
-
-  return (
-    <div
-      className={isSidebar ? "hito-shell-nav px-3" : "hito-workbench-section-rail lg:hidden"}
-      role="tablist"
-      aria-orientation={isSidebar ? "vertical" : "horizontal"}
-      aria-label="Admin analytics sections"
-    >
-      <div className={isSidebar ? "grid gap-0.5" : "hito-workbench-quick-links"}>
-        {ADMIN_SECTIONS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.key}
-            className={
-              isSidebar ? "hito-shell-nav-row w-full text-left" : "hito-workbench-quick-link"
-            }
-            data-active={activeTab === tab.key ? "true" : undefined}
-            aria-current={!isSidebar && activeTab === tab.key ? "location" : undefined}
-            onClick={() => onChange(tab.key)}
-          >
-            {isSidebar ? <Icon name={tab.icon} className="hito-shell-nav-icon" /> : null}
-            {tab.label}
-            {isSidebar && activeTab === tab.key ? <span className="hito-shell-nav-dot" /> : null}
-          </button>
-        ))}
-        <Link
-          to="/admin/capture"
-          className={isSidebar ? "hito-shell-nav-row" : "hito-workbench-quick-link"}
-        >
-          {isSidebar ? <Icon name="plan-note" className="hito-shell-nav-icon" /> : null}
-          Backlog
-        </Link>
-      </div>
-    </div>
-  );
 }
 
 function AnalyticsContent({

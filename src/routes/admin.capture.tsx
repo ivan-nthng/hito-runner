@@ -2,6 +2,10 @@ import { Link, createFileRoute, redirect, useRouter } from "@tanstack/react-rout
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
+  AdminWorkspaceMobileNav,
+  AdminWorkspaceSidebar,
+} from "@/components/admin/AdminWorkspaceNav";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -9,8 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { HitoLogo } from "@/components/ui/hito-logo";
-import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/icon";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import {
   adminCaptureItemTypes,
@@ -28,16 +31,23 @@ import {
   type AdminCaptureItemView,
   type AdminCapturePriority,
   type AdminCaptureResult,
+  type AdminCaptureSourceGroupFilter,
   type AdminCaptureStatus,
   type AdminCaptureTargetRole,
 } from "@/lib/admin-capture";
 import { APP_NAME } from "@/lib/app-config";
+import {
+  adminWorkItemSourceGroupOptions,
+  getAdminWorkItemSourceGroupLabel,
+  isAdminWorkItemSourceGroup,
+} from "@/lib/admin-work-items";
 
 type CaptureStatusFilter = AdminCaptureStatus | "all";
 type NullableFilter<T extends string> = T | "all";
 
 type CaptureSearch = {
   status: CaptureStatusFilter;
+  source: AdminCaptureSourceGroupFilter;
   type: NullableFilter<AdminCaptureItemType>;
   priority: NullableFilter<AdminCapturePriority>;
   role: NullableFilter<AdminCaptureTargetRole>;
@@ -73,6 +83,11 @@ type RepoDerivedInfo = {
   markdownType: string | null;
   markdownPriority: string | null;
   markdownNextRole: string | null;
+  workItemKind: string | null;
+  workItemLifecycle: string | null;
+  sourceGroup: string | null;
+  sourceGroupLabel: string | null;
+  sourceLabel: string | null;
   missingRequiredFields: string[];
   invalidRequiredFields: string[];
 };
@@ -91,21 +106,6 @@ const EDITABLE_CAPTURE_STATUS_OPTIONS: Array<{ value: AdminCaptureStatus; label:
   { value: "archived", label: "archived" },
 ];
 
-const ADMIN_CAPTURE_NAV: Array<{
-  label: string;
-  icon: HitoIconName;
-  href: "/admin/analytics" | "/admin/capture";
-  active?: boolean;
-}> = [
-  { label: "Overview", icon: "activity", href: "/admin/analytics" },
-  { label: "Funnel & Usage", icon: "progress", href: "/admin/analytics" },
-  { label: "Feedback", icon: "watch", href: "/admin/analytics" },
-  { label: "AI & Entitlements", icon: "sparkles", href: "/admin/analytics" },
-  { label: "Users", icon: "user", href: "/admin/analytics" },
-  { label: "Test accounts", icon: "shield-alert", href: "/admin/analytics" },
-  { label: "Backlog", icon: "plan-note", href: "/admin/capture", active: true },
-];
-
 const initialQuickNoteState: QuickNoteState = {
   open: false,
   itemType: "context_capture",
@@ -122,6 +122,7 @@ const initialQuickNoteState: QuickNoteState = {
 export const Route = createFileRoute("/admin/capture")({
   validateSearch: (search: Record<string, unknown>): CaptureSearch => ({
     status: parseCaptureStatus(search.status),
+    source: parseCaptureSourceGroup(search.source),
     type: parseNullableFilter(search.type, adminCaptureItemTypes),
     priority: parseNullableFilter(search.priority, adminCapturePriorities),
     role: parseNullableFilter(search.role, adminCaptureTargetRoles),
@@ -129,10 +130,10 @@ export const Route = createFileRoute("/admin/capture")({
   }),
   head: () => ({
     meta: [
-      { title: `Backlog — ${APP_NAME}` },
+      { title: `Work items — ${APP_NAME}` },
       {
         name: "description",
-        content: "Internal Hito capture backlog for admin triage and manual Codex handoff.",
+        content: "Internal Hito work-item surface for repo tasks, plans, specs, and admin notes.",
       },
     ],
   }),
@@ -142,6 +143,7 @@ export const Route = createFileRoute("/admin/capture")({
       itemType: search.type === "all" ? null : search.type,
       priority: search.priority === "all" ? null : search.priority,
       targetRole: search.role === "all" ? null : search.role,
+      sourceGroup: search.source,
       search: captureQueryText(search.q) || null,
       limit: 100,
     };
@@ -209,15 +211,17 @@ function AdminCapturePage() {
   const activeFilterCount = useMemo(
     () =>
       [
+        search.source !== "all_work",
         search.type !== "all",
         search.priority !== "all",
         search.role !== "all",
         Boolean(captureQueryText(search.q)),
       ].filter(Boolean).length,
-    [search.priority, search.q, search.role, search.type],
+    [search.priority, search.q, search.role, search.source, search.type],
   );
 
   const clearFiltersHref = buildCaptureHref(search, {
+    source: "all_work",
     type: "all",
     priority: "all",
     role: "all",
@@ -498,26 +502,27 @@ function AdminCapturePage() {
   return (
     <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
       <div className="hito-workbench-shell [--hito-workbench-sidebar-width:240px]">
-        <AdminCaptureSidebar />
+        <AdminWorkspaceSidebar activeSection="work-items" />
 
         <section className="hito-workbench-main">
           <header className="hito-workbench-topbar">
             <div className="flex flex-col gap-4 px-5 py-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-10">
               <div className="min-w-0">
                 <div className="hito-workbench-location lg:hidden">
-                  <span className="hito-workbench-location-title">Admin</span>
+                  <span className="hito-workbench-location-title">Admin workspace</span>
                   <span className="hito-workbench-location-meta">
-                    <span>Backlog</span>
+                    <span>Work items</span>
                     <span aria-hidden="true">/</span>
                     <span>{formatStatusLabel(search.status)}</span>
                   </span>
                 </div>
-                <p className="hito-micro-label">Admin</p>
+                <p className="hito-micro-label">Admin workspace</p>
                 <h1 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-                  Backlog
+                  Work items
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  Review captured work and copy prompts for manual handoff.
+                  Review repo work items, active plans, specs, briefs, and admin notes for manual
+                  handoff.
                 </p>
               </div>
               <div className="flex flex-wrap items-start gap-2 lg:items-center">
@@ -539,7 +544,7 @@ function AdminCapturePage() {
                 </a>
               </div>
             </div>
-            <AdminCaptureRouteRail />
+            <AdminWorkspaceMobileNav activeSection="work-items" />
           </header>
 
           <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
@@ -591,77 +596,11 @@ function CapturePendingState() {
     <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
       <div className="mx-auto flex min-h-screen max-w-3xl items-center px-6">
         <section className="hito-state-surface w-full">
-          <p className="hito-label">Loading backlog...</p>
-          <h1 className="hito-page-title mt-3">Fetching captured items and notes.</h1>
+          <p className="hito-label">Loading work items...</p>
+          <h1 className="hito-page-title mt-3">Fetching repo work items and notes.</h1>
         </section>
       </div>
     </main>
-  );
-}
-
-function AdminCaptureSidebar() {
-  return (
-    <aside className="hito-workbench-sidebar">
-      <div className="px-6 pb-10 pt-7">
-        <Link to="/" className="flex items-end gap-2">
-          <HitoLogo decorative className="[--hito-logo-height:1.35rem]" />
-          <span className="font-display text-xl leading-none tracking-tight">Admin</span>
-        </Link>
-        <p className="hito-micro-label mt-1">Internal tools</p>
-      </div>
-
-      <nav className="hito-shell-nav px-3" aria-label="Admin surfaces">
-        <div className="grid gap-0.5">
-          {ADMIN_CAPTURE_NAV.map((item) => (
-            <Link
-              key={item.label}
-              to={item.href}
-              className="hito-shell-nav-row"
-              data-active={item.active ? "true" : undefined}
-            >
-              <Icon name={item.icon} className="hito-shell-nav-icon" />
-              {item.label}
-              {item.active ? <span className="hito-shell-nav-dot" /> : null}
-            </Link>
-          ))}
-        </div>
-      </nav>
-
-      <div className="mt-auto p-4">
-        <div className="hito-row-group">
-          <div className="hito-list-row items-start">
-            <div className="min-w-0">
-              <div className="hito-micro-label flex items-center gap-2">
-                <Icon name="shield-alert" size="xs" className="text-signal" />
-                Manual handoff
-              </div>
-              <p className="hito-list-row-copy">
-                Capture items stay admin-only. Prompt copy is manual; nothing auto-dispatches.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function AdminCaptureRouteRail() {
-  return (
-    <nav className="hito-workbench-section-rail lg:hidden" aria-label="Admin surfaces">
-      <div className="hito-workbench-quick-links">
-        {ADMIN_CAPTURE_NAV.map((item) => (
-          <Link
-            key={item.label}
-            to={item.href}
-            className="hito-workbench-quick-link"
-            data-active={item.active ? "true" : undefined}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </div>
-    </nav>
   );
 }
 
@@ -731,7 +670,7 @@ function CaptureUtilityRow({
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {isSearchOpen ? (
           <label className="hito-field hito-field-sm hito-data-table-search">
-            <span className="sr-only">Search backlog</span>
+            <span className="sr-only">Search work items</span>
             <Icon name="search" size="xs" className="text-muted-foreground" />
             <input
               autoFocus
@@ -748,7 +687,7 @@ function CaptureUtilityRow({
             />
             {draftQuery ? (
               <a
-                aria-label="Clear search backlog"
+                aria-label="Clear work-item search"
                 className="hito-button hito-button-ghost hito-button-xs hito-data-table-search-clear"
                 href={buildCaptureHref(search, { q: "" })}
                 onMouseDown={(event) => event.preventDefault()}
@@ -760,7 +699,7 @@ function CaptureUtilityRow({
         ) : (
           <button
             type="button"
-            aria-label="Search backlog"
+            aria-label="Search work items"
             className="hito-button hito-button-secondary hito-button-sm hito-data-table-icon-button"
             onClick={() => setSearchOpen(true)}
           >
@@ -775,8 +714,8 @@ function CaptureUtilityRow({
               className="hito-button hito-button-secondary hito-button-sm hito-data-table-filter-summary"
               aria-label={
                 activeFilterCount > 0
-                  ? `${activeFilterCount} active backlog filters`
-                  : "Backlog filters"
+                  ? `${activeFilterCount} active work-item filters`
+                  : "Work-item filters"
               }
             >
               <Icon name="settings" size="xs" />
@@ -821,6 +760,13 @@ function CaptureUtilityRow({
                 <DropdownMenuSeparator />
               </>
             ) : null}
+            <DropdownMenuLabel className="hito-micro-label">Source</DropdownMenuLabel>
+            <CaptureFilterMenuItems
+              currentValue={search.source}
+              options={adminWorkItemSourceGroupOptions}
+              onSelect={(source) => goToFilter({ source: source as AdminCaptureSourceGroupFilter })}
+            />
+            <DropdownMenuSeparator />
             <DropdownMenuLabel className="hito-micro-label">Type</DropdownMenuLabel>
             <CaptureFilterMenuItems
               currentValue={search.type}
@@ -934,9 +880,7 @@ function QuickNotePanel({
                 <Icon name="plus" size="xs" className="text-signal" />
                 Add quick note
               </span>
-              <span className="hito-list-row-copy">
-                Capture a backlog item without selecting UI.
-              </span>
+              <span className="hito-list-row-copy">Capture a work item without selecting UI.</span>
             </span>
             <Icon name="chevron-down" size="sm" />
           </>
@@ -955,7 +899,7 @@ function QuickNotePanel({
         >
           <div className="grid gap-1">
             <h2 className="hito-body font-medium text-foreground">Add quick note</h2>
-            <p className="hito-field-helper">Capture a backlog item without selecting UI.</p>
+            <p className="hito-field-helper">Capture a work item without selecting UI.</p>
           </div>
           <div className="grid gap-4 lg:grid-cols-4">
             <SelectField
@@ -1133,8 +1077,8 @@ function CaptureBacklogList({
     ) : (
       <EmptyState
         icon="plan-note"
-        title="No backlog items yet."
-        description="Captured UI notes and quick admin notes will appear here."
+        title="No work items yet."
+        description="Repo work items, captured UI notes, and quick admin notes will appear here."
       />
     );
   }
@@ -1163,7 +1107,7 @@ function CaptureBacklogList({
                   </code>
                   <span>{formatDateTime(item.createdAt)}</span>
                   <span>{formatItemSource(item)}</span>
-                  {repoSource.sourceType ? <span>{repoSource.sourceType}</span> : null}
+                  {repoSource.sourceGroupLabel ? <span>{repoSource.sourceGroupLabel}</span> : null}
                 </span>
               </button>
               <div className="hito-backlog-row-metadata flex min-w-0 flex-wrap items-center justify-start gap-1.5 md:justify-end">
@@ -1359,9 +1303,9 @@ function CaptureItemDetail({
                 tone="rollout"
                 tooltip="This item is mirrored from the repo. Change task truth in the source markdown, then refresh the backlog import."
               >
-                repo mirror
+                {repoSource.sourceLabel ?? "Repo mirror"}
               </HitoMetadataTag>
-              <span>Markdown is the source of truth. This item is read-only in Backlog.</span>
+              <span>Markdown is the source of truth. This item is read-only in Work items.</span>
             </div>
             {repoSource.missingRequiredFields.length > 0 ? (
               <MetadataHint label="Missing metadata" fields={repoSource.missingRequiredFields} />
@@ -1441,8 +1385,20 @@ function CaptureItemDetail({
             {repoSource.sourcePath ? (
               <DetailRow label="Source path" value={repoSource.sourcePath} code />
             ) : null}
+            {repoSource.sourceLabel ? (
+              <DetailRow label="Source" value={repoSource.sourceLabel} />
+            ) : null}
+            {repoSource.sourceGroupLabel ? (
+              <DetailRow label="Source group" value={repoSource.sourceGroupLabel} />
+            ) : null}
             {repoSource.sourceType ? (
               <DetailRow label="Source type" value={repoSource.sourceType} />
+            ) : null}
+            {repoSource.workItemKind ? (
+              <DetailRow label="Work item kind" value={repoSource.workItemKind} />
+            ) : null}
+            {repoSource.workItemLifecycle ? (
+              <DetailRow label="Lifecycle" value={repoSource.workItemLifecycle} />
             ) : null}
             {repoSource.workItemStatus ? (
               <DetailRow label="Work item status" value={repoSource.workItemStatus} />
@@ -1544,8 +1500,8 @@ function CaptureUnavailableState({
 }) {
   const title =
     result.reason === "supabase_admin_unavailable"
-      ? "Backlog unavailable."
-      : "Backlog unavailable.";
+      ? "Work items unavailable."
+      : "Work items unavailable.";
 
   return (
     <section className="hito-surface-flat p-6" data-tone="warning">
@@ -1671,13 +1627,13 @@ function MetadataMenu({
 function readOnlyMetadataTooltip(kind: "status" | "type" | "priority" | "role" | undefined) {
   switch (kind) {
     case "status":
-      return "Status from backlog source. Change it in the source task or markdown, then refresh the backlog import.";
+      return "Status from source markdown. Change it in the source work item, then refresh the import.";
     case "type":
-      return "Type from backlog source. Change it in the source task or markdown, then refresh the backlog import.";
+      return "Type from source markdown. Change it in the source work item, then refresh the import.";
     case "priority":
-      return "Priority from backlog source. Change it in the source task or markdown, then refresh the backlog import.";
+      return "Priority from source markdown. Change it in the source work item, then refresh the import.";
     case "role":
-      return "Owner role from backlog source. Change it in the source task or markdown, then refresh the backlog import.";
+      return "Owner role from source markdown. Change it in the source work item, then refresh the import.";
     default:
       return null;
   }
@@ -1749,6 +1705,7 @@ function buildCaptureHref(search: CaptureSearch, patch: Partial<CaptureSearch>) 
   const next = { ...search, ...patch };
   const params = new URLSearchParams();
   params.set("status", next.status);
+  params.set("source", next.source);
   params.set("type", next.type);
   params.set("priority", next.priority);
   params.set("role", next.role);
@@ -1800,6 +1757,15 @@ function getActiveCaptureFilters(search: CaptureSearch) {
       label: "Search",
       value: query,
       removePatch: { q: "" },
+    });
+  }
+
+  if (search.source !== "all_work") {
+    filters.push({
+      id: "source",
+      label: "Source",
+      value: getAdminWorkItemSourceGroupLabel(search.source),
+      removePatch: { source: "all_work" },
     });
   }
 
@@ -1870,8 +1836,10 @@ function formatCaptureMutationError(result: Extract<AdminCaptureResult<unknown>,
 }
 
 function formatItemSource(item: AdminCaptureItemView) {
-  if (getRepoDerivedInfo(item).readOnly) {
-    return "Repo import";
+  const repoSource = getRepoDerivedInfo(item);
+
+  if (repoSource.readOnly) {
+    return repoSource.sourceLabel ?? "Repo import";
   }
 
   return item.source === "captured_ui" ? "Captured UI" : "Quick note";
@@ -1879,19 +1847,27 @@ function formatItemSource(item: AdminCaptureItemView) {
 
 function getRepoDerivedInfo(item: AdminCaptureItemView): RepoDerivedInfo {
   const metadata = isJsonObject(item.metadata) ? item.metadata : {};
-  const sourcePath = getMetadataString(metadata.source_path);
+  const repoWorkItem = item.repoWorkItem;
+  const sourcePath = repoWorkItem?.sourcePath ?? getMetadataString(metadata.source_path);
   const importedFromRepo =
     metadata.imported_from_repo === true || item.source === "repo_import" || Boolean(sourcePath);
 
   return {
     readOnly: importedFromRepo,
     sourcePath,
-    sourceType: getMetadataString(metadata.source_type),
-    workItemStatus: getMetadataString(metadata.work_item_status),
+    sourceType: repoWorkItem?.sourceType ?? getMetadataString(metadata.source_type),
+    workItemStatus: repoWorkItem?.workItemStatus ?? getMetadataString(metadata.work_item_status),
     markdownStatus: getMetadataString(metadata.markdown_status),
     markdownType: getMetadataString(metadata.markdown_type),
     markdownPriority: getMetadataString(metadata.markdown_priority),
     markdownNextRole: getMetadataString(metadata.markdown_next_role),
+    workItemKind: repoWorkItem?.workItemKind ?? getMetadataString(metadata.work_item_kind),
+    workItemLifecycle:
+      repoWorkItem?.workItemLifecycle ?? getMetadataString(metadata.work_item_lifecycle),
+    sourceGroup: repoWorkItem?.sourceGroup ?? getMetadataString(metadata.source_group),
+    sourceGroupLabel:
+      repoWorkItem?.sourceGroupLabel ?? getMetadataString(metadata.source_group_label),
+    sourceLabel: repoWorkItem?.sourceLabel ?? getMetadataString(metadata.source_label),
     missingRequiredFields: getMetadataStringList(metadata.missing_required_fields),
     invalidRequiredFields: getMetadataStringList(metadata.invalid_required_fields),
   };
@@ -1985,6 +1961,10 @@ function parseCaptureStatus(value: unknown): CaptureStatusFilter {
   }
 
   return "all";
+}
+
+function parseCaptureSourceGroup(value: unknown): AdminCaptureSourceGroupFilter {
+  return typeof value === "string" && isAdminWorkItemSourceGroup(value) ? value : "all_work";
 }
 
 function parseNullableFilter<T extends string>(

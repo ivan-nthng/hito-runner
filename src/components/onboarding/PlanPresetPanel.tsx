@@ -271,6 +271,7 @@ function PlanPresetCard({
           <span>{card.durationWeeks} weeks</span>
           <span>{card.daysPerWeek} days/week</span>
         </div>
+        <p className="hito-field-helper">{durationReadback(card)}</p>
       </CardHeader>
 
       <CardContent className="hito-plan-preset-card-content grid flex-1 gap-4">
@@ -565,6 +566,7 @@ function PlanPresetLearnMoreDialog({
                 label="Range"
                 value={`${card.startDate} to ${card.estimatedEndDate} · ${card.durationWeeks} weeks`}
               />
+              <PlanPresetFact label="Program sizing" value={durationReadback(card)} />
               <PlanPresetFact label="Weekly rhythm" value={`${card.daysPerWeek} runs/week`} />
               <PlanPresetFact label="Long run" value={card.longRunDay} />
               <PlanPresetFact label="Workout mix" value={card.workoutMixSummary} />
@@ -623,6 +625,8 @@ function PlanPresetReviewScaffold({
   onConfirm: () => void;
 }) {
   const review = draft.reviewShape;
+  const finalOutcome = finalOutcomeReadback(review);
+  const progressionReadback = adaptiveProgressionReadback(review);
 
   return (
     <div className="hito-row-group" data-preset-review="true">
@@ -630,7 +634,8 @@ function PlanPresetReviewScaffold({
         <div className="min-w-0">
           <p className="hito-list-row-title">{review.programFamily} review</p>
           <p className="hito-list-row-copy">
-            This review is non-mutating. Nothing changes until you confirm this preset.
+            {finalOutcome}. This review is non-mutating, and nothing changes until you confirm this
+            preset.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -660,6 +665,7 @@ function PlanPresetReviewScaffold({
             label="Range"
             value={`${review.startDate} to ${review.estimatedEndDate} · ${review.durationWeeks} weeks`}
           />
+          <PlanPresetFact label="Program sizing" value={durationReadback(review)} />
           <PlanPresetFact label="Weekly rhythm" value={review.weeklyRhythmSummary} />
           <PlanPresetFact
             label="Days and rest"
@@ -668,6 +674,7 @@ function PlanPresetReviewScaffold({
             }`}
           />
           <PlanPresetFact label="Long run" value={review.longRunDay} />
+          <PlanPresetFact label="Final outcome" value={finalOutcome} />
           <PlanPresetFact label="Workout mix" value={review.workoutMixSummary} />
           <PlanPresetFact label="Metric policy" value={review.metricModeSummary} />
         </div>
@@ -677,6 +684,7 @@ function PlanPresetReviewScaffold({
         <div className="grid gap-3">
           <PlanPresetFact label="Why this fits" value={review.whyThisFits} />
           <PlanPresetFact label="Level fit" value={review.levelFitSummary} />
+          <PlanPresetFact label="Progression" value={progressionReadback} />
           <div>
             <p className="hito-label">Key workout types</p>
             <p className="hito-body-small text-muted-foreground">
@@ -700,10 +708,7 @@ function PlanPresetReviewScaffold({
         <div className="grid gap-3 sm:grid-cols-3">
           <PlanPresetFact label="Rows" value={`${review.rowCounts.calendarRows} calendar rows`} />
           <PlanPresetFact label="Runs" value={`${review.rowCounts.nonRestRows} non-rest rows`} />
-          <PlanPresetFact
-            label="Source"
-            value={`${draft.sourceKind} · persisted ${String(draft.persisted)}`}
-          />
+          <PlanPresetFact label="Review boundary" value="Backend-built review · not saved yet" />
         </div>
       </div>
     </div>
@@ -717,6 +722,54 @@ function PlanPresetFact({ label, value }: { label: string; value: string }) {
       <p className="hito-body-small text-muted-foreground">{value}</p>
     </div>
   );
+}
+
+function durationReadback({
+  daysPerWeek,
+  durationWeeks,
+}: Pick<PlanPresetCardViewModel, "daysPerWeek" | "durationWeeks">) {
+  if (daysPerWeek <= 2) {
+    return `${durationWeeks} weeks with a longer runway for ${daysPerWeek} days/week.`;
+  }
+
+  return `${durationWeeks} weeks sized from your availability and level.`;
+}
+
+function finalOutcomeReadback(review: PlanPresetReviewDraftContract["reviewShape"]) {
+  const rule = review.adaptiveProgram.finalOutcomeRule.toLowerCase();
+
+  if (rule.includes("10k")) {
+    return "Ends with a 10K completion or checkpoint day";
+  }
+
+  if (rule.includes("half")) {
+    return "Ends with a half-marathon readiness marker";
+  }
+
+  if (rule.includes("base endpoint") || rule.includes("race peak")) {
+    return "Ends with a marathon base endpoint, not a race-peak promise";
+  }
+
+  return sentenceCase(review.adaptiveProgram.finalOutcomeRule);
+}
+
+function adaptiveProgressionReadback(review: PlanPresetReviewDraftContract["reviewShape"]) {
+  const cleanLoadSummary = review.adaptiveProgram.loadAdjustmentSummary
+    .split(" Builder artifacts:")[0]
+    .trim();
+  const cutback = review.adaptiveProgram.cutbackFrequency.replaceAll("_", " ");
+
+  return `${cleanLoadSummary} Cutback rhythm: ${cutback}.`;
+}
+
+function sentenceCase(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "Final outcome is defined by the backend builder.";
+  }
+
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
 function distanceIdentityLabel(cardId: PlanPresetCardId) {

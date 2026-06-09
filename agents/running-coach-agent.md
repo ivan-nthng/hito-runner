@@ -17,6 +17,19 @@ When the requested coaching output is large, Running Coach may create or update 
 files instead of writing a long chat response. This is the preferred path for plan matrices,
 training-program tables, doctrine tables, scenario matrices, or backend-ready coaching contracts.
 
+## Primary Skills
+
+- `skills/hito-running-coach-audit/SKILL.md`
+  Use for training-plan quality, running doctrine, workout diversity, progression, recovery,
+  terrain/hill logic, metric-target realism, and sports-safety guardrail reviews.
+- `skills/hito-plan-writing-and-closeout/SKILL.md`
+  Use when coaching work updates an active plan or produces a plan-linked artifact.
+- `skills/hito-prompt-handoff/SKILL.md`
+  Use when handing coaching rules to Backend, Frontend, QA, or Product.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -224,6 +237,9 @@ QA or Backend.
 8. Next recommended role
 9. Blockers
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

@@ -1,4 +1,8 @@
 import {
+  resolveRunningPlanPreviewSegments,
+  runningPlanPrescriptionIsExact,
+} from "@/lib/plan-creation-engine/prescription-resolver";
+import {
   getRunningPlanWorkoutDayTemplate,
   resolveRunningPlanEndpointTemplate,
   RUNNING_PLAN_SOURCE_MODEL,
@@ -18,7 +22,6 @@ import {
   type RunningPlanDistanceFamily,
   type RunningPlanEndpointTemplate,
   type RunningPlanRunnerLevel,
-  type RunningPlanSegmentPrescription,
   type RunningPlanTargetTruthMode,
   type RunningPlanWatchExecutableSegmentTemplate,
   type RunningPlanWorkoutDayKind,
@@ -342,10 +345,20 @@ function buildTenKCalendarRows(
       loadContext: input.loadContext,
     });
 
-    rows.push(buildWorkoutRow({ date, weekNumber, dayNumber, weekday, workoutDayKind }));
+    rows.push(
+      buildWorkoutRow({
+        date,
+        weekNumber,
+        dayNumber,
+        weekday,
+        workoutDayKind,
+        runnerLevel: input.runnerLevel,
+        loadContext: input.loadContext,
+      }),
+    );
   }
 
-  return enforceRecoveryAfterStressors(rows);
+  return enforceRecoveryAfterStressors(rows, input);
 }
 
 function buildWorkoutRow({
@@ -354,17 +367,30 @@ function buildWorkoutRow({
   dayNumber,
   weekday,
   workoutDayKind,
+  runnerLevel,
+  loadContext,
 }: {
   date: string;
   weekNumber: number;
   dayNumber: number;
   weekday: WeekdayName;
   workoutDayKind: RunningPlanWorkoutDayKind;
+  runnerLevel: RunningPlanRunnerLevel;
+  loadContext: TenKPlanNormalizedInputSummary["loadContext"];
 }): TenKPlanCalendarRow {
   const template =
     workoutDayKind === "final_selected_distance_day"
       ? resolveRunningPlanEndpointTemplate("10K")
       : getRunningPlanWorkoutDayTemplate(workoutDayKind);
+  const segments = resolveRunningPlanPreviewSegments({
+    family: "10K",
+    workoutDayKind,
+    runnerLevel,
+    loadContext,
+    weekNumber,
+    horizonWeeks: TEN_K_PLAN_BUILDER_WEEKS,
+    segments: template.segments,
+  });
 
   return {
     rowId: `10k-w${weekNumber}-d${dayNumber}-${workoutDayKind}`,
@@ -379,7 +405,7 @@ function buildWorkoutRow({
     primaryContract: template.primaryContract,
     targetTruthModes: template.targetTruthModes,
     cueRole: template.cueRole,
-    segments: template.segments,
+    segments,
     endpointGateId:
       "endpointGateId" in template
         ? (template as RunningPlanEndpointTemplate).endpointGateId
@@ -460,6 +486,7 @@ function selectWorkoutDayKind({
 
 function enforceRecoveryAfterStressors(
   rows: readonly TenKPlanCalendarRow[],
+  input: TenKPlanNormalizedInputSummary,
 ): readonly TenKPlanCalendarRow[] {
   const repairedRows = [...rows];
 
@@ -495,6 +522,8 @@ function enforceRecoveryAfterStressors(
       dayNumber: nextRow.dayNumber,
       weekday: nextRow.weekday,
       workoutDayKind: "recovery",
+      runnerLevel: input.runnerLevel,
+      loadContext: input.loadContext,
     });
   }
 
@@ -572,6 +601,7 @@ function validateTenKPlanPreview({
       "threshold_in_10k_preview",
       "unsafe_beginner_development_touch",
       "post_stressor_recovery_spacing",
+      "unresolved_executable_ranges",
     ],
   };
 }
@@ -640,8 +670,8 @@ function validateWatchExecutableRows(rows: readonly TenKPlanCalendarRow[], issue
     }
 
     for (const segment of row.segments) {
-      if (!segmentPrescriptionIsNumeric(segment.primaryPrescription)) {
-        issues.push(`${row.rowId}.${segment.id} lacks numeric execution structure.`);
+      if (!runningPlanPrescriptionIsExact(segment.primaryPrescription)) {
+        issues.push(`${row.rowId}.${segment.id} lacks exact numeric execution structure.`);
       }
     }
   }
@@ -873,61 +903,6 @@ function endpointTemplateMainDistanceMeters(template: RunningPlanEndpointTemplat
   }
 
   return distanceMeters.min;
-}
-
-function segmentPrescriptionIsNumeric(prescription: RunningPlanSegmentPrescription) {
-  switch (prescription.mode) {
-    case "time":
-    case "open_warmup":
-    case "open_cooldown":
-    case "time_with_default_hr_cap":
-      return rangeIsPositive(prescription.durationSeconds);
-    case "distance":
-    case "distance_with_default_hr_cap":
-      return rangeIsPositive(prescription.distanceMeters);
-    case "recovery_time":
-      return rangeIsPositive(prescription.recoveryDurationSeconds);
-    case "recovery_distance":
-      return rangeIsPositive(prescription.recoveryDistanceMeters);
-    case "free_run_with_cap":
-      return (
-        rangeIsPositive(prescription.durationSecondsOrDistanceMeters) &&
-        prescription.explicitCap.length > 0
-      );
-    case "repeat":
-      return (
-        rangeIsPositive(prescription.repeatCount) &&
-        repeatPrescriptionIsNumeric(prescription.work) &&
-        repeatPrescriptionIsNumeric(prescription.recovery)
-      );
-  }
-}
-
-function repeatPrescriptionIsNumeric(
-  prescription:
-    | Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["work"]
-    | Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["recovery"],
-) {
-  if (prescription.mode === "time") {
-    return rangeIsPositive(prescription.durationSeconds);
-  }
-  if (prescription.mode === "distance") {
-    return rangeIsPositive(prescription.distanceMeters);
-  }
-  if (prescription.mode === "recovery_time") {
-    return rangeIsPositive(prescription.recoveryDurationSeconds);
-  }
-
-  return rangeIsPositive(prescription.recoveryDistanceMeters);
-}
-
-function rangeIsPositive(range: { min: number; max: number }) {
-  return (
-    Number.isFinite(range.min) &&
-    Number.isFinite(range.max) &&
-    range.min > 0 &&
-    range.max >= range.min
-  );
 }
 
 function isIsoDate(value: string) {

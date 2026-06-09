@@ -7,11 +7,9 @@ import {
   FIRST_PLAN_TERRAIN_FOCUS_VALUES,
   FIRST_PLAN_WATCH_ACCESS_VALUES,
 } from "@/lib/first-plan-authoring-utils";
-import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import { FITNESS_LEVEL_VALUES } from "@/lib/runner-training-preferences";
 import {
   structuredFirstPlanOnboardingInputSchema,
-  type StructuredFirstPlanAuthoringInput,
   type StructuredFirstPlanOnboardingInput,
   type StructuredFirstPlanOnboardingRequestInput,
 } from "@/lib/structured-first-plan-onboarding";
@@ -249,67 +247,5 @@ export interface PlanPresetEligibilityResult {
     doesNotMutatePlan: true;
     persistsNothing: true;
     frontendMustNotComputeEligibility: true;
-  };
-}
-
-export interface PlanPresetReviewDraftContract {
-  sourceKind: "plan_preset_v1";
-  source_kind: "plan_preset_v1";
-  sourceStatus: "preset_recipe_expanded";
-  presetId: PlanPresetRecipeId;
-  presetVersion: PlanPresetRecipeSummary["presetVersion"];
-  persisted: false;
-  authoringInput: StructuredFirstPlanAuthoringInput;
-  canonicalPlan: TrainingPlanV2;
-  metricTruth: PlanPresetMetricTruthSummary;
-  reviewShape: {
-    whyThisFit: string;
-    runningDaysPerWeek: number;
-    fixedRestDays: WeekdayName[];
-    preferredLongRunDay: WeekdayName | null;
-    horizonWeeks: number;
-    targetMode: "preset_no_target_date_or_time";
-    metricPolicy: string;
-    durationWeeks: number;
-    startDate: string;
-    estimatedEndDate: string;
-    daysPerWeek: number;
-    longRunDay: WeekdayName;
-    programFamily: string;
-    workoutMixSummary: string;
-    keyWorkoutTypes: string[];
-    metricModeSummary: string;
-    whyThisFits: string;
-    levelFitSummary: string;
-    disabledReasonSummary: null;
-    customReasonSummary: null;
-    weeklyRhythmSummary: string;
-    restDays: WeekdayName[];
-    safetyAssumptions: string[];
-    adaptiveProgram: {
-      scenarioId: string;
-      programBias: string;
-      finalOutcomeRule: string;
-      progressionConservatism: string;
-      impactLoadAdjustment: string;
-      longRunRampPolicy: string;
-      cutbackFrequency: string;
-      moderateTouchCapPerWeek: number;
-      delaySharpWork: boolean;
-      loadAdjustmentSummary: string;
-    };
-    rowCounts: {
-      calendarRows: number;
-      nonRestRows: number;
-      restRows: number;
-      weekCount: number;
-    };
-    identitySummary: string[];
-  };
-  safety: {
-    doesNotCallOpenAi: true;
-    doesNotMutatePlan: true;
-    persistsNothing: true;
-    confirmPathImplemented: true;
   };
 }

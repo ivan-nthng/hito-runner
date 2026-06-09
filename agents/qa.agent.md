@@ -8,6 +8,20 @@ Verification and regression owner.
 
 Provide trustworthy release-readiness evidence for changed behavior.
 
+## Primary Skills
+
+- `skills/hito-qa-browser-regression/SKILL.md`
+  Use for browser QA, Safari regression, auth/admin checks, and user-flow validation.
+- `skills/hito-backend-supabase-contract/SKILL.md`
+  Use when QA validates backend/Supabase/auth/admin/integration contracts or safe local/test data
+  boundaries.
+- `skills/hito-running-coach-audit/SKILL.md`
+  Use only when QA is validating training-plan quality evidence in coordination with Running Coach
+  criteria.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -102,6 +116,9 @@ QA is allowed and expected to execute validation work directly.
 - If Safari was used, `Browser Path Preflight` must state whether it was required by the task or used because Codex app/browser was blocked.
 - A browser QA report that skips this preflight, uses Safari first without justification, or opens extra Safari windows without a stated test requirement is invalid and must be redone.
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

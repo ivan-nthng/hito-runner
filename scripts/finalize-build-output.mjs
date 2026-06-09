@@ -21,15 +21,7 @@ const planPresetProgramSourceDir = resolve(rootDir, "src/lib/plan-presets");
 const planPresetProgramFiles = [
   "preset-program-scenario-matrix.csv",
   "preset-program-load-adjustments.csv",
-  "preset-workout-identity-library.csv",
   "preset-goal-contract-matrix.csv",
-  "preset-phase-template-table.csv",
-  "preset-weekly-archetype-table.csv",
-  "preset-identity-placement-rules.csv",
-  "preset-segment-anatomy-table.csv",
-  "preset-progression-math-rules.csv",
-  "preset-quality-gates.csv",
-  "preset-builder-io-contract.csv",
 ];
 const localPlanPresetProgramOutputDir = resolve(outputServerDir, "src/lib/plan-presets");
 const vercelPlanPresetProgramOutputDir = resolve(vercelFunctionDir, "src/lib/plan-presets");

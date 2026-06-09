@@ -45,20 +45,6 @@ export type PlanPresetLoadAdjustment = {
   runnerFacingRationale: string;
 };
 
-export type PlanPresetWorkoutIdentityDefinition = {
-  workoutIdentity: string;
-  workoutFamily: string;
-  primaryUseFamilies: string[];
-  runnerLevels: string[];
-  goalPurpose: string;
-  defaultStructureType: string;
-  targetModeWhenNoTruth: string;
-  targetModeWhenPaceTruthExists: string;
-  targetModeWhenHrTruthExists: string;
-  forbiddenUse: string;
-  notes: string;
-};
-
 export type PlanPresetGoalContract = {
   familyId: PlanPresetRecipeFamilyId;
   runnerLevel: Exclude<RunnerFitnessLevel, "custom">;
@@ -71,122 +57,6 @@ export type PlanPresetGoalContract = {
   benchmarkRequired: string;
   advancedCustomRouteReason: string;
   finalOutcomeRequired: string;
-};
-
-export type PlanPresetPhaseTemplate = {
-  familyId: PlanPresetRecipeFamilyId;
-  runnerLevel: Exclude<RunnerFitnessLevel, "custom">;
-  daysPerWeek: string;
-  durationMinWeeks: number;
-  durationMaxWeeks: number;
-  conservatism: string;
-  phaseSequence: string;
-  phaseName: string;
-  phaseOrder: number;
-  phaseMinWeeks: number;
-  phaseTargetRatio: number;
-  required: boolean;
-  phaseGoal: string;
-  entryCondition: string;
-  exitMarker: string;
-};
-
-export type PlanPresetWeeklyArchetype = {
-  familyId: PlanPresetRecipeFamilyId;
-  daysPerWeek: string;
-  phaseName: string;
-  weekArchetype: string;
-  slots: string[];
-  longRunSlot: string;
-  specificTouchCount: number;
-  supportsFloatingRest: boolean;
-  protectedRecoveryRule: string;
-  notes: string;
-};
-
-export type PlanPresetIdentityPlacementRule = {
-  familyId: PlanPresetRecipeFamilyId;
-  identity: string;
-  phaseName: string;
-  daysPerWeekMin: number;
-  daysPerWeekMax: number;
-  levelMin: string;
-  conservatismAllowed: string;
-  frequencyRule: string;
-  earliestPhaseOrder: number;
-  latestPhaseOrder: number;
-  requiresBenchmark: string;
-  canSubstituteFor: string[];
-  cannotCoexistSameWeekWith: string[];
-  requiredForFamilyOutcome: boolean;
-  notes: string;
-};
-
-export type PlanPresetSegmentAnatomy = {
-  identity: string;
-  segmentSequence: number;
-  segmentType: string;
-  labelPattern: string;
-  prescriptionMode: string;
-  durationOrDistanceRule: string;
-  repeatRule: string;
-  recoveryRule: string;
-  targetMode: string;
-  targetIntensity: string;
-  paceAllowed: string;
-  hrAllowed: string;
-  benchmarkRequired: string;
-  runnerCue: string;
-  safetyNote: string;
-};
-
-export type PlanPresetProgressionMathRule = {
-  familyId: PlanPresetRecipeFamilyId;
-  runnerLevel: Exclude<RunnerFitnessLevel, "custom">;
-  daysPerWeek: string;
-  conservatism: string;
-  phaseName: string;
-  longRunRampRule: string;
-  durationRampRule: string;
-  cutbackFrequency: string;
-  cutbackReductionRule: string;
-  intensityDelayRule: string;
-  specificTouchFrequency: string;
-  maxWeeklyLoadIncrease: string;
-  extensionTrigger: string;
-  notes: string;
-};
-
-export type PlanPresetQualityGate = {
-  familyId: PlanPresetRecipeFamilyId | "all_supported_families";
-  daysPerWeek: string;
-  gateId: string;
-  gateDescription: string;
-  required: boolean;
-  checkType: string;
-  minimumCount: number;
-  phaseScope: string;
-  failureAction: string;
-  notes: string;
-};
-
-export type PlanPresetBuilderIoContract = {
-  contractType: "weekly_slot_alias" | "final_outcome_marker" | "inheritance_rule";
-  familyId: PlanPresetRecipeFamilyId | "all_supported_families";
-  sourceTokenOrMarker: string;
-  appliesToPhase: string;
-  daysPerWeek: string;
-  runnerLevel: string;
-  resolutionPriority: number;
-  outputBehavior: string;
-  canonicalOutputIdentity: string;
-  fallbackOutputIdentity: string;
-  fallbackCondition: string;
-  segmentAnatomySource: string;
-  reviewMetadataBehavior: string;
-  qualityGateBinding: string;
-  countsAsSpecificTouch: boolean;
-  notes: string;
 };
 
 export type ResolvedPlanPresetProgram = {
@@ -229,15 +99,7 @@ const csvDirCandidates = isPackagedRuntime(moduleDir)
 
 let scenarioRowsCache: PlanPresetProgramScenario[] | null = null;
 let loadAdjustmentRowsCache: PlanPresetLoadAdjustment[] | null = null;
-let workoutIdentityRowsCache: PlanPresetWorkoutIdentityDefinition[] | null = null;
 let goalContractRowsCache: PlanPresetGoalContract[] | null = null;
-let phaseTemplateRowsCache: PlanPresetPhaseTemplate[] | null = null;
-let weeklyArchetypeRowsCache: PlanPresetWeeklyArchetype[] | null = null;
-let identityPlacementRowsCache: PlanPresetIdentityPlacementRule[] | null = null;
-let segmentAnatomyRowsCache: PlanPresetSegmentAnatomy[] | null = null;
-let progressionMathRowsCache: PlanPresetProgressionMathRule[] | null = null;
-let qualityGateRowsCache: PlanPresetQualityGate[] | null = null;
-let builderIoContractRowsCache: PlanPresetBuilderIoContract[] | null = null;
 
 export function getPlanPresetProgramScenarios() {
   scenarioRowsCache ??= parseScenarioRows(readCsv("preset-program-scenario-matrix.csv"));
@@ -253,68 +115,10 @@ export function getPlanPresetLoadAdjustments() {
   return loadAdjustmentRowsCache;
 }
 
-export function getPlanPresetWorkoutIdentityLibrary() {
-  workoutIdentityRowsCache ??= parseWorkoutIdentityRows(
-    readCsv("preset-workout-identity-library.csv"),
-  );
-
-  return workoutIdentityRowsCache;
-}
-
 export function getPlanPresetGoalContracts() {
   goalContractRowsCache ??= parseGoalContractRows(readCsv("preset-goal-contract-matrix.csv"));
 
   return goalContractRowsCache;
-}
-
-export function getPlanPresetPhaseTemplates() {
-  phaseTemplateRowsCache ??= parsePhaseTemplateRows(readCsv("preset-phase-template-table.csv"));
-
-  return phaseTemplateRowsCache;
-}
-
-export function getPlanPresetWeeklyArchetypes() {
-  weeklyArchetypeRowsCache ??= parseWeeklyArchetypeRows(
-    readCsv("preset-weekly-archetype-table.csv"),
-  );
-
-  return weeklyArchetypeRowsCache;
-}
-
-export function getPlanPresetIdentityPlacementRules() {
-  identityPlacementRowsCache ??= parseIdentityPlacementRows(
-    readCsv("preset-identity-placement-rules.csv"),
-  );
-
-  return identityPlacementRowsCache;
-}
-
-export function getPlanPresetSegmentAnatomyTable() {
-  segmentAnatomyRowsCache ??= parseSegmentAnatomyRows(readCsv("preset-segment-anatomy-table.csv"));
-
-  return segmentAnatomyRowsCache;
-}
-
-export function getPlanPresetProgressionMathRules() {
-  progressionMathRowsCache ??= parseProgressionMathRows(
-    readCsv("preset-progression-math-rules.csv"),
-  );
-
-  return progressionMathRowsCache;
-}
-
-export function getPlanPresetQualityGates() {
-  qualityGateRowsCache ??= parseQualityGateRows(readCsv("preset-quality-gates.csv"));
-
-  return qualityGateRowsCache;
-}
-
-export function getPlanPresetBuilderIoContracts() {
-  builderIoContractRowsCache ??= parseBuilderIoContractRows(
-    readCsv("preset-builder-io-contract.csv"),
-  );
-
-  return builderIoContractRowsCache;
 }
 
 export function resolvePlanPresetProgram({
@@ -440,22 +244,6 @@ function parseLoadAdjustmentRows(csv: string): PlanPresetLoadAdjustment[] {
   }));
 }
 
-function parseWorkoutIdentityRows(csv: string): PlanPresetWorkoutIdentityDefinition[] {
-  return parseCsv(csv).map((row) => ({
-    workoutIdentity: row.workout_identity,
-    workoutFamily: row.workout_family,
-    primaryUseFamilies: semicolonList(row.primary_use_families),
-    runnerLevels: semicolonList(row.runner_levels),
-    goalPurpose: row.goal_purpose,
-    defaultStructureType: row.default_structure_type,
-    targetModeWhenNoTruth: row.target_mode_when_no_truth,
-    targetModeWhenPaceTruthExists: row.target_mode_when_pace_truth_exists,
-    targetModeWhenHrTruthExists: row.target_mode_when_hr_truth_exists,
-    forbiddenUse: row.forbidden_use,
-    notes: row.notes,
-  }));
-}
-
 function parseGoalContractRows(csv: string): PlanPresetGoalContract[] {
   return parseCsv(csv).map((row) => ({
     familyId: row.family as PlanPresetRecipeFamilyId,
@@ -498,138 +286,6 @@ function buildUnavailableGoalContract({
     advancedCustomRouteReason: scenario.notes || "setup routes away from this preset",
     finalOutcomeRequired: "advanced_custom_only",
   };
-}
-
-function parsePhaseTemplateRows(csv: string): PlanPresetPhaseTemplate[] {
-  return parseCsv(csv).map((row) => ({
-    familyId: row.family as PlanPresetRecipeFamilyId,
-    runnerLevel: row.runner_level as Exclude<RunnerFitnessLevel, "custom">,
-    daysPerWeek: row.days_per_week,
-    durationMinWeeks: numberField(row, "duration_min_weeks"),
-    durationMaxWeeks: numberField(row, "duration_max_weeks"),
-    conservatism: row.conservatism,
-    phaseSequence: row.phase_sequence,
-    phaseName: row.phase_name,
-    phaseOrder: numberField(row, "phase_order"),
-    phaseMinWeeks: numberField(row, "phase_min_weeks"),
-    phaseTargetRatio: Number(row.phase_target_ratio),
-    required: row.required === "yes",
-    phaseGoal: row.phase_goal,
-    entryCondition: row.entry_condition,
-    exitMarker: row.exit_marker,
-  }));
-}
-
-function parseWeeklyArchetypeRows(csv: string): PlanPresetWeeklyArchetype[] {
-  return parseCsv(csv).map((row) => ({
-    familyId: row.family as PlanPresetRecipeFamilyId,
-    daysPerWeek: row.days_per_week,
-    phaseName: row.phase_name,
-    weekArchetype: row.week_archetype,
-    slots: [row.slot_1, row.slot_2, row.slot_3, row.slot_4, row.slot_5].filter(
-      (slot) => slot && slot.length > 0,
-    ),
-    longRunSlot: row.long_run_slot,
-    specificTouchCount: numberField(row, "specific_touch_count"),
-    supportsFloatingRest: row.supports_floating_rest === "yes",
-    protectedRecoveryRule: row.protected_recovery_rule,
-    notes: row.notes,
-  }));
-}
-
-function parseIdentityPlacementRows(csv: string): PlanPresetIdentityPlacementRule[] {
-  return parseCsv(csv).map((row) => ({
-    familyId: row.family as PlanPresetRecipeFamilyId,
-    identity: row.identity,
-    phaseName: row.phase_name,
-    daysPerWeekMin: numberField(row, "days_per_week_min"),
-    daysPerWeekMax: numberField(row, "days_per_week_max"),
-    levelMin: row.level_min,
-    conservatismAllowed: row.conservatism_allowed,
-    frequencyRule: row.frequency_rule,
-    earliestPhaseOrder: numberField(row, "earliest_phase_order"),
-    latestPhaseOrder: numberField(row, "latest_phase_order"),
-    requiresBenchmark: row.requires_benchmark,
-    canSubstituteFor: semicolonList(row.can_substitute_for),
-    cannotCoexistSameWeekWith: semicolonList(row.cannot_coexist_same_week_with),
-    requiredForFamilyOutcome: row.required_for_family_outcome === "yes",
-    notes: row.notes,
-  }));
-}
-
-function parseSegmentAnatomyRows(csv: string): PlanPresetSegmentAnatomy[] {
-  return parseCsv(csv).map((row) => ({
-    identity: row.identity,
-    segmentSequence: numberField(row, "segment_sequence"),
-    segmentType: row.segment_type,
-    labelPattern: row.label_pattern,
-    prescriptionMode: row.prescription_mode,
-    durationOrDistanceRule: row.duration_or_distance_rule,
-    repeatRule: row.repeat_rule,
-    recoveryRule: row.recovery_rule,
-    targetMode: row.target_mode,
-    targetIntensity: row.target_intensity,
-    paceAllowed: row.pace_allowed,
-    hrAllowed: row.hr_allowed,
-    benchmarkRequired: row.benchmark_required,
-    runnerCue: row.runner_cue,
-    safetyNote: row.safety_note,
-  }));
-}
-
-function parseProgressionMathRows(csv: string): PlanPresetProgressionMathRule[] {
-  return parseCsv(csv).map((row) => ({
-    familyId: row.family as PlanPresetRecipeFamilyId,
-    runnerLevel: row.level as Exclude<RunnerFitnessLevel, "custom">,
-    daysPerWeek: row.days_per_week,
-    conservatism: row.conservatism,
-    phaseName: row.phase_name,
-    longRunRampRule: row.long_run_ramp_rule,
-    durationRampRule: row.duration_ramp_rule,
-    cutbackFrequency: row.cutback_frequency,
-    cutbackReductionRule: row.cutback_reduction_rule,
-    intensityDelayRule: row.intensity_delay_rule,
-    specificTouchFrequency: row.specific_touch_frequency,
-    maxWeeklyLoadIncrease: row.max_weekly_load_increase,
-    extensionTrigger: row.extension_trigger,
-    notes: row.notes,
-  }));
-}
-
-function parseQualityGateRows(csv: string): PlanPresetQualityGate[] {
-  return parseCsv(csv).map((row) => ({
-    familyId: row.family as PlanPresetQualityGate["familyId"],
-    daysPerWeek: row.days_per_week,
-    gateId: row.gate_id,
-    gateDescription: row.gate_description,
-    required: row.required === "yes",
-    checkType: row.check_type,
-    minimumCount: numberField(row, "minimum_count"),
-    phaseScope: row.phase_scope,
-    failureAction: row.failure_action,
-    notes: row.notes,
-  }));
-}
-
-function parseBuilderIoContractRows(csv: string): PlanPresetBuilderIoContract[] {
-  return parseCsv(csv).map((row) => ({
-    contractType: row.contract_type as PlanPresetBuilderIoContract["contractType"],
-    familyId: row.family as PlanPresetBuilderIoContract["familyId"],
-    sourceTokenOrMarker: row.source_token_or_marker,
-    appliesToPhase: row.applies_to_phase,
-    daysPerWeek: row.days_per_week,
-    runnerLevel: row.runner_level,
-    resolutionPriority: numberField(row, "resolution_priority"),
-    outputBehavior: row.output_behavior,
-    canonicalOutputIdentity: row.canonical_output_identity,
-    fallbackOutputIdentity: row.fallback_output_identity,
-    fallbackCondition: row.fallback_condition,
-    segmentAnatomySource: row.segment_anatomy_source,
-    reviewMetadataBehavior: row.review_metadata_behavior,
-    qualityGateBinding: row.quality_gate_binding,
-    countsAsSpecificTouch: row.counts_as_specific_touch === "yes",
-    notes: row.notes,
-  }));
 }
 
 function parseCsv(csv: string): CsvRecord[] {

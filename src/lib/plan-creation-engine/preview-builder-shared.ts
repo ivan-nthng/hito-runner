@@ -1,4 +1,8 @@
 import {
+  resolveRunningPlanPreviewSegments,
+  runningPlanPrescriptionIsExact,
+} from "@/lib/plan-creation-engine/prescription-resolver";
+import {
   getRunningPlanWorkoutDayTemplate,
   resolveRunningPlanEndpointTemplate,
   RUNNING_PLAN_SOURCE_MODEL,
@@ -280,11 +284,22 @@ export function buildRunningPlanCalendarRows({
         workoutDayKind,
         rowIdPrefix,
         family,
+        runnerLevel: input.runnerLevel,
+        loadContext: input.loadContext,
+        horizonWeeks,
       }),
     );
   }
 
-  return enforceRecoveryAfterStressors({ rows, recoveryAfterKinds, rowIdPrefix, family });
+  return enforceRecoveryAfterStressors({
+    rows,
+    recoveryAfterKinds,
+    rowIdPrefix,
+    family,
+    runnerLevel: input.runnerLevel,
+    loadContext: input.loadContext,
+    horizonWeeks,
+  });
 }
 
 export function buildWorkoutRow({
@@ -295,6 +310,9 @@ export function buildWorkoutRow({
   workoutDayKind,
   rowIdPrefix,
   family,
+  runnerLevel,
+  loadContext,
+  horizonWeeks,
 }: {
   date: string;
   weekNumber: number;
@@ -303,11 +321,23 @@ export function buildWorkoutRow({
   workoutDayKind: RunningPlanWorkoutDayKind;
   rowIdPrefix: string;
   family: RunningPlanDistanceFamily;
+  runnerLevel: RunningPlanRunnerLevel;
+  loadContext: RunningPlanPreviewLoadContext;
+  horizonWeeks: number;
 }): RunningPlanPreviewCalendarRow {
   const template =
     workoutDayKind === "final_selected_distance_day" || workoutDayKind === "marathon_base_endpoint"
       ? resolveRunningPlanEndpointTemplate(family)
       : getRunningPlanWorkoutDayTemplate(workoutDayKind);
+  const segments = resolveRunningPlanPreviewSegments({
+    family,
+    workoutDayKind,
+    runnerLevel,
+    loadContext,
+    weekNumber,
+    horizonWeeks,
+    segments: template.segments,
+  });
 
   return {
     rowId: `${rowIdPrefix}-w${weekNumber}-d${dayNumber}-${workoutDayKind}`,
@@ -322,7 +352,7 @@ export function buildWorkoutRow({
     primaryContract: template.primaryContract,
     targetTruthModes: template.targetTruthModes,
     cueRole: template.cueRole,
-    segments: template.segments,
+    segments,
     endpointGateId: "endpointGateId" in template ? template.endpointGateId : null,
     endpointDistanceMeters:
       "endpointDistanceMeters" in template ? template.endpointDistanceMeters : null,
@@ -412,31 +442,7 @@ export function endpointTemplateMainDistanceMeters(template: RunningPlanEndpoint
 }
 
 export function segmentPrescriptionIsNumeric(prescription: RunningPlanSegmentPrescription) {
-  switch (prescription.mode) {
-    case "time":
-    case "open_warmup":
-    case "open_cooldown":
-    case "time_with_default_hr_cap":
-      return rangeIsPositive(prescription.durationSeconds);
-    case "distance":
-    case "distance_with_default_hr_cap":
-      return rangeIsPositive(prescription.distanceMeters);
-    case "recovery_time":
-      return rangeIsPositive(prescription.recoveryDurationSeconds);
-    case "recovery_distance":
-      return rangeIsPositive(prescription.recoveryDistanceMeters);
-    case "free_run_with_cap":
-      return (
-        rangeIsPositive(prescription.durationSecondsOrDistanceMeters) &&
-        prescription.explicitCap.length > 0
-      );
-    case "repeat":
-      return (
-        rangeIsPositive(prescription.repeatCount) &&
-        repeatPrescriptionIsNumeric(prescription.work) &&
-        repeatPrescriptionIsNumeric(prescription.recovery)
-      );
-  }
+  return runningPlanPrescriptionIsExact(prescription);
 }
 
 export function isRunningPlanIsoDate(value: string) {
@@ -448,11 +454,17 @@ function enforceRecoveryAfterStressors({
   recoveryAfterKinds,
   rowIdPrefix,
   family,
+  runnerLevel,
+  loadContext,
+  horizonWeeks,
 }: {
   rows: readonly RunningPlanPreviewCalendarRow[];
   recoveryAfterKinds: readonly RunningPlanPreviewCalendarWorkoutDayKind[];
   rowIdPrefix: string;
   family: RunningPlanDistanceFamily;
+  runnerLevel: RunningPlanRunnerLevel;
+  loadContext: RunningPlanPreviewLoadContext;
+  horizonWeeks: number;
 }): readonly RunningPlanPreviewCalendarRow[] {
   const repairedRows = [...rows];
 
@@ -491,6 +503,9 @@ function enforceRecoveryAfterStressors({
       workoutDayKind: "recovery",
       rowIdPrefix,
       family,
+      runnerLevel,
+      loadContext,
+      horizonWeeks,
     });
   }
 
@@ -532,7 +547,7 @@ function validateWatchExecutableRows(
 
     for (const segment of row.segments) {
       if (!segmentPrescriptionIsNumeric(segment.primaryPrescription)) {
-        issues.push(`${row.rowId}.${segment.id} lacks numeric execution structure.`);
+        issues.push(`${row.rowId}.${segment.id} lacks exact numeric execution structure.`);
       }
     }
   }
@@ -749,33 +764,6 @@ function weekdayOffset(weekday: WeekdayName, offset: number): WeekdayName {
 
 function weekdayIndex(weekday: WeekdayName) {
   return WEEKDAY_INDEX.get(weekday) ?? 0;
-}
-
-function repeatPrescriptionIsNumeric(
-  prescription:
-    | Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["work"]
-    | Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["recovery"],
-) {
-  if (prescription.mode === "time") {
-    return rangeIsPositive(prescription.durationSeconds);
-  }
-  if (prescription.mode === "distance") {
-    return rangeIsPositive(prescription.distanceMeters);
-  }
-  if (prescription.mode === "recovery_time") {
-    return rangeIsPositive(prescription.recoveryDurationSeconds);
-  }
-
-  return rangeIsPositive(prescription.recoveryDistanceMeters);
-}
-
-function rangeIsPositive(range: { min: number; max: number }) {
-  return (
-    Number.isFinite(range.min) &&
-    Number.isFinite(range.max) &&
-    range.min > 0 &&
-    range.max >= range.min
-  );
 }
 
 function isIsoDate(value: string) {

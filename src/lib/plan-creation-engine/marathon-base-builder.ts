@@ -275,6 +275,7 @@ function validateMarathonBasePlanPreview({
       "watch_no_watch_gate",
       "beginner_marathon_base_allowed",
       "support_only_marathon_base_preview",
+      "unresolved_executable_ranges",
     ],
   };
 }

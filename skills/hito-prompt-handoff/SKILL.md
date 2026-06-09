@@ -30,7 +30,8 @@ explains the current state to the user, and writes the next-role prompt directly
 6. State constraints and what not to touch.
 7. Specify validation requirements.
 8. Specify expected output format.
-9. Include handoff block only when continuity would otherwise be lost.
+9. Do not include a long continuity footer by default. Use only the standard shell plus `Blockers`
+   for routine Product prompt-routing.
 
 ## Product-Owned Direct Handoff
 
@@ -52,6 +53,7 @@ The handoff must:
 - state constraints, non-goals, and known product decisions
 - avoid optional second prompts or later-role prompts
 - avoid implementation details beyond what the next role needs to execute safely
+- end with `Blockers`; do not append a long continuity footer unless context would otherwise be lost
 
 If this routing layer would add noise for a trivial follow-up, say that directly and recommend the
 simpler one-step handoff.
@@ -120,6 +122,8 @@ Blockers:
 - Do not include optional QA prompts, follow-up prompts, or "after that" prompts unless the user explicitly asks for that single prompt next.
 - Include a clearly labelled `Exact prompt for that role` section for any handoff response.
 - Do not output a naked prompt without the required shell.
+- Do not append `HANDOFF BLOCK` or another long continuity footer to routine Product routing
+  responses. The prompt plus `Blockers` is the default close.
 - The exact prompt must be self-contained and include its own expected output/report format.
 - Preserve canonical architecture rules from `AGENTS.md`.
 - Keep prompts execution-ready, not inspirational.
@@ -249,3 +253,7 @@ QA handoff wording rule:
 6. What we do next
 7. Exact prompt for that role
 8. Blockers
+
+Do not add a long continuity footer after `Blockers` unless the task is blocked, genuinely gated
+with context not already captured in the prompt, too large for the standard shell to preserve
+continuity, or the user explicitly requests it.

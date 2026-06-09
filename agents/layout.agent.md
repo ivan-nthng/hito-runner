@@ -8,6 +8,16 @@ Presentation-only UI implementer.
 
 Ship markup/styling/layout fixes without changing logic, state, or backend behavior.
 
+## Primary Skills
+
+- `skills/hito-frontend-design-system/SKILL.md`
+  Use for layout, spacing, typography, route surfaces, Hito DS primitives, and visual consistency.
+- `skills/hito-qa-browser-regression/SKILL.md`
+  Use when the task explicitly includes browser proof or responsive regression validation.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -43,6 +53,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - add new component primitives without explicit Designer/Architect approval
 - leave unused styling/classes/components behind after a layout correction
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

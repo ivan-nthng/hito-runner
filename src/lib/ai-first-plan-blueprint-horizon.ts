@@ -1,4 +1,4 @@
-import { type AiFirstPlanBlueprintTraceMetadata } from "@/lib/ai-first-plan-draft-authoring";
+import { type AiFirstPlanBlueprintTraceMetadata } from "@/lib/ai-first-plan-draft-metadata";
 import { buildAiFirstPlanBlueprintPrompt } from "@/lib/ai-first-plan-blueprint-prompt";
 import type {
   CanonicalWorkout,

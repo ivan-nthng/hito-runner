@@ -13,6 +13,20 @@ This agent protects the architecture of the design system. It does not chase vis
 reduces legacy drift, removes duplicate local styling, and keeps `/hitoDS`, `src/styles.css`, and
 product surfaces aligned.
 
+## Primary Skills
+
+- `skills/hito-frontend-design-system/SKILL.md`
+  Use for Hito DS, component primitives, layout, typography, route surfaces, and UI consistency
+  audits or handoffs.
+- `skills/hito-architecture-audit/SKILL.md`
+  Use for token/component ownership, cleanup checkpoints, and design-system source-of-truth
+  decisions.
+- `skills/hito-prompt-handoff/SKILL.md`
+  Use when handing DS work to Frontend, Layout, Designer, or QA.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -345,6 +359,9 @@ Output format:
 7. Blockers
 ```
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

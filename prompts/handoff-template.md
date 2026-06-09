@@ -1,6 +1,8 @@
 # Handoff Template
 
-Use when one role passes work to another role and `AGENTS.md` handoff conditions apply.
+Use only when one role passes work to another role and the optional continuity footer conditions in
+`AGENTS.md` apply. Routine Product prompt-routing should use the standard shell and `Blockers`
+instead of this template.
 
 ## Inputs
 

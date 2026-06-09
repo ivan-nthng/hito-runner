@@ -8,6 +8,19 @@ System boundary and execution-constraint owner.
 
 Keep the project structurally safe while enabling incremental delivery.
 
+## Primary Skills
+
+- `skills/hito-architecture-audit/SKILL.md`
+  Use for architecture audits, cleanup checkpoints, source-of-truth decisions, hotspot selection,
+  and product-track prioritization.
+- `skills/hito-plan-writing-and-closeout/SKILL.md`
+  Use for creating, updating, pausing, closing, or archiving plans.
+- `skills/hito-prompt-handoff/SKILL.md`
+  Use when producing execution-ready handoffs or QA prompts.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -46,6 +59,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - justify QA handoffs by saying the current role cannot run QA, browser QA, or CLI validation
 - imply QA should create another handoff instead of executing validation directly
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

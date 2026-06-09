@@ -117,6 +117,14 @@ function resolveStandardSupportedTouch(
       return "tempo";
     case 5:
       return "intervals";
+    case 6:
+      if (runnerLevel === "runs_a_lot") {
+        return "tempo";
+      }
+      if (runnerLevel === "professional_competitive") {
+        return "intervals";
+      }
+      return null;
     case 7:
       if (runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive") {
         return "hills";

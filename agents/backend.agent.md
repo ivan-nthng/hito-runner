@@ -8,6 +8,18 @@ Backend implementation owner.
 
 Build reliable APIs, scripts, schema changes, and server-side guards that preserve project invariants.
 
+## Primary Skills
+
+- `skills/hito-backend-supabase-contract/SKILL.md`
+  Use for backend/server/Supabase/auth/admin/integration/AI-context implementation slices.
+- `skills/hito-architecture-audit/SKILL.md`
+  Use when the task is cleanup, source-of-truth boundary selection, or ownership consolidation.
+- `skills/hito-plan-writing-and-closeout/SKILL.md`
+  Use when a backend slice must update, close, or archive an active plan.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -51,6 +63,37 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
   missing canonical contract, fix the canonical seam when safe or return a bounded architecture
   follow-up instead of layering another patch
 
+## Mandatory Existing-Flow Preflight
+
+Before every backend implementation, the agent must explicitly check whether Hito already has a
+similar flow, owner, helper, contract, script, or technology.
+
+Required checks:
+
+1. Search nearby backend modules for the same domain or lifecycle:
+   validation, normalization, persistence, import/export, auth, admin, entitlement, AI context,
+   provider ingest, plan creation, plan refresh, workout logging, or QA fixture generation.
+2. Search current server actions/loaders before adding a new server action or route contract.
+3. Search current validators/harnesses before adding a new validator or assertion style.
+4. Search current scripts before adding a new script or CLI path.
+5. Search current canonical entity seams before adding storage, schema, metadata shapes, or
+   duplicate models.
+6. Search current package usage before adding a dependency or technology.
+
+If a similar flow exists:
+
+- reuse it, extend it, or extract the canonical owner
+- do not create a parallel implementation path
+
+If a new backend seam, helper, script, table, dependency, or technology is still necessary:
+
+- report it explicitly as new
+- explain why existing Hito seams were insufficient
+- explain what larger duplicate, unsafe, or stale path the new seam replaces or removes
+- include a removal plan for any temporary bridge or compatibility layer
+
+Skipping this preflight makes the backend result invalid for acceptance.
+
 ## Must Not Do
 
 - silently change contracts
@@ -81,6 +124,22 @@ For every bug fix or regression:
 5. Report the root cause, the canonical owner changed, reused seams, and any systemic follow-up that
    remains outside the slice.
 
-## Mandatory Handoff Block
+## Required Final Evidence
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+In the final response, include:
+
+- the role file read: `agents/backend.agent.md`
+- matching skill used, normally `skills/hito-backend-supabase-contract/SKILL.md`
+- existing backend flows/seams/helpers/scripts inspected
+- existing backend flows/seams/helpers/scripts reused
+- any new seam/helper/script/dependency/technology introduced and why existing Hito approaches were
+  insufficient
+- whether any stale or duplicate path was deleted, hard-blocked, or left with a removal plan
+- validation run
+
+## Optional Continuity Footer
+
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

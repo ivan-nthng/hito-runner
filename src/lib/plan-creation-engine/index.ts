@@ -1,4 +1,9 @@
 export {
+  resolveRunningPlanPreviewSegments,
+  runningPlanPrescriptionIsExact,
+  type RunningPlanPrescriptionLoadContext,
+} from "@/lib/plan-creation-engine/prescription-resolver";
+export {
   getRunningPlanWorkoutDayTemplate,
   RUNNING_PLAN_SOURCE_MODEL,
   resolveRunningPlanEndpointTemplate,

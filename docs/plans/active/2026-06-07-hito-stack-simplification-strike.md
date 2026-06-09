@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+in_progress
 
 ## Type
 
@@ -14,67 +14,490 @@ high
 
 ## Next Recommended Role
 
-ARCHITECT
+QA
 
 ## Task
 
-Resume service-size cleanup only after the dedicated Running Plan Creation Engine Rebuild plan is
-accepted.
+Decompose Hito DS route/specimen ownership.
 
 ## Stage
 
-ARCHITECT paused cleanup / superseded for plan-creation rebuild.
+FRONTEND cleanup / Hito DS route decomposition.
+
+## Previous Cleanup Result
+
+Implemented on 2026-06-09.
+
+- [Training API facade](../../../src/lib/training-api.ts) no longer re-exports
+  `reviewPlanPresetDraft(...)`, `confirmPlanPresetDraft(...)`, or their action-result types.
+- [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) still expose
+  `getPlanPresetCards(...)` for backend-shaped availability cards.
+- Stale direct calls to `reviewPlanPresetDraft(...)` or `confirmPlanPresetDraft(...)` now return a
+  bounded `preview_only` blocked result and do not rebuild drafts, sign review tokens, validate
+  review checksums, call active-plan persistence, or persist a `plan_preset_v1` plan.
+- [Running plan engine actions](../../../src/lib/running-plan-engine-actions.ts) still own the
+  accepted selected-plan preview path through `previewRunningPlanDraft(...)`.
+- Superseded by Slice 10B: low-level Plan Preset recipe/review contract harnesses and old
+  algorithmic expansion source were removed after selected-plan preview became the accepted owner.
+
+Validation evidence:
+
+- Source audit shows `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)` remain only in
+  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) as bounded `preview_only`
+  blocked actions, not in [Training API facade](../../../src/lib/training-api.ts), frontend, scripts,
+  or package scripts.
+- Source audit shows [Onboarding gate](../../../src/components/OnboardingGate.tsx) still imports
+  `getPlanPresetCards(...)` and `previewRunningPlanDraft(...)`.
+- Targeted ESLint passed for Training API, Plan Preset actions, running-plan engine actions,
+  Onboarding gate, and Plan Preset panel.
+- Running-plan engine source, 10K builder, and R6 builder validators passed.
+- Plan Preset eligibility fixtures passed.
+- Admin capture backlog validation passed.
+- Targeted `git diff --check` passed.
+- `npm run build` passed.
+
+## Backend Slice 10C Result
+
+Implemented on 2026-06-09.
+
+- Deleted `src/lib/ai-first-plan-draft-authoring.ts`, the remaining historical strict nested
+  `ai-first-plan-draft-v1` prompt/schema/OpenAI schema/normalizer module.
+- Removed the obsolete strict nested assertion island from
+  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts):
+  `buildAiFirstPlanDraftFixture(...)`, strict draft fixture helpers,
+  `assertAiFirstPlanDraftContract(...)`, and the top-level assertion call.
+- Kept [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts) as the
+  product-owned metadata/trace seam for blueprint/envelope/service code.
+- Kept [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts)
+  `strict-draft` selection as a bounded `unsupported_contract` negative proof.
+- Preserved blueprint, envelope, structured-authoring/readback, rich workout draft, active refresh,
+  import/export, Plan Preset card discovery, running-plan preview, and admin backlog validations.
+
+Source audit evidence:
+
+- `rg -n "ai-first-plan-draft-authoring|ai-first-plan-draft-v1|strict_draft|strict-draft|aiFirstPlanDraftSchema|aiFirstPlanDraftOpenAiSchema" src scripts docs/plans/active docs/tasks package.json`
+  found no live `src`/`scripts` import of the deleted strict authoring file. Remaining source hit is
+  only the intentional `strict-draft` unsupported guard in
+  [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts).
+- `rg -n "ai_first_plan_blueprint_v1|ai_first_plan_envelope_v1|structured_authoring_v1|unsupported_contract" src scripts`
+  still shows blueprint/envelope release-gate assertions, `structured_authoring_v1` compatibility
+  readback, and the `unsupported_contract` guard.
+- `rg -n "AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION|buildAiFirstPlanDraftPrompt|normalizeAiFirstPlanDraftToTrainingPlan|AiFirstPlanDraft\\b|assertAiFirstPlanDraftContract|buildAiRunningDraftWorkout|emptyAiDraftTarget|aiFirstPlanDraftSchema|aiFirstPlanDraftOpenAiSchema" src scripts`
+  no longer finds strict nested schema/prompt/normalizer symbols outside current service naming.
+
+Validation evidence:
+
+- `npm exec eslint -- src/lib/ai-first-plan-*.ts src/lib/first-plan-actions.ts scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/first-plan-release-gates.ts scripts/author-ai-first-plan-draft.ts` passed.
+- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts` passed.
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
+  passed with `sourceKind: ai_first_plan_blueprint_v1`, `persisted: false`, and no deterministic
+  fallback success.
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope` passed with
+  `sourceKind: ai_first_plan_envelope_v1`, `sourceStatus: expanded_from_envelope`, and
+  `persisted: false`.
+- `npm run author-ai-first-plan-draft -- --contract strict-draft` returned the expected bounded
+  failure: `ok: false`, `reason: unsupported_contract`.
+- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts` passed.
+- `npm run validate-admin-capture-backlog` passed.
+- `npm run build` passed.
+
+Cleanup impact:
+
+- Removed the tracked `1602`-line strict nested authoring module from `src`.
+- Reduced [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
+  from about `7263` lines to `6788` lines by deleting obsolete strict nested assertions rather than
+  moving them.
+
+## Frontend Hito DS Route Decomposition Result
+
+Implemented on 2026-06-09.
+
+- Kept [Hito DS route](../../../src/routes/hitoDS.tsx) as the route shell, nav/hash orchestration,
+  section registry, and inline section composition owner.
+- Added [Hito DS reference anatomy](../../../src/components/hito-ds/reference.tsx) for shared DS
+  documentation rows, section intros, specimen shells, and product links.
+- Added [Hito DS specimen previews](../../../src/components/hito-ds/specimen-previews.tsx) for the
+  data-table preview, modal-window preview, choice selector, selection-control preview, toggle row,
+  demo input, demo button, and menu row helpers.
+- Preserved `/hitoDS`, `/hitoDS#calendar-workout-playground`, and
+  `/hitoDS#workout-library-playground` behavior, including the SSR-safe initial section state and
+  the current workout-library provider-control no-overflow fix.
+- Did not touch product calendar, onboarding, workout routes, Supabase, backend, provider sync,
+  persistence, admin routes, or global style cleanup.
+
+Line impact:
+
+- [Hito DS route](../../../src/routes/hitoDS.tsx) went from `4770` lines to `4072` lines.
+- The extracted responsibilities now live in focused Hito DS modules:
+  [reference anatomy](../../../src/components/hito-ds/reference.tsx) at `132` lines and
+  [specimen previews](../../../src/components/hito-ds/specimen-previews.tsx) at `627` lines.
+
+Next recommended role:
+
+QA should run focused browser/source validation for `/hitoDS`, the two calendar playground deep
+links, hydration mismatch absence, `32` workout-library identities, and 375px no-overflow.
+
+## Major Cleanup Gate Selection
+
+Decision date: 2026-06-09.
+
+Current audit evidence:
+
+- `git status --short --branch` shows the branch is clean relative to `origin/main` only for git
+  history, but the worktree still has unrelated dirty/in-flight files:
+  [simplification strike plan](2026-06-07-hito-stack-simplification-strike.md),
+  [DS workout-library plan](2026-06-09-hito-ds-workout-library-calendar-detail-playground.md),
+  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts),
+  [Training API facade](../../../src/lib/training-api.ts), [Hito DS route](../../../src/routes/hitoDS.tsx),
+  and untracked DS workout-library playground files under
+  [Hito DS components](../../../src/components/hito-ds/). Treat those as external in-flight work
+  and do not overwrite them in this cleanup slice.
+- `find src -type f | wc -l` reports `230` source files.
+- TS/TSX/CSS line scan reports about `92408` total lines under `src`.
+- Script line scan reports about `23340` total lines under `scripts`.
+- Largest current source hotspots include [styles](../../../src/styles.css) at about `5206` lines,
+  [Hito DS route](../../../src/routes/hitoDS.tsx) at about `4773` lines,
+  [admin analytics route](../../../src/routes/admin.analytics.tsx) at about `2393` lines,
+  [admin capture route](../../../src/routes/admin.capture.tsx) at about `2125` lines,
+  [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) at
+  about `1795` lines, [voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts) at
+  about `1685` lines, [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts)
+  at about `1602` lines, and [first plan actions](../../../src/lib/first-plan-actions.ts) at
+  about `1551` lines.
+- Largest script hotspots include
+  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) at
+  about `7263` lines, [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts)
+  at about `2114` lines, and
+  [repo work item importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts) at about
+  `1815` lines.
+- Source reference proof shows [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts)
+  is still imported by product runtime modules mostly for shared metadata/trace types:
+  [AI draft service](../../../src/lib/ai-first-plan-draft-service.ts),
+  [AI blueprint schema](../../../src/lib/ai-first-plan-blueprint-schema.ts),
+  [AI blueprint trace](../../../src/lib/ai-first-plan-blueprint-trace.ts),
+  [AI blueprint horizon](../../../src/lib/ai-first-plan-blueprint-horizon.ts), and
+  [AI blueprint validation](../../../src/lib/ai-first-plan-blueprint-validation.ts).
+- The historical strict nested prompt/schema/normalizer also remains imported by
+  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts), which
+  means it still has QA value but should not remain a product-runtime owner.
+- `package.json` still exposes broad ops tooling, but there is no package-level `strict_draft`
+  entrypoint; [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) keeps
+  `strict-draft` bounded as an unsupported contract.
+
+Candidate ranking:
+
+| Candidate | Impact | Risk | Decision |
+| --- | --- | --- | --- |
+| Demote strict nested `ai-first-plan-draft-v1` runtime coupling | High: removes a historical 1600-line authoring module from product-runtime ownership while preserving metadata and doctrine value | Moderate: shared metadata types must be extracted before prompt/schema isolation | Selected immediate gate |
+| Delete old Plan Preset algorithmic builder or fixtures | High line-count impact | High: Plan Preset/running-plan transition remains in flight and old harnesses still protect behavior | Defer |
+| Decompose doctrine validator | High reviewability impact | Low behavior risk, but mostly shifts harness ownership rather than deleting runtime complexity | Later slice after first runtime demotion |
+| Split `/hitoDS` route and global CSS | High file-size impact | Medium/high because DS workout-library playground is currently dirty/in flight | Defer until DS track stabilizes |
+| Narrow all `training-api.ts` facade exports | Medium | Medium because it can break server action import contracts broadly | Do only one export group per later slice |
+| Delete `structured_authoring_v1` compatibility | Potentially high | Too risky: still deterministic generator/readback compatibility and not the same as strict nested AI draft | Forbidden |
+
+Selected gate:
+
+`BACKEND Slice 10A: strict nested AI first-plan draft runtime demotion`.
+
+Approved scope:
+
+- Extract `AiFirstPlanDraftMetadata`, `AiFirstPlanBlueprintTraceMetadata`, and any shared trace/result
+  metadata needed by product runtime into a small product-owned metadata module.
+- Update blueprint/service/action/ops-script type imports to use that metadata module instead of
+  importing [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts).
+- Move or isolate the strict nested `ai-first-plan-draft-v1` prompt/schema/normalizer into
+  doctrine-only ownership so [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
+  can keep historical coverage without making the strict nested authoring module product runtime.
+- Preserve `ai_first_plan_blueprint_v1` as the advanced/custom production default.
+- Preserve `ai_first_plan_envelope_v1` as internal/non-default.
+- Preserve bounded `strict-draft` CLI behavior as `unsupported_contract`.
+- Preserve `structured_authoring_v1` readback/deterministic compatibility while keeping it blocked
+  as a successful first-plan fallback.
+
+Forbidden in Slice 10A:
+
+- No Plan Preset runtime/builder/frontend/confirm/persistence changes.
+- No running-plan engine preview builder changes.
+- No DS workout-library playground changes.
+- No Supabase mutation, DB/schema migration, or persistence changes.
+- No OpenAI prompt rewrite except moving historical strict nested prompt/schema ownership if required
+  for demotion.
+- No deletion of doctrine coverage before replacement coverage is proven.
+
+## Backend Slice 10A Result
+
+Implemented on 2026-06-09.
+
+- Added [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts) as the
+  small product-owned home for `AiFirstPlanDraftMetadata`,
+  `AiFirstPlanBlueprintTraceMetadata`, normalization issue shape, and
+  `AiFirstPlanDraftNormalizationResult`.
+- Updated blueprint/service/runtime imports to consume the metadata module instead of importing
+  [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts).
+- Updated [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) to import trace
+  metadata from the new metadata module.
+- Left strict nested `ai-first-plan-draft-v1` prompt/schema/OpenAI schema/normalizer in
+  [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) with an
+  ownership comment marking it historical/doctrine-only for product runtime.
+- Preserved [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
+  strict nested coverage, and fixed two drift-prone request-level target dates so the fixture does
+  not expire against real `today`.
+
+Validation evidence:
+
+- Source audit shows product runtime no longer imports `ai-first-plan-draft-authoring.ts`; remaining
+  strict authoring references are the doctrine validator, strict schema/prompt constants inside the
+  strict file itself, and bounded `strict-draft` argument handling in the ops script.
+- Source audit shows shared metadata now resolves through
+  [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts).
+- Targeted ESLint passed.
+- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts` passed.
+- Blueprint mock with trace passed and remained `ai_first_plan_blueprint_v1`.
+- Envelope mock passed and remained `ai_first_plan_envelope_v1`.
+- `--contract strict-draft` remained bounded with `unsupported_contract` and did not produce a
+  runtime draft.
+- Plan Preset eligibility fixtures passed.
+- Admin capture backlog validation passed.
+- `git diff --check` passed.
+- `npm run build` failed once on the known intermittent Nitro SSR generated hashed chunk issue, then
+  passed on immediate rerun without source changes. Treat this as a build-lifecycle follow-up if QA
+  requires cold-build determinism beyond this source slice.
+
+## Backend Slice 10B Result
+
+Implemented and QA-passed on 2026-06-09.
+
+- Deleted the old product-failed Plan Preset algorithmic review expansion owners:
+  - `src/lib/plan-presets/algorithmic-builder.ts`
+  - `src/lib/plan-presets/expand.ts`
+  - `src/lib/plan-presets/composition.ts`
+  - `src/lib/plan-presets/persistence-metadata.ts`
+  - `src/lib/plan-presets/review-token.ts`
+  - `src/lib/plan-presets/recipe-expanders/shared.ts`
+- Deleted old builder-only Plan Preset CSV/source files from runtime source:
+  - `preset-workout-identity-library.csv`
+  - `preset-phase-template-table.csv`
+  - `preset-weekly-archetype-table.csv`
+  - `preset-identity-placement-rules.csv`
+  - `preset-segment-anatomy-table.csv`
+  - `preset-progression-math-rules.csv`
+  - `preset-quality-gates.csv`
+  - `preset-builder-io-contract.csv`
+  - `preset-program-source-of-truth.md`
+- Deleted old per-recipe review/confirm harness files under `scripts/plan-presets/`.
+- Kept the current Plan Preset card-discovery seam:
+  - [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) still expose
+    `getPlanPresetCards(...)`.
+  - [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts), progressive card modules,
+    recipes, schema, and card-summary modules remain.
+  - [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts) now owns only active
+    card-discovery data: scenario matrix, load adjustments, and goal contract matrix.
+- Kept the accepted selected-plan preview seam:
+  - [Running plan engine actions](../../../src/lib/running-plan-engine-actions.ts) still expose
+    `previewRunningPlanDraft(...)`.
+  - [Plan creation engine](../../../src/lib/plan-creation-engine/) remains the accepted
+    10K/Half/Marathon Base preview builder owner.
+- Rewrote [Plan Preset eligibility validator](../../../scripts/validate-plan-preset-eligibility.ts)
+  into a card-discovery/source-model harness instead of an old review/confirm draft harness.
+- Updated [build finalizer](../../../scripts/finalize-build-output.mjs) to package only the three
+  active Plan Preset card-discovery CSVs.
+
+Source audit evidence:
+
+- `rg` found no `src` or `scripts` imports of `buildPlanPresetReviewDraftContract`,
+  `buildPlanPresetAlgorithmicDraft`, `PlanPresetReviewDraftContract`, review-token helpers,
+  persistence metadata helpers, old composition helpers, or old algorithmic quality gates.
+- Remaining old-builder strings are limited to historical plan text and explicit absence assertions
+  in the rewritten Plan Preset validator.
+- `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)` remain only as bounded
+  `preview_only` blocked actions in [Plan Preset actions](../../../src/lib/plan-preset-actions.ts);
+  they are not exported by [Training API facade](../../../src/lib/training-api.ts).
+
+Validation evidence:
+
+- Targeted ESLint passed for Plan Preset modules, Plan Preset actions, Training API facade,
+  running-plan engine actions, onboarding preset UI surfaces, the rewritten Plan Preset validator,
+  and the build finalizer.
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts` passed.
+- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts` passed.
+- `npm run validate-admin-capture-backlog` passed.
+- `git diff --check` passed after plan closeout update.
+- `npm run build` passed.
+
+Ownership reduction:
+
+- Removed 20 tracked legacy Plan Preset builder/review files.
+- Removed the old 1795-line algorithmic builder, old 152-line expansion facade, old review token
+  and persistence helpers, old composition/shared helpers, old per-recipe harnesses, and builder-only
+  CSV source files.
+- Current active Plan Preset runtime source under `src/lib/plan-presets/*.ts` is about 1971 lines,
+  focused on card discovery, progressive card policy, recipes, and active program data.
+- The validator is now a current-flow card/source harness instead of an old review/confirm
+  acceptance harness.
+
+QA closeout evidence:
+
+- Old product-failed Plan Preset algorithmic builder/review harness files are deleted.
+- No runtime import remains for old review draft builder, algorithmic draft builder, review-token
+  helpers, persistence metadata helpers, composition helpers, or algorithmic quality gates.
+- `getPlanPresetCards(...)` remains preserved for card discovery.
+- `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)` remain only as bounded
+  `preview_only` blocked actions.
+- [Training API facade](../../../src/lib/training-api.ts) exports `getPlanPresetCards(...)` and
+  `previewRunningPlanDraft(...)`, not legacy review/confirm.
+- Running-plan preview builders remain validated.
+- Cleanup impact from Slice 10B was about `5955` deletions / `1003` insertions, around `5k` net
+  line reduction.
+
+## Next Cleanup Gate After Slice 10B QA
+
+Decision date: 2026-06-09.
+
+Current cleanup state:
+
+- Slice 10A removed strict nested AI draft authoring from product runtime imports by extracting
+  shared metadata into [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts).
+- Slice 10B removed the old product-failed Plan Preset algorithmic review expansion and harness
+  ownership.
+- Current active Plan Preset source is now about `2104` lines and focused on card discovery,
+  progressive card policy, recipes, schema, and active card data.
+- Current script total is about `21816` lines after old Plan Preset harness deletion.
+- [Plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) remains
+  about `7263` lines and still imports the strict nested doctrine-only module.
+- [Strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) is now about
+  `1499` lines and contains only the historical `ai-first-plan-draft-v1` prompt/schema/OpenAI
+  schema/normalizer for doctrine coverage.
+
+Candidate re-evaluation:
+
+| Candidate | Cleanup value | Risk | Decision |
+| --- | --- | --- | --- |
+| Delete doctrine-only strict nested `ai-first-plan-draft-v1` module and obsolete doctrine assertions | High: removes the last unsupported strict draft authoring module and reduces validator scope | Moderate: must preserve blueprint/envelope and `strict-draft` unsupported proof | Selected next gate |
+| Narrow [Training API facade](../../../src/lib/training-api.ts) | Medium: reduces hidden export surface | Lower line-count impact and less urgent after Plan Preset review/confirm exports are already gone | Defer one slice |
+| Decompose [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) generally | High reviewability, low deletion | Moves code more than it removes; better after obsolete strict draft assertions are deleted | Defer until after 10C |
+| Split [Onboarding gate](../../../src/components/OnboardingGate.tsx) | Medium reviewability | Frontend flow still tied to running-plan preview and DS tracks; not source-of-truth deletion | Defer |
+| Split [Hito DS route](../../../src/routes/hitoDS.tsx) or [styles](../../../src/styles.css) | High line-count potential | DS workout-library QA-fix track is separate and in flight | Defer |
+| Voice/text/custom overlap audit | Potentially high | Replacement advanced/custom engine not accepted yet | Defer |
+| Admin route/tooling cleanup | Medium | Less direct duplication after recent Admin simplification | Defer |
+
+Selected gate:
+
+`BACKEND Slice 10C: strict nested AI draft doctrine-only deletion`.
+
+Approved scope:
+
+- Delete [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) if
+  source scans confirm only doctrine-only consumers remain.
+- Remove the obsolete strict nested `ai-first-plan-draft-v1` assertion block from
+  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts), including
+  prompt/schema/normalizer fixture assertions around:
+  `AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION`, `buildAiFirstPlanDraftPrompt`,
+  `normalizeAiFirstPlanDraftToTrainingPlan`, and `AiFirstPlanDraft`.
+- Keep [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts) because
+  blueprint/envelope/service traces still need shared metadata.
+- Keep `strict-draft` command-line selection in
+  [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) as a bounded
+  `unsupported_contract` negative proof, without importing the deleted strict module.
+- Preserve active doctrine gates for blueprint, envelope, first-plan review/confirm, rich workout
+  draft, structured authoring, active-plan refresh, import/export, and no
+  `structured_authoring_v1` first-plan fallback success.
+
+Expected impact:
+
+- Remove the last unsupported `ai-first-plan-draft-v1` authoring module from `src`.
+- Reduce [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
+  by deleting obsolete strict nested assertions instead of merely moving them.
+- Make `author-ai-first-plan-draft` and the doctrine validator prove only supported/current
+  first-plan contracts plus negative unsupported strict-draft behavior.
+
+Forbidden in Slice 10C:
+
+- Do not delete [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts).
+- Do not weaken `ai_first_plan_blueprint_v1` default behavior.
+- Do not promote `ai_first_plan_envelope_v1`.
+- Do not delete `structured_authoring_v1` deterministic/readback compatibility.
+- Do not touch Plan Preset card discovery, running-plan preview builders, DS workout-library,
+  Supabase/DB/schema, provider sync, frontend UI, or persistence.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: ARCHITECT
+ROLE: BACKEND
 
 Task:
-Resume Hito Stack Simplification Strike only after the dedicated Running Plan Creation Engine
-Rebuild plan has passed product acceptance.
+Delete doctrine-only strict nested ai-first-plan-draft-v1 module and obsolete assertions.
 
 Stage:
-ARCHITECT paused cleanup / post-plan-creation-rebuild cleanup gate.
+BACKEND implementation / strict nested doctrine-only deletion.
 
 PLAN:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
 
 Context:
-- The simplification strike completed several useful cleanup/admin/design-system slices.
-- Plan-creation work inside this strike is superseded by the dedicated active plan:
-  `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md`.
-- The current Plan Preset builder and product flow are not product-accepted.
-- Do not resume service-size cleanup Slice 10A until the new plan creation engine is implemented and
-  QA/product accepted.
+- Slice 10A demoted strict nested `ai-first-plan-draft-v1` out of product runtime ownership by
+  moving shared metadata/trace types to `src/lib/ai-first-plan-draft-metadata.ts`.
+- Slice 10B deleted the old product-failed Plan Preset algorithmic builder/review harness path and
+  passed QA.
+- The remaining strict nested draft module is now doctrine-only:
+  `src/lib/ai-first-plan-draft-authoring.ts`.
+- `scripts/validate-plan-authoring-doctrine.ts` is the remaining real consumer of that strict
+  prompt/schema/normalizer coverage.
+- `strict-draft` CLI selection should remain as a bounded unsupported contract, but the unsupported
+  path no longer needs a full strict draft prompt/schema/normalizer module.
 
-Your job if this strike is resumed:
-1. Confirm the new Running Plan Creation Engine Rebuild plan has passed product acceptance.
-2. Re-audit current service-size hotspots after the rebuild, because stale/deletion candidates may
-   have changed.
-3. Resume cleanup with the smallest safe deletion/demotion gate.
-4. Do not reopen Plan Preset builder work inside this simplification strike.
+Implement:
+- Source-audit all remaining `ai-first-plan-draft-authoring`, `ai-first-plan-draft-v1`,
+  `AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION`, `buildAiFirstPlanDraftPrompt`,
+  `normalizeAiFirstPlanDraftToTrainingPlan`, and `AiFirstPlanDraft` references.
+- Delete `src/lib/ai-first-plan-draft-authoring.ts` if the audit confirms it is doctrine-only.
+- Remove the obsolete strict nested draft assertion block from
+  `scripts/validate-plan-authoring-doctrine.ts` instead of moving it to another fixture.
+- Keep `src/lib/ai-first-plan-draft-metadata.ts` and all blueprint/envelope/service metadata imports.
+- Keep `npm run author-ai-first-plan-draft -- --contract strict-draft` bounded as
+  `unsupported_contract`.
+- Preserve blueprint, envelope, structured authoring, rich draft, active refresh, import/export, and
+  Plan Preset/running-plan preview validations.
 
-Constraints:
-- Do not start service-size cleanup while plan creation is product-failed.
-- Do not mutate DB/Supabase.
-- Do not change product code in an architecture resume pass.
-- Do not archive this strike until future cleanup scope is either completed or explicitly abandoned.
+Do not touch:
+- Plan Preset card discovery or `plan_preset_v1` active card metadata.
+- Running-plan preview builders.
+- `structured_authoring_v1` deterministic/readback compatibility.
+- Supabase, DB/schema, migrations, provider sync, frontend UI, Hito DS workout-library, or
+  persistence.
 
-Validation:
+Run:
+- `rg -n "ai-first-plan-draft-authoring|ai-first-plan-draft-v1|AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION|buildAiFirstPlanDraftPrompt|normalizeAiFirstPlanDraftToTrainingPlan|AiFirstPlanDraft|strict_draft|strict-draft" src scripts package.json`
+- `rg -n "AiFirstPlanDraftMetadata|AiFirstPlanBlueprintTraceMetadata|ai-first-plan-draft-metadata" src scripts`
+- `npm exec eslint -- src/lib/ai-first-plan-*.ts src/lib/first-plan-actions.ts scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/first-plan-release-gates.ts scripts/author-ai-first-plan-draft.ts`
+- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope`
+- `npm run author-ai-first-plan-draft -- --contract strict-draft`
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
+- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`
+- `npm run validate-admin-capture-backlog`
 - `git diff --check`
+- `npm run build`
 
 Report:
 1. Task
 2. Stage
-3. Files inspected
-4. Rebuild acceptance evidence
-5. Remaining service-size hotspots
-6. Selected cleanup gate
-7. What remains forbidden
-8. Validation results
-9. Next recommended role
-10. Blockers
+3. Files changed
+4. Strict nested deletion summary
+5. Source audit proof
+6. Preserved metadata proof
+7. Preserved blueprint/envelope proof
+8. Preserved structured-authoring/readback proof
+9. Unsupported strict-draft proof
+10. Validation results
+11. Blockers
 ```
 
 ## Owner
@@ -83,7 +506,7 @@ ARCHITECT / BACKEND / FRONTEND / QA
 
 ## Last Updated
 
-2026-06-08
+2026-06-09
 
 ## Reference Links
 
@@ -100,6 +523,169 @@ ARCHITECT / BACKEND / FRONTEND / QA
 - [Plan Preset actions](../../../src/lib/plan-preset-actions.ts)
 - [First plan actions](../../../src/lib/first-plan-actions.ts)
 - [Plan replacement actions](../../../src/lib/plan-replacement-actions.ts)
+
+## Cleanup Master Plan
+
+Date: 2026-06-09.
+
+Purpose:
+
+Turn the simplification strike from a sequence of local cleanup tasks into one aggressive,
+evidence-based deletion and reuse strategy.
+
+This is not a promise to cut the repo by `50%`. The current evidence does not justify that claim.
+Treat `50%` as the user aspiration, then reduce toward it by deleting/demoting wrong ownership
+first and decomposing only where reviewability is the actual bottleneck.
+
+Current measured baseline:
+
+| Area | Current count | Notes |
+| --- | ---: | --- |
+| `src` TS/TSX/CSS files | `217` files | Counts tracked source files matching `*.ts`, `*.tsx`, `*.css`; generated route tree included because it is checked in. |
+| `src` TS/TSX/CSS lines | about `92,418` lines | Does not include docs, node_modules, QA artifacts, or lockfile. |
+| `scripts` TS/TSX/MJS/JS lines | about `23,340` lines | Includes validators, ops scripts, importer tooling, and harnesses. |
+| `supabase/migrations` SQL lines | about `1,199` lines | Schema history; not a cleanup target without migration policy. |
+| Service code estimate | about `116,957` lines | `src + scripts + supabase/migrations`; package lock, docs, node_modules, and QA artifacts excluded. |
+
+Top hotspots by responsibility:
+
+| Hotspot | Approx lines | Responsibility | Cleanup classification |
+| --- | ---: | --- | --- |
+| [Plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | `7263` | multi-domain QA harness | decompose later; do not delete safety net |
+| [Global styles](../../../src/styles.css) | `5206` | DS tokens, route styles, legacy utilities, product chrome | audit/delete unused classes after DS playground stabilizes |
+| [Hito DS route](../../../src/routes/hitoDS.tsx) | `4773` | design-system route plus many specimen sections | split/specimen ownership after DS workout-library QA |
+| [Admin analytics route](../../../src/routes/admin.analytics.tsx) | `2393` | admin workspace UI | decompose only after source-owner map; not first deletion target |
+| [Admin capture route](../../../src/routes/admin.capture.tsx) | `2125` | admin work-item UI | keep; route is current product/admin surface |
+| [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) | `1795` | old product-failed Plan Preset expansion | selected post-10A deletion/demotion candidate |
+| [Voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts) | `1685` | Pro voice/text-ish plan authoring seam | audit after new engine custom path is stable |
+| [Active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | `1591` | future schedule edit preview | keep until schedule-edit roadmap is audited |
+| [First plan actions](../../../src/lib/first-plan-actions.ts) | `1551` | structured/voice/AI first-plan action layer | decompose only after new engine ownership settles |
+| [Strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) | `1499` | historical strict nested prompt/schema/normalizer | Slice 10A demotes runtime ownership; QA pending |
+
+### Source-Of-Truth Map
+
+| Domain | Current product truth owner | Notes |
+| --- | --- | --- |
+| First-plan creation / advanced custom | [First plan actions](../../../src/lib/first-plan-actions.ts), [AI draft service](../../../src/lib/ai-first-plan-draft-service.ts), and blueprint modules | `ai_first_plan_blueprint_v1` remains production custom/advanced default; no strict nested runtime ownership after Slice 10A. |
+| Selected-plan previews | [Running plan engine actions](../../../src/lib/running-plan-engine-actions.ts) plus [plan creation engine](../../../src/lib/plan-creation-engine/) | Preview-only, no persistence/create contract yet. |
+| Running-plan engine previews | [plan creation engine](../../../src/lib/plan-creation-engine/) | Accepted preview owners for 10K, Half, and Marathon Base; do not delete. |
+| Plan Preset cards | [Plan Preset actions](../../../src/lib/plan-preset-actions.ts), [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts), progressive card modules | Still used for backend-shaped card availability; old review/confirm mutation seam is demoted. |
+| Old Plan Preset expansion/review | [Plan Preset expand](../../../src/lib/plan-presets/expand.ts), [algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts), Plan Preset CSV artifacts, Plan Preset harnesses | Product-failed old expansion path; next deletion/demotion target after Slice 10A QA. |
+| Structured authoring | [structured plan authoring](../../../src/lib/structured-plan-authoring.ts) and split policy/workout/metric modules | Deterministic generator and compatibility/readback owner; must not become first-plan fallback success. |
+| Voice/text authoring | [voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts), [OpenAI text authoring](../../../src/lib/openai-plan-authoring.ts), [rich workout draft authoring](../../../src/lib/rich-workout-draft-authoring.ts) | Keep until rebuilt engine advanced/custom path defines replacement or consolidation. |
+| Active-plan refresh/apply | [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts), [refresh draft](../../../src/lib/active-plan-refresh-draft.ts), [active plan persistence](../../../src/lib/active-plan-persistence.ts) | Explicit reviewed mutation path; not deletion target. |
+| Workout result import/comparison | [workout-result import modules](../../../src/lib/workout-result-import/) and workout detail UI | Current Garmin feedback truth; do not touch in plan-creation cleanup. |
+| Provider evidence/feedback | [workout log actions](../../../src/lib/workout-log-actions.ts), [Completion panel](../../../src/components/CompletionPanel.tsx), comparison/AI insight modules | Current saved-mode behavior; keep separate from DS fake playground. |
+| Admin backlog/capture | [admin capture server](../../../src/lib/admin-capture.server.ts), [admin work items](../../../src/lib/admin-work-items.ts), [repo importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts), [admin capture route](../../../src/routes/admin.capture.tsx) | Current admin work-item surface; cleanup only through admin-specific slices. |
+| Hito DS playground/specimens | [Hito DS route](../../../src/routes/hitoDS.tsx), [Hito DS playground components](../../../src/components/hito-ds/) | Internal specimen truth only; fake data must not leak into product routes. |
+
+### Duplicate And Stale Path Map
+
+| Stale / duplicate path | Current owner | Old owner / duplicate owner | Runtime status | Mutation risk | Decision |
+| --- | --- | --- | --- | --- | --- |
+| Strict nested `ai-first-plan-draft-v1` | doctrine-only after Slice 10A | former full AI first-plan draft authoring module | product runtime demotion implemented, QA pending | low after metadata extraction | keep doctrine coverage; no runtime ownership |
+| Old Plan Preset review/confirm | [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) | old `plan_preset_v1` review/confirm before rebuilt selected-plan engine | returns bounded `preview_only` after prior cleanup | formerly high; now bounded | delete/demote old expansion dependencies next |
+| Old Plan Preset algorithmic expansion | [algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts), [expand facade](../../../src/lib/plan-presets/expand.ts), CSV artifacts | product-failed preset expansion path | used by Plan Preset harnesses and old review contract; not accepted product truth | indirect if stale callers return | selected post-10A candidate |
+| `training-api.ts` broad facade | [Training API facade](../../../src/lib/training-api.ts) | multiple extracted action owners | current compatibility import map | medium if stale exports expose old seams | narrow one group per slice later |
+| `structured_authoring_v1` deterministic generator | [structured authoring](../../../src/lib/structured-plan-authoring.ts) | old first-plan fallback semantics | current deterministic generator/readback compatibility | high if reintroduced as first-plan success fallback | keep; forbid deletion until replacement/readback audit |
+| Voice/text/custom AI seams | voice/text/rich-draft modules | overlap with advanced custom first-plan direction | current non-default product paths | medium | audit after rebuilt engine defines advanced custom replacement |
+| `/hitoDS` route-local specimens | [Hito DS route](../../../src/routes/hitoDS.tsx) plus specimen components | route-local demo data and many section owners | internal only | low product mutation risk, high bloat risk | split/delete after DS workout-library QA |
+| Admin work-item importer and route UI | importer/admin routes | earlier backlog/capture split | current admin tool truth | low product mutation risk, medium admin drift risk | keep; cleanup only with admin QA |
+| Active/archive duplicate docs | docs/plans active/archive | stale active copies | docs/importer visibility only | no runtime mutation | cleanup as docs/admin hygiene, not code-size priority |
+
+### Cleanup Roadmap
+
+Tier 1: delete/demote now or immediately after QA.
+
+- Finish QA for Slice 10A strict nested draft demotion.
+- After Slice 10A QA, run `BACKEND Slice 10B: old Plan Preset algorithmic builder and review harness demotion`.
+- Narrow stale Plan Preset exports and scripts only after source scans prove the rebuilt selected-plan preview does not use them.
+- Keep `getPlanPresetCards(...)` and `previewRunningPlanDraft(...)`; delete/demote only old review/confirm expansion ownership.
+
+Tier 2: consolidate after proof.
+
+- Narrow [Training API facade](../../../src/lib/training-api.ts) one import group at a time.
+- Decompose [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
+  into assertion owners after strict/Plan Preset stale paths are settled.
+- Split [Hito DS route](../../../src/routes/hitoDS.tsx) and move specimen data/components behind
+  route-neutral Hito DS modules after DS workout-library QA.
+- Classify [global styles](../../../src/styles.css) into semantic tokens, shared primitives, route
+  styles, admin styles, and dead rules before deletion.
+- Audit voice/text/custom authoring once the rebuilt running-plan engine has accepted custom/advanced
+  ownership.
+
+Tier 3: defer or keep.
+
+- Keep [plan creation engine](../../../src/lib/plan-creation-engine/) because it is the accepted
+  preview owner.
+- Keep [active plan persistence](../../../src/lib/active-plan-persistence.ts) as canonical mutation
+  owner.
+- Keep workout result import/comparison/provider evidence until a provider cleanup plan exists.
+- Keep Supabase migrations as history; do not delete schema files to chase line count.
+- Keep current admin work-items/capture until a dedicated admin route decomposition slice is chosen.
+
+### Big Cleanup Slices
+
+| Slice | Owner | Target files | Deletion / demotion target | Expected impact | Replacement coverage | Validation | Risks / do not touch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Slice 10A: strict nested runtime demotion | BACKEND -> QA | [AI first-plan draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts), [metadata](../../../src/lib/ai-first-plan-draft-metadata.ts), blueprint/service imports, doctrine validator | remove strict nested module from product runtime ownership | removes stale runtime dependency on historical strict draft module; does not delete doctrine value | blueprint/envelope mocks, strict-draft unsupported proof, doctrine validator | already scoped in current QA prompt | do not weaken blueprint/envelope or `structured_authoring_v1` readback |
+| Slice 10B: old Plan Preset expansion deletion/demotion | BACKEND | [algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts), [expand facade](../../../src/lib/plan-presets/expand.ts), [program data](../../../src/lib/plan-presets/program-data.ts), Plan Preset CSV artifacts, Plan Preset harness scripts | delete or move old product-failed `plan_preset_v1` review expansion out of runtime after proof | potential `2k-4k+` runtime/code ownership reduction, plus fewer false product seams | running-plan preview builders, `getPlanPresetCards(...)`, bounded `preview_only` old actions | `rg buildPlanPresetReviewDraftContract/buildPlanPresetAlgorithmicDraft`, running engine validators, Plan Preset card smoke, build | do not delete card resolver/progressive cards if onboarding still uses them |
+| Slice 11: `training-api.ts` facade narrowing | BACKEND | [Training API facade](../../../src/lib/training-api.ts) and direct import call sites | remove one obsolete export group per slice | lower hidden API surface; modest line reduction | direct action-owner imports and serverFn wrappers | import map, targeted ESLint, build | do not break TanStack serverFn route contracts |
+| Slice 12: doctrine validator decomposition | BACKEND / QA tooling | [doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts), [doctrine folder](../../../scripts/plan-authoring-doctrine/) | split assertion ownership without weakening checks | reviewability gain, not net deletion | stable top-level validator entrypoint | doctrine validator, targeted ESLint | do not delete assertions to make file smaller |
+| Slice 13: Hito DS route/specimen split | FRONTEND | [Hito DS route](../../../src/routes/hitoDS.tsx), [Hito DS components](../../../src/components/hito-ds/) | move specimen data/components out of route; delete dead route-local specimens | route file responsibility reduction and safer DS reuse | existing Hito DS playground anatomy, DS workout-library QA | targeted ESLint, build, browser `/hitoDS`, 375px | do not mix with product calendar or provider sync |
+| Slice 14: global CSS semantic cleanup | FRONTEND / DESIGNER | [styles](../../../src/styles.css), selected route/component class usages | delete dead classes and route-local one-offs after source/visual proof | potential large CSS complexity reduction, exact lines unknown | Hito DS tokens/classes and current route screenshots | class usage map, targeted browser QA, build | do not invent light mode or new visual system in cleanup slice |
+| Slice 15: admin route/tooling responsibility cleanup | FRONTEND / BACKEND | [admin analytics](../../../src/routes/admin.analytics.tsx), [admin capture](../../../src/routes/admin.capture.tsx), importer | split admin UI/tooling ownership where it reduces duplication | reviewability and admin consistency | Admin Work Items/source-group model | admin browser QA, importer dry-run, validator | do not run live import or `--archive-stale` without approval |
+| Slice 16: voice/text/custom authoring consolidation audit | ARCHITECT -> BACKEND | [voice authoring](../../../src/lib/voice-to-plan-authoring.ts), [OpenAI text authoring](../../../src/lib/openai-plan-authoring.ts), [rich draft authoring](../../../src/lib/rich-workout-draft-authoring.ts) | decide whether advanced custom path can reuse one backend contract | potentially high, but blocked until new engine custom path is accepted | running-plan engine custom/advanced architecture | source audit only first | do not delete live Pro/advanced paths without replacement |
+
+### Immediate Post-10A Slice
+
+Selected next implementation slice after Slice 10A QA passes:
+
+`BACKEND Slice 10B: old Plan Preset algorithmic builder and review harness demotion`.
+
+Why this is the next bold slice:
+
+- It targets a known product-failed plan-generation path, not a random large file.
+- The old review/confirm mutation seam is already bounded as `preview_only`.
+- The accepted selected-plan path now lives in [running plan engine actions](../../../src/lib/running-plan-engine-actions.ts)
+  and [plan creation engine](../../../src/lib/plan-creation-engine/).
+- It can remove or isolate several thousand lines of stale runtime/harness ownership if source scans
+  prove the old builder is no longer needed for product behavior.
+
+Slice 10B required proof before deletion:
+
+- Source scan for `buildPlanPresetReviewDraftContract`, `buildPlanPresetAlgorithmicDraft`,
+  `preset-builder-io-contract`, `preset-segment-anatomy-table`, `preset-quality-gates`,
+  and `validate-plan-preset-eligibility`.
+- Prove no frontend or runtime product path can call old review/confirm expansion.
+- Prove `getPlanPresetCards(...)` still works if it remains required for the onboarding card view.
+- Prove `previewRunningPlanDraft(...)` still works for accepted 10K/Half/Marathon preview families.
+- Prove no plan confirm/persistence path is added.
+
+Slice 10B validation expectations:
+
+- `rg -n "buildPlanPresetReviewDraftContract|buildPlanPresetAlgorithmicDraft|preset-builder-io-contract|preset-segment-anatomy-table|preset-quality-gates|validate-plan-preset-eligibility" src scripts package.json`.
+- `rg -n "getPlanPresetCards|previewRunningPlanDraft|reviewPlanPresetDraft|confirmPlanPresetDraft" src scripts package.json`.
+- `npm exec eslint -- src/lib/plan-preset-actions.ts src/lib/training-api.ts src/lib/plan-presets/*.ts src/lib/plan-presets/recipe-expanders/*.ts src/lib/plan-creation-engine/*.ts scripts/validate-running-plan-engine-source.ts scripts/validate-running-plan-engine-10k-builder.ts scripts/validate-running-plan-engine-r6-builders.ts`.
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`.
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`.
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`.
+- `npm run validate-admin-capture-backlog`.
+- `git diff --check`.
+- `npm run build`.
+
+### No-New-System Rules
+
+- No new plan-creation path without deleting, demoting, or explicitly isolating the old path it replaces.
+- No new route-local UI system when a Hito DS primitive, token, or shared component already exists.
+- No new AI path without a bounded backend contract, explicit review/confirm boundary, and removal plan
+  for any replaced path.
+- No new facade export unless it is the canonical public seam and its owner is named.
+- No compatibility branch without a removal condition, compatibility owner, and validation proof.
+- No `1000+` line file receives new responsibility without an extraction plan in the same slice or a
+  recorded architecture exception.
+- No frontend-owned schedule, metric, eligibility, persistence, provider, or billing truth.
+- No QA harness deletion unless replacement validation proves the same safety boundary.
 
 ## Context
 
@@ -3181,6 +3767,125 @@ Validation expected for Slice 10A:
 - `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`.
 - `git diff --check`.
 - `npm run build`.
+
+### 2026-06-09 Cleanup Resume Audit
+
+Status:
+
+architecture decision complete; next backend gate selected.
+
+Scope decision:
+
+Service-size cleanup can resume in parallel with the DS workout-library playground only as narrow
+source/runtime cleanup.
+
+What changed since the previous pause:
+
+- The DS workout-library playground is now a separate active plan routed to RUNNING COACH first:
+  [Hito DS Workout Library Calendar And Detail Playground](2026-06-09-hito-ds-workout-library-calendar-detail-playground.md).
+- The Running Plan Creation Engine Rebuild remains the plan-creation owner:
+  [Running Plan Creation Engine Rebuild](2026-06-08-running-plan-creation-engine-rebuild.md).
+- The rebuilt selected-plan preview path is stable enough for audit:
+  - accepted 10K selected-plan preview
+  - backend-validated Half Marathon and Marathon Base preview builders
+  - frontend-selected preview wiring for 10K, Half Marathon, and Marathon Base
+  - Marathon Base visible-copy fix passed QA re-validation per latest handoff context
+- The rebuild is still preview-focused:
+  no create/confirm/persistence path has been accepted for the new running-plan engine.
+
+Current service-size/hotspot evidence:
+
+| Area | Approx lines / evidence | Classification | Decision |
+| --- | ---: | --- | --- |
+| [Plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | about `7263` lines | oversized QA harness | keep; decompose later, do not delete |
+| [Hito styles](../../../src/styles.css) | about `5206` lines | broad styling owner | defer; not the safest plan-creation cleanup gate |
+| [Hito DS route](../../../src/routes/hitoDS.tsx) | about `4770` lines | broad DS route owner | defer; DS workout-library track is separate |
+| [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) | about `1795` lines | old product-failed builder still used by old review/confirm helpers and harnesses | audit before deleting; do not touch builder in this gate |
+| [Onboarding gate](../../../src/components/OnboardingGate.tsx) | about `1107` lines | broad frontend orchestrator | defer; frontend decomposition can happen after plan-creation ownership stabilizes |
+| [Structured plan constructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx) | about `964` lines | broad setup component | defer; no behavior cleanup selected |
+| [Running plan 10K builder](../../../src/lib/plan-creation-engine/ten-k-builder.ts) | about `974` lines | accepted preview engine code | keep; do not touch in cleanup gate |
+| [Running plan preview shared builder](../../../src/lib/plan-creation-engine/preview-builder-shared.ts) | about `801` lines | accepted preview engine shared logic | keep; do not touch in cleanup gate |
+| [Training API facade](../../../src/lib/training-api.ts) | about `656` lines | compatibility facade with stale exports | audit target; select one stale export group only |
+
+Runtime/source proof before backend demotion:
+
+- [Onboarding gate](../../../src/components/OnboardingGate.tsx) imports and uses
+  `getPlanPresetCards(...)` and `previewRunningPlanDraft(...)`.
+- [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx) renders card selection
+  and opens [Selected running plan preview dialog](../../../src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx).
+- Source scan found no frontend imports of `reviewPlanPresetDraft(...)` or
+  `confirmPlanPresetDraft(...)`.
+- Before this backend slice, [Training API facade](../../../src/lib/training-api.ts) still re-exported
+  `reviewPlanPresetDraft(...)`, `confirmPlanPresetDraft(...)`, and their result types from
+  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts).
+- Before this backend slice, [Plan Preset actions](../../../src/lib/plan-preset-actions.ts)
+  implemented the old
+  mutation-capable `plan_preset_v1` review/confirm path through
+  [active plan persistence](../../../src/lib/active-plan-persistence.ts).
+- The accepted selected-plan preview path now lives in
+  [running plan engine actions](../../../src/lib/running-plan-engine-actions.ts), dispatching to the
+  accepted preview builders in [plan creation engine](../../../src/lib/plan-creation-engine/).
+
+Candidate classification:
+
+| Candidate | Bucket | Reason | Decision |
+| --- | --- | --- | --- |
+| Demote old Plan Preset `reviewPlanPresetDraft` / `confirmPlanPresetDraft` runtime-facing exports | delete/demote now | no current frontend caller; still mutation-capable; old Plan Preset create path is product-failed while new engine has no confirm contract | selected next gate |
+| Delete old Plan Preset builder files | audit first | builder is product-failed but still connected to old review/confirm/harnesses; deletion before demoting mutation seam is too broad | defer |
+| Demote strict nested `ai-first-plan-draft-v1` | audit first | still valid from prior source map, but less urgent than removing stale product-failed preset mutation exposure | keep as later Slice 10A candidate |
+| Narrow broad `training-api.ts` facade generally | audit first | facade contains many live compatibility exports; broad narrowing could break route imports | narrow only the stale Plan Preset review/confirm group |
+| Decompose doctrine validator | keep | large but protects many contracts; not runtime bloat | later decomposition |
+| Decompose `/hitoDS` route or CSS | defer | useful cleanup, but parallel DS workout-library track is already active and isolated | do not mix |
+| Active/archive stale plan duplicates | audit first | still visible duplicates exist for heart-rate and voice-to-plan plans | handle as docs cleanup later, not the next runtime cleanup gate |
+
+Selected next cleanup gate:
+
+`BACKEND Slice: stale Plan Preset review/confirm mutation seam demotion`.
+
+Implementation boundary:
+
+- Remove or demote runtime-facing `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)`.
+- Preserve `getPlanPresetCards(...)`.
+- Preserve `previewRunningPlanDraft(...)`.
+- Preserve the new preview-only [plan creation engine](../../../src/lib/plan-creation-engine/).
+- Preserve canonical [active plan persistence](../../../src/lib/active-plan-persistence.ts).
+- Preserve low-level old Plan Preset fixture/harness coverage only if needed as regression evidence,
+  but do not leave the stale create action as a product-facing runtime seam.
+- If a stale caller attempts old Plan Preset review/confirm, return a bounded unsupported/preview-only
+  result instead of persisting a product-failed plan.
+
+Why this is the safest first gate:
+
+- It does not touch new preview builders, DS playground work, provider ingest, DB/schema, or
+  canonical persistence.
+- It removes a stale mutation-capable path before any new create path is implemented.
+- It matches the current product state: selected-plan preview is allowed, but create/confirm is not.
+- It is smaller and safer than deleting the old Plan Preset builder or narrowing the whole
+  `training-api.ts` facade.
+
+Validation expected:
+
+- `rg "reviewPlanPresetDraft|confirmPlanPresetDraft" src scripts package.json`.
+- `rg "getPlanPresetCards|previewRunningPlanDraft" src/components src/lib`.
+- Targeted ESLint for changed backend/source files.
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`.
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`.
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`.
+- `npm run validate-admin-capture-backlog`.
+- `git diff --check`.
+- `npm run build`.
+
+Still gated / forbidden:
+
+- no new running-plan confirm/persistence implementation
+- no Supabase mutation
+- no DB/schema/migration changes
+- no provider ingest/sync changes
+- no DS workout-library implementation changes
+- no manual workout CRUD
+- no new preset families
+- no deletion of accepted preview engine builders
+- no broad Plan Preset builder deletion until mutation demotion and replacement coverage are proven
 
 ### Slice 7: Package Manager Signal Cleanup
 

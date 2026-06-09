@@ -18,11 +18,11 @@ QA
 
 ## Task
 
-Validate backend R6B Half Marathon and Marathon Base deterministic preview expansion.
+Validate exact watch-executable running-plan engine prescriptions and level-aware stimulus rules.
 
 ## Stage
 
-QA Slice R6C / backend Half Marathon and Marathon Base acceptance.
+QA validation / exact prescriptions plus weekly development stimulus rules.
 
 ## Exact Handoff Prompt
 
@@ -30,54 +30,50 @@ QA Slice R6C / backend Half Marathon and Marathon Base acceptance.
 ROLE: QA
 
 Task:
-Validate backend R6B Half Marathon and Marathon Base deterministic preview expansion.
+Validate exact watch-executable running-plan engine prescriptions and level-aware stimulus rules.
 
 Stage:
-QA Slice R6C / backend Half Marathon and Marathon Base acceptance.
+QA validation / exact prescriptions plus weekly development stimulus rules.
 
 PLAN:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md
 
 Context:
-- The previous Plan Preset builder and product flow are product-failed / not accepted.
-- The rebuilt 10K selected-plan vertical is accepted.
-- Running Coach R6A created the canonical doctrine for `Half Marathon` and `Marathon Base`:
-  `docs/tasks/running-coach/2026-06-09-running-plan-engine-r6-half-marathon-marathon-base-doctrine.md`.
-- Backend R6B implemented family-specific deterministic preview builders:
-  - `buildHalfMarathonPlanPreviewDraft(...)`
-  - `buildMarathonBasePlanPreviewDraft(...)`
-- R6B output is preview-only:
-  - `persisted: false`
-  - `mutates: false`
-  - `callsOpenAi: false`
-  - `confirmPathImplemented: false`
-- Half Marathon backend proof:
-  - source kind: `running_plan_engine_half_marathon_builder_v1`
-  - `14` weeks / `98` calendar rows / `70` non-rest rows for the 5-days/week fixture
-  - final non-rest row: `final_selected_distance_day`
-  - endpoint/main segment: exact `21100m`
-  - `beginner_new_runner` is blocked
-  - `sometimes_runs` has no `threshold`
-  - higher-support standard-load runners include `threshold`
-- Marathon Base backend proof:
-  - source kind: `running_plan_engine_marathon_base_builder_v1`
-  - `16` weeks / `112` calendar rows / `80` non-rest rows for the 5-days/week fixture
-  - final non-rest row: `marathon_base_endpoint`
-  - no selected-distance `42195m` endpoint
-  - no `intervals`
-  - no full marathon race-readiness claim
-  - `beginner_new_runner` is blocked
-- Existing 10K harness still passes.
-- `npm run build` passes.
+- The rebuilt running-plan engine is preview-only and non-mutating.
+- Backend now resolves preview workout templates into exact watch-executable prescriptions before
+  returning rows.
+- Source templates may still contain coach-authored ranges, but preview-ready rows must not expose
+  unresolved duration, distance, repeat, work, or recovery ranges.
+- Backend generated a scenario JSON pack under:
+  `qa-artifacts/plan-engine-scenarios/2026-06-09/`
+- Scenario pack proof:
+  - `13` scenarios generated
+  - `11` preview-ready scenarios
+  - `2` expected unavailable scenarios
+  - `0` unresolved executable segment ranges
+- Endpoint proof:
+  - 10K final endpoint remains exact `10000m`
+  - Half Marathon final endpoint remains exact `21100m`
+  - Marathon Base final row remains `marathon_base_endpoint` and does not emit `42195m`
+- Runner-level proof:
+  - beginner Half Marathon remains unavailable
+  - beginner Marathon Base remains unavailable
+  - professional 10K/Half/Marathon Base development sequences now differ from `runs_a_lot`
+  - conservative/heavy load contexts reduce or soften prescriptions without fake pace/HR precision
+- Build proof:
+  - targeted ESLint passed
+  - source, 10K, and R6 builder harnesses passed
+  - scenario JSON generator passed
+  - `npm run build` passed
 
 Your job:
-1. Run backend/source validation for R6B.
-2. Prove Half Marathon exact endpoint behavior and runner-level gates.
-3. Prove Marathon Base honest base endpoint behavior and no full-marathon overclaim.
-4. Prove existing 10K behavior is preserved.
+1. Run backend/source validation for the exact-prescription slice.
+2. Inspect the generated scenario JSON pack and prove preview rows contain exact numeric structure,
+   not unresolved ranges.
+3. Prove 10K, Half Marathon, and Marathon Base endpoint contracts remain intact.
+4. Prove runner-level and load-context differences are visible and safe.
 5. Prove no fake pace, no fake personal HR, no 5K benchmark dependency, and no watch/no-watch gate.
-6. Preserve no Supabase mutation unless a separate disposable validation fixture is explicitly
-   scoped.
+6. Preserve preview-only/non-mutating boundaries.
 
 Constraints:
 - Do not implement product fixes.
@@ -99,6 +95,7 @@ Validation:
 - `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
 - `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
 - `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
+- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts`
 - `npm run build`
 
 Report:
@@ -106,12 +103,13 @@ Report:
 2. Stage
 3. Files inspected
 4. Validation commands
-5. Half Marathon endpoint and eligibility proof
-6. Marathon Base endpoint and overclaim proof
-7. Existing 10K preservation proof
-8. Metric-truth proof
-9. Mutation-safety proof
-10. Blockers
+5. Exact prescription proof
+6. Scenario JSON proof
+7. Endpoint and eligibility proof
+8. Runner-level/load-context proof
+9. Metric-truth proof
+10. Mutation-safety proof
+11. Blockers
 ```
 
 ## Owner
@@ -121,6 +119,71 @@ ARCHITECT / RUNNING COACH / BACKEND / FRONTEND / QA
 ## Last Updated
 
 2026-06-09
+
+## Backend Exact Prescription Slice Result
+
+- Implemented a shared exact-prescription resolver for running-plan preview rows.
+- Preview builders now resolve coach-authored template ranges into exact numeric duration,
+  distance, repeat, work, and recovery prescriptions before returning watch-executable rows.
+- 10K, Half Marathon, and Marathon Base validators now reject unresolved executable ranges instead
+  of accepting positive `min/max` ranges as executable.
+- Professional/competitive development sequences now diverge from `runs_a_lot` where doctrine
+  requires visible progression:
+  - 10K adds a stronger week 6 interval stimulus.
+  - Half Marathon adds a professional week 9 interval stimulus.
+  - Marathon Base adds a professional week 14 threshold stimulus without adding intervals.
+- Added scenario JSON generation for QA under `qa-artifacts/plan-engine-scenarios/2026-06-09/`.
+- Validation evidence:
+  - targeted ESLint passed for plan-creation-engine files and validators
+  - source model validator passed
+  - 10K builder validator passed
+  - R6 Half/Marathon builder validator passed
+  - scenario JSON generator passed with `13` scenarios and `0` unresolved executable ranges
+  - `npm run build` passed
+
+## Backend Fake Metric Truth Boundary Fix Result
+
+- QA found `fakePrecisePaceAppears` and `fakePersonalHrAppears` failures in the generated scenario
+  JSON pack after the exact-prescription slice.
+- Root cause: the scenario generator scanned the full draft JSON, which counted internal
+  negative-proof metadata as runner-facing fake output:
+  - `draft.validation.forbiddenOutputGateIdsChecked`
+  - `draft.validation.rejectedOldBehaviorSignalsChecked`
+  - `draft.endpointProof.rejectedGenericFinalOutputs`
+- Builder rows and segment prescriptions did not contain fake precise pace or fake personal HR
+  targets.
+- Fixed the scenario generator so fake metric flags scan runner-facing/executable
+  `draft.calendarRows` only, while keeping internal negative-proof metadata in the artifact.
+- Added explicit `unresolvedRangeCount` alongside `unresolvedExecutableSegmentCount`.
+- Regenerated scenario proof:
+  - `unresolvedRangeCount: 0`
+  - `unresolvedExecutableSegmentCount: 0`
+  - preview-ready `fakePrecisePaceAppears: false`
+  - preview-ready `fakePersonalHrAppears: false`
+
+## Backend Running Coach Scenario-Pack Follow-Up Result
+
+- Implemented the Running Coach should-fix for Half Marathon durability specificity and long-run
+  detail variety.
+- Root cause: preview rows were exact and safe, but Half Marathon `sometimes_runs` still relied on
+  generic tempo/interval labels and Half/Marathon Base long runs over 90 minutes repeated the same
+  checkpoint/finish shell.
+- Changed the backend resolver/anatomy seam so:
+  - `sometimes_runs_half_marathon` includes a mid/late `half_marathon_durability_tempo` signal
+  - Half Marathon long runs over 90 minutes rotate endurance, fueling, posture, and controlled
+    steady-finish detail
+  - Marathon Base long runs over 90 minutes rotate time-on-feet, fueling/form, posture, and durable
+    finish detail without claiming marathon race readiness
+- Scenario proof after regeneration:
+  - `sometimes_runs_half_marathon` has week 11 `half_marathon_durability_tempo`
+  - `sometimes_runs_half_marathon` long runs over 90 minutes expose `3` checkpoint intents and `3`
+    finish intents
+  - `sometimes_runs_marathon_base` long runs over 90 minutes expose `3` checkpoint intents and `3`
+    finish intents
+  - `unresolvedRangeCount: 0`
+  - `unresolvedExecutableSegmentCount: 0`
+  - fake pace scenario list remains empty
+  - fake personal HR scenario list remains empty
 
 ## R5B Frontend Visual Cleanup Note
 

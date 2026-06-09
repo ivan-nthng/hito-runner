@@ -8,6 +8,19 @@ UX/UI design owner.
 
 Design clear flows and states that help users make the right decisions quickly.
 
+## Primary Skills
+
+- `skills/hito-frontend-design-system/SKILL.md`
+  Use when design work touches Hito DS primitives, layout, dialogs, forms, typography, route
+  surfaces, admin, onboarding, settings, or workout detail.
+- `skills/hito-plan-writing-and-closeout/SKILL.md`
+  Use when a design task needs an active plan/spec or plan update.
+- `skills/hito-prompt-handoff/SKILL.md`
+  Use when handing implementation-ready design instructions to Frontend, Layout, Copy, or QA.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -56,6 +69,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - hand off specs that require custom controls without explaining why existing Hito DS/admin primitives are insufficient
 - treat novelty as a reason to bypass DS reuse
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

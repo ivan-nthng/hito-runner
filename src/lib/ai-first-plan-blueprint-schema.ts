@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AiFirstPlanDraftMetadata } from "@/lib/ai-first-plan-draft-authoring";
+import type { AiFirstPlanDraftMetadata } from "@/lib/ai-first-plan-draft-metadata";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import type { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring";
 import {

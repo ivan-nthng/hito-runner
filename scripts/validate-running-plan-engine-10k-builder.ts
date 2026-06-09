@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import {
   buildTenKPlanPreviewDraft,
+  runningPlanPrescriptionIsExact,
   TEN_K_PLAN_BUILDER_SOURCE_KIND,
   TEN_K_PLAN_BUILDER_WEEKS,
-  type RunningPlanSegmentPrescription,
   type TenKPlanCalendarRow,
   type TenKPlanPreviewDraft,
 } from "../src/lib/plan-creation-engine";
@@ -128,6 +128,11 @@ function validateRunnerLevelDiversityMatrix() {
     excludes: ["threshold"],
     label: "professional_competitive standard",
   });
+  assert.notDeepEqual(
+    developmentSequence(professionalDraft.calendarRows),
+    developmentSequence(runsALotDraft.calendarRows),
+    "professional_competitive 10K must be visibly distinct from runs_a_lot.",
+  );
 }
 
 function validateConservativeDowngrade() {
@@ -461,8 +466,8 @@ function validateWatchExecutableSegments(rows: readonly TenKPlanCalendarRow[]) {
 
     for (const segment of row.segments) {
       assert.ok(
-        segmentPrescriptionIsNumeric(segment.primaryPrescription),
-        `${row.rowId}.${segment.id} must have numeric duration, distance, repeat, work, or recovery structure.`,
+        runningPlanPrescriptionIsExact(segment.primaryPrescription),
+        `${row.rowId}.${segment.id} must have exact duration, distance, repeat, work, or recovery structure.`,
       );
 
       if (segment.targetTruthMode === "editable_default_hr") {
@@ -544,6 +549,12 @@ function workoutKindSet(rows: readonly TenKPlanCalendarRow[]) {
   return new Set(rows.filter((row) => !row.isRestDay).map((row) => row.workoutDayKind));
 }
 
+function developmentSequence(rows: readonly TenKPlanCalendarRow[]) {
+  return rows
+    .filter((row) => !row.isRestDay && isDevelopmentTouch(row.workoutDayKind))
+    .map((row) => `${row.weekNumber}:${row.workoutDayKind}`);
+}
+
 function replaceWorkoutKind(
   rows: readonly TenKPlanCalendarRow[],
   fromKind: TenKPlanCalendarRow["workoutDayKind"],
@@ -580,61 +591,6 @@ function assertIssueIncludes(issues: readonly string[], expectedSnippet: string)
 
 function isDevelopmentTouch(kind: TenKPlanCalendarRow["workoutDayKind"]) {
   return ["strides", "tempo", "intervals", "hills"].includes(kind);
-}
-
-function segmentPrescriptionIsNumeric(prescription: RunningPlanSegmentPrescription) {
-  switch (prescription.mode) {
-    case "time":
-    case "open_warmup":
-    case "open_cooldown":
-    case "time_with_default_hr_cap":
-      return rangeIsPositive(prescription.durationSeconds);
-    case "distance":
-    case "distance_with_default_hr_cap":
-      return rangeIsPositive(prescription.distanceMeters);
-    case "recovery_time":
-      return rangeIsPositive(prescription.recoveryDurationSeconds);
-    case "recovery_distance":
-      return rangeIsPositive(prescription.recoveryDistanceMeters);
-    case "free_run_with_cap":
-      return (
-        rangeIsPositive(prescription.durationSecondsOrDistanceMeters) &&
-        prescription.explicitCap.length > 0
-      );
-    case "repeat":
-      return (
-        rangeIsPositive(prescription.repeatCount) &&
-        repeatPrescriptionIsNumeric(prescription.work) &&
-        repeatPrescriptionIsNumeric(prescription.recovery)
-      );
-  }
-}
-
-function repeatPrescriptionIsNumeric(
-  prescription:
-    | Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["work"]
-    | Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["recovery"],
-) {
-  if (prescription.mode === "time") {
-    return rangeIsPositive(prescription.durationSeconds);
-  }
-  if (prescription.mode === "distance") {
-    return rangeIsPositive(prescription.distanceMeters);
-  }
-  if (prescription.mode === "recovery_time") {
-    return rangeIsPositive(prescription.recoveryDurationSeconds);
-  }
-
-  return rangeIsPositive(prescription.recoveryDistanceMeters);
-}
-
-function rangeIsPositive(range: { min: number; max: number }) {
-  return (
-    Number.isFinite(range.min) &&
-    Number.isFinite(range.max) &&
-    range.min > 0 &&
-    range.max >= range.min
-  );
 }
 
 main();

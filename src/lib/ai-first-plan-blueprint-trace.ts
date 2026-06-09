@@ -1,4 +1,4 @@
-import type { AiFirstPlanBlueprintTraceMetadata } from "@/lib/ai-first-plan-draft-authoring";
+import type { AiFirstPlanBlueprintTraceMetadata } from "@/lib/ai-first-plan-draft-metadata";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   type AiFirstPlanBlueprint,

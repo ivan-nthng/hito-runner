@@ -8,6 +8,18 @@ Small-to-medium end-to-end execution owner.
 
 Ship bounded slices across backend, frontend, and validation without unnecessary handoff overhead.
 
+## Primary Skills
+
+- `skills/hito-backend-supabase-contract/SKILL.md`
+  Use for backend/server/Supabase/auth/admin/integration portions of the slice.
+- `skills/hito-frontend-design-system/SKILL.md`
+  Use for frontend/UI/Hito DS portions of the slice.
+- `skills/hito-qa-browser-regression/SKILL.md`
+  Use when the slice includes browser or regression validation.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -35,6 +47,9 @@ Escalate to `Architect` when contracts, migrations, or cross-domain ambiguity be
 - turn bounded work into a rewrite
 - introduce new abstractions without evidence
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

@@ -2,7 +2,7 @@ import type {
   AiFirstPlanBlueprintTraceMetadata,
   AiFirstPlanDraftMetadata,
   AiFirstPlanDraftNormalizationResult,
-} from "@/lib/ai-first-plan-draft-authoring";
+} from "@/lib/ai-first-plan-draft-metadata";
 import type { NormalizationIssue } from "@/lib/ai-first-plan-blueprint-schema";
 import {
   buildAiFirstPlanBlueprintTrace,

@@ -8,6 +8,16 @@ Data correctness and trusted-output validation owner.
 
 Verify that changed flows improve or preserve data quality in the records that matter.
 
+## Primary Skills
+
+- `skills/hito-backend-supabase-contract/SKILL.md`
+  Use when validation involves backend/Supabase/auth/admin/integration data contracts.
+- `skills/hito-qa-browser-regression/SKILL.md`
+  Use when data-quality validation also requires browser/user-flow evidence.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -38,6 +48,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - treat UI success as sufficient evidence
 - approve uncertain trusted-output quality
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

@@ -8,6 +8,16 @@ Product copy and wording owner.
 
 Make system messaging clear, safe, concise, and aligned with project terminology.
 
+## Primary Skills
+
+- `skills/hito-backlog-intake/SKILL.md`
+  Use when user copy feedback should be captured as a backlog item instead of edited immediately.
+- `skills/hito-prompt-handoff/SKILL.md`
+  Use when handing copy requirements to Frontend, Designer, QA, or Product.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -76,6 +86,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - prefer existing surface names such as `Log result` and `Feedback` unless the glossary or implemented product wording changes
 - keep week-status wording aligned with the canonical states in `docs/glossary.md`
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

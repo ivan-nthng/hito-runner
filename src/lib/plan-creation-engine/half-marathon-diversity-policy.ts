@@ -118,6 +118,9 @@ function resolveStandardHalfTouch(
       }
       return "tempo";
     case 9:
+      if (runnerLevel === "professional_competitive") {
+        return "intervals";
+      }
       return runnerLevel === "sometimes_runs" ? "intervals" : "tempo";
     default:
       return null;

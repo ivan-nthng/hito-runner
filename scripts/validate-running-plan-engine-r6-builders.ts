@@ -4,12 +4,12 @@ import {
   buildMarathonBasePlanPreviewDraft,
   HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
   MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
+  runningPlanPrescriptionIsExact,
   type HalfMarathonPlanCalendarRow,
   type HalfMarathonPlanPreviewDraft,
   type MarathonBasePlanCalendarRow,
   type MarathonBasePlanPreviewDraft,
   type RunningPlanPreviewCalendarWorkoutDayKind,
-  type RunningPlanSegmentPrescription,
 } from "../src/lib/plan-creation-engine";
 import {
   HALF_MARATHON_ENDPOINT_DISTANCE_METERS,
@@ -87,20 +87,45 @@ function validateHalfMarathonSometimesRuns() {
     excludes: ["threshold", "marathon_base_endpoint"],
     label: "Half Marathon sometimes_runs",
   });
+  validateHalfSpecificDurabilitySignal(draft.calendarRows);
+  validateLongRunDetailVariety(draft.calendarRows, "Half Marathon sometimes_runs");
 
   return draft;
 }
 
 function validateHalfMarathonHigherSupport() {
   const draft = buildHalfDraft("runs_a_lot");
+  const professionalDraft = buildHalfDraft("professional_competitive");
 
   assertWorkoutKinds(draft.calendarRows, {
     includes: ["strides", "tempo", "threshold", "final_selected_distance_day"],
     excludes: ["marathon_base_endpoint"],
     label: "Half Marathon runs_a_lot",
   });
+  assertWorkoutKinds(professionalDraft.calendarRows, {
+    includes: ["strides", "tempo", "threshold", "intervals", "final_selected_distance_day"],
+    excludes: ["marathon_base_endpoint"],
+    label: "Half Marathon professional_competitive",
+  });
+  assert.notDeepEqual(
+    developmentSequence(professionalDraft.calendarRows),
+    developmentSequence(draft.calendarRows),
+    "professional_competitive Half Marathon must be visibly distinct from runs_a_lot.",
+  );
   validateRecoveryAfterStressors(draft.calendarRows, ["long_run", "cutback_long_run", "threshold"]);
+  validateRecoveryAfterStressors(professionalDraft.calendarRows, [
+    "long_run",
+    "cutback_long_run",
+    "threshold",
+    "intervals",
+  ]);
+  validateLongRunDetailVariety(draft.calendarRows, "Half Marathon runs_a_lot");
+  validateLongRunDetailVariety(
+    professionalDraft.calendarRows,
+    "Half Marathon professional_competitive",
+  );
   validateHalfEndpointExactness(draft.calendarRows);
+  validateHalfEndpointExactness(professionalDraft.calendarRows);
 
   return draft;
 }
@@ -158,6 +183,7 @@ function validateHalfMarathonBadGates(
 
 function validateMarathonBaseSupported() {
   const draft = buildMarathonBaseDraft("runs_a_lot");
+  const professionalDraft = buildMarathonBaseDraft("professional_competitive");
 
   assert.equal(draft.sourceKind, MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND);
   assert.equal(draft.source_kind, MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND);
@@ -189,6 +215,7 @@ function validateMarathonBaseSupported() {
   validateWatchExecutableSegments(draft.calendarRows);
   validateForbiddenMetricSignals(draft.calendarRows, draft.normalizedInputSummary);
   validateNoMarathonOverclaim(draft.calendarRows);
+  validateLongRunDetailVariety(draft.calendarRows, "Marathon Base runs_a_lot");
 
   assertWorkoutKinds(draft.calendarRows, {
     includes: [
@@ -202,6 +229,29 @@ function validateMarathonBaseSupported() {
     excludes: ["intervals", "final_selected_distance_day"],
     label: "Marathon Base runs_a_lot",
   });
+  assertWorkoutKinds(professionalDraft.calendarRows, {
+    includes: [
+      "strides",
+      "tempo",
+      "threshold",
+      "hills",
+      "long_run",
+      "cutback_long_run",
+      "marathon_base_endpoint",
+    ],
+    excludes: ["intervals", "final_selected_distance_day"],
+    label: "Marathon Base professional_competitive",
+  });
+  assert.notDeepEqual(
+    developmentSequence(professionalDraft.calendarRows),
+    developmentSequence(draft.calendarRows),
+    "professional_competitive Marathon Base must be visibly distinct from runs_a_lot.",
+  );
+  validateNoMarathonOverclaim(professionalDraft.calendarRows);
+  validateLongRunDetailVariety(
+    professionalDraft.calendarRows,
+    "Marathon Base professional_competitive",
+  );
 
   return draft;
 }
@@ -215,6 +265,7 @@ function validateMarathonBaseSometimesRuns() {
     label: "Marathon Base sometimes_runs",
   });
   validateNoMarathonOverclaim(draft.calendarRows);
+  validateLongRunDetailVariety(draft.calendarRows, "Marathon Base sometimes_runs");
 }
 
 function validateMarathonBaseBeginnerBlocked() {
@@ -446,8 +497,8 @@ function validateWatchExecutableSegments(
 
     for (const segment of row.segments) {
       assert.ok(
-        segmentPrescriptionIsNumeric(segment.primaryPrescription),
-        `${row.rowId}.${segment.id} must have numeric structure.`,
+        runningPlanPrescriptionIsExact(segment.primaryPrescription),
+        `${row.rowId}.${segment.id} must have exact numeric structure.`,
       );
 
       if (segment.targetTruthMode === "editable_default_hr") {
@@ -479,6 +530,88 @@ function validateNoMarathonOverclaim(rows: readonly MarathonBasePlanCalendarRow[
   assert.doesNotMatch(text, /42195|42\.195|full_marathon|race_readiness|race_peak|race_pace/i);
 }
 
+function validateHalfSpecificDurabilitySignal(rows: readonly HalfMarathonPlanCalendarRow[]) {
+  const durabilityRows = rows.filter((row) => {
+    if (row.isRestDay) {
+      return false;
+    }
+
+    return JSON.stringify(row.segments).includes("half_marathon_durability");
+  });
+
+  assert.ok(
+    durabilityRows.some((row) => row.workoutDayKind === "tempo" && row.weekNumber >= 10),
+    "sometimes_runs Half Marathon must include a mid/late half-specific durability tempo signal.",
+  );
+}
+
+function validateLongRunDetailVariety(
+  rows: readonly (HalfMarathonPlanCalendarRow | MarathonBasePlanCalendarRow)[],
+  label: string,
+) {
+  const substantialLongRuns = rows.filter(
+    (row) =>
+      row.workoutDayKind === "long_run" &&
+      mainSegmentDurationSeconds(row) !== null &&
+      mainSegmentDurationSeconds(row)! > 90 * 60,
+  );
+
+  assert.ok(
+    substantialLongRuns.length >= 2,
+    `${label} must include multiple long runs over 90 minutes for variety proof.`,
+  );
+
+  const checkpointLabels = new Set(
+    substantialLongRuns
+      .map((row) => segmentIntensityLabel(row, "checkpoint"))
+      .filter((value): value is string => Boolean(value)),
+  );
+  const finishLabels = new Set(
+    substantialLongRuns
+      .map((row) => segmentIntensityLabel(row, "finish"))
+      .filter((value): value is string => Boolean(value)),
+  );
+  const cueTexts = new Set(
+    substantialLongRuns.flatMap((row) =>
+      row.segments
+        .filter(
+          (segment) => segment.segmentRole === "checkpoint" || segment.segmentRole === "finish",
+        )
+        .map((segment) => segment.secondaryCue),
+    ),
+  );
+
+  assert.ok(
+    checkpointLabels.size >= 2,
+    `${label} long runs over 90 minutes must vary checkpoint intent.`,
+  );
+  assert.ok(finishLabels.size >= 2, `${label} long runs over 90 minutes must vary finish intent.`);
+  assert.ok(cueTexts.size >= 4, `${label} long runs over 90 minutes must vary detail cues.`);
+}
+
+function mainSegmentDurationSeconds(
+  row: HalfMarathonPlanCalendarRow | MarathonBasePlanCalendarRow,
+) {
+  const mainSegment = row.segments.find((segment) => segment.segmentRole === "main");
+  if (!mainSegment || !("durationSeconds" in mainSegment.primaryPrescription)) {
+    return null;
+  }
+
+  return mainSegment.primaryPrescription.durationSeconds.min;
+}
+
+function segmentIntensityLabel(
+  row: HalfMarathonPlanCalendarRow | MarathonBasePlanCalendarRow,
+  segmentRole: "checkpoint" | "finish",
+) {
+  const segment = row.segments.find((candidate) => candidate.segmentRole === segmentRole);
+  if (!segment || !("intensityLabel" in segment.primaryPrescription)) {
+    return null;
+  }
+
+  return segment.primaryPrescription.intensityLabel;
+}
+
 function assertWorkoutKinds(
   rows: readonly (HalfMarathonPlanCalendarRow | MarathonBasePlanCalendarRow)[],
   {
@@ -498,6 +631,14 @@ function assertWorkoutKinds(
   for (const excluded of excludes) {
     assert.equal(kinds.has(excluded), false, `${label} must not include ${excluded}.`);
   }
+}
+
+function developmentSequence(
+  rows: readonly (HalfMarathonPlanCalendarRow | MarathonBasePlanCalendarRow)[],
+) {
+  return rows
+    .filter((row) => !row.isRestDay && isDevelopmentTouch(row.workoutDayKind))
+    .map((row) => `${row.weekNumber}:${row.workoutDayKind}`);
 }
 
 function replaceWorkoutKind<T extends HalfMarathonPlanCalendarRow | MarathonBasePlanCalendarRow>(
@@ -537,43 +678,6 @@ function assertIssueIncludes(issues: readonly string[], expectedFragment: string
 
 function isDevelopmentTouch(kind: RunningPlanPreviewCalendarWorkoutDayKind) {
   return ["strides", "tempo", "threshold", "intervals", "hills"].includes(kind);
-}
-
-function segmentPrescriptionIsNumeric(prescription: RunningPlanSegmentPrescription) {
-  switch (prescription.mode) {
-    case "time":
-    case "open_warmup":
-    case "open_cooldown":
-    case "time_with_default_hr_cap":
-      return rangeIsPositive(prescription.durationSeconds);
-    case "distance":
-    case "distance_with_default_hr_cap":
-      return rangeIsPositive(prescription.distanceMeters);
-    case "recovery_time":
-      return rangeIsPositive(prescription.recoveryDurationSeconds);
-    case "recovery_distance":
-      return rangeIsPositive(prescription.recoveryDistanceMeters);
-    case "free_run_with_cap":
-      return (
-        rangeIsPositive(prescription.durationSecondsOrDistanceMeters) &&
-        prescription.explicitCap.length > 0
-      );
-    case "repeat":
-      return (
-        rangeIsPositive(prescription.repeatCount) &&
-        segmentPrescriptionIsNumeric(prescription.work) &&
-        segmentPrescriptionIsNumeric(prescription.recovery)
-      );
-  }
-}
-
-function rangeIsPositive(range: { min: number; max: number }) {
-  return (
-    Number.isFinite(range.min) &&
-    Number.isFinite(range.max) &&
-    range.min > 0 &&
-    range.max >= range.min
-  );
 }
 
 main();

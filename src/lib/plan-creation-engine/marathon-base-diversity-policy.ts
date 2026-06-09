@@ -118,6 +118,8 @@ function resolveStandardMarathonBaseTouch(
       return "strides";
     case 13:
       return runnerLevel === "sometimes_runs" ? "tempo" : "hills";
+    case 14:
+      return runnerLevel === "professional_competitive" ? "threshold" : null;
     default:
       return null;
   }

@@ -349,7 +349,7 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
         goalStyle: "target_time",
         terrainFocus: "standard",
         targetTime: "2:00:00",
-        targetDate: "2026-06-14",
+        targetDate: "2026-07-12",
       },
     }),
   );

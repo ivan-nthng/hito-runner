@@ -200,6 +200,47 @@ Goal:
 
 Stop recurring bugs from becoming a pile of local fixes.
 
+## 2.57) Mandatory Reuse Preflight (Frontend And Backend)
+
+Agents must prove they tried to reuse the existing system before adding anything new.
+
+Frontend agents must perform a design-system preflight before every UI task:
+
+- inspect nearby route/component patterns that already solve the same UI problem
+- inspect `src/components/ui/*`, relevant `src/components/hito-ds/*`, `/hitoDS`, and existing
+  classes/tokens in `src/styles.css` before adding components, styling, layout, typography, or
+  interaction patterns
+- bind new or changed UI to existing Hito DS primitives, typography roles, spacing rhythm, tokens,
+  icon sizing, controls, dialogs, tabs, tables, cards, surfaces, and status patterns whenever they
+  exist
+- if a custom element, class recipe, wrapper, hook, or visual pattern remains, explicitly report it
+  as custom, explain why no existing DS primitive/pattern covers it, and state where it will be
+  reused or how it will be removed
+- if an existing custom element is touched, either migrate it toward Hito DS primitives or report why
+  that migration is outside the current slice
+- a frontend final report is incomplete if it does not name the DS primitives/patterns reused and
+  any custom elements left behind
+
+Backend agents must perform an existing-flow preflight before every backend/server/script task:
+
+- inspect nearby server actions, route loaders, validators, persistence helpers, import/export
+  helpers, entitlement/admin/auth guards, AI-context builders, scripts, and canonical entity seams
+  before adding a new module, action, script, validator, storage model, helper, or dependency
+- reuse existing validation, normalization, persistence, lifecycle, auth/admin/entitlement,
+  provider-ingest, AI-context, import/export, and view-model patterns before creating a new path
+- if a new backend seam, helper, script, table, dependency, or technology is introduced, explicitly
+  report why the existing approach could not cover it and what larger duplicated or unsafe path it
+  replaces
+- if a similar flow already exists, extend or extract the canonical owner instead of creating a
+  parallel flow
+- a backend final report is incomplete if it does not name the existing flow/seam reused or explain
+  why a new one was necessary
+
+Goal:
+
+Make every implementation answer the question: "what did we reuse, and why did we need anything
+custom?"
+
 ## 2.6) Canonical Hito Architecture Approach (Mandatory)
 
 Every agent must preserve one canonical Hito architecture. Do not create parallel product systems
@@ -279,6 +320,123 @@ Current project skills:
 
 If a task matches one of these skills, load the skill before doing substantial work and follow its workflow
 unless the user gives a stricter instruction.
+
+## 2.8) Mandatory Role Startup And Skill Preflight
+
+Every role agent must ground itself before answering or executing project work.
+
+Mandatory startup for every project-work response:
+
+1. Read `AGENTS.md`.
+2. Read the current role file under `agents/`, for example:
+   - `agents/product.agent.md`
+   - `agents/architect.agent.md`
+   - `agents/backend.agent.md`
+   - `agents/frontend.agent.md`
+   - `agents/qa.agent.md`
+   - `agents/running-coach-agent.md`
+3. Load every matching project skill from `skills/*/SKILL.md` before substantial work.
+4. Read the active plan/spec/task named by the request, when one exists.
+5. Inspect nearby source/docs before proposing architecture, implementation, QA, or cleanup.
+
+If the agent cannot read its role file or a mandatory matching skill, it must state that explicitly
+and either stop or proceed only with a clearly bounded fallback.
+
+Every project-work final report must name:
+
+- role file read
+- project skill or skills used, or `none` with a reason
+- active plan/spec/task file used, or `none`
+
+Role files should list their most common skills, but `AGENTS.md` remains the higher-level rule:
+agents must still load any task-matching skill even if the role file does not mention it.
+
+## 2.9) Standard Report Formats
+
+Do not duplicate routine report formats in every handoff prompt unless the task needs a stricter or
+custom format. Prompts may refer to the relevant standard format below.
+
+### Orchestration / Prior-Agent Review / Handoff
+
+Use this shape when reviewing another agent's work, reporting current progress, or routing the next
+role:
+
+1. Plan file
+2. Task
+3. Stage
+4. What we did
+5. Where we are
+6. What we do next
+7. Exact prompt for that role, only when a handoff is needed
+8. Blockers
+
+### Implementation Report
+
+Use this shape for BACKEND, FRONTEND, FULLSTACK, LAYOUT, COPY, DESIGNER implementation/spec work,
+and any execution slice that changed files:
+
+1. Task
+2. Stage
+3. Root cause
+4. Files inspected
+5. Files changed
+6. What changed
+7. What was preserved
+8. Validation results
+9. Next recommended role
+10. Blockers
+
+For very small copy/design/docs-only work, agents may omit `What was preserved` if it adds no value.
+
+### QA Report
+
+Use this shape for QA validation:
+
+1. Task
+2. Stage
+3. Browser Path Preflight
+4. QA Execution Authority
+5. Files inspected
+6. Validation coverage
+7. Required behavior proof
+8. Issues found
+9. Coverage gaps
+10. Verdict: Passed or Failed
+
+QA reports that skip an explicit verdict are incomplete.
+
+### Architecture / Cleanup / Plan Report
+
+Use this shape for ARCHITECT audits, cleanup selection, source-of-truth decisions, and execution
+plans:
+
+1. Task
+2. Stage
+3. Files inspected
+4. Current state
+5. Findings
+6. Decision or recommendation
+7. Selected next gate or owner
+8. What must not be touched
+9. Files changed
+10. Validation results
+11. Next recommended role
+12. Blockers
+
+### Running Coach Report
+
+Use this shape for training-plan quality, sports-safety, workout diversity, or coaching doctrine:
+
+1. Task
+2. Stage
+3. Current training quality
+4. Findings
+5. Safety concerns
+6. Recommended coaching changes
+7. Product rules to encode
+8. What not to change
+9. Next recommended role
+10. Blockers
 
 ## 3) Required Context And Source Hierarchy
 
@@ -377,22 +535,25 @@ Completion gate:
 - If screenshots are promoted into `docs/process/screenshots/`, the QA report must explain why they are permanent evidence.
 - Existing committed screenshots under `docs/process/screenshots/` are preserved unless a separate Architect cleanup slice explicitly moves or archives them.
 
-## 7) Handoff Footer (Conditional)
+## 7) Optional Continuity Handoff Footer
 
-Handoff footer is required only when continuity would otherwise be lost:
+The long continuity footer is optional, not a routine requirement.
 
-- task is blocked
-- task is gated and awaiting another role
-- work is explicitly handed to another role
-- change is large enough that next-step continuity requires formal transfer
+For normal Product/orchestration prompt-routing, the standard response shell plus `Blockers` is
+enough. Do not append a large handoff footer just because the response contains a next-role prompt.
 
-When required, use this exact footer:
+Use a continuity footer only when context would otherwise be lost, for example:
 
-`## 🔁 HANDOFF BLOCK (MANDATORY)`
+- task is blocked and needs a future agent to understand the blocking condition
+- task is gated and awaiting another role with context that is not already captured in the prompt
+- work is large enough that the next-step prompt/report alone cannot preserve continuity
+- the user explicitly asks for a formal handoff block
+
+When a footer is truly needed, use this format:
+
+`## Handoff Context`
 
 ```md
-## Handoff Context
-
 ### Summary
 
 <short summary of what was done>

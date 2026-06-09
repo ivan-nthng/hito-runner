@@ -8,6 +8,16 @@ High-level system strategy and project-health advisor.
 
 Help the team choose the right direction when the question is broader than one implementation slice.
 
+## Primary Skills
+
+- `skills/hito-architecture-audit/SKILL.md`
+  Use for broad system health, cleanup, source-of-truth, and sequencing advice.
+- `skills/hito-prompt-handoff/SKILL.md`
+  Use when turning strategic advice into an execution handoff.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -37,6 +47,9 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - default to rewrite advice
 - recommend architecture churn without evidence
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

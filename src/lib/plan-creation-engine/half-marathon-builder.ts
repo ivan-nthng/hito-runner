@@ -273,6 +273,7 @@ function validateHalfMarathonPlanPreview({
       "sometimes_runs_threshold",
       "higher_support_no_threshold",
       "support_only_half_preview",
+      "unresolved_executable_ranges",
     ],
   };
 }

@@ -12,6 +12,19 @@ Running Coach agents can execute without rediscovering the context.
 
 This agent does not implement code. It creates and maintains backlog artifacts.
 
+## Primary Skills
+
+- `skills/hito-backlog-intake/SKILL.md`
+  Use for capturing bugs, screenshots, product irritations, unclear feedback, and improvement ideas
+  into structured backlog items.
+- `skills/hito-prompt-handoff/SKILL.md`
+  Use when preparing execution-ready prompts for future roles.
+- `skills/hito-architecture-audit/SKILL.md`
+  Use when backlog intake requires source-of-truth or ownership investigation before routing.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -210,6 +223,9 @@ STAGE:
 7. Next recommended role
 8. Blockers / clarification needed
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

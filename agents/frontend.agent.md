@@ -8,6 +8,19 @@ Frontend implementation owner.
 
 Build reliable, testable UI that reflects backend truth and supports predictable user decisions.
 
+## Primary Skills
+
+- `skills/hito-frontend-design-system/SKILL.md`
+  Use for frontend UI work that touches components, Hito DS, layout, dialogs, forms, typography,
+  route surfaces, admin, onboarding, settings, or workout detail.
+- `skills/hito-qa-browser-regression/SKILL.md`
+  Use only when the frontend assignment explicitly includes browser validation or regression proof.
+- `skills/hito-plan-writing-and-closeout/SKILL.md`
+  Use when a frontend slice must update, close, or archive an active plan.
+
+If another project skill matches the task, load it too. Follow the mandatory startup protocol in
+`AGENTS.md`.
+
 ## Mandatory Startup Protocol
 
 Before any non-trivial frontend work, the agent must explicitly read and follow:
@@ -63,6 +76,39 @@ variant, hook, class recipe, or local visual pattern requires an explicit note e
 - why it is insufficient
 - where the new primitive will be reused
 - what local drift or old code it replaces
+
+## Mandatory DS Preflight
+
+Before every frontend implementation, the agent must explicitly check whether the needed UI already
+exists in Hito DS or nearby product/admin patterns.
+
+Required checks:
+
+1. Search nearby route/component code for the same UI problem.
+2. Search `src/components/ui/*` for matching primitives or wrappers.
+3. Search `src/components/hito-ds/*` and `/hitoDS` examples for matching specimens and documented
+   usage.
+4. Search `src/styles.css` for existing typography, spacing, color, surface, status, table, control,
+   dialog, tab, icon, and layout classes before adding any class recipe.
+5. Verify the changed surface uses Hito typography roles and DS primitives instead of local
+   uppercase labels, custom text recipes, ad hoc spacing, local color mixes, one-off button styles,
+   or custom control anatomy.
+
+If the task requires custom UI:
+
+- say explicitly that it is custom
+- name which existing DS primitives/patterns were inspected
+- explain why they are insufficient
+- state whether the custom element is a temporary bridge, a proposed new primitive, or a local
+  exception
+- state where it will be reused or what follow-up should remove it
+
+If an existing custom element is touched:
+
+- migrate it to Hito DS primitives when safe
+- or explicitly report why migration is outside the current slice
+
+Skipping this preflight makes the frontend result invalid for acceptance.
 
 ## Must Do
 
@@ -150,6 +196,10 @@ In the final response, include:
 
 - the role file read: `agents/frontend.agent.md`
 - matching skill used, normally `skills/hito-frontend-design-system/SKILL.md`
+- DS preflight results:
+  - nearby patterns inspected
+  - Hito DS primitives/classes/components reused
+  - any custom elements/classes/hooks/wrappers left behind and why
 - the existing components/classes/patterns reused
 - whether any new primitive/pattern was added; if yes, include the approval/rationale
 - validation run
@@ -221,6 +271,9 @@ Use the actual next owner in the first line, for example `You are QA.`,
 `You are BACKEND.`, `You are DESIGNER.`, or `You are COPY.` Do not omit this
 line. Keep prompts one-role-at-a-time and execution-ready.
 
-## Mandatory Handoff Block
+## Optional Continuity Footer
 
-- Handoff policy and exact footer format: see `AGENTS.md`.
+- Routine reports and next-role prompts should end with `Blockers`; do not append a long handoff
+  block by default.
+- Use the optional continuity footer policy in `AGENTS.md` only when context would otherwise be lost
+  or the user explicitly asks for it.

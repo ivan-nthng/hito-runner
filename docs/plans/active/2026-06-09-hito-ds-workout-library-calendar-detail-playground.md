@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+frontend_implemented_awaiting_qa
 
 ## Type
 
@@ -14,7 +14,7 @@ high
 
 ## Next Recommended Role
 
-RUNNING COACH
+QA
 
 ## Task
 
@@ -23,9 +23,12 @@ workout type and provider-feedback overlay state.
 
 ## Stage
 
-ARCHITECT plan / DS workout library playground implementation scope.
+FRONTEND implementation / static DS workout library playground.
 
-## Exact Handoff Prompt
+## Previous Handoff Prompt
+
+Historical prompt used to create the Running Coach specimen matrix; superseded by the Frontend
+implementation status above.
 
 ```text
 ROLE: RUNNING COACH
@@ -439,6 +442,19 @@ Required validation:
 - browser proof with built-in Codex browser first
 - screenshot or DOM/JSON fallback artifacts if PNG capture times out
 
+### Post-QA Frontend Fix
+
+QA found two acceptance failures after the initial static playground implementation:
+
+- direct-loading `/hitoDS#workout-library-playground` could hydrate with a server/client active-nav
+  mismatch
+- switching to `Mobile` view and selecting `Provider compare future` could create desktop
+  page-level horizontal overflow from the provider control layout
+
+Frontend fixed both without changing specimen data, product calendar behavior, provider semantics,
+or the static/specimen-only boundary. The next owner remains QA for focused re-validation of the
+deep-link hydration path and the provider-control overflow scenario.
+
 ## What Remains Forbidden
 
 - Do not implement manual workout creation, editing, copy, paste, recurrence, or templates.
@@ -463,10 +479,11 @@ Required validation:
 
 ## Next Decision
 
-Send to RUNNING COACH first.
+Send to QA for focused browser/source validation.
 
 Reason:
 
-Frontend should not invent the detailed sectors for every workout identity. The design-system
-playground must be static, but its specimen data still needs coaching ownership so it remains a
-trusted visual reference instead of another route-local fake.
+The Running Coach specimen matrix now exists and Frontend implemented the static
+`/hitoDS#workout-library-playground` from that matrix. QA should verify identity coverage, provider
+and result controls, static-only boundaries, existing calendar playground non-regression, and
+375px no-overflow behavior before this plan moves toward closeout.

@@ -5,7 +5,7 @@ import {
   type AiFirstPlanGenerationContract,
   type AiFirstPlanDraftServiceInputKind,
 } from "../src/lib/ai-first-plan-draft-service";
-import type { AiFirstPlanBlueprintTraceMetadata } from "../src/lib/ai-first-plan-draft-authoring";
+import type { AiFirstPlanBlueprintTraceMetadata } from "../src/lib/ai-first-plan-draft-metadata";
 import {
   AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
   type AiFirstPlanBlueprint,

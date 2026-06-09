@@ -77,6 +77,11 @@ export {
   type PlanPresetReviewDraftActionResult,
 } from "@/lib/plan-preset-actions";
 export {
+  previewRunningPlanDraft,
+  type RunningPlanPreviewActionInput,
+  type RunningPlanPreviewActionResult,
+} from "@/lib/running-plan-engine-actions";
+export {
   exportActivePlan,
   exportActivePlanForUser,
   type ExportActivePlanResult,

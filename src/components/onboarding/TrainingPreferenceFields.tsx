@@ -28,6 +28,7 @@ interface TrainingPreferenceFieldsProps {
   fixedRestDaysHelper?: string;
   maxRunningDaysHelper?: string;
   preferredLongRunHelper?: string;
+  showRunningDays?: boolean;
 }
 
 export function TrainingPreferenceFields({
@@ -48,6 +49,7 @@ export function TrainingPreferenceFields({
   fixedRestDaysHelper,
   maxRunningDaysHelper,
   preferredLongRunHelper,
+  showRunningDays = true,
 }: TrainingPreferenceFieldsProps) {
   const allowedRunningDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
   const selectedRunningDays = Number.parseInt(maxRunningDaysPerWeek, 10);
@@ -123,7 +125,7 @@ export function TrainingPreferenceFields({
         </div>
       </TrainingPreferenceField>
 
-      {restDaysAnswered ? (
+      {restDaysAnswered && showRunningDays ? (
         <TrainingPreferenceField
           label="Default running days per week"
           helper={

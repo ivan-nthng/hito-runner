@@ -212,7 +212,7 @@ export function StructuredPlanConstructor({
 
           <Field
             label="Available running days per week"
-            helper="Optional before choosing. If you leave this open, the selected preset will ask for rhythm before review."
+            helper="Optional before choosing. If you leave this open, the selected 10K preview uses the backend default."
           >
             <OptionGrid label="Available running days per week">
               {PRESET_RUNNING_DAY_OPTIONS.map((option) => (
@@ -226,6 +226,42 @@ export function StructuredPlanConstructor({
               ))}
             </OptionGrid>
           </Field>
+
+          <HitoEditableDateChip
+            label="Plan Start Date"
+            value={state.startDate}
+            onChange={setState.setStartDate}
+            helper="Optional. Leave unset to let the 10K preview use the backend default start date."
+          />
+          <input type="hidden" name="schedule.startDate" value={state.startDate} />
+
+          <div className="hito-row-group">
+            <div className="hito-list-row items-start">
+              <div className="grid gap-4">
+                <div>
+                  <p className="hito-label">Schedule rhythm</p>
+                  <p className="hito-list-row-copy">
+                    Optional before selecting. These values are sent to the backend preview, not
+                    used to compute rows in the browser.
+                  </p>
+                </div>
+                <TrainingPreferenceFields
+                  fixedRestDays={state.fixedRestDays}
+                  onFixedRestDaysChange={setState.setFixedRestDays}
+                  restDaysAnswered={state.restDaysAnswered}
+                  onRestDaysAnsweredChange={setState.setRestDaysAnswered}
+                  maxRunningDaysPerWeek={state.maxRunningDaysPerWeek}
+                  onMaxRunningDaysPerWeekChange={setState.setMaxRunningDaysPerWeek}
+                  preferredLongRunDay={state.preferredLongRunDay}
+                  onPreferredLongRunDayChange={setState.setPreferredLongRunDay}
+                  preferredLongRunMode="default-sunday"
+                  showRunningDays={false}
+                  fixedRestDaysHelper="Optional. Protect days that should stay off the run schedule."
+                  preferredLongRunHelper="Optional. Leave unselected to keep the backend default."
+                />
+              </div>
+            </div>
+          </div>
         </ConstructorSection>
 
         {typeof planPresetPanel === "function"
@@ -361,14 +397,6 @@ export function StructuredPlanConstructor({
                   ))}
                 </OptionGrid>
               </Field>
-
-              <HitoEditableDateChip
-                label="Plan Start Date"
-                value={state.startDate}
-                onChange={setState.setStartDate}
-                helper="Optional. Leave unset to let Hito choose the default start date."
-              />
-              <input type="hidden" name="schedule.startDate" value={state.startDate} />
 
               {showsTargetFields ? (
                 <div className="grid gap-4 md:grid-cols-2">

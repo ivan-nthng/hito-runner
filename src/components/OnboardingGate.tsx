@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Icon } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
@@ -22,21 +22,21 @@ import {
 } from "@/components/onboarding/onboarding-form-model";
 import { type ImportedPlan, validateImportedPlanJson } from "@/lib/imported-plan";
 import type { PlanPresetCardId, PlanPresetCardRequestInput } from "@/lib/plan-presets/schema";
+import type { RunningPlanDistanceFamily, RunningPlanRunnerLevel } from "@/lib/plan-creation-engine";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
 import {
   completeOnboarding,
-  confirmPlanPresetDraft,
   confirmStructuredFirstPlanDraft,
   confirmVoiceToPlanDraft,
   getPlanPresetCards,
   generateStructuredFirstPlanDraft,
   generateVoiceToPlanDraft,
-  reviewPlanPresetDraft,
+  previewRunningPlanDraft,
   type PlanPresetCardsActionResult,
-  type PlanPresetConfirmActionResult,
-  type PlanPresetReviewDraftActionResult,
+  type RunningPlanPreviewActionInput,
+  type RunningPlanPreviewActionResult,
   type StructuredFirstPlanDraftResult,
   type UserSettingsSummary,
 } from "@/lib/training-api";
@@ -52,17 +52,16 @@ const STRUCTURED_REVIEW_TIMEOUT_MS = 300_000;
 export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSummary | null }) {
   const generateStructuredFirstPlanDraftFn = useServerFn(generateStructuredFirstPlanDraft);
   const confirmStructuredFirstPlanDraftFn = useServerFn(confirmStructuredFirstPlanDraft);
-  const confirmPlanPresetDraftFn = useServerFn(confirmPlanPresetDraft);
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const generateVoiceToPlanDraftFn = useServerFn(generateVoiceToPlanDraft);
   const confirmVoiceToPlanDraftFn = useServerFn(confirmVoiceToPlanDraft);
   const getPlanPresetCardsFn = useServerFn(getPlanPresetCards);
-  const reviewPlanPresetDraftFn = useServerFn(reviewPlanPresetDraft);
+  const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
   const voiceTranscriptRef = useRef<HTMLTextAreaElement | null>(null);
-  const presetConfirmInFlightRef = useRef(false);
   const presetAutoLoadKeyRef = useRef<string | null>(null);
+  const runningPlanPreviewInputKeyRef = useRef<string | null>(null);
 
   const [age, setAge] = useState(() => (defaults?.age != null ? String(defaults.age) : ""));
   const [weightKg, setWeightKg] = useState(() =>
@@ -105,12 +104,10 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [presetCardsResult, setPresetCardsResult] = useState<PlanPresetCardsActionResult | null>(
     null,
   );
-  const [presetReviewResult, setPresetReviewResult] =
-    useState<PlanPresetReviewDraftActionResult | null>(null);
-  const [presetConfirmResult, setPresetConfirmResult] =
-    useState<PlanPresetConfirmActionResult | null>(null);
   const [presetSelectedCardId, setPresetSelectedCardId] = useState<PlanPresetCardId | null>(null);
-  const [presetReviewedCardId, setPresetReviewedCardId] = useState<PlanPresetCardId | null>(null);
+  const [runningPlanPreviewOpen, setRunningPlanPreviewOpen] = useState(false);
+  const [runningPlanPreviewResult, setRunningPlanPreviewResult] =
+    useState<RunningPlanPreviewActionResult | null>(null);
   const [presetError, setPresetError] = useState<string | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
@@ -130,32 +127,59 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const isPresetBusy = presetStatus !== "idle";
   const isBusy =
     constructorStatus !== "idle" || jsonStatus !== "idle" || isVoiceBusy || isPresetBusy;
-  const constructorState: StructuredConstructorState = {
-    age,
-    weightKg,
-    heightCm,
-    fitnessLevel,
-    recent5kTime,
-    recent5kPace,
-    fixedRestDays,
-    restDaysAnswered,
-    maxRunningDaysPerWeek,
-    preferredLongRunDay,
-    goalDistance,
-    goalStyle,
-    targetTime,
-    startDate,
-    targetDate,
-    terrainFocus,
-    watchAccess,
-    guidancePreference,
-    strengthPreference,
-    comment,
-  };
-  const effectiveConstructorState: StructuredConstructorState = {
-    ...constructorState,
-    terrainFocus: resolveTerrainFocus(goalDistance, terrainFocus),
-  };
+  const constructorState: StructuredConstructorState = useMemo(
+    () => ({
+      age,
+      weightKg,
+      heightCm,
+      fitnessLevel,
+      recent5kTime,
+      recent5kPace,
+      fixedRestDays,
+      restDaysAnswered,
+      maxRunningDaysPerWeek,
+      preferredLongRunDay,
+      goalDistance,
+      goalStyle,
+      targetTime,
+      startDate,
+      targetDate,
+      terrainFocus,
+      watchAccess,
+      guidancePreference,
+      strengthPreference,
+      comment,
+    }),
+    [
+      age,
+      comment,
+      fitnessLevel,
+      fixedRestDays,
+      goalDistance,
+      goalStyle,
+      guidancePreference,
+      heightCm,
+      maxRunningDaysPerWeek,
+      preferredLongRunDay,
+      recent5kPace,
+      recent5kTime,
+      restDaysAnswered,
+      startDate,
+      strengthPreference,
+      targetDate,
+      targetTime,
+      terrainFocus,
+      watchAccess,
+      weightKg,
+    ],
+  );
+  const effectiveConstructorState: StructuredConstructorState = useMemo(
+    () => ({
+      ...constructorState,
+      terrainFocus: resolveTerrainFocus(goalDistance, terrainFocus),
+    }),
+    [constructorState, goalDistance, terrainFocus],
+  );
   const isConstructorReady = isStructuredConstructorReady(constructorState);
   const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
   const presetCardInput = buildPlanPresetCardInput(effectiveConstructorState);
@@ -173,16 +197,14 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
   useEffect(() => {
     presetAutoLoadKeyRef.current = null;
-    setPresetReviewResult(null);
-    setPresetConfirmResult(null);
-    setPresetReviewedCardId(null);
+    runningPlanPreviewInputKeyRef.current = null;
+    setRunningPlanPreviewResult(null);
     setPresetError(null);
-    presetConfirmInFlightRef.current = false;
 
-    if (!presetSelectedCardId) {
+    if (!presetSelectedCardId && !runningPlanPreviewOpen) {
       setPresetCardsResult(null);
     }
-  }, [presetDiscoveryKey, presetSelectedCardId]);
+  }, [presetDiscoveryKey, presetSelectedCardId, runningPlanPreviewOpen]);
 
   const clearStructuredReview = () => {
     setStructuredDraftResult(null);
@@ -400,10 +422,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
   const loadPlanPresetCards = async () => {
     setPresetError(null);
-    setPresetReviewResult(null);
-    setPresetConfirmResult(null);
     setPresetSelectedCardId(null);
-    setPresetReviewedCardId(null);
+    setRunningPlanPreviewResult(null);
+    runningPlanPreviewInputKeyRef.current = null;
 
     try {
       setPresetStatus("loading_cards");
@@ -454,138 +475,92 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     autoLoadPlanPresetCards,
   ]);
 
-  const selectPlanPresetForRefinement = (cardId: PlanPresetCardId) => {
-    setPresetError(null);
-    setPresetReviewResult(null);
-    setPresetConfirmResult(null);
-    setPresetReviewedCardId(null);
-    setPresetSelectedCardId(cardId);
-    window.requestAnimationFrame(() =>
-      structuredFormRef.current?.querySelector("[data-preset-refinement]")?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      }),
-    );
-  };
+  const refreshSelectedRunningPlanPreview = async (cardIdOverride?: PlanPresetCardId) => {
+    const cardId = cardIdOverride ?? presetSelectedCardId;
 
-  const reviewPlanPreset = async (cardId: PlanPresetCardId) => {
-    setPresetError(null);
-    setPresetReviewResult(null);
-    setPresetConfirmResult(null);
-    setPresetReviewedCardId(null);
-    setPresetSelectedCardId(cardId);
-
-    try {
-      const inputResult = buildPlanPresetStructuredInput(effectiveConstructorState, cardId);
-
-      if (!inputResult.ok) {
-        setPresetError(inputResult.error);
-        return;
-      }
-
-      setPresetStatus("reviewing_draft");
-      const result = await reviewPlanPresetDraftFn({
-        data: {
-          cardId,
-          input: inputResult.input,
-        },
-      });
-
-      setPresetReviewResult(result);
-      setPresetReviewedCardId(result.ok ? cardId : null);
+    if (!cardId) {
       setPresetStatus("idle");
-
-      if (!result.ok) {
-        setPresetError(result.message);
-      }
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : "Could not review this preset.";
-      setPresetStatus("idle");
-      setPresetError(message);
-    }
-  };
-
-  const confirmPlanPreset = async () => {
-    if (presetConfirmInFlightRef.current) {
+      setRunningPlanPreviewResult(null);
+      setPresetError("Select a plan preset before previewing it.");
       return;
     }
 
-    if (!presetReviewResult?.ok || !presetReviewedCardId) {
-      setPresetError("Review a preset before creating a plan.");
+    const inputResult = buildRunningPlanPreviewInput(effectiveConstructorState, cardId);
+
+    if (!inputResult.ok) {
+      setPresetStatus("idle");
+      setRunningPlanPreviewResult(null);
+      setPresetError(inputResult.error);
       return;
     }
 
-    presetConfirmInFlightRef.current = true;
-    setPresetStatus("creating_plan");
-    setPresetConfirmResult(null);
+    const inputKey = JSON.stringify(inputResult.input);
     setPresetError(null);
-    hitoToast.working({
-      id: STRUCTURED_REVIEW_TOAST_ID,
-      title: "Creating preset plan",
-      description: "Hito is creating the active plan from the reviewed preset.",
-    });
+    setPresetStatus("previewing_plan");
 
     try {
-      const inputResult = buildPlanPresetStructuredInput(
-        effectiveConstructorState,
-        presetReviewedCardId,
-      );
-
-      if (!inputResult.ok) {
-        presetConfirmInFlightRef.current = false;
-        setPresetStatus("idle");
-        setPresetError(inputResult.error);
-        hitoToast.error({
-          id: STRUCTURED_REVIEW_TOAST_ID,
-          title: "Plan not created",
-          description: inputResult.error,
-        });
-        return;
-      }
-
-      const result = await confirmPlanPresetDraftFn({
-        data: {
-          cardId: presetReviewedCardId,
-          input: inputResult.input,
-          reviewToken: presetReviewResult.reviewToken,
-          reviewChecksum: presetReviewResult.reviewChecksum,
-        },
+      const result = await previewRunningPlanDraftFn({
+        data: inputResult.input,
       });
 
-      setPresetConfirmResult(result);
+      runningPlanPreviewInputKeyRef.current = inputKey;
+      setRunningPlanPreviewResult(result);
+      setPresetStatus("idle");
 
       if (!result.ok) {
-        presetConfirmInFlightRef.current = false;
-        setPresetStatus("idle");
-        setPresetError(result.message);
-        hitoToast.error({
-          id: STRUCTURED_REVIEW_TOAST_ID,
-          title: "Plan not created",
-          description: result.message,
-        });
+        setPresetError(null);
         return;
       }
 
       hitoToast.success({
         id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Plan created",
-        description: "Opening your saved plan now.",
-        duration: 2600,
+        title: `${inputResult.input.distanceFamily} preview ready`,
+        description: "Review the backend-shaped calendar before create is implemented.",
       });
-      openSavedHome();
     } catch (submitError) {
-      presetConfirmInFlightRef.current = false;
-      setPresetStatus("idle");
       const message =
-        submitError instanceof Error ? submitError.message : "Could not create this preset plan.";
+        submitError instanceof Error ? submitError.message : "Could not build this preview.";
+      setRunningPlanPreviewResult(null);
+      setPresetStatus("idle");
       setPresetError(message);
-      hitoToast.error({
-        id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Plan not created",
-        description: message,
-      });
     }
+  };
+
+  const refreshRunningPlanPreviewEffect = useEffectEvent(() => {
+    void refreshSelectedRunningPlanPreview();
+  });
+
+  useEffect(() => {
+    if (!presetSelectedCardId || !runningPlanPreviewOpen || presetStatus !== "idle") {
+      return;
+    }
+
+    const inputResult = buildRunningPlanPreviewInput(
+      effectiveConstructorState,
+      presetSelectedCardId,
+    );
+    const inputKey = inputResult.ok ? JSON.stringify(inputResult.input) : inputResult.error;
+
+    if (runningPlanPreviewInputKeyRef.current === inputKey && runningPlanPreviewResult) {
+      return;
+    }
+
+    refreshRunningPlanPreviewEffect();
+  }, [
+    effectiveConstructorState,
+    presetStatus,
+    refreshRunningPlanPreviewEffect,
+    presetSelectedCardId,
+    runningPlanPreviewOpen,
+    runningPlanPreviewResult,
+  ]);
+
+  const selectPlanPresetPreview = (cardId: PlanPresetCardId) => {
+    setPresetSelectedCardId(cardId);
+    setRunningPlanPreviewOpen(true);
+    setRunningPlanPreviewResult(null);
+    runningPlanPreviewInputKeyRef.current = null;
+    void refreshSelectedRunningPlanPreview(cardId);
   };
 
   const confirmStructuredPlan = async () => {
@@ -783,41 +758,22 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           planPresetPanel={({ openAdvancedCustom }) => (
             <PlanPresetPanel
               cardsResult={presetCardsResult}
-              reviewResult={presetReviewResult}
-              confirmResult={presetConfirmResult}
+              previewResult={runningPlanPreviewResult}
               error={presetError}
               status={presetStatus}
               isBusy={isBusy}
               isPresetDiscoveryReady={isPresetDiscoveryReady}
               selectedCardId={presetSelectedCardId}
-              reviewedCardId={presetReviewedCardId}
-              refinementState={{
-                fixedRestDays,
-                restDaysAnswered,
-                maxRunningDaysPerWeek,
-                preferredLongRunDay,
-                fitnessLevel,
-                recent5kTime,
-              }}
-              refinementSetters={{
-                setFixedRestDays,
-                setRestDaysAnswered,
-                setMaxRunningDaysPerWeek,
-                setPreferredLongRunDay,
-                setFitnessLevel,
-                setRecent5kTime,
-              }}
+              previewOpen={runningPlanPreviewOpen}
+              onPreviewOpenChange={setRunningPlanPreviewOpen}
               onLoadCards={() => {
                 void loadPlanPresetCards();
               }}
-              onSelectCard={(cardId) => {
-                selectPlanPresetForRefinement(cardId);
+              onSelectPlan={(cardId) => {
+                selectPlanPresetPreview(cardId);
               }}
-              onReviewCard={(cardId) => {
-                void reviewPlanPreset(cardId);
-              }}
-              onConfirmReview={() => {
-                void confirmPlanPreset();
+              onRefreshPreview={() => {
+                void refreshSelectedRunningPlanPreview();
               }}
               onUseAdvancedCustom={openAdvancedCustom}
             />
@@ -864,18 +820,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     </section>
   );
 }
-
-const PLAN_PRESET_CARD_LIST_GOAL_DISTANCE: Extract<GoalDistance, "build_consistency"> =
-  "build_consistency";
-
-const PLAN_PRESET_CARD_GOAL_DISTANCE: Record<
-  PlanPresetCardId,
-  Extract<GoalDistance, "10k" | "half_marathon" | "marathon">
-> = {
-  "10k": "10k",
-  half_marathon: "half_marathon",
-  marathon: "marathon",
-};
 
 function buildPlanPresetCardInput(state: StructuredConstructorState): PlanPresetCardRequestInput {
   const age = optionalPlanPresetNumber(state.age, { min: 13, max: 100, integer: true });
@@ -933,34 +877,107 @@ function buildPlanPresetCardInputKey(input: PlanPresetCardRequestInput) {
   return JSON.stringify(input);
 }
 
-function buildPlanPresetStructuredInput(
+function buildRunningPlanPreviewInput(
   state: StructuredConstructorState,
-  cardId?: PlanPresetCardId,
-) {
-  return buildStructuredInput(buildPlanPresetConstructorState(state, cardId));
+  cardId: PlanPresetCardId,
+): { ok: true; input: RunningPlanPreviewActionInput } | { ok: false; error: string } {
+  const age = requiredNumber(state.age, {
+    label: "Age",
+    min: 13,
+    max: 100,
+    integer: true,
+  });
+  const heightCm = requiredNumber(state.heightCm, {
+    label: "Height",
+    min: 120,
+    max: 230,
+    integer: true,
+  });
+  const weightKg = requiredNumber(state.weightKg, {
+    label: "Weight",
+    min: 30,
+    max: 250,
+  });
+
+  if (!age.ok) {
+    return { ok: false, error: age.error };
+  }
+  if (!heightCm.ok) {
+    return { ok: false, error: heightCm.error };
+  }
+  if (!weightKg.ok) {
+    return { ok: false, error: weightKg.error };
+  }
+
+  const daysPerWeek = optionalPlanPresetNumber(state.maxRunningDaysPerWeek, {
+    min: 1,
+    max: 7,
+    integer: true,
+  });
+
+  return {
+    ok: true,
+    input: {
+      age: age.value,
+      heightCm: heightCm.value,
+      weightKg: weightKg.value,
+      runnerLevel: mapRunnerLevelToPlanEngine(state.fitnessLevel),
+      distanceFamily: distanceFamilyForPresetCard(cardId),
+      daysPerWeek,
+      fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
+      preferredLongRunDay: state.preferredLongRunDay || null,
+      startDate: state.startDate.trim() || null,
+    },
+  };
 }
 
-// Preset v1 still validates through structured setup input; cardId remains the preset authority.
-function buildPlanPresetConstructorState(
-  state: StructuredConstructorState,
-  cardId?: PlanPresetCardId,
-): StructuredConstructorState {
-  return {
-    ...state,
-    fitnessLevel: state.fitnessLevel,
-    recent5kPace: "",
-    goalDistance: cardId
-      ? PLAN_PRESET_CARD_GOAL_DISTANCE[cardId]
-      : PLAN_PRESET_CARD_LIST_GOAL_DISTANCE,
-    goalStyle: "balanced",
-    targetTime: "",
-    startDate: "",
-    targetDate: "",
-    terrainFocus: "standard",
-    guidancePreference: "effort",
-    strengthPreference: "none",
-    comment: "",
-  };
+function distanceFamilyForPresetCard(cardId: PlanPresetCardId): RunningPlanDistanceFamily {
+  switch (cardId) {
+    case "10k":
+      return "10K";
+    case "half_marathon":
+      return "Half Marathon";
+    case "marathon":
+      return "Marathon Base";
+  }
+}
+
+function mapRunnerLevelToPlanEngine(level: RunnerFitnessLevel): RunningPlanRunnerLevel {
+  switch (level) {
+    case "new_to_running":
+      return "beginner_new_runner";
+    case "beginner":
+      return "sometimes_runs";
+    case "running_regularly":
+      return "runs_a_lot";
+    case "performance_focused":
+      return "professional_competitive";
+    case "custom":
+      return "sometimes_runs";
+  }
+}
+
+function requiredNumber(
+  value: string,
+  {
+    integer = false,
+    label,
+    max,
+    min,
+  }: {
+    label: string;
+    min: number;
+    max: number;
+    integer?: boolean;
+  },
+): { ok: true; value: number } | { ok: false; error: string } {
+  const parsed = optionalPlanPresetNumber(value, { min, max, integer });
+
+  if (parsed == null) {
+    return { ok: false, error: `${label} must be filled before selecting a plan preview.` };
+  }
+
+  return { ok: true, value: parsed };
 }
 
 function optionalPlanPresetNumber(

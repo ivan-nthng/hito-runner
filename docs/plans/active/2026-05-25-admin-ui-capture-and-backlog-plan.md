@@ -18,11 +18,11 @@ DESIGNER
 
 ## Task
 
-Define the admin capture-layer interaction spec.
+Define the portable Hito Debugger overlay and capture API contract.
 
 ## Stage
 
-DESIGNER spec / route-spanning admin capture layer
+ARCHITECT / DESIGNER spec / portable debugger overlay, API boundary, and Hito DS interaction layer
 
 ## Exact Handoff Prompt
 
@@ -30,18 +30,30 @@ DESIGNER spec / route-spanning admin capture layer
 ROLE: DESIGNER
 
 TASK:
-Define the admin capture-layer interaction spec for the route-spanning admin debug/capture overlay.
+Define the portable Hito Debugger overlay interaction spec for element-level text/comment capture.
 
 STAGE:
-DESIGNER spec / route-spanning admin capture layer
+DESIGNER spec / portable debugger overlay and Hito DS element-inspector controls
 
 CONTEXT:
 - Source path: docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md
 - Backend now exposes an admin-only `adminDebugCapture` capability probe through the canonical
   `AdminAccessContext` resolver.
-- The future capture layer should work across accessible Hito routes, not only inside
-  `/admin/capture`.
-- `/admin/capture` remains the backlog/review queue.
+- Product clarification: the debugger should be treated as a portable pseudo-service, not as a
+  route-local Hito backlog widget.
+- The debugger overlay opens over a target app/service, verifies Hito admin credentials or a
+  Hito-owned debugger session, detects hovered elements like a browser inspector, and creates
+  normalized capture records through a debugger API.
+- Hito Admin Work Items consumes or mirrors those records through the API; Work Items is not the
+  owner of element detection, overlay behavior, or cross-project capture.
+- In the Hito context, the overlay must use Hito DS primitives for tooltip/popover chrome, menus,
+  buttons, icon buttons, text inputs, textareas, selects, status pills, focus rings, and helper
+  text.
+- The first useful slice should support text-change tasks and element comments/design notes.
+- Hito DS token/style introspection is future-capable but not required for the first capture slice.
+- The future capture layer should work across accessible Hito routes first, then be portable to
+  other owner projects through the same API/SDK boundary.
+- `/admin/capture` remains the Work Items review queue, not the only place capture can happen.
 - The capture layer must stay admin-only, internal, and non-mutating until the admin explicitly
   saves a bounded capture item.
 
@@ -61,11 +73,14 @@ OUTPUT:
 4. Launcher behavior
 5. Selection-mode behavior
 6. Capture panel anatomy
-7. Mobile/collision behavior
-8. Hito DS reuse rules
-9. Accessibility and privacy notes
-10. Frontend handoff requirements
-11. Blockers
+7. Text-change capture flow
+8. Element comment/design-note flow
+9. Mobile/collision behavior
+10. Hito DS reuse rules
+11. Portable API/SDK assumptions
+12. Accessibility and privacy notes
+13. Frontend handoff requirements
+14. Blockers
 ```
 
 ## Owner
@@ -137,8 +152,10 @@ Important product correction:
 
 - the backlog/review queue lives in admin
 - the capture layer itself must work across the whole Hito product
-- admin should be able to open normal product routes, enable capture mode, select any visible product element, and save the item into the same admin backlog
+- admin should be able to open normal product routes, enable debugger/capture mode, select any
+  visible product element, and save a normalized capture record through the debugger API
 - `/admin/capture` is the queue, not the only place capture can happen
+- Work Items consumes or mirrors debugger records; it does not own overlay inspection behavior
 - for repo-authored work, markdown files are the only canonical editable task truth
 - imported markdown work items in admin are for filtering, review, prompt copy, and discovery, not
   editing lifecycle attributes
@@ -152,13 +169,17 @@ V1 flow:
 
 1. Admin signs in through `/admin/login`.
 2. Admin opens any accessible Hito product/admin/public page.
-3. A small admin-only floating launcher appears after backend admin verification.
-4. Admin clicks `Capture UI` in the launcher.
-5. The page enters element-selection mode.
-6. Admin selects a visible UI element.
-7. Admin writes a note, classifies the capture, and chooses an optional target role/priority.
-8. Backend saves the item into the admin backlog.
-9. Admin opens the backlog, reviews the item, and copies a role-targeted prompt into Codex manually.
+3. A small admin-only debugger launcher appears after backend admin verification.
+4. Admin clicks `Capture UI` / `Open debugger` in the launcher.
+5. The page enters element-inspection mode.
+6. Admin hovers/selects a visible UI element.
+7. The debugger shows a Hito DS tooltip/popover with element context.
+8. For text elements, admin creates a text-change capture with current text and desired
+   replacement.
+9. For other elements, admin creates a comment/design/behavior capture with bounded context.
+10. The debugger API creates a normalized capture record.
+11. Hito Work Items consumes or mirrors the record for review and deterministic prompt copy.
+12. Admin opens Work Items, reviews the item, and copies a role-targeted prompt into Codex manually.
 
 Repo work-item flow:
 
@@ -180,13 +201,135 @@ V1 must not:
 
 ## Canonical Pipeline
 
-`admin-selected UI context -> browser capture normalization -> backend admin validation -> canonical admin_capture_items storage -> admin backlog review -> deterministic copy-prompt generation -> manual Codex handoff`
+Portable debugger pipeline:
+
+`target app -> Hito Debugger overlay/client -> element inspection normalization -> debugger API -> normalized capture record -> Hito Admin Work Items import/read mirror -> deterministic copy-prompt generation -> manual Codex handoff`
+
+Hito-local compatibility pipeline:
+
+`admin-selected UI context -> Hito Debugger overlay -> backend admin validation -> debugger capture API -> admin_capture_items mirror/storage -> Work Items review -> deterministic copy-prompt generation -> manual Codex handoff`
 
 For repo-authored work:
 
 `markdown task/plan/spec -> explicit import/refresh -> Supabase read mirror -> admin Backlog read/copy -> manual Codex handoff`
 
-This follows the Hito rule: raw context is captured first, backend validates and stores canonical truth, and any future execution still requires explicit human handoff.
+This follows the Hito rule: raw context is captured first, backend validates and stores canonical
+truth, and any future execution still requires explicit human handoff.
+
+## Portable Debugger Service Boundary
+
+The route-spanning overlay should be designed as `Hito Debugger`, a reusable pseudo-service boundary
+that can later attach to other owner projects without rewriting Hito Work Items.
+
+V1 may live in this repo for speed, but the ownership boundary must already be API-shaped:
+
+- `Hito Debugger` owns:
+  - admin/debugger session verification
+  - project binding
+  - overlay activation
+  - hover/selection inspection
+  - selected-element normalization
+  - selector/component hints
+  - element text capture
+  - bounded DOM/style metadata capture
+  - capture-record creation API
+  - privacy/redaction before storage or handoff
+- Hito Admin Work Items owns:
+  - listing/reviewing imported or mirrored capture records
+  - triage/status/readback
+  - deterministic prompt copy
+  - conversion into canonical markdown tasks when needed
+- Hito Admin Work Items must not own:
+  - hover detection
+  - selector generation
+  - style inspection
+  - cross-project project binding
+  - overlay UI behavior
+  - direct element editing
+
+Portable API shape to define before implementation:
+
+- `GET /debugger/session`
+  verifies Hito admin credentials or a debugger-scoped admin session and returns bounded capability
+  state.
+- `POST /debugger/captures`
+  creates a normalized capture record from selected element context.
+- `GET /debugger/captures`
+  lists capture records for Work Items import/readback.
+- `GET /debugger/projects`
+  returns project binding metadata only if/when multi-project support is introduced.
+
+The API names above are architecture placeholders. BACKEND may choose exact route/function names,
+but the product boundary must remain: debugger collects and normalizes, Work Items consumes.
+
+## MVP Element Capture Flows
+
+First useful debugger slice:
+
+1. Admin opens a target Hito route and enables debugger mode.
+2. Hovering an element highlights the element like a browser inspector.
+3. The debugger opens a small Hito DS tooltip/popover near the selected element.
+4. If the selected element has meaningful text, the panel shows:
+   - current text
+   - target role default: `copy` or `product`
+   - input/textarea for replacement text
+   - action: `Create text-change task`
+5. If the selected element is not primarily text, the panel shows:
+   - element label/role/selector hint
+   - optional current text if present
+   - textarea for comment
+   - task type: comment, design note, behavior note
+   - action: `Create element note`
+6. Saved capture records appear in Work Items through the debugger API/import seam.
+
+Out of MVP:
+
+- live editing
+- automatic code changes
+- automatic Codex dispatch
+- screenshot requirement
+- Figma sync
+- browser extension packaging
+- full design-token diffing
+- cross-project SDK installer
+
+## Hito DS Overlay Contract
+
+The overlay must use Hito DS and admin-workbench primitives rather than a new mini visual system.
+
+Use Hito DS for:
+
+- tooltip/popover/sheet chrome
+- icon buttons
+- primary/secondary/destructive button tiers
+- text input
+- textarea
+- select/dropdown
+- menu/list rows
+- labels/captions/helper text
+- status pills
+- focus rings
+- divider/hairline treatment
+- compact metadata tags
+
+Element-inspector visuals:
+
+- selected element outline should be clearly internal/admin-only and must not look like product
+  focus state.
+- hover outline must ignore the debugger overlay itself.
+- capture controls should be compact and collision-aware.
+- disabled/future actions must be visibly disabled, not fake clickable controls.
+- mobile may use a bottom sheet instead of a near-element tooltip if positioning is unsafe.
+
+Future configurable design-system introspection:
+
+- computed padding, margin, typography, color, border radius, and dimensions
+- mapped Hito DS token names where available
+- component/primitive hints where available
+- "not mapped to Hito DS" warnings where useful
+
+This introspection is future-capable. It must not block the MVP text-change and element-comment
+flows.
 
 ## Recommended Route Model
 
@@ -226,20 +369,28 @@ If the target page also requires a normal runner session, v1 does not bypass tha
 
 ## Capture Surface Decision
 
-Choose built-in Hito capture layer for v1.
+Choose a Hito-hosted debugger overlay/client for the first implementation, but keep the service
+boundary portable.
 
 Why:
 
 - it works across Hito routes without asking the product owner to install a browser extension
 - it can reuse the existing server-owned admin auth/session boundary
-- it can save directly into the canonical `admin_capture_items` backlog
+- it can prove the debugger overlay and API contract before packaging a cross-project SDK
+- it can mirror Hito debugger captures into the existing Work Items queue without making Work Items
+  own hover/selector/style inspection
 - it keeps capture metadata compatible with Hito route/state concepts
 - it is faster to QA than a Chrome extension, Codex plugin, or VS Code extension
 
 Other options:
 
+- embeddable SDK/script:
+  the intended portability path after Hito-local proof; it should mount the same overlay/client in
+  other owner projects and send captures to the same debugger API contract
 - Chrome extension:
-  possible later if capture needs to work across non-Hito sites or outside the app runtime; not v1 because extension auth, packaging, screenshot permissions, and cross-origin storage add avoidable complexity
+  possible later if capture needs to work across non-Hito sites or outside the app runtime; not v1
+  because extension auth, packaging, screenshot permissions, and cross-origin storage add avoidable
+  complexity
 - Codex plugin:
   possible later for `Open in Codex` or richer handoff; not v1 because captured items still need human triage before agent execution
 - VS Code extension:
@@ -247,7 +398,7 @@ Other options:
 
 Canonical v1:
 
-`in-app admin capture layer -> backend capture API -> /admin/capture backlog -> manual copy prompt`
+`Hito-hosted debugger overlay/client -> debugger capture API -> Work Items mirror/import -> manual copy prompt`
 
 ## Admin Floating Launcher Contract
 
@@ -267,7 +418,7 @@ Launcher behavior:
 Initial launcher actions:
 
 - `Capture UI`
-- `Open backlog`
+- `Open Work Items`
 - `Hide`
 
 Selection mode behavior:
@@ -282,16 +433,22 @@ Selection mode behavior:
 Capture panel behavior:
 
 - opens after element selection
-- shows selected element text/nearby heading/route summary
-- asks for item type:
-  - `Bug`
-  - `Change request`
-  - `Context capture`
-- asks for note
-- optional target role and priority can be set now or later in backlog
-- primary action is `Save to backlog`
+- shows selected element text, nearby heading, route summary, and selector/component hint
+- detects whether the selected element is primarily text
+- for text elements, defaults to text-change capture:
+  - shows current text
+  - asks for replacement text
+  - creates a task like "Change this text to..."
+  - suggested target role: `copy` or `product`
+- for non-text or mixed elements, defaults to element note/design capture:
+  - asks for comment
+  - lets admin choose comment/design/behavior note
+  - suggested target role: `designer`, `frontend`, or `product`
+- optional priority can be set now or later in Work Items
+- primary action is `Save capture`
 - secondary action is `Cancel`
-- after save, show success with `Open backlog` and `Capture another`
+- save goes through the debugger capture API, then Work Items consumes/mirrors the record
+- after save, show success with `Open Work Items` and `Capture another`
 
 This is an internal tool, but it still must feel calm and deliberate. It should not look like a public product feature.
 
@@ -659,7 +816,7 @@ Allowed `target_role` values:
 - `designer`
 - `copy`
 - `qa`
-- `prompt_engineer`
+- `product`
 - `running_coach`
 
 Suggested `priority` values:

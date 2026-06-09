@@ -167,7 +167,7 @@ The copy should:
 | `designer` | `Designer` | |
 | `copy` | `Copy` | |
 | `qa` | `QA` | Keep uppercase. |
-| `prompt_engineer` | `Prompt Engineer` | |
+| `product` | `Product` | |
 | `running_coach` | `Running Coach` | |
 
 ### 8. Backlog Row And Detail Labels

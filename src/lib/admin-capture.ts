@@ -25,7 +25,7 @@ export const adminCaptureTargetRoles = [
   "designer",
   "copy",
   "qa",
-  "prompt_engineer",
+  "product",
   "running_coach",
 ] as const;
 

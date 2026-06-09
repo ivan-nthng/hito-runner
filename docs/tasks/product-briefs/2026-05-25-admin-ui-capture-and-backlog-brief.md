@@ -66,7 +66,7 @@ Examples:
 - "this button"
 - "that card on the right"
 - "this spacing is broken"
-- "this should go to prompt engineer"
+- "this should go to product"
 
 The product needs one internal admin-only tool that allows the product owner to point at a UI element in the browser, capture its exact context, and save it as a structured internal item.
 
@@ -166,7 +166,7 @@ Use when:
 - the flow should change
 - wording should change
 - the component should behave differently
-- the prompt engineer or frontend should get a targeted request
+- product or frontend should get a targeted request
 
 ### 3. Context Capture
 
@@ -218,7 +218,7 @@ Items that have been classified and are being prepared for handoff.
 
 Items with enough context to be sent as prompts to:
 
-- PROMPT_ENGINEER
+- PRODUCT
 - FRONTEND
 - DESIGNER
 - QA

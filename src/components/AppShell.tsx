@@ -108,7 +108,7 @@ export function AppShell({
             <div className="hito-row-group">
               <div className="hito-list-row items-start">
                 <div className="relative min-w-0 flex-1 pr-8">
-                  <div className="hito-micro-label flex items-center gap-2">
+                  <div className="hito-label flex items-center gap-2">
                     <Icon name="plan-note" size="xs" className="text-signal" />
                     Plan note
                   </div>

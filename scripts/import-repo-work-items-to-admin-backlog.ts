@@ -85,7 +85,7 @@ type TargetRole =
   | "designer"
   | "copy"
   | "qa"
-  | "prompt_engineer"
+  | "product"
   | "running_coach";
 type WorkItemStatus = "backlog" | "in_progress" | "completed" | "closed" | "archived";
 type CanonicalMarkdownField = (typeof CANONICAL_MARKDOWN_FIELDS)[number];
@@ -988,8 +988,8 @@ function inferTargetRole(
     return "designer";
   }
 
-  if (/\bprompt\b/.test(combined)) {
-    return "prompt_engineer";
+  if (/\bprompt\b|\bhandoff\b|\bproduct\b/.test(combined)) {
+    return "product";
   }
 
   if (
@@ -1475,7 +1475,7 @@ function normalizeRole(input: string): TargetRole | null {
       "designer",
       "copy",
       "qa",
-      "prompt_engineer",
+      "product",
       "running_coach",
     ].includes(normalized)
   ) {

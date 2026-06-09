@@ -2162,6 +2162,250 @@
     cursor: help;
   }
 
+  .hito-selected-plan-calendar {
+    min-width: 0;
+  }
+
+  .hito-selected-plan-calendar-legend {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.75rem;
+    color: color-mix(in oklch, var(--color-foreground) 66%, transparent);
+    font-size: 0.72rem;
+    font-weight: 650;
+  }
+
+  .hito-selected-plan-calendar-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .hito-selected-plan-calendar-legend-swatch {
+    width: 0.6rem;
+    height: 0.6rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: var(--hito-selected-plan-calendar-tone, var(--color-muted-foreground));
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-background) 35%, transparent);
+  }
+
+  .hito-selected-plan-calendar-detail {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 0.75rem;
+  }
+
+  .hito-selected-plan-calendar-detail > * {
+    min-width: 0;
+  }
+
+  .hito-selected-plan-calendar-weeks {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(10.25rem, 1fr));
+    gap: 0.85rem 1rem;
+  }
+
+  .hito-selected-plan-calendar-week {
+    display: grid;
+    align-content: start;
+    gap: 0.42rem;
+    min-width: 0;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 0.55rem;
+  }
+
+  .hito-selected-plan-calendar-week-grid {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(7, minmax(1rem, 1fr));
+    gap: 0.25rem;
+  }
+
+  .hito-selected-plan-calendar-cell {
+    position: relative;
+    display: grid;
+    aspect-ratio: 1;
+    min-width: 0;
+    min-height: 1.65rem;
+    place-items: center;
+    border: 0;
+    border-radius: 0.48rem;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 78%, white 6%),
+        color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 62%, var(--color-background))
+      );
+    color: color-mix(in oklch, var(--color-background) 82%, black);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklch, white 18%, transparent),
+      0 7px 18px color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 12%, transparent);
+    transition:
+      box-shadow 160ms ease,
+      transform 160ms ease,
+      background 160ms ease;
+  }
+
+  .hito-selected-plan-calendar-cell:hover {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklch, white 28%, transparent),
+      0 10px 24px color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 22%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .hito-selected-plan-calendar-cell:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 62%, transparent);
+    outline-offset: 2px;
+  }
+
+  .hito-selected-plan-calendar-cell-day {
+    position: absolute;
+    top: 0.16rem;
+    left: 0.22rem;
+    font-size: 0.48rem;
+    font-weight: 800;
+    line-height: 1;
+    color: color-mix(in oklch, currentColor 56%, transparent);
+  }
+
+  .hito-selected-plan-calendar-cell-glyph {
+    width: 0.72rem;
+    height: 0.72rem;
+    opacity: 0.9;
+  }
+
+  .hito-selected-plan-calendar-cell-trophy {
+    width: 0.9rem;
+    height: 0.9rem;
+    color: var(--color-signal-foreground);
+  }
+
+  .hito-selected-plan-calendar-cell-endpoint {
+    position: absolute;
+    right: 0.16rem;
+    bottom: 0.13rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--color-background) 82%, transparent);
+    padding: 0.08rem 0.18rem;
+    font-size: 0.4rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="easy"] {
+    --hito-selected-plan-calendar-tone: var(--easy);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="long"] {
+    --hito-selected-plan-calendar-tone: var(--long);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="strides"] {
+    --hito-selected-plan-calendar-tone: var(--success);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="tempo"] {
+    --hito-selected-plan-calendar-tone: var(--quality);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="intervals"] {
+    --hito-selected-plan-calendar-tone: var(--warn);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="hills"] {
+    --hito-selected-plan-calendar-tone: color-mix(in oklch, var(--success) 68%, var(--easy));
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="rest"] {
+    --hito-selected-plan-calendar-tone: var(--rest);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="final"] {
+    --hito-selected-plan-calendar-tone: var(--orange-500);
+  }
+
+  .hito-selected-plan-calendar-cell[data-preview-tone="rest"] {
+    color: color-mix(in oklch, var(--color-muted-foreground) 88%, transparent);
+  }
+
+  .hito-selected-plan-calendar-cell[data-preview-tone="final"] {
+    color: var(--color-signal-foreground);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklch, white 26%, transparent),
+      0 10px 30px color-mix(in oklch, var(--orange-500) 28%, transparent);
+  }
+
+  .hito-selected-plan-segment-card {
+    min-width: 0;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+    background: color-mix(in oklch, var(--color-surface-elevated) 58%, transparent);
+    padding: 1rem;
+  }
+
+  .hito-selected-plan-segment-row {
+    display: grid;
+    min-width: 0;
+    gap: 0.25rem;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 0.65rem;
+  }
+
+  .hito-selected-plan-segment-row:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .hito-selected-plan-segment-row > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 560px) {
+    .hito-selected-plan-calendar-detail {
+      flex-direction: column;
+    }
+
+    .hito-selected-plan-calendar-week {
+      gap: 0.45rem;
+    }
+
+    .hito-selected-plan-calendar-week-grid {
+      gap: 0.28rem;
+    }
+
+    .hito-selected-plan-calendar-cell {
+      min-height: 1.6rem;
+      border-radius: var(--radius-sm);
+    }
+
+    .hito-selected-plan-calendar-cell-day {
+      top: 0.16rem;
+      left: 0.22rem;
+      font-size: 0.55rem;
+    }
+
+    .hito-selected-plan-calendar-cell-glyph {
+      width: 0.74rem;
+      height: 0.74rem;
+    }
+
+    .hito-selected-plan-calendar-cell-endpoint {
+      right: 0.14rem;
+      bottom: 0.13rem;
+      font-size: 0.42rem;
+    }
+  }
+
   .hito-onboarding-option-button {
     align-items: flex-start;
     gap: 0.65rem;
@@ -3290,11 +3534,7 @@
   input.hito-radio:checked {
     border-color: var(--color-signal);
     background-color: color-mix(in oklch, var(--color-signal) 15%, transparent);
-    background-image: radial-gradient(
-      circle,
-      var(--color-signal) 0 38%,
-      transparent 42% 100%
-    );
+    background-image: radial-gradient(circle, var(--color-signal) 0 38%, transparent 42% 100%);
   }
 
   .hito-radio:checked,
@@ -4314,11 +4554,7 @@
   }
 
   .hito-comparison-bar[data-status="skipped"] {
-    --hito-comparison-bar-color: color-mix(
-      in oklch,
-      var(--color-destructive) 30%,
-      transparent
-    );
+    --hito-comparison-bar-color: color-mix(in oklch, var(--color-destructive) 30%, transparent);
     opacity: 0.5;
   }
 

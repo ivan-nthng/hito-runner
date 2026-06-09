@@ -507,7 +507,7 @@ function ChoiceControl<T extends string>({
 }) {
   return (
     <div className="grid gap-2">
-      <p className="hito-micro-label">{label}</p>
+      <p className="hito-form-label">{label}</p>
       <div className="hito-choice-toggle-group" role="radiogroup" aria-label={label}>
         {options.map((option) => (
           <button
@@ -540,7 +540,7 @@ function SelectControl<T extends string>({
 }) {
   return (
     <div className="grid gap-2">
-      <p className="hito-micro-label">{label}</p>
+      <p className="hito-form-label">{label}</p>
       <Select value={value} onValueChange={(nextValue) => onChange(nextValue as T)}>
         <SelectTrigger aria-label={label} className="hito-field-sm">
           <SelectValue />

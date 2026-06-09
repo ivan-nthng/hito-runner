@@ -275,8 +275,8 @@ function CellHeader({
 }) {
   if (week) {
     return (
-      <div className="hito-micro-label flex items-center justify-between">
-        <span>{weekday}</span>
+      <div className="flex items-center justify-between">
+        <span className="hito-micro-label">{weekday}</span>
         <span className={cn("flex items-center gap-1.5", reserveActionSpace && "pr-7")}>
           <span className="hito-technical-mono">{day}</span>
           <ResultMarker result={result} />
@@ -297,7 +297,9 @@ function CellHeader({
         {day}
       </span>
       {weekday ? (
-        <span className="ml-1 text-[0.625rem] uppercase text-muted-foreground">{weekday}</span>
+        <span className="hito-micro-label ml-1 text-[0.625rem] text-muted-foreground">
+          {weekday}
+        </span>
       ) : null}
       <ResultMarker result={result} />
     </div>
@@ -386,7 +388,7 @@ function WorkoutLabel({
   return (
     <span
       className={cn(
-        "hito-micro-label inline-flex max-w-full min-w-0 items-center gap-1.5",
+        "hito-label inline-flex max-w-full min-w-0 items-center gap-1.5",
         muted && "line-through opacity-50",
       )}
       style={{ color: workout.color }}

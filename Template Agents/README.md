@@ -10,7 +10,7 @@ All agents must follow this sequence:
 
 1. Architect audits the existing system.
 2. Architect creates the canonical architecture plan.
-3. Product, Designer, Backend, iOS Developer, Copy, QA, and Prompt Engineer work only inside that architecture unless the Architect updates it.
+3. Product, Designer, Backend, iOS Developer, Copy, and QA work only inside that architecture unless the Architect updates it.
 4. Implementation happens in small, reviewable slices.
 5. QA verifies behavior and reports evidence before work is considered complete.
 
@@ -109,7 +109,7 @@ Use this footer when a task is blocked, handed to another role, or needs continu
 
 ### Next Recommended Role
 
-<ARCHITECT / PRODUCT / DESIGNER / BACKEND / IOS / QA / COPY / PROMPT-ENGINEER>
+<ARCHITECT / PRODUCT / DESIGNER / BACKEND / IOS / QA / COPY>
 
 ### Suggested Next Step
 

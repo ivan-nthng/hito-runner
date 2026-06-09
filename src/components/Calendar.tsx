@@ -476,7 +476,7 @@ function Tooltip({ workout }: { workout: Workout }) {
   return (
     <div className="hito-tooltip w-72 max-w-72">
       <div className="flex items-center justify-between">
-        <span className="hito-micro-label" style={{ color: meta.color }}>
+        <span className="hito-label" style={{ color: meta.color }}>
           {meta.label}
         </span>
         <span className="hito-micro-label">
@@ -493,13 +493,13 @@ function Tooltip({ workout }: { workout: Workout }) {
         <div className="hito-caption mt-3 space-y-0.5 border-t border-hairline pt-3">
           {targetEntries.map((entry) => (
             <div key={entry.key} className="flex justify-between gap-3">
-              <span className="hito-micro-label">{entry.label}</span>
+              <span className="hito-metric-label">{entry.label}</span>
               <span className="text-foreground/80 truncate">{entry.value}</span>
             </div>
           ))}
           {showStructureOnly && (
             <div className="flex justify-between gap-3">
-              <span className="hito-micro-label">Structure</span>
+              <span className="hito-metric-label">Structure</span>
               <span className="text-foreground/80 truncate">Segment plan</span>
             </div>
           )}

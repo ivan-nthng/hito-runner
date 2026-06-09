@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -14,94 +14,66 @@ high
 
 ## Next Recommended Role
 
-BACKEND
+ARCHITECT
 
 ## Task
 
-Demote strict nested ai-first-plan-draft-v1 out of product runtime ownership.
+Resume service-size cleanup only after the dedicated Running Plan Creation Engine Rebuild plan is
+accepted.
 
 ## Stage
 
-BACKEND cleanup / strict nested AI draft demotion.
+ARCHITECT paused cleanup / superseded for plan-creation rebuild.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: BACKEND
+ROLE: ARCHITECT
 
 Task:
-Execute Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime ownership.
+Resume Hito Stack Simplification Strike only after the dedicated Running Plan Creation Engine
+Rebuild plan has passed product acceptance.
 
 Stage:
-BACKEND cleanup / strict nested AI draft demotion.
+ARCHITECT paused cleanup / post-plan-creation-rebuild cleanup gate.
 
 PLAN:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
 
 Context:
-- Backend Slice 6B for the deterministic Plan Preset algorithmic builder is implemented and
-  QA-passed.
-- The active simplification strike selected strict nested `ai-first-plan-draft-v1` as the first
-  safe plan-creation demotion gate.
-- `strict-draft` is already unsupported from routine ops-script selection.
-- The old strict nested prompt/schema/normalizer still lives under product runtime source at
-  `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/ai-first-plan-draft-authoring.ts`.
-- Product runtime still imports shared metadata/trace types from that same file, while strict nested
-  prompt/schema/normalizer behavior is only needed for historical doctrine coverage.
-- The goal is demotion/isolation, not broad deletion.
+- The simplification strike completed several useful cleanup/admin/design-system slices.
+- Plan-creation work inside this strike is superseded by the dedicated active plan:
+  `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md`.
+- The current Plan Preset builder and product flow are not product-accepted.
+- Do not resume service-size cleanup Slice 10A until the new plan creation engine is implemented and
+  QA/product accepted.
+
+Your job if this strike is resumed:
+1. Confirm the new Running Plan Creation Engine Rebuild plan has passed product acceptance.
+2. Re-audit current service-size hotspots after the rebuild, because stale/deletion candidates may
+   have changed.
+3. Resume cleanup with the smallest safe deletion/demotion gate.
+4. Do not reopen Plan Preset builder work inside this simplification strike.
 
 Constraints:
-- Do not touch Plan Preset runtime, builder CSV artifacts, resolver, review, confirm, persistence,
-  or frontend.
-- Do not weaken `ai_first_plan_blueprint_v1` default behavior.
-- Do not promote or change `ai_first_plan_envelope_v1`.
-- Do not remove `structured_authoring_v1` legacy readback/generator compatibility.
-- Do not change text authoring, voice-to-plan, active-plan refresh/apply, JSON import/apply, or
-  canonical persistence.
-- Do not run migrations or mutate Supabase.
-- Do not implement browser/UI changes.
+- Do not start service-size cleanup while plan creation is product-failed.
+- Do not mutate DB/Supabase.
+- Do not change product code in an architecture resume pass.
+- Do not archive this strike until future cleanup scope is either completed or explicitly abandoned.
 
-Required implementation:
-1. Extract shared AI first-plan metadata and blueprint trace types out of
-   `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/ai-first-plan-draft-authoring.ts`
-   into a small product-owned metadata/trace module.
-2. Update blueprint, envelope/service, first-plan action, and ops-script type imports to depend on
-   the new metadata module instead of the strict nested draft module.
-3. Move or isolate the strict nested `ai-first-plan-draft-v1` prompt/schema/normalizer into
-   doctrine-only ownership so
-   `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/scripts/validate-plan-authoring-doctrine.ts`
-   can still validate historical fixtures.
-4. Keep the stable doctrine validator entrypoint unchanged.
-5. Keep
-   `npm run author-ai-first-plan-draft -- --contract strict-draft`
-   bounded as `unsupported_contract`.
-6. Remove now-dead product-runtime source-kind branches only if source scans prove no runtime path
-   can emit them.
-
-Validation expected:
-- Source proof:
-  `rg "ai-first-plan-draft-authoring|ai-first-plan-draft-v1|strict_draft|strict-draft" src scripts package.json`
-- Product runtime import proof that strict nested prompt/schema/normalizer ownership is no longer
-  imported from runtime paths, while doctrine coverage remains.
-- `npm exec eslint -- src/lib/ai-first-plan-*.ts src/lib/first-plan-actions.ts scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/first-plan-release-gates.ts scripts/author-ai-first-plan-draft.ts`
-- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope`
-- `npm run author-ai-first-plan-draft -- --contract strict-draft`
-- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`
+Validation:
 - `git diff --check`
-- `npm run build`
 
 Report:
 1. Task
 2. Stage
 3. Files inspected
-4. Files changed
-5. Demotion implemented
-6. Runtime import proof
-7. Doctrine coverage proof
-8. Behavior preservation proof
-9. Validation results
+4. Rebuild acceptance evidence
+5. Remaining service-size hotspots
+6. Selected cleanup gate
+7. What remains forbidden
+8. Validation results
+9. Next recommended role
 10. Blockers
 ```
 
@@ -2741,6 +2713,232 @@ Minor source-text drift:
   Plan Preset source artifacts are next touched, but it does not block Slice 6B closeout or the next
   service-size cleanup gate.
 
+### Plan Preset Product Contract Reset
+
+Date:
+
+2026-06-08.
+
+Status:
+
+controlled reset required before service-size cleanup resumes.
+
+Trigger:
+
+Real Plan Preset output failed product acceptance. The Half Marathon export is the concrete proof
+case, but the decision applies to all shipped Plan Preset programs.
+
+Evidence:
+
+- Exported file:
+  `/Users/ivan/Downloads/half-marathon-balanced-plan-preset-2026-06-08.json`.
+- The selected card was Half Marathon.
+- The exported plan is `plan_preset_v1`, named `Half Marathon Balanced Plan Preset`.
+- The exported plan has `119` rows across `17` weeks.
+- The final row is `half_readiness_marker`.
+- The final row title is `Half marathon readiness marker`.
+- The final row summary is `68 min half readiness marker`.
+- The final row has structured time-based segments, but no explicit `21.1K` endpoint distance field.
+- User acceptance expectation:
+  choosing a Half Marathon card should produce a plan that culminates in a real Half
+  Marathon-distance outcome or an explicitly named Half Marathon completion/checkpoint, not a
+  hidden internal readiness marker.
+- Additional readback evidence:
+  workout detail/export surfaces can show effort labels such as `Effort: easy`,
+  `Effort: threshold steady`, `Mode: Executable structure`, and `Effort threshold steady` as
+  primary-feeling execution copy.
+
+Decision:
+
+This is not only frontend copy drift. It is a product-contract failure across Running Coach
+doctrine, backend source-of-truth, builder segment anatomy, metric truth, export/review/readback, and
+frontend workout-detail rendering.
+
+Reset decision:
+
+- The current Plan Preset algorithmic builder is product-failed / not accepted as the canonical
+  creation model.
+- Do not keep patching the current algorithm blindly.
+- Treat current generated outputs as regression evidence for what failed, not as accepted coaching
+  targets.
+- The rebuild must start from human coach benchmark plans and watch-executable workout examples
+  before Backend writes a new builder.
+- Keep the product deterministic and backend-owned; do not replace the failed algorithm with
+  frontend templates or OpenAI runtime improvisation.
+
+Service-size cleanup sequencing:
+
+- `BACKEND Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime ownership`
+  is paused.
+- Do not clean old plan-authoring paths while the current primary no-active-plan creation product is
+  failing real acceptance.
+- Resume service-size cleanup only after the corrected Plan Preset product contract is implemented
+  and QA-passed.
+
+What remains salvageable:
+
+- Visual card direction can be preserved if it supports the corrected interaction.
+- Existing review/confirm/persistence safety can be preserved:
+  review must remain non-mutating, confirm must persist exact reviewed canonical rows, and duplicate
+  active-plan guards remain mandatory.
+- Backend-owned truth remains mandatory:
+  eligibility, schedule, calendar rows, workout placement, metric truth, load/progression, and
+  persistence must not move to frontend.
+- Existing `plan_preset_v1` source kind can remain if the rebuilt contract preserves auditability,
+  but source metadata must clearly distinguish corrected builder versions.
+- Hito DS visual primitives and card styling can be reused.
+
+What is deleted, demoted, or frozen:
+
+- Current algorithmic builder output is frozen as failed product behavior until rebuilt.
+- Current source-of-truth CSVs are frozen for audit:
+  keep them as evidence only until Running Coach/Backend replaces or corrects the wrong doctrine.
+- Old recipe expanders that are already removed should stay removed unless Backend proves one
+  specific deleted piece is safer as a temporary fixture than the failed algorithm.
+- Quality gates that allow readiness-only final outcomes for selected distance cards must be
+  replaced.
+- Any segment model that lets effort wording be the primary execution target must be rejected.
+- Do not run a blind `git reset`, broad revert, or mass deletion:
+  every deletion/demotion must name the file/symbol, prove replacement coverage, and pass harnesses.
+
+Controlled deletion strategy:
+
+1. Freeze failed builder behavior behind the current plan as product-failed, not accepted.
+2. Ask Running Coach for backend-ready reference doctrine and example plans.
+3. Let Backend compare current builder/source files against the corrected doctrine.
+4. Delete or demote only the specific builder/source/gate pieces that encode the wrong doctrine.
+5. Preserve review/confirm/persistence seams unless a concrete contract bug is proven.
+6. Keep old failed outputs only as test fixtures that prove the new builder no longer emits them.
+
+New canonical Plan Preset creation pipeline:
+
+`runner basics -> load/progression context -> selected distance goal -> days/week capacity -> coach-authored reference doctrine -> phase plan -> weekly calendar preview -> workout placement -> watch-executable segment construction -> review modal -> confirm/persist`
+
+Pipeline ownership:
+
+- Runner basics:
+  age, height, weight, running level, and days/week are collected by frontend but interpreted by
+  backend.
+- Load/progression context:
+  backend applies safe, non-shaming, non-medical multipliers for preparation duration, volume, and
+  progression conservatism.
+- Selected distance goal:
+  backend owns the real endpoint contract for 10K, Half Marathon, and Marathon/Base.
+- Days/week capacity:
+  backend turns selected or default days/week into viable phase/weekly rhythm.
+- Coach-authored reference doctrine:
+  Running Coach provides human benchmark plans and workout examples before code.
+- Phase plan:
+  backend maps doctrine into phase durations, cutback rhythm, quality density, long-run growth, and
+  endpoint/taper behavior.
+- Weekly calendar preview:
+  backend returns calendar rows before confirm; frontend renders only backend-shaped truth.
+- Workout placement:
+  backend places rest days, long runs, quality days, cutbacks, and recovery spacing, with flexible
+  defaults if runner omits preferences.
+- Watch-executable segment construction:
+  backend emits duration/distance/repeats/work/recovery segment prescriptions and only adds pace/HR
+  when real truth exists.
+- Review modal:
+  frontend shows selected-plan details, mini calendar, colored workout types, preferences, endpoint,
+  and review copy.
+- Confirm/persist:
+  existing explicit confirm path persists exact reviewed canonical rows.
+
+Corrected selected-distance endpoint contract:
+
+- `10K Foundation` must culminate in a real 10K completion/checkpoint endpoint.
+- `Half Marathon Balanced` must culminate in a real Half Marathon-distance endpoint or explicitly
+  named Half Marathon completion/checkpoint endpoint.
+- A hidden `readiness marker only` cannot satisfy a selected distance card unless the card copy
+  clearly says it is not a completion-distance plan.
+- `Marathon Base` must be re-decided explicitly:
+  either rename/reposition it as honest base-building and not a `run a marathon` plan,
+  or define safe constraints for a future Marathon-distance endpoint.
+- Endpoint behavior must be represented in backend source-of-truth, builder output, review/export,
+  and QA harnesses.
+- Endpoint behavior must not be inferred from internal identity names alone; exported canonical rows
+  need runner-auditable endpoint fields/copy.
+
+Corrected watch-executable metric contract:
+
+- Hito assumes watch/app execution for supported new-plan creation.
+- Pace targets require benchmark truth.
+- HR targets require personal HR-zone truth.
+- Lack of pace/HR truth must not collapse a workout into vague `Effort: threshold steady` as the
+  primary target.
+- Every generated non-rest workout segment must have watch-executable structure:
+  duration and/or distance, interval/repeat counts where relevant, work/recovery units where
+  relevant, and explicit target-mode classification.
+- Primary prescription examples:
+  `10 min`, `8 km easy`, `3 x 10 min`, `3 min recovery`, `6 x 2 min`, `1 km recovery`,
+  or a similarly watch-programmable structure.
+- Secondary cue examples:
+  conversational, controlled, steady, threshold-like, relaxed, smooth, durable.
+- Effort/RPE/coaching cue may exist as secondary instruction, but must not be the primary metric
+  target shown as if it is enough for a watch-based plan.
+- Do not show raw internal effort labels such as `threshold steady` as primary runner-facing metric
+  truth.
+- If a workout cannot be expressed in watch-executable structure without fake pace/HR, it should fail
+  quality gates or route to custom/review instead of silently shipping vague effort-only text.
+
+Backend/source-of-truth contract:
+
+- Backend must use age, height, weight, level, and days/week as real inputs into duration, load, and
+  progression, not decorative fields.
+- Backend must ask or accept rest-day and long-run preferences after plan selection.
+- Backend must support flexible/default rest-day and long-run behavior when the runner omits those
+  preferences.
+- Backend should avoid rigid same-pattern weekly placement when the source-of-truth allows safe
+  variation.
+- Backend source-of-truth, segment anatomy, quality gates, and harnesses must prevent Half Marathon
+  from passing without selected-distance endpoint behavior.
+- Backend source-of-truth, segment anatomy, quality gates, and harnesses must prevent generated
+  non-rest segments from passing when their primary execution target is only vague effort wording.
+- Export/review/readback must preserve the primary structured prescription and keep cue/effort copy
+  secondary.
+
+Frontend interaction/readback contract:
+
+- Cards can appear after age, height, weight, and level are known.
+- Days/week may have a backend-owned default if not selected, but it must remain editable before
+  review/confirm.
+- Primary card CTA is `Select Plan`.
+- Remove the separate `Learn more` CTA.
+- `Select Plan` opens a selected-plan modal.
+- The selected-plan modal shows simple plan details plus preference controls:
+  running days/week if missing or editable, rest-day count/selection based on days/week, preferred
+  long-run day, and a flexible/default option when omitted.
+- Card click may reveal extra details below, but it must not be the primary creation/review path.
+- Remove `Ready to create`.
+- Replace `Create preset plan` with runner-facing copy such as `Create my plan`, only inside the
+  selected-plan modal after backend review is ready.
+- Frontend must never send rows/workouts or calculate schedule/metric truth locally.
+- Workout detail/readback must show primary structured prescription before effort/cue.
+
+Plan ownership transition:
+
+- This simplification strike no longer owns Plan Preset or plan-creation rebuild execution.
+- The rebuild is now owned by
+  [Running Plan Creation Engine Rebuild](2026-06-08-running-plan-creation-engine-rebuild.md).
+- Keep this section only as evidence for why service-size cleanup was paused and why plan-creation
+  work moved to a dedicated product plan.
+- Do not add more plan-creation implementation slices to this simplification strike.
+- Resume this strike only after the dedicated rebuild plan passes product acceptance.
+
+What remains forbidden:
+
+- no 5K shipped card
+- no target-time preset support
+- no fake pace or HR
+- no frontend-owned schedule logic
+- no DB/schema changes unless separately approved
+- no persistence semantic changes
+- no manual workout CRUD
+- no active-plan replacement/refresh
+- no OpenAI runtime generation for preset happy path
+- no service-size cleanup until this correction passes QA
+
 Slice 6 out of scope:
 
 - adding 5K as shipped
@@ -2930,9 +3128,15 @@ Selected deletion/demotion gate:
 
 `BACKEND Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime ownership`.
 
+Status:
+
+paused after real Plan Preset acceptance failure. Keep this as the first service-size cleanup gate,
+but do not start it until the corrected Plan Preset endpoint/watch-executable contract is
+implemented and QA-passed.
+
 Next owner:
 
-BACKEND.
+BACKEND after Plan Preset contract correction QA passes.
 
 Scope approved for Slice 10A:
 
@@ -3013,8 +3217,8 @@ Scope:
 - classification completed in `Slice 9: Plan-Creation Source Map And First Deletion Gate`
 - selected first gate is strict nested `ai-first-plan-draft-v1` demotion from product runtime
   ownership
-- current Plan Preset builder QA gate is resolved, so this is the next approved service-size cleanup
-  step
+- paused because real Plan Preset acceptance failed; resume only after corrected selected-distance
+  endpoint and watch-executable metric contract is implemented and QA-passed
 
 ### Slice 10: First Code Deletion/Demotion
 
@@ -3025,7 +3229,7 @@ BACKEND
 Scope:
 
 - execute `BACKEND Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime
-  ownership`
+  ownership` only after Plan Preset contract correction QA passes
 - preserve blueprint, Plan Preset, review/confirm, persistence, and metric-truth behavior
 
 ### Slice 11: Script/Validator Decomposition

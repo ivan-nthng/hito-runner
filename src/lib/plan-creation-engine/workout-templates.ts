@@ -1,0 +1,525 @@
+import {
+  ALL_SUPPORTED_RUNNING_PLAN_FAMILIES,
+  meters,
+  seconds,
+} from "@/lib/plan-creation-engine/source-shared";
+import type {
+  RunningPlanEngineSourceModel,
+  RunningPlanWorkoutDayTemplate,
+} from "@/lib/plan-creation-engine/source-types";
+
+const recoveryTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "recovery",
+  label: "Recovery Run",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ALL_SUPPORTED_RUNNING_PLAN_FAMILIES,
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "recovery_opening",
+      order: 1,
+      segmentRole: "opener",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(5),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Start relaxed.",
+    },
+    {
+      id: "recovery_main",
+      order: 2,
+      segmentRole: "main",
+      primaryPrescription: {
+        mode: "time",
+        durationSeconds: seconds(20, 30),
+        intensityLabel: "softer_than_easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Softer than a normal easy run.",
+    },
+    {
+      id: "recovery_cooldown",
+      order: 3,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(5),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Finish fresher than mid-run.",
+    },
+  ],
+};
+
+const easyTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "easy",
+  label: "Easy Aerobic Run",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ALL_SUPPORTED_RUNNING_PLAN_FAMILIES,
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "easy_warmup",
+      order: 1,
+      segmentRole: "warmup",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Settle gradually.",
+    },
+    {
+      id: "easy_main",
+      order: 2,
+      segmentRole: "main",
+      primaryPrescription: {
+        mode: "time_with_default_hr_cap",
+        durationSeconds: seconds(30, 45),
+        defaultHrZoneLabelOrCap: "editable default HR cap",
+        intensityLabel: "easy_conversational",
+      },
+      targetTruthMode: "editable_default_hr",
+      secondaryCue: "Conversational rhythm.",
+    },
+    {
+      id: "easy_cooldown",
+      order: 3,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(5),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Smooth finish.",
+    },
+  ],
+};
+
+const longRunTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "long_run",
+  label: "Long Run",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ALL_SUPPORTED_RUNNING_PLAN_FAMILIES,
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "long_opening",
+      order: 1,
+      segmentRole: "opener",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Start patient.",
+    },
+    {
+      id: "long_main",
+      order: 2,
+      segmentRole: "main",
+      primaryPrescription: {
+        mode: "time_with_default_hr_cap",
+        durationSeconds: seconds(60, 120),
+        defaultHrZoneLabelOrCap: "editable default HR ceiling",
+        intensityLabel: "durable_easy",
+      },
+      targetTruthMode: "editable_default_hr",
+      secondaryCue: "Durable, not rushed.",
+    },
+    {
+      id: "long_checkpoint",
+      order: 3,
+      segmentRole: "checkpoint",
+      primaryPrescription: {
+        mode: "time",
+        durationSeconds: seconds(3, 5),
+        intensityLabel: "posture_fueling_check",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Stay calm through the middle.",
+    },
+    {
+      id: "long_finish",
+      order: 4,
+      segmentRole: "finish",
+      primaryPrescription: {
+        mode: "time",
+        durationSeconds: seconds(5),
+        intensityLabel: "easy_finish",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Finish controlled.",
+    },
+  ],
+};
+
+const cutbackLongRunTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "cutback_long_run",
+  label: "Cutback Long Run",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ALL_SUPPORTED_RUNNING_PLAN_FAMILIES,
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "cutback_long_opening",
+      order: 1,
+      segmentRole: "opener",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Lighter week mindset.",
+    },
+    {
+      id: "cutback_long_main",
+      order: 2,
+      segmentRole: "main",
+      primaryPrescription: {
+        mode: "time_with_default_hr_cap",
+        durationSeconds: seconds(40, 80),
+        defaultHrZoneLabelOrCap: "editable default HR ceiling",
+        intensityLabel: "reduced_long_run",
+      },
+      targetTruthMode: "editable_default_hr",
+      secondaryCue: "Clearly easier than the prior peak.",
+    },
+    {
+      id: "cutback_long_finish",
+      order: 3,
+      segmentRole: "finish",
+      primaryPrescription: {
+        mode: "time",
+        durationSeconds: seconds(5),
+        intensityLabel: "easy_finish",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Finish fresh.",
+    },
+  ],
+};
+
+const stridesTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "strides",
+  label: "Easy Run With Strides",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only"],
+  allowedFamilies: ALL_SUPPORTED_RUNNING_PLAN_FAMILIES,
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "strides_warmup",
+      order: 1,
+      segmentRole: "warmup",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Open up gradually.",
+    },
+    {
+      id: "strides_support",
+      order: 2,
+      segmentRole: "main",
+      primaryPrescription: {
+        mode: "time",
+        durationSeconds: seconds(10, 20),
+        intensityLabel: "easy_support",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Keep it relaxed.",
+    },
+    {
+      id: "strides_repeats",
+      order: 3,
+      segmentRole: "work",
+      primaryPrescription: {
+        mode: "repeat",
+        repeatCount: { min: 4, max: 8 },
+        work: {
+          mode: "time",
+          durationSeconds: { min: 20, max: 20 },
+          intensityLabel: "quick_relaxed_stride",
+        },
+        recovery: {
+          mode: "recovery_time",
+          recoveryDurationSeconds: { min: 60, max: 60 },
+          intensityLabel: "easy_jog",
+        },
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Quick feet, relaxed body; reset fully after each stride.",
+    },
+    {
+      id: "strides_cooldown",
+      order: 4,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(5),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Finish calm.",
+    },
+  ],
+};
+
+const tempoTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "tempo",
+  label: "Tempo Run",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ["10K", "Half Marathon", "Marathon Base"],
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "tempo_warmup",
+      order: 1,
+      segmentRole: "warmup",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(12, 15),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Prepare fully.",
+    },
+    {
+      id: "tempo_repeats",
+      order: 2,
+      segmentRole: "work",
+      primaryPrescription: {
+        mode: "repeat",
+        repeatCount: { min: 2, max: 3 },
+        work: {
+          mode: "time",
+          durationSeconds: seconds(8, 12),
+          intensityLabel: "controlled_tempo",
+        },
+        recovery: {
+          mode: "recovery_time",
+          recoveryDurationSeconds: seconds(2, 3),
+          intensityLabel: "easy_jog",
+        },
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Strong and smooth; recover enough to repeat cleanly.",
+    },
+    {
+      id: "tempo_cooldown",
+      order: 3,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(8, 10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Finish composed.",
+    },
+  ],
+};
+
+const thresholdTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "threshold",
+  label: "Threshold Intervals",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ["Half Marathon", "Marathon Base"],
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "threshold_warmup",
+      order: 1,
+      segmentRole: "warmup",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(15),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Arrive calm.",
+    },
+    {
+      id: "threshold_repeats",
+      order: 2,
+      segmentRole: "work",
+      primaryPrescription: {
+        mode: "repeat",
+        repeatCount: { min: 3, max: 3 },
+        work: {
+          mode: "time",
+          durationSeconds: seconds(8, 10),
+          intensityLabel: "threshold_like_controlled",
+        },
+        recovery: {
+          mode: "recovery_time",
+          recoveryDurationSeconds: seconds(3),
+          intensityLabel: "easy_jog",
+        },
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Strong but controlled; fully reset.",
+    },
+    {
+      id: "threshold_cooldown",
+      order: 3,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Bring effort down gradually.",
+    },
+  ],
+};
+
+const intervalsTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "intervals",
+  label: "Short Or Long Intervals",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only"],
+  allowedFamilies: ["10K", "Half Marathon"],
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "intervals_warmup",
+      order: 1,
+      segmentRole: "warmup",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(15),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Prepare fully.",
+    },
+    {
+      id: "intervals_repeats",
+      order: 2,
+      segmentRole: "work",
+      primaryPrescription: {
+        mode: "repeat",
+        repeatCount: { min: 4, max: 6 },
+        work: {
+          mode: "distance",
+          distanceMeters: meters(400, 1000),
+          intensityLabel: "controlled_repeat",
+        },
+        recovery: {
+          mode: "recovery_distance",
+          recoveryDistanceMeters: meters(200, 200),
+          intensityLabel: "easy_jog",
+        },
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Repeat the same controlled rhythm.",
+    },
+    {
+      id: "intervals_cooldown",
+      order: 3,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Finish relaxed.",
+    },
+  ],
+};
+
+const hillsTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "hills",
+  label: "Hill Repeats",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ALL_SUPPORTED_RUNNING_PLAN_FAMILIES,
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "hills_warmup",
+      order: 1,
+      segmentRole: "warmup",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(15),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Warm fully before the hill.",
+    },
+    {
+      id: "hills_repeats",
+      order: 2,
+      segmentRole: "work",
+      primaryPrescription: {
+        mode: "repeat",
+        repeatCount: { min: 6, max: 10 },
+        work: {
+          mode: "time",
+          durationSeconds: { min: 45, max: 45 },
+          intensityLabel: "uphill_controlled",
+        },
+        recovery: {
+          mode: "recovery_time",
+          recoveryDurationSeconds: { min: 75, max: 90 },
+          intensityLabel: "walk_or_jog_down",
+        },
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Strong push, relaxed upper body; control the descent.",
+    },
+    {
+      id: "hills_cooldown",
+      order: 3,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Finish calm.",
+    },
+  ],
+};
+
+export const workoutDayTemplates: RunningPlanEngineSourceModel["workoutDayTemplates"] = {
+  recovery: recoveryTemplate,
+  easy: easyTemplate,
+  long_run: longRunTemplate,
+  cutback_long_run: cutbackLongRunTemplate,
+  strides: stridesTemplate,
+  tempo: tempoTemplate,
+  threshold: thresholdTemplate,
+  intervals: intervalsTemplate,
+  hills: hillsTemplate,
+} as const;

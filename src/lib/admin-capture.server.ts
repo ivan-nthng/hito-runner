@@ -1108,8 +1108,8 @@ function formatTargetRole(value: AdminCaptureTargetRole) {
       return "Copy";
     case "qa":
       return "QA";
-    case "prompt_engineer":
-      return "Prompt Engineer";
+    case "product":
+      return "Product";
     case "running_coach":
       return "Running Coach";
   }

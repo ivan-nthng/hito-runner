@@ -9,6 +9,9 @@ description: Use when writing Hito prompts for the next agent, decomposing tasks
 
 Create precise next-role prompts that preserve Hito decisions and avoid scope drift.
 
+This skill is owned by Product for routine Hito routing. Product reads the prior-agent report,
+explains the current state to the user, and writes the next-role prompt directly.
+
 ## Required Reading
 
 1. `docs/context.md`
@@ -28,6 +31,78 @@ Create precise next-role prompts that preserve Hito decisions and avoid scope dr
 7. Specify validation requirements.
 8. Specify expected output format.
 9. Include handoff block only when continuity would otherwise be lost.
+
+## Product-Owned Direct Handoff
+
+Use this mode when Product receives another agent's result and needs to decide what happens next.
+
+Product writes the next-role prompt directly. Do not create an intermediate package for a separate
+prompt-writing role.
+
+The handoff must:
+
+- be written in Russian around the exact prompt and English inside the exact prompt by default
+- put the exact next-role prompt inside one fenced code block
+- name the active plan/spec/doc with an absolute clickable file link in the surrounding Russian
+  shell
+- include the prior agent's task, stage, changed files, validation evidence, blockers, and product
+  acceptance status
+- list the source-of-truth files the next role should use
+- state the immediate next owner
+- state constraints, non-goals, and known product decisions
+- avoid optional second prompts or later-role prompts
+- avoid implementation details beyond what the next role needs to execute safely
+
+If this routing layer would add noise for a trivial follow-up, say that directly and recommend the
+simpler one-step handoff.
+
+Recommended response shape:
+
+~~~text
+Plan file:
+<clickable absolute Markdown link, or none>
+
+Task:
+<current task>
+
+Stage:
+<current stage>
+
+What we did:
+<compact prior-agent result>
+
+Where we are:
+<accepted / rejected / blocked / ready for next role>
+
+What we do next:
+<one immediate next action>
+
+Exact prompt for that role:
+~~~md
+ROLE: <ROLE>
+
+Task:
+<execution-ready task>
+
+Stage:
+<stage>
+
+Context:
+<self-contained context>
+
+Scope:
+<exact scope>
+
+Validation:
+<required checks>
+
+Report format:
+<required report shape>
+~~~
+
+Blockers:
+<none or concrete blockers>
+~~~
 
 ## Hito Prompt Rules
 

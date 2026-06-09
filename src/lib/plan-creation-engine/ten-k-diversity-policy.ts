@@ -1,0 +1,292 @@
+import type {
+  RunningPlanRunnerLevel,
+  RunningPlanWorkoutDayKind,
+} from "@/lib/plan-creation-engine/source-types";
+
+export const TEN_K_CUTBACK_WEEKS = [4, 8] as const;
+export const TEN_K_TAPER_SHARPENING_WEEK = 9 as const;
+export const TEN_K_ENDPOINT_WEEK = 10 as const;
+
+export const TEN_K_DEVELOPMENT_TOUCH_VALUES = ["strides", "tempo", "intervals", "hills"] as const;
+
+export type TenKDevelopmentTouch = (typeof TEN_K_DEVELOPMENT_TOUCH_VALUES)[number];
+export type TenKLoadContext = "standard" | "conservative";
+export type TenKDiversityWorkoutKind = RunningPlanWorkoutDayKind | "rest";
+
+export interface TenKDiversityPolicyInput {
+  runnerLevel: RunningPlanRunnerLevel;
+  loadContext: TenKLoadContext;
+  weekNumber: number;
+}
+
+export interface TenKDiversityValidationRow {
+  rowId: string;
+  dayNumber: number;
+  weekNumber: number;
+  isRestDay: boolean;
+  workoutDayKind: TenKDiversityWorkoutKind;
+}
+
+export interface TenKDiversityValidationInput {
+  runnerLevel: RunningPlanRunnerLevel;
+  loadContext: TenKLoadContext;
+  rows: readonly TenKDiversityValidationRow[];
+}
+
+export function resolveTenKDevelopmentTouch({
+  runnerLevel,
+  loadContext,
+  weekNumber,
+}: TenKDiversityPolicyInput): TenKDevelopmentTouch | null {
+  if (weekNumber === TEN_K_ENDPOINT_WEEK) {
+    return null;
+  }
+
+  if (TEN_K_CUTBACK_WEEKS.includes(weekNumber as never)) {
+    return null;
+  }
+
+  if (weekNumber === TEN_K_TAPER_SHARPENING_WEEK) {
+    return "strides";
+  }
+
+  if (runnerLevel === "beginner_new_runner") {
+    return resolveBeginnerTouch(weekNumber);
+  }
+
+  if (loadContext === "conservative") {
+    return resolveConservativeSupportedTouch(weekNumber);
+  }
+
+  return resolveStandardSupportedTouch(runnerLevel, weekNumber);
+}
+
+export function validateTenKDiversityPolicy({
+  runnerLevel,
+  loadContext,
+  rows,
+}: TenKDiversityValidationInput): readonly string[] {
+  const issues: string[] = [];
+  const nonRestRows = rows.filter((row) => !row.isRestDay);
+  const workoutKinds = new Set(nonRestRows.map((row) => row.workoutDayKind));
+
+  validateGlobalDiversityGates(workoutKinds, issues);
+  validateRunnerLevelDiversityGates({ runnerLevel, loadContext, workoutKinds, issues });
+  validateWeekRules(rows, issues);
+  validateRecoverySpacing(rows, issues);
+  validateDevelopmentDensity(rows, issues);
+
+  return issues;
+}
+
+export function isTenKDevelopmentTouch(
+  kind: TenKDiversityWorkoutKind,
+): kind is TenKDevelopmentTouch {
+  return TEN_K_DEVELOPMENT_TOUCH_VALUES.includes(kind as TenKDevelopmentTouch);
+}
+
+function resolveBeginnerTouch(weekNumber: number): TenKDevelopmentTouch | null {
+  if (weekNumber === 2 || weekNumber === 5 || weekNumber === 7) {
+    return "strides";
+  }
+
+  return null;
+}
+
+function resolveConservativeSupportedTouch(weekNumber: number): TenKDevelopmentTouch | null {
+  switch (weekNumber) {
+    case 2:
+    case 5:
+      return "strides";
+    case 3:
+    case 7:
+      return "tempo";
+    default:
+      return null;
+  }
+}
+
+function resolveStandardSupportedTouch(
+  runnerLevel: Exclude<RunningPlanRunnerLevel, "beginner_new_runner">,
+  weekNumber: number,
+): TenKDevelopmentTouch | null {
+  switch (weekNumber) {
+    case 2:
+      return "strides";
+    case 3:
+      return "tempo";
+    case 5:
+      return "intervals";
+    case 7:
+      if (runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive") {
+        return "hills";
+      }
+      return "tempo";
+    default:
+      return null;
+  }
+}
+
+function validateGlobalDiversityGates(
+  workoutKinds: ReadonlySet<TenKDiversityWorkoutKind>,
+  issues: string[],
+) {
+  const requiredKinds: readonly TenKDiversityWorkoutKind[] = [
+    "easy",
+    "recovery",
+    "long_run",
+    "cutback_long_run",
+    "final_selected_distance_day",
+  ];
+
+  for (const requiredKind of requiredKinds) {
+    if (!workoutKinds.has(requiredKind)) {
+      issues.push(`10K preview must include ${requiredKind}.`);
+    }
+  }
+
+  if (workoutKinds.has("threshold")) {
+    issues.push("10K preview must not include threshold.");
+  }
+}
+
+function validateRunnerLevelDiversityGates({
+  runnerLevel,
+  loadContext,
+  workoutKinds,
+  issues,
+}: {
+  runnerLevel: RunningPlanRunnerLevel;
+  loadContext: TenKLoadContext;
+  workoutKinds: ReadonlySet<TenKDiversityWorkoutKind>;
+  issues: string[];
+}) {
+  if (runnerLevel === "beginner_new_runner") {
+    for (const forbiddenKind of ["tempo", "intervals", "hills"] as const) {
+      if (workoutKinds.has(forbiddenKind)) {
+        issues.push(`Beginner 10K preview must not include ${forbiddenKind}.`);
+      }
+    }
+
+    if (!workoutKinds.has("strides")) {
+      issues.push("Beginner 10K preview must include strides.");
+    }
+    return;
+  }
+
+  if (loadContext === "conservative") {
+    for (const forbiddenKind of ["intervals", "hills"] as const) {
+      if (workoutKinds.has(forbiddenKind)) {
+        issues.push(`Conservative 10K preview must not force ${forbiddenKind}.`);
+      }
+    }
+    if (!workoutKinds.has("strides")) {
+      issues.push("Conservative 10K preview must include strides.");
+    }
+    return;
+  }
+
+  for (const requiredKind of ["strides", "tempo", "intervals"] as const) {
+    if (!workoutKinds.has(requiredKind)) {
+      issues.push(`Supported standard-load 10K preview must include ${requiredKind}.`);
+    }
+  }
+
+  const isHigherSupport =
+    runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive";
+  if (isHigherSupport && !workoutKinds.has("hills")) {
+    issues.push(`${runnerLevel} standard-load 10K preview must include hills.`);
+  }
+
+  const developmentKinds = TEN_K_DEVELOPMENT_TOUCH_VALUES.filter((kind) => workoutKinds.has(kind));
+  if (
+    developmentKinds.length > 0 &&
+    developmentKinds.every((kind) => kind === "strides" || kind === "tempo")
+  ) {
+    issues.push("Supported standard-load 10K preview must not use only strides plus tempo.");
+  }
+}
+
+function validateWeekRules(rows: readonly TenKDiversityValidationRow[], issues: string[]) {
+  for (const cutbackWeek of TEN_K_CUTBACK_WEEKS) {
+    const weekRows = rowsForWeek(rows, cutbackWeek);
+    if (!weekRows.some((row) => row.workoutDayKind === "cutback_long_run")) {
+      issues.push(`Week ${cutbackWeek} must include cutback_long_run.`);
+    }
+
+    for (const forbiddenKind of ["intervals", "hills", "threshold"] as const) {
+      if (weekRows.some((row) => row.workoutDayKind === forbiddenKind)) {
+        issues.push(`Week ${cutbackWeek} must not include ${forbiddenKind}.`);
+      }
+    }
+  }
+
+  const taperRows = rowsForWeek(rows, TEN_K_TAPER_SHARPENING_WEEK);
+  if (!taperRows.some((row) => row.workoutDayKind === "strides")) {
+    issues.push("Week 9 must include strides.");
+  }
+  for (const forbiddenKind of ["intervals", "hills", "tempo", "threshold"] as const) {
+    if (taperRows.some((row) => row.workoutDayKind === forbiddenKind)) {
+      issues.push(`Week 9 must not include ${forbiddenKind}.`);
+    }
+  }
+
+  const endpointRows = rowsForWeek(rows, TEN_K_ENDPOINT_WEEK);
+  const endpointNonRestRows = endpointRows.filter((row) => !row.isRestDay);
+  if (!endpointNonRestRows.some((row) => row.workoutDayKind === "final_selected_distance_day")) {
+    issues.push("Week 10 must include final_selected_distance_day.");
+  }
+  for (const row of endpointNonRestRows) {
+    if (
+      row.workoutDayKind !== "final_selected_distance_day" &&
+      row.workoutDayKind !== "easy" &&
+      row.workoutDayKind !== "recovery"
+    ) {
+      issues.push("Week 10 non-endpoint workouts must stay easy or recovery.");
+    }
+  }
+}
+
+function validateRecoverySpacing(rows: readonly TenKDiversityValidationRow[], issues: string[]) {
+  const recoveryRequiredAfter: readonly TenKDiversityWorkoutKind[] = [
+    "long_run",
+    "cutback_long_run",
+    "intervals",
+    "hills",
+  ];
+
+  for (const row of rows) {
+    if (!recoveryRequiredAfter.includes(row.workoutDayKind)) {
+      continue;
+    }
+
+    const nextRunningRow = rows.find(
+      (candidate) => candidate.dayNumber > row.dayNumber && !candidate.isRestDay,
+    );
+    if (!nextRunningRow) {
+      continue;
+    }
+
+    if (nextRunningRow.workoutDayKind !== "recovery" && nextRunningRow.workoutDayKind !== "easy") {
+      issues.push(
+        `Next running row after ${row.rowId} must be recovery or easy, got ${nextRunningRow.workoutDayKind}.`,
+      );
+    }
+  }
+}
+
+function validateDevelopmentDensity(rows: readonly TenKDiversityValidationRow[], issues: string[]) {
+  for (let weekNumber = 1; weekNumber <= TEN_K_ENDPOINT_WEEK; weekNumber += 1) {
+    const developmentRows = rowsForWeek(rows, weekNumber).filter((row) =>
+      isTenKDevelopmentTouch(row.workoutDayKind),
+    );
+
+    if (developmentRows.length > 1) {
+      issues.push(`Week ${weekNumber} must not contain more than one development touch.`);
+    }
+  }
+}
+
+function rowsForWeek(rows: readonly TenKDiversityValidationRow[], weekNumber: number) {
+  return rows.filter((row) => row.weekNumber === weekNumber);
+}

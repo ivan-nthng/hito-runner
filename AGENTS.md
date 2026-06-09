@@ -93,7 +93,8 @@ Exact next-role prompt recipient rule:
 - Every exact next-role prompt must begin by naming who the task is for.
 - The first line inside the prompt block must be `ROLE: <ROLE>`, for example `ROLE: FRONTEND`,
   `ROLE: QA`, `ROLE: BACKEND`, `ROLE: ARCHITECT`, `ROLE: DESIGNER`, `ROLE: COPY`, or
-  `ROLE: RUNNING COACH`.
+  `ROLE: RUNNING COACH`. Use `ROLE: PRODUCT` when the next step is product definition, prompt
+  routing, product artifact creation, or next-role handoff preparation.
 - Do not start an exact handoff prompt with `Task`, `Stage`, context, or prose before the `ROLE:`
   line.
 - After the `ROLE:` line, include the task and stage in the prompt body.
@@ -269,7 +270,8 @@ Current project skills:
 - `skills/hito-qa-browser-regression/SKILL.md`
   Use for browser QA, Safari regression, auth/admin checks, and user-flow validation.
 - `skills/hito-prompt-handoff/SKILL.md`
-  Use for next-role prompts, execution handoffs, QA prompts, and checkpoint continuity.
+  Use for Product-owned next-role prompts, execution handoffs, QA prompts, and checkpoint
+  continuity.
 - `skills/hito-running-coach-audit/SKILL.md`
   Use for training-plan quality, running doctrine, workout diversity, progression, recovery, terrain/hill logic, metric-target realism, and sports-safety guardrail reviews.
 - `skills/hito-backlog-intake/SKILL.md`

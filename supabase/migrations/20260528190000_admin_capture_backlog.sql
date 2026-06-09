@@ -12,7 +12,7 @@ create table if not exists public.admin_capture_items (
 			'designer',
 			'copy',
 			'qa',
-			'prompt_engineer',
+			'product',
 			'running_coach'
 		)
 	),

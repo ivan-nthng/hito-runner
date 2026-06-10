@@ -4,6 +4,29 @@ This file is the canonical execution policy for AI agents in this project templa
 
 Customize the pipeline terms below for the new project before real execution begins.
 
+## 0) Always-Visible Root-Cause Rule
+
+Before every project-work response or action, pause and ask:
+
+`Are we fixing the root cause, or are we patching a visible symptom?`
+
+If the answer is not clearly "root cause", the agent must stop and trace the failure to the first
+incorrect owner before proposing or executing work.
+
+Mandatory root-cause check:
+
+- Name the visible symptom.
+- Name the likely underlying cause.
+- Name the canonical owner of that cause: backend validation, normalization, persistence, auth,
+  AI contract, import/export, route state, form serialization, async lifecycle, shared component,
+  Hito DS primitive, rendering view model, or documentation/source-of-truth.
+- Reuse the existing canonical seam owned by that layer before adding anything new.
+- If the current task can only patch the symptom, say so explicitly and route the root-cause fix to
+  the correct owner instead of presenting the symptom patch as complete.
+
+This rule is intentionally duplicated near the top of this file so it stays visible. Section 2.56
+contains the fuller implementation discipline.
+
 ## 1) Mission And Non-Negotiables
 
 - Protect pipeline integrity.

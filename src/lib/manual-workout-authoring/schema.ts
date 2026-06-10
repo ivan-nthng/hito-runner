@@ -1,0 +1,267 @@
+import { z } from "zod";
+import type {
+  CalendarIconKey,
+  CanonicalMetricModeJson,
+  CanonicalWorkoutFamily,
+  CanonicalWorkoutIdentity,
+} from "@/lib/rich-workout-model";
+import type { Step, WorkoutType } from "@/lib/training";
+
+export const MANUAL_WORKOUT_AUTHORING_SOURCE_KIND = "manual_workout_authoring_v1" as const;
+export const MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS = "manual_draft_reviewed" as const;
+
+export const MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES = [
+  "structure_only",
+  "editable_default_hr",
+  "none",
+] as const;
+
+export type ManualWorkoutTargetTruthMode = (typeof MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES)[number];
+
+export const MANUAL_WORKOUT_TEMPLATE_KEY_VALUES = [
+  "rest_day",
+  "recovery_jog",
+  "easy_aerobic_run",
+  "steady_aerobic_run",
+  "easy_run_with_strides",
+  "progression_run",
+  "controlled_tempo_session",
+  "half_marathon_threshold_durability",
+  "time_intervals",
+  "distance_intervals",
+  "long_aerobic_run",
+  "long_run_with_steady_finish",
+  "cutback_long_run",
+  "taper_long_run",
+  "uphill_repeats",
+  "rolling_hills_session",
+  "run_walk_adaptation",
+  "technical_trail_easy",
+] as const;
+
+export type ManualWorkoutTemplateKey = (typeof MANUAL_WORKOUT_TEMPLATE_KEY_VALUES)[number];
+
+export const MANUAL_WORKOUT_BLOCK_KEY_VALUES = [
+  "warmup_block",
+  "cooldown_block",
+  "easy_run_block",
+  "steady_run_block",
+  "progression_block",
+  "tempo_block",
+  "threshold_block",
+  "interval_work_block",
+  "interval_recovery_block",
+  "hill_work_block",
+  "downhill_control_block",
+  "rest_walk_jog_recovery_block",
+  "long_run_body_block",
+  "long_run_finish_block",
+  "strides_block",
+  "drills_mobility_note_block",
+  "coach_cue_note_block",
+] as const;
+
+export type ManualWorkoutBlockKey = (typeof MANUAL_WORKOUT_BLOCK_KEY_VALUES)[number];
+
+export const MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES = [
+  "intervals",
+  "tempo_repeats",
+  "hill_repeats",
+  "run_walk",
+  "strides",
+  "downhill_control",
+] as const;
+
+export type ManualWorkoutRepeatSafetyKind =
+  (typeof MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES)[number];
+
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+const manualWorkoutTargetInputSchema = z
+  .object({
+    intensity: z.string().trim().min(1).max(120).optional(),
+    label: z.string().trim().min(1).max(120).optional(),
+    sourceNote: z.string().trim().min(1).max(200).optional(),
+    cue: z.string().trim().min(1).max(200).optional(),
+    hint: z.string().trim().min(1).max(200).optional(),
+    rpe: z.union([z.string().trim().min(1).max(32), z.number().min(1).max(10)]).optional(),
+    pace: z.string().trim().min(1).max(80).optional(),
+    paceMinPerKmRange: z.string().trim().min(1).max(80).optional(),
+    hrBpmRange: z.string().trim().min(1).max(80).optional(),
+    hrTargetSource: z.enum(["personal_hr_zone", "default_estimated_hr"]).optional(),
+  })
+  .strict();
+
+export const manualWorkoutBlockInputSchema = z
+  .object({
+    blockKey: z.enum(MANUAL_WORKOUT_BLOCK_KEY_VALUES),
+    label: z.string().trim().min(1).max(120).optional(),
+    durationSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(8 * 60 * 60)
+      .optional(),
+    distanceMeters: z.number().int().positive().max(100_000).optional(),
+    noteText: z.string().trim().min(1).max(500).optional(),
+    targetTruthMode: z.enum(MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES).optional(),
+    target: manualWorkoutTargetInputSchema.optional(),
+    nestedRepeatGroup: z.unknown().optional(),
+  })
+  .strict();
+
+export type ManualWorkoutBlockInput = z.infer<typeof manualWorkoutBlockInputSchema>;
+
+export const manualWorkoutRepeatGroupInputSchema = z
+  .object({
+    repeatCount: z.number().int().min(2).max(50),
+    safetyKind: z.enum(MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES),
+    groupLabel: z.string().trim().min(1).max(120).optional(),
+    workBlock: manualWorkoutBlockInputSchema,
+    recoveryBlock: manualWorkoutBlockInputSchema.optional(),
+    nestedRepeatGroup: z.unknown().optional(),
+  })
+  .strict();
+
+export type ManualWorkoutRepeatGroupInput = z.infer<typeof manualWorkoutRepeatGroupInputSchema>;
+
+export const manualWorkoutConstructorEntrySchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("block"),
+      block: manualWorkoutBlockInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("repeat_group"),
+      group: manualWorkoutRepeatGroupInputSchema,
+    })
+    .strict(),
+]);
+
+export type ManualWorkoutConstructorEntryInput = z.infer<
+  typeof manualWorkoutConstructorEntrySchema
+>;
+
+export const manualWorkoutDraftContextSchema = z
+  .object({
+    mode: z
+      .enum(["no_active_plan_draft", "user_built_plan_draft", "existing_active_plan"])
+      .default("no_active_plan_draft"),
+    activePlanId: z.string().uuid().optional(),
+    activePlanSourceKind: z.string().trim().min(1).max(80).optional(),
+    targetDateProtection: z
+      .enum([
+        "none",
+        "past_workout",
+        "logged_workout",
+        "provider_evidence",
+        "actual_metrics",
+        "comparison_or_ai_insight",
+      ])
+      .default("none"),
+  })
+  .strict();
+
+export type ManualWorkoutDraftContext = z.infer<typeof manualWorkoutDraftContextSchema>;
+
+export const manualWorkoutDraftInputSchema = z
+  .object({
+    templateKey: z.enum(MANUAL_WORKOUT_TEMPLATE_KEY_VALUES),
+    workoutDate: isoDateSchema,
+    title: z.string().trim().min(1).max(120).optional(),
+    notes: z.string().trim().max(1000).optional().nullable(),
+    targetTruthMode: z.enum(MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES).optional(),
+    entries: z.array(manualWorkoutConstructorEntrySchema).min(0).max(20).optional(),
+    context: manualWorkoutDraftContextSchema.optional(),
+  })
+  .strict();
+
+export type ManualWorkoutDraftInput = z.input<typeof manualWorkoutDraftInputSchema>;
+export type ParsedManualWorkoutDraftInput = z.output<typeof manualWorkoutDraftInputSchema>;
+
+export interface ManualWorkoutDraftIssue {
+  code:
+    | "invalid_input"
+    | "unsupported_template"
+    | "unsupported_mapping"
+    | "nested_repeat_not_supported"
+    | "missing_executable_structure"
+    | "missing_recovery"
+    | "unsafe_block_structure"
+    | "unsafe_metric_truth"
+    | "protected_date_conflict"
+    | "active_plan_conflict";
+  message: string;
+  path?: Array<string | number>;
+}
+
+export interface ManualWorkoutDraftConflict {
+  code:
+    | "existing_active_plan_not_supported"
+    | "protected_past_or_history"
+    | "protected_provider_or_analysis";
+  message: string;
+  workoutDate: string;
+  activePlanId?: string | null;
+}
+
+export interface ManualWorkoutReviewSummary {
+  headline: string;
+  bullets: string[];
+  warnings: string[];
+}
+
+export interface ManualWorkoutCanonicalDraft {
+  sourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
+  sourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
+  source_kind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
+  persisted: false;
+  templateKey: ManualWorkoutTemplateKey;
+  workoutDate: string;
+  weekday: string;
+  title: string;
+  notes: string | null;
+  workoutType: WorkoutType;
+  sourceWorkoutType: string;
+  workoutFamily: CanonicalWorkoutFamily;
+  workoutIdentity: CanonicalWorkoutIdentity;
+  calendarIconKey: CalendarIconKey;
+  metricMode: CanonicalMetricModeJson;
+  steps: Step[];
+  plannedRpe: number | null;
+  estimatedFatigue: string | null;
+  recoveryPriority: string | null;
+  totalDurationMin: number;
+  totalDistanceKm: number;
+  mappingGaps: string[];
+}
+
+export type ManualWorkoutDraftReviewResult =
+  | {
+      ok: true;
+      status: "draft_ready";
+      draft: ManualWorkoutCanonicalDraft;
+      review: ManualWorkoutReviewSummary;
+      reviewToken: string;
+      reviewChecksum: string;
+      exactnessPayloadVersion: "manual_workout_review_payload_v1";
+      conflicts: ManualWorkoutDraftConflict[];
+    }
+  | {
+      ok: false;
+      status: "draft_rejected";
+      reason:
+        | "invalid_input"
+        | "unsupported_template"
+        | "unsupported_mapping"
+        | "unsafe_block_structure"
+        | "unsafe_metric_truth"
+        | "protected_date_conflict"
+        | "active_plan_conflict";
+      message: string;
+      issues: ManualWorkoutDraftIssue[];
+      conflicts: ManualWorkoutDraftConflict[];
+      persisted: false;
+    };

@@ -1,12 +1,14 @@
+import {
+  collectRunningPlanCompositionGrammarIssues,
+  resolveRunningPlanCompositionWeek,
+  type RunningPlanCompositionDevelopmentTouch,
+} from "@/lib/plan-creation-engine/composition-grammar";
 import type {
   RunningPlanPreviewCalendarRow,
   RunningPlanPreviewCalendarWorkoutDayKind,
   RunningPlanPreviewLoadContext,
 } from "@/lib/plan-creation-engine/preview-builder-shared";
-import type {
-  RunningPlanRunnerLevel,
-  RunningPlanWorkoutDayKind,
-} from "@/lib/plan-creation-engine/source-types";
+import type { RunningPlanRunnerLevel } from "@/lib/plan-creation-engine/source-types";
 
 export const MARATHON_BASE_PLAN_BUILDER_WEEKS = 16 as const;
 export const MARATHON_BASE_CUTBACK_WEEKS = [4, 8, 12] as const;
@@ -39,27 +41,15 @@ export function resolveMarathonBaseDevelopmentTouch({
   loadContext,
   weekNumber,
 }: MarathonBaseDiversityPolicyInput): MarathonBaseDevelopmentTouch | null {
-  if (weekNumber === MARATHON_BASE_ENDPOINT_WEEK) {
-    return null;
-  }
-
-  if (MARATHON_BASE_CUTBACK_WEEKS.includes(weekNumber as never)) {
-    return null;
-  }
-
-  if (weekNumber === MARATHON_BASE_PENULTIMATE_WEEK) {
-    return "strides";
-  }
-
-  if (runnerLevel === "beginner_new_runner") {
-    return null;
-  }
-
-  if (loadContext === "conservative") {
-    return resolveConservativeMarathonBaseTouch(runnerLevel, weekNumber);
-  }
-
-  return resolveStandardMarathonBaseTouch(runnerLevel, weekNumber);
+  return toMarathonBaseDevelopmentTouch(
+    resolveRunningPlanCompositionWeek({
+      family: "Marathon Base",
+      runnerLevel,
+      loadContext,
+      weekNumber,
+      horizonWeeks: MARATHON_BASE_PLAN_BUILDER_WEEKS,
+    }).developmentTouch,
+  );
 }
 
 export function validateMarathonBaseDiversityPolicy({
@@ -76,8 +66,39 @@ export function validateMarathonBaseDiversityPolicy({
   validateMarathonBaseWeekRules(rows, issues);
   validateMarathonBaseRecoverySpacing(rows, issues);
   validateDevelopmentDensity(rows, issues);
+  validateConservativeDurabilityIdentity({ loadContext, rows, issues });
+  issues.push(
+    ...collectRunningPlanCompositionGrammarIssues({
+      family: "Marathon Base",
+      runnerLevel,
+      loadContext,
+      horizonWeeks: MARATHON_BASE_PLAN_BUILDER_WEEKS,
+      rows,
+    }),
+  );
 
   return issues;
+}
+
+function validateConservativeDurabilityIdentity({
+  loadContext,
+  rows,
+  issues,
+}: {
+  loadContext: RunningPlanPreviewLoadContext;
+  rows: readonly RunningPlanPreviewCalendarRow[];
+  issues: string[];
+}) {
+  if (loadContext !== "conservative") {
+    return;
+  }
+
+  const rowText = JSON.stringify(rows.filter((row) => !row.isRestDay));
+  if (!/marathon_base_time_on_feet|durability_steady_finish/.test(rowText)) {
+    issues.push(
+      "Conservative Marathon Base preview must keep time-on-feet or steady-finish long-run identity.",
+    );
+  }
 }
 
 export function isMarathonBaseDevelopmentTouch(
@@ -86,43 +107,13 @@ export function isMarathonBaseDevelopmentTouch(
   return MARATHON_BASE_DEVELOPMENT_TOUCH_VALUES.includes(kind as MarathonBaseDevelopmentTouch);
 }
 
-function resolveConservativeMarathonBaseTouch(
-  runnerLevel: Exclude<RunningPlanRunnerLevel, "beginner_new_runner">,
-  weekNumber: number,
+function toMarathonBaseDevelopmentTouch(
+  touch: RunningPlanCompositionDevelopmentTouch | null,
 ): MarathonBaseDevelopmentTouch | null {
-  if (weekNumber === 2 || weekNumber === 6) {
-    return "strides";
-  }
-
-  if (runnerLevel !== "sometimes_runs" && (weekNumber === 3 || weekNumber === 10)) {
-    return "tempo";
-  }
-
-  return null;
-}
-
-function resolveStandardMarathonBaseTouch(
-  runnerLevel: Exclude<RunningPlanRunnerLevel, "beginner_new_runner">,
-  weekNumber: number,
-): MarathonBaseDevelopmentTouch | null {
-  switch (weekNumber) {
-    case 2:
-      return "strides";
-    case 3:
-    case 10:
-      return "tempo";
-    case 6:
-      if (runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive") {
-        return "threshold";
-      }
-      return "strides";
-    case 13:
-      return runnerLevel === "sometimes_runs" ? "tempo" : "hills";
-    case 14:
-      return runnerLevel === "professional_competitive" ? "threshold" : null;
-    default:
-      return null;
-  }
+  return touch &&
+    MARATHON_BASE_DEVELOPMENT_TOUCH_VALUES.includes(touch as MarathonBaseDevelopmentTouch)
+    ? (touch as MarathonBaseDevelopmentTouch)
+    : null;
 }
 
 function validateMarathonBaseGlobalGates(

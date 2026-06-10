@@ -14,15 +14,345 @@ high
 
 ## Next Recommended Role
 
-QA
+BACKEND
 
 ## Task
 
-Decompose Hito DS route/specimen ownership.
+Run Slice 12A: plan-authoring doctrine validator ownership extraction.
 
 ## Stage
 
-FRONTEND cleanup / Hito DS route decomposition.
+BACKEND cleanup / doctrine validator decomposition without behavior changes.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: BACKEND
+
+Task:
+Run Slice 12A: plan-authoring doctrine validator ownership extraction.
+
+Stage:
+BACKEND cleanup / doctrine validator decomposition without behavior changes.
+
+Plan:
+/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
+
+Context:
+This is a parallel service-size cleanup track. Do not block or touch the running-plan R8/R8B
+confirm/persist create-path work. Architecture re-audited the current service after the Plan Preset
+builder deletion and running-plan preview work:
+- `src` TS/TSX/CSS: about `91,990` lines across `221` files.
+- `scripts`: about `23,977` lines across `27` files.
+- The largest script hotspot is `scripts/validate-plan-authoring-doctrine.ts` at about `6788`
+  lines.
+- Prior slices already deleted the strict nested draft runtime module and old Plan Preset
+  algorithmic builder/review path.
+- There is no safe broad runtime deletion candidate that should preempt R8.
+
+Root cause and architecture fit:
+The root issue for this slice is not product runtime behavior. It is that the main plan-authoring
+doctrine validator has become a multi-domain safety net that mixes rich workout normalization,
+import/export/readback, active-plan refresh, structured authoring, blueprint, envelope, and release
+gate assertions in one 6.7k-line file. Keep the stable top-level validator command, but move
+assertion ownership into focused `scripts/plan-authoring-doctrine/` modules so future cleanup can
+delete stale assertion groups safely instead of editing one giant file.
+
+Required reading:
+1. AGENTS.md
+2. agents/backend.agent.md
+3. skills/hito-architecture-audit/SKILL.md
+4. skills/hito-plan-writing-and-closeout/SKILL.md
+5. docs/context.md
+6. docs/glossary.md
+7. docs/current-system.md
+8. docs/current-product.md
+9. docs/current-state.md
+10. docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
+
+Inspect:
+- scripts/validate-plan-authoring-doctrine.ts
+- scripts/plan-authoring-doctrine/
+- src/lib/rich-workout-draft-authoring.ts
+- src/lib/rich-workout-model.ts
+- src/lib/plan-export.ts
+- src/lib/active-plan-refresh-draft.ts
+- src/lib/plan-refresh-proposal.ts
+- src/lib/ai-first-plan-blueprint-*
+- src/lib/ai-first-plan-envelope-*
+- src/lib/structured-plan-authoring*
+
+Scope:
+1. Keep `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts` as the stable
+   entrypoint.
+2. Extract one focused assertion island from `scripts/validate-plan-authoring-doctrine.ts` into
+   `scripts/plan-authoring-doctrine/`.
+3. Recommended first extraction: rich workout/readback/refresh assertions and helpers, including
+   rich workout draft normalization, rich compatibility mapping, persistence/readback,
+   import/export roundtrip, saved-mode QA fixture, and active-plan refresh rich draft / apply /
+   timeout-fallback assertions.
+4. Keep behavior and assertion coverage unchanged.
+5. Do not turn this into a broad doctrine rewrite. If the first extraction reveals a smaller safer
+   seam, take the smaller seam and report why.
+6. Keep shared helper extraction minimal and real-ownership based.
+7. Update this active plan with the Slice 12A result, line-count impact, extracted module ownership,
+   and remaining validator hotspots.
+
+What not to do:
+- Do not touch R8/R8B running-plan confirm/persist source unless source audit proves a direct
+  conflict.
+- Do not change product runtime behavior.
+- Do not remove assertions to reduce line count.
+- Do not run Supabase mutations, migrations, provider sync, browser QA, or live imports.
+- Do not edit frontend UI, Hito DS, CSS, Plan Preset card discovery, manual workout authoring,
+  active-plan persistence, or running-plan preview builders.
+- Do not delete `structured_authoring_v1` compatibility or blueprint/envelope safety gates.
+- Do not revive old Plan Preset review/confirm.
+
+Validation:
+- `npm exec eslint -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/*.ts`
+- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
+- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope`
+- `npm run author-ai-first-plan-draft -- --contract strict-draft`
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
+- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`
+- `npm run validate-admin-capture-backlog`
+- `git diff --check -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
+- `npm run build` only if imports or package-level script behavior changed.
+
+Report format:
+1. Task
+2. Stage
+3. Root cause
+4. Files inspected
+5. Files changed
+6. Assertion ownership extracted
+7. Behavior preserved
+8. Line-count/reviewability impact
+9. Remaining validator hotspots
+10. Validation results
+11. Blockers
+```
+
+## Parallel Cleanup Audit After R8 Confirm/Persist Work
+
+Decision date: 2026-06-09.
+
+Purpose:
+
+Resume service-size reduction without blocking the ongoing running-plan R8/R8B confirm/persist
+track. This audit is deliberately parallel: it selects a cleanup target outside the R8 create-path
+files unless a direct safety conflict appears.
+
+Current measured size baseline:
+
+| Area | Current count | Notes |
+| --- | ---: | --- |
+| `src` TS/TSX/CSS files | `221` files | Runtime/product/admin/DS source; generated route tree is included if checked in. |
+| `src` TS/TSX/CSS lines | about `91,990` lines | Excludes docs, lockfiles, `node_modules`, and QA artifacts. |
+| `scripts` TS/TSX/MJS/JS files | `27` files | Validators, harnesses, importers, and ops scripts. |
+| `scripts` TS/TSX/MJS/JS lines | about `23,977` lines | Validation/tooling bloat remains significant. |
+| `docs/plans` + `docs/tasks` markdown/CSV | `143` files / about `72,102` lines | Planning/history/reference load; not service runtime. |
+| `qa-artifacts` | about `386M` | Gitignored/local generated proof artifacts; cleanup is disk hygiene, not runtime code reduction. |
+
+Largest current source hotspots:
+
+| File | Lines | Category | Audit note |
+| --- | ---: | --- | --- |
+| [global styles](../../../src/styles.css) | `5132` | runtime CSS / DS/product/admin styles | Slice 14A removed confirmed dead selectors; further cleanup needs QA/visual proof. |
+| [Hito DS route](../../../src/routes/hitoDS.tsx) | `4072` | internal DS route | Already decomposed once; further split should wait for DS/test-calendar tracks. |
+| [Admin analytics route](../../../src/routes/admin.analytics.tsx) | `2393` | admin UI runtime | Decompose later; current admin surface is live. |
+| [Admin capture route](../../../src/routes/admin.capture.tsx) | `2125` | admin UI runtime | Decompose later; current work-items surface is live. |
+| [voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts) | `1685` | product/runtime AI assist | Keep until rebuilt custom/advanced engine replacement is accepted. |
+| [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | `1591` | product/runtime schedule preview | Current reviewed mutation boundary; keep. |
+| [first-plan actions](../../../src/lib/first-plan-actions.ts) | `1551` | product/runtime first-plan actions | Broad but live; defer until create-engine replacement settles. |
+| [structured plan authoring workouts](../../../src/lib/structured-plan-authoring-workouts.ts) | `1398` | deterministic generator compatibility | Keep while legacy/readback/custom paths still depend on it. |
+| [imported plan contract](../../../src/lib/imported-plan.ts) | `1355` | canonical import/readback | Keep; schema/import compatibility owner. |
+| [CompletionPanel](../../../src/components/CompletionPanel.tsx) | `1342` | workout detail UI | Decompose later through frontend DS/workout-detail slice. |
+
+Largest current script hotspots:
+
+| File | Lines | Category | Audit note |
+| --- | ---: | --- | --- |
+| [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | `6788` | validation harness | Selected next cleanup gate; too broad for safe review. |
+| [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) | `2114` | ops/diagnostic | Keep until blueprint/envelope diagnostics are consolidated. |
+| [repo work-item importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts) | `1815` | admin tooling | Keep; bounded importer diagnostics are current. |
+| [first-plan release gates](../../../scripts/plan-authoring-doctrine/first-plan-release-gates.ts) | `1349` | validation harness | Keep; already extracted release-gate owner. |
+| [admin capture validator](../../../scripts/validate-admin-capture-backlog.ts) | `1078` | admin validation | Keep; admin work-items safety net. |
+| [running-plan scenario generator](../../../scripts/generate-running-plan-engine-scenarios.ts) | `974` | running-plan validation/artifacts | Keep while R8/Rich preview work is active. |
+
+Weak spots found:
+
+- Runtime product code:
+  - [training API facade](../../../src/lib/training-api.ts) is still broad, but it is touched by R8
+    exports and should not be narrowed in parallel with R8B/QA.
+  - first-plan, voice/text/custom, structured authoring, and active-plan refresh seams still overlap
+    conceptually, but several are live or needed for compatibility until the rebuilt engine fully
+    owns custom/advanced creation.
+- Validation/test harnesses:
+  - [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
+    remains the biggest weak seam. It mixes rich workout, import/export, refresh, structured,
+    blueprint, envelope, and first-plan release-gate assertions.
+  - validation scripts are not product runtime bloat, but a 6.7k-line harness becomes a weak
+    architecture seam when future agents cannot see which assertions belong to which product owner.
+- Docs/plans/specs:
+  - active docs remain large and numerous; this is admin/backlog visibility load, not runtime code.
+  - stale active-plan cleanup should continue separately through Admin Work Items/source-of-truth
+    hygiene, not as this implementation slice.
+- Generated/local artifacts:
+  - `qa-artifacts` is large at about `386M`, but it is gitignored proof output. Do not treat it as
+    service code. Add a disk-hygiene task later only if local storage becomes a problem.
+- Compatibility/legacy stubs:
+  - old Plan Preset review/confirm remains safely bounded as `preview_only`.
+  - `structured_authoring_v1` compatibility is still intentional and must not be deleted.
+  - old strict nested AI draft runtime was already deleted in Slice 10C.
+
+Cleanup candidates considered:
+
+| Candidate | Type | Expected impact | Risk | Decision |
+| --- | --- | ---: | --- | --- |
+| Doctrine validator ownership extraction | Decompose | High reviewability; can shrink main script by moving `1000+` lines into focused owners | Low runtime risk; script-only if behavior is preserved | Selected |
+| Training API facade narrowing | Consolidate/delete exports | Medium runtime simplification | Direct file conflict risk with R8/R8B and route/serverFn imports | Defer until R8 completes |
+| Voice/text/custom authoring consolidation | Audit then demote | Potentially high | Replacement advanced/custom engine is not accepted yet | Defer |
+| Admin analytics/capture route decomposition | Decompose | High route reviewability | Frontend/admin QA required; less direct source-of-truth cleanup | Defer |
+| Hito DS/global CSS second pass | Decompose/delete CSS | High visual/code cleanup | Slice 14A needs separate QA/design stability before deeper split | Defer |
+| QA artifact cleanup | Delete local artifacts | High disk impact, no runtime line impact | Could remove useful evidence if done blindly | Backlog/disk hygiene only |
+| Manual workout authoring cleanup | Audit | Medium/high future impact | Current manual workout track is in-flight and untracked | Do not touch |
+| Plan-creation engine cleanup | Decompose | High | Accepted preview/R8 create-path work is active | Do not touch in this parallel slice |
+
+Selected next cleanup gate:
+
+`BACKEND Slice 12A: plan-authoring doctrine validator ownership extraction`.
+
+Why this is the highest-impact/safest next slice:
+
+- It attacks the current largest script hotspot (`6788` lines) without touching product runtime,
+  Supabase, UI, R8 confirm/persist, or the accepted running-plan preview builders.
+- It reduces source-of-truth risk: validators should prove contracts, not become an unreadable
+  second implementation map.
+- It is safer than narrowing [Training API facade](../../../src/lib/training-api.ts) while R8B is
+  still active.
+- It is more root-cause-aligned than another small CSS deletion pass because the weak seam is
+  validation ownership, not one selector group.
+
+Slice 12A approved scope:
+
+- Keep the top-level command stable:
+  `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`.
+- Extract exactly one assertion island into `scripts/plan-authoring-doctrine/`.
+- Recommended first island:
+  rich workout draft normalization, rich compatibility mapping, rich persistence/readback,
+  import/export roundtrip, saved-mode QA fixture, and active-plan refresh rich draft/apply/timeout
+  assertions.
+- Keep assertion behavior unchanged.
+- Keep any shared helper extraction minimal and ownership-based.
+- Record main-file line-count reduction and remaining hotspots after extraction.
+
+Forbidden in Slice 12A:
+
+- Do not remove assertions to make the file smaller.
+- Do not touch R8/R8B running-plan confirm/persist source unless a direct conflict is proven.
+- Do not edit product runtime, DB/schema, Supabase data, frontend UI, Hito DS, Plan Preset card
+  discovery, manual workout authoring, active-plan persistence, or running-plan preview builders.
+- Do not delete `structured_authoring_v1` compatibility, blueprint/envelope gates, or current
+  first-plan release gates.
+
+## Slice 14A Global CSS Cleanup Result
+
+Implemented on 2026-06-09.
+
+Ownership map:
+
+- Hito DS tokens/primitives:
+  [global styles](../../../src/styles.css) lines around `:root`, `@theme`, typography roles,
+  fields, buttons, tabs, choice controls, checkbox/radio controls, status pills, status markers,
+  feedback markers, product dialogs, toast chrome, date fields, menu/select wrappers, and shared
+  calendar-day anatomy.
+- Hito DS route/specimen styles:
+  workbench shell/sidebar, DS nested navigation, reference rows, specimen shells, playground
+  anatomy, data-table specimen controls, modal/window specimen, and calendar/workout playground
+  display classes.
+- Product calendar/workout styles:
+  shared calendar grid/mobile-row classes, calendar type glyphs, feedback markers, state surfaces,
+  nav cards, workout-result/readback support surfaces, and active-plan schedule edit narrow-layout
+  safety overrides.
+- Onboarding/preset styles:
+  onboarding surfaces, preset card/grid/stage treatment, selected-plan preview calendar,
+  selected-plan segment rows, editable value chip, date/time controls, and first-plan dialog chrome.
+- Admin/work-items styles:
+  admin shell/profile/menu, backlog divider-list/detail/metadata tags, analytics cards, data-table
+  utility row/search/header/menu classes, chart/comparison/scale/severity primitives.
+- Legacy/dead/duplicate candidates:
+  old product-dialog mode/row/note helpers, unused `hito-ui-sidebar-shell`, unused standalone
+  error/success text aliases, and old radio visual-helper aliases.
+
+Deleted with source proof:
+
+- Deleted unused product-dialog helpers:
+  `hito-product-dialog-content-fit`, `hito-product-dialog-scroll-fill`,
+  `hito-product-dialog-header-row`, `hito-product-dialog-body-content-fit`,
+  `hito-product-dialog-footer-row`, and `hito-product-dialog-footer-note`.
+  `rg --fixed-strings` found no runtime/source consumers outside
+  [global styles](../../../src/styles.css), excluding this result record.
+  Live dialog classes such as `hito-product-dialog`, `hito-product-dialog-header`,
+  `hito-product-dialog-body-scroll-fill`, and `hito-product-dialog-footer` remain in use.
+- Deleted unused `hito-ui-sidebar-shell`; `rg --fixed-strings` found no runtime/source consumers
+  outside [global styles](../../../src/styles.css), excluding this result record. Live sidebar specimen classes
+  `hito-ui-sidebar-panel` and `hito-ui-sidebar-row` remain in use.
+- Deleted unused `hito-error-text` and `hito-success-text`; `rg --fixed-strings` found no
+  runtime/source consumers outside [global styles](../../../src/styles.css), excluding this result
+  record. Current form feedback uses
+  `hito-field-error`, `hito-field-success`, helper copy, and status primitives.
+- Deleted unused `hito-radio-checked` and `hito-radio-indicator-dot`; `rg --fixed-strings` found no
+  runtime/source consumers outside [global styles](../../../src/styles.css), excluding this result
+  record. Native/input radio checked styling and `data-state="checked"` styling remain.
+
+Kept intentionally:
+
+- Kept the remaining no-fixed-reference size-ladder selectors:
+  `hito-button-xl`, `hito-field-xs`, `hito-field-xl`, `hito-checkbox-md`, `hito-radio-md`,
+  `hito-control-label-md`, `hito-choice-toggle-md`, `hito-choice-toggle-lg`,
+  `hito-choice-toggle-xl`, and `hito-textarea-lg`.
+- These are Hito DS primitive/size variants or specimen-controlled variants. Several are used
+  through dynamic class construction in [Hito DS route](../../../src/routes/hitoDS.tsx) and
+  [specimen previews](../../../src/components/hito-ds/specimen-previews.tsx), so they are not
+  safe deletion targets in this pass.
+
+Line impact:
+
+- [global styles](../../../src/styles.css) went from `5206` lines to `5132` lines.
+- This pass deleted `74` CSS lines without changing TS/TSX, product behavior, backend truth, or
+  global visual design.
+
+Validation evidence:
+
+- Source proof used `rg --fixed-strings` for every deleted selector and confirmed zero runtime/source
+  consumers outside [global styles](../../../src/styles.css), excluding this result record.
+- Post-cleanup dead-selector scan reports only intentionally kept DS size-ladder/specimen variants.
+- Targeted `git diff --check` passed for [global styles](../../../src/styles.css), route/component
+  files, and this active plan.
+- `npm run build` passed.
+- Built-in browser smoke passed for `/hitoDS`, `/hitoDS#workout-library-playground`, and
+  `/hitoDS#calendar-workout-playground`; direct deep-link load produced no fresh hydration mismatch,
+  workout-library still rendered `32` calendar cells and `32` mobile rows, and `375px` viewport had
+  no horizontal overflow.
+
+Follow-up cleanup candidates:
+
+- Split [global styles](../../../src/styles.css) by ownership only after another source-proof pass:
+  DS primitives, admin/workbench, onboarding/presets, calendar/workout, and DS specimens.
+- Audit the remaining DS size-ladder classes with a component-level decision before deleting any
+  primitive variants.
+- Later cleanup can migrate used-but-route-specific admin/backlog styles toward shared DS/admin
+  modules, but that is intentionally out of scope for Slice 14A.
+
+Next recommended role:
+
+QA should run focused source/browser validation for `/hitoDS`, touched DS control/specimen surfaces,
+and mobile no-overflow.
 
 ## Previous Cleanup Result
 
@@ -135,10 +465,52 @@ Line impact:
   [reference anatomy](../../../src/components/hito-ds/reference.tsx) at `132` lines and
   [specimen previews](../../../src/components/hito-ds/specimen-previews.tsx) at `627` lines.
 
-Next recommended role:
+QA closeout:
 
-QA should run focused browser/source validation for `/hitoDS`, the two calendar playground deep
-links, hydration mismatch absence, `32` workout-library identities, and 375px no-overflow.
+Passed on 2026-06-09.
+
+- Built-in Codex Browser was used first.
+- Dev server `127.0.0.1:8082` had an in-app Browser runtime issue around
+  `@id/virtual:tanstack-start-client-entry`, while `curl` returned `200 OK`.
+- Final browser proof passed against a safe local production server on `127.0.0.1:8099`.
+- `/hitoDS`, `/hitoDS#calendar-workout-playground`, and `/hitoDS#workout-library-playground`
+  loaded successfully.
+- Fresh console checks on `8099` showed `0` errors and `0` warnings.
+- Deep links resolved to target sections.
+- Patterns nav expanded and active child state moved correctly.
+- Workout-library showed `32` identities, `32` mobile rows, `32` mobile date entries, and `7`
+  grid headings.
+- Provider/mobile overflow path passed with no horizontal overflow.
+- Source boundary proof passed: no Supabase/server actions, product Calendar imports, workout route
+  imports, provider sync, AI, persistence, mutation behavior, or new route-local styling system.
+- Targeted ESLint passed for [Hito DS route](../../../src/routes/hitoDS.tsx),
+  [Hito DS components](../../../src/components/hito-ds/), and
+  [shared calendar day UI](../../../src/components/ui/hito-calendar-day.tsx).
+- `npm run build` passed.
+- `git diff --check -- src/routes/hitoDS.tsx src/components/hito-ds src/styles.css docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
+  passed.
+
+Acceptance decision:
+
+Slice 13 is implemented and QA-passed. The Hito DS route decomposition is accepted as a
+behavior-preserving responsibility split. It should not be reopened unless a concrete regression is
+found.
+
+Next cleanup slice:
+
+`FRONTEND Slice 14A: global CSS semantic cleanup preflight and first safe deletion pass`.
+
+Why this is next:
+
+- [Global styles](../../../src/styles.css) is now the largest source hotspot at about `5206` lines.
+- The Hito DS route/specimen split is QA-stable, so CSS ownership can be audited against a stable DS
+  proof surface.
+- This is higher-impact than admin route cleanup if the first pass deletes dead global rules and
+  records ownership boundaries.
+- This is safer than voice/text/custom authoring consolidation because the running-plan custom path
+  is still being rebuilt.
+- The slice is intentionally bounded: ownership map plus confirmed-unused CSS deletion only, not
+  light/dark mode, visual redesign, or a new token system.
 
 ## Major Cleanup Gate Selection
 

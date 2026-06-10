@@ -1,3 +1,8 @@
+import {
+  collectRunningPlanCompositionGrammarIssues,
+  resolveRunningPlanCompositionWeek,
+  type RunningPlanCompositionDevelopmentTouch,
+} from "@/lib/plan-creation-engine/composition-grammar";
 import type {
   RunningPlanRunnerLevel,
   RunningPlanWorkoutDayKind,
@@ -38,27 +43,15 @@ export function resolveTenKDevelopmentTouch({
   loadContext,
   weekNumber,
 }: TenKDiversityPolicyInput): TenKDevelopmentTouch | null {
-  if (weekNumber === TEN_K_ENDPOINT_WEEK) {
-    return null;
-  }
-
-  if (TEN_K_CUTBACK_WEEKS.includes(weekNumber as never)) {
-    return null;
-  }
-
-  if (weekNumber === TEN_K_TAPER_SHARPENING_WEEK) {
-    return "strides";
-  }
-
-  if (runnerLevel === "beginner_new_runner") {
-    return resolveBeginnerTouch(weekNumber);
-  }
-
-  if (loadContext === "conservative") {
-    return resolveConservativeSupportedTouch(weekNumber);
-  }
-
-  return resolveStandardSupportedTouch(runnerLevel, weekNumber);
+  return toTenKDevelopmentTouch(
+    resolveRunningPlanCompositionWeek({
+      family: "10K",
+      runnerLevel,
+      loadContext,
+      weekNumber,
+      horizonWeeks: TEN_K_ENDPOINT_WEEK,
+    }).developmentTouch,
+  );
 }
 
 export function validateTenKDiversityPolicy({
@@ -75,6 +68,15 @@ export function validateTenKDiversityPolicy({
   validateWeekRules(rows, issues);
   validateRecoverySpacing(rows, issues);
   validateDevelopmentDensity(rows, issues);
+  issues.push(
+    ...collectRunningPlanCompositionGrammarIssues({
+      family: "10K",
+      runnerLevel,
+      loadContext,
+      horizonWeeks: TEN_K_ENDPOINT_WEEK,
+      rows,
+    }),
+  );
 
   return issues;
 }
@@ -85,54 +87,12 @@ export function isTenKDevelopmentTouch(
   return TEN_K_DEVELOPMENT_TOUCH_VALUES.includes(kind as TenKDevelopmentTouch);
 }
 
-function resolveBeginnerTouch(weekNumber: number): TenKDevelopmentTouch | null {
-  if (weekNumber === 2 || weekNumber === 5 || weekNumber === 7) {
-    return "strides";
-  }
-
-  return null;
-}
-
-function resolveConservativeSupportedTouch(weekNumber: number): TenKDevelopmentTouch | null {
-  switch (weekNumber) {
-    case 2:
-    case 5:
-      return "strides";
-    case 3:
-    case 7:
-      return "tempo";
-    default:
-      return null;
-  }
-}
-
-function resolveStandardSupportedTouch(
-  runnerLevel: Exclude<RunningPlanRunnerLevel, "beginner_new_runner">,
-  weekNumber: number,
+function toTenKDevelopmentTouch(
+  touch: RunningPlanCompositionDevelopmentTouch | null,
 ): TenKDevelopmentTouch | null {
-  switch (weekNumber) {
-    case 2:
-      return "strides";
-    case 3:
-      return "tempo";
-    case 5:
-      return "intervals";
-    case 6:
-      if (runnerLevel === "runs_a_lot") {
-        return "tempo";
-      }
-      if (runnerLevel === "professional_competitive") {
-        return "intervals";
-      }
-      return null;
-    case 7:
-      if (runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive") {
-        return "hills";
-      }
-      return "tempo";
-    default:
-      return null;
-  }
+  return touch && TEN_K_DEVELOPMENT_TOUCH_VALUES.includes(touch as TenKDevelopmentTouch)
+    ? (touch as TenKDevelopmentTouch)
+    : null;
 }
 
 function validateGlobalDiversityGates(

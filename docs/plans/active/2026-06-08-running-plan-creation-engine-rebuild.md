@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+selected_plan_create_accepted_ready_for_final_closeout
 
 ## Type
 
@@ -14,102 +14,67 @@ high
 
 ## Next Recommended Role
 
-QA
+ARCHITECT
 
 ## Task
 
-Validate exact watch-executable running-plan engine prescriptions and level-aware stimulus rules.
+Final closeout/archive decision for the running-plan creation engine rebuild.
 
 ## Stage
 
-QA validation / exact prescriptions plus weekly development stimulus rules.
+ARCHITECT closeout / selected-plan create accepted.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: QA
+ROLE: ARCHITECT
 
 Task:
-Validate exact watch-executable running-plan engine prescriptions and level-aware stimulus rules.
+Final closeout/archive decision for the running-plan creation engine rebuild.
 
 Stage:
-QA validation / exact prescriptions plus weekly development stimulus rules.
+ARCHITECT closeout / selected-plan create accepted.
 
 PLAN:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md
 
 Context:
-- The rebuilt running-plan engine is preview-only and non-mutating.
-- Backend now resolves preview workout templates into exact watch-executable prescriptions before
-  returning rows.
-- Source templates may still contain coach-authored ranges, but preview-ready rows must not expose
-  unresolved duration, distance, repeat, work, or recovery ranges.
-- Backend generated a scenario JSON pack under:
-  `qa-artifacts/plan-engine-scenarios/2026-06-09/`
-- Scenario pack proof:
-  - `13` scenarios generated
-  - `11` preview-ready scenarios
-  - `2` expected unavailable scenarios
-  - `0` unresolved executable segment ranges
-- Endpoint proof:
-  - 10K final endpoint remains exact `10000m`
-  - Half Marathon final endpoint remains exact `21100m`
-  - Marathon Base final row remains `marathon_base_endpoint` and does not emit `42195m`
-- Runner-level proof:
-  - beginner Half Marathon remains unavailable
-  - beginner Marathon Base remains unavailable
-  - professional 10K/Half/Marathon Base development sequences now differ from `runs_a_lot`
-  - conservative/heavy load contexts reduce or soften prescriptions without fake pace/HR precision
-- Build proof:
-  - targeted ESLint passed
-  - source, 10K, and R6 builder harnesses passed
-  - scenario JSON generator passed
-  - `npm run build` passed
+- The rebuilt selected running-plan preview-to-create path has passed backend, scoped remote
+  persistence, and built-server browser acceptance.
+- Accepted visible families: `10K`, `Half Marathon`, and `Marathon Base`.
+- Backend owns review token/checksum, server-side preview rebuild, exactness validation, canonical
+  `training-plan-v2` mapping, and persistence through `createFirstPlanFromReviewedCanonicalPlanForUser(...)`.
+- Frontend owns thin interaction wiring only and sends only `previewInput`, `planFamily`,
+  `sourceKind`, `reviewToken`, and `reviewChecksum`.
+- Built-server QA on `http://127.0.0.1:8099/` proved the Marathon Base `Create plan` path creates
+  exactly one active plan and `112` planned workouts, then cleans up disposable QA records.
+- This acceptance does not approve production rollout, active-plan replacement, manual workout CRUD,
+  OpenAI generation, DB/schema changes, or old Plan Preset confirm revival.
 
 Your job:
-1. Run backend/source validation for the exact-prescription slice.
-2. Inspect the generated scenario JSON pack and prove preview rows contain exact numeric structure,
-   not unresolved ranges.
-3. Prove 10K, Half Marathon, and Marathon Base endpoint contracts remain intact.
-4. Prove runner-level and load-context differences are visible and safe.
-5. Prove no fake pace, no fake personal HR, no 5K benchmark dependency, and no watch/no-watch gate.
-6. Preserve preview-only/non-mutating boundaries.
+1. Read `AGENTS.md`, `agents/architect.agent.md`, `skills/hito-architecture-audit/SKILL.md`,
+   `skills/hito-plan-writing-and-closeout/SKILL.md`, and this active plan.
+2. Inspect current docs and determine whether the active rebuild plan's exit criteria are now met.
+3. If exit criteria are met, update final status/evidence and archive the plan.
+4. If any real acceptance gap remains, keep the plan active and choose exactly one bounded next
+   owner/gate.
+5. Preserve the accepted boundary: backend owns plan truth and persistence; frontend renders and
+   confirms only backend-shaped review truth.
+6. Keep service-size cleanup as the likely next track after final closeout, not inside this plan.
 
 Constraints:
-- Do not implement product fixes.
-- Do not mutate DB/Supabase.
-- Do not add persistence, confirm/create, or active-plan creation.
-- Do not call OpenAI.
-- Do not add shipped 5K.
-- Do not add target-time support.
-- Do not require or consume 5K benchmark.
-- Do not reintroduce no-watch/no-app as a normal input.
-- Do not invent precise pace targets.
-- Do not invent personal HR targets.
-- Do not weaken any existing R2/R3/R4C/R6B invariant or accepted Running Coach doctrine.
-- Do not approve frontend/browser selected-plan behavior for Half/Marathon Base unless a separate
-  frontend slice wires those families into the UI.
+- Do not implement code.
+- Do not run new browser QA unless a specific missing proof is found.
+- Do not approve production rollout beyond accepted local/built-server QA evidence.
+- Do not add active-plan replacement, manual workout CRUD, OpenAI, DB/schema, target-time pace, fake
+  HR, no-watch/no-app, Plan Preset confirm revival, or new preset families.
+- Do not merge this closeout with the separate Hito Stack Simplification Strike implementation.
 
 Validation:
-- `npm exec eslint -- src/lib/plan-creation-engine/*.ts scripts/validate-running-plan-engine-source.ts scripts/validate-running-plan-engine-10k-builder.ts scripts/validate-running-plan-engine-r6-builders.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
-- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts`
-- `npm run build`
+- `git diff --check -- docs/plans/active docs/plans/archive docs/current-product.md docs/current-system.md docs/current-state.md docs/history/changelog.md`
+- No build required unless product source is unexpectedly changed.
 
-Report:
-1. Task
-2. Stage
-3. Files inspected
-4. Validation commands
-5. Exact prescription proof
-6. Scenario JSON proof
-7. Endpoint and eligibility proof
-8. Runner-level/load-context proof
-9. Metric-truth proof
-10. Mutation-safety proof
-11. Blockers
+Report using the standard Architecture / Cleanup / Plan Report format from AGENTS.md.
 ```
 
 ## Owner
@@ -118,7 +83,375 @@ ARCHITECT / RUNNING COACH / BACKEND / FRONTEND / QA
 
 ## Last Updated
 
-2026-06-09
+2026-06-10
+
+## Architecture Acceptance Closeout For Selected-Plan Create
+
+Decision: accept the selected running-plan preview-to-create path after successful built-server
+browser QA.
+
+Root cause closed:
+
+- Visible symptom: the selected-plan preview showed `Create unavailable`.
+- Root cause: the system did not yet have accepted backend confirm/persist proof, then browser
+  Create acceptance was blocked by dev-server/browser tooling instability.
+- Canonical owner:
+  - Backend owns review token/checksum, server-side preview rebuild, exactness validation, canonical
+    persistence, and active-plan conflict behavior.
+  - Frontend owns thin interaction wiring only.
+  - QA proved the browser path against a stable production-built local server.
+
+Accepted built-server browser QA proof:
+
+- Built-in Codex Browser was used first against `http://127.0.0.1:8099/`.
+- `10K` preview showed enabled `Create plan`, `70` cells, exact `10000m endpoint`, `Reviewed`,
+  `Not saved yet`, and `No OpenAI`.
+- `Half Marathon` preview showed enabled `Create plan`, `98` cells, and exact `21100m`.
+- `Marathon Base` preview showed enabled `Create plan`, `112` cells, and
+  `marathon_base_endpoint`.
+- Mobile `375px` no-overflow passed.
+- QA clicked `Create plan` for `Marathon Base` in a disposable tester state.
+- UI transitioned to saved active-plan home/calendar state.
+- DB readback after create showed exactly:
+  - `1` active `plan_cycles` row
+  - `112` `planned_workouts`
+  - source kind `running_plan_engine_marathon_base_builder_v1`
+  - source status `confirmed_selected_plan`
+  - review contract version `running_plan_review_v1`
+- Cleanup returned all scoped disposable records to zero:
+  - `runnerProfiles: 0`
+  - `planCycles: 0`
+  - `plannedWorkouts: 0`
+  - `workoutLogs: 0`
+- Source proof confirms frontend sends only:
+  - `previewInput`
+  - `planFamily`
+  - `sourceKind`
+  - `reviewToken`
+  - `reviewChecksum`
+
+Acceptance boundary:
+
+- The selected-plan Create path is accepted for local/built-server QA evidence.
+- This does not approve production rollout by itself.
+- This does not approve active-plan replacement, manual workout CRUD, OpenAI normal-path generation,
+  DB/schema changes, old Plan Preset confirm revival, target-time fake pace, fake personal HR,
+  no-watch/no-app branches, or Marathon Base race overclaim.
+
+Next gate:
+
+- Final `ARCHITECT` closeout/archive decision for this active rebuild plan.
+- If the exit criteria are met, archive this plan and resume service-size cleanup through the
+  separate Hito Stack Simplification Strike.
+
+## Architecture Acceptance Closeout For R8 Confirm/Persist
+
+Decision: accept Backend Slice R8 selected running-plan preview-to-confirm-to-persist boundary and
+hand off a bounded frontend Create wiring slice.
+
+What is accepted:
+
+- R8 uses backend-issued review proof:
+  - `reviewToken`
+  - `reviewChecksum`
+  - `reviewContractVersion: running_plan_review_v1`
+- Confirm rebuilds the selected preview server-side before persistence.
+- Confirm rejects stale or unsafe review attempts before persistence:
+  - changed start date
+  - changed setup
+  - invalid token
+  - mismatched checksum
+  - family/source mismatch
+  - extra client rows
+  - preview-unavailable state
+- Confirm does not trust client-sent calendar rows.
+- Confirm persists through the existing canonical active-plan persistence owner:
+  `createFirstPlanFromReviewedCanonicalPlanForUser(...)`.
+- Active-plan conflicts remain bounded as `active_plan_exists`.
+- Old Plan Preset confirm remains bounded `preview_only` and is not revived.
+- The schema-aware harness cleanup/readback fix preserves the correct source-of-truth boundary:
+  it changes only the validation harness table cleanup/readback ownership and does not change product
+  runtime persistence semantics.
+
+Scoped remote QA persistence evidence accepted:
+
+- Target: `https://dltfjwexyctmihclcjqj.supabase.co`
+- Mode: `remote_disposable_supabase_override`
+- `10K` persisted: `70` rows / `50` non-rest / exact `10000m`
+- `Half Marathon` persisted: `98` rows / `70` non-rest / exact `21100m`
+- `Marathon Base` persisted: `112` rows / `80` non-rest / `marathon_base_endpoint`
+- Harness asserted:
+  - changed start date/setup rejection
+  - invalid token rejection
+  - mismatched checksum rejection
+  - family/source mismatch rejection
+  - extra client rows rejection
+  - preview-unavailable rejection
+  - duplicate confirm returns `active_plan_exists`
+  - no trusted client rows
+  - no fake pace
+  - no personal HR targets
+  - old Plan Preset confirm remains `preview_only`
+- Cleanup readback confirmed:
+  - `qaAuthUsersRemaining: 0`
+  - `workout_logs: 0`
+  - `planned_workouts: 0`
+  - `plan_cycles: 0`
+  - `runner_profiles: 0`
+
+Size/ownership decision:
+
+- The historical R8 size/ownership note is no longer a blocker for frontend Create wiring because:
+  - live persistence proof passed
+  - confirm uses the existing active-plan persistence seam
+  - `training-api.ts` only exposes the route-facing action exports
+  - no second persistence system was introduced
+- The size concern remains a cleanup follow-up, not acceptance blocker:
+  - `src/lib/running-plan-engine-review.ts` is still about `848` lines
+  - `scripts/validate-running-plan-engine-confirm.ts` is now about `789` lines after schema-aware
+    harness cleanup/readback assertions
+  - no new responsibilities should be added to those files without a focused extraction or explicit
+    architecture approval
+
+Frontend Create gating after acceptance:
+
+- Frontend may now wire a Create action for the accepted selected-plan preview path.
+- Frontend must pass only setup input, selected family/source kind, `reviewToken`, and
+  `reviewChecksum` to `confirmRunningPlanDraft(...)`.
+- Frontend must not send calendar rows, generated workouts, canonical rows, segment data, endpoint
+  proof, metric truth, or persistence metadata.
+- Frontend must render backend-shaped success/error states and refresh into saved active-plan state
+  only after backend `created` success.
+
+Still forbidden:
+
+- production rollout approval from this acceptance alone
+- active-plan replacement/refresh
+- client-sent plan rows
+- frontend-owned schedule, metric, endpoint, or persistence truth
+- DB/schema changes
+- old Plan Preset confirm revival
+- OpenAI normal-path generation
+- target-time fake pace
+- fake personal HR
+- no-watch/no-app branches
+- Marathon Base race-readiness or `42195m` overclaim
+- manual workout creation/edit/copy/paste/recurrence
+
+## Architecture Validation-Environment Decision For R8 Persistence Proof
+
+Status update, 2026-06-10: this section records the validation strategy that unblocked R8 live
+persistence proof. The scoped proof has now passed; see the acceptance closeout above for the
+current frontend Create gating decision.
+
+Decision: accept exactly one live persistence proof path for R8 before frontend Create wiring:
+explicit disposable remote Supabase validation against project `dltfjwexyctmihclcjqj`.
+
+Rationale:
+
+- Source-only/non-mutating exactness checks are necessary but not sufficient for full confirm/persist
+  acceptance because R8 introduces real `plan_cycles`, `planned_workouts`, and `runner_profiles`
+  mutation through the canonical active-plan persistence seam.
+- Local disposable Supabase remains the preferred default validation shape, but it is not currently
+  executable in this shell because `supabase` and `docker` are unavailable.
+- The harness now has the required mutation guardrails:
+  - non-mutating review/checksum/input-mismatch checks run by default
+  - loopback Supabase targets are treated as local disposable targets
+  - remote Supabase mutation is blocked by default
+  - remote mutation requires both `--allow-remote-disposable-supabase-mutation` and
+    `HITO_RUNNING_PLAN_CONFIRM_ALLOW_REMOTE_MUTATION=I_UNDERSTAND_THIS_MUTATES_REMOTE_DISPOSABLE_SUPABASE`
+  - `--require-persistence` fails fast when no safe persistence target is available
+  - disposable cleanup counts remaining `workout_logs`, `plan_cycles`, `planned_workouts`, and
+    `runner_profiles`, and deletes the disposable auth user
+- The existing remote project `dltfjwexyctmihclcjqj` is already the configured project in local env,
+  so the smallest accepted path is a scoped QA run against disposable remote users, not a new
+  environment build-out.
+
+## Backend Slice R8 Persistence Harness Schema-Aware Cleanup Result
+
+- QA ran the approved scoped remote persistence proof against Supabase project
+  `dltfjwexyctmihclcjqj`.
+- Remote safety guard and non-mutating checks passed, but live cleanup verification failed because
+  the harness counted every disposable table with `.select("id", { count: "exact", head: true })`.
+- Root cause: disposable cleanup/readback was schema-blind. `runner_profiles` is keyed/read back by
+  `user_id` and has no `id` column, so the harness cleanup proof could fail after otherwise valid
+  persistence behavior.
+- Backend fix:
+  - `scripts/validate-running-plan-engine-confirm.ts` now defines one schema-aware disposable table
+    contract for every table it cleans up
+  - each spec records table name, user ownership column, count/select column, and cleanup proof key
+  - cleanup order remains explicit: `workout_logs`, `planned_workouts`, `plan_cycles`,
+    `runner_profiles`
+  - `runner_profiles` uses `user_id` as both owner and count/select column
+  - cleanup proof remains strict and now verifies zero remaining `workout_logs`, `plan_cycles`,
+    `planned_workouts`, and `runner_profiles` rows before reporting auth user deletion
+- Product runtime persistence, DB schema, migrations, frontend Create wiring, and active-plan
+  persistence semantics were not changed.
+
+Accepted QA proof path:
+
+1. Run the non-mutating harness first.
+2. Run `--require-persistence` without remote override and confirm it blocks before mutation.
+3. Confirm the target project ref is exactly `dltfjwexyctmihclcjqj`.
+4. Run the persistence harness only with the explicit remote-disposable CLI flag plus exact env
+   confirmation.
+5. Prove each supported family persists and cleans up:
+   - `10K`: `70` rows / `50` non-rest / exact `10000m` endpoint
+   - `Half Marathon`: `98` rows / `70` non-rest / exact `21100m` endpoint
+   - `Marathon Base`: `112` rows / `80` non-rest / `marathon_base_endpoint`
+6. Prove duplicate confirm is bounded by `active_plan_exists`.
+7. Prove cleanup leaves `0` disposable `workout_logs`, `plan_cycles`, `planned_workouts`, and
+   `runner_profiles` rows and deletes each disposable auth user.
+
+Rejected proof paths:
+
+- Do not accept source-only/non-mutating checks as full R8 persistence acceptance.
+- Do not require frontend Create wiring before persistence proof.
+- Do not use production or unknown remote projects.
+- Do not run broad remote mutations outside the script's disposable user namespace.
+- Do not add DB/schema changes to make the proof easier.
+
+Frontend Create gating:
+
+- This scoped persistence proof has passed and now unblocks the bounded frontend Create wiring
+  handoff above.
+- The passed scoped remote proof does not by itself approve production rollout, active-plan
+  replacement, manual workout CRUD, OpenAI changes, new preset families, or DB/schema changes.
+
+## Historical Architecture Size Gate Decision For Backend Slice R8
+
+Current status note, 2026-06-10: this section records the prior R8 size/ownership gate. The
+immediate active gate is now the scoped persistence-proof QA run above. Passing the persistence
+proof does not approve frontend Create by itself; Architect still needs to close out R8 with both
+the live persistence evidence and the remaining size/ownership status before frontend wiring.
+
+Historical decision: block QA briefly and require `BACKEND Slice R8B` no-behavior-change
+decomposition before QA validates confirm/persist.
+
+Size findings:
+
+- Tracked R8 diff for the named files is `834` insertions / `87` deletions, but this undercounts
+  the slice because two R8 files are currently untracked.
+- Runtime/action files:
+  - `src/lib/running-plan-engine-actions.ts`: `373` lines, tracked, about `331` added lines.
+  - `src/lib/running-plan-engine-review.ts`: `848` lines, untracked new runtime module.
+  - `src/lib/training-api.ts`: `652` lines, tracked, only `3` added export lines for R8.
+- Validation harness:
+  - `scripts/validate-running-plan-engine-confirm.ts`: `515` lines, untracked new validation
+    entrypoint.
+- Plan/docs:
+  - this active plan is `1533` lines after accumulated rebuild evidence; R8 added about `500`
+    tracked documentation lines.
+
+Architecture findings:
+
+- R8 behavioral direction is accepted:
+  - `confirmRunningPlanDraft(...)` rebuilds the preview server-side.
+  - client-sent calendar rows are rejected by the strict input schema.
+  - persistence reuses `createFirstPlanFromReviewedCanonicalPlanForUser(...)`.
+  - the canonical persistence seam still owns active-plan guard and rollback-on-workout-insert
+    failure.
+  - `training-api.ts` is not materially bloated by R8.
+  - old Plan Preset review/confirm remains bounded `preview_only`.
+- R8 size/ownership risk is real:
+  - the new review module mixes review proof, canonical mapping, segment prescription mapping,
+    persistence metadata, profile patching, source-kind helpers, metric/composition summaries, and
+    crypto/stable JSON helpers.
+  - at `848` lines, it crosses the project's large-file watch threshold before QA has accepted the
+    mutation boundary.
+  - letting QA pass this shape would harden a broad bridge module into another plan-creation owner.
+
+Required R8B cleanup:
+
+- Keep behavior exactly stable.
+- Extract the canonical `training-plan-v2` mapping and segment/workout mapping out of
+  `src/lib/running-plan-engine-review.ts` into a focused backend-owned module.
+- Keep review proof/token/checksum exactness in `src/lib/running-plan-engine-review.ts`.
+- Keep the action API, validation harness entrypoint, source metadata, active-plan guard, and
+  persistence seam unchanged.
+- Re-run the R8 confirm harness and existing builder/source validators before handing back to QA.
+
+## Backend Slice R8 Confirm/Persist Contract Result
+
+- Implemented selected running-plan review exactness in
+  `src/lib/running-plan-engine-review.ts`.
+- Preview-ready selected-plan drafts now carry backend-issued stable review proof:
+  - `reviewToken`
+  - `reviewChecksum`
+  - `reviewContractVersion: running_plan_review_v1`
+  - canonical row counts
+- Added `confirmRunningPlanDraft(...)` and `confirmRunningPlanDraftForUser(...)` in
+  `src/lib/running-plan-engine-actions.ts`.
+- Confirm accepts only setup input, selected family/source kind, review token, and checksum.
+- Confirm rebuilds the preview server-side, validates stable checksum/token exactness, maps the
+  rebuilt result into canonical `training-plan-v2`, and persists through the existing
+  `createFirstPlanFromReviewedCanonicalPlanForUser(...)` seam.
+- No client-sent calendar rows are accepted or trusted.
+- Active-plan conflicts return bounded `active_plan_exists` and do not replace existing plans.
+- Source metadata records:
+  - source kind/status
+  - selected family
+  - runner level and load context
+  - row counts
+  - endpoint proof
+  - metric policy
+  - composition grammar proof
+  - review checksum/version
+- Added `scripts/validate-running-plan-engine-confirm.ts` for R8 review/confirm/persist proof.
+
+R8 proof:
+
+- 10K confirm harness: `70` calendar rows / `50` non-rest rows / exact `10000m` endpoint.
+- Half Marathon confirm harness: `98` calendar rows / `70` non-rest rows / exact `21100m`
+  endpoint.
+- Marathon Base confirm harness: `112` calendar rows / `80` non-rest rows /
+  `marathon_base_endpoint` with no selected-distance `42195m` claim.
+- Fresh review token validates after immediate server-side rebuild.
+- Changed start date, changed setup, tampered rows, invalid token, mismatched checksum,
+  source/family mismatch, extra client rows, and preview-unavailable results are rejected before
+  persistence.
+- Supabase persistence harness creates disposable users, confirms each supported family, verifies
+  persisted row counts/source metadata, verifies duplicate confirm is blocked by the active-plan
+  guard, and cleans up disposable data only after a safe local/disposable target preflight passes.
+- Legacy Plan Preset confirm remains `preview_only`.
+
+Validation evidence:
+
+- `npm exec eslint -- src/lib/running-plan-engine-actions.ts src/lib/running-plan-engine-review.ts src/lib/training-api.ts scripts/validate-running-plan-engine-confirm.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
+- `node --env-file=.env.local --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
+  blocked remote mutation by default and ran only non-mutating exactness checks.
+
+## Backend Slice R8 Confirm/Persist QA Safety Blocker Result
+
+- Root cause: the confirm/persist validation harness previously treated any configured Supabase
+  server env as a runnable persistence target, so QA only had a remote `.env.local` target and no
+  deterministic local/disposable mutation boundary.
+- The harness now runs stable non-mutating review/checksum/input-mismatch checks regardless of
+  Supabase env.
+- Persistence mutation now requires a target preflight:
+  - loopback Supabase URLs such as `localhost` / `127.0.0.1` / `::1` are treated as local
+    disposable targets
+  - remote Supabase URLs are blocked by default
+  - remote mutation requires both the explicit CLI flag
+    `--allow-remote-disposable-supabase-mutation` and the exact env confirmation
+    `HITO_RUNNING_PLAN_CONFIRM_ALLOW_REMOTE_MUTATION=I_UNDERSTAND_THIS_MUTATES_REMOTE_DISPOSABLE_SUPABASE`
+  - `--require-persistence` fails fast with an explicit blocker when no safe persistence target is
+    available
+- Disposable cleanup proof now counts remaining `plan_cycles`, `planned_workouts`, and
+  `runner_profiles` rows for the disposable user after cleanup and confirms auth user deletion.
+- Current checkout status:
+  - `.env.local` points to remote project `dltfjwexyctmihclcjqj.supabase.co`
+  - the harness detects that target and blocks mutation before any Supabase writes
+  - local Supabase tooling is unavailable in this shell (`supabase: command not found`), so true
+    local/disposable persistence proof remains blocked until a local target is started or an
+    approved disposable remote override is explicitly scoped
+- QA status: safety blocker fixed; full persistence acceptance is still gated on running the harness
+  against a local/disposable Supabase target.
+- Architecture follow-up, 2026-06-10: local disposable Supabase remains unavailable in this shell,
+  so the accepted R8 proof path is now a scoped disposable remote run against project
+  `dltfjwexyctmihclcjqj` using the harness's explicit remote flag and env confirmation. Frontend
+  Create remains blocked until that proof passes and Architect closes out the R8 acceptance gate.
 
 ## Backend Exact Prescription Slice Result
 
@@ -184,6 +517,406 @@ ARCHITECT / RUNNING COACH / BACKEND / FRONTEND / QA
   - `unresolvedExecutableSegmentCount: 0`
   - fake pace scenario list remains empty
   - fake personal HR scenario list remains empty
+
+## Backend Pattern Grammar Integration Result
+
+- Implemented `running_plan_composition_grammar_v1` as the canonical backend composition layer for
+  selected-plan previews.
+- Root cause: week archetype, development touch, long-run role, and family-specific signals were
+  still split across per-family policies and scenario assertions, so quality issues were being fixed
+  symptom-by-symptom.
+- New ownership seam:
+  - `src/lib/plan-creation-engine/composition-grammar.ts` owns week archetypes, development touch
+    resolution, family signals, long-run roles, and composition grammar validation.
+  - 10K, Half Marathon, and Marathon Base diversity policies now read development touches from the
+    grammar instead of owning separate switch tables.
+  - segment enrichment now reads grammar signals/long-run roles before applying Half durability and
+    long-run detail labels.
+- Scenario JSON now exposes `compositionGrammar` proof:
+  - `weekArchetypeSequence`
+  - `plannedDevelopmentSequence`
+  - `actualDevelopmentSequence`
+  - `developmentTouchCountsByWeek`
+  - `familySignals`
+  - `longRunRoleSequence`
+  - `forbiddenCombinationHits`
+- Validation evidence:
+  - targeted ESLint passed for plan-creation-engine files and running-plan validators
+  - source model validator passed
+  - 10K builder validator passed
+  - R6 Half/Marathon builder validator passed
+  - scenario generator passed with `13` scenarios, `11` preview-ready, `2` unavailable,
+    `0` unresolved ranges, and `0` unresolved executable segments
+  - `npm run build` passed
+  - scoped `git diff --check` passed
+- QA focus:
+  - verify scenario JSON grammar proof is readable and sufficient
+  - verify Half `sometimes_runs` no longer depends on generic tempo repetition alone
+  - verify no create/confirm/persist path was enabled
+  - verify metric truth and endpoint gates remain intact
+
+## Backend Dynamic Scenario Matrix Result
+
+- Extended `scripts/generate-running-plan-engine-scenarios.ts` so it now preserves the existing
+  `13`-scenario acceptance pack and also generates a broader Running Coach review matrix under
+  `qa-artifacts/plan-engine-coach-review/2026-06-09-dynamic-scenario-matrix/`.
+- Root cause: the previous static pack was useful as a release gate, but too narrow for coaching
+  review across family, runner level, body/load profile, days/week, rest pattern, long-run
+  preference, and start-date shape.
+- New matrix proof:
+  - total scenarios: `396`
+  - preview-ready: `269`
+  - preview-unavailable: `127`
+  - families: `10K`, `Half Marathon`, `Marathon Base`
+  - runner levels: `beginner_new_runner`, `sometimes_runs`, `runs_a_lot`,
+    `professional_competitive`
+  - body/load profiles: `young_light`, `average_adult`, `older_heavier`, `tall_heavier`,
+    `shorter_light`
+  - days/week: `3`, `4`, `5`
+  - rest patterns: `none`, `wednesday_saturday`, `monday_friday`
+  - long-run preferences: `sunday`, `saturday`, `unset_default`
+  - start patterns: `normal_monday`, `midweek_wednesday`
+- Matrix summary now includes aggregate counts, unavailable reason counts, row/non-rest
+  distributions, workout-kind counts, development sequences, composition grammar proof, endpoint
+  proof, metric-truth proof, and create/confirm/persist boundary proof.
+- Added `coach-review-subset.json` with `12` representative scenarios for first-pass Running Coach
+  review, while retaining full JSON for every generated scenario.
+- Boundary proof:
+  - no OpenAI call
+  - no Supabase mutation
+  - no create path
+  - no confirm path
+  - no persist path
+  - `unresolvedRangeCount: 0`
+  - `unresolvedExecutableSegmentCount: 0`
+  - fake precise pace scenario list remains empty
+  - fake personal HR scenario list remains empty
+
+## Backend Rich Composition Matrix Result
+
+- Implemented the Running Coach rich composition matrix as the canonical backend
+  `running_plan_composition_grammar_v1` layer before create-path work.
+- Root cause: conservative Half Marathon and higher-support conservative Marathon Base previews
+  were safe, exact, and non-mutating, but could still collapse into repeated `strides`/`tempo`
+  support without preserving family-specific durability identity.
+- Changed the canonical grammar/resolver seam so:
+  - conservative Half Marathon keeps soft `half_specific_durability` tempo plus long-run
+    `half_long_run_durability` / `half_long_run_steady_finish` roles
+  - conservative Marathon Base keeps `marathon_base_time_on_feet` and
+    `marathon_base_steady_finish` long-run roles without becoming a hidden race plan
+  - long-run detail enrichment now follows composition roles even when conservative long runs are
+    intentionally at or below the old 90-minute enrichment threshold
+  - compressed low-availability schedules with no honest non-adjacent development slot become
+    bounded `builder_validation_failed` previews instead of squeezing development onto the day
+    before the long run
+- Updated family validators so conservative Half/Marathon richness must appear in generated segment
+  anatomy, not only in abstract grammar metadata.
+- Updated the dynamic coach-review matrix:
+  - total scenarios: `468`
+  - preview-ready: `247`
+  - preview-unavailable: `221`
+  - unavailable reasons: `long_run_day_blocked: 33`, `insufficient_available_days: 80`,
+    `builder_validation_failed: 30`, `unsupported_runner_level_for_family: 78`
+  - `coach-review-subset.json` now has `16` scenarios, including conservative Half, conservative
+    Marathon Base, blocked beginner Half, blocked long-run/rest conflict, and compressed
+    low-availability `builder_validation_failed`
+  - fake precise pace scenario list remains empty
+  - fake personal HR scenario list remains empty
+  - forbidden composition combinations remain empty
+  - multiple development touches remain empty
+- Boundary preserved:
+  - no create path
+  - no confirm path
+  - no persistence path
+  - no Supabase mutation
+  - no OpenAI path
+  - no frontend route/UI change in this slice
+
+## Backend Dynamic Artifact Hygiene Result
+
+- Fixed non-blocking QA artifact hygiene before Running Coach acceptance.
+- Root cause: `scripts/generate-running-plan-engine-scenarios.ts` wrote current scenario JSON files
+  over the existing output directory but never pruned JSON files from older matrix shapes, so raw
+  folder scans could see stale unreferenced scenarios.
+- The scenario-pack writer now self-cleans top-level stale `.json` files before regeneration while
+  preserving current scenario JSON, `summary.json`, and `coach-review-subset.json`.
+- Regeneration removed `171` stale JSON files from
+  `qa-artifacts/plan-engine-coach-review/2026-06-09-dynamic-scenario-matrix/`.
+- Post-regeneration proof:
+  - `468` referenced scenario JSON files
+  - `470` total JSON files (`468` scenarios plus `summary.json` and `coach-review-subset.json`)
+  - `0` unreferenced JSON files
+  - `0` missing referenced scenario files
+  - dynamic matrix counts preserved: `468` total, `247` preview-ready, `221` unavailable
+  - `unresolvedRangeCount: 0`
+  - `unresolvedExecutableSegmentCount: 0`
+  - fake precise pace list remains empty
+  - fake personal HR list remains empty
+
+## Post Selected-Plan Preview Feedback Decision
+
+Product reviewed the selected-plan preview after 10K/Half/Marathon Base were wired into the UI.
+
+Root cause split:
+
+- Preview calendar visual problems are FRONTEND/DS ownership. The current compact cells still carry
+  date/day numbers, legend chrome, bordered/gridded treatment, and tooltip behavior that does not
+  feel like the product calendar.
+- Workout-quality concerns are RUNNING COACH + BACKEND ownership. Product saw a Half Marathon path
+  that appeared to have only one interval-like quality workout, which may be acceptable only if the
+  full development pattern has enough tempo, threshold, hills, strides, long-run durability, and
+  recovery protection.
+- The disabled create path is a BACKEND mutation-boundary issue. `Create unavailable` must not be
+  solved as a local CTA change; a safe running-plan preview confirm/persist contract is required
+  before any active plan can be created.
+
+Architecture decision:
+
+- Keep one active plan for this milestone. Do not create a separate plan yet.
+- Separate the next work into three tracks:
+  1. RUNNING COACH quality contract.
+  2. FRONTEND selected-plan preview calendar visual cleanup.
+  3. BACKEND preview-to-confirm-to-persist contract.
+- Do not enable create/persist until quality acceptance and backend mutation proof exist.
+- Do not let frontend own schedule, metric truth, or persistence.
+
+### Slice R7A: Running Coach Selected-Plan Quality Gate
+
+Owner:
+
+RUNNING COACH.
+
+Status:
+
+accepted / Running Coach quality-passed / create-path architecture-ready.
+
+Acceptance evidence:
+
+- Running Coach accepted the rich dynamic scenario matrix as coaching-quality acceptable for
+  create-path planning.
+- Accepted artifact:
+  [running-plan-rich-composition-implementation-coach-acceptance.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-09-running-plan-rich-composition-implementation-coach-acceptance.md>)
+- The accepted matrix keeps 10K differentiated by runner level and load context.
+- Supported Half Marathon no longer collapses into generic tempo filler in conservative cases.
+- Marathon Base conservative cases preserve aerobic durability / time-on-feet identity without
+  becoming a hidden race plan.
+- Unavailable scenarios are mostly honest protective blockers rather than squeezed unsafe previews.
+- Fake precise pace and fake personal HR remain absent.
+- The create-path UI must not flatten backend richness back into generic visible naming.
+
+Scope:
+
+- inspect the dynamic scenario matrix under
+  `qa-artifacts/plan-engine-coach-review/2026-06-09-dynamic-scenario-matrix/`
+- use the `13`-scenario acceptance pack under `qa-artifacts/plan-engine-scenarios/2026-06-09/` as
+  a release-gate reference, not as the full coach-review sample
+- inspect current family policies:
+  - `src/lib/plan-creation-engine/ten-k-diversity-policy.ts`
+  - `src/lib/plan-creation-engine/half-marathon-diversity-policy.ts`
+  - `src/lib/plan-creation-engine/marathon-base-diversity-policy.ts`
+  - `src/lib/plan-creation-engine/prescription-resolver.ts`
+- define what "credible weekly development stimulus" means by family, runner level, and load
+  context
+- decide whether Half Marathon with one interval-like workout is acceptable when other quality
+  types and long-run durability are present
+- define exact backend rules for minimum quality mix, safe adaptation, recovery protection, and
+  forbidden overreach
+
+Rules to preserve:
+
+- `beginner_new_runner` may avoid intervals in the first adaptation weeks.
+- Supported 10K/Half runners after adaptation should usually have one weekly development stimulus
+  unless load context requires a conservative week.
+- A development stimulus can be intervals, threshold, hills, tempo, strides, or durability-specific
+  long-run work depending on family and level.
+- Half Marathon must not pass as rich/credible if its development pattern is effectively one
+  interval-like touch plus generic long runs.
+- Marathon Base stays base-building and must not become a hidden marathon race plan.
+- Long-run detail stays varied and watch-executable.
+
+### Slice R7B: Frontend Selected-Plan Calendar Visual Cleanup
+
+Owner:
+
+FRONTEND.
+
+Status:
+
+ready after or in parallel with R7A, but not a substitute for quality acceptance.
+
+Scope:
+
+- align compact selected-plan preview calendar with existing Hito product calendar style
+- remove date/day numbers from compact preview cells
+- remove the legend
+- remove border-heavy/gridded cell treatment
+- use one-color cells with spacing between them, closer to product calendar reference
+- cells show concise workout meaning only: workout type plus approximate duration or distance where
+  useful
+- keep hover/focus/click detail on a Hito DS dark/surface detail strip or product-calendar-style
+  tooltip; do not use an ugly white tooltip
+- keep backend rows as the only source of schedule/workout truth
+
+Files likely in scope:
+
+- `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`
+- `src/styles.css`
+- `src/components/Calendar.tsx` as visual reference only
+- Hito DS tooltip/surface primitives as reuse reference
+
+Validation expectations:
+
+- targeted ESLint
+- `git diff --check`
+- browser proof in built-in Codex browser first
+- 375px no horizontal overflow
+- prove no frontend schedule/date/metric computation was introduced
+
+### Slice R7C: Backend Running-Plan Preview Confirm/Persist Contract
+
+Owner:
+
+BACKEND.
+
+Status:
+
+accepted as the next backend gate after Running Coach quality acceptance.
+
+Scope:
+
+- add a safe running-plan engine create path only after review/quality gates pass
+- reuse the existing canonical persistence owner
+  `createFirstPlanFromReviewedCanonicalPlanForUser(...)`
+- rebuild the preview server-side on confirm; never trust client-sent rows
+- use backend-issued review token/checksum or equivalent exactness proof
+- re-check no-active-plan lifecycle before apply
+- preserve source metadata for running-plan engine source kind, selected distance/family, runner
+  level, dates, row counts, endpoint proof, metric policy, and quality-gate summary
+- map persisted rows exactly from the reviewed canonical `training-plan-v2` rows
+- return bounded errors for stale review, input mismatch, active plan exists, duplicate click, and
+  apply failure
+- no DB/schema change unless BACKEND proves an existing schema field cannot safely carry the source
+  metadata
+
+Validation expectations:
+
+- token/checksum mismatch proof
+- start-date/input mismatch proof
+- active-plan conflict proof
+- duplicate-click/idempotency proof
+- rollback/error proof through existing persistence seam
+- exact row-match proof against rebuilt preview
+- no OpenAI, no target-time, no 5K benchmark dependency, no no-watch/no-app branch, no fake pace, no
+  fake personal HR
+
+## Create-Path Architecture Acceptance Decision
+
+Decision date:
+
+2026-06-09.
+
+Accepted:
+
+- The rich running-plan preview engine is good enough to enter create-path architecture.
+- 10K, Half Marathon, and Marathon Base selected-plan previews are accepted as deterministic
+  backend-owned product truth for the next mutation-boundary slice.
+- The next step is Backend Slice R8: selected running-plan preview confirm/persist contract.
+
+Selected create-path boundary:
+
+`selected-plan setup input -> backend preview/review -> review token/checksum -> confirm action -> server-side preview rebuild -> canonical training-plan-v2 mapping -> createFirstPlanFromReviewedCanonicalPlanForUser(...) -> active plan`
+
+Why this can include confirm/persist in one backend slice:
+
+- The selected-plan preview already exists as the non-mutating review surface.
+- Adding another review-only wrapper would not unblock the product problem.
+- The risky part is confirm/persist exactness, so the next bounded backend slice should implement
+  review exactness plus confirm/persist together while keeping the frontend Create button disabled
+  until QA passes.
+- Frontend wiring is a later slice after backend source, harness, and mutation proof pass.
+
+Canonical persistence owner:
+
+- Reuse
+  [active-plan-persistence.ts](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-persistence.ts>)
+  and specifically `createFirstPlanFromReviewedCanonicalPlanForUser(...)`.
+- Do not create a second running-plan persistence system.
+- Do not revive old Plan Preset confirm/persistence paths.
+
+Review/confirm contract:
+
+- `previewRunningPlanDraft(...)` may remain the non-mutating preview/review action.
+- Preview-ready results should carry a backend-issued review token/checksum or equivalent exactness
+  proof.
+- Add `confirmRunningPlanDraft(...)` as the only selected-plan create action.
+- Confirm accepts only setup input, selected source/family identity, review token, and review
+  checksum.
+- Confirm rebuilds the preview server-side from the accepted builder.
+- Confirm rejects:
+  - active plan exists
+  - preview unavailable
+  - stale review token/checksum
+  - changed setup input
+  - changed start date
+  - changed selected family/source kind
+  - row/checksum mismatch
+  - duplicate click / post-success active-plan conflict
+  - canonical persistence failure
+
+Persisted entity contract:
+
+- One active `plan_cycles` row.
+- Exact reviewed `planned_workouts` rows.
+- Runner profile patch only for the bounded profile/setup fields already accepted by the current
+  onboarding path, if required by the existing persistence seam.
+- No workout logs, provider assets, comparisons, AI insights, manual workout rows, or recurrence
+  rows.
+
+Source metadata contract:
+
+- Preserve builder source kind:
+  - `running_plan_engine_10k_builder_v1`
+  - `running_plan_engine_half_marathon_builder_v1`
+  - `running_plan_engine_marathon_base_builder_v1`
+- Preserve source status as a reviewed/confirmed selected-plan engine draft in plan metadata.
+- Preserve selected distance/family, runner level, start/end dates, row counts, endpoint proof,
+  metric policy, composition grammar proof, quality-gate summary, and unavailable/negative-proof
+  boundaries where useful.
+- Do not persist raw comments, prompts, OpenAI payloads, or client-sent rows.
+
+Frontend contract after Backend passes:
+
+- Frontend receives backend-shaped preview/review data, review token/checksum, confirm readiness,
+  bounded errors, and success state.
+- Frontend renders the selected-plan review and calls confirm only from an explicit user action.
+- Frontend never computes schedule, metric truth, endpoint truth, source metadata, canonical rows,
+  idempotency, or persistence locally.
+
+Stale paths that remain blocked:
+
+- `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)` remain bounded `preview_only`
+  legacy-blocked actions.
+- Old failed Plan Preset builder/review harness artifacts remain deleted/demoted.
+- AI blueprint/custom authoring remains a separate Advanced/custom path, not the normal selected-plan
+  create path.
+- Old `structured_authoring_v1` deterministic fallback must not return as a successful normal
+  first-plan path.
+
+QA required before runner-facing Create:
+
+- review token/checksum exactness
+- server-side rebuild proof
+- no client-row trust proof
+- active-plan conflict proof
+- duplicate-click/idempotency proof
+- preview-unavailable cannot confirm
+- exact persisted row match by date, weekday, week, type, identity, and steps
+- source metadata preservation
+- rollback/error proof through existing persistence seam
+- no OpenAI, no target-time pace, no 5K benchmark dependency, no no-watch/no-app branch, no fake
+  personal HR
+- disposable/local or explicitly scoped remote Supabase mutation smoke before final production
+  acceptance
 
 ## R5B Frontend Visual Cleanup Note
 
@@ -1011,7 +1744,7 @@ Validation evidence:
     `marathon_base_endpoint`, source kind `running_plan_engine_marathon_base_builder_v1`
 - `npm run build`
 
-### Slice R7: Controlled Deletion Of Failed Builder Artifacts
+### Slice R10: Controlled Deletion Of Failed Builder Artifacts
 
 Owner:
 
@@ -1024,7 +1757,7 @@ Scope:
 - preserve review/confirm/persistence
 - preserve negative fixtures that prove the failure cannot recur
 
-### Slice R8: Resume Service-Size Cleanup
+### Slice R11: Resume Service-Size Cleanup
 
 Owner:
 
@@ -1038,6 +1771,10 @@ Scope:
 
 ## What Remains Forbidden
 
+Current status update, 2026-06-10: selected-plan Create is now accepted for the rebuilt engine. The
+forbidden list below applies to new scope beyond the accepted backend-owned preview/review/confirm
+path.
+
 - no shipped 5K
 - no target-time support as a happy path
 - no 5K benchmark as a normal happy-path input
@@ -1045,13 +1782,17 @@ Scope:
 - no fake pace
 - no fake personal HR
 - no frontend-owned schedule logic
-- no DB/Supabase mutation in planning/coaching slices
-- no persistence semantic changes in this plan unless separately approved
+- no unreviewed or unscoped DB/Supabase mutation outside the accepted selected-plan Create path
+- no additional persistence semantic changes in this plan unless separately approved
 - no OpenAI runtime generation for normal plan creation
 - no broad deletion without a deletion boundary
-- no current product/system docs update as if the rebuild is shipped
+- no current product/system docs or changelog wording that implies production rollout, active-plan
+  replacement, or manual workout authoring
 
 ## QA Expectations
+
+Current status update, 2026-06-10: selected-plan Create has passed built-server browser QA. The list
+below is retained as historical acceptance criteria for earlier rebuild slices.
 
 Acceptance QA must prove:
 
@@ -1101,6 +1842,8 @@ Acceptance QA must prove:
 - QA Slice R5 accepted the rebuilt 10K selected-plan vertical.
 - Backend Slice R6B Half Marathon and Marathon Base preview expansion is implemented,
   harness-validated, and build validated.
-- QA Slice R6C is ready for backend acceptance.
-- Frontend Slice R6D selected-plan preview wiring is implemented and ready for QA validation.
-- Service-size cleanup is blocked until this rebuild passes product acceptance.
+- Frontend Slice R6D selected-plan preview wiring is implemented and accepted through later
+  selected-plan Create browser QA.
+- R8 confirm/persist is accepted through scoped remote persistence proof and built-server browser
+  Create proof.
+- No current blocker remains for Architect final closeout/archive decision.

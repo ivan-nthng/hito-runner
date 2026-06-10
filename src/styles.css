@@ -1120,11 +1120,6 @@
     color: var(--color-foreground);
   }
 
-  .hito-ui-sidebar-shell {
-    background: color-mix(in oklch, var(--color-sidebar) 96%, transparent);
-    color: var(--color-sidebar-foreground);
-  }
-
   .hito-ui-sidebar-panel {
     border-color: var(--color-hairline);
     background: color-mix(in oklch, var(--color-sidebar) 96%, transparent);
@@ -1166,25 +1161,10 @@
     overflow: hidden;
   }
 
-  .hito-product-dialog-content-fit {
-    grid-template-rows: auto auto auto;
-  }
-
-  .hito-product-dialog-scroll-fill {
-    grid-template-rows: auto minmax(0, 1fr) auto;
-  }
-
   .hito-product-dialog-header {
     border-bottom: 1px solid var(--color-hairline);
     padding: 1.25rem 1.5rem;
     text-align: left;
-  }
-
-  .hito-product-dialog-header-row {
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: 1rem;
   }
 
   .hito-product-dialog-body {
@@ -1201,27 +1181,9 @@
     padding: 1.25rem 1.5rem;
   }
 
-  .hito-product-dialog-body-content-fit {
-    min-height: 0;
-    overflow: visible;
-    padding: 1.25rem 1.5rem;
-  }
-
   .hito-product-dialog-footer {
     border-top: 1px solid var(--color-hairline);
     padding: 1rem 1.5rem;
-  }
-
-  .hito-product-dialog-footer-row {
-    display: flex;
-    flex-direction: column-reverse;
-    gap: 0.75rem;
-  }
-
-  .hito-product-dialog-footer-note {
-    font-size: 0.75rem;
-    line-height: 1.45;
-    color: var(--color-muted-foreground);
   }
 
   .hito-window {
@@ -1322,16 +1284,6 @@
   }
 
   @media (min-width: 640px) {
-    .hito-product-dialog-footer-row {
-      flex-direction: row;
-      align-items: center;
-      justify-content: flex-end;
-    }
-
-    .hito-product-dialog-footer-row[data-align="split"] {
-      justify-content: space-between;
-    }
-
     .hito-window-footer {
       flex-direction: row;
       align-items: center;
@@ -2880,20 +2832,6 @@
     color: var(--color-foreground);
   }
 
-  .hito-error-text {
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.45;
-    color: var(--color-destructive);
-  }
-
-  .hito-success-text {
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.45;
-    color: var(--color-success);
-  }
-
   .hito-disclosure {
     border-top: 1px solid var(--color-hairline);
     padding-top: 0.875rem;
@@ -3548,23 +3486,11 @@
     background-color: color-mix(in oklch, var(--color-signal) 15%, transparent) !important;
   }
 
-  .hito-radio-checked {
-    border-color: var(--color-signal) !important;
-    background-color: color-mix(in oklch, var(--color-signal) 15%, transparent) !important;
-  }
-
   .hito-radio:checked:hover:not(:disabled),
   .hito-radio[data-state="checked"]:hover:not(:disabled),
   .hito-radio[data-demo-state="checked-hover"] {
     border-color: color-mix(in oklch, var(--color-signal) 86%, var(--color-foreground));
     background-color: color-mix(in oklch, var(--color-signal) 20%, transparent);
-  }
-
-  .hito-radio-indicator-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 999px;
-    background: var(--color-signal);
   }
 
   .hito-checkbox:focus-visible,

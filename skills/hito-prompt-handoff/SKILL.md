@@ -12,6 +12,23 @@ Create precise next-role prompts that preserve Hito decisions and avoid scope dr
 This skill is owned by Product for routine Hito routing. Product reads the prior-agent report,
 explains the current state to the user, and writes the next-role prompt directly.
 
+## Always-Visible Root-Cause Handoff Gate
+
+Before writing any next-role prompt, ask:
+
+`Is this prompt sending the next agent to fix the root cause, or only the visible symptom?`
+
+If it is only symptom-level, rewrite the handoff before sending it. The prompt must name:
+
+- the visible symptom
+- the suspected underlying cause
+- the canonical owner that should fix it
+- the existing seam/pattern that should be reused first
+- the stop condition if the true root cause belongs to another role
+
+For BACKEND and FRONTEND prompts, this gate is mandatory in the `Root cause and architecture fit`
+section. For QA prompts, this gate becomes explicit source-boundary proof and stop conditions.
+
 ## Required Reading
 
 1. `docs/context.md`

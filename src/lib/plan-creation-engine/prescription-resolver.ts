@@ -1,3 +1,8 @@
+import {
+  resolveRunningPlanCompositionWeek,
+  type RunningPlanCompositionSignal,
+  type RunningPlanCompositionWeek,
+} from "@/lib/plan-creation-engine/composition-grammar";
 import type {
   RunningPlanDistanceFamily,
   RunningPlanRange,
@@ -138,7 +143,7 @@ function enrichResolvedSegment({
     return enrichHalfMarathonTempoSegment({ segment, context, primaryPrescription });
   }
 
-  if (context.workoutDayKind === "long_run" && longRunExceedsNinetyMinutes(context)) {
+  if (context.workoutDayKind === "long_run" && longRunShouldReceiveCompositionDetail(context)) {
     return enrichLongRunSegment({ segment, context, primaryPrescription });
   }
 
@@ -155,9 +160,7 @@ function enrichHalfMarathonTempoSegment({
   primaryPrescription: RunningPlanSegmentPrescription;
 }): RunningPlanWatchExecutableSegmentTemplate {
   if (
-    context.runnerLevel !== "sometimes_runs" ||
-    context.loadContext !== "standard" ||
-    context.weekNumber < 10 ||
+    !compositionWeekHasSignal(context, "half_specific_durability") ||
     primaryPrescription.mode !== "repeat"
   ) {
     return { ...segment, primaryPrescription };
@@ -272,15 +275,24 @@ function longRunExceedsNinetyMinutes(context: PrescriptionContext) {
   return resolveLongRunDurationSeconds(context) > minutes(90);
 }
 
+function longRunShouldReceiveCompositionDetail(context: PrescriptionContext) {
+  if (longRunExceedsNinetyMinutes(context)) {
+    return true;
+  }
+
+  const composition = resolveCompositionWeek(context);
+  return (
+    composition.longRunRole === "durability_checkpoint" ||
+    composition.longRunRole === "steady_finish"
+  );
+}
+
 function longRunDetailVariant(context: PrescriptionContext) {
+  const composition = resolveCompositionWeek(context);
   const variantIndex = context.weekNumber % 3;
   const isHalfMarathon = context.family === "Half Marathon";
-  const steadyFinishIsSafe =
-    context.loadContext === "standard" &&
-    context.runnerLevel !== "beginner_new_runner" &&
-    context.weekNumber >= Math.ceil(context.horizonWeeks * 0.65);
 
-  if (isHalfMarathon && steadyFinishIsSafe && variantIndex === 2) {
+  if (isHalfMarathon && composition.longRunRole === "steady_finish") {
     return {
       mainIntensityLabel: "half_marathon_durability_easy",
       mainCue: "Build relaxed time-on-feet before the short steady finish.",
@@ -291,7 +303,7 @@ function longRunDetailVariant(context: PrescriptionContext) {
     };
   }
 
-  if (!isHalfMarathon && steadyFinishIsSafe && variantIndex === 2) {
+  if (!isHalfMarathon && composition.longRunRole === "steady_finish") {
     return {
       mainIntensityLabel: "marathon_base_durable_easy",
       mainCue: "Accumulate calm aerobic time without turning this into race prep.",
@@ -302,7 +314,7 @@ function longRunDetailVariant(context: PrescriptionContext) {
     };
   }
 
-  if (variantIndex === 1) {
+  if (composition.longRunRole === "durability_checkpoint" && variantIndex === 1) {
     return {
       mainIntensityLabel: isHalfMarathon
         ? "half_marathon_aerobic_durability"
@@ -328,6 +340,30 @@ function longRunDetailVariant(context: PrescriptionContext) {
     checkpointCue: "Use the checkpoint to reset posture and breathing before the final minutes.",
     finishIntensityLabel: "relaxed_durable_finish",
     finishCue: "Finish relaxed and durable, not depleted.",
+  };
+}
+
+function compositionWeekHasSignal(
+  context: PrescriptionContext,
+  signal: RunningPlanCompositionSignal,
+) {
+  return resolveCompositionWeek(context).familySignals.includes(signal);
+}
+
+function resolveCompositionWeek(
+  context: PrescriptionContext,
+): Pick<RunningPlanCompositionWeek, "familySignals" | "longRunRole"> {
+  const composition = resolveRunningPlanCompositionWeek({
+    family: context.family,
+    runnerLevel: context.runnerLevel,
+    loadContext: context.loadContext,
+    weekNumber: context.weekNumber,
+    horizonWeeks: context.horizonWeeks,
+  });
+
+  return {
+    familySignals: composition.familySignals,
+    longRunRole: composition.longRunRole,
   };
 }
 

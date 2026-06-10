@@ -706,12 +706,15 @@ function resolveDevelopmentWeekday(
     return null;
   }
 
-  return candidates
+  const safelySpacedCandidates = candidates
     .map((weekday) => ({
       weekday,
       spacingBeforeLongRun: (weekdayIndex(longRunDay) - weekdayIndex(weekday) + 7) % 7,
     }))
-    .sort((left, right) => right.spacingBeforeLongRun - left.spacingBeforeLongRun)[0]!.weekday;
+    .filter((candidate) => candidate.spacingBeforeLongRun >= 2)
+    .sort((left, right) => right.spacingBeforeLongRun - left.spacingBeforeLongRun);
+
+  return safelySpacedCandidates[0]?.weekday ?? null;
 }
 
 function resolveFinalEndpointDayNumber({

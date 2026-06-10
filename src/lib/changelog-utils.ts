@@ -87,6 +87,16 @@ export function parseChangelog(markdown: string): ChangelogDay[] {
 
     if (entryMatch) {
       current.entries.push(entryMatch[1].trim());
+      continue;
+    }
+
+    const continuationMatch = line.match(/^\s{2,}(\S.*)$/);
+
+    if (continuationMatch && current.entries.length > 0) {
+      const previousEntryIndex = current.entries.length - 1;
+      const continuationText = continuationMatch[1].trim();
+      current.entries[previousEntryIndex] =
+        `${current.entries[previousEntryIndex]} ${continuationText}`;
     }
   }
 
@@ -196,7 +206,11 @@ function getHighlightBadge(entry: string): HighlightBadge | null {
     return "Cleanup";
   }
 
-  if (/^(improved|updated|upgraded|refined|normalized|reworked|tightened|hardened|aligned)\b/i.test(entry)) {
+  if (
+    /^(improved|updated|upgraded|refined|normalized|reworked|tightened|hardened|aligned)\b/i.test(
+      entry,
+    )
+  ) {
     return "Improved";
   }
 

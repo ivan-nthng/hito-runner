@@ -28,6 +28,7 @@ import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
 import {
   completeOnboarding,
+  confirmRunningPlanDraft,
   confirmStructuredFirstPlanDraft,
   confirmVoiceToPlanDraft,
   getPlanPresetCards,
@@ -35,6 +36,7 @@ import {
   generateVoiceToPlanDraft,
   previewRunningPlanDraft,
   type PlanPresetCardsActionResult,
+  type RunningPlanConfirmActionResult,
   type RunningPlanPreviewActionInput,
   type RunningPlanPreviewActionResult,
   type StructuredFirstPlanDraftResult,
@@ -57,11 +59,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const confirmVoiceToPlanDraftFn = useServerFn(confirmVoiceToPlanDraft);
   const getPlanPresetCardsFn = useServerFn(getPlanPresetCards);
   const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
+  const confirmRunningPlanDraftFn = useServerFn(confirmRunningPlanDraft);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
   const voiceTranscriptRef = useRef<HTMLTextAreaElement | null>(null);
   const presetAutoLoadKeyRef = useRef<string | null>(null);
   const runningPlanPreviewInputKeyRef = useRef<string | null>(null);
+  const runningPlanCreateInFlightRef = useRef(false);
 
   const [age, setAge] = useState(() => (defaults?.age != null ? String(defaults.age) : ""));
   const [weightKg, setWeightKg] = useState(() =>
@@ -108,6 +112,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [runningPlanPreviewOpen, setRunningPlanPreviewOpen] = useState(false);
   const [runningPlanPreviewResult, setRunningPlanPreviewResult] =
     useState<RunningPlanPreviewActionResult | null>(null);
+  const [runningPlanPreviewInput, setRunningPlanPreviewInput] =
+    useState<RunningPlanPreviewActionInput | null>(null);
+  const [runningPlanConfirmResult, setRunningPlanConfirmResult] =
+    useState<RunningPlanConfirmActionResult | null>(null);
+  const [runningPlanCreateStatus, setRunningPlanCreateStatus] = useState<"idle" | "creating">(
+    "idle",
+  );
   const [presetError, setPresetError] = useState<string | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
@@ -124,7 +135,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
 
   const isVoiceBusy = voiceStatus === "reviewing" || voiceStatus === "creating";
-  const isPresetBusy = presetStatus !== "idle";
+  const isPresetBusy = presetStatus !== "idle" || runningPlanCreateStatus !== "idle";
   const isBusy =
     constructorStatus !== "idle" || jsonStatus !== "idle" || isVoiceBusy || isPresetBusy;
   const constructorState: StructuredConstructorState = useMemo(
@@ -199,6 +210,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     presetAutoLoadKeyRef.current = null;
     runningPlanPreviewInputKeyRef.current = null;
     setRunningPlanPreviewResult(null);
+    setRunningPlanPreviewInput(null);
+    setRunningPlanConfirmResult(null);
     setPresetError(null);
 
     if (!presetSelectedCardId && !runningPlanPreviewOpen) {
@@ -424,6 +437,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     setPresetError(null);
     setPresetSelectedCardId(null);
     setRunningPlanPreviewResult(null);
+    setRunningPlanPreviewInput(null);
+    setRunningPlanConfirmResult(null);
     runningPlanPreviewInputKeyRef.current = null;
 
     try {
@@ -481,6 +496,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     if (!cardId) {
       setPresetStatus("idle");
       setRunningPlanPreviewResult(null);
+      setRunningPlanPreviewInput(null);
+      setRunningPlanConfirmResult(null);
       setPresetError("Select a plan preset before previewing it.");
       return;
     }
@@ -490,12 +507,15 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     if (!inputResult.ok) {
       setPresetStatus("idle");
       setRunningPlanPreviewResult(null);
+      setRunningPlanPreviewInput(null);
+      setRunningPlanConfirmResult(null);
       setPresetError(inputResult.error);
       return;
     }
 
     const inputKey = JSON.stringify(inputResult.input);
     setPresetError(null);
+    setRunningPlanConfirmResult(null);
     setPresetStatus("previewing_plan");
 
     try {
@@ -505,6 +525,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
       runningPlanPreviewInputKeyRef.current = inputKey;
       setRunningPlanPreviewResult(result);
+      setRunningPlanPreviewInput(result.ok ? inputResult.input : null);
       setPresetStatus("idle");
 
       if (!result.ok) {
@@ -515,12 +536,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       hitoToast.success({
         id: STRUCTURED_REVIEW_TOAST_ID,
         title: `${inputResult.input.distanceFamily} preview ready`,
-        description: "Review the backend-shaped calendar before create is implemented.",
+        description: "Review the backend-shaped calendar before creating the plan.",
       });
     } catch (submitError) {
       const message =
         submitError instanceof Error ? submitError.message : "Could not build this preview.";
       setRunningPlanPreviewResult(null);
+      setRunningPlanPreviewInput(null);
       setPresetStatus("idle");
       setPresetError(message);
     }
@@ -559,8 +581,93 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     setPresetSelectedCardId(cardId);
     setRunningPlanPreviewOpen(true);
     setRunningPlanPreviewResult(null);
+    setRunningPlanPreviewInput(null);
+    setRunningPlanConfirmResult(null);
     runningPlanPreviewInputKeyRef.current = null;
     void refreshSelectedRunningPlanPreview(cardId);
+  };
+
+  const confirmSelectedRunningPlan = async () => {
+    if (runningPlanCreateInFlightRef.current) {
+      return;
+    }
+
+    const draft = runningPlanPreviewResult?.ok ? runningPlanPreviewResult.draft : null;
+
+    if (!draft || !runningPlanPreviewInput || !draft.reviewToken || !draft.reviewChecksum) {
+      setRunningPlanConfirmResult({
+        ok: false,
+        status: "blocked",
+        persisted: false,
+        reason: "invalid_review",
+        message: "Refresh the selected preview before creating this plan.",
+        ...(draft?.sourceKind ? { sourceKind: draft.sourceKind } : {}),
+        ...(draft?.planFamily ? { planFamily: draft.planFamily } : {}),
+      });
+      return;
+    }
+
+    runningPlanCreateInFlightRef.current = true;
+    setRunningPlanCreateStatus("creating");
+    setRunningPlanConfirmResult(null);
+    setPresetError(null);
+    hitoToast.working({
+      id: STRUCTURED_REVIEW_TOAST_ID,
+      title: "Creating plan",
+      description: "Hito is confirming the reviewed selected plan server-side.",
+    });
+
+    try {
+      const result = await confirmRunningPlanDraftFn({
+        data: {
+          previewInput: runningPlanPreviewInput,
+          planFamily: draft.planFamily,
+          sourceKind: draft.sourceKind,
+          reviewToken: draft.reviewToken,
+          reviewChecksum: draft.reviewChecksum,
+        },
+      });
+
+      setRunningPlanConfirmResult(result);
+
+      if (!result.ok) {
+        runningPlanCreateInFlightRef.current = false;
+        setRunningPlanCreateStatus("idle");
+        hitoToast.error({
+          id: STRUCTURED_REVIEW_TOAST_ID,
+          title: "Plan not created",
+          description: result.message,
+        });
+        return;
+      }
+
+      hitoToast.success({
+        id: STRUCTURED_REVIEW_TOAST_ID,
+        title: "Plan created",
+        description: "Opening your saved plan now.",
+        duration: 2600,
+      });
+      openSavedHome();
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error ? submitError.message : "Could not create this plan.";
+      runningPlanCreateInFlightRef.current = false;
+      setRunningPlanCreateStatus("idle");
+      setRunningPlanConfirmResult({
+        ok: false,
+        status: "blocked",
+        persisted: false,
+        reason: "persistence_failed",
+        message,
+        sourceKind: draft.sourceKind,
+        planFamily: draft.planFamily,
+      });
+      hitoToast.error({
+        id: STRUCTURED_REVIEW_TOAST_ID,
+        title: "Plan not created",
+        description: message,
+      });
+    }
   };
 
   const confirmStructuredPlan = async () => {
@@ -758,7 +865,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           planPresetPanel={({ openAdvancedCustom }) => (
             <PlanPresetPanel
               cardsResult={presetCardsResult}
+              confirmResult={runningPlanConfirmResult}
               previewResult={runningPlanPreviewResult}
+              createStatus={runningPlanCreateStatus}
               error={presetError}
               status={presetStatus}
               isBusy={isBusy}
@@ -774,6 +883,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
               }}
               onRefreshPreview={() => {
                 void refreshSelectedRunningPlanPreview();
+              }}
+              onCreatePlan={() => {
+                void confirmSelectedRunningPlan();
               }}
               onUseAdvancedCustom={openAdvancedCustom}
             />

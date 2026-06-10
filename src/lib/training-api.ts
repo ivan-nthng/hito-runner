@@ -70,7 +70,10 @@ export {
 } from "@/lib/first-plan-actions";
 export { getPlanPresetCards, type PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
 export {
+  confirmRunningPlanDraft,
   previewRunningPlanDraft,
+  type RunningPlanConfirmActionInput,
+  type RunningPlanConfirmActionResult,
   type RunningPlanPreviewActionInput,
   type RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";

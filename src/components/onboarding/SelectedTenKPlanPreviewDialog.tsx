@@ -12,18 +12,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import type {
-  HalfMarathonPlanBuilderResult,
-  MarathonBasePlanBuilderResult,
   RunningPlanRange,
   RunningPlanSegmentPrescription,
   RunningPlanWorkoutDayKind,
-  TenKPlanBuilderResult,
 } from "@/lib/plan-creation-engine";
+import type {
+  RunningPlanConfirmActionResult,
+  RunningPlanPreviewActionResult,
+} from "@/lib/training-api";
 
-type SelectedRunningPlanPreviewResult =
-  | TenKPlanBuilderResult
-  | HalfMarathonPlanBuilderResult
-  | MarathonBasePlanBuilderResult;
+type SelectedRunningPlanPreviewResult = RunningPlanPreviewActionResult;
 type SelectedRunningPlanPreviewDraft = Extract<
   SelectedRunningPlanPreviewResult,
   { ok: true }
@@ -34,6 +32,7 @@ type SelectedRunningPlanPreviewUnavailable = Extract<
 >["unavailable"];
 type SelectedRunningPlanCalendarRow = SelectedRunningPlanPreviewDraft["calendarRows"][number];
 type SelectedRunningPlanPreviewStatus = "idle" | "loading_cards" | "previewing_plan";
+type RunningPlanCreateStatus = "idle" | "creating";
 type PreviewCalendarTone =
   | "easy"
   | "long"
@@ -47,14 +46,20 @@ type PreviewCalendarTone =
 interface SelectedRunningPlanPreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  confirmResult: RunningPlanConfirmActionResult | null;
+  createStatus: RunningPlanCreateStatus;
   result: SelectedRunningPlanPreviewResult | null;
   status: SelectedRunningPlanPreviewStatus;
   error: string | null;
   onRefresh: () => void;
+  onCreate: () => void;
 }
 
 export function SelectedRunningPlanPreviewDialog({
+  confirmResult,
+  createStatus,
   error,
+  onCreate,
   onOpenChange,
   onRefresh,
   open,
@@ -62,8 +67,10 @@ export function SelectedRunningPlanPreviewDialog({
   status,
 }: SelectedRunningPlanPreviewDialogProps) {
   const loading = status === "previewing_plan";
+  const creating = createStatus === "creating";
   const draft = result?.ok ? result.draft : null;
   const unavailable = result && !result.ok ? result.unavailable : null;
+  const reviewReady = Boolean(draft?.reviewToken && draft?.reviewChecksum);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,8 +87,8 @@ export function SelectedRunningPlanPreviewDialog({
               {draft?.planFamily ?? unavailable?.planFamily ?? "Selected"} plan preview
             </DialogTitle>
             <DialogDescription className="hito-body max-w-2xl">
-              Backend-built preview from the running plan engine. Nothing is saved, and create is
-              not available yet.
+              Backend-built preview from the running plan engine. Create confirms this reviewed
+              preview server-side before anything is saved.
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -106,6 +113,9 @@ export function SelectedRunningPlanPreviewDialog({
 
           {unavailable ? <PreviewUnavailableState result={unavailable} /> : null}
           {draft ? <PreviewDraftView draft={draft} /> : null}
+          {confirmResult && !confirmResult.ok ? (
+            <CreateBlockedNotice result={confirmResult} />
+          ) : null}
         </div>
 
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
@@ -113,10 +123,10 @@ export function SelectedRunningPlanPreviewDialog({
             {draft ? (
               <>
                 <span className="hito-status-pill" data-tone="success">
-                  Preview only
+                  Reviewed
                 </span>
                 <span className="hito-status-pill" data-tone="muted">
-                  Not saved
+                  Not saved yet
                 </span>
                 <span className="hito-status-pill" data-tone="muted">
                   No OpenAI
@@ -127,18 +137,98 @@ export function SelectedRunningPlanPreviewDialog({
           <button
             type="button"
             className="hito-button hito-button-secondary hito-button-md"
-            disabled={loading}
+            disabled={loading || creating}
             onClick={onRefresh}
           >
             {loading ? "Refreshing..." : "Refresh preview"}
           </button>
-          <button type="button" className="hito-button hito-button-primary hito-button-md" disabled>
-            Create unavailable
+          <button
+            type="button"
+            className="hito-button hito-button-primary hito-button-md"
+            disabled={!reviewReady || loading || creating}
+            onClick={onCreate}
+          >
+            {creating ? "Creating plan..." : reviewReady ? "Create plan" : "Review required"}
           </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+function CreateBlockedNotice({
+  result,
+}: {
+  result: Extract<RunningPlanConfirmActionResult, { ok: false }>;
+}) {
+  const view = createBlockedView(result);
+
+  return (
+    <div className="hito-surface-wash" data-tone={view.tone}>
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="hito-list-row-title">{view.title}</p>
+          <p className="hito-list-row-copy">{view.copy}</p>
+          {view.helper ? <p className="hito-field-helper mt-2">{view.helper}</p> : null}
+        </div>
+        {view.openPlan ? (
+          <a href="/" className="hito-button hito-button-secondary hito-button-sm shrink-0">
+            Open plan
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok: false }>): {
+  title: string;
+  copy: string;
+  helper?: string;
+  openPlan?: boolean;
+  tone: "destructive" | "signal";
+} {
+  switch (result.reason) {
+    case "active_plan_exists":
+      return {
+        title: "Active plan already exists",
+        copy: "Selected plans can create a new plan only when there is no active plan.",
+        helper: "Open plan to review the saved plan before changing anything.",
+        openPlan: true,
+        tone: "signal",
+      };
+    case "stale_review":
+    case "invalid_review":
+    case "input_mismatch":
+    case "preview_unavailable":
+      return {
+        title: "Refresh this preview",
+        copy: "This reviewed preview is no longer current. Refresh the selected preview, then create again.",
+        helper: result.message,
+        tone: "signal",
+      };
+    case "unauthenticated":
+      return {
+        title: "Sign in before creating",
+        copy: "This session cannot create a selected running plan yet.",
+        helper: result.message,
+        tone: "destructive",
+      };
+    case "unsupported_family":
+      return {
+        title: "Selected family unavailable",
+        copy: "This selected-plan family is not ready to create from this preview.",
+        helper: result.message,
+        tone: "signal",
+      };
+    case "persistence_failed":
+      return {
+        title: "Plan was not created",
+        copy: "The selected running plan could not be saved. The current plan is unchanged.",
+        helper: result.message,
+        tone: "destructive",
+      };
+  }
 }
 
 function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPreviewUnavailable }) {

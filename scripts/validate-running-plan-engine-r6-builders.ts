@@ -24,11 +24,13 @@ import {
 function main() {
   const halfSometimes = validateHalfMarathonSometimesRuns();
   const halfHigherSupport = validateHalfMarathonHigherSupport();
+  validateHalfMarathonConservativeRichness();
   validateHalfMarathonBeginnerBlocked();
   validateHalfMarathonBadGates(halfSometimes, halfHigherSupport);
 
   const marathonBase = validateMarathonBaseSupported();
   validateMarathonBaseSometimesRuns();
+  validateMarathonBaseConservativeRichness();
   validateMarathonBaseBeginnerBlocked();
   validateMarathonBaseBadGates(marathonBase);
 
@@ -128,6 +130,23 @@ function validateHalfMarathonHigherSupport() {
   validateHalfEndpointExactness(professionalDraft.calendarRows);
 
   return draft;
+}
+
+function validateHalfMarathonConservativeRichness() {
+  const draft = buildConservativeHalfDraft("runs_a_lot");
+
+  assert.equal(draft.normalizedInputSummary.loadContext, "conservative");
+  assertWorkoutKinds(draft.calendarRows, {
+    includes: ["strides", "tempo", "long_run", "cutback_long_run", "final_selected_distance_day"],
+    excludes: ["threshold", "intervals", "marathon_base_endpoint"],
+    label: "Conservative Half Marathon runs_a_lot",
+  });
+  validateHalfSpecificDurabilitySignal(draft.calendarRows);
+  validateSegmentTextIncludes(
+    draft.calendarRows,
+    /half_marathon_durability_tempo|half_marathon_aerobic_durability|controlled_steady_finish/,
+    "Conservative Half Marathon must preserve half-specific durability through soft segment anatomy.",
+  );
 }
 
 function validateHalfMarathonBeginnerBlocked() {
@@ -268,6 +287,22 @@ function validateMarathonBaseSometimesRuns() {
   validateLongRunDetailVariety(draft.calendarRows, "Marathon Base sometimes_runs");
 }
 
+function validateMarathonBaseConservativeRichness() {
+  const draft = buildConservativeMarathonBaseDraft("runs_a_lot");
+
+  assert.equal(draft.normalizedInputSummary.loadContext, "conservative");
+  assertWorkoutKinds(draft.calendarRows, {
+    includes: ["strides", "tempo", "long_run", "cutback_long_run", "marathon_base_endpoint"],
+    excludes: ["threshold", "intervals", "final_selected_distance_day"],
+    label: "Conservative Marathon Base runs_a_lot",
+  });
+  validateSegmentTextIncludes(
+    draft.calendarRows,
+    /marathon_base_time_on_feet|durability_steady_finish/,
+    "Conservative Marathon Base must preserve time-on-feet or steady-finish long-run identity.",
+  );
+}
+
 function validateMarathonBaseBeginnerBlocked() {
   const result = buildMarathonBasePlanPreviewDraft({
     age: 32,
@@ -335,6 +370,29 @@ function buildHalfDraft(
   return result.draft;
 }
 
+function buildConservativeHalfDraft(
+  runnerLevel: "sometimes_runs" | "runs_a_lot" | "professional_competitive",
+): HalfMarathonPlanPreviewDraft {
+  const result = buildHalfMarathonPlanPreviewDraft({
+    age: 58,
+    heightCm: 176,
+    weightKg: 96,
+    runnerLevel,
+    distanceFamily: "Half Marathon",
+    daysPerWeek: 5,
+    fixedRestDays: ["Wednesday", "Saturday"],
+    preferredLongRunDay: "Sunday",
+    startDate: "2026-06-08",
+  });
+
+  assert.equal(result.ok, true, `${runnerLevel} conservative Half Marathon fixture must build.`);
+  if (!result.ok) {
+    throw new Error(result.unavailable.error.message);
+  }
+
+  return result.draft;
+}
+
 function buildMarathonBaseDraft(
   runnerLevel: "sometimes_runs" | "runs_a_lot" | "professional_competitive",
 ): MarathonBasePlanPreviewDraft {
@@ -351,6 +409,29 @@ function buildMarathonBaseDraft(
   });
 
   assert.equal(result.ok, true, `${runnerLevel} Marathon Base fixture must build.`);
+  if (!result.ok) {
+    throw new Error(result.unavailable.error.message);
+  }
+
+  return result.draft;
+}
+
+function buildConservativeMarathonBaseDraft(
+  runnerLevel: "sometimes_runs" | "runs_a_lot" | "professional_competitive",
+): MarathonBasePlanPreviewDraft {
+  const result = buildMarathonBasePlanPreviewDraft({
+    age: 58,
+    heightCm: 176,
+    weightKg: 96,
+    runnerLevel,
+    distanceFamily: "Marathon Base",
+    daysPerWeek: 5,
+    fixedRestDays: ["Wednesday", "Saturday"],
+    preferredLongRunDay: "Sunday",
+    startDate: "2026-06-08",
+  });
+
+  assert.equal(result.ok, true, `${runnerLevel} conservative Marathon Base fixture must build.`);
   if (!result.ok) {
     throw new Error(result.unavailable.error.message);
   }
@@ -522,6 +603,14 @@ function validateForbiddenMetricSignals(rows: readonly object[], inputSummary: o
   assert.equal(Object.hasOwn(inputSummary, "recent5kBenchmark"), false);
   assert.equal(Object.hasOwn(inputSummary, "targetTime"), false);
   assert.equal(Object.hasOwn(inputSummary, "personalHrZones"), false);
+}
+
+function validateSegmentTextIncludes(
+  rows: readonly (HalfMarathonPlanCalendarRow | MarathonBasePlanCalendarRow)[],
+  expected: RegExp,
+  message: string,
+) {
+  assert.match(JSON.stringify(rows.filter((row) => !row.isRestDay)), expected, message);
 }
 
 function validateNoMarathonOverclaim(rows: readonly MarathonBasePlanCalendarRow[]) {

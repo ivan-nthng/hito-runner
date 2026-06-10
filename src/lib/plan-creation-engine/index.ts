@@ -1,4 +1,23 @@
 export {
+  collectRunningPlanCompositionGrammarIssues,
+  isRunningPlanCompositionDevelopmentTouch,
+  resolveRunningPlanCompositionWeek,
+  RUNNING_PLAN_COMPOSITION_DEVELOPMENT_TOUCH_VALUES,
+  RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION,
+  RUNNING_PLAN_COMPOSITION_LONG_RUN_ROLE_VALUES,
+  RUNNING_PLAN_COMPOSITION_SIGNAL_VALUES,
+  RUNNING_PLAN_WEEK_ARCHETYPE_VALUES,
+  type ResolveRunningPlanCompositionWeekOptions,
+  type RunningPlanCompositionDevelopmentTouch,
+  type RunningPlanCompositionLoadContext,
+  type RunningPlanCompositionLongRunRole,
+  type RunningPlanCompositionSignal,
+  type RunningPlanCompositionValidationRow,
+  type RunningPlanCompositionWeek,
+  type RunningPlanWeekArchetype,
+  type ValidateRunningPlanCompositionGrammarOptions,
+} from "@/lib/plan-creation-engine/composition-grammar";
+export {
   resolveRunningPlanPreviewSegments,
   runningPlanPrescriptionIsExact,
   type RunningPlanPrescriptionLoadContext,

@@ -1,18 +1,39 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+  createFirstPlanFromReviewedCanonicalPlanForUser,
+  getActivePlan,
+} from "@/lib/active-plan-persistence";
+import { getRequestAuthContext } from "@/lib/backend/auth";
+import {
   buildHalfMarathonPlanPreviewDraft,
   buildMarathonBasePlanPreviewDraft,
   buildTenKPlanPreviewDraft,
+  HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
+  MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
+  TEN_K_PLAN_BUILDER_SOURCE_KIND,
   type BuildRunningPlanPreviewInput,
   type HalfMarathonPlanBuilderResult,
+  type HalfMarathonPlanPreviewDraft,
   type MarathonBasePlanBuilderResult,
+  type MarathonBasePlanPreviewDraft,
   type TenKPlanBuilderResult,
+  type TenKPlanPreviewDraft,
 } from "@/lib/plan-creation-engine";
 import {
   RUNNING_PLAN_DISTANCE_FAMILY_VALUES,
   RUNNING_PLAN_RUNNER_LEVEL_VALUES,
 } from "@/lib/plan-creation-engine/source-types";
+import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import {
+  RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
+  addRunningPlanReviewProof,
+  buildRunningPlanPersistenceMetadata,
+  buildRunningPlanProfilePatch,
+  runningPlanSourceKindMatchesFamily,
+  validateRunningPlanReviewExactness,
+  type RunningPlanReviewedPreviewDraft,
+} from "@/lib/running-plan-engine-review";
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
 const weekdayNameSchema = z.enum(WEEKDAY_NAMES);
@@ -31,26 +52,322 @@ const runningPlanPreviewInputSchema = z
   })
   .strict();
 
+const runningPlanSourceKindSchema = z.enum([
+  TEN_K_PLAN_BUILDER_SOURCE_KIND,
+  HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
+  MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
+]);
+
+const runningPlanConfirmInputSchema = z
+  .object({
+    previewInput: runningPlanPreviewInputSchema,
+    planFamily: z.enum(RUNNING_PLAN_DISTANCE_FAMILY_VALUES),
+    sourceKind: runningPlanSourceKindSchema,
+    reviewToken: z.string().trim().min(16),
+    reviewChecksum: z.string().trim().length(64),
+  })
+  .strict();
+
+type RunningPlanPreviewActionReadyResult =
+  | {
+      ok: true;
+      draft: RunningPlanReviewedPreviewDraft<TenKPlanPreviewDraft>;
+    }
+  | {
+      ok: true;
+      draft: RunningPlanReviewedPreviewDraft<HalfMarathonPlanPreviewDraft>;
+    }
+  | {
+      ok: true;
+      draft: RunningPlanReviewedPreviewDraft<MarathonBasePlanPreviewDraft>;
+    };
+
 export type RunningPlanPreviewActionResult =
-  | TenKPlanBuilderResult
-  | HalfMarathonPlanBuilderResult
-  | MarathonBasePlanBuilderResult;
+  | RunningPlanPreviewActionReadyResult
+  | Extract<TenKPlanBuilderResult, { ok: false }>
+  | Extract<HalfMarathonPlanBuilderResult, { ok: false }>
+  | Extract<MarathonBasePlanBuilderResult, { ok: false }>;
 export type RunningPlanPreviewActionInput = z.output<typeof runningPlanPreviewInputSchema>;
+export type RunningPlanConfirmActionInput = z.output<typeof runningPlanConfirmInputSchema>;
+
+export type RunningPlanConfirmFailureReason =
+  | "unauthenticated"
+  | "active_plan_exists"
+  | "unsupported_family"
+  | "preview_unavailable"
+  | "stale_review"
+  | "invalid_review"
+  | "input_mismatch"
+  | "persistence_failed";
+
+export type RunningPlanConfirmActionResult =
+  | {
+      ok: true;
+      status: "created";
+      persisted: true;
+      sourceKind: RunningPlanConfirmActionInput["sourceKind"];
+      sourceStatus: typeof RUNNING_PLAN_CONFIRMED_SOURCE_STATUS;
+      planFamily: RunningPlanConfirmActionInput["planFamily"];
+      schemaVersion: "training-plan-v2";
+      effectiveStartDate: string;
+      appliedStartDate: string;
+      workoutCount: number;
+      calendarRowCount: number;
+      nonRestWorkoutCount: number;
+      reviewChecksum: string;
+      safety: {
+        requiresExplicitConfirm: true;
+        trustedClientRows: false;
+        serverRebuiltPreview: true;
+        callsOpenAi: false;
+      };
+    }
+  | {
+      ok: false;
+      status: "blocked";
+      persisted: false;
+      reason: RunningPlanConfirmFailureReason;
+      message: string;
+      sourceKind?: RunningPlanConfirmActionInput["sourceKind"];
+      planFamily?: RunningPlanConfirmActionInput["planFamily"];
+    };
 
 export const previewRunningPlanDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => runningPlanPreviewInputSchema.parse(value))
   .handler(async ({ data }): Promise<RunningPlanPreviewActionResult> => {
-    const input: BuildRunningPlanPreviewInput = {
-      ...data,
-      daysPerWeek: data.daysPerWeek as BuildRunningPlanPreviewInput["daysPerWeek"],
-    };
-
-    switch (data.distanceFamily) {
-      case "10K":
-        return buildTenKPlanPreviewDraft(input);
-      case "Half Marathon":
-        return buildHalfMarathonPlanPreviewDraft(input);
-      case "Marathon Base":
-        return buildMarathonBasePlanPreviewDraft(input);
-    }
+    return buildReviewedRunningPlanPreview(data);
   });
+
+export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => runningPlanConfirmInputSchema.parse(value))
+  .handler(async ({ data }): Promise<RunningPlanConfirmActionResult> => {
+    const auth = getRequestAuthContext();
+    if (!auth.userId) {
+      return buildConfirmFailure({
+        reason: "unauthenticated",
+        message: "Sign in before creating a selected running plan.",
+        sourceKind: data.sourceKind,
+        planFamily: data.planFamily,
+      });
+    }
+
+    let userId: string | null = null;
+    try {
+      userId = await getPersistedUserIdForAuthContext(auth);
+    } catch {
+      return buildConfirmFailure({
+        reason: "unauthenticated",
+        message: "This session cannot create a persisted running plan yet.",
+        sourceKind: data.sourceKind,
+        planFamily: data.planFamily,
+      });
+    }
+
+    if (!userId) {
+      return buildConfirmFailure({
+        reason: "unauthenticated",
+        message: "This session cannot create a persisted running plan yet.",
+        sourceKind: data.sourceKind,
+        planFamily: data.planFamily,
+      });
+    }
+
+    return confirmRunningPlanDraftForUser(userId, data);
+  });
+
+export async function confirmRunningPlanDraftForUser(
+  userId: string,
+  input: unknown,
+): Promise<RunningPlanConfirmActionResult> {
+  const parsed = runningPlanConfirmInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return buildConfirmFailure({
+      reason: "invalid_review",
+      message: "The selected-plan confirmation payload is invalid. Refresh the preview.",
+    });
+  }
+
+  const request = parsed.data;
+
+  if (
+    request.previewInput.distanceFamily !== request.planFamily ||
+    !runningPlanSourceKindMatchesFamily({
+      family: request.planFamily,
+      sourceKind: request.sourceKind,
+    })
+  ) {
+    return buildConfirmFailure({
+      reason: "input_mismatch",
+      message:
+        "The selected family or source kind no longer matches the reviewed preview. Refresh the preview.",
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
+  try {
+    activePlan = await getActivePlan(userId);
+  } catch {
+    return buildConfirmFailure({
+      reason: "persistence_failed",
+      message:
+        "The selected running plan could not verify the current active-plan state. Try again before creating a plan.",
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  if (activePlan) {
+    return buildConfirmFailure({
+      reason: "active_plan_exists",
+      message:
+        "Selected plans can create a new plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  const preview = buildRunningPlanPreview(request.previewInput);
+  if (!preview.ok) {
+    return buildConfirmFailure({
+      reason: "preview_unavailable",
+      message: preview.unavailable.error.message,
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  if (
+    preview.draft.sourceKind !== request.sourceKind ||
+    preview.draft.planFamily !== request.planFamily
+  ) {
+    return buildConfirmFailure({
+      reason: "input_mismatch",
+      message:
+        "The selected-plan preview rebuilt to a different source or family. Refresh the preview.",
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  const exactness = await validateRunningPlanReviewExactness({
+    draft: preview.draft,
+    reviewToken: request.reviewToken,
+    reviewChecksum: request.reviewChecksum,
+  });
+
+  if (!exactness.ok) {
+    return buildConfirmFailure({
+      reason: exactness.reason,
+      message: exactness.message,
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  try {
+    const applyResult = await createFirstPlanFromReviewedCanonicalPlanForUser(
+      userId,
+      exactness.canonicalPlan,
+      buildRunningPlanProfilePatch(preview.draft),
+      buildRunningPlanPersistenceMetadata({
+        draft: preview.draft,
+        canonicalPlan: exactness.canonicalPlan,
+        reviewChecksum: exactness.reviewChecksum,
+      }),
+    );
+
+    return {
+      ok: true,
+      status: "created",
+      persisted: true,
+      sourceKind: request.sourceKind,
+      sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
+      planFamily: request.planFamily,
+      schemaVersion: exactness.canonicalPlan.schema_version,
+      effectiveStartDate: applyResult.effectiveStartDate,
+      appliedStartDate: applyResult.appliedStartDate,
+      workoutCount: applyResult.workoutCount,
+      calendarRowCount: exactness.canonicalPlan.planned_workouts.length,
+      nonRestWorkoutCount: exactness.canonicalPlan.planned_workouts.filter(
+        (workout) => workout.workout_type !== "rest",
+      ).length,
+      reviewChecksum: exactness.reviewChecksum,
+      safety: {
+        requiresExplicitConfirm: true,
+        trustedClientRows: false,
+        serverRebuiltPreview: true,
+        callsOpenAi: false,
+      },
+    };
+  } catch (error) {
+    if (error instanceof Error && /active plan/i.test(error.message)) {
+      return buildConfirmFailure({
+        reason: "active_plan_exists",
+        message:
+          "Selected plans can create a new plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
+        sourceKind: request.sourceKind,
+        planFamily: request.planFamily,
+      });
+    }
+
+    return buildConfirmFailure({
+      reason: "persistence_failed",
+      message: "The selected running plan could not be created. The current plan is unchanged.",
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+}
+
+export async function buildReviewedRunningPlanPreview(
+  data: RunningPlanPreviewActionInput,
+): Promise<RunningPlanPreviewActionResult> {
+  const result = buildRunningPlanPreview(data);
+
+  if (!result.ok) {
+    return result;
+  }
+
+  return {
+    ok: true,
+    draft: await addRunningPlanReviewProof(result.draft),
+  } as RunningPlanPreviewActionResult;
+}
+
+export function buildRunningPlanPreview(
+  data: RunningPlanPreviewActionInput,
+): TenKPlanBuilderResult | HalfMarathonPlanBuilderResult | MarathonBasePlanBuilderResult {
+  const input: BuildRunningPlanPreviewInput = {
+    ...data,
+    daysPerWeek: data.daysPerWeek as BuildRunningPlanPreviewInput["daysPerWeek"],
+  };
+
+  switch (data.distanceFamily) {
+    case "10K":
+      return buildTenKPlanPreviewDraft(input);
+    case "Half Marathon":
+      return buildHalfMarathonPlanPreviewDraft(input);
+    case "Marathon Base":
+      return buildMarathonBasePlanPreviewDraft(input);
+  }
+}
+
+function buildConfirmFailure(input: {
+  reason: RunningPlanConfirmFailureReason;
+  message: string;
+  sourceKind?: RunningPlanConfirmActionInput["sourceKind"];
+  planFamily?: RunningPlanConfirmActionInput["planFamily"];
+}): Extract<RunningPlanConfirmActionResult, { ok: false }> {
+  return {
+    ok: false,
+    status: "blocked",
+    persisted: false,
+    reason: input.reason,
+    message: input.message,
+    ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
+    ...(input.planFamily ? { planFamily: input.planFamily } : {}),
+  };
+}

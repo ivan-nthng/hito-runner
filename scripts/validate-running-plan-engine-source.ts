@@ -5,7 +5,10 @@ import {
   RUNNING_PLAN_DISTANCE_FAMILY_VALUES,
   RUNNING_PLAN_RUNNER_LEVEL_VALUES,
   RUNNING_PLAN_SOURCE_MODEL,
+  RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION,
+  RUNNING_PLAN_WEEK_ARCHETYPE_VALUES,
   assertRunningPlanSourceModel,
+  resolveRunningPlanCompositionWeek,
   type RunningPlanSegmentPrescription,
 } from "../src/lib/plan-creation-engine";
 
@@ -19,6 +22,7 @@ function main() {
   validateEndpointTemplates();
   validateMetricAndHrTruthBoundary();
   validateForbiddenOutputGates();
+  validateCompositionGrammarContract();
   validateStaleSourceFilesRemainAbsent();
 
   console.log("Running plan engine source model invariants passed.", summary);
@@ -219,6 +223,75 @@ function validateForbiddenOutputGates() {
   assert.ok(gateIds.includes("no_5k_benchmark_normal_path_dependency"));
   assert.ok(gateIds.includes("no_watch_choice_gate"));
   assert.ok(gateIds.includes("no_target_time_normal_path"));
+}
+
+function validateCompositionGrammarContract() {
+  assert.equal(RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION, "running_plan_composition_grammar_v1");
+  assert.ok(RUNNING_PLAN_WEEK_ARCHETYPE_VALUES.includes("easy_support_week"));
+  assert.ok(RUNNING_PLAN_WEEK_ARCHETYPE_VALUES.includes("long_run_durability_week"));
+  assert.ok(RUNNING_PLAN_WEEK_ARCHETYPE_VALUES.includes("endpoint_week"));
+
+  const supportedTenK = resolveRunningPlanCompositionWeek({
+    family: "10K",
+    runnerLevel: "sometimes_runs",
+    loadContext: "standard",
+    weekNumber: 5,
+    horizonWeeks: 10,
+  });
+  assert.equal(supportedTenK.developmentTouch, "intervals");
+  assert.equal(supportedTenK.archetype, "interval_week");
+  assert.ok(supportedTenK.familySignals.includes("ten_k_repeatability"));
+
+  const supportedHalf = resolveRunningPlanCompositionWeek({
+    family: "Half Marathon",
+    runnerLevel: "sometimes_runs",
+    loadContext: "standard",
+    weekNumber: 11,
+    horizonWeeks: 14,
+  });
+  assert.equal(supportedHalf.developmentTouch, "tempo");
+  assert.ok(supportedHalf.familySignals.includes("half_specific_durability"));
+
+  const conservativeHalfTempo = resolveRunningPlanCompositionWeek({
+    family: "Half Marathon",
+    runnerLevel: "runs_a_lot",
+    loadContext: "conservative",
+    weekNumber: 11,
+    horizonWeeks: 14,
+  });
+  assert.equal(conservativeHalfTempo.developmentTouch, "tempo");
+  assert.ok(conservativeHalfTempo.familySignals.includes("half_specific_durability"));
+
+  const conservativeHalfLongRun = resolveRunningPlanCompositionWeek({
+    family: "Half Marathon",
+    runnerLevel: "runs_a_lot",
+    loadContext: "conservative",
+    weekNumber: 10,
+    horizonWeeks: 14,
+  });
+  assert.equal(conservativeHalfLongRun.longRunRole, "steady_finish");
+  assert.ok(conservativeHalfLongRun.familySignals.includes("half_long_run_steady_finish"));
+
+  const supportedMarathonBase = resolveRunningPlanCompositionWeek({
+    family: "Marathon Base",
+    runnerLevel: "professional_competitive",
+    loadContext: "standard",
+    weekNumber: 13,
+    horizonWeeks: 16,
+  });
+  assert.equal(supportedMarathonBase.developmentTouch, "hills");
+  assert.ok(supportedMarathonBase.familySignals.includes("marathon_base_hill_strength"));
+
+  const conservativeMarathonBase = resolveRunningPlanCompositionWeek({
+    family: "Marathon Base",
+    runnerLevel: "runs_a_lot",
+    loadContext: "conservative",
+    weekNumber: 13,
+    horizonWeeks: 16,
+  });
+  assert.equal(conservativeMarathonBase.developmentTouch, null);
+  assert.equal(conservativeMarathonBase.longRunRole, "steady_finish");
+  assert.ok(conservativeMarathonBase.familySignals.includes("marathon_base_steady_finish"));
 }
 
 function validateStaleSourceFilesRemainAbsent() {

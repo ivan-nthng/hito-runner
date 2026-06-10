@@ -1,8 +1,8 @@
-# Hito DS Workout Library Calendar And Detail Playground
+# Hito DS Day-State Specimen And Test Calendar Sandbox
 
 ## Status
 
-frontend_implemented_awaiting_qa
+in_progress
 
 ## Type
 
@@ -14,384 +14,324 @@ high
 
 ## Next Recommended Role
 
-QA
+FRONTEND
 
 ## Task
 
-Create a Hito DS fake workout-library calendar with drilldown detail specimens for every canonical
-workout type and provider-feedback overlay state.
+Re-scope the workout-library playground into two separate surfaces: a Hito DS day-state specimen and
+a product-like `/test-calendar` sandbox.
 
 ## Stage
 
-FRONTEND implementation / static DS workout library playground.
+FRONTEND implementation / Hito DS specimen cleanup plus fake product calendar sandbox.
 
-## Previous Handoff Prompt
-
-Historical prompt used to create the Running Coach specimen matrix; superseded by the Frontend
-implementation status above.
+## Exact Handoff Prompt
 
 ```text
-ROLE: RUNNING COACH
+ROLE: FRONTEND
 
 Task:
-Create the canonical workout specimen matrix for the Hito DS workout-library calendar/detail
-playground.
+Implement the re-scoped calendar/workout design sandbox as two separate surfaces: keep Hito DS as a
+quiet day-state specimen and create a product-like `/test-calendar` fake calendar sandbox.
 
 Stage:
-RUNNING COACH source-of-truth / workout library specimen matrix.
-
-Plan:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md
+FRONTEND implementation / Hito DS specimen cleanup and `/test-calendar` product-design sandbox.
 
 Context:
-- The user wants a design-system sandbox that avoids creating real plans just to inspect workout
-  visuals.
-- `/hitoDS#calendar-workout-playground` already proves day-cell/mobile-row states, but it does not
-  provide a full fake calendar of canonical workout identities or drilldown workout-detail examples.
-- The new playground must show all canonical workout identities one after another in a fake calendar
-  and let the user open a static detail specimen for each workout.
-- Every specimen workout must be fully populated with detailed watch-executable segments.
-- Provider/feedback overlay controls should let QA/design inspect no evidence, Garmin evidence,
-  feedback-ready, and future Strava/provider visual states without creating real uploaded activity
-  data.
+The previous `/hitoDS#workout-library-playground` direction is superseded. The full fake workout
+calendar must not live as a Hito DS workout-library playground. Hito DS should keep only reusable
+day-cell/workout-row state specimens. The product-like fake calendar belongs on `/test-calendar`.
 
-Your job:
-1. Produce a backend/frontend-ready markdown or CSV matrix under `docs/tasks/running-coach/`.
-2. Cover every canonical workout identity currently accepted by Hito, including rest, recovery,
-   easy, steady, long, cutback, taper, tempo, threshold, intervals, progression, race/endpoint,
-   hills, trail, ultra, and mountain identities.
-3. For each identity define:
-   - family
-   - display label
-   - calendar label
-   - detail title
-   - primary purpose
-   - segment sequence
-   - segment prescription values
-   - secondary cues
-   - target truth mode
-   - allowed provider/feedback overlay expectations
-   - what the specimen proves
-4. Preserve the accepted product contract:
-   - watch/app execution is assumed
-   - no 5K benchmark dependency in the normal happy path
-   - no fake precise pace
-   - no fake personal HR
-   - Hito default HR zones are editable defaults only, not personal HR truth
-   - cues are secondary to numeric structure
-5. Do not design product mutations, manual workout CRUD, persistence, active-plan replacement, or
-   provider sync behavior.
+Active plan:
+docs/plans/active/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md
+
+Root cause and architecture fit:
+- The current direction mixes two different jobs:
+  1. Hito DS component/state proof.
+  2. Product-flow design review for a fake calendar and workout detail.
+- Fix the ownership boundary rather than polishing the wrong `/hitoDS` destination.
+- Reuse existing Hito DS primitives, product calendar visual language, workout-detail anatomy, modal/sheet/dialog primitives, feedback/evidence markers, and static fixture data.
+- Do not create a new UI kit, frontend-owned product truth, server action path, provider seam, or persistence model.
+
+Required reading:
+1. AGENTS.md
+2. agents/frontend.agent.md
+3. skills/hito-frontend-design-system/SKILL.md
+4. docs/context.md
+5. docs/glossary.md
+6. docs/current-product.md
+7. docs/current-system.md
+8. docs/current-state.md
+9. docs/plans/active/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md
+10. docs/tasks/running-coach/2026-06-09-hito-ds-workout-library-specimen-matrix.md
+
+Inspect and reuse:
+- src/routes/hitoDS.tsx
+- src/components/hito-ds/calendar-workout-playground.tsx
+- src/components/hito-ds/calendar-workout-playground-data.ts
+- src/components/hito-ds/workout-library-playground.tsx
+- src/components/hito-ds/workout-library-playground-data.ts
+- src/components/ui/hito-calendar-day.tsx
+- src/components/Calendar.tsx
+- src/routes/workout.$date.tsx
+- src/components/CompletionPanel.tsx
+- src/components/IntervalsViz.tsx
+- src/components/ui/dialog.tsx
+- src/components/ui/sheet.tsx
+- src/components/ui/select.tsx
+- src/components/ui/icon.tsx
+- src/styles.css
+
+Scope:
+1. `/hitoDS`:
+   - Preserve `/hitoDS#calendar-workout-playground` as the canonical day-state/component specimen.
+   - Remove/demote the full `/hitoDS#workout-library-playground` fake calendar as the accepted
+     product sandbox.
+   - If a workout-library import/sidebar item exists in `/hitoDS`, remove it or convert it into a
+     non-primary note/link that points to `/test-calendar`; do not keep it as a full DS section.
+   - Make the day-state specimen feel like one quiet black specimen block, not a page full of cards.
+   - Keep useful mobile/desktop preview controls.
+   - Preserve `HitoCalendarDayCell` / `HitoWorkoutDayRow` as shared presentational primitives.
+
+2. `/test-calendar`:
+   - Add a product-design sandbox route at `/test-calendar`.
+   - It should feel like the real Hito calendar page, using fake data only.
+   - Every calendar day is either a fake workout or rest.
+   - Clicking a fake day opens a fake workout-day detail modal/sheet.
+   - The detail modal/sheet shows workout structure/segments, feedback, evidence, provider state,
+     and recommendation copy.
+   - Add a floating top-right settings button.
+   - Settings must toggle fake states:
+     - completed / not completed / partial / skipped
+     - feedback exists / no feedback
+     - FIT file uploaded / not uploaded
+     - Garmin attached / not attached
+     - Strava attached as future/specimen-only
+     - future provider comparison / recommendation state
+
+Fixture rules:
+- Use static/fake fixtures only.
+- The existing Running Coach specimen matrix can be reused as fixture source, but its old
+  `/hitoDS#workout-library-playground` target language is superseded by this plan.
+- Keep fixture data focused; do not introduce user ids, plan ids, persisted workout ids, raw provider
+  payloads, server actions, active-plan lifecycle, provider upload, OpenAI, or generated plan recipe
+  logic.
+
+What not to do:
+- Do not mutate Supabase.
+- Do not create plans.
+- Do not log workouts.
+- Do not upload, parse, compare, or sync real provider files.
+- Do not call OpenAI.
+- Do not generate real recommendations.
+- Do not import real product route loaders into `/test-calendar`.
+- Do not make `/test-calendar` a replacement source of truth for product calendar behavior.
+- Do not add manual workout CRUD, copy/paste, recurrence, active-plan replacement, or provider sync.
+- Do not create another design system outside Hito DS.
 
 Validation:
-- `git diff --check -- docs/tasks/running-coach`
+- `npm exec eslint -- src/routes/hitoDS.tsx src/components/hito-ds/*.tsx src/components/hito-ds/*.ts src/routes/test-calendar.tsx`
+  Adjust the route path in the command if TanStack filename differs.
+- `git diff --check -- src/routes src/components src/styles.css docs/plans/active/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md`
+- `npm run build`
+- Built-in Codex browser proof first:
+  - `/hitoDS` loads.
+  - `/hitoDS#calendar-workout-playground` remains useful.
+  - `/hitoDS` no longer presents the full workout-library fake calendar as the accepted product sandbox.
+  - `/test-calendar` loads directly.
+  - `/test-calendar` uses fake data only.
+  - clicking fake days opens fake workout detail.
+  - settings toggles result/evidence/provider/recommendation states.
+  - desktop and 375px mobile have no horizontal overflow.
 
-Report:
+Report format:
 1. Task
 2. Stage
-3. Files changed
-4. Workout identities covered
-5. Segment/anatomy contract
-6. Provider overlay assumptions
-7. What remains visual-only
-8. Validation results
-9. Blockers
+3. Root cause
+4. Files inspected
+5. Files changed
+6. What changed
+7. Reused Hito DS/product primitives
+8. Static-only boundary proof
+9. Validation results
+10. Blockers
 ```
 
 ## Owner
 
-ARCHITECT / RUNNING COACH / DESIGNER / FRONTEND / QA
+ARCHITECT / FRONTEND / QA
 
 ## Last Updated
 
 2026-06-09
 
-## Reference Links
+## Root Cause
 
-- [Project operating rules](../../../AGENTS.md)
-- [Project context](../../context.md)
-- [Glossary](../../glossary.md)
-- [Current product](../../current-product.md)
-- [Current system](../../current-system.md)
-- [Current state](../../current-state.md)
-- [Completed calendar/workout playground spec](../../tasks/frontend-specs/2026-06-04-hito-ds-calendar-workout-playground-spec.md)
-- [Shared calendar-day component](../../../src/components/ui/hito-calendar-day.tsx)
-- [Existing calendar/workout playground](../../../src/components/hito-ds/calendar-workout-playground.tsx)
-- [Existing calendar/workout playground data](../../../src/components/hito-ds/calendar-workout-playground-data.ts)
-- [Hito DS route](../../../src/routes/hitoDS.tsx)
-- [Hito DS playground shell](../../../src/components/hito-ds/playground.tsx)
-- [Rich workout model](../../../src/lib/rich-workout-model.ts)
-- [Workout glyph mapping](../../../src/lib/workout-glyph.ts)
-- [Workout detail route](../../../src/routes/workout.$date.tsx)
-- [Intervals visualization](../../../src/components/IntervalsViz.tsx)
-- [Workout feedback panel](../../../src/components/CompletionPanel.tsx)
-- [Running Plan Engine Watch-Executable Workout Library](../../tasks/running-coach/2026-06-08-running-plan-engine-watch-executable-workout-library.md)
-- [Running Plan Creation Engine Rebuild](2026-06-08-running-plan-creation-engine-rebuild.md)
+The previous plan mixed two different surfaces:
 
-## User Need
+- `/hitoDS` as a design-system component/state reference.
+- a product-like fake calendar and workout-detail flow for product/design review.
 
-The user wants a stable design-system sandbox for workout-day and workout-detail visual testing.
-
-Today, validating a calendar cell, workout detail page, Garmin/Strava feedback marker, or segment
-layout often requires creating or importing a real plan. That slows design, QA, and product review
-and encourages one-off fixtures.
-
-The requested solution is a dedicated `/hitoDS` playground:
-
-- a fake calendar filled with every canonical workout type in sequence
-- every fake day has a fully populated exemplar workout
-- clicking a fake day opens the static exemplar workout detail
-- controls can toggle result/evidence/feedback provider states
-- the playground has its own sidebar item in the Hito DS navigation
-- the playground uses Hito DS primitives and shared calendar-day anatomy
-- no backend mutation, persistence, provider sync, or real plan creation is involved
+That made the implementation drift toward a full fake workout calendar inside `/hitoDS`, which is
+not the accepted product direction. `/hitoDS` should not become a product-flow sandbox. It should
+prove reusable day-cell and workout-row states only.
 
 ## Architecture Decision
 
-Create a new Hito DS section:
+Keep one plan, but split the target into two surfaces:
 
-`/hitoDS#workout-library-playground`
+| Surface | Owner | Purpose | Acceptance target |
+|---|---|---|---|
+| `/hitoDS#calendar-workout-playground` | Hito DS | reusable day-cell/workout-row state specimen | quiet component specimen only |
+| `/test-calendar` | Product-design sandbox | fake product calendar and fake workout detail review | full fake calendar/detail flow |
+| real `/` calendar and `/workout/$date` | Product runtime | persisted saved-mode behavior | unchanged |
 
-Suggested sidebar label:
+The old `/hitoDS#workout-library-playground` direction is superseded. It must not be the acceptance
+target for this plan.
 
-`Workout library`
+## Hito DS Day-State Specimen Contract
 
-This is separate from the completed `/hitoDS#calendar-workout-playground`.
+`/hitoDS#calendar-workout-playground` remains the accepted DS specimen for reusable calendar/workout
+day anatomy.
 
-Reason:
+It should cover:
 
-- The existing calendar/workout playground proves state anatomy for one controlled day cell or
-  mobile row.
-- The new playground proves a full library of workout identities plus drilldown workout-detail
-  specimen readback.
-- Combining them would make the accepted state playground too large and blur two different jobs.
+- desktop month-cell anatomy
+- mobile workout-row anatomy
+- planned workout
+- rest day
+- empty/no-plan date
+- outside-month
+- outside-plan/pre-start where useful
+- today
+- selected/focused overlays
+- completed/partial/skipped result states
+- feedback/evidence marker
+- provider marker language where it is a small reusable visual state
+- easy/recovery/steady/long/tempo/intervals/hills/trail/quality/rest identities
+- title overflow/wrapping
+- dense month-grid stress
+- visual-only future affordances if they remain clearly specimen-only
 
-## Canonical Boundary
+Design direction:
 
-### Shared Visual Primitives
+- one quiet black specimen block
+- no full product-like calendar
+- no page full of nested cards
+- keep useful desktop/mobile preview controls
+- preserve `HitoCalendarDayCell` and `HitoWorkoutDayRow` as presentational shared primitives
 
-Allowed reuse:
+## `/test-calendar` Product-Design Sandbox Contract
 
-- `HitoDsPlayground` for section anatomy.
-- `HitoCalendarDayCell` and `HitoWorkoutDayRow` for fake calendar day and mobile row anatomy.
-- `WorkoutGlyph` / icon primitives for canonical identity visuals.
-- Hito DS controls, buttons, selects, choice toggles, labels, dividers, status pills, grouped rows,
-  tooltips, and dialog/sheet primitives.
-- Presentational workout-structure components only if they do not own route, loader, persistence,
-  or server-action behavior.
+`/test-calendar` is the accepted target for the fake full calendar.
 
-### Playground-Only Ownership
+It should:
 
-The new playground owns:
+- feel like the real Hito calendar page
+- use fake static data only
+- render every day as either fake workout or rest
+- use real product calendar visual rhythm where safe
+- let Product/Design click a fake day
+- open fake workout detail in a modal/sheet
+- show workout structure/segments
+- show result state
+- show feedback/evidence/provider states
+- show recommendation copy as static fake copy
+- include a floating top-right settings button
+- let settings toggle fake visual states without mutation
 
-- static specimen data
-- fake dates
-- selected specimen state
-- fake provider/evidence overlay state
-- fake result state
-- static drilldown behavior inside `/hitoDS`
-- visual stress states for detail page segments
+Settings must include:
 
-### Product-Only Ownership
+- completion state: not completed / completed / partial / skipped
+- feedback: exists / none
+- FIT file: uploaded / not uploaded
+- Garmin: attached / not attached
+- Strava: attached as future/specimen-only
+- future provider comparison state
+- future recommendation state
 
-The real product calendar and workout detail continue to own:
+The route exists for design clarification only.
+
+## Source And Primitive Reuse
+
+Frontend should reuse existing product/DS seams before adding anything new:
+
+- real calendar visual language from `src/components/Calendar.tsx`
+- shared `HitoCalendarDayCell` / `HitoWorkoutDayRow` from
+  `src/components/ui/hito-calendar-day.tsx` where safe
+- workout-detail route anatomy from `src/routes/workout.$date.tsx` as visual reference
+- presentational pieces from `CompletionPanel` and feedback readback where safe
+- `IntervalsViz` or segment-list anatomy where safe
+- Hito DS dialog/sheet primitives
+- Hito DS buttons/selects/toggles/status pills/markers
+- existing feedback/evidence/result marker language
+- existing workout glyph/icon primitives
+- static fixture data from `docs/tasks/running-coach/2026-06-09-hito-ds-workout-library-specimen-matrix.md`
+  as a source reference, while treating its old `/hitoDS#workout-library-playground` target wording
+  as superseded
+
+## Old `/hitoDS` Behavior To Remove Or Demote
+
+If present in implementation, Frontend must remove or demote:
+
+- `WorkoutLibraryPlayground` as a full `/hitoDS` section
+- `workout-library-playground` sidebar item as a primary DS acceptance target
+- full fake workout calendar grid inside `/hitoDS`
+- fake product drilldown detail inside `/hitoDS`
+- provider/result settings intended for product-flow review inside `/hitoDS`
+- any `/hitoDS` copy that says the workout-library fake calendar is the accepted product sandbox
+
+Frontend may reuse useful static fixture data and presentational subpieces after moving ownership to
+`/test-calendar`, but the full product-like surface should not stay under `/hitoDS`.
+
+## Product Boundary
+
+Hito DS owns:
+
+- primitive/state proof
+- shared visual component anatomy
+- reusable markers, controls, state badges, and layout primitives
+- static specimen explanation
+
+`/test-calendar` owns:
+
+- fake product-flow design review
+- fake calendar page composition
+- fake workout detail modal/sheet
+- fake provider/result/recommendation toggles
+- static fixture state only
+
+Real product routes own:
 
 - persisted `TrainingSnapshot` and `Workout` truth
-- real route links
-- real `/workout/$date` route behavior
-- real Garmin upload/remove actions
-- real comparison/AI insight readback
-- workout log mutation
+- route loaders
+- real `/workout/$date` navigation
+- real workout log mutation
+- real Garmin upload/remove
+- real deterministic comparison
+- real AI insight readback
 - active-plan lifecycle
 - provider sync
-- manual workout creation/edit/copy/paste/recurrence
+- manual workout creation/edit/copy/paste/recurrence when later implemented
 
-## Required Specimen Inventory
+## What Remains Forbidden
 
-The first implementation must cover every currently accepted canonical workout identity from
-`src/lib/rich-workout-model.ts`.
-
-Required identity coverage:
-
-| Family | Required identities |
-|---|---|
-| Rest | `rest_and_recovery` |
-| Recovery | `recovery_jog` |
-| Easy | `easy_aerobic_run`, `cutback_aerobic_run`, `easy_run_with_strides` |
-| Steady | `steady_aerobic_run`, `marathon_steady_specificity` |
-| Long | `long_aerobic_run`, `long_run_with_steady_finish`, `base_endpoint_marker`, `cutback_long_run`, `taper_long_run`, `ultra_time_on_feet_durability` |
-| Tempo | `controlled_tempo_session`, `half_marathon_threshold_durability`, `half_readiness_marker` |
-| Intervals | `distance_intervals`, `time_intervals`, `5k_sharpening_repeats`, `10k_rhythm_intervals`, `quality_session` |
-| Progression | `progression_run` |
-| Race / endpoint | `race_pace_session`, `taper_tuneup_run`, `tenk_completion_or_checkpoint` |
-| Hills | `uphill_repeats`, `rolling_hills_session`, `controlled_downhill_durability`, `climbing_steady_run` |
-| Trail / mountain | `technical_trail_easy`, `hike_run_endurance`, `mountain_long_run_time_on_feet` |
-
-If backend or Running Coach adds new canonical identities before implementation, the specimen matrix
-must add them before QA passes.
-
-## Playground UX Contract
-
-### Calendar View
-
-The playground should render a fake filled calendar, not a real persisted plan.
-
-Requirements:
-
-- show all workout identities sequentially
-- use believable fake dates, such as one reference month plus spillover weeks
-- avoid implying these are generated rows from a real plan
-- group visually by week or phase only when useful for scanning
-- use real shared day-cell/mobile-row anatomy
-- desktop view shows a dense calendar grid
-- mobile view shows the corresponding row/list anatomy
-- each workout cell is clickable/selectable
-- selected cell opens or updates the drilldown detail panel
-- cells should include representative title, family glyph, result marker, and provider/evidence
-  marker based on controls
-
-### Detail View
-
-Clicking a fake workout opens the static exemplar detail.
-
-Allowed UI patterns:
-
-- desktop split view: calendar left, detail right
-- mobile: selected detail below calendar or in a Hito DS sheet/dialog
-- optional `Back to library` control on mobile
-
-Detail specimen must show:
-
-- workout family and identity
-- workout title
-- purpose
-- watch-executable segment list
-- segment prescription values
-- secondary cues
-- metric truth mode
-- editable default HR note when applicable
-- result/evidence/feedback overlay state
-- provider note row
-- what this proves / what this does not imply
-
-Do not import the real `WorkoutPage` route or fake the route loader.
-
-### Provider / Feedback Overlay Controls
-
-The first playground control set should include:
-
-- Provider state:
-  - `None`
-  - `Garmin evidence attached`
-  - `Garmin feedback ready`
-  - `Strava activity attached` as future visual-only
-  - `Provider comparison ready` as future visual-only if useful
-- Result state:
-  - `Planned`
-  - `Completed`
-  - `Partial`
-  - `Skipped`
-- Detail density:
-  - `Compact`
-  - `Full segments`
-- View:
-  - `Desktop`
-  - `Mobile`
-- Filter:
-  - all families
-  - family-specific filter if the full calendar becomes too dense
-
-Provider control rules:
-
-- Garmin states may reuse current evidence/feedback marker language because Garmin upload/readback
-  exists.
-- Strava/provider states must be labelled future/specimen-only until provider sync ships.
-- Provider overlays must never imply real uploaded data, real comparison rows, real AI insight, or
-  connected account state.
-
-## Static Data Contract
-
-The implementation should introduce a focused fixture module, for example:
-
-`src/components/hito-ds/workout-library-playground-data.ts`
-
-The fixture should not be a second product plan model.
-
-It may contain:
-
-- canonical identity key
-- family
-- glyph
-- display label
-- title
-- purpose
-- fake date
-- segment rows
-- target truth mode
-- provider overlay compatibility notes
-- specimen-only notes
-
-It must not contain:
-
-- user ids
-- plan ids
-- persisted workout ids
-- raw provider payloads
-- real Garmin/Strava account truth
-- server actions
-- active-plan lifecycle behavior
-- generated plan recipe logic
+- no Supabase mutation
+- no real plan creation
+- no real workout log mutation
+- no real provider upload/parse/sync
+- no OpenAI call
+- no real AI recommendation generation
+- no frontend-owned schedule/product truth
+- no real route loader import into the fake sandbox
+- no provider credentials or user/account data
+- no manual workout CRUD/copy/paste/recurrence
+- no new UI kit outside Hito DS
+- no QA closeout against the old `/hitoDS#workout-library-playground` target
 
 ## Implementation Slices
 
-### Slice 1: Running Coach Specimen Matrix
-
-Owner:
-
-RUNNING COACH
-
-Scope:
-
-- Create a canonical workout specimen matrix under `docs/tasks/running-coach/`.
-- Cover every identity listed in this plan.
-- Fill each workout with detailed watch-executable segments.
-- Include provider/feedback overlay assumptions.
-- Keep the matrix implementation-ready for frontend fixtures.
-
-Acceptance:
-
-- every canonical identity has a specimen row
-- every non-rest identity has at least warmup/opener, main/work, and cooldown/finish style anatomy
-  unless Running Coach explicitly documents why a different structure is safer
-- repeat workouts include repeat count, work unit, recovery unit, and cooldown
-- long runs over 60 minutes are never a single anonymous block
-- cues stay secondary to numeric structure
-- no fake precise pace or fake personal HR
-- default HR zones, if used, are labelled editable defaults
-
-### Slice 2: Designer Interaction Spec
-
-Owner:
-
-DESIGNER
-
-Scope:
-
-- Define the `/hitoDS#workout-library-playground` layout.
-- Choose desktop split layout and mobile drilldown behavior.
-- Define control placement using `HitoDsPlayground`.
-- Define provider/result overlay styling.
-- Define how the new sidebar item appears without disrupting existing Hito DS navigation.
-
-Acceptance:
-
-- no nested card soup
-- fake calendar and detail read as one workbench
-- click-to-detail behavior is obvious
-- provider overlay states are clear and bounded
-- Strava/provider-future states are visibly specimen-only
-- 375px mobile behavior is specified
-
-### Slice 3: Frontend Static Playground Implementation
+### Slice 1: Re-scope Existing Hito DS Work
 
 Owner:
 
@@ -399,26 +339,30 @@ FRONTEND
 
 Scope:
 
-- Add the new `/hitoDS` section and sidebar item.
-- Add static specimen data from the Running Coach matrix.
-- Render the fake calendar using `HitoCalendarDayCell` / `HitoWorkoutDayRow`.
-- Render selected detail using Hito DS primitives and, only if safe, presentational structure
-  helpers.
-- Add controls for view, family filter, result state, provider state, and detail density.
-- Preserve existing `/hitoDS#calendar-workout-playground`.
+- keep `/hitoDS#calendar-workout-playground`
+- make it a quiet single-specimen day-state block
+- preserve useful mobile/desktop controls
+- remove/demote full workout-library product-flow UI from `/hitoDS`
+- preserve existing `/hitoDS` anchors and navigation
 
-Acceptance:
+### Slice 2: Add `/test-calendar`
 
-- all canonical identities are represented
-- selecting every specimen opens a detail readback
-- all specimen details show full segment structure
-- provider/result controls update calendar and detail visuals
-- no product route, loader, server action, persistence, or provider upload action is imported
-- no real plan creation is required to inspect the states
-- existing `/hitoDS` anchors still work
-- desktop, intermediate, and 375px mobile have no horizontal overflow
+Owner:
 
-### Slice 4: QA Acceptance
+FRONTEND
+
+Scope:
+
+- add a product-like fake calendar route at `/test-calendar`
+- use fake static fixtures
+- reuse product calendar visual language
+- every fake day is workout or rest
+- click opens fake workout detail modal/sheet
+- add floating settings
+- wire static toggles for result/evidence/provider/recommendation states
+- keep fake/future/specimen labels visible for Strava/provider comparison/recommendations
+
+### Slice 3: QA Acceptance
 
 Owner:
 
@@ -426,64 +370,29 @@ QA
 
 Scope:
 
-- Source inspect dependency boundaries.
-- Browser-test `/hitoDS#workout-library-playground`.
-- Click through representative and edge identities.
-- Verify all identities are present.
-- Verify provider/result controls.
-- Verify mobile no-overflow.
-- Verify existing `/hitoDS#calendar-workout-playground` was not regressed.
-
-Required validation:
-
-- targeted ESLint for changed `/hitoDS` and DS playground files
-- `git diff --check`
-- `npm run build`
-- browser proof with built-in Codex browser first
-- screenshot or DOM/JSON fallback artifacts if PNG capture times out
-
-### Post-QA Frontend Fix
-
-QA found two acceptance failures after the initial static playground implementation:
-
-- direct-loading `/hitoDS#workout-library-playground` could hydrate with a server/client active-nav
-  mismatch
-- switching to `Mobile` view and selecting `Provider compare future` could create desktop
-  page-level horizontal overflow from the provider control layout
-
-Frontend fixed both without changing specimen data, product calendar behavior, provider semantics,
-or the static/specimen-only boundary. The next owner remains QA for focused re-validation of the
-deep-link hydration path and the provider-control overflow scenario.
-
-## What Remains Forbidden
-
-- Do not implement manual workout creation, editing, copy, paste, recurrence, or templates.
-- Do not implement provider sync or Strava ingestion.
-- Do not upload, parse, or compare real provider activity data.
-- Do not mutate Supabase.
-- Do not create or persist plans, workouts, logs, comparisons, or AI insights.
-- Do not import product `Calendar.tsx` into `/hitoDS`.
-- Do not import the real `WorkoutPage` route into `/hitoDS`.
-- Do not make frontend own backend plan-generation truth.
-- Do not use this playground as a replacement for backend validation harnesses.
-- Do not add a new visual system outside Hito DS.
-- Do not change the completed calendar/workout state playground except for shared imports if needed.
+- source boundary proof
+- built-in browser proof first
+- `/hitoDS` day-state specimen proof
+- `/test-calendar` direct-load proof
+- fake day click/detail proof
+- settings toggle proof
+- static-only/no mutation proof
+- desktop and 375px no-overflow proof
 
 ## Validation For This Architect Plan
 
 - `git diff --check -- docs/plans/active/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md`
-- If untracked, also run:
-  `git diff --check --no-index /dev/null docs/plans/active/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md`
 - `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000`
 - `npm run validate-admin-capture-backlog`
 
+No build or browser QA is required for this Architect replan because product source was not changed.
+
 ## Next Decision
 
-Send to QA for focused browser/source validation.
+Send to FRONTEND.
 
 Reason:
 
-The Running Coach specimen matrix now exists and Frontend implemented the static
-`/hitoDS#workout-library-playground` from that matrix. QA should verify identity coverage, provider
-and result controls, static-only boundaries, existing calendar playground non-regression, and
-375px no-overflow behavior before this plan moves toward closeout.
+The source-of-truth boundary is now clear enough for implementation. The next slice is not design
+exploration and not QA. It is a bounded frontend re-scope: remove/demote the wrong `/hitoDS` full
+calendar direction and create `/test-calendar` as a static product-design sandbox.

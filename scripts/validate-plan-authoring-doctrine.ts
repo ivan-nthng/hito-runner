@@ -91,6 +91,15 @@ import {
 type SegmentRecord = Record<string, unknown>;
 
 const fixedRestDays = ["Wednesday", "Sunday"] as const;
+const forbiddenStructuredReviewDisplayTitleTerms = [
+  "blueprint",
+  "opening blueprint",
+  "repaired_ai_draft",
+  "backendExtendedWeeks",
+  "requestedHorizonWeeks",
+  "aiAuthoredHorizonWeeks",
+  "ai_first_plan_blueprint_v1",
+] as const;
 
 function buildRequest(
   goalDistance: StructuredFirstPlanOnboardingRequestInput["goal"]["goalDistance"],
@@ -127,6 +136,21 @@ function buildPlan(input: StructuredFirstPlanOnboardingRequestInput) {
     authoringInput,
     plan: buildStructuredAuthoringPlan(authoringInput),
   };
+}
+
+function assertStructuredReviewDisplayTitleIsRunnerFacing(
+  review: { displayTitle: string },
+  label: string,
+) {
+  const normalizedTitle = review.displayTitle.toLowerCase();
+
+  for (const term of forbiddenStructuredReviewDisplayTitleTerms) {
+    assert.equal(
+      normalizedTitle.includes(term.toLowerCase()),
+      false,
+      `${label} display title must not expose internal term ${term}`,
+    );
+  }
 }
 
 function buildPlanWithNoAge(input: StructuredFirstPlanOnboardingRequestInput) {
@@ -5979,7 +6003,12 @@ assertRichWorkoutContract(
     execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
   });
   const { input, authoringInput, plan } = buildPlan(request);
-  const review = buildStructuredFirstPlanDraftReview(input, plan, authoringInput);
+  const pollutedPlanName = {
+    ...plan,
+    plan_name:
+      "Opening blueprint ai_first_plan_blueprint_v1 repaired_ai_draft backendExtendedWeeks requestedHorizonWeeks aiAuthoredHorizonWeeks",
+  };
+  const review = buildStructuredFirstPlanDraftReview(input, pollutedPlanName, authoringInput);
   const persistenceMetadata = buildPlanScopedStructuredAuthoringMetadata({
     source: "structured_first_plan",
     authoringInput,
@@ -5995,6 +6024,20 @@ assertRichWorkoutContract(
     unknown
   >;
 
+  assert.equal(
+    review.displayTitle,
+    "Half marathon 2:00:00 target plan through 2026-08-30",
+    "target-date structured review display title should describe the full plan through target date",
+  );
+  assert.equal(
+    /16-week/i.test(review.displayTitle),
+    false,
+    "target-date structured review display title must not imply only an opening 16-week review",
+  );
+  assertStructuredReviewDisplayTitleIsRunnerFacing(
+    review,
+    "target-date structured first-plan review",
+  );
   assert.equal(
     goalMetadata.goal_style,
     "target_time",
@@ -6116,7 +6159,31 @@ assertRichWorkoutContract(
     },
   });
   const { authoringInput, plan } = buildPlan(request);
-  const review = buildStructuredFirstPlanDraftReview(request, plan, authoringInput);
+  const review = buildStructuredFirstPlanDraftReview(
+    request,
+    {
+      ...plan,
+      plan_name: "AI blueprint raw marathon plan repaired_ai_draft",
+    },
+    authoringInput,
+  );
+  const horizonWeeks =
+    plan.preparation_horizon_weeks ?? authoringInput.schedule.preparationHorizonWeeks;
+
+  assert.equal(
+    review.displayTitle,
+    `${horizonWeeks}-week Marathon 3:30:00 target plan`,
+    "non-target-date structured review display title should use actual plan length framing",
+  );
+  assert.equal(
+    /through \d{4}-\d{2}-\d{2}/i.test(review.displayTitle),
+    false,
+    "non-target-date structured review display title must not imply race-day coverage",
+  );
+  assertStructuredReviewDisplayTitleIsRunnerFacing(
+    review,
+    "default-horizon structured first-plan review",
+  );
 
   assert.ok(
     review.assumptions.some((assumption) => /stays effort-based/i.test(assumption)),

@@ -1,12 +1,14 @@
+import {
+  collectRunningPlanCompositionGrammarIssues,
+  resolveRunningPlanCompositionWeek,
+  type RunningPlanCompositionDevelopmentTouch,
+} from "@/lib/plan-creation-engine/composition-grammar";
 import type {
   RunningPlanPreviewCalendarRow,
   RunningPlanPreviewCalendarWorkoutDayKind,
   RunningPlanPreviewLoadContext,
 } from "@/lib/plan-creation-engine/preview-builder-shared";
-import type {
-  RunningPlanRunnerLevel,
-  RunningPlanWorkoutDayKind,
-} from "@/lib/plan-creation-engine/source-types";
+import type { RunningPlanRunnerLevel } from "@/lib/plan-creation-engine/source-types";
 
 export const HALF_MARATHON_PLAN_BUILDER_WEEKS = 14 as const;
 export const HALF_MARATHON_CUTBACK_WEEKS = [4, 8, 12] as const;
@@ -41,27 +43,15 @@ export function resolveHalfMarathonDevelopmentTouch({
   loadContext,
   weekNumber,
 }: HalfMarathonDiversityPolicyInput): HalfMarathonDevelopmentTouch | null {
-  if (weekNumber === HALF_MARATHON_ENDPOINT_WEEK) {
-    return null;
-  }
-
-  if (HALF_MARATHON_CUTBACK_WEEKS.includes(weekNumber as never)) {
-    return null;
-  }
-
-  if (weekNumber === HALF_MARATHON_PENULTIMATE_WEEK) {
-    return "strides";
-  }
-
-  if (runnerLevel === "beginner_new_runner") {
-    return null;
-  }
-
-  if (loadContext === "conservative") {
-    return resolveConservativeHalfTouch(weekNumber);
-  }
-
-  return resolveStandardHalfTouch(runnerLevel, weekNumber);
+  return toHalfMarathonDevelopmentTouch(
+    resolveRunningPlanCompositionWeek({
+      family: "Half Marathon",
+      runnerLevel,
+      loadContext,
+      weekNumber,
+      horizonWeeks: HALF_MARATHON_PLAN_BUILDER_WEEKS,
+    }).developmentTouch,
+  );
 }
 
 export function validateHalfMarathonDiversityPolicy({
@@ -78,8 +68,43 @@ export function validateHalfMarathonDiversityPolicy({
   validateHalfWeekRules(rows, issues);
   validateHalfRecoverySpacing(rows, issues);
   validateDevelopmentDensity(rows, issues);
+  validateConservativeDurabilityIdentity({ loadContext, rows, issues });
+  issues.push(
+    ...collectRunningPlanCompositionGrammarIssues({
+      family: "Half Marathon",
+      runnerLevel,
+      loadContext,
+      horizonWeeks: HALF_MARATHON_PLAN_BUILDER_WEEKS,
+      rows,
+    }),
+  );
 
   return issues;
+}
+
+function validateConservativeDurabilityIdentity({
+  loadContext,
+  rows,
+  issues,
+}: {
+  loadContext: RunningPlanPreviewLoadContext;
+  rows: readonly RunningPlanPreviewCalendarRow[];
+  issues: string[];
+}) {
+  if (loadContext !== "conservative") {
+    return;
+  }
+
+  const rowText = JSON.stringify(rows.filter((row) => !row.isRestDay));
+  if (
+    !/half_marathon_durability_tempo|half_marathon_aerobic_durability|controlled_steady_finish/.test(
+      rowText,
+    )
+  ) {
+    issues.push(
+      "Conservative Half Marathon preview must keep half-specific durability in workout segments.",
+    );
+  }
 }
 
 export function isHalfMarathonDevelopmentTouch(
@@ -88,43 +113,13 @@ export function isHalfMarathonDevelopmentTouch(
   return HALF_MARATHON_DEVELOPMENT_TOUCH_VALUES.includes(kind as HalfMarathonDevelopmentTouch);
 }
 
-function resolveConservativeHalfTouch(weekNumber: number): HalfMarathonDevelopmentTouch | null {
-  switch (weekNumber) {
-    case 2:
-      return "strides";
-    case 3:
-    case 6:
-    case 9:
-    case 11:
-      return "tempo";
-    default:
-      return null;
-  }
-}
-
-function resolveStandardHalfTouch(
-  runnerLevel: Exclude<RunningPlanRunnerLevel, "beginner_new_runner">,
-  weekNumber: number,
+function toHalfMarathonDevelopmentTouch(
+  touch: RunningPlanCompositionDevelopmentTouch | null,
 ): HalfMarathonDevelopmentTouch | null {
-  switch (weekNumber) {
-    case 2:
-      return "strides";
-    case 3:
-      return "tempo";
-    case 6:
-    case 11:
-      if (runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive") {
-        return "threshold";
-      }
-      return "tempo";
-    case 9:
-      if (runnerLevel === "professional_competitive") {
-        return "intervals";
-      }
-      return runnerLevel === "sometimes_runs" ? "intervals" : "tempo";
-    default:
-      return null;
-  }
+  return touch &&
+    HALF_MARATHON_DEVELOPMENT_TOUCH_VALUES.includes(touch as HalfMarathonDevelopmentTouch)
+    ? (touch as HalfMarathonDevelopmentTouch)
+    : null;
 }
 
 function validateHalfGlobalGates(

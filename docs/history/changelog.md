@@ -13,6 +13,29 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-10
+
+- Accepted the selected running-plan Create path for the rebuilt plan engine: `10K`, `Half Marathon`,
+  and `Marathon Base` previews now expose a reviewed `Create plan` action backed by server-side
+  review token/checksum validation, backend preview rebuild, canonical `training-plan-v2`
+  persistence through the existing active-plan seam, and built-server browser QA that created and
+  cleaned up a disposable Marathon Base active plan without client-sent rows, OpenAI generation, or
+  fake metric truth.
+
+## 2026-06-09
+
+- Simplified the `/hitoDS` route/specimen ownership without changing behavior: `/hitoDS` remains
+  the shell, navigation, hash, and registry owner while large reference-anatomy and specimen-preview
+  content moved into focused Hito DS modules; QA proved `/hitoDS`,
+  `/hitoDS#calendar-workout-playground`, and `/hitoDS#workout-library-playground` direct loads,
+  deep links, zero console warnings on a safe local production server, workout-library identity
+  counts, provider/mobile overflow handling, source boundaries, targeted lint, and build.
+- Deleted the obsolete product-failed Plan Preset algorithmic review expansion path and old harness
+  sources while preserving backend-owned card discovery and the accepted selected-plan preview
+  builders; QA proved no old review-draft builder, review-token, persistence-metadata, composition,
+  or algorithmic-quality-gate imports remain, current Plan Preset cards and running-plan preview
+  builders stay intact, validators pass, and production build remains green.
+
 ## 2026-06-07
 
 - Shipped Plan Presets for no-active-plan creation: runners can start from backend-owned

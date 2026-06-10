@@ -761,6 +761,23 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
 
   if (boundedHorizonResult.ok && boundedHorizonResult.status === "draft_ready") {
     assert.equal(
+      boundedHorizonResult.review.displayTitle,
+      "Marathon 3:50:00 target plan through 2026-12-11",
+      "long target-date structured review display title should describe the full plan through target date",
+    );
+    assert.equal(
+      /16-week/i.test(boundedHorizonResult.review.displayTitle),
+      false,
+      "long target-date structured review display title must not imply only the AI-authored opening window",
+    );
+    assert.equal(
+      /blueprint|opening blueprint|repaired_ai_draft|backendExtendedWeeks|requestedHorizonWeeks|aiAuthoredHorizonWeeks|ai_first_plan_blueprint_v1/i.test(
+        boundedHorizonResult.review.displayTitle,
+      ),
+      false,
+      "long target-date structured review display title must not expose internal source/debug terms",
+    );
+    assert.equal(
       boundedHorizonResult.draft.canonicalPlan.source_kind,
       "ai_first_plan_blueprint_v1",
       "long target-date structured first-plan review should remain blueprint-backed",

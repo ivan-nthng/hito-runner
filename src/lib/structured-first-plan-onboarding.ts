@@ -254,6 +254,7 @@ export interface StructuredFirstPlanProfilePatch {
 }
 
 export interface StructuredFirstPlanDraftReview {
+  displayTitle: string;
   runnerUnderstanding: {
     profile: string;
     benchmark: string;
@@ -442,6 +443,7 @@ export function buildStructuredFirstPlanDraftReview(
   const terrainFocus = authoringInput.preferences.terrainFocus ?? "standard";
 
   return {
+    displayTitle: buildStructuredReviewDisplayTitle(reviewInput, canonicalPlan, authoringInput),
     runnerUnderstanding: {
       profile: `${reviewInput.profile.age} years old, ${reviewInput.profile.weightKg} kg, ${reviewInput.profile.heightCm} cm.`,
       benchmark: formatBenchmarkReview(reviewInput.benchmark),
@@ -475,6 +477,39 @@ export function buildStructuredFirstPlanDraftReview(
     ],
     nextActions: ["ok_create_plan", "back_and_edit"],
   };
+}
+
+function buildStructuredReviewDisplayTitle(
+  input: StructuredFirstPlanOnboardingInput,
+  canonicalPlan: TrainingPlanV2,
+  authoringInput: StructuredFirstPlanAuthoringInput,
+) {
+  const goalLabel = formatGoalDistance(input.goal.goalDistance);
+  const goalFocusLabel = buildStructuredReviewGoalFocusLabel(input);
+  const targetDate = authoringInput.schedule.targetDate ?? canonicalPlan.target_date ?? null;
+
+  if (targetDate) {
+    return `${goalLabel} ${goalFocusLabel} plan through ${targetDate}`;
+  }
+
+  const horizonWeeks =
+    authoringInput.schedule.preparationHorizonWeeks ??
+    canonicalPlan.preparation_horizon_weeks ??
+    null;
+
+  if (horizonWeeks) {
+    return `${horizonWeeks}-week ${goalLabel} ${goalFocusLabel} plan`;
+  }
+
+  return `${goalLabel} ${goalFocusLabel} plan`;
+}
+
+function buildStructuredReviewGoalFocusLabel(input: StructuredFirstPlanOnboardingInput) {
+  if (input.goal.goalStyle === "target_time" && input.goal.targetTime) {
+    return `${input.goal.targetTime} target`;
+  }
+
+  return formatGoalStyle(input.goal.goalStyle);
 }
 
 function formatBenchmarkReview(benchmark: StructuredFirstPlanOnboardingInput["benchmark"]) {

@@ -8,15 +8,19 @@ import type {
 } from "@/lib/plan-presets/schema";
 import type {
   PlanPresetCardsActionResult,
+  RunningPlanConfirmActionResult,
   RunningPlanPreviewActionResult,
 } from "@/lib/training-api";
 import { cn } from "@/lib/utils";
 
 export type PlanPresetUiStatus = "idle" | "loading_cards" | "previewing_plan";
+type RunningPlanCreateStatus = "idle" | "creating";
 
 interface PlanPresetPanelProps {
   cardsResult: PlanPresetCardsActionResult | null;
+  confirmResult: RunningPlanConfirmActionResult | null;
   previewResult: RunningPlanPreviewActionResult | null;
+  createStatus: RunningPlanCreateStatus;
   error: string | null;
   status: PlanPresetUiStatus;
   isBusy: boolean;
@@ -27,15 +31,19 @@ interface PlanPresetPanelProps {
   onLoadCards: () => void;
   onSelectPlan: (cardId: PlanPresetCardId) => void;
   onRefreshPreview: () => void;
+  onCreatePlan: () => void;
   onUseAdvancedCustom: () => void;
 }
 
 export function PlanPresetPanel({
   cardsResult,
+  confirmResult,
+  createStatus,
   error,
   isBusy,
   isPresetDiscoveryReady,
   onLoadCards,
+  onCreatePlan,
   onPreviewOpenChange,
   onRefreshPreview,
   onSelectPlan,
@@ -137,10 +145,13 @@ export function PlanPresetPanel({
       <SelectedRunningPlanPreviewDialog
         open={previewOpen}
         onOpenChange={onPreviewOpenChange}
+        confirmResult={confirmResult}
+        createStatus={createStatus}
         result={previewResult}
         status={status}
         error={error}
         onRefresh={onRefreshPreview}
+        onCreate={onCreatePlan}
       />
     </section>
   );
@@ -243,7 +254,7 @@ function PlanPresetCardStateNote({ card }: { card: PlanPresetCardViewModel }) {
   if (card.state === "recommended" || card.state === "available") {
     return (
       <p className="hito-field-helper">
-        Opens a backend-shaped calendar preview. Create/confirm is not available yet.
+        Opens a backend-shaped calendar preview. Create confirms the reviewed plan server-side.
       </p>
     );
   }

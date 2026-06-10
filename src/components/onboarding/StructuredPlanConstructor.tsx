@@ -524,7 +524,6 @@ export function StructuredPlanConstructor({
         {isDraftReady ? (
           <StructuredDraftReadyReviewModal
             result={draftResult}
-            state={state}
             status={constructorStatus}
             isBusy={isBusy}
             onConfirmDraft={onConfirmDraft}
@@ -586,14 +585,12 @@ export function Field({
 
 function StructuredDraftReadyReviewModal({
   result,
-  state,
   status,
   isBusy,
   onConfirmDraft,
   onCancel,
 }: {
   result: StructuredDraftReady;
-  state: StructuredConstructorState;
   status: ConstructorStatus;
   isBusy: boolean;
   onConfirmDraft: () => void;
@@ -603,7 +600,6 @@ function StructuredDraftReadyReviewModal({
   const summary = result.draft.summary;
   const longHorizonReviewCopy = getLongHorizonReviewCopy(result);
   const durationLabel = summary.targetDate ? "Plan range" : "Plan length";
-  const reviewPlanName = getStructuredReviewPlanName(state);
 
   return (
     <Dialog
@@ -659,7 +655,7 @@ function StructuredDraftReadyReviewModal({
           <div className="hito-list-row items-start">
             <div className="grid gap-3">
               <p className="hito-form-label">Plan setup summary</p>
-              <StructuredReviewLine label="Plan" value={reviewPlanName} />
+              <StructuredReviewLine label="Plan" value={review.displayTitle} />
               <StructuredReviewLine label={durationLabel} value={review.planShape.durationLabel} />
               <StructuredReviewLine
                 label="Days per week"
@@ -796,73 +792,6 @@ function getLongHorizonReviewCopy(result: StructuredDraftReady) {
   }
 
   return "Hito reviewed your answers and prepared your full plan. The active plan is created only after the next explicit confirmation.";
-}
-
-const REVIEW_GOAL_LABELS: Record<GoalDistance, string> = {
-  build_consistency: "Consistency",
-  "5k": "5K",
-  "10k": "10K",
-  half_marathon: "Half Marathon",
-  marathon: "Marathon",
-  ultra_marathon: "Ultra Marathon",
-  mountain_running: "Mountain Running",
-};
-
-function getStructuredReviewPlanName(state: StructuredConstructorState) {
-  const goalLabel = REVIEW_GOAL_LABELS[state.goalDistance];
-
-  if (state.goalStyle === "target_time") {
-    const targetTimeLabel = formatReviewTargetTime(state.targetTime);
-    return targetTimeLabel
-      ? `${goalLabel} ${targetTimeLabel} Target Plan`
-      : `${goalLabel} Target Plan`;
-  }
-
-  if (state.goalDistance === "build_consistency") {
-    return "Consistency Plan";
-  }
-
-  const styleLabel = getReviewGoalStyleLabel(state.goalStyle);
-  return `${goalLabel} ${styleLabel} Plan`;
-}
-
-function getReviewGoalStyleLabel(goalStyle: Exclude<GoalStyle, "target_time">) {
-  if (goalStyle === "relaxed") {
-    return "Finish";
-  }
-
-  if (goalStyle === "ambitious") {
-    return "Ambitious";
-  }
-
-  return "Balanced";
-}
-
-function formatReviewTargetTime(value: string) {
-  const parts = value
-    .trim()
-    .split(":")
-    .map((part) => Number(part));
-
-  if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part))) {
-    return value.trim() || null;
-  }
-
-  const [hours, minutes, seconds] = parts;
-  const hasValidClockParts =
-    hours >= 0 && minutes >= 0 && minutes <= 59 && seconds >= 0 && seconds <= 59;
-
-  if (!hasValidClockParts) {
-    return value.trim() || null;
-  }
-
-  const minuteLabel = String(minutes).padStart(2, "0");
-
-  if (seconds === 0) {
-    return `${hours}:${minuteLabel}`;
-  }
-
-  return `${hours}:${minuteLabel}:${String(seconds).padStart(2, "0")}`;
 }
 
 const PRESET_RUNNING_DAY_OPTIONS: { value: string; label: string; copy: string }[] = [

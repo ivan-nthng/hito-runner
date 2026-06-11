@@ -13,8 +13,34 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-11
+
+- Extended manual user-built plans beyond the first workout: saved `manual_user_built_plan_v1`
+  calendars now show the existing compact `Add` action on eligible future empty days, review the
+  new workout through backend-owned manual authoring, and persist the added workout through the
+  accepted active-plan add seam without client-sent rows, segments, or persistence metadata. Focused
+  browser and DB QA proved the selected `Sun, Jun 14` date stayed consistent across the calendar,
+  Add menu, constructor, final confirmation, persisted readback, cleanup, and `375px` mobile layout.
+- Cleaned up runner-facing workout target display grammar: saved calendar and workout structure
+  surfaces now show bounded durations such as `46 min` and `9 min 24 sec` instead of raw floats or
+  decimal-prime shorthand, hide internal `Structure-only executable target` labels, and preserve
+  concrete structure-only prescriptions without fake pace or fake personal HR. Browser QA proved the
+  saved-plan fixture, workout detail, interval readback, mobile no-overflow, and disposable cleanup.
+- Added manual saved-template reuse to the manual builder: reviewed manual workouts can be saved
+  with a runner-provided display name and icon, reappear under `My saved templates` in the existing
+  template picker, and reconstruct backend-reviewed drafts before first create or before adding to
+  an existing manual active plan. Browser and DB QA proved `manual_saved_workout_template_v1`
+  metadata, existing-plan Add reuse, two-workout readback after Add, strict `structure_only` target
+  truth, mobile no-overflow, and disposable cleanup without adding copy/paste, recurrence, JSON
+  export, move-workout behavior, or frontend-owned template rows.
+
 ## 2026-06-10
 
+- Added the first manual user-built plan creation path: no-active-plan runners can choose
+  `Build my plan myself`, create and review an `Easy aerobic run`, then persist a
+  `manual_user_built_plan_v1` active plan through backend review token/checksum confirmation and
+  the existing active-plan persistence seam. Disposable browser QA proved the create-click flow,
+  exact one-row readback, strict structure-only metric truth, mobile no-overflow, and cleanup.
 - Accepted the selected running-plan Create path for the rebuilt plan engine: `10K`, `Half Marathon`,
   and `Marathon Base` previews now expose a reviewed `Create plan` action backed by server-side
   review token/checksum validation, backend preview rebuild, canonical `training-plan-v2`

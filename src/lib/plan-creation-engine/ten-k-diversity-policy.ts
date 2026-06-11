@@ -3,6 +3,11 @@ import {
   resolveRunningPlanCompositionWeek,
   type RunningPlanCompositionDevelopmentTouch,
 } from "@/lib/plan-creation-engine/composition-grammar";
+import {
+  resolveRunningPlanCutbackWeeks,
+  resolveRunningPlanEndpointWeek,
+  resolveRunningPlanTaperWeek,
+} from "@/lib/plan-creation-engine/horizon-policy";
 import type {
   RunningPlanRunnerLevel,
   RunningPlanWorkoutDayKind,
@@ -22,6 +27,7 @@ export interface TenKDiversityPolicyInput {
   runnerLevel: RunningPlanRunnerLevel;
   loadContext: TenKLoadContext;
   weekNumber: number;
+  horizonWeeks?: number;
 }
 
 export interface TenKDiversityValidationRow {
@@ -42,6 +48,7 @@ export function resolveTenKDevelopmentTouch({
   runnerLevel,
   loadContext,
   weekNumber,
+  horizonWeeks = TEN_K_ENDPOINT_WEEK,
 }: TenKDiversityPolicyInput): TenKDevelopmentTouch | null {
   return toTenKDevelopmentTouch(
     resolveRunningPlanCompositionWeek({
@@ -49,7 +56,7 @@ export function resolveTenKDevelopmentTouch({
       runnerLevel,
       loadContext,
       weekNumber,
-      horizonWeeks: TEN_K_ENDPOINT_WEEK,
+      horizonWeeks,
     }).developmentTouch,
   );
 }
@@ -62,18 +69,20 @@ export function validateTenKDiversityPolicy({
   const issues: string[] = [];
   const nonRestRows = rows.filter((row) => !row.isRestDay);
   const workoutKinds = new Set(nonRestRows.map((row) => row.workoutDayKind));
+  const horizonWeeks = maxWeekNumber(rows);
 
   validateGlobalDiversityGates(workoutKinds, issues);
   validateRunnerLevelDiversityGates({ runnerLevel, loadContext, workoutKinds, issues });
-  validateWeekRules(rows, issues);
+  validateWeekRules({ rows, horizonWeeks, issues });
   validateRecoverySpacing(rows, issues);
-  validateDevelopmentDensity(rows, issues);
+  validateDevelopmentDensity({ rows, horizonWeeks, issues });
+  validateLongHorizonAntiFlatness({ runnerLevel, loadContext, rows, horizonWeeks, issues });
   issues.push(
     ...collectRunningPlanCompositionGrammarIssues({
       family: "10K",
       runnerLevel,
       loadContext,
-      horizonWeeks: TEN_K_ENDPOINT_WEEK,
+      horizonWeeks,
       rows,
     }),
   );
@@ -175,8 +184,20 @@ function validateRunnerLevelDiversityGates({
   }
 }
 
-function validateWeekRules(rows: readonly TenKDiversityValidationRow[], issues: string[]) {
-  for (const cutbackWeek of TEN_K_CUTBACK_WEEKS) {
+function validateWeekRules({
+  rows,
+  horizonWeeks,
+  issues,
+}: {
+  rows: readonly TenKDiversityValidationRow[];
+  horizonWeeks: number;
+  issues: string[];
+}) {
+  const cutbackWeeks = resolveRunningPlanCutbackWeeks(horizonWeeks);
+  const taperWeek = resolveRunningPlanTaperWeek(horizonWeeks);
+  const endpointWeek = resolveRunningPlanEndpointWeek(horizonWeeks);
+
+  for (const cutbackWeek of cutbackWeeks) {
     const weekRows = rowsForWeek(rows, cutbackWeek);
     if (!weekRows.some((row) => row.workoutDayKind === "cutback_long_run")) {
       issues.push(`Week ${cutbackWeek} must include cutback_long_run.`);
@@ -189,20 +210,20 @@ function validateWeekRules(rows: readonly TenKDiversityValidationRow[], issues: 
     }
   }
 
-  const taperRows = rowsForWeek(rows, TEN_K_TAPER_SHARPENING_WEEK);
+  const taperRows = rowsForWeek(rows, taperWeek);
   if (!taperRows.some((row) => row.workoutDayKind === "strides")) {
-    issues.push("Week 9 must include strides.");
+    issues.push(`Week ${taperWeek} must include strides.`);
   }
   for (const forbiddenKind of ["intervals", "hills", "tempo", "threshold"] as const) {
     if (taperRows.some((row) => row.workoutDayKind === forbiddenKind)) {
-      issues.push(`Week 9 must not include ${forbiddenKind}.`);
+      issues.push(`Week ${taperWeek} must not include ${forbiddenKind}.`);
     }
   }
 
-  const endpointRows = rowsForWeek(rows, TEN_K_ENDPOINT_WEEK);
+  const endpointRows = rowsForWeek(rows, endpointWeek);
   const endpointNonRestRows = endpointRows.filter((row) => !row.isRestDay);
   if (!endpointNonRestRows.some((row) => row.workoutDayKind === "final_selected_distance_day")) {
-    issues.push("Week 10 must include final_selected_distance_day.");
+    issues.push(`Week ${endpointWeek} must include final_selected_distance_day.`);
   }
   for (const row of endpointNonRestRows) {
     if (
@@ -210,7 +231,7 @@ function validateWeekRules(rows: readonly TenKDiversityValidationRow[], issues: 
       row.workoutDayKind !== "easy" &&
       row.workoutDayKind !== "recovery"
     ) {
-      issues.push("Week 10 non-endpoint workouts must stay easy or recovery.");
+      issues.push(`Week ${endpointWeek} non-endpoint workouts must stay easy or recovery.`);
     }
   }
 }
@@ -243,8 +264,16 @@ function validateRecoverySpacing(rows: readonly TenKDiversityValidationRow[], is
   }
 }
 
-function validateDevelopmentDensity(rows: readonly TenKDiversityValidationRow[], issues: string[]) {
-  for (let weekNumber = 1; weekNumber <= TEN_K_ENDPOINT_WEEK; weekNumber += 1) {
+function validateDevelopmentDensity({
+  rows,
+  horizonWeeks,
+  issues,
+}: {
+  rows: readonly TenKDiversityValidationRow[];
+  horizonWeeks: number;
+  issues: string[];
+}) {
+  for (let weekNumber = 1; weekNumber <= horizonWeeks; weekNumber += 1) {
     const developmentRows = rowsForWeek(rows, weekNumber).filter((row) =>
       isTenKDevelopmentTouch(row.workoutDayKind),
     );
@@ -255,6 +284,66 @@ function validateDevelopmentDensity(rows: readonly TenKDiversityValidationRow[],
   }
 }
 
+function validateLongHorizonAntiFlatness({
+  runnerLevel,
+  loadContext,
+  rows,
+  horizonWeeks,
+  issues,
+}: {
+  runnerLevel: RunningPlanRunnerLevel;
+  loadContext: TenKLoadContext;
+  rows: readonly TenKDiversityValidationRow[];
+  horizonWeeks: number;
+  issues: string[];
+}) {
+  if (
+    horizonWeeks < 16 ||
+    runnerLevel === "beginner_new_runner" ||
+    loadContext !== "conservative"
+  ) {
+    return;
+  }
+
+  const developmentWeeks = uniqueNumbers(
+    rows
+      .filter((row) => !row.isRestDay && isTenKDevelopmentTouch(row.workoutDayKind))
+      .map((row) => row.weekNumber),
+  );
+  const observedGap = maxDevelopmentWeekGap(developmentWeeks, horizonWeeks);
+
+  if (developmentWeeks.length < 5 || observedGap > 10) {
+    issues.push(
+      `Long-horizon conservative 10K preview has excessive identity desert: ${developmentWeeks.join(", ") || "none"}.`,
+    );
+  }
+}
+
 function rowsForWeek(rows: readonly TenKDiversityValidationRow[], weekNumber: number) {
   return rows.filter((row) => row.weekNumber === weekNumber);
+}
+
+function maxWeekNumber(rows: readonly TenKDiversityValidationRow[]) {
+  return Math.max(...rows.map((row) => row.weekNumber));
+}
+
+function maxDevelopmentWeekGap(developmentWeeks: readonly number[], horizonWeeks: number) {
+  if (developmentWeeks.length === 0) {
+    return horizonWeeks;
+  }
+
+  const sortedWeeks = [...developmentWeeks].sort((a, b) => a - b);
+  const gaps = [sortedWeeks[0]! - 1];
+
+  for (let index = 1; index < sortedWeeks.length; index += 1) {
+    gaps.push(sortedWeeks[index]! - sortedWeeks[index - 1]!);
+  }
+
+  gaps.push(horizonWeeks - sortedWeeks[sortedWeeks.length - 1]!);
+
+  return Math.max(...gaps);
+}
+
+function uniqueNumbers(values: readonly number[]) {
+  return [...new Set(values)];
 }

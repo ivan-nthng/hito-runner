@@ -4,9 +4,12 @@ import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/ui/icon";
 import {
   displayExecutableTargetEntries,
+  displayWorkoutStructureEntries,
   feedbackMarkerMeta,
   formatDistanceKm,
   formatDate,
+  formatDurationMin,
+  formatPrescriptionDistanceKm,
   findWorkout,
   primaryWorkoutTarget,
   type TrainingSnapshot,
@@ -28,10 +31,12 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   const target = primaryWorkoutTarget(workout);
   const targetEntries = displayExecutableTargetEntries(target, workout.metricMode);
   const primaryTarget = targetEntries[0] ?? null;
+  const structureOnly = workout.metricMode.executableMode === "structure_only_executable";
+  const primaryStructureEntry =
+    !primaryTarget && structureOnly ? (displayWorkoutStructureEntries(workout)[0] ?? null) : null;
   const paceTarget = targetEntries.find(
     (entry) => entry.key === "pace_min_per_km_range" || entry.key === "pace",
   );
-  const structureOnly = workout.metricMode.executableMode === "structure_only_executable";
   const workoutSupportText = isRestDay
     ? "Keep the day light unless a small recovery assignment is actually planned."
     : (workout.notes?.trim() ?? "Open the workout for segment-by-segment instructions.");
@@ -68,11 +73,13 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
             <>
               <div className="hito-metric-row mt-8 max-w-3xl">
                 {km != null && <Metric label="Distance" value={formatDistanceKm(km)} unit="km" />}
-                {duration > 0 && <Metric label="Duration" value={`${duration}`} unit="min" />}
+                {duration > 0 && <Metric label="Duration" value={formatDurationMin(duration)} />}
                 {primaryTarget && (
                   <Metric label={primaryTarget.label} value={primaryTarget.value} />
                 )}
-                {!primaryTarget && structureOnly && <Metric label="Structure" value="Segments" />}
+                {primaryStructureEntry && (
+                  <Metric label={primaryStructureEntry.label} value={primaryStructureEntry.value} />
+                )}
                 {paceTarget && paceTarget.key !== primaryTarget?.key && (
                   <Metric label="Pace" value={paceTarget.value} />
                 )}
@@ -285,26 +292,25 @@ function summarizeUpcomingWorkout(
   }
 
   if (km && duration > 0) {
-    return `${formatDistanceKm(km)}km · ${duration}′`;
+    return `${formatDistanceKm(km)} km · ${formatDurationMin(duration)}`;
   }
 
   if (km) {
-    return `${formatDistanceKm(km)}km`;
+    return `${formatDistanceKm(km)} km`;
   }
 
   if (duration > 0) {
-    return `${duration}′`;
+    return formatDurationMin(duration);
   }
 
   const intervalStep = workout.steps.find((step) => step.repeats && step.work);
 
   if (intervalStep?.repeats && intervalStep.work?.distance_km) {
-    const meters = Math.round(intervalStep.work.distance_km * 1000);
-    return `${intervalStep.repeats} × ${meters}m`;
+    return `${intervalStep.repeats} x ${formatPrescriptionDistanceKm(intervalStep.work.distance_km)}`;
   }
 
   if (intervalStep?.repeats && intervalStep.work?.duration_min) {
-    return `${intervalStep.repeats} × ${intervalStep.work.duration_min}′`;
+    return `${intervalStep.repeats} x ${formatDurationMin(intervalStep.work.duration_min, "segment")}`;
   }
 
   return workoutTypeMeta(workout).label;

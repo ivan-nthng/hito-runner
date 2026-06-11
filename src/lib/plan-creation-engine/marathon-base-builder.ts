@@ -1,8 +1,7 @@
 import {
-  MARATHON_BASE_CUTBACK_WEEKS,
-  MARATHON_BASE_ENDPOINT_WEEK,
-  MARATHON_BASE_PLAN_BUILDER_WEEKS,
+  resolveMarathonBaseCutbackWeeks,
   resolveMarathonBaseDevelopmentTouch,
+  resolveMarathonBaseEndpointWeek,
   validateMarathonBaseDiversityPolicy,
 } from "@/lib/plan-creation-engine/marathon-base-diversity-policy";
 import {
@@ -92,9 +91,6 @@ export function buildMarathonBasePlanPreviewDraft(
     input,
     family: "Marathon Base",
     sourceKind: MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
-    allowRunnerLevel: (runnerLevel) => runnerLevel !== "beginner_new_runner",
-    blockedRunnerLevelMessage:
-      "Marathon Base preview is not available for beginner_new_runner in deterministic v1.",
   });
   if (!normalized.ok) {
     return {
@@ -103,10 +99,13 @@ export function buildMarathonBasePlanPreviewDraft(
     };
   }
 
+  const horizonWeeks = normalized.input.horizonSelection.horizonWeeks;
+  const cutbackWeeks = resolveMarathonBaseCutbackWeeks(horizonWeeks);
+  const endpointWeek = resolveMarathonBaseEndpointWeek(horizonWeeks);
   const calendarRows = buildRunningPlanCalendarRows({
     input: normalized.input,
     family: "Marathon Base",
-    horizonWeeks: MARATHON_BASE_PLAN_BUILDER_WEEKS,
+    horizonWeeks,
     rowIdPrefix: "marathon-base",
     recoveryAfterKinds: ["long_run", "cutback_long_run", "threshold", "hills"],
     selectWorkoutDayKind: ({
@@ -119,13 +118,11 @@ export function buildMarathonBasePlanPreviewDraft(
       loadContext,
     }) => {
       if (weekday === longRunDay) {
-        if (weekNumber === MARATHON_BASE_ENDPOINT_WEEK) {
+        if (weekNumber === endpointWeek) {
           return "marathon_base_endpoint";
         }
 
-        return MARATHON_BASE_CUTBACK_WEEKS.includes(weekNumber as never)
-          ? "cutback_long_run"
-          : "long_run";
+        return cutbackWeeks.includes(weekNumber) ? "cutback_long_run" : "long_run";
       }
 
       if (weekday === nextAfterLongRunDay && weekNumber > 1) {
@@ -136,12 +133,9 @@ export function buildMarathonBasePlanPreviewDraft(
         runnerLevel,
         loadContext,
         weekNumber,
+        horizonWeeks,
       });
-      if (
-        weekNumber < MARATHON_BASE_ENDPOINT_WEEK &&
-        weekday === developmentWeekday &&
-        developmentTouch
-      ) {
+      if (weekNumber < endpointWeek && weekday === developmentWeekday && developmentTouch) {
         return developmentTouch;
       }
 

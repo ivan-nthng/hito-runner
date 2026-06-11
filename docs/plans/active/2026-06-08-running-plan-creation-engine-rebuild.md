@@ -2,7 +2,7 @@
 
 ## Status
 
-selected_plan_create_accepted_ready_for_final_closeout
+universal_selected_distance_product_contract_defined_backend_confirm_next
 
 ## Type
 
@@ -14,68 +14,158 @@ high
 
 ## Next Recommended Role
 
-ARCHITECT
+BACKEND
 
 ## Task
 
-Final closeout/archive decision for the running-plan creation engine rebuild.
+Extend selected running-plan confirm/persist to Marathon Completion.
 
 ## Stage
 
-ARCHITECT closeout / selected-plan create accepted.
+BACKEND implementation / Marathon Completion selected-plan confirm-persist boundary.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: ARCHITECT
+ROLE: BACKEND
 
 Task:
-Final closeout/archive decision for the running-plan creation engine rebuild.
+Extend selected running-plan confirm/persist to Marathon Completion.
 
 Stage:
-ARCHITECT closeout / selected-plan create accepted.
+BACKEND implementation / Marathon Completion selected-plan confirm-persist boundary.
 
 PLAN:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md
 
+Product contract:
+/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/product-briefs/2026-06-11-universal-selected-distance-no-dead-end-ux-taxonomy.md
+
+Running Coach source-of-truth contract:
+/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-11-marathon-completion-selected-plan-family-contract.md
+
 Context:
-- The rebuilt selected running-plan preview-to-create path has passed backend, scoped remote
-  persistence, and built-server browser acceptance.
-- Accepted visible families: `10K`, `Half Marathon`, and `Marathon Base`.
-- Backend owns review token/checksum, server-side preview rebuild, exactness validation, canonical
-  `training-plan-v2` mapping, and persistence through `createFirstPlanFromReviewedCanonicalPlanForUser(...)`.
-- Frontend owns thin interaction wiring only and sends only `previewInput`, `planFamily`,
-  `sourceKind`, `reviewToken`, and `reviewChecksum`.
-- Built-server QA on `http://127.0.0.1:8099/` proved the Marathon Base `Create plan` path creates
-  exactly one active plan and `112` planned workouts, then cleans up disposable QA records.
-- This acceptance does not approve production rollout, active-plan replacement, manual workout CRUD,
-  OpenAI generation, DB/schema changes, or old Plan Preset confirm revival.
+- Product accepted the universal selected-distance no-dead-end UX taxonomy.
+- Hito should not block selected-distance plans because the runner is a beginner, low-volume,
+  conservative, slow, or needs a long timeline.
+- Long horizons are valid plan truth when they make the selected-distance request honest.
+- Backend deterministic preview support for `Marathon Completion` is QA-passed.
+- `Marathon Completion` is separate from `Marathon Base` and ends with exact `42195m` selected-distance endpoint proof.
+- `Marathon Base` remains base-only with `endpointDistanceMeters: null`, `marathon_base_endpoint`,
+  no `42195m` rows, and no forbidden runner-facing language.
+- Frontend should not expose a new `Finish a Marathon` selected-distance option until the
+  create/confirm/persist path is proven for this family.
 
-Your job:
-1. Read `AGENTS.md`, `agents/architect.agent.md`, `skills/hito-architecture-audit/SKILL.md`,
-   `skills/hito-plan-writing-and-closeout/SKILL.md`, and this active plan.
-2. Inspect current docs and determine whether the active rebuild plan's exit criteria are now met.
-3. If exit criteria are met, update final status/evidence and archive the plan.
-4. If any real acceptance gap remains, keep the plan active and choose exactly one bounded next
-   owner/gate.
-5. Preserve the accepted boundary: backend owns plan truth and persistence; frontend renders and
-   confirms only backend-shaped review truth.
-6. Keep service-size cleanup as the likely next track after final closeout, not inside this plan.
+Root cause and architecture fit:
+- Visible symptom: Hito can preview Marathon Completion, but user-facing exposure would be unsafe if
+  Create/confirm/persist exactness is not proven for this newly accepted family.
+- Underlying cause: selected-plan confirm/persist acceptance previously covered the earlier accepted
+  families, before Marathon Completion existed.
+- Canonical owner: backend selected running-plan review/confirm/persist contract.
+- Reuse the existing R8 selected-plan confirm path, server-side preview rebuild, review
+  token/checksum exactness, `training-plan-v2` mapping, and
+  `createFirstPlanFromReviewedCanonicalPlanForUser(...)`.
+- Do not create a parallel persistence path.
 
-Constraints:
-- Do not implement code.
-- Do not run new browser QA unless a specific missing proof is found.
-- Do not approve production rollout beyond accepted local/built-server QA evidence.
-- Do not add active-plan replacement, manual workout CRUD, OpenAI, DB/schema, target-time pace, fake
-  HR, no-watch/no-app, Plan Preset confirm revival, or new preset families.
-- Do not merge this closeout with the separate Hito Stack Simplification Strike implementation.
+Files to inspect:
+1. AGENTS.md
+2. agents/backend.agent.md
+3. skills/hito-backend-supabase-contract/SKILL.md
+4. skills/hito-plan-writing-and-closeout/SKILL.md
+5. the active plan and Product contract above
+6. the Marathon Completion Running Coach contract above
+7. src/lib/running-plan-engine-actions.ts
+8. src/lib/running-plan-engine-review.ts
+9. src/lib/active-plan-persistence.ts
+10. src/lib/imported-plan.ts
+11. src/lib/training-api.ts
+12. src/lib/plan-creation-engine/*
+13. scripts/validate-running-plan-engine-confirm.ts
+14. scripts/validate-running-plan-engine-r6-builders.ts
+15. scripts/generate-running-plan-engine-scenarios.ts
+
+Implement:
+1. Extend the selected running-plan confirm/persist contract so a reviewed `Marathon Completion`
+   preview can be confirmed and persisted safely.
+2. Rebuild the preview server-side during confirm; never trust client-sent rows, workouts, segments,
+   endpoint proof, or persistence metadata.
+3. Require review token/checksum exactness and reject stale/tampered mismatches.
+4. Persist through the existing canonical active-plan seam.
+5. Preserve exact `42195m` endpoint truth in the persisted plan rows/metadata.
+6. Preserve Marathon Base as base-only; do not let Base inherit `42195m`, completion endpoint,
+   target-time readiness, or race-readiness copy.
+7. Preserve 10K and Half exact endpoint behavior.
+8. Add or extend confirm harness proof for Marathon Completion:
+   - fresh confirm success
+   - changed start date/setup rejection
+   - invalid token rejection
+   - checksum mismatch rejection
+   - family/source mismatch rejection
+   - preview-unavailable rejection
+   - duplicate confirm / active-plan conflict
+   - no trusted client rows
+   - cleanup proof for disposable persistence
+9. Keep the path deterministic and OpenAI-free.
+
+What must not change:
+- No frontend exposure wiring.
+- No DB/schema migration unless source audit proves existing metadata cannot represent the family.
+- No active-plan replacement.
+- No Plan Preset confirm revival.
+- No manual-workout changes.
+- No OpenAI normal-path generation.
+- No fake pace.
+- No fake personal HR.
+- No target-time readiness or race-pace copy.
+- No Marathon Base overclaim.
 
 Validation:
-- `git diff --check -- docs/plans/active docs/plans/archive docs/current-product.md docs/current-system.md docs/current-state.md docs/history/changelog.md`
-- No build required unless product source is unexpectedly changed.
-
-Report using the standard Architecture / Cleanup / Plan Report format from AGENTS.md.
+- Run targeted ESLint for changed backend/source/script files.
+- Run `node --import tsx ./scripts/validate-running-plan-engine-source.ts`.
+- Run `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`.
+- Run `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`.
+- Run `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts`.
+- Run the non-mutating confirm harness.
+- If a safe local/disposable Supabase target is available, run scoped persistence proof with cleanup.
+  If only remote Supabase is configured, preserve the existing remote-mutation guard discipline and
+  report the live proof as QA-owned unless explicitly scoped.
+- Run `npm run build`.
+- Run scoped `git diff --check`.
 ```
+
+## Product Decision: Universal Selected-Distance No-Dead-End UX Taxonomy
+
+Status:
+
+accepted / next backend implementation gate selected.
+
+Source artifact:
+
+[universal-selected-distance-no-dead-end-ux-taxonomy.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/product-briefs/2026-06-11-universal-selected-distance-no-dead-end-ux-taxonomy.md>)
+
+Decision:
+
+- Treat no-dead-end as a universal selected-distance product law, not a Marathon-only exception.
+- Do not block preview or creation because the runner is a beginner, low-volume, conservative, slow,
+  ambitious, or needs a long timeline.
+- Auto-extend when more calendar time makes the plan honest.
+- Let the runner accept or reject the long plan after seeing it.
+- Preserve structural unavailable states only for insufficient days, impossible long-run placement,
+  unrecoverable recovery compression, unsupported family mapping, or a target date below the honest
+  family floor.
+
+Current taxonomy:
+
+- `Run 10K` maps to exact `10K` selected-distance family and exact `10000m`.
+- `Run a Half Marathon` maps to exact `Half Marathon` selected-distance family and exact `21100m`.
+- `Finish a Marathon` maps to `Marathon Completion` and exact `42195m`.
+- `Build Marathon Base` remains a separate base-building option with no `42195m` selected-distance
+  endpoint.
+
+Next gate:
+
+- BACKEND should extend selected running-plan confirm/persist proof to `Marathon Completion` before
+  Frontend exposes the new selected-distance option.
 
 ## Owner
 
@@ -83,7 +173,277 @@ ARCHITECT / RUNNING COACH / BACKEND / FRONTEND / QA
 
 ## Last Updated
 
-2026-06-10
+2026-06-11
+
+## Backend Marathon Completion Runner-Facing Copy Blocker Fix
+
+Status:
+
+implemented / QA-passed / accepted.
+
+Root cause:
+
+- Visible symptom: Marathon Completion preview rows contained runner-facing phrases such as
+  `race pace` / `race-pace` in negative caution copy.
+- Underlying cause: backend-owned runner-facing prescription/cue text and validator scanners were
+  not aligned with the Marathon Completion v1 contract; several validators only caught
+  `race_pace` and missed spaced/hyphenated/collapsed variants.
+- Canonical owner changed: running-plan engine prescription copy and shared runner-facing
+  forbidden-language validation, reused by preview builders, family diversity policy, source/R6
+  harnesses, and dynamic scenario matrix proof.
+
+What changed:
+
+- Replaced Marathon Completion runner-facing cues with completion-safe language that avoids
+  race-pace vocabulary.
+- Added a shared forbidden runner-facing language scanner for fake precise pace, personal HR,
+  effort-only legacy tokens, race/goal/target pace, target-time, and race-readiness/peak language
+  variants.
+- Updated dynamic scenario proof to expose a zero-count
+  `forbiddenRunnerFacingLanguageScenarioList` alongside fake pace/HR lists.
+- Preserved internal negative-proof metadata such as rejected old behavior tokens; the scanner is
+  applied to runner-facing rows/templates, not proof metadata.
+
+Next gate:
+
+- BACKEND confirm/persist widening for Marathon Completion before Frontend exposes it as a
+  selected-distance option.
+
+## Backend Marathon Completion Preview Family Result
+
+Status:
+
+implemented / QA-passed / accepted for deterministic preview-family scope.
+
+Root cause:
+
+- Visible symptom: Hito had `Marathon Base` as a base-only selected-plan family, but no honest
+  selected-distance full-marathon completion preview family.
+- Underlying cause: source-of-truth ownership did not yet include a dedicated Marathon Completion
+  family, endpoint gate, horizon policy, builder, diversity policy, or matrix proof.
+- Canonical owner changed: running-plan engine source model, horizon/composition policy,
+  prescription resolver, deterministic preview builder, scenario generator, and source/R6
+  validation harnesses.
+
+What changed:
+
+- Added dedicated `Marathon Completion` source-model family support.
+- Added exact `42195m` endpoint gate/template and deterministic preview builder.
+- Kept `Marathon Base` base-only with `marathon_base_endpoint` and `endpointDistanceMeters: null`.
+- Added Marathon Completion horizon policy by runner level/load context, conservative
+  run-walk/adaptation handling for beginners, cutback/taper roles, and completion-specific segment
+  anatomy.
+- Added diversity validation so Completion rejects Base endpoint substitution, hard intervals,
+  threshold/hills, fake pace/HR, target-time/race-pace claims, and identity-flat tails.
+- Updated source, R6, acceptance, and dynamic Running Coach matrix proof.
+
+Validation evidence:
+
+- targeted ESLint passed for `src/lib/plan-creation-engine/*.ts` and running-plan engine scripts.
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts` passed:
+  - `distanceFamilyCount: 4`
+  - `endpointTemplateCount: 4`
+  - `scenarioRuleCount: 16`
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts` passed:
+  - 10K remains `12` weeks / `84` rows / `60` non-rest / exact `10000m`
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts` passed:
+  - Half remains exact `21100m`
+  - Marathon Base remains `marathon_base_endpoint`
+  - Marathon Completion fixture: `28` weeks / `196` rows / `140` non-rest / exact `42195m`
+- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts` passed:
+  - acceptance pack: `17` scenarios / `17` preview-ready / `0` unavailable
+  - coach matrix: `624` scenarios / `399` preview-ready / `225` unavailable
+  - unresolved range count: `0`
+  - unresolved executable segment count: `0`
+  - coach-review subset count: `22`
+
+QA rerun acceptance evidence:
+
+- Acceptance pack: `17` scenarios, `17` preview-ready, `0` unavailable.
+- Dynamic coach matrix: `624` scenarios, `399` preview-ready, `225` unavailable.
+- `unresolvedRangeCount: 0`.
+- `unresolvedExecutableSegmentCount: 0`.
+- Fake precise pace list: `0`.
+- Fake personal HR list: `0`.
+- Forbidden runner-facing language list: `0`.
+- Artifact hygiene is clean.
+- `beginner_marathon_completion` produces `56` weeks, `392` rows, `280` non-rest rows,
+  `endpointDistanceMeters: 42195`, `finalWorkoutDayKind: final_selected_distance_day`, and
+  `forbiddenMatches: []`.
+- 10K endpoint remains exact `10000m`.
+- Half Marathon endpoint remains exact `21100m`.
+- Marathon Base remains `marathon_base_endpoint`, `endpointDistanceMeters: null`, has no `42195`
+  in calendar rows, and has `forbiddenMatches: []`.
+- Internal negative-proof metadata may still mention rejected terms, but QA accepted the
+  runner-facing scan boundary as correct.
+
+Acceptance decision:
+
+- Accept the Marathon Completion deterministic preview-family backend gate.
+- This acceptance is backend preview scope only. It does not claim frontend product exposure,
+  create/confirm/persist UI availability, production rollout, OpenAI behavior, DB/schema changes,
+  or Supabase mutation.
+- Keep Marathon Completion separate from Marathon Base. Do not let Base inherit `42195m`,
+  selected-distance endpoint behavior, or completion/race-readiness copy.
+
+Changelog decision:
+
+- Do not update [changelog.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md>) for this closeout.
+- Reason: this is QA-passed backend deterministic preview support and artifact validation, not yet
+  a user-facing product exposure or shipped runner flow. Add shipped-history only after the selected
+  product exposure/create path is accepted.
+
+Next gate:
+
+- BACKEND confirm/persist widening for Marathon Completion, using the accepted universal
+  selected-distance product taxonomy and preserving Marathon Base as base-only.
+
+## Architecture Decision: Universal No-Dead-End Running-Plan Doctrine
+
+Status:
+
+accepted / next backend implementation gate selected.
+
+Primary source of truth:
+
+[running-plan-universal-no-dead-end-doctrine.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md>)
+
+Related source artifacts:
+
+- [beginner-half-marathon-bridge-plan-contract.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-beginner-half-marathon-bridge-plan-contract.md>)
+- [running-plan-rich-composition-matrix.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-09-running-plan-rich-composition-matrix.md>)
+- [running-plan-engine-pattern-library-and-composition-grammar.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-09-running-plan-engine-pattern-library-and-composition-grammar.md>)
+
+Decision:
+
+- Accept the universal no-dead-end doctrine as canonical for the running-plan engine.
+- Treat the implemented beginner Half Marathon bridge as a valid partial specialization, not as the
+  full product boundary.
+- Replace normal runner-level/distance ambition blockers with backend-owned horizon selection plus
+  structural validation.
+- Auto-extend when more calendar time makes the plan honest. Do not ask the runner whether they
+  want more weeks, and do not offer a shorter unsafe version.
+- Preserve structural unavailable states only when time cannot honestly solve the request or when
+  the product does not yet have an honest family mapping.
+
+Valid unavailable reasons going forward:
+
+- insufficient available running days
+- blocked long-run day or impossible long-run placement
+- recovery compression that cannot be solved by adding more weeks
+- unsupported family mapping
+
+Invalid normal unavailable reasons:
+
+- `beginner_new_runner`
+- ambitious distance by itself
+- weak current fitness by itself
+- conservative or heavy load context by itself
+- long required duration by itself
+
+Family decisions:
+
+- `10K` remains an exact selected-distance family and should auto-extend when needed.
+- `Half Marathon` remains an exact selected-distance family; the beginner bridge is a
+  family-specific specialization under the global doctrine.
+- `Marathon Base` remains base-only. It must not become hidden Marathon Completion, race readiness,
+  target-time readiness, or selected-distance `42195m` endpoint. Beginner/conservative/heavy
+  contexts may receive a very long base path when structurally plausible.
+- `Marathon Completion` is required before Hito can honestly support a runner selecting
+  `I want to run a marathon` as a full selected-distance goal. Until that family contract exists,
+  true Marathon selected-distance should remain unavailable as `unsupported_family_mapping`, not
+  because the runner is too beginner.
+
+Current beginner Half QA gate:
+
+- The beginner Half backend implementation may still be QA-valid as a partial validation slice.
+- It is no longer the top-level acceptance gate for the product boundary.
+- Future QA should treat beginner Half as one specialization inside the global no-dead-end law,
+  while Backend next implements the global eligibility/horizon-selection layer.
+
+Next gate:
+
+- BACKEND: implement the global no-dead-end eligibility and horizon-selection layer for existing
+  running-plan preview families.
+- A separate RUNNING COACH / PRODUCT family contract is required later before implementing true
+  Marathon Completion.
+
+What remains forbidden:
+
+- frontend copy-only substitution for backend eligibility truth
+- OpenAI normal-path plan authorship
+- fake precise pace
+- fake personal HR
+- no-watch/no-app branches
+- weakening structural unavailable cases
+- turning Marathon Base into a full marathon plan
+- merging this with manual workout authoring, Plan Presets, or unrelated cleanup
+
+## Backend Beginner Half Marathon Bridge Implementation
+
+Status:
+
+implemented as a partial specialization / awaiting QA validation, but superseded as the top-level
+product boundary by the universal no-dead-end doctrine above.
+
+Primary source of truth:
+
+[beginner-half-marathon-bridge-plan-contract.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-beginner-half-marathon-bridge-plan-contract.md>)
+
+Root cause:
+
+- Visible symptom: beginner Half Marathon selected-plan preview could still resolve to
+  `Create unavailable`.
+- Underlying cause: the Half Marathon builder, diversity validator, and scenario matrix still
+  encoded the old `beginner_new_runner` unsupported gate.
+- Canonical owner: running-plan engine Half builder/policy, composition grammar, prescription
+  resolver, scenario generator, and R6 validation harness.
+
+What changed:
+
+- Added a focused backend policy owner for beginner Half Marathon bridge horizons, adaptation
+  windows, cutbacks, taper/endpoint week, development-touch cadence, and conservative long-run
+  bounds.
+- Updated the Half Marathon builder to auto-extend beginner bridge previews instead of treating
+  beginner runner level as unsupported.
+- Updated composition grammar and prescription resolver so beginner Half bridge weeks carry
+  run-walk/easy adaptation, frequent cutbacks, light strides, limited late tempo-like durability,
+  varied long-run checkpoints, and exact `21100m` endpoint proof.
+- Updated scenario rules and dynamic coach-review matrix assertions so beginner Half is
+  preview-ready for plausible `3d/4d/5d` standard and conservative schedules.
+- Preserved beginner Marathon Base as unavailable at the time of that narrow slice. This is now
+  superseded by the universal doctrine: Marathon Base should become an honest long base path when
+  structurally plausible, while true Marathon Completion remains a separate unsupported family
+  mapping until its own contract exists.
+
+Backend validation evidence:
+
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts` passed and proved:
+  - standard `5d` beginner Half: `24` weeks / `168` rows / `120` non-rest / exact `21100m`
+  - standard `4d` beginner Half: `28` weeks
+  - standard `3d` beginner Half: `32` weeks
+  - conservative `5d` beginner Half: `28` weeks
+  - conservative `4d` beginner Half: `32` weeks
+  - conservative `3d` beginner Half: `36` weeks
+- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts` passed with:
+  - acceptance scenarios: `13` total, `12` preview-ready, `1` unavailable
+  - dynamic matrix: `468` total, `276` preview-ready, `192` unavailable
+  - `unresolvedRangeCount: 0`
+  - `unresolvedExecutableSegmentCount: 0`
+  - `coachReviewSubsetCount: 16`
+
+Boundaries preserved:
+
+- No OpenAI path.
+- No create/confirm/persist path change.
+- No Supabase mutation or DB/schema change.
+- No fake precise pace or fake personal HR.
+- No frontend route/UI change in this backend slice.
+- Marathon Base beginner unsupported behavior was bounded in that narrow slice, but is now
+  superseded by the universal no-dead-end doctrine and must be replaced by honest long base
+  horizon selection when structurally plausible.
 
 ## Architecture Acceptance Closeout For Selected-Plan Create
 
@@ -617,9 +977,10 @@ Validation evidence:
   - preview-unavailable: `221`
   - unavailable reasons: `long_run_day_blocked: 33`, `insufficient_available_days: 80`,
     `builder_validation_failed: 30`, `unsupported_runner_level_for_family: 78`
-  - `coach-review-subset.json` now has `16` scenarios, including conservative Half, conservative
-    Marathon Base, blocked beginner Half, blocked long-run/rest conflict, and compressed
-    low-availability `builder_validation_failed`
+  - `coach-review-subset.json` had `16` scenarios at that checkpoint, including conservative Half,
+    conservative Marathon Base, then-blocked beginner Half, blocked long-run/rest conflict, and
+    compressed low-availability `builder_validation_failed`; the beginner Half outcome is superseded
+    by the later auto-extended bridge slice above.
   - fake precise pace scenario list remains empty
   - fake personal HR scenario list remains empty
   - forbidden composition combinations remain empty
@@ -647,11 +1008,284 @@ Validation evidence:
   - `470` total JSON files (`468` scenarios plus `summary.json` and `coach-review-subset.json`)
   - `0` unreferenced JSON files
   - `0` missing referenced scenario files
-  - dynamic matrix counts preserved: `468` total, `247` preview-ready, `221` unavailable
+  - then-current dynamic matrix counts preserved: `468` total, `247` preview-ready, `221`
+    unavailable
   - `unresolvedRangeCount: 0`
   - `unresolvedExecutableSegmentCount: 0`
   - fake precise pace list remains empty
   - fake personal HR list remains empty
+
+## Backend Universal No-Dead-End Horizon Result
+
+- Implemented the global backend-owned no-dead-end eligibility and horizon-selection layer as
+  `running_plan_horizon_policy_v1`.
+- Root cause: family builders and scenario validators still preserved older runner-level dead ends,
+  especially beginner Marathon Base, even when a longer honest horizon could safely produce a
+  preview.
+- Changed the canonical preview normalization/building seam so normal coach-plausible combinations
+  choose an honest horizon instead of returning `unsupported_runner_level_for_family`.
+- Horizon policy now owns current preview lengths:
+  - 10K standard `12-16` weeks and conservative `16-20` weeks depending on days/week.
+  - Half Marathon standard `24-32` weeks and conservative `28-36` weeks depending on days/week.
+  - Marathon Base standard `24-40` weeks and conservative `32-52` weeks depending on days/week.
+- Preserved structural unavailable states only:
+  - `long_run_day_blocked`
+  - `insufficient_available_days`
+  - `builder_validation_failed` for compressed calendars that cannot keep spacing/recovery safely
+- Updated Marathon Base beginner handling so the late long-run phase can carry conservative
+  time-on-feet / steady-finish durability while still avoiding hidden tempo, threshold, intervals,
+  hills, full-marathon endpoint, race readiness, or target-time claims.
+- Updated source, 10K, R6, and dynamic scenario validators so the old runner-level unavailable
+  path no longer counts as valid proof.
+- Regenerated the dynamic coach-review matrix:
+  - total scenarios: `468`
+  - preview-ready: `305`
+  - preview-unavailable: `163`
+  - unavailable reasons: `long_run_day_blocked: 39`, `insufficient_available_days: 84`,
+    `builder_validation_failed: 40`
+  - `unsupported_runner_level_for_family: 0`
+  - `coach-review-subset.json` now has `18` scenarios, including beginner and conservative
+    beginner Marathon Base preview-ready representatives
+  - unresolved range count remains `0`
+  - unresolved executable segment count remains `0`
+  - fake precise pace scenario list remains empty
+  - fake personal HR scenario list remains empty
+- Boundary preserved:
+  - no frontend route/UI change
+  - no Supabase mutation
+  - no DB/schema change
+  - no OpenAI path
+  - no create/confirm/persistence semantic change
+
+## QA Acceptance Closeout: Global No-Dead-End Horizon Selection
+
+Date: 2026-06-10
+
+Status:
+
+QA-passed / accepted for the backend/source/CLI/JSON gate.
+
+Root cause:
+
+- Visible symptom: some selected-plan cases could still become unavailable because the runner was a
+  beginner, conservative, heavy-load, or needed a long honest duration.
+- Underlying cause: eligibility remained partly encoded as runner-level/family blocking instead of
+  backend-owned horizon selection plus structural validation.
+- Canonical owner: running-plan engine eligibility/horizon policy and family builders.
+
+QA evidence recorded:
+
+- Browser was not used because this gate was backend/source/CLI/JSON only.
+- Acceptance pack: `13` scenarios, `13` preview-ready, `0` unavailable.
+- Dynamic coach matrix: `468` scenarios, `305` preview-ready, `163` unavailable.
+- Remaining unavailable reasons are structural only.
+- `unsupported_runner_level_for_family: 0`.
+- Beginner preview-ready count: `92`.
+- Conservative preview-ready count: `50`.
+- `unresolvedRangeCount: 0`.
+- `unresolvedExecutableSegmentCount: 0`.
+- 10K endpoint remains exact `10000m`.
+- Half Marathon endpoint remains exact `21100m`.
+- Marathon Base remains `marathon_base_endpoint`.
+- Marathon Base runner-facing rows have no `42195m`, race-readiness, race-pace, target-time, or
+  selected-distance endpoint claim.
+- No fake precise pace and no fake personal HR appeared in `draft.calendarRows`.
+- Artifact hygiene passed: `468` referenced scenario JSON files, `0` missing, `0`
+  stale/unreferenced.
+- Source audit found no Supabase, DB/schema, OpenAI, frontend/UI, create/confirm, persistence,
+  shipped 5K, target-time pace truth, or manual CRUD path introduced.
+- Validation passed: targeted ESLint, source validator, 10K validator, R6 validator, scenario
+  generator, build, and scoped diff check.
+
+Acceptance decision:
+
+- Accept the global no-dead-end backend gate as QA-passed.
+- The engine now proves it can build coach-plausible 10K, Half Marathon, and Marathon Base previews
+  through backend-owned dynamic horizons without normal runner-level dead ends.
+- Do not treat this as product rollout acceptance by itself. The next question is coaching quality:
+  whether newly preview-ready beginner, conservative, and long-horizon plans are rich, phased, and
+  credible enough rather than merely valid.
+
+Next gate:
+
+- RUNNING COACH quality audit of the newly expanded long-horizon matrix before further product/UX
+  rollout.
+
+What remains forbidden:
+
+- product code changes in this Architect closeout
+- frontend/UI work
+- create/confirm/persist/Supabase mutation
+- OpenAI normal-path authorship
+- fake precise pace or fake personal HR
+- Marathon Base overclaim or hidden Marathon Completion behavior
+- Marathon Completion implementation before a dedicated family contract exists
+- manual-workout merge into this running-plan track
+
+## Backend Long-Horizon Anti-Flatness Repair Result
+
+Date: 2026-06-10
+
+Status:
+
+BACKEND implemented / ready for Running Coach acceptance.
+
+Root cause:
+
+- Visible symptom: several newly preview-ready long-horizon Marathon Base beginner/conservative
+  scenarios were safe but read as too flat after early touches, especially across the middle and
+  second half of the plan.
+- Underlying cause: `running_plan_horizon_policy_v1` could safely extend horizons, but the
+  composition layer did not reintroduce soft family identity often enough for long horizons.
+- Canonical owner: running-plan source model, composition grammar, family diversity gates, and
+  scenario generator/readback.
+
+What changed:
+
+- Added canonical `steady_aerobic_run` as a numeric-structure support workout template. It is
+  watch-executable by structure and default editable HR cap only; it does not invent precise pace or
+  personal HR truth.
+- Added `steady_support_week`, `steady_aerobic_run` development-touch support, and family signals
+  for 10K and Marathon Base composition readback.
+- Added beginner/conservative Marathon Base soft bridge logic:
+  - early and mid-block strides
+  - later steady aerobic bridge weeks
+  - additional late steady bridge for very long horizons
+- Added conservative long-horizon 10K late tempo reminder so the plan does not disappear into a
+  long easy-only tail before taper/endpoint.
+- Added long-horizon anti-flatness gates to Marathon Base and 10K diversity validators so excessive
+  identity deserts fail source validation.
+- Regenerated scenarios with artifact hygiene preserved.
+
+Scenario evidence:
+
+- `matrix__marathon_base__beginner_new_runner__young_light__3d__none__sunday__normal_monday`:
+  `9:strides`, `17:strides`, `25:steady_aerobic_run`, `33:steady_aerobic_run`, `39:strides`.
+- `matrix__marathon_base__beginner_new_runner__young_light__5d__monday_friday__sunday__normal_monday`:
+  `5:strides`, `11:strides`, `15:steady_aerobic_run`, `23:strides`.
+- `beginner_marathon_base`: `5:strides`, `11:strides`, `15:steady_aerobic_run`, `23:strides`.
+- `matrix__marathon_base__beginner_new_runner__older_heavier__5d__none__unset_default__normal_monday`:
+  `7:strides`, `14:strides`, `21:steady_aerobic_run`, `27:steady_aerobic_run`,
+  `31:strides`.
+- `matrix__marathon_base__runs_a_lot__older_heavier__3d__none__sunday__midweek_wednesday`:
+  `2:strides`, `3:tempo`, `6:strides`, `10:tempo`, `17:steady_aerobic_run`,
+  `26:steady_aerobic_run`, `37:steady_aerobic_run`, `45:steady_aerobic_run`,
+  `51:strides`.
+- `matrix__10k__sometimes_runs__older_heavier__3d__wednesday_saturday__unset_default__midweek_wednesday`:
+  `2:strides`, `3:tempo`, `5:strides`, `7:tempo`, `13:tempo`, `19:strides`.
+
+Preserved behavior:
+
+- Dynamic coach matrix remains `468` total scenarios, `305` preview-ready, `163` unavailable.
+- Acceptance pack remains `13` scenarios, `13` preview-ready, `0` unavailable.
+- `unsupported_runner_level_for_family` remains `0`.
+- `unresolvedRangeCount: 0`.
+- `unresolvedExecutableSegmentCount: 0`.
+- Fake precise pace list remains empty.
+- Fake personal HR list remains empty.
+- Marathon Base remains a base endpoint, not hidden Marathon Completion or `42195m` readiness.
+- No frontend/UI, Supabase, DB/schema, OpenAI, create/confirm/persistence, manual workout, or Plan
+  Preset behavior changed.
+
+Next gate:
+
+- RUNNING COACH acceptance check of the anti-flatness repair before product/UX rollout continues.
+
+## Running Coach Acceptance Closeout: Long-Horizon Anti-Flatness Repair
+
+Date: 2026-06-11
+
+Status:
+
+Running Coach accepted / QA technical acceptance passed / next family-contract gate selected.
+
+Acceptance artifact:
+
+[running-plan-anti-flatness-repair-coach-acceptance.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-11-running-plan-anti-flatness-repair-coach-acceptance.md>)
+
+Previous audit:
+
+[running-plan-no-dead-end-long-horizon-coach-audit.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-no-dead-end-long-horizon-coach-audit.md>)
+
+Root cause:
+
+- Visible symptom: long-horizon beginner/conservative previews were safe but read as too flat,
+  especially Marathon Base plans where soft midweek identity disappeared for long spans.
+- Underlying cause: horizon selection could extend plans safely, but composition did not
+  reintroduce enough soft phase meaning across long horizons.
+- Canonical owner: running-plan composition grammar, family diversity gates, and generated
+  scenario validation.
+
+Running Coach evidence accepted:
+
+- Repaired long-horizon `Marathon Base` beginner/conservative plans now have enough soft midweek
+  phase meaning.
+- `steady_aerobic_run` and `steady_support_week` improve base identity without turning
+  `Marathon Base` into hidden Marathon Completion.
+- Conservative long-horizon `10K` late-plan identity desert is closed by the added late reminder.
+- No new coaching blocker was found.
+- No new safety issue, fake precise pace, fake personal HR, hidden `42195m`, or race-readiness
+  overclaim was found.
+
+QA technical evidence accepted:
+
+- Browser was not used because this was source/CLI/build/JSON artifact validation only.
+- ESLint passed for `plan-creation-engine` and scenario scripts.
+- 10K builder validator passed.
+- R6 builders validator passed.
+- Scenario generator passed.
+- `npm run build` passed.
+- Scoped `git diff --check` passed.
+- Acceptance pack remains `13` scenarios, `13` preview-ready, `0` unavailable.
+- Dynamic matrix remains `468` scenarios, `305` preview-ready, `163` unavailable.
+- Remaining unavailable reasons are structural only.
+- `unsupported_runner_level_for_family: 0`.
+- `unresolvedRangeCount: 0`.
+- `unresolvedExecutableSegmentCount: 0`.
+- 10K endpoint remains exact `10000m`.
+- Half Marathon endpoint remains exact `21100m`.
+- Marathon Base remains `marathon_base_endpoint`.
+- No fake precise pace or fake personal HR appeared.
+- Marathon Base has no `42195m`, race-readiness, race-pace, target-time, or selected-distance
+  endpoint claim.
+- Artifact hygiene is clean: `468` referenced scenario JSON files, `0` missing, `0`
+  stale/unreferenced.
+- Boundary proof remains preview-only: no Supabase mutation, OpenAI, frontend/UI,
+  create/confirm/persist semantic change, manual workout path, or Plan Preset behavior was
+  introduced.
+
+Architecture decision:
+
+- Accept the long-horizon anti-flatness repair as complete for this preview-engine checkpoint.
+- Running Coach acceptance proves the coaching-quality boundary.
+- QA source/CLI/build/JSON validation proves the technical regression boundary.
+- No additional QA is required for this anti-flatness repair before selecting the next
+  running-plan engine product gate.
+- Keep the repair scoped to deterministic preview quality. It does not expand create/confirm,
+  persistence, frontend UI, OpenAI generation, or Marathon Completion behavior.
+
+Changelog decision:
+
+- Do not update [changelog.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md>) for this closeout.
+- Reason: this is QA-passed internal engine-quality work for preview artifacts, not a new
+  user-facing shipped behavior by itself. A later user-visible running-plan release or final
+  rebuild closeout can add the shipped-history entry with the complete product surface.
+
+Next gate:
+
+- RUNNING COACH source-of-truth contract for a dedicated `Marathon Completion` selected-plan
+  family, separate from `Marathon Base`.
+
+What remains forbidden:
+
+- frontend/UI work
+- create/confirm/persist/Supabase mutation
+- DB/schema changes
+- OpenAI normal-path generation
+- fake precise pace or fake personal HR
+- Marathon Base overclaim or hidden Marathon Completion behavior
+- Marathon Completion implementation before a dedicated family contract exists
+- manual-workout, Plan Preset, or cleanup-track merge into this running-plan gate
 
 ## Post Selected-Plan Preview Feedback Decision
 
@@ -1846,4 +2480,10 @@ Acceptance QA must prove:
   selected-plan Create browser QA.
 - R8 confirm/persist is accepted through scoped remote persistence proof and built-server browser
   Create proof.
-- No current blocker remains for Architect final closeout/archive decision.
+- Running Coach accepted the long-horizon anti-flatness repair.
+- QA accepted the long-horizon anti-flatness repair with source/CLI/build/JSON proof.
+- Running Coach produced the Marathon Completion family contract.
+- Backend implemented and QA accepted the Marathon Completion deterministic preview family.
+- Product accepted the universal selected-distance no-dead-end UX taxonomy.
+- Current gate before frontend exposure: BACKEND confirm/persist widening for Marathon Completion,
+  while preserving `Marathon Base` as base-only.

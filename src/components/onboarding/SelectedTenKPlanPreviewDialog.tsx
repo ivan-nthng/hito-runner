@@ -935,5 +935,5 @@ function truthModeReadback(mode: SelectedRunningPlanCalendarRow["targetTruthMode
     return "Default HR guidance is advisory, not personal HR target truth.";
   }
 
-  return "Structure-only executable target.";
+  return "Executable structure: duration, distance, repeats, work, and recovery.";
 }

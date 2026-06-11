@@ -284,13 +284,123 @@ const stridesTemplate: RunningPlanWorkoutDayTemplate = {
   ],
 };
 
+const steadyAerobicRunTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "steady_aerobic_run",
+  label: "Steady Aerobic Run",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ["10K", "Half Marathon", "Marathon Base", "Marathon Completion"],
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "steady_warmup",
+      order: 1,
+      segmentRole: "warmup",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(10),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Ease into the steady work.",
+    },
+    {
+      id: "steady_main",
+      order: 2,
+      segmentRole: "main",
+      primaryPrescription: {
+        mode: "time_with_default_hr_cap",
+        durationSeconds: seconds(20, 35),
+        defaultHrZoneLabelOrCap: "editable default HR cap",
+        intensityLabel: "steady_aerobic",
+      },
+      targetTruthMode: "editable_default_hr",
+      secondaryCue: "Smooth and controlled; this is base support, not race work.",
+    },
+    {
+      id: "steady_cooldown",
+      order: 3,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(5, 8),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Back off before the finish.",
+    },
+  ],
+};
+
+const progressionTemplate: RunningPlanWorkoutDayTemplate = {
+  kind: "progression",
+  label: "Progression Run",
+  watchExecutable: true,
+  primaryContract: "numeric_structure",
+  targetTruthModes: ["structure_only", "editable_default_hr"],
+  allowedFamilies: ["Half Marathon", "Marathon Completion"],
+  cueRole: "secondary_only",
+  segments: [
+    {
+      id: "progression_warmup",
+      order: 1,
+      segmentRole: "warmup",
+      primaryPrescription: {
+        mode: "open_warmup",
+        durationSeconds: seconds(10, 12),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Start relaxed before building.",
+    },
+    {
+      id: "progression_main",
+      order: 2,
+      segmentRole: "main",
+      primaryPrescription: {
+        mode: "time_with_default_hr_cap",
+        durationSeconds: seconds(25, 40),
+        defaultHrZoneLabelOrCap: "editable default HR cap",
+        intensityLabel: "controlled_progression",
+      },
+      targetTruthMode: "editable_default_hr",
+      secondaryCue: "Build gently from easy to steady; never chase pace.",
+    },
+    {
+      id: "progression_finish",
+      order: 3,
+      segmentRole: "finish",
+      primaryPrescription: {
+        mode: "time",
+        durationSeconds: seconds(5, 8),
+        intensityLabel: "steady_but_controlled",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Finish a touch steadier while staying composed.",
+    },
+    {
+      id: "progression_cooldown",
+      order: 4,
+      segmentRole: "cooldown",
+      primaryPrescription: {
+        mode: "open_cooldown",
+        durationSeconds: seconds(5, 8),
+        intensityLabel: "easy",
+      },
+      targetTruthMode: "structure_only",
+      secondaryCue: "Let effort come back down.",
+    },
+  ],
+};
+
 const tempoTemplate: RunningPlanWorkoutDayTemplate = {
   kind: "tempo",
   label: "Tempo Run",
   watchExecutable: true,
   primaryContract: "numeric_structure",
   targetTruthModes: ["structure_only", "editable_default_hr"],
-  allowedFamilies: ["10K", "Half Marathon", "Marathon Base"],
+  allowedFamilies: ["10K", "Half Marathon", "Marathon Base", "Marathon Completion"],
   cueRole: "secondary_only",
   segments: [
     {
@@ -518,6 +628,8 @@ export const workoutDayTemplates: RunningPlanEngineSourceModel["workoutDayTempla
   long_run: longRunTemplate,
   cutback_long_run: cutbackLongRunTemplate,
   strides: stridesTemplate,
+  steady_aerobic_run: steadyAerobicRunTemplate,
+  progression: progressionTemplate,
   tempo: tempoTemplate,
   threshold: thresholdTemplate,
   intervals: intervalsTemplate,

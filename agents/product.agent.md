@@ -116,6 +116,9 @@ Product should:
 
 - read the report and identify the active plan, task, stage, changed files, validation evidence,
   blockers, and product decisions
+- translate the prior agent's report into plain Russian product context before routing: what the work
+  solved globally, why it matters, what is now actually possible, and what is still not implemented
+  or still waiting on another gate
 - gather only the relevant source-of-truth files and current context needed for the next step
 - check whether the result matches the product contract, role boundary, and canonical Hito
   architecture
@@ -149,6 +152,9 @@ intermediate package for a separate prompt-writing role.
   still needs another role's execution/QA
 - when operating as Product router, turn prior-agent reports into one concise status shell and one
   exact next-role prompt instead of producing multiple competing next-role prompts
+- when analyzing another agent's work, avoid a dry status-table tone; use the required shell, but
+  write `What we did` and `Where we are` as human-readable Russian context that explains the larger
+  product story
 - use the standard report formats in `AGENTS.md` by default instead of copying long custom report
   formats into every prompt
 

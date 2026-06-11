@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   buildHalfMarathonPlanPreviewDraft,
   buildMarathonBasePlanPreviewDraft,
+  buildMarathonCompletionPlanPreviewDraft,
   buildTenKPlanPreviewDraft,
   isRunningPlanCompositionDevelopmentTouch,
   resolveRunningPlanCompositionWeek,
@@ -17,6 +18,7 @@ import {
   type RunningPlanPreviewLoadContext,
   type RunningPlanRunnerLevel,
 } from "../src/lib/plan-creation-engine";
+import { findForbiddenRunnerFacingLanguageMatchesInText } from "../src/lib/plan-creation-engine/forbidden-runner-facing-language";
 import {
   buildCoachReviewScenarioDefinitions,
   buildCoachReviewSubset,
@@ -61,6 +63,30 @@ const scenarios: readonly ScenarioDefinition[] = [
   scenario(
     "professional_competitive_marathon_base",
     "Marathon Base",
+    "professional_competitive",
+    "young_light",
+  ),
+  scenario(
+    "beginner_marathon_completion",
+    "Marathon Completion",
+    "beginner_new_runner",
+    "average_adult",
+  ),
+  scenario(
+    "sometimes_runs_marathon_completion",
+    "Marathon Completion",
+    "sometimes_runs",
+    "average_adult",
+  ),
+  scenario(
+    "runs_a_lot_heavy_marathon_completion",
+    "Marathon Completion",
+    "runs_a_lot",
+    "older_heavier",
+  ),
+  scenario(
+    "professional_competitive_marathon_completion",
+    "Marathon Completion",
     "professional_competitive",
     "young_light",
   ),
@@ -261,6 +287,8 @@ function buildScenarioOutput(definition: ScenarioDefinition) {
     exactness,
     fakePrecisePaceAppears: metricTruthScan.fakePrecisePaceMatches.length > 0,
     fakePersonalHrAppears: metricTruthScan.fakePersonalHrMatches.length > 0,
+    forbiddenRunnerFacingLanguageAppears:
+      metricTruthScan.forbiddenRunnerFacingLanguageMatches.length > 0,
     defaultHrReadback: {
       appears: metricTruthScan.editableDefaultHrMatches.length > 0,
       labelledEditableDefaultAdvisory:
@@ -281,7 +309,11 @@ function buildScenario(input: ScenarioInput) {
     return buildHalfMarathonPlanPreviewDraft(input as BuildRunningPlanPreviewInput);
   }
 
-  return buildMarathonBasePlanPreviewDraft(input as BuildRunningPlanPreviewInput);
+  if (input.distanceFamily === "Marathon Base") {
+    return buildMarathonBasePlanPreviewDraft(input as BuildRunningPlanPreviewInput);
+  }
+
+  return buildMarathonCompletionPlanPreviewDraft(input as BuildRunningPlanPreviewInput);
 }
 
 function buildSummary(
@@ -385,6 +417,13 @@ function buildSummary(
             output.endpointProof.endpointDistanceMeters === null,
         )
         .map((output) => output.scenarioId),
+      marathonCompletionExactEndpointScenarios: readyOutputs
+        .filter(
+          (output) =>
+            output.family === "Marathon Completion" &&
+            output.endpointProof.endpointDistanceMeters === 42_195,
+        )
+        .map((output) => output.scenarioId),
     },
     unresolvedRangeCount,
     unresolvedExecutableSegmentCount,
@@ -396,6 +435,9 @@ function buildSummary(
         .map((output) => output.scenarioId),
       fakePersonalHrScenarioList: readyOutputs
         .filter((output) => output.fakePersonalHrAppears)
+        .map((output) => output.scenarioId),
+      forbiddenRunnerFacingLanguageScenarioList: readyOutputs
+        .filter((output) => output.forbiddenRunnerFacingLanguageAppears)
         .map((output) => output.scenarioId),
       editableDefaultHrAdvisoryScenarioList: readyOutputs
         .filter((output) => output.defaultHrReadback.appears)
@@ -463,6 +505,7 @@ function buildSummary(
         exactness: output.exactness,
         fakePrecisePaceAppears: output.fakePrecisePaceAppears,
         fakePersonalHrAppears: output.fakePersonalHrAppears,
+        forbiddenRunnerFacingLanguageAppears: output.forbiddenRunnerFacingLanguageAppears,
         defaultHrReadback: output.defaultHrReadback,
         metricTruthScan: output.metricTruthScan,
       };
@@ -530,13 +573,10 @@ function summarizeExactness(rows: readonly RunningPlanPreviewCalendarRow[]) {
 }
 
 function validateScenarioProof(summary: ReturnType<typeof buildSummary>) {
-  assert.equal(summary.scenarioCount, 13);
+  assert.equal(summary.scenarioCount, 17);
   assert.equal(summary.unresolvedRangeCount, 0);
   assert.equal(summary.unresolvedExecutableSegmentCount, 0);
-  assert.deepEqual(
-    summary.unavailableScenarios.map((scenario) => scenario.scenarioId),
-    ["beginner_half_marathon", "beginner_marathon_base"],
-  );
+  assert.deepEqual(summary.unavailableScenarios, []);
 
   const comparison = new Map(
     summary.scenarioComparison.map((entry) => [entry.scenarioId, entry] as const),
@@ -546,21 +586,37 @@ function validateScenarioProof(summary: ReturnType<typeof buildSummary>) {
   const proHalf = comparison.get("professional_competitive_half_marathon");
   const runsALotHalf = comparison.get("runs_a_lot_half_marathon");
   const sometimesHalf = comparison.get("sometimes_runs_half_marathon");
+  const beginnerHalf = comparison.get("beginner_half_marathon");
+  const beginnerMarathon = comparison.get("beginner_marathon_base");
   const proMarathon = comparison.get("professional_competitive_marathon_base");
   const sometimesMarathon = comparison.get("sometimes_runs_marathon_base");
   const runsALotMarathon = comparison.get("runs_a_lot_heavy_marathon_base");
+  const beginnerMarathonCompletion = comparison.get("beginner_marathon_completion");
+  const sometimesMarathonCompletion = comparison.get("sometimes_runs_marathon_completion");
+  const runsALotMarathonCompletion = comparison.get("runs_a_lot_heavy_marathon_completion");
+  const proMarathonCompletion = comparison.get("professional_competitive_marathon_completion");
 
   assertReady(tenK);
   assertReady(runsALotTenK);
   assertReady(sometimesHalf);
+  assertReady(beginnerHalf);
+  assertReady(beginnerMarathon);
   assertReady(proHalf);
   assertReady(runsALotHalf);
   assertReady(sometimesMarathon);
   assertReady(proMarathon);
   assertReady(runsALotMarathon);
+  assertReady(beginnerMarathonCompletion);
+  assertReady(sometimesMarathonCompletion);
+  assertReady(runsALotMarathonCompletion);
+  assertReady(proMarathonCompletion);
   assert.notDeepEqual(tenK.developmentSequence, runsALotTenK.developmentSequence);
   assert.notDeepEqual(proHalf.developmentSequence, runsALotHalf.developmentSequence);
   assert.notDeepEqual(proMarathon.developmentSequence, runsALotMarathon.developmentSequence);
+  assert.notDeepEqual(
+    proMarathonCompletion.developmentSequence,
+    runsALotMarathonCompletion.developmentSequence,
+  );
   assert.equal(tenK.endpointProof.endpointDistanceMeters, 10_000);
   assert.ok(
     sometimesHalf.durabilitySignals.halfSpecificDurabilityRows.length > 0,
@@ -570,12 +626,88 @@ function validateScenarioProof(summary: ReturnType<typeof buildSummary>) {
     sometimesHalf.longRunDetailVariety.checkpointIntentCount >= 2,
     "sometimes_runs_half_marathon long runs must vary checkpoint intent.",
   );
+  assert.equal(beginnerHalf.weekCount, 24);
+  assert.equal(beginnerHalf.rowCount, 168);
+  assert.equal(beginnerHalf.nonRestRowCount, 120);
+  assert.equal(beginnerHalf.endpointProof.endpointDistanceMeters, 21_100);
+  assert.equal(beginnerHalf.workoutKindCounts.threshold ?? 0, 0);
+  assert.equal(beginnerHalf.workoutKindCounts.intervals ?? 0, 0);
+  assert.equal(beginnerHalf.workoutKindCounts.hills ?? 0, 0);
+  assert.ok(
+    beginnerHalf.workoutKindCounts.strides >= 3,
+    "beginner_half_marathon must include light strides after adaptation.",
+  );
+  assert.ok(
+    beginnerHalf.workoutKindCounts.cutback_long_run >= 4,
+    "beginner_half_marathon must include repeated cutback long runs.",
+  );
+  assert.ok(
+    beginnerHalf.durabilitySignals.halfSpecificDurabilityRows.length > 0,
+    "beginner_half_marathon must expose half-specific durability signal.",
+  );
+  assert.ok(
+    beginnerHalf.longRunDetailVariety.checkpointIntentCount >= 2,
+    "beginner_half_marathon long runs must vary checkpoint intent.",
+  );
+  assert.equal(beginnerMarathon.weekCount, 24);
+  assert.equal(beginnerMarathon.rowCount, 168);
+  assert.equal(beginnerMarathon.nonRestRowCount, 120);
+  assert.equal(beginnerMarathon.endpointProof.endpointDistanceMeters, null);
+  assert.equal(beginnerMarathon.workoutKindCounts.tempo ?? 0, 0);
+  assert.equal(beginnerMarathon.workoutKindCounts.threshold ?? 0, 0);
+  assert.equal(beginnerMarathon.workoutKindCounts.intervals ?? 0, 0);
+  assert.equal(beginnerMarathon.workoutKindCounts.hills ?? 0, 0);
+  assert.ok(
+    beginnerMarathon.compositionGrammar.familySignals.some((signal) =>
+      ["marathon_base_time_on_feet", "marathon_base_steady_finish"].includes(signal),
+    ),
+    "beginner_marathon_base must use conservative durability before the base endpoint.",
+  );
+  assert.ok(
+    beginnerMarathon.longRunDetailVariety.finishIntentCount >= 2,
+    "beginner_marathon_base long runs must vary finish intent without marathon race-readiness claims.",
+  );
   assert.ok(
     sometimesMarathon.longRunDetailVariety.finishIntentCount >= 2,
     "sometimes_runs_marathon_base long runs must vary finish intent.",
   );
   assert.equal(proHalf.endpointProof.endpointDistanceMeters, 21_100);
   assert.equal(proMarathon.endpointProof.endpointDistanceMeters, null);
+  assert.equal(beginnerMarathonCompletion.weekCount, 56);
+  assert.equal(beginnerMarathonCompletion.rowCount, 392);
+  assert.equal(beginnerMarathonCompletion.nonRestRowCount, 280);
+  assert.equal(beginnerMarathonCompletion.endpointProof.endpointDistanceMeters, 42_195);
+  assert.equal(beginnerMarathonCompletion.workoutKindCounts.marathon_base_endpoint ?? 0, 0);
+  assert.equal(beginnerMarathonCompletion.workoutKindCounts.tempo ?? 0, 0);
+  assert.equal(beginnerMarathonCompletion.workoutKindCounts.threshold ?? 0, 0);
+  assert.equal(beginnerMarathonCompletion.workoutKindCounts.intervals ?? 0, 0);
+  assert.equal(beginnerMarathonCompletion.workoutKindCounts.hills ?? 0, 0);
+  assert.ok(
+    beginnerMarathonCompletion.workoutKindCounts.strides >= 4,
+    "beginner_marathon_completion must include gentle stride support.",
+  );
+  assert.ok(
+    beginnerMarathonCompletion.workoutKindCounts.steady_aerobic_run >= 4,
+    "beginner_marathon_completion must include steady support without hard intensity.",
+  );
+  assert.ok(
+    beginnerMarathonCompletion.compositionGrammar.familySignals.includes(
+      "marathon_completion_exact_endpoint",
+    ),
+    "beginner_marathon_completion must prove exact 42195m endpoint grammar signal.",
+  );
+  assert.ok(
+    beginnerMarathonCompletion.compositionGrammar.familySignals.includes(
+      "marathon_completion_long_run_durability",
+    ),
+    "beginner_marathon_completion must prove long-run durability grammar signal.",
+  );
+  assert.equal(sometimesMarathonCompletion.endpointProof.endpointDistanceMeters, 42_195);
+  assert.equal(runsALotMarathonCompletion.endpointProof.endpointDistanceMeters, 42_195);
+  assert.equal(proMarathonCompletion.endpointProof.endpointDistanceMeters, 42_195);
+  assert.equal(sometimesMarathonCompletion.workoutKindCounts.marathon_base_endpoint ?? 0, 0);
+  assert.equal(runsALotMarathonCompletion.workoutKindCounts.marathon_base_endpoint ?? 0, 0);
+  assert.equal(proMarathonCompletion.workoutKindCounts.marathon_base_endpoint ?? 0, 0);
 
   for (const entry of summary.scenarioComparison) {
     if (entry.status !== "preview_ready") {
@@ -594,6 +726,7 @@ function validateScenarioProof(summary: ReturnType<typeof buildSummary>) {
     );
     assert.equal(entry.fakePrecisePaceAppears, false);
     assert.equal(entry.fakePersonalHrAppears, false);
+    assert.equal(entry.forbiddenRunnerFacingLanguageAppears, false);
   }
 
   assert.ok(
@@ -625,6 +758,18 @@ function validateScenarioProof(summary: ReturnType<typeof buildSummary>) {
   assert.ok(
     proMarathon.compositionGrammar.familySignals.includes("marathon_base_hill_strength"),
     "professional_competitive_marathon_base must prove hill-strength grammar signal.",
+  );
+  assert.ok(
+    sometimesMarathonCompletion.compositionGrammar.familySignals.includes(
+      "marathon_completion_steady_support",
+    ),
+    "sometimes_runs_marathon_completion must prove steady support grammar signal.",
+  );
+  assert.ok(
+    proMarathonCompletion.compositionGrammar.familySignals.includes(
+      "marathon_completion_specificity",
+    ),
+    "professional_competitive_marathon_completion must prove specific support grammar signal.",
   );
 }
 
@@ -737,6 +882,13 @@ function findForbiddenCompositionHits({
       hits.push(`week_${weekNumber}_marathon_base_intervals`);
     }
 
+    if (
+      family === "Marathon Completion" &&
+      weekKinds.some((kind) => ["threshold", "intervals", "hills"].includes(kind))
+    ) {
+      hits.push(`week_${weekNumber}_marathon_completion_hard_intensity`);
+    }
+
     const hasSteadyFinishLongRun = weekRows.some(
       (row) =>
         row.workoutDayKind === "long_run" &&
@@ -839,14 +991,36 @@ function uniqueStrings(values: readonly string[]) {
 function scanRunnerFacingMetricTruth(rows: readonly RunningPlanPreviewCalendarRow[]) {
   const fakePrecisePaceMatches: Array<{ path: string; value: string }> = [];
   const fakePersonalHrMatches: Array<{ path: string; value: string }> = [];
+  const forbiddenRunnerFacingLanguageMatches: Array<{
+    path: string;
+    value: string;
+    signals: readonly string[];
+  }> = [];
   const editableDefaultHrMatches: Array<{ path: string; value: string }> = [];
 
   walkStrings(rows, "draft.calendarRows", (path, value) => {
-    if (/pace_min|pace_target|pace_range|race_pace/i.test(value)) {
+    const forbiddenMatches = findForbiddenRunnerFacingLanguageMatchesInText(value);
+    if (
+      forbiddenMatches.some((match) =>
+        [
+          "fake_precise_pace_token",
+          "race_pace_claim",
+          "goal_pace_claim",
+          "target_pace_claim",
+        ].includes(match.signal),
+      )
+    ) {
       fakePrecisePaceMatches.push({ path, value });
     }
-    if (/personal_hr|personal HR/i.test(value)) {
+    if (forbiddenMatches.some((match) => match.signal === "fake_personal_hr_token")) {
       fakePersonalHrMatches.push({ path, value });
+    }
+    if (forbiddenMatches.length > 0) {
+      forbiddenRunnerFacingLanguageMatches.push({
+        path,
+        value,
+        signals: [...new Set(forbiddenMatches.map((match) => match.signal))],
+      });
     }
     if (/editable default/i.test(value)) {
       editableDefaultHrMatches.push({ path, value });
@@ -864,6 +1038,7 @@ function scanRunnerFacingMetricTruth(rows: readonly RunningPlanPreviewCalendarRo
     ],
     fakePrecisePaceMatches,
     fakePersonalHrMatches,
+    forbiddenRunnerFacingLanguageMatches,
     editableDefaultHrMatches,
   };
 }
@@ -921,7 +1096,15 @@ function isRangeLike(value: unknown): value is { min: number; max: number } {
 }
 
 function isDevelopmentTouch(kind: string) {
-  return ["strides", "tempo", "threshold", "intervals", "hills"].includes(kind);
+  return [
+    "strides",
+    "steady_aerobic_run",
+    "progression",
+    "tempo",
+    "threshold",
+    "intervals",
+    "hills",
+  ].includes(kind);
 }
 
 function maxWeekNumber(rows: readonly RunningPlanPreviewCalendarRow[]) {
@@ -960,7 +1143,8 @@ node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts
 Proof focus:
 
 - preview-ready non-rest rows have exact executable duration/distance/repeat/recovery values
-- beginner Half Marathon and Marathon Base remain unavailable
+- beginner Half Marathon is auto-extended into a preview-ready bridge plan
+- beginner Marathon Base is auto-extended into an honest preview-ready base plan
 - 10K endpoint remains exact 10000m
 - Half Marathon endpoint remains exact 21100m
 - Marathon Base remains an honest base endpoint, not 42195m race readiness

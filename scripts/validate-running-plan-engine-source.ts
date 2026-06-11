@@ -11,6 +11,7 @@ import {
   resolveRunningPlanCompositionWeek,
   type RunningPlanSegmentPrescription,
 } from "../src/lib/plan-creation-engine";
+import { findForbiddenRunnerFacingLanguageMatches } from "../src/lib/plan-creation-engine/forbidden-runner-facing-language";
 
 function main() {
   const summary = assertRunningPlanSourceModel();
@@ -32,7 +33,7 @@ function validateAcceptedFamilyAndRunnerLevelContract() {
   assert.deepEqual(
     RUNNING_PLAN_SOURCE_MODEL.supportedDistanceFamilies.map((contract) => contract.family),
     [...RUNNING_PLAN_DISTANCE_FAMILY_VALUES],
-    "Supported families must stay exactly 10K, Half Marathon, and Marathon Base.",
+    "Supported families must stay exactly 10K, Half Marathon, Marathon Base, and Marathon Completion.",
   );
   assert.deepEqual(
     Object.keys(RUNNING_PLAN_SOURCE_MODEL.runnerLevels),
@@ -137,17 +138,18 @@ function validateWatchExecutableTemplates() {
     "marathon_base_endpoint must be resolved through family endpointTemplates, not generic workoutDayTemplates.",
   );
 
-  const templateText = JSON.stringify({
+  const runnerFacingTemplates = {
     workoutDayTemplates: RUNNING_PLAN_SOURCE_MODEL.workoutDayTemplates,
     endpointTemplates: RUNNING_PLAN_SOURCE_MODEL.endpointTemplates,
-  });
-  assert.doesNotMatch(templateText, /pace_min|pace_target|personal_hr|effort_only/i);
+  };
+  assert.deepEqual(findForbiddenRunnerFacingLanguageMatches(runnerFacingTemplates), []);
 }
 
 function validateEndpointGates() {
   const tenKGate = RUNNING_PLAN_SOURCE_MODEL.endpointGates["10K"];
   const halfGate = RUNNING_PLAN_SOURCE_MODEL.endpointGates["Half Marathon"];
   const marathonGate = RUNNING_PLAN_SOURCE_MODEL.endpointGates["Marathon Base"];
+  const marathonCompletionGate = RUNNING_PLAN_SOURCE_MODEL.endpointGates["Marathon Completion"];
 
   assert.equal(tenKGate.endpointDistanceMeters, 10_000);
   assert.ok(tenKGate.requiredFinalWorkoutKinds.includes("final_selected_distance_day"));
@@ -163,12 +165,22 @@ function validateEndpointGates() {
   assert.ok(marathonGate.requiredFinalWorkoutKinds.includes("marathon_base_endpoint"));
   assert.equal(marathonGate.mustNotClaimFullMarathonReadiness, true);
   assert.ok(marathonGate.rejectedFinalOutputs.includes("target_time_endpoint"));
+
+  assert.equal(marathonCompletionGate.requiredEndpointKind, "selected_distance_endpoint");
+  assert.equal(marathonCompletionGate.endpointDistanceMeters, 42_195);
+  assert.ok(
+    marathonCompletionGate.requiredFinalWorkoutKinds.includes("final_selected_distance_day"),
+  );
+  assert.ok(marathonCompletionGate.rejectedFinalOutputs.includes("marathon_base_endpoint"));
+  assert.ok(marathonCompletionGate.rejectedFinalOutputs.includes("target_time_endpoint"));
 }
 
 function validateEndpointTemplates() {
   const tenKTemplate = RUNNING_PLAN_SOURCE_MODEL.endpointTemplates["10K"];
   const halfTemplate = RUNNING_PLAN_SOURCE_MODEL.endpointTemplates["Half Marathon"];
   const marathonBaseTemplate = RUNNING_PLAN_SOURCE_MODEL.endpointTemplates["Marathon Base"];
+  const marathonCompletionTemplate =
+    RUNNING_PLAN_SOURCE_MODEL.endpointTemplates["Marathon Completion"];
 
   assert.equal(tenKTemplate.family, "10K");
   assert.equal(tenKTemplate.kind, "final_selected_distance_day");
@@ -189,6 +201,17 @@ function validateEndpointTemplates() {
   assert.equal(marathonBaseTemplate.mustNotClaimFullMarathonReadiness, true);
   assert.equal(endpointMainDistanceMeters(marathonBaseTemplate), null);
   assert.deepEqual(marathonBaseTemplate.allowedFamilies, ["Marathon Base"]);
+
+  assert.equal(marathonCompletionTemplate.family, "Marathon Completion");
+  assert.equal(marathonCompletionTemplate.kind, "final_selected_distance_day");
+  assert.equal(marathonCompletionTemplate.endpointDistanceMeters, 42_195);
+  assert.equal(
+    marathonCompletionTemplate.endpointBehavior,
+    "selected_distance_completion_or_checkpoint",
+  );
+  assert.equal(marathonCompletionTemplate.mustNotClaimFullMarathonReadiness, false);
+  assert.equal(endpointMainDistanceMeters(marathonCompletionTemplate), 42_195);
+  assert.deepEqual(marathonCompletionTemplate.allowedFamilies, ["Marathon Completion"]);
 }
 
 function validateMetricAndHrTruthBoundary() {
@@ -266,8 +289,8 @@ function validateCompositionGrammarContract() {
     family: "Half Marathon",
     runnerLevel: "runs_a_lot",
     loadContext: "conservative",
-    weekNumber: 10,
-    horizonWeeks: 14,
+    weekNumber: 22,
+    horizonWeeks: 28,
   });
   assert.equal(conservativeHalfLongRun.longRunRole, "steady_finish");
   assert.ok(conservativeHalfLongRun.familySignals.includes("half_long_run_steady_finish"));
@@ -277,21 +300,106 @@ function validateCompositionGrammarContract() {
     runnerLevel: "professional_competitive",
     loadContext: "standard",
     weekNumber: 13,
-    horizonWeeks: 16,
+    horizonWeeks: 24,
   });
   assert.equal(supportedMarathonBase.developmentTouch, "hills");
   assert.ok(supportedMarathonBase.familySignals.includes("marathon_base_hill_strength"));
+
+  const supportedMarathonBaseSteadyFinish = resolveRunningPlanCompositionWeek({
+    family: "Marathon Base",
+    runnerLevel: "professional_competitive",
+    loadContext: "standard",
+    weekNumber: 17,
+    horizonWeeks: 24,
+  });
+  assert.equal(supportedMarathonBaseSteadyFinish.longRunRole, "steady_finish");
+  assert.ok(
+    supportedMarathonBaseSteadyFinish.familySignals.includes("marathon_base_steady_finish"),
+  );
 
   const conservativeMarathonBase = resolveRunningPlanCompositionWeek({
     family: "Marathon Base",
     runnerLevel: "runs_a_lot",
     loadContext: "conservative",
-    weekNumber: 13,
-    horizonWeeks: 16,
+    weekNumber: 22,
+    horizonWeeks: 32,
   });
   assert.equal(conservativeMarathonBase.developmentTouch, null);
   assert.equal(conservativeMarathonBase.longRunRole, "steady_finish");
   assert.ok(conservativeMarathonBase.familySignals.includes("marathon_base_steady_finish"));
+
+  const beginnerMarathonBaseBridge = resolveRunningPlanCompositionWeek({
+    family: "Marathon Base",
+    runnerLevel: "beginner_new_runner",
+    loadContext: "standard",
+    weekNumber: 25,
+    horizonWeeks: 40,
+  });
+  assert.equal(beginnerMarathonBaseBridge.developmentTouch, "steady_aerobic_run");
+  assert.equal(beginnerMarathonBaseBridge.archetype, "steady_support_week");
+  assert.ok(beginnerMarathonBaseBridge.familySignals.includes("marathon_base_steady_support"));
+
+  const beginnerMarathonCompletionAdaptation = resolveRunningPlanCompositionWeek({
+    family: "Marathon Completion",
+    runnerLevel: "beginner_new_runner",
+    loadContext: "standard",
+    weekNumber: 2,
+    horizonWeeks: 56,
+  });
+  assert.equal(beginnerMarathonCompletionAdaptation.developmentTouch, null);
+  assert.equal(beginnerMarathonCompletionAdaptation.archetype, "adaptation_run_walk_week");
+
+  const beginnerMarathonCompletionDurability = resolveRunningPlanCompositionWeek({
+    family: "Marathon Completion",
+    runnerLevel: "beginner_new_runner",
+    loadContext: "standard",
+    weekNumber: 31,
+    horizonWeeks: 56,
+  });
+  assert.ok(
+    beginnerMarathonCompletionDurability.familySignals.includes("marathon_completion_time_on_feet"),
+  );
+  assert.ok(
+    beginnerMarathonCompletionDurability.familySignals.includes(
+      "marathon_completion_long_run_durability",
+    ),
+  );
+
+  const beginnerMarathonCompletionEndpoint = resolveRunningPlanCompositionWeek({
+    family: "Marathon Completion",
+    runnerLevel: "beginner_new_runner",
+    loadContext: "standard",
+    weekNumber: 56,
+    horizonWeeks: 56,
+  });
+  assert.ok(
+    beginnerMarathonCompletionEndpoint.familySignals.includes("marathon_completion_exact_endpoint"),
+  );
+
+  const supportedMarathonCompletionProgression = resolveRunningPlanCompositionWeek({
+    family: "Marathon Completion",
+    runnerLevel: "runs_a_lot",
+    loadContext: "standard",
+    weekNumber: 17,
+    horizonWeeks: 28,
+  });
+  assert.equal(supportedMarathonCompletionProgression.developmentTouch, "progression");
+  assert.equal(supportedMarathonCompletionProgression.archetype, "progression_support_week");
+  assert.ok(
+    supportedMarathonCompletionProgression.familySignals.includes(
+      "marathon_completion_progression_support",
+    ),
+  );
+
+  const conservativeTenKLateReminder = resolveRunningPlanCompositionWeek({
+    family: "10K",
+    runnerLevel: "sometimes_runs",
+    loadContext: "conservative",
+    weekNumber: 13,
+    horizonWeeks: 20,
+  });
+  assert.equal(conservativeTenKLateReminder.developmentTouch, "tempo");
+  assert.ok(conservativeTenKLateReminder.familySignals.includes("ten_k_tempo_support"));
 }
 
 function validateStaleSourceFilesRemainAbsent() {

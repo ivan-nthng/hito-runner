@@ -195,6 +195,7 @@ function validateEndpointGates(model: RunningPlanEngineSourceModel, issues: stri
   const tenK = model.endpointGates["10K"];
   const half = model.endpointGates["Half Marathon"];
   const marathonBase = model.endpointGates["Marathon Base"];
+  const marathonCompletion = model.endpointGates["Marathon Completion"];
 
   if (tenK.endpointDistanceMeters !== 10_000) {
     issues.push("10K endpoint gate must require a 10000m endpoint.");
@@ -230,6 +231,22 @@ function validateEndpointGates(model: RunningPlanEngineSourceModel, issues: stri
 
   if (!marathonBase.mustNotClaimFullMarathonReadiness) {
     issues.push("Marathon Base endpoint must forbid full-marathon readiness claims.");
+  }
+
+  if (marathonCompletion.requiredEndpointKind !== "selected_distance_endpoint") {
+    issues.push("Marathon Completion endpoint gate must require selected-distance endpoint kind.");
+  }
+
+  if (marathonCompletion.endpointDistanceMeters !== 42_195) {
+    issues.push("Marathon Completion endpoint gate must require exactly 42195m.");
+  }
+
+  if (!marathonCompletion.requiredFinalWorkoutKinds.includes("final_selected_distance_day")) {
+    issues.push("Marathon Completion endpoint must require final_selected_distance_day.");
+  }
+
+  if (!marathonCompletion.rejectedFinalOutputs.includes("marathon_base_endpoint")) {
+    issues.push("Marathon Completion endpoint gate must reject marathon_base_endpoint.");
   }
 }
 
@@ -272,6 +289,7 @@ function validateEndpointTemplates(model: RunningPlanEngineSourceModel, issues: 
   const tenK = model.endpointTemplates["10K"];
   const half = model.endpointTemplates["Half Marathon"];
   const marathonBase = model.endpointTemplates["Marathon Base"];
+  const marathonCompletion = model.endpointTemplates["Marathon Completion"];
 
   if (tenK.kind !== "final_selected_distance_day") {
     issues.push("10K endpoint template must use final_selected_distance_day kind.");
@@ -307,6 +325,24 @@ function validateEndpointTemplates(model: RunningPlanEngineSourceModel, issues: 
   }
   if (templateHasDistanceMainSegment(marathonBase)) {
     issues.push("Marathon Base endpoint template must not use selected-distance race behavior.");
+  }
+
+  if (marathonCompletion.kind !== "final_selected_distance_day") {
+    issues.push("Marathon Completion endpoint template must use final_selected_distance_day kind.");
+  }
+  if (marathonCompletion.endpointDistanceMeters !== 42_195) {
+    issues.push(
+      "Marathon Completion endpoint template must resolve endpointDistanceMeters to exactly 42195.",
+    );
+  }
+  if (marathonCompletion.endpointBehavior !== "selected_distance_completion_or_checkpoint") {
+    issues.push("Marathon Completion endpoint template must remain selected-distance completion.");
+  }
+  if (marathonCompletion.mustNotClaimFullMarathonReadiness) {
+    issues.push("Marathon Completion endpoint template may promise completion, not base-only.");
+  }
+  if (!templateMainDistanceIsExactly(marathonCompletion, 42_195)) {
+    issues.push("Marathon Completion endpoint template main segment must be exactly 42195m.");
   }
 }
 

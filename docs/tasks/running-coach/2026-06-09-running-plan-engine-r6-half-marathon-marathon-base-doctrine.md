@@ -16,6 +16,17 @@ This artifact covers:
 
 It does not approve a full selected-distance Marathon endpoint in v1.
 
+## Scope Note
+
+This 2026-06-09 artifact is no longer canonical for beginner runner-level eligibility.
+
+That is now governed by:
+
+- `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md`
+- `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-beginner-half-marathon-bridge-plan-contract.md`
+
+All Half-Marathon and Marathon-Base rules below apply to family shape after eligibility is granted under the universal no-dead-end doctrine.
+
 ## Canonical Constraints To Preserve
 
 - Hito engine builds the normal plan, not AI.
@@ -42,7 +53,7 @@ It does not approve a full selected-distance Marathon endpoint in v1.
 1. `Half Marathon` is approved for R6 as an exact selected-distance endpoint family with explicit `21100m` final-day truth.
 2. `Marathon` is not approved as a full selected-distance endpoint in this R6 v1 expansion.
 3. R6 should ship only honest `Marathon Base`, with a base-durability endpoint and explicit no-full-marathon-readiness overclaim.
-4. `beginner_new_runner` should be blocked from both `Half Marathon` and `Marathon Base` in this deterministic v1 vertical.
+4. `beginner_new_runner + Half Marathon` and `beginner_new_runner + Marathon Base` are superseded by the universal auto-extension doctrine; this artifact no longer owns runner-level blocking.
 5. The engine must not copy the 10K diversity pattern blindly:
    - Half Marathon should be less interval-led and more durability-led.
    - Marathon Base should be more recovery- and long-run-led, with sharper work tightly limited.
@@ -51,21 +62,14 @@ It does not approve a full selected-distance Marathon endpoint in v1.
 
 | Family | `beginner_new_runner` | `sometimes_runs` | `runs_a_lot` | `professional_competitive` |
 | --- | --- | --- | --- | --- |
-| `Half Marathon` | Block and route away | Eligible | Eligible | Eligible, but still one-touch-max and not pseudo-elite |
-| `Marathon Base` | Block and route away | Eligible | Eligible | Eligible, but conservative base only |
+| `Half Marathon` | Eligible via auto-extended bridge doctrine | Eligible | Eligible | Eligible, but still one-touch-max and not pseudo-elite |
+| `Marathon Base` | Eligible via auto-extended base bridge doctrine | Eligible | Eligible | Eligible, but conservative base only |
 
 ### Blocking Rules
 
-`beginner_new_runner` must be blocked from:
+`beginner_new_runner` runner-level blocking is no longer the canonical rule for either family.
 
-- `Half Marathon`
-- `Marathon Base`
-
-Reason:
-
-- the accepted deterministic v1 engine has only one-touch weekly richness and limited workout families
-- that is enough for safe 10K and supported Half
-- it is not enough to promise honest Half or Marathon-Base output for true new-runner support needs without collapsing into filler or overloading the long run
+Structural blockers may still apply, but family ambition alone is not the normal reason to refuse preview generation.
 
 ## Half Marathon Doctrine
 
@@ -195,7 +199,7 @@ QA should fail a Half preview if:
 - `sometimes_runs` output uses `threshold`
 - cutback weeks are missing or not visibly lighter
 - final two weeks become generic support-only filler before endpoint
-- `beginner_new_runner` is allowed through
+- a non-beginner supported runner is incorrectly rejected
 
 ## Marathon Base Doctrine
 
@@ -389,7 +393,7 @@ Backend should add two family-specific policy layers rather than cloning `ten-k-
 
 Minimum backend expectations:
 
-1. Enforce `beginner_new_runner` block for both families.
+1. Enforce the universal no-dead-end doctrine and the dedicated beginner Half bridge specialization.
 2. Enforce exact `21100m` Half endpoint.
 3. Keep Marathon Base as honest base-only endpoint.
 4. Require `tempo` for supported Half and Marathon Base standard-load runners.
@@ -412,7 +416,8 @@ QA should fail if:
 - supported Half looks like generic support-only filler
 - supported Marathon Base looks like generic support-only filler
 - Half or Marathon Base simply mirrors the 10K week map with renamed labels
-- `beginner_new_runner` is not blocked
+- `beginner_new_runner + Half Marathon` is still rejected instead of auto-extended
+- `beginner_new_runner + Marathon Base` is still rejected instead of auto-extended
 - long-run progression and cutback shape are not visibly stronger than 10K
 - final two weeks are empty or misleading
 

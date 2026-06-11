@@ -2,7 +2,11 @@
 
 ## Status
 
-in_progress
+in_progress — manual Add, Backend Slice 4 personal saved-template persistence, shared workout
+target display grammar cleanup, FRONTEND Slice 3 saved-template UI wiring, QA Slice 3B existing
+manual active-plan Add reuse, and Backend Slice 5 copy/paste review-confirm source validation are
+passed in the proved scope. Backend fixed the Slice 5 live canonical persisted-strides
+copy-review blocker; next gate is QA rerun for Backend Slice 5.
 
 ## Type
 
@@ -14,31 +18,272 @@ high
 
 ## Next Recommended Role
 
-BACKEND
+QA
 
 ## Task
 
-Implement Backend Slice 1 for manual workout authoring: non-mutating draft/review contract and
-backend-owned template registry.
+Validate Backend Slice 5 copy/paste draft reconstruction and reviewed paste confirm for existing
+manual active plans.
 
 ## Stage
 
-BACKEND implementation / manual workout authoring draft contract.
+QA validation / manual copy-paste review-confirm boundary.
 
-## Exact Handoff Prompt
+## Suggested Next Step
+
+QA should validate the new backend copy/paste primitive: copy one existing manual workout day into
+a new eligible future empty day by rebuilding a backend-reviewed draft and confirming the paste
+through the existing active-plan add seam. This must remain backend-owned and must not copy raw
+planned-workout rows or move schedule truth into the browser.
+
+## Backend Slice 5 Implementation Notes
+
+- Added `src/lib/manual-workout-authoring/copy-paste.ts` as the focused review/confirm
+  orchestrator for manual copy/paste.
+- Added `src/lib/manual-workout-authoring/copy-paste-reconstruction.ts` as the focused owner for
+  source-workout eligibility and persisted-row-to-manual-draft reconstruction.
+- Review reconstructs a `ManualWorkoutDraftInput` server-side from a persisted manual
+  `planned_workouts` row, then passes it through the existing manual review owner.
+- Confirm rebuilds the same copy draft server-side, validates review token/checksum exactness, and
+  persists by reusing the existing manual active-plan add seam.
+- The contract accepts only active plan/source workout/date/target date plus review exactness
+  fields; strict schemas reject client-sent row/segment payloads.
+- Supported source rows must come from `manual_user_built_plan_v1`, belong to the current runner's
+  active manual plan, use a supported manual template key, and include executable segment structure.
+- Date-only truth is preserved: target date and weekday are derived from the requested target date,
+  not copied from the source row.
+- Deterministic harness coverage now proves happy path copy review/confirm, source date reference,
+  changed target rejection, changed source rejection, stale token/checksum rejection, occupied
+  target rejection, non-manual active plan rejection, foreign source rejection, client payload
+  rejection, no fake pace/HR, and repeat-with-recovery anatomy preservation.
+- Backend blocker fix on 2026-06-11: live QA found that a normally persisted
+  `easy_run_with_strides` source row failed copy review with `unsafe_block_structure` because the
+  canonical persisted repeat parent stores `segment_type: "strides"` / `type: "intervals"`, while
+  the nested work block stores only `type: "work"`. Copy reconstruction now resolves that
+  persisted template/work shape back to `strides_block`, and the deterministic harness now builds
+  the copy source row through the canonical TrainingPlanV2/import/persist path instead of a
+  synthetic review-shaped row.
+- Validation run on 2026-06-11:
+  - `npm exec eslint -- src/lib/manual-workout-authoring/actions.ts src/lib/manual-workout-authoring/active-plan-add.ts src/lib/manual-workout-authoring/copy-paste.ts src/lib/manual-workout-authoring/copy-paste-reconstruction.ts src/lib/manual-workout-authoring/persistence.ts src/lib/manual-workout-authoring/saved-templates.ts src/lib/manual-workout-authoring/schema.ts src/lib/training-api.ts scripts/validate-manual-workout-authoring.ts scripts/manual-workout-authoring/persistence-proof.ts`
+  - `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+  - `node --import tsx ./scripts/validate-manual-workout-authoring.ts --require-persistence`
+    blocked before mutation because no disposable/local Supabase env was configured.
+  - `npm run build`
+  - Blocker-fix validation also ran:
+    `npm exec eslint -- src/lib/manual-workout-authoring/copy-paste-reconstruction.ts scripts/validate-manual-workout-authoring.ts`
+
+## Current Backend Slice 5 Handoff Prompt
 
 ```text
 ROLE: BACKEND
 
 Task:
-Implement Backend Slice 1 for manual workout authoring: non-mutating draft/review contract and
-backend-owned template registry.
+Implement Backend Slice 5 for manual user-built plans: copy/paste draft reconstruction and reviewed
+paste confirm for existing manual active plans.
 
 Stage:
-BACKEND implementation / manual workout authoring draft contract.
+BACKEND implementation / manual copy-paste review-confirm boundary.
+
+Context:
+Manual user-built plans can now create the first workout, add more workouts to eligible future empty
+days, save reviewed workouts as personal templates, and reuse those templates in the existing
+manual active-plan Add lifecycle. QA Slice 3B passed browser + DB proof for saved-template reuse
+inside an existing `manual_user_built_plan_v1` active plan.
+
+The next missing manual-builder reuse primitive is copy/paste. Do not solve this by duplicating
+calendar rows in the frontend. Backend must reconstruct a reviewed draft from the persisted source
+workout and confirm the paste through the canonical manual active-plan add boundary.
+
+Required preflight:
+- Read `AGENTS.md`.
+- Read `agents/backend.agent.md`.
+- Load `skills/hito-backend-supabase-contract/SKILL.md`.
+- Read the active manual plan and the manual flow spec.
+- Inspect existing manual seams before adding anything new:
+  - `src/lib/manual-workout-authoring/active-plan-add.ts`
+  - `src/lib/manual-workout-authoring/actions.ts`
+  - `src/lib/manual-workout-authoring/persistence.ts`
+  - `src/lib/manual-workout-authoring/saved-templates.ts`
+  - `src/lib/active-plan-persistence.ts`
+  - `src/lib/training-api.ts`
+  - `scripts/validate-manual-workout-authoring.ts`
+
+Implementation scope:
+- Add a backend-owned copy review function for existing manual active plans.
+- Accept only minimal identifiers/input from the client: active plan id if needed, source workout
+  day/id, target `YYYY-MM-DD` date, and any existing review exactness fields required by the seam.
+- Rebuild the draft server-side from the persisted source workout/manual authoring truth.
+- Do not trust client-sent workout rows, segments, source metadata, duration totals, or metric truth.
+- Return backend-shaped review state with source date, target date, display labels, review token,
+  review checksum, conflict/protection state, and metric policy.
+- Add a confirm/paste function that validates token/checksum exactness, active plan lifecycle,
+  source workout still exists on the same manual active plan, target date is still eligible and
+  empty, and protected/logged/provider-evidence constraints still pass.
+- Persist the pasted workout by reusing the existing manual active-plan add seam wherever possible.
+- Preserve strict `structure_only_executable` / metric-truth behavior. No fake pace and no fake
+  personal HR.
+- Preserve date-only truth: canonical date identity is `YYYY-MM-DD`; do not derive mutation targets
+  from localized labels.
+
+Required rejections:
+- non-manual active plan
+- missing or stale source workout
+- target date occupied
+- changed target date after review
+- changed source workout after review
+- stale checksum/token
+- client-sent row/segment payload attempts
+- protected/logged/provider-evidence target day if the existing safety model blocks it
+
+What not to do:
+- Do not implement frontend copy/paste UI.
+- Do not add recurrence.
+- Do not add move workout behavior.
+- Do not add JSON export.
+- Do not save personal templates in this slice.
+- Do not mutate generated, preset, imported, or running-engine plans.
+- Do not run migrations unless a hard blocker is discovered and routed back to Architecture first.
+- Do not weaken backend review/confirm boundaries.
+
+Validation:
+- Extend the manual workout authoring harness for copy review and confirm/paste.
+- Prove happy path paste into one eligible future empty day.
+- Prove occupied-day, stale-review, changed-source, changed-target, invalid-token/checksum, and
+  client-sent row attempts are rejected.
+- Prove source metadata, date-only target truth, workout identity, segment anatomy, and metric truth
+  are preserved.
+- Prove no fake pace or fake personal HR.
+- Run targeted ESLint for changed backend/script files.
+- Run `node --import tsx ./scripts/validate-manual-workout-authoring.ts`.
+- Run `npm run build` if imports or public exports change.
+- Run scoped `git diff --check`.
+```
+
+## Previous Frontend Slice 3 Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+1. Task
+
+Implement manual saved-template UI wiring for reviewed manual workouts and the Add activity picker.
+
+2. Stage
+
+FRONTEND implementation / manual saved-template modal and picker wiring.
+
+3. Context
+
+Backend Slice 4 implemented and QA accepted personal saved-template persistence/readback:
+- `saveManualWorkoutSavedTemplate(...)`
+- `listManualWorkoutSavedTemplates(...)`
+- `reviewManualWorkoutSavedTemplate(...)`
+
+The shared workout target display grammar cleanup also passed saved active-plan browser QA, so the
+previous blocker for user-facing saved-template UI is closed.
+
+Root cause:
+Runners can build manual workouts, but they cannot yet reuse a reviewed manual workout as a
+personal template through the UI. Do not solve this with frontend-local template state. The UI must
+call the backend-owned saved-template actions and keep review-before-confirm/add intact.
+
+4. Required preflight
+
+- Read AGENTS.md.
+- Read agents/frontend.agent.md.
+- Load skills/hito-frontend-design-system/SKILL.md.
+- Inspect the existing manual builder UI and Hito DS primitives before editing.
+- Reuse the existing manual authoring dialogs, template picker, calendar day anatomy, buttons,
+  fields, menus, toasts, and status patterns.
+
+5. Files To Inspect
+
+- AGENTS.md
+- agents/frontend.agent.md
+- skills/hito-frontend-design-system/SKILL.md
+- docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
+- docs/tasks/frontend-specs/2026-06-10-manual-user-built-plan-flow-spec.md
+- docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md
+- src/components/manual-workout/ManualWorkoutAuthoringControls.tsx
+- src/components/onboarding/ManualUserBuiltPlanPanel.tsx
+- src/components/Calendar.tsx
+- src/components/ui/hito-calendar-day.tsx
+- src/lib/manual-workout-authoring/saved-templates.ts
+- src/lib/manual-workout-authoring/saved-template-repository.ts
+- src/lib/manual-workout-authoring/actions.ts
+- src/lib/training-api.ts
+
+6. Implementation Scope
+
+- Expose `Save as template` only from a reviewed manual workout state.
+- Collect runner-provided display name and icon/glyph using existing Hito DS form/dialog patterns.
+- Call `saveManualWorkoutSavedTemplate(...)` with only `displayName`, `iconKey`, `draftInput`,
+  `reviewToken`, and `reviewChecksum`.
+- Prevent duplicate save clicks/loading races and show bounded backend errors.
+- Load current-user templates through `listManualWorkoutSavedTemplates(...)`.
+- Add current-user saved templates to the existing `Add activity` / template picker without
+  replacing Hito-owned built-in templates.
+- Clearly distinguish personal templates from built-in Hito templates without creating a separate
+  gallery system.
+- Selecting a personal template must call `reviewManualWorkoutSavedTemplate(...)` for the chosen
+  future date and then render the existing backend-shaped review state.
+- Confirming/adding from a saved template must still use the existing manual review/confirm or
+  active-plan add path; do not skip review.
+- Preserve shared workout target display grammar.
+
+7. What not to do
+
+- Do not create frontend-owned template persistence.
+- Do not store raw planned workout rows as templates.
+- Do not skip backend review before confirm/add.
+- Do not add copy/paste persistence.
+- Do not add recurrence.
+- Do not add JSON export.
+- Do not add move-workout behavior.
+- Do not mutate generated, preset, imported, or running-engine plans.
+- Do not add a new calendar/add UI system.
+- Do not weaken metric-truth guardrails.
+- Do not add fake pace or fake personal HR.
+- Do not run migrations.
+
+8. Validation
+
+- targeted ESLint for changed frontend/manual authoring files
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- `npm run build`
+- `git diff --check -- <changed files>`
+- Built-in Codex Browser first:
+  - save a reviewed manual workout as a personal template with display name and icon/glyph
+  - see that template in the existing Add activity/template picker
+  - select it for a future date
+  - prove backend reconstruction/review runs before confirm/add
+  - prove no frontend-owned template rows or fake saved state
+  - prove mobile `375px` has no horizontal overflow
+
+9. Stop Conditions
+
+Stop and report if the backend saved-template actions are not callable from the current client
+surface, if saved templates cannot be scoped to the current user, or if the UI would need to invent
+template truth locally.
+```
+
+## Previous Backend Slice 2 Handoff Prompt
+
+```text
+ROLE: BACKEND
+
+Task:
+Implement Backend Slice 2 for manual user-built plans: confirm/persist the first reviewed manual
+workout and create a `manual_user_built_plan_v1` active plan through canonical persistence.
+
+Stage:
+BACKEND implementation / manual user-built plan confirm-persist boundary.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
+
+Designer spec:
+/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-06-10-manual-user-built-plan-flow-spec.md
 
 Running Coach source of truth:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-09-manual-workout-constructor-taxonomy-and-template-library.md
@@ -47,34 +292,92 @@ Backlog source:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md
 
 Context:
-Hito needs a backend-owned manual workout authoring path for runners who choose `Build my plan
-myself` instead of generated/preset/custom plan creation. The first backend slice is review-only:
-no DB writes, no schema changes, no frontend route, no active empty plan persistence, no copy/paste
-persistence, no recurrence, no OpenAI.
+DESIGNER completed and Architect accepted the manual draft-first UX spec for `Build my plan
+myself`. Backend Slice 1 is implemented and accepted for sequencing as a non-mutating
+manual workout review contract with backend-owned templates, validation, normalization,
+review token/checksum, and deterministic harness coverage.
+
+Root cause:
+Hito has generated, preset, import, and refresh plan paths, but no canonical user-built
+plan lifecycle. Do not solve this as a frontend calendar save button. The next backend
+slice must define the mutation boundary that turns one reviewed manual workout into the
+first active `manual_user_built_plan_v1` plan through an existing canonical persistence seam.
+
+Required preflight:
+1. Read AGENTS.md.
+2. Read agents/backend.agent.md.
+3. Load matching project skills, especially hito-backend-supabase-contract.
+4. Read the plan, Designer spec, backlog source, and Running Coach source artifact above.
+5. Inspect existing seams before adding code:
+   - src/lib/manual-workout-authoring/*
+   - scripts/validate-manual-workout-authoring.ts
+   - src/lib/active-plan-persistence.ts
+   - src/lib/persisted-plan-replacement.ts
+   - src/lib/imported-plan.ts
+   - src/lib/training-api.ts
+   - src/lib/plan-preset-actions.ts
+   - src/lib/running-plan-engine-actions.ts
 
 Implement:
-- typed manual workout constructor input/schema
-- backend-owned template registry derived from Running Coach source truth
-- block/repeat validation
-- metric-truth validation
-- canonical draft normalization
-- protected-date/conflict result shape
-- review result shape suitable for frontend rendering
-- token/checksum or equivalent exactness data for a later confirm slice
-- harness fixtures for accepted/rejected rest, easy, long, interval, hill, run-walk, nested repeat,
-  missing recovery, fake pace, and fake personal HR cases
+1. A focused confirm action, likely `confirmManualWorkoutDraft(...)`, owned by the
+   manual-workout-authoring backend module.
+2. Server-side rebuild and exactness verification:
+   - accept only the structured draft input/context needed to rebuild the draft, plus
+     `reviewToken` and `reviewChecksum`
+   - call/reuse `reviewManualWorkoutDraft(...)` server-side
+   - require `draft_ready`
+   - reject changed date/setup/template/entries, invalid token, stale checksum, protected
+     target date, and active-plan conflicts
+   - never trust client-sent canonical rows or client-sent persisted workout payloads
+3. Canonical persistence:
+   - map the reviewed manual draft into canonical `training-plan-v2` / imported-plan seed shape
+   - call the existing canonical active-plan persistence seam, preferably
+     `createFirstPlanFromReviewedCanonicalPlanForUser(...)`, instead of creating a second
+     plan persistence path
+   - create `manual_user_built_plan_v1` only after at least one valid reviewed workout exists
+   - never persist an empty active plan silently
+4. Source metadata:
+   - plan source kind: `manual_user_built_plan_v1`
+   - workout authoring source metadata: `manual_workout_authoring_v1`
+   - source status for confirmed manual creation, template key/version, workout date, row count,
+     review payload version, review checksum, mapping gaps, metric truth mode, and warnings
+     where useful
+5. Lifecycle/error policy:
+   - if an active plan already exists, return a bounded `active_plan_exists`-style result and
+     do not replace it
+   - preserve canonical persistence rollback behavior on insert failures or row-count mismatch
+   - return UI-consumable bounded errors for invalid review, protected date, unsupported template,
+     active-plan conflict, and persistence failure
+6. Public API:
+   - add only thin exports/server-action wrappers where needed
+   - do not make `training-api.ts` the implementation owner
 
 What not to do:
-- Do not write to Supabase.
-- Do not add DB schema.
+- Do not write to Supabase outside the explicit reviewed confirm/persist path owned by this slice.
+- Do not run unscoped live/remote mutation proof without a disposable target, explicit flags, and
+  cleanup requirements.
+- Do not add DB schema unless source audit proves existing plan/workout metadata columns cannot
+  safely carry the reviewed canonical truth.
 - Do not persist an empty active plan.
 - Do not edit frontend.
 - Do not add recurrence.
 - Do not implement copy/paste persistence.
+- Do not implement save-as-template persistence.
+- Do not mutate generated, preset, imported, or running-engine plans.
 - Do not edit generated/preset plan content.
 - Do not call OpenAI.
+- Do not revive old Plan Preset confirm behavior.
 
-Report using the standard Implementation Report format from AGENTS.md.
+Validation:
+- Run targeted TypeScript/ESLint for changed backend/script files.
+- Run `node --import tsx ./scripts/validate-manual-workout-authoring.ts`.
+- Add and run a confirm/persist harness proving token/checksum exactness, server-side rebuild,
+  active-plan conflict rejection, protected-date rejection, no client-sent row trust, bounded
+  persistence errors, and source metadata preservation.
+- If a disposable/local Supabase target is available, run a scoped mutation proof with cleanup.
+  If not, report the live persistence proof as a QA/environment gap; do not hide it.
+- Run `git diff --check -- <changed files>`.
+
 ```
 
 ## Owner
@@ -83,7 +386,205 @@ ARCHITECT / BACKEND / FRONTEND / RUNNING COACH / QA
 
 ## Last Updated
 
-2026-06-09
+2026-06-11
+
+## Manual Date-Only And Weekday Contract
+
+Date: 2026-06-11
+
+Status:
+
+accepted as the current manual calendar source-of-truth rule before the next Frontend fix.
+
+Root cause:
+
+- Visible symptom: QA proved the original off-by-one label bug is fixed in the calendar, Add menu,
+  constructor, review-ready state, persistence, and mobile layout, but the final Add confirmation
+  modal is still date-neutral.
+- Underlying cause: manual calendar actions need one date-only contract before Hito adds move,
+  copy/paste, saved-template, and export flows. If each modal formats or infers dates locally, the
+  product can persist the right day while showing the wrong weekday, which is worse than a simple UI
+  typo.
+- Canonical owner: shared manual/calendar rendering view model for runner-facing date labels,
+  backed by backend review/persistence truth for mutation targets.
+
+Contract:
+
+- Canonical calendar day identity is always a date-only `YYYY-MM-DD` string.
+- `workoutDate` / `workout_date` is the mutation and persistence key.
+- Weekday is derived evidence from the canonical date, not independent truth and not a mutation
+  target.
+- Frontend must not parse bare `YYYY-MM-DD` through timezone-sensitive `new Date(iso)` or UTC
+  instant logic for runner-facing day labels.
+- Frontend must use the existing shared Hito/manual date-only helper for runner-facing labels.
+- Backend remains the owner of persisted target date, review exactness, occupied/protected/logged
+  day validation, and source metadata.
+- Frontend must render the selected date in every risky confirmation where the runner can commit a
+  calendar mutation.
+- Mutation payloads must continue to send only backend-allowed data. They must not send localized
+  display labels, client rows, segments, or persistence metadata.
+
+Why this matters for later:
+
+- Future move-workout flows must carry source date, target date, derived weekday labels, and a
+  backend review/confirm boundary.
+- Copy/paste must regenerate target-date-specific review truth instead of duplicating raw rows.
+- JSON export must read canonical active-plan/workout truth, not frontend display labels.
+
+Immediate decision:
+
+- Do not route a broad ARCHITECT slice before the next testable fix.
+- FRONTEND Slice 2A should make the final manual Add confirmation modal repeat the selected
+  date/weekday using the accepted date-only helper and existing Hito DS dialog pattern.
+- QA should rerun the focused browser add flow after this fix, including the persistent local server,
+  disposable cleanup, and `375px` no-overflow proof.
+
+## Frontend Slice 2A Date Confirmation Result
+
+Date: 2026-06-11
+
+Status:
+
+implemented / QA-passed / accepted as the manual Add date-only display gate.
+
+What changed:
+
+- `ManualReviewSummary` now renders the reviewed workout date before the final confirm action.
+- The visible date label uses `formatReadableDate(review.draft.workoutDate)`.
+- The UI also shows `review.draft.weekday` as display evidence.
+- Mutation truth remains the ISO `workoutDate`.
+- Confirm payload remains unchanged:
+  `activePlanId`, `draftInput`, `reviewToken`, and `reviewChecksum` only.
+
+Preserved:
+
+- no backend changes
+- no schema changes
+- no persistence semantics changes
+- no copy/paste
+- no recurrence
+- no save-as-template
+- no JSON export
+- no new calendar/Add control pattern
+
+Frontend validation evidence:
+
+- Targeted ESLint passed for manual Add/control/date-helper/training surfaces.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed.
+- `npm run build` passed with existing non-blocking warnings.
+- Scoped `git diff --check` passed.
+
+QA acceptance evidence:
+
+- Built-in Codex Browser proved one selected date across the full Add path:
+  `Sun, Jun 14` in the saved calendar action, Add menu, constructor/dialog, and final
+  `Review add` modal.
+- Final confirmation also showed `Sunday` and `Selected calendar day for this reviewed workout.`
+- No stale `Sat, Jun 13` label appeared in the selected Add/review confirmation context.
+- Persisted readback proved the added workout on `2026-06-14` with weekday `Sunday`, plan source
+  `manual_user_built_plan_v1`, and workout metadata `manual_workout_authoring_v1`.
+- Source inspection proved the Add payload still sends only `activePlanId`, `draftInput`,
+  `reviewToken`, and `reviewChecksum`.
+- Disposable cleanup returned auth user and Supabase rows to zero/absent.
+- Mobile `375px` proof passed with no horizontal overflow.
+
+Acceptance decision:
+
+- Accept FRONTEND Slice 2A and the user-facing post-create manual Add flow as QA-passed.
+- Manual user-built plans can now be created from the no-active-plan path and expanded with
+  additional reviewed workouts on eligible future empty days.
+- This is shipped-history material.
+
+## Unified Plan Creation Lifecycle Direction
+
+Date: 2026-06-11
+
+Product brief:
+
+[Unified Plan Creation Lifecycle](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/product-briefs/2026-06-11-unified-plan-creation-lifecycle.md>)
+
+Decision:
+
+- Manual planning and AI planning should converge into one active-plan calendar lifecycle.
+- `Build my plan myself` is not a separate product silo. It is one authorship mode for adding
+  reviewed plan truth into the same active plan surface.
+- A runner may manually create the first days or weeks, then later ask Hito to continue with an
+  AI/generated reviewed block.
+- Future `Continue with Hito` or `Add plan block` should add reviewed future workouts after the
+  already-authored range, not replace manual days or silently overwrite occupied/protected dates.
+- Coach/organization-authored plans should fit the same model later: different source, same reviewed
+  active-plan calendar lifecycle.
+
+Current scope boundary:
+
+- This direction is documented so the team does not lose the larger product model.
+- It does not change the immediate implementation gate.
+- FRONTEND Slice 2A has implemented the date confirmation repair.
+- Focused QA browser validation remains next before the current manual builder Add flow can be
+  accepted.
+- AI continuation blocks, personal saved templates, copy/paste, move-workout, and JSON export remain
+  later slices.
+
+## Backend Manual Confirm Harness Guardrail Result
+
+Status:
+
+implemented / QA-passed / accepted for manual Slice 2B closeout.
+
+Root cause closed in this slice:
+
+- Visible symptom: QA could not safely run live manual confirm/persist proof.
+- Underlying cause: `scripts/validate-manual-workout-authoring.ts` had deterministic fake
+  persistence checks but no canonical safe-target policy for real Supabase mutation.
+- Canonical owner: backend validation tooling, reusing the accepted R8 confirm-harness safety
+  pattern.
+
+What changed:
+
+- Default manual authoring validator remains non-mutating.
+- Added `--require-persistence`.
+- Remote Supabase mutation is blocked by default.
+- Loopback Supabase URLs are treated as local disposable persistence targets.
+- Remote disposable mutation requires:
+  - `--allow-remote-disposable-supabase-mutation`
+  - `HITO_MANUAL_WORKOUT_CONFIRM_ALLOW_REMOTE_MUTATION=I_UNDERSTAND_THIS_MUTATES_REMOTE_DISPOSABLE_SUPABASE`
+  - project ref `dltfjwexyctmihclcjqj`
+- Added manual-workout-specific disposable auth user email/metadata for validation runs.
+- Added schema-aware cleanup/readback proof for `workout_logs`, `planned_workouts`,
+  `plan_cycles`, `runner_profiles`, and auth-user deletion.
+- Kept product runtime persistence semantics unchanged.
+
+Backend validation evidence:
+
+- `npm exec eslint -- scripts/validate-manual-workout-authoring.ts scripts/manual-workout-authoring/persistence-proof.ts src/lib/manual-workout-authoring/*.ts src/lib/training-api.ts` passed.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed with
+  `mode: not_requested`, proving the default remains non-mutating.
+- `node --env-file=.env.local --import tsx ./scripts/validate-manual-workout-authoring.ts --require-persistence` failed fast before mutation with remote target
+  `https://dltfjwexyctmihclcjqj.supabase.co` and explicit override instructions.
+
+QA disposable persistence proof:
+
+- Default harness remained non-mutating with `mode: not_requested`.
+- `--require-persistence` without override blocked before mutation against
+  `https://dltfjwexyctmihclcjqj.supabase.co` with `remote_supabase_blocked`.
+- Guarded override run passed against approved project `dltfjwexyctmihclcjqj`.
+- Disposable run id: `manual-workout-confirm-1781137125035-8a14cfa46e52e`.
+- Persisted proof: `rows: 1`, `sourceKind: manual_user_built_plan_v1`,
+  `sourceStatus: manual_user_built_plan_created`.
+- Review checksum readback:
+  `854bb20a888a072e09f23fc86674ee1af8aa070cd3227df6fb1279c551949d0a`.
+- Cleanup proof: `workoutLogsRemaining: 0`, `planCyclesRemaining: 0`,
+  `plannedWorkoutsRemaining: 0`, `runnerProfilesRemaining: 0`, `authUserDeleted: true`,
+  `authUserRemaining: false`.
+- QA passed ESLint, manual validator, guarded remote run, build, and scoped diff checks.
+
+Acceptance decision:
+
+- Backend Slice 2 / 2B persistence proof is closed.
+- Source-only acceptance is not being claimed; acceptance is based on the guarded disposable live
+  persistence proof above.
+- Frontend may now wire the first manual create interaction through the accepted backend
+  review/confirm seams.
 
 ## Source Links
 
@@ -92,6 +593,86 @@ ARCHITECT / BACKEND / FRONTEND / RUNNING COACH / QA
 - Current product: [current-product.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-product.md>)
 - Current system: [current-system.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-system.md>)
 - Current state: [current-state.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-state.md>)
+
+## Manual Plan Builder MVP Reframe
+
+Date: 2026-06-11
+
+Decision:
+
+- Reframe this active plan around the full end-to-end `New plan from scratch` / `Build my plan
+  myself` lifecycle.
+- Treat the QA-passed first-create slice as the foundation for the manual builder, not as the full
+  product completion.
+- Keep one active manual authoring plan instead of creating another plan file. This plan remains the
+  canonical execution owner for the manual builder MVP.
+
+Root cause:
+
+- Visible symptom: Hito can create one reviewed manual workout as the first
+  `manual_user_built_plan_v1` active plan, but the user expectation is an empty editable calendar
+  where they can keep building the plan.
+- Underlying cause: the plan treated add-more-workout, saved templates, copy/paste, and export as
+  separate future conveniences instead of one coherent product lifecycle after `New plan from
+  scratch`.
+- Canonical owners:
+  - Backend owns validation, normalization, review, confirm, persistence, template registry,
+    personal saved-template truth, copy/paste validation, JSON export truth, protected-day rules,
+    and metric truth.
+  - Frontend owns interaction, calendar rendering, modal/sheet UI, Hito DS reuse, form input,
+    async state, and display of backend-shaped truth.
+  - Running Coach owns workout block/template taxonomy and training meaning.
+  - QA owns browser and disposable persistence proof.
+
+Accepted product scenario:
+
+1. Runner chooses `New plan from scratch`, `Build my plan myself`, or equivalent manual entry.
+2. Hito opens the existing calendar visual system in an empty manual-builder state.
+3. Empty eligible days can be selected.
+4. Desktop shows an `Add` affordance on hover/focus; mobile keeps `Add` visible.
+5. Runner chooses `Add activity`, `Add training`, or equivalent.
+6. Runner selects from Hito-owned templates such as easy, long, intervals, hills, or rest.
+7. A modal/sheet opens with the template loaded.
+8. The constructor shows a top preview plus editable sections for warm-up, work, recovery/rest,
+   cooldown, repeat/loop groups where supported, and duration/distance/target fields where backend
+   metric truth allows them.
+9. Runner saves the reviewed workout and it appears on that calendar day.
+10. Runner repeats this for other days.
+11. From the workout modal or day menu, runner can `Save as template activity`.
+12. Save-as-template asks for a name and icon/glyph.
+13. The saved personal template appears in the next `Add activity` template list.
+14. Runner can copy an existing workout day.
+15. Runner can paste it into another day after backend review before persistence.
+16. The resulting manual plan can be exported/shared as JSON using canonical plan/workout truth.
+
+Manual builder MVP scope:
+
+- first manual plan creation from one reviewed workout
+- adding additional reviewed workouts to existing manual plans
+- frontend empty-calendar add flow after the first plan exists
+- Hito-owned template picker and constructor rendering
+- personal saved templates with name and icon/glyph
+- copy/paste through draft reconstruction and backend review
+- JSON export/share using canonical active-plan export truth
+- browser QA covering multiple days, rest days, saved template, custom icon/glyph, copy/paste, JSON
+  export, and mobile `375px`
+
+Explicitly later:
+
+- recurrence or persistent recurrence-rule storage
+- editing generated, preset, imported, or running-engine plans through the manual builder
+- active-plan replacement/refresh semantics
+- advanced/performance-only templates that need new eligibility fixtures
+- provider upload/sync, Garmin/Strava behavior, OpenAI, or AI recommendations
+- a new visual system outside Hito DS
+
+Sequencing decision:
+
+- Keep BACKEND Slice 3A as the immediate next gate because adding one reviewed workout to an
+  existing manual plan is the first missing root mutation after first-create.
+- Do not jump to personal templates, copy/paste, or export before Slice 3A proves the manual active
+  plan can be safely expanded.
+- Do not let Frontend fake post-create rows while Backend Slice 3A is missing.
 
 ## Product Intent
 
@@ -108,13 +689,16 @@ conflict detection, lifecycle rules, source metadata, and persistence.
 ## Current Architecture Gap
 
 Implemented Hito has canonical paths for generated plans, Plan Presets, import/apply, active-plan
-refresh, schedule reflow, and workout result logging. It does not yet have a canonical path for:
+refresh, schedule reflow, workout result logging, the first `manual_user_built_plan_v1` creation
+from one reviewed manual workout, and adding additional reviewed workouts to eligible future empty
+days in existing manual user-built plans. It does not yet have the remaining canonical manual
+builder path for:
 
-- user-built plan creation from a no-active-plan state
-- adding a planned workout on an empty day
 - editing planned workout content
-- creating a workout from a template
+- creating workouts from runner-saved personal templates
 - copying/pasting a workout to another date
+- saving personal custom activity templates
+- exporting/sharing the completed manual plan as canonical JSON
 - validating user-edited workout blocks/repeat groups
 - recurrence or repeat-pattern expansion
 
@@ -440,22 +1024,679 @@ Validation evidence:
 - `npm exec eslint -- src/lib/manual-workout-authoring/*.ts scripts/validate-manual-workout-authoring.ts`
 - `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
 
-## Later Slice Order
+## Architecture Checkpoint: Designer Spec Acceptance And Slice 2 Selection
+
+Date: 2026-06-10
+
+Decision:
+
+- Accept the Designer spec
+  [Manual User-Built Plan Flow Spec](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-06-10-manual-user-built-plan-flow-spec.md>)
+  as the UX/product design input for the manual `Build my plan myself` path.
+- Accept Backend Slice 1 as implementation-validated enough to route forward. The non-mutating
+  review seam, backend-owned templates, validation, normalization, review token/checksum, and
+  deterministic harness evidence are sufficient for the next backend mutation-boundary slice.
+- Do not treat Backend Slice 1 or the Designer spec as shipped user-facing behavior. The manual
+  flow still lacks confirm/persist, frontend wiring, browser QA, and final acceptance.
+- Select BACKEND Slice 2 as the next gate before frontend implementation. The root cause is the
+  missing canonical user-built plan lifecycle, not a missing calendar button. Frontend should not
+  scaffold save/create behavior until Backend proves the reviewed manual draft can become a
+  persisted `manual_user_built_plan_v1` active plan through the canonical persistence seam.
+
+Rationale:
+
+- A frontend-only draft calendar would risk fake saved states, route-local templates, and local
+  mutation truth.
+- Backend Slice 1 already provides the needed non-mutating review contract for first persistence
+  work: canonical draft output, source metadata, conflict shape, review token, and checksum.
+- The next unsafe boundary is mutation: server-side rebuild, exactness verification, active-plan
+  guard, rollback behavior, and canonical `training-plan-v2` persistence.
+- Reusing `createFirstPlanFromReviewedCanonicalPlanForUser(...)`, imported-plan seed mapping, and
+  planned-workout insert helpers keeps manual authoring on the same lifecycle path as other
+  reviewed plan creation instead of creating a parallel persistence system.
+
+Backend Slice 2 must preserve:
+
+- no active empty plan persistence
+- no generated/preset/imported/running-engine plan mutation
+- no recurrence
+- no copy/paste persistence
+- no save-as-template persistence
+- no frontend-owned templates, eligibility, metric truth, schedule truth, or persistence
+- no fake precise pace
+- no fake personal HR
+- no OpenAI
+- no Plan Preset confirm revival
+
+## Backend Slice 2 Implementation Notes
+
+Status: implemented / QA-passed / accepted for frontend wiring after guarded disposable
+persistence proof.
+
+Implemented:
+
+- `confirmManualWorkoutDraft(...)` server action exported through the existing manual authoring seam.
+- `confirmManualWorkoutDraftForUser(...)` pure user-scoped confirm helper for harness and future QA.
+- `manual-workout-authoring/persistence.ts` owns the reviewed-workout to `training-plan-v2`
+  mapping and persistence metadata shaping, keeping the action file focused on lifecycle,
+  exactness, and bounded results.
+- Server-side rebuild through `reviewManualWorkoutDraft(...)`; confirm never accepts client-sent
+  canonical rows.
+- Exactness verification for review token/checksum, including changed date, changed template,
+  changed entries, invalid token, stale checksum, protected date, and active-plan conflict.
+- Canonical mapping from one reviewed manual workout into `training-plan-v2` with source kind
+  `manual_user_built_plan_v1`.
+- Canonical persistence delegation to `createFirstPlanFromReviewedCanonicalPlanForUser(...)`.
+- Source metadata for manual plan creation, workout authoring source, template key/version,
+  workout date, row count, review payload version, review checksum, mapping gaps, metric truth mode,
+  and warnings.
+- Rest-only first confirm is blocked with a bounded `manual_workout_required` response so Hito does
+  not create an active empty/rest-only manual plan.
+- The manual review checksum no longer imports Node-only crypto, keeping the public action/export
+  build-safe.
+
+Validation evidence:
+
+- `npm exec eslint -- src/lib/manual-workout-authoring/*.ts src/lib/training-api.ts scripts/validate-manual-workout-authoring.ts`
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- `git diff --check -- src/lib/manual-workout-authoring/actions.ts src/lib/manual-workout-authoring/persistence.ts src/lib/manual-workout-authoring/schema.ts src/lib/manual-workout-authoring/index.ts src/lib/training-api.ts scripts/validate-manual-workout-authoring.ts docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md`
+- `npm run build`
+
+Final acceptance evidence:
+
+- Backend deterministic source/harness gates passed.
+- Guarded remote-disposable persistence proof passed against project `dltfjwexyctmihclcjqj`.
+- Persisted one row with source kind `manual_user_built_plan_v1` and source status
+  `manual_user_built_plan_created`.
+- Cleanup returned disposable auth and manual plan/workout/profile/log rows to zero.
+- Frontend create wiring is no longer blocked by persistence proof, but it must remain a thin
+  interaction layer over `reviewManualWorkoutDraft(...)` and `confirmManualWorkoutDraft(...)`.
+
+## Architecture Validation-Environment Decision For Manual Slice 2 Persistence Proof
+
+Status update, 2026-06-10: resolved. QA passed the guarded remote-disposable persistence proof
+after Backend Slice 2B harness hardening.
+
+Historical decision before Backend Slice 2B:
+
+- Do not accept source-only proof as full manual confirm/persist acceptance.
+- Do not send QA directly into scoped remote mutation before harness hardening, because
+  `scripts/validate-manual-workout-authoring.ts` does not currently contain the R8-style target
+  preflight, explicit remote override, allowlist, disposable user namespace, or cleanup/readback
+  proof required for a safe remote persistence run.
+- Select BACKEND hardening as the next gate. Backend must add manual-workout-specific
+  fail-safe controls to the harness first.
+- After hardening, the accepted proof strategy is:
+  - local disposable Supabase by default when available
+  - if local Supabase remains unavailable, exactly one explicit remote-disposable proof against
+    project `dltfjwexyctmihclcjqj`
+  - remote proof must use the guarded harness flag, exact env confirmation, project allowlist, and
+    disposable cleanup proof
+
+Closeout decision after Backend Slice 2B and QA:
+
+- Backend added the required manual-workout-specific harness guardrails.
+- QA proved the default non-mutating path, remote block-before-mutation behavior, guarded
+  remote-disposable persistence, and cleanup readback.
+- The manual persistence proof blocker is closed.
+- FRONTEND Slice 1 may now wire the manual draft calendar/review/create interaction, provided it
+  calls the accepted backend review/confirm seams and does not create frontend-owned templates,
+  persistence, or saved-state truth.
+
+Rationale:
+
+- Backend Slice 2 writes active-plan truth: `runner_profiles`, `plan_cycles`, and
+  `planned_workouts`.
+- `.env.local` currently points at remote Supabase project `dltfjwexyctmihclcjqj.supabase.co`.
+- QA found local Supabase unavailable on port `54321`.
+- The R8 running-plan confirm harness already established the correct safety pattern:
+  non-mutating by default, `--require-persistence` fail-fast, loopback as local disposable,
+  remote mutation blocked by default, explicit remote-disposable override only, and strict cleanup
+  proof.
+- Manual workout authoring needs the same class of harness protection before any remote mutation
+  proof is acceptable.
+
+Required manual harness guardrails:
+
+- non-mutating review/exactness checks run by default
+- `--require-persistence` fails fast when no safe target exists
+- loopback Supabase URLs are treated as local disposable targets
+- remote Supabase mutation is blocked by default
+- remote mutation requires `--allow-remote-disposable-supabase-mutation`
+- remote mutation requires an exact manual-workout env confirmation such as
+  `HITO_MANUAL_WORKOUT_CONFIRM_ALLOW_REMOTE_MUTATION=I_UNDERSTAND_THIS_MUTATES_REMOTE_DISPOSABLE_SUPABASE`
+- remote mutation allowlist is limited to project ref `dltfjwexyctmihclcjqj`
+- disposable auth user naming/metadata is specific to the manual workout proof
+- cleanup/readback is schema-aware and verifies zero remaining:
+  - `workout_logs`
+  - `planned_workouts`
+  - `plan_cycles`
+  - `runner_profiles`
+  - disposable auth user
+
+Rejected proof paths:
+
+- source-only/non-mutating harness as full persistence acceptance
+- direct QA remote mutation without manual harness guardrails
+- unscoped remote mutation
+- production or non-disposable user mutation
+- frontend Create/save wiring before live persistence proof passed and Architect closed the gate
+- DB/schema changes to make the proof easier
+- active-plan replacement, recurrence, copy/paste persistence, or save-as-template persistence
+
+Next accepted sequence:
+
+1. BACKEND added the manual harness safety controls above.
+2. QA reran non-mutating source/harness checks.
+3. QA ran `--require-persistence` without remote override and proved it blocked before mutation.
+4. QA verified guarded remote proof against project ref `dltfjwexyctmihclcjqj`.
+5. QA ran one scoped remote-disposable persistence proof with explicit flag and env confirmation,
+   then proved cleanup left zero manual QA records.
+6. ARCHITECT closes the persistence acceptance gate in this plan update and selects FRONTEND Slice
+   1 for manual draft calendar/review/create wiring.
+
+## Frontend Slice 1 First-Create Flow Acceptance
+
+Date: 2026-06-10
+
+Status:
+
+implemented / QA-passed / accepted for first manual user-built plan creation.
+
+Root cause closed:
+
+- Visible symptom: `Build my plan myself` existed as an intended flow, but the first create path
+  still needed end-to-end browser proof that a runner could create a persisted manual plan from the
+  UI.
+- Underlying cause: the missing gate was safe create-click acceptance across frontend interaction,
+  backend review/confirm, canonical persistence, saved-mode readback, and cleanup.
+- Canonical owners:
+  - frontend interaction and Hito DS rendering
+  - backend review/confirm/persistence truth
+  - QA disposable browser and DB readback proof
+
+QA browser create-click evidence:
+
+- Browser flow completed: `Build my plan myself` -> `Create workout` -> `Review workout` ->
+  `draft_ready` -> `Create manual plan`.
+- Pre-create DB state for `qa-date-controls-release-20260529@local.test` was zero for runner
+  profiles, plan cycles, active plans, manual plans/workouts, and workout logs.
+- Create succeeded and UI transitioned to saved/home calendar state with `Manual user-built plan`,
+  `Open plan`, and `Easy aerobic run`.
+- DB readback showed exactly one active plan with `source_kind: manual_user_built_plan_v1`,
+  `source_status: manual_user_built_plan_created`, one row, and one non-rest row.
+- Persisted workout matched the reviewed draft:
+  - title: `Easy aerobic run`
+  - date: `2026-06-11`
+  - weekday: `Thursday`
+  - identity/source type: `easy_aerobic_run`
+  - three executable structure-only steps
+- Metric truth stayed strict:
+  - `structure_only_executable`
+  - `pace_targets_allowed: false`
+  - `hr_targets_allowed: false`
+- Source proof still shows confirm sends only `draftInput`, `reviewToken`, and `reviewChecksum`.
+- Mobile post-create at `375px` had no horizontal overflow.
+- Cleanup returned `workout_logs`, `planned_workouts`, `plan_cycles`, and `runner_profiles` to
+  zero; the disposable auth user was deleted.
+
+Acceptance decision:
+
+- Accept FRONTEND Slice 1 as QA-passed for first manual user-built plan creation.
+- This is user-facing shipped-history material because a no-active-plan runner can now create one
+  persisted manual plan from a reviewed manual workout through the UI.
+- Changelog should record this first-create capability, but must not claim edit, add-more-workout,
+  clear/delete, copy/paste, recurrence, save-as-template, active-plan replacement, generated-plan
+  mutation, or manual template persistence.
+
+Next gate:
+
+- BACKEND Slice 3A: add one reviewed manual workout to an existing `manual_user_built_plan_v1`
+  active plan on an eligible future empty day.
+
+What remains blocked:
+
+- edit existing manual workouts
+- clear/delete persisted manual days
+- copy/paste persistence until the later reviewed paste MVP gate
+- recurrence as future-only outside this MVP
+- save-as-template persistence until the later personal template MVP gate
+- manual mutation of generated, preset, imported, or running-engine plans
+- active-plan replacement
+
+## Backend Slice 3A Add-Workout Mutation Result
+
+Date: 2026-06-10
+
+Status:
+
+implemented / QA-passed / accepted for manual active-plan add-workout mutation.
+
+Root cause closed:
+
+- Visible symptom: after `Build my plan myself`, the first reviewed workout could create a manual
+  active plan, but the runner could not safely add the next workout to that existing plan.
+- Underlying cause: Hito had first-create manual persistence but no backend-owned mutation boundary
+  for adding one reviewed workout to an existing `manual_user_built_plan_v1`.
+- Canonical owner: manual workout authoring review/exactness, active-plan lifecycle validation,
+  planned-workout persistence mapping, and protected-day guards.
+
+What changed:
+
+- Added a focused add-workout server/action seam:
+  - `addManualWorkoutToActivePlan`
+  - `addManualWorkoutToActivePlanForUser(...)`
+- Added `src/lib/manual-workout-authoring/active-plan-add.ts` so existing-plan mutation does not
+  pile into the first-create action owner.
+- Reused `reviewManualWorkoutDraft(...)` and `validateManualWorkoutReviewExactness(...)`; confirm
+  rebuilds the reviewed draft server-side and verifies `reviewToken` + `reviewChecksum`.
+- Reused canonical `training-plan-v2` row mapping through `buildImportedPlanSeed(...)` and
+  `buildPersistedWorkoutInsertRows(...)` rather than hand-building `planned_workouts`.
+- Enforced server-side mutation bounds:
+  - requires an active plan
+  - requires `plan_cycles.source_kind === manual_user_built_plan_v1`
+  - requires a future target date on or after the manual plan start date
+  - requires an empty target day
+  - rejects logged/evidence-backed occupied days as protected
+  - rejects generated, preset, imported, and running-engine plans
+  - rejects stale review, invalid token/checksum, and client-sent row payloads
+- Preserved source metadata in the plan metadata trail:
+  - `manual_user_built_plan_v1`
+  - `manual_workout_authoring_v1`
+  - template key/version
+  - workout date
+  - review payload version
+  - checksum
+  - metric truth mode
+  - mapping gaps
+  - warnings
+
+Validation evidence:
+
+- Targeted ESLint passed for manual authoring backend files, `training-api.ts`, and the manual
+  validation harness.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed.
+- The default harness remains non-mutating.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts --require-persistence` blocks
+  before mutation when no safe Supabase persistence env is loaded.
+
+QA acceptance evidence:
+
+- `addManualWorkoutToActivePlanForUser(...)` accepts only `activePlanId?`, `draftInput`,
+  `reviewToken`, and `reviewChecksum`.
+- The add seam rebuilds review server-side and rejects client-sent rows, workouts, and segments.
+- The add seam only permits active plans with `source_kind: manual_user_built_plan_v1`.
+- Guarded remote-disposable live smoke created one manual active plan, added one reviewed
+  `steady_aerobic_run` on `2026-06-18`, and read back exactly two planned workouts.
+- Duplicate same-date add rejected with `occupied_day`.
+- Changed reviewed date rejected with `stale_review`.
+- Metadata and readback proof preserved manual plan/workout source truth.
+- Metric truth stayed strict: no fake precise pace and no fake personal HR.
+- Cleanup returned `workout_logs`, `planned_workouts`, `plan_cycles`, `runner_profiles`, and auth
+  user to zero/absent.
+
+Acceptance decision:
+
+- Accept Backend Slice 3A as QA-passed.
+- The backend root cause is closed: Hito now has a reviewed-workout-to-existing-manual-active-plan
+  mutation boundary.
+- This is not a frontend shipped capability yet. It becomes user-facing only after Frontend Slice 2
+  wires the calendar interaction and QA proves the browser flow.
+- Do not add a changelog entry for this backend-only closeout; defer shipped-history wording until
+  the user-facing add-workout flow passes frontend/browser QA.
+
+Next gate:
+
+- FRONTEND Slice 2: wire the post-create empty-calendar `Add activity` flow for existing
+  `manual_user_built_plan_v1` active plans, consuming only backend-shaped review/add results from
+  Backend Slice 3A.
+
+## Architecture Decision: Date-Only And Weekday Ownership
+
+Date: 2026-06-11
+
+Status:
+
+accepted / Frontend Slice 2A selected before manual Add acceptance can pass.
+
+Root cause:
+
+- Visible symptom: selecting a manual Add day such as `Sun, Jun 14` could show `Sat, Jun 13` in
+  runner-facing UI, while DB persistence still used the correct `2026-06-14`.
+- Immediate fix: Frontend repaired the shared manual display helper, but QA still failed because
+  the final Add confirmation modal did not repeat the selected date.
+- Underlying architectural risk: manual calendar rendering, authoring review, final confirmation,
+  persistence readback, and future move/copy/paste flows could drift if date-only values and weekday
+  labels do not have one ownership contract.
+
+Canonical date-only representation:
+
+- Canonical calendar day identity is `YYYY-MM-DD`.
+- `workoutDate`, `workout_date`, `sourceDate`, and `targetDate` are date-only product truth.
+- A timezone-bearing `Date` object is never canonical day identity.
+- `Date` objects are allowed only as local implementation details inside shared date helpers.
+- Persisted/manual mutation payloads must never derive a day from runner-facing display text.
+
+Weekday ownership:
+
+- Weekday is derived evidence from the canonical date, not independent product truth.
+- Backend review/normalization should derive weekday from `workoutDate` when producing review and
+  persistence readback.
+- Frontend may render weekday labels from canonical `YYYY-MM-DD` using the shared Hito date-only
+  display helper.
+- If backend-provided weekday and frontend-derived weekday disagree, that is a defect. Do not
+  silently choose one label.
+- Storing `weekday` in persisted rows remains acceptable for readback/audit, but it must be treated
+  as derived from `workout_date`.
+
+Forbidden patterns:
+
+- Do not parse bare `YYYY-MM-DD` with timezone-sensitive `new Date(iso)` for runner-facing labels.
+- Do not use UTC instant conversion as the source of weekday truth for local calendar days.
+- Do not derive mutation target date from localized display labels such as `Sun, Jun 14`.
+- Do not let frontend own weekday truth for review/confirm exactness.
+- Do not store or mutate weekday as an independent source of truth when `workoutDate` is canonical.
+
+Manual Add confirmation contract:
+
+- The day action menu, constructor, review summary, final Add confirmation modal, success/error
+  copy, and persisted readback must all refer to the same `YYYY-MM-DD` date-only value.
+- Final Add confirmation must repeat the selected date and weekday before the runner clicks
+  `Add workout`.
+- The final confirmation should use backend-shaped review truth as the source:
+  `review.draft.workoutDate` plus derived/backend weekday evidence.
+- Confirm must still send only `activePlanId?`, `draftInput`, `reviewToken`, and `reviewChecksum`.
+- The UI must not claim the workout was added until persisted backend readback refreshes the
+  calendar.
+
+Future move-workout contract:
+
+- Moving a workout is a separate backend-reviewed mutation, not a frontend drag/drop row update.
+- A future move review must include:
+  - `activePlanId`
+  - planned workout id or canonical source workout reference
+  - `sourceDate`
+  - `targetDate`
+  - source weekday label/evidence derived from `sourceDate`
+  - target weekday label/evidence derived from `targetDate`
+  - review token/checksum
+- Backend owns validation for occupied days, protected days, logged/provider-evidence days,
+  generated/preset/imported/running-engine source rejection, and persistence.
+- Frontend owns interaction and rendering of backend-shaped source/target review only.
+- Future move confirm must not trust client-sent rows, segments, weekday strings, or display labels.
+
+Next gate:
+
+- FRONTEND Slice 3: wire the personal saved-template UI now that shared workout target display
+  grammar cleanup is QA-passed.
+
+What remains out of scope:
+
+- move-workout implementation
+- copy/paste persistence
+- recurrence
+- JSON export
+- additional DB/schema changes beyond the QA-passed `runner_manual_workout_templates` table
+- generated/preset/imported/running-engine manual mutation
+
+## Backend Slice 4 Implementation Notes — 2026-06-11
+
+Status:
+
+implemented / QA-passed / accepted for backend personal saved-template persistence.
+
+Backend implemented and QA accepted the personal saved-template persistence boundary without
+changing manual first-create, post-create Add, generated/preset/imported/running-engine, OpenAI, or
+frontend UI behavior.
+
+What changed:
+
+- Added `runner_manual_workout_templates` as the explicit user-owned personal template table with
+  RLS, source metadata, runner display name, allowed icon/glyph key, review checksum, and normalized
+  manual draft payload.
+- Added `src/lib/manual-workout-authoring/saved-templates.ts` as the focused backend owner for:
+  - saving a reviewed manual workout as a personal template
+  - listing the current user's personal templates
+  - reconstructing a future `ManualWorkoutDraftInput` from a saved template and rerunning
+    `reviewManualWorkoutDraft(...)`
+- Kept active-plan persistence and `planned_workouts` out of personal template ownership so saved
+  templates do not become raw row duplication.
+- Exported the typed server actions/results through the existing manual workout/training API seams
+  for future frontend consumption.
+- Extended the manual authoring harness with deterministic saved-template coverage:
+  save, readback, invalid name, invalid icon/glyph, unsupported payload, cross-user rejection,
+  fake pace/HR rejection, and reconstruct-review proof.
+- Extended guarded disposable cleanup/readback specs so future live persistence proof also checks
+  zero remaining `runner_manual_workout_templates` rows for the disposable user.
+
+Backend validation evidence:
+
+- `npm exec eslint -- src/lib/manual-workout-authoring/*.ts src/lib/training-api.ts scripts/validate-manual-workout-authoring.ts scripts/manual-workout-authoring/persistence-proof.ts`
+  passed.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed with non-mutating
+  default persistence mode.
+- `node --env-file=.env.local --import tsx ./scripts/validate-manual-workout-authoring.ts --require-persistence`
+  blocked before mutation against remote project `dltfjwexyctmihclcjqj`, as designed.
+- `npm run build` passed.
+
+QA acceptance evidence:
+
+- QA applied the exact scoped migration SQL
+  `20260611120000_runner_manual_workout_templates.sql` only to the approved disposable remote
+  target and repaired only migration version `20260611120000`.
+- `--require-persistence` without explicit override blocked before remote mutation.
+- Live disposable proof saved one reviewed workout as `manual_saved_workout_template_v1` with:
+  - display name: `QA reusable strides`
+  - icon key: `easy`
+  - workout source kind: `manual_workout_authoring_v1`
+  - target truth mode: `structure_only`
+  - trusted client rows: `false`
+- Owner authenticated readback saw one template.
+- A second disposable authenticated user saw zero templates.
+- Cross-user review returned `not_found`.
+- Reconstruction for `2026-06-25` returned `persisted: false`, passed manual review, and preserved
+  `reviewedThroughManualAuthoring: true`.
+- Cleanup returned `runner_manual_workout_templates`, `workout_logs`, `planned_workouts`,
+  `plan_cycles`, and `runner_profiles` to zero; both disposable auth users were deleted.
+
+Acceptance decision:
+
+- Accept Backend Slice 4 as QA-passed for backend/source/schema/RLS/persistence/readback.
+- This is not yet user-facing shipped behavior because frontend `Save as template` and personal
+  template picker wiring are still future work.
+- Do not update changelog for runner-facing shipped history until the frontend template UI passes
+  browser QA.
+
+## Shared Workout Target Display Grammar Cleanup Acceptance — 2026-06-11
+
+Status:
+
+QA-passed / accepted.
+
+Context:
+
+The shared runner-facing workout target display grammar cleanup was a blocker before exposing more
+manual-builder template UI. It ensured manual and saved workout surfaces do not teach runners to
+read internal target labels as workout prescriptions.
+
+QA evidence:
+
+- Browser proof used a saved active-plan fixture.
+- Saved calendar row proof showed the `45.85`-style fixture duration renders as `46 min`.
+- Workout detail and interval/segment readback showed `9.4 min` renders as `9 min 24 sec`.
+- `Target: Structure-only executable target` is absent from runner-facing tested surfaces.
+- Structure-only mode still shows concrete executable structure.
+- Fake pace did not appear.
+- Fake personal HR did not appear.
+- Mobile `375px` layout has no horizontal overflow.
+- Disposable `planned_workouts`, `plan_cycles`, `runner_profiles`, and `workout_logs` returned to
+  zero after cleanup.
+
+Acceptance decision:
+
+- Accept the shared workout target display grammar cleanup as QA-passed.
+- Record this as shipped runner-facing bugfix material in
+  [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md).
+- The blocker on user-facing `Save as template` UI is removed.
+- Select FRONTEND Slice 3 as the next manual builder gate.
+
+## Frontend Slice 3 Saved Template UI Acceptance — 2026-06-11
+
+Status:
+
+QA-passed / accepted for the scoped happy path.
+
+Context:
+
+FRONTEND Slice 3 exposed the Backend Slice 4 personal saved-template seam in the manual builder UI
+without creating frontend-owned template truth.
+
+QA evidence:
+
+- Non-Chrome browser proof used Playwright WebKit against the canonical built local server.
+- Chrome was not used.
+- One disposable QA user was used and cleaned up.
+- `Save as template` was absent before review.
+- After manual workout review returned `draft_ready`, `Save as template` appeared.
+- Save modal collected runner display name `QA reusable tempo 20260611153239` and icon `tempo`.
+- Saved template appeared under `My saved templates` in the existing `Choose template` picker beside
+  registry groups.
+- Selecting the saved template for `Sun, Jun 14` reconstructed a backend-reviewed draft before
+  confirm.
+- One first-create path was confirmed from the saved-template-reviewed draft.
+- DB readback showed one `manual_saved_workout_template_v1` row and one persisted
+  `manual_user_built_plan_v1` planned workout.
+- Saved template preserved `manual_workout_authoring_v1`,
+  `saved_from_reviewed_manual_workout`, icon key, display name, and `structure_only` target truth.
+- Mobile `375px` no-overflow passed for save modal, picker, reviewed state, and post-create state.
+- Cleanup returned `runner_manual_workout_templates`, `planned_workouts`, `plan_cycles`,
+  `runner_profiles`, `workout_logs`, auth user, and local auth account to clean state.
+
+Acceptance decision:
+
+- Accept FRONTEND Slice 3 for the scoped saved-template happy path.
+- This is changelog material because a runner-facing saved-template UI path passed browser + DB QA.
+- Do not claim copy/paste, recurrence, JSON export, move workout, coach/organization templates, or
+  generated-plan mutation.
+- Do not treat the first-create proof as coverage for every saved-template path.
+- The existing manual active-plan `Add activity` saved-template reuse gap is closed by QA Slice 3B
+  below.
+
+## QA Slice 3B Saved Template Existing-Plan Add Acceptance — 2026-06-11
+
+Status:
+
+QA-passed / accepted.
+
+Context:
+
+QA Slice 3B proved the saved-template lifecycle path that was intentionally not covered by the
+first-create saved-template QA: existing `manual_user_built_plan_v1` active plan -> eligible future
+empty day -> calendar `Add activity` -> saved personal template -> backend review ->
+`addManualWorkoutToActivePlan(...)` -> persisted added workout.
+
+QA evidence:
+
+- Non-Chrome browser proof used Playwright WebKit against the canonical built local server.
+- The existing local server was reused, not duplicated.
+- One disposable QA user was used and cleaned up.
+- The user created one manual active plan from a reviewed manual workout.
+- The user saved the reviewed workout as personal template `QA Saved Add Reuse 20260611155836`.
+- The saved active-plan calendar exposed `Add activity` for a future empty day.
+- The saved template appeared under `My saved templates`.
+- Selecting the saved template reconstructed backend review.
+- `Review add` showed `draft_ready`.
+- `Add workout` persisted into the existing active plan.
+- DB readback showed one active `manual_user_built_plan_v1` plan.
+- DB readback showed one `manual_saved_workout_template_v1` row.
+- Saved template metadata preserved `manual_workout_authoring_v1` and
+  `saved_from_reviewed_manual_workout`.
+- DB readback showed two planned workouts total after add.
+- The added workout date was `2026-06-14`.
+- The added workout title came from the saved template.
+- The added workout identity was `easy_aerobic_run`.
+- The added workout preserved `structure_only_executable`.
+- Fake pace did not appear.
+- Fake personal HR did not appear.
+- Mobile `375px` no-overflow passed for picker, reviewed add state, and post-add calendar.
+- Cleanup returned templates, logs, planned workouts, plan cycles, runner profiles, local account,
+  and auth user to zero/absent.
+
+QA interpretation note:
+
+- The raw `summary.json` had `ok: false` because an early QA assertion incorrectly expected
+  `planned_workouts.source_workout_type` to hold manual authoring source-kind metadata.
+- Source inspection confirmed that `planned_workouts.source_workout_type` stores the workout/template
+  type, such as `easy_aerobic_run`.
+- Treat this as QA harness interpretation noise, not a product failure.
+
+Acceptance decision:
+
+- Accept QA Slice 3B as closing the saved-template existing-plan Add lifecycle.
+- Saved personal templates are now QA-accepted for both scoped first-create reuse and existing
+  manual active-plan Add reuse.
+- Update the changelog entry because the accepted user-facing saved-template behavior now extends
+  beyond the previous first-create-only proof.
+- Select BACKEND Slice 5 as the next manual-builder gate: copy/paste draft reconstruction and
+  reviewed paste confirm for existing manual active plans.
+
+## Manual Plan Builder MVP Slice Order
 
 1. BACKEND Slice 1:
-   manual workout non-mutating draft/review contract and template registry.
+   manual workout non-mutating draft/review contract and template registry. Implemented and
+   architecture-accepted for sequencing on 2026-06-10.
 2. ARCHITECT checkpoint:
-   accept/reject Backend Slice 1 and decide persistence exactness.
+   accepted Designer spec and Backend Slice 1; selected Backend Slice 2 as next gate.
 3. BACKEND Slice 2:
    confirm/persist first manual workout and create `manual_user_built_plan_v1` active plan through
-   canonical plan/workout persistence.
-4. FRONTEND Slice 1:
+   canonical plan/workout persistence. Implemented and accepted after guarded disposable
+   persistence proof.
+4. QA:
+   source/harness validation and guarded disposable persistence proof passed.
+5. BACKEND Slice 2B:
+   harden the manual workout authoring confirm harness for local/remote disposable persistence
+   proof. Implemented and QA-passed.
+6. FRONTEND Slice 1:
    no-active-plan `Build my plan myself`, draft calendar, Add menu, template picker, constructor
-   scaffold, and review display using backend-shaped truth.
-5. QA:
-   browser, source, and harness validation for initial user-built plan creation.
-6. BACKEND/FRONTEND later:
-   edit future unprotected workouts, copy/paste, and recurrence review batch expansion.
+   scaffold, review display, and first create wiring using backend-shaped truth and
+   `confirmManualWorkoutDraft(...)`. Implemented and QA-passed with disposable browser create-click
+   proof.
+7. QA:
+   browser, source, and harness validation for initial user-built plan creation. Passed.
+8. BACKEND Slice 3A:
+   add one reviewed manual workout to an existing `manual_user_built_plan_v1` active plan on an
+   eligible future empty day. Implemented and QA-passed with guarded disposable live add proof.
+9. FRONTEND Slice 2:
+   post-create empty-calendar `Add activity` flow for existing manual active plans, consuming only
+   backend-shaped add-workout review/confirm results from Slice 3A. Implemented and QA-passed after
+   the Slice 2A date-only confirmation repair.
+10. BACKEND Slice 4:
+   personal saved-template persistence with user-provided name and icon/glyph, using existing
+   manual template/canonical workout truth instead of frontend-owned templates. Implemented and
+   QA-passed with guarded disposable migration/RLS/readback proof.
+11. FRONTEND Slice 3:
+   save-as-template modal and saved personal templates in the `Add activity` template picker.
+   Implemented using backend-owned save/list/review actions and existing Hito DS manual builder
+   primitives; QA-passed for the scoped first-create saved-template happy path.
+12. QA Slice 3B:
+   existing manual active-plan Add regression for saved personal templates, proving
+   `manual_user_built_plan_v1` active plan -> eligible future empty day -> saved template review ->
+   `addManualWorkoutToActivePlan(...)` persistence and cleanup. Passed and accepted on 2026-06-11.
+13. BACKEND Slice 5:
+   copy/paste draft reconstruction and reviewed paste confirm for existing manual active plans,
+   including target-date conflict/protected-day validation. Selected as the next implementation
+   gate.
+14. FRONTEND Slice 4:
+   day more-menu copy/paste interaction and paste review flow, with no raw row duplication.
+15. BACKEND / EXPORT Slice 6:
+   JSON export/share for manual plans through the existing canonical active-plan export owner,
+   preserving `manual_user_built_plan_v1` source metadata and canonical workout rows.
+16. QA:
+   end-to-end manual builder MVP browser proof across multiple consecutive days, rest day, saved
+   template, custom icon/glyph, copy/paste, JSON export, cleanup, and mobile `375px`.
+17. Future-only:
+   recurrence/batch expansion architecture, edit/delete/clear persisted manual days, generated or
+   preset plan manual mutation, and advanced/performance-only manual templates.
 
 ## Frontend Boundaries For Later
 
@@ -476,11 +1717,19 @@ This plan can close when:
 
 - Backend has a canonical manual authoring review/confirm/persist seam.
 - No-active-plan user-built plan creation is implemented and QA-passed.
-- Frontend can create at least one valid manual workout from scratch and one from template.
-- Manual workouts render correctly in calendar and workout detail.
+- Existing manual active plans can receive additional reviewed workouts on eligible future empty
+  days without frontend-owned row appends.
+- Frontend can create multiple manual workouts from scratch and from Hito-owned templates through
+  the calendar `Add activity` flow.
+- Personal saved templates with runner-provided name and icon/glyph are persisted by backend and
+  reappear in the `Add activity` picker.
+- Copy/paste works through backend-reviewed draft reconstruction, not raw row duplication.
+- Manual plan JSON export/share uses canonical active-plan export truth and preserves
+  `manual_user_built_plan_v1` source metadata.
+- Manual workouts render correctly in calendar, workout detail, and export readback.
 - Protected logged/evidence-backed workouts cannot be silently overwritten.
-- Copy/paste and recurrence are either implemented and QA-passed or preserved as separate backlog
-  follow-ups.
+- Recurrence is explicitly preserved as future-only unless a separate batch-review architecture is
+  accepted.
 - Current docs and changelog are updated only for shipped behavior.
 
 ## Backend Slice 1 Full Handoff Detail
@@ -575,13 +1824,13 @@ Validation:
 - Run the new manual workout authoring harness.
 - Run `git diff --check -- <changed files>`.
 - Run build only if the project policy or changed imports make it necessary.
-
-Report using the standard Implementation Report format from AGENTS.md.
 ```
 
 ## Blockers
 
-- Backend Slice 1 must run before frontend implementation.
-- Persistence/confirm remains intentionally undefined until the review contract is implemented and
-  accepted.
+- No blocker for shared workout target display grammar cleanup.
+- No blocker for saved personal template reuse in the scoped manual builder paths: first-create and
+  existing manual active-plan Add reuse are both QA-passed.
+- Copy/paste persistence, JSON export, edit/delete/clear, recurrence, and
+  generated/preset/imported/running-engine manual mutation remain intentionally out of scope.
 - Recurrence remains blocked until a separate batch-review architecture decision.

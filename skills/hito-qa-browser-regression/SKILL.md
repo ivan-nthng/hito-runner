@@ -39,18 +39,43 @@ Verify Hito behavior with real browser evidence and honest coverage.
 ## Browser Policy
 
 - Use the built-in Codex app/browser testing environment first whenever it can cover the task.
+- Prefer the persistent production-built local QA server over repeatedly starting `npm run dev` for
+  browser acceptance work.
+- The canonical local QA server is the built app served with `npm run serve:local` at
+  `http://127.0.0.1:3000/` / `http://localhost:3000/`.
+- Before starting a server, check whether the canonical local QA server is already responding and
+  reuse it when it is healthy.
+- Do not start duplicate local app servers for the same proof. If the server is stale, hung, or
+  serving the wrong build, restart the existing server intentionally and report that restart.
+- If source changes affect the browser-visible app, rebuild before restarting the persistent built
+  server.
+- Use `npm run dev` only when the task specifically needs dev/HMR behavior or the built server
+  cannot cover the scope; state the reason in `Browser Path Preflight`.
+- Leave the persistent local QA server running after validation unless it is serving a known-bad
+  build, blocking the next task, or the user explicitly asks to stop it.
 - Treat Safari as a fallback path unless the task explicitly requires Safari-specific verification.
 - Use Computer Use with Safari only when Safari QA is required or the built-in browser cannot cover the task.
 - Reuse the existing Safari session whenever practical.
-- Prefer navigating the current Safari tab; if a separate state is needed, open a new tab in the same Safari window.
+- Preserve one browser context by default: one existing Safari window and, whenever possible, one
+  existing tab.
+- Prefer navigating the current Safari tab and completing the whole validation flow in that tab.
+- Open a new Safari tab only when the test genuinely requires a separate state or navigation
+  context; if used, state why in the QA report.
 - Do not open multiple Safari windows for QA.
 - Opening a new Safari window is prohibited unless the test explicitly requires multiple windows; if used, state why in the QA report.
 - Do not use private/incognito windows unless a clean unauthenticated session is required.
 - Preserve useful logged-in Safari sessions.
-- Chrome is only a last-resort fallback; report why Safari was blocked.
+- Chrome must not be used for QA browser testing unless the user explicitly requests or approves
+  Chrome for that specific QA run.
 - Every QA report must include a `Browser Path Preflight` line that states whether the built-in Codex app/browser was used first. If it was not used first, the report must give the concrete reason.
+- Every browser QA report must state which local app server URL was used and whether the existing
+  persistent server was reused, restarted, or replaced.
 - If Safari is used, the report must state whether Safari was required by the task or used because the built-in browser was blocked.
-- A report that skips the built-in browser without explanation, uses Safari first without justification, or opens extra Safari windows without a stated test requirement is invalid and must be redone.
+- If Safari is used, the report must state whether QA stayed in the existing window/tab or why a new
+  tab/window was required.
+- A report that skips the built-in browser without explanation, uses Safari first without
+  justification, opens extra Safari windows, opens unnecessary tabs, or uses Chrome without explicit
+  user approval is invalid and must be redone.
 
 ## Screenshot Artifact Policy
 
@@ -69,14 +94,16 @@ Verify Hito behavior with real browser evidence and honest coverage.
 
 1. Read the active plan, implementation summary, and QA expectations.
 2. Write the browser path preflight before opening or navigating any external browser.
-3. Identify the smallest end-to-end scope that proves the change.
-4. Run the CLI/build/script checks named by the handoff when they are relevant and feasible.
-5. Test admin/auth blocking separately from happy path when relevant.
-6. Verify data outcomes for any mutation.
-7. Source-verify any branch that cannot be safely exercised.
-8. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
-9. Report exact failures with repro steps.
-10. End with a verdict.
+3. Check whether the canonical persistent local QA server is already healthy before starting or
+   restarting any local app server.
+4. Identify the smallest end-to-end scope that proves the change.
+5. Run the CLI/build/script checks named by the handoff when they are relevant and feasible.
+6. Test admin/auth blocking separately from happy path when relevant.
+7. Verify data outcomes for any mutation.
+8. Source-verify any branch that cannot be safely exercised.
+9. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
+10. Report exact failures with repro steps.
+11. End with a verdict.
 
 ## Hito-Specific Checks
 

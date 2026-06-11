@@ -157,12 +157,12 @@ Non-blocking safety note:
 | `10K` | `runs_a_lot` | standard | `tempo`, `intervals`, `hills`, `strides` all present across the block | extra `tempo` | `threshold` |
 | `10K` | `professional_competitive` | standard | `tempo`, `intervals`, second stronger interval-like exposure, `hills`, `strides` | richer long intervals later | `threshold` in v1 |
 | `10K` | supported | conservative | `strides` plus `tempo` only | none | `intervals`, `hills`, `threshold` |
-| `Half Marathon` | `beginner_new_runner` | any | blocked | none | all family generation |
+| `Half Marathon` | `beginner_new_runner` | any | auto-extended bridge plan with light development only | none beyond family-safe bridge richness | threshold, hills, intervals-heavy or compressed family generation |
 | `Half Marathon` | `sometimes_runs` | standard | `strides`; at least one `tempo`; at least one clearly half-specific durability touch | one generic intervals week only if half-specific durability is also present elsewhere | `threshold` by default; `hills` unless future doctrine explicitly opens them |
 | `Half Marathon` | `runs_a_lot` | standard | `strides`; `tempo`; `threshold`; second half-specific development touch later | one extra `tempo` or long-run steady finish | pure generic support-only pattern |
 | `Half Marathon` | `professional_competitive` | standard | `strides`; `tempo`; `threshold`; one sharper interval-like or long-interval stimulus; second threshold-capable durability signal | richer long-run finish | two hard touches in one week |
 | `Half Marathon` | supported | conservative | `strides` and `tempo` only | none | `threshold`, `intervals`, `hills` |
-| `Marathon Base` | `beginner_new_runner` | any | blocked | none | all family generation |
+| `Marathon Base` | `beginner_new_runner` | any | auto-extended base bridge with light development only | none beyond honest base richness | threshold-rich, interval-led, or compressed family generation |
 | `Marathon Base` | `sometimes_runs` | standard | `strides`; `tempo`; later additional tempo or durability touch | long-run steady finish only if later doctrine explicitly opens it | `threshold`, `intervals` |
 | `Marathon Base` | `runs_a_lot` | standard | `strides`; `tempo`; one stronger durability touch such as `threshold` or `hills` | one additional marathon-base-specific steady durability variant later | `intervals` |
 | `Marathon Base` | `professional_competitive` | standard | `strides`; `tempo`; `threshold`; `hills`; second threshold-capable durability exposure | richer long-run finish detail | `intervals`, race-pace work |

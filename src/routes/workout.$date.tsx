@@ -6,7 +6,9 @@ import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   displayExecutableTargetEntries,
+  displayStepStructureEntries,
   displayTargetSupportEntries,
+  displayWorkoutStructureEntries,
   formatDistanceKm,
   formatDate,
   formatDurationMin,
@@ -105,6 +107,11 @@ function WorkoutPage() {
   const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
   const primaryTarget = primaryWorkoutTarget(workout);
   const primaryTargetMetrics = displayExecutableTargetEntries(primaryTarget, workout.metricMode);
+  const structureOnly = workout.metricMode.executableMode === "structure_only_executable";
+  const primaryStructureMetrics =
+    primaryTargetMetrics.length === 0 && structureOnly
+      ? displayWorkoutStructureEntries(workout).slice(0, 2)
+      : [];
   const targetSupportEntries = displayTargetSupportEntries(primaryTarget);
   const executionSummary = workoutExecutionSummary(workout);
   const identityRows = workoutIdentityRows(workout, meta.label);
@@ -115,7 +122,7 @@ function WorkoutPage() {
     ? []
     : [
         km != null ? { label: "Distance", value: formatDistanceKm(km), unit: "km" } : null,
-        duration > 0 ? { label: "Duration", value: duration.toString(), unit: "min" } : null,
+        duration > 0 ? { label: "Duration", value: formatDurationMin(duration) } : null,
         duration > 0 ? { label: "Load", value: loadFor(workout) } : null,
       ].filter((metric): metric is { label: string; value: string; unit?: string } =>
         Boolean(metric),
@@ -256,12 +263,13 @@ function WorkoutPage() {
               {!isRestDay &&
                 (executionSummary ||
                   primaryTargetMetrics.length > 0 ||
+                  primaryStructureMetrics.length > 0 ||
                   targetSupportEntries.length > 0) && (
                   <SidebarSection title="Execution" tone="signal" titleVariant="strong">
                     <div className="space-y-3">
                       {executionSummary && <ReadbackRow label="Mode" value={executionSummary} />}
 
-                      {primaryTargetMetrics.map((entry) => (
+                      {[...primaryTargetMetrics, ...primaryStructureMetrics].map((entry) => (
                         <div
                           key={entry.key}
                           className="flex items-start justify-between gap-3 py-1 last:border-0"
@@ -782,7 +790,10 @@ function buildSegmentInstructionReadback(
 ): SegmentInstructionReadback | null {
   const entries = dedupeReadbackEntries(
     [
-      ...segmentStructureEntries(step),
+      ...displayStepStructureEntries(step).map((entry) => ({
+        label: entry.label,
+        value: entry.value,
+      })),
       ...displayExecutableTargetEntries(step.target, metricMode).map((entry) => ({
         label: entry.label,
         value: entry.value,
@@ -805,78 +816,6 @@ function buildSegmentInstructionReadback(
     label: step.label?.trim() || humanizeSnakeCase(step.segment_type || step.type || "Segment"),
     entries,
   };
-}
-
-function segmentStructureEntries(
-  step: Workout["steps"][number],
-): Array<{ label: string; value: string }> {
-  const entries: Array<{ label: string; value: string }> = [];
-  const prescription = step.prescription;
-
-  if (prescription?.mode === "time" && isPositiveNumber(prescription.duration_min)) {
-    entries.push({ label: "Duration", value: formatDurationMin(prescription.duration_min) });
-  }
-
-  if (prescription?.mode === "distance" && isPositiveNumber(prescription.distance_km)) {
-    entries.push({ label: "Distance", value: `${formatDistanceKm(prescription.distance_km)} km` });
-  }
-
-  if (prescription?.mode === "repeats") {
-    const repeatCount = prescription.repeat_count ?? step.repeats;
-
-    if (isPositiveNumber(repeatCount)) {
-      entries.push({ label: "Repeats", value: `${repeatCount}x` });
-    }
-
-    const work = describeUnitPrescription(prescription.repeat_unit);
-    const recovery = describeUnitPrescription(prescription.recovery_unit);
-
-    if (work) {
-      entries.push({ label: "Work", value: work });
-    }
-
-    if (recovery) {
-      entries.push({ label: "Recovery", value: recovery });
-    }
-  }
-
-  if (!entries.some((entry) => entry.label === "Duration") && isPositiveNumber(step.duration_min)) {
-    entries.push({ label: "Duration", value: formatDurationMin(step.duration_min) });
-  }
-
-  if (!entries.some((entry) => entry.label === "Distance") && isPositiveNumber(step.distance_km)) {
-    entries.push({ label: "Distance", value: `${formatDistanceKm(step.distance_km)} km` });
-  }
-
-  if (!entries.some((entry) => entry.label === "Repeats") && isPositiveNumber(step.repeats)) {
-    entries.push({ label: "Repeats", value: `${step.repeats}x` });
-  }
-
-  return entries;
-}
-
-function describeUnitPrescription(
-  unit:
-    | { mode: "time" | "distance" | "none"; duration_min?: number; distance_km?: number }
-    | undefined,
-) {
-  if (!unit || typeof unit !== "object") {
-    return null;
-  }
-
-  if (unit.mode === "time" && isPositiveNumber(unit.duration_min)) {
-    return formatDurationMin(unit.duration_min);
-  }
-
-  if (unit.mode === "distance" && isPositiveNumber(unit.distance_km)) {
-    return `${formatDistanceKm(unit.distance_km)} km`;
-  }
-
-  return null;
-}
-
-function isPositiveNumber(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function dedupeReadbackEntries(entries: Array<{ label: string; value: string }>) {

@@ -8,6 +8,11 @@ import {
   RUNNING_PLAN_SOURCE_MODEL,
 } from "@/lib/plan-creation-engine/source-model";
 import {
+  resolveRunningPlanHorizonSelection,
+  type RunningPlanHorizonSelection,
+} from "@/lib/plan-creation-engine/horizon-policy";
+import { findForbiddenRunnerFacingLanguageMatches } from "@/lib/plan-creation-engine/forbidden-runner-facing-language";
+import {
   RUNNING_PLAN_DAYS_PER_WEEK_VALUES,
   RUNNING_PLAN_DISTANCE_FAMILY_VALUES,
   RUNNING_PLAN_RUNNER_LEVEL_VALUES,
@@ -68,12 +73,12 @@ export interface RunningPlanPreviewNormalizedInputSummary extends RunningPlanBui
   longRunDaySource: "runner_preference" | "backend_default" | "backend_fallback";
   trainingWeekdays: readonly WeekdayName[];
   loadContext: RunningPlanPreviewLoadContext;
+  horizonSelection: RunningPlanHorizonSelection;
 }
 
 export type RunningPlanPreviewUnavailableCode =
   | "unsupported_distance_family"
   | "unsupported_runner_level"
-  | "unsupported_runner_level_for_family"
   | "unsupported_days_per_week"
   | "invalid_runner_basics"
   | "invalid_start_date"
@@ -93,16 +98,12 @@ export interface NormalizeRunningPlanPreviewInputOptions {
   input: BuildRunningPlanPreviewInput;
   family: RunningPlanDistanceFamily;
   sourceKind: string;
-  allowRunnerLevel: (runnerLevel: RunningPlanRunnerLevel) => boolean;
-  blockedRunnerLevelMessage?: string;
 }
 
 export function normalizeRunningPlanPreviewInput({
   input,
   family,
   sourceKind,
-  allowRunnerLevel,
-  blockedRunnerLevelMessage,
 }: NormalizeRunningPlanPreviewInputOptions):
   | { ok: true; input: RunningPlanPreviewNormalizedInputSummary }
   | {
@@ -137,13 +138,6 @@ export function normalizeRunningPlanPreviewInput({
     return failure(
       "unsupported_runner_level",
       `Unsupported runner level: ${String(input.runnerLevel)}.`,
-    );
-  }
-
-  if (!allowRunnerLevel(input.runnerLevel)) {
-    return failure(
-      "unsupported_runner_level_for_family",
-      blockedRunnerLevelMessage ?? `${input.runnerLevel} is not eligible for ${family}.`,
     );
   }
 
@@ -185,6 +179,7 @@ export function normalizeRunningPlanPreviewInput({
   if (!trainingWeekdays.ok) {
     return failure(trainingWeekdays.code, trainingWeekdays.message);
   }
+  const loadContext = resolveLoadContext(input);
 
   return {
     ok: true,
@@ -202,7 +197,13 @@ export function normalizeRunningPlanPreviewInput({
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
       longRunDaySource: longRunResolution.source,
       trainingWeekdays: trainingWeekdays.weekdays,
-      loadContext: resolveLoadContext(input),
+      loadContext,
+      horizonSelection: resolveRunningPlanHorizonSelection({
+        family,
+        runnerLevel: input.runnerLevel,
+        loadContext,
+        daysPerWeek,
+      }),
     },
   };
 }
@@ -558,9 +559,14 @@ function validateForbiddenSignals(
   issues: string[],
 ) {
   const text = JSON.stringify(rows);
+  const forbiddenRunnerFacingMatches = findForbiddenRunnerFacingLanguageMatches(rows);
 
-  if (/pace_min|pace_target|pace_range|race_pace|personal_hr|effort_only/i.test(text)) {
-    issues.push("Preview rows must not contain fake pace, personal HR, or effort-only targets.");
+  if (forbiddenRunnerFacingMatches.length > 0) {
+    issues.push(
+      `Preview rows must not contain forbidden runner-facing metric or race-readiness language: ${[
+        ...new Set(forbiddenRunnerFacingMatches.map((match) => match.signal)),
+      ].join(", ")}.`,
+    );
   }
 
   if (/recent5k|recent_5k|5k_benchmark|watchAccess|no_watch/i.test(text)) {

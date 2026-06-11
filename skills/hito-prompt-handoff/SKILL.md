@@ -46,7 +46,8 @@ section. For QA prompts, this gate becomes explicit source-boundary proof and st
 5. List exact files/surfaces to inspect.
 6. State constraints and what not to touch.
 7. Specify validation requirements.
-8. Specify expected output format.
+8. Rely on the standard report formats in `AGENTS.md` by default. Specify custom output only when
+   the task needs stricter evidence, unusual ordering, or a non-standard report shape.
 9. Do not include a long continuity footer by default. Use only the standard shell plus `Blockers`
    for routine Product prompt-routing.
 
@@ -63,6 +64,8 @@ The handoff must:
 - put the exact next-role prompt inside one fenced code block
 - name the active plan/spec/doc with an absolute clickable file link in the surrounding Russian
   shell
+- translate the prior agent's report into human product context: what the work solved globally, why
+  it matters, what is now actually possible, and what remains future/blocked/out of scope
 - include the prior agent's task, stage, changed files, validation evidence, blockers, and product
   acceptance status
 - list the source-of-truth files the next role should use
@@ -88,10 +91,10 @@ Stage:
 <current stage>
 
 What we did:
-<compact prior-agent result>
+<compact prior-agent result in human language: what changed globally and why it matters>
 
 Where we are:
-<accepted / rejected / blocked / ready for next role>
+<accepted / rejected / blocked / ready for next role, explained in plain Russian product context>
 
 What we do next:
 <one immediate next action>
@@ -114,9 +117,6 @@ Scope:
 
 Validation:
 <required checks>
-
-Report format:
-<required report shape>
 ~~~
 
 Blockers:
@@ -126,6 +126,9 @@ Blockers:
 ## Hito Prompt Rules
 
 - Start orchestration/review/handoff responses with: `Plan file`, `Task`, `Stage`, `What we did`, `Where we are`, `What we do next`.
+- When reviewing another agent's work, do not make `What we did` and `Where we are` feel like copied
+  tracker fields. Explain the story in Russian: what problem this slice solved, what capability is
+  now real, what is still not real, and why the next role is the right owner.
 - Write user-facing explanation/status in Russian by default.
 - Write the exact next-role execution prompt in English by default.
 - Do not mix Russian into execution prompts unless the user explicitly requests a Russian prompt.
@@ -141,7 +144,9 @@ Blockers:
 - Do not output a naked prompt without the required shell.
 - Do not append `HANDOFF BLOCK` or another long continuity footer to routine Product routing
   responses. The prompt plus `Blockers` is the default close.
-- The exact prompt must be self-contained and include its own expected output/report format.
+- The exact prompt must be self-contained, but it must not duplicate routine report formats from
+  `AGENTS.md`. Include report instructions only for custom evidence or stricter task-specific
+  output requirements.
 - Preserve canonical architecture rules from `AGENTS.md`.
 - Keep prompts execution-ready, not inspirational.
 - For BACKEND and FRONTEND implementation/debugging prompts, require root-cause investigation and
@@ -178,7 +183,8 @@ The prompt inside `Exact prompt for that role` must:
 - include `Root cause and architecture fit` for BACKEND or FRONTEND implementation/debugging prompts
 - list exact files/surfaces to inspect when relevant
 - list commands or browser policy when validation is required
-- include a precise output/report format
+- rely on `AGENTS.md` standard report formats by default; include custom output requirements only
+  when the task needs them
 - avoid optional second prompts or later-role prompts
 
 For BACKEND and FRONTEND prompts, `Root cause and architecture fit` must tell the agent to:
@@ -232,18 +238,6 @@ Run:
 7. Required behavior proof
 
 <exact invariants, counts, statuses, and boundaries to verify>
-
-8. Report format
-
-Return:
-1. Task
-2. Stage
-3. Browser Path Preflight
-4. QA Execution Authority
-5. Validation coverage
-6. Issues found
-7. Coverage gaps
-8. Verdict: Passed or Failed
 ```
 
 QA handoff wording rule:

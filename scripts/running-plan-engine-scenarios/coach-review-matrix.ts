@@ -68,6 +68,7 @@ export interface CoachReviewScenarioSummary {
   metricTruthProof: {
     fakePrecisePaceScenarioList: readonly string[];
     fakePersonalHrScenarioList: readonly string[];
+    forbiddenRunnerFacingLanguageScenarioList: readonly string[];
   };
   compositionGrammarProof: {
     scenariosWithForbiddenCombinationHits: readonly unknown[];
@@ -150,7 +151,7 @@ const startPatterns = {
   },
 } as const;
 
-const distanceFamilies = ["10K", "Half Marathon", "Marathon Base"] as const;
+const distanceFamilies = ["10K", "Half Marathon", "Marathon Base", "Marathon Completion"] as const;
 const runnerLevels = [
   "beginner_new_runner",
   "sometimes_runs",
@@ -417,11 +418,54 @@ export function buildCoachReviewSubset(summary: CoachReviewScenarioSummary) {
       expectedStatus: "preview_ready",
     },
     {
-      label: "blocked beginner Half Marathon",
+      label: "beginner Marathon Completion",
+      family: "Marathon Completion",
+      runnerLevel: "beginner_new_runner",
+      bodyProfile: "young_light",
+      daysPerWeek: 5,
+      expectedStatus: "preview_ready",
+    },
+    {
+      label: "sometimes_runs Marathon Completion",
+      family: "Marathon Completion",
+      runnerLevel: "sometimes_runs",
+      expectedStatus: "preview_ready",
+    },
+    {
+      label: "runs_a_lot heavy Marathon Completion",
+      family: "Marathon Completion",
+      runnerLevel: "runs_a_lot",
+      bodyLoadProfile: "conservative_load",
+      expectedStatus: "preview_ready",
+    },
+    {
+      label: "professional Marathon Completion",
+      family: "Marathon Completion",
+      runnerLevel: "professional_competitive",
+      expectedStatus: "preview_ready",
+    },
+    {
+      label: "beginner Half Marathon bridge",
       family: "Half Marathon",
       runnerLevel: "beginner_new_runner",
-      expectedStatus: "preview_unavailable",
-      expectedUnavailableCode: "unsupported_runner_level_for_family",
+      bodyProfile: "average_adult",
+      daysPerWeek: 3,
+      expectedStatus: "preview_ready",
+    },
+    {
+      label: "beginner Marathon Base honest base",
+      family: "Marathon Base",
+      runnerLevel: "beginner_new_runner",
+      bodyProfile: "young_light",
+      daysPerWeek: 5,
+      expectedStatus: "preview_ready",
+    },
+    {
+      label: "conservative beginner Marathon Base honest base",
+      family: "Marathon Base",
+      runnerLevel: "beginner_new_runner",
+      bodyLoadProfile: "conservative_load",
+      expectedStatus: "preview_ready",
     },
     {
       label: "blocked long-run rest conflict",
@@ -500,12 +544,13 @@ export function validateCoachReviewMatrixProof(
   assert.equal(summary.unresolvedExecutableSegmentCount, 0);
   assert.deepEqual(summary.metricTruthProof.fakePrecisePaceScenarioList, []);
   assert.deepEqual(summary.metricTruthProof.fakePersonalHrScenarioList, []);
+  assert.deepEqual(summary.metricTruthProof.forbiddenRunnerFacingLanguageScenarioList, []);
   assert.deepEqual(summary.compositionGrammarProof.scenariosWithForbiddenCombinationHits, []);
   assert.deepEqual(summary.compositionGrammarProof.scenariosWithMultipleDevelopmentTouches, []);
   assert.equal(summary.createConfirmPersistBoundaryProof.createPathEnabled, false);
   assert.equal(summary.createConfirmPersistBoundaryProof.confirmPathEnabled, false);
   assert.equal(summary.createConfirmPersistBoundaryProof.persistPathEnabled, false);
-  assert.equal(subset.selectionCount, 16);
+  assert.equal(subset.selectionCount, 22);
 
   assertDimensionCoverage(summary.matrixDimensionCoverage.families, distanceFamilies);
   assertDimensionCoverage(summary.matrixDimensionCoverage.runnerLevels, runnerLevels);
@@ -518,9 +563,12 @@ export function validateCoachReviewMatrixProof(
   );
   assertDimensionCoverage(summary.matrixDimensionCoverage.startPatterns, startPatternKeys);
 
-  assert.ok(
-    summary.unavailableReasonCounts.unsupported_runner_level_for_family > 0,
-    "Matrix must include unsupported beginner Half/Marathon cases.",
+  validateBeginnerHalfMarathonBridgeMatrix(summary);
+  validateUniversalNoDeadEndMatrix(summary);
+  assert.equal(
+    summary.unavailableReasonCounts.unsupported_runner_level_for_family ?? 0,
+    0,
+    "Coach-plausible plans must not be blocked by runner level alone.",
   );
   assert.ok(
     summary.unavailableReasonCounts.long_run_day_blocked > 0,
@@ -530,6 +578,138 @@ export function validateCoachReviewMatrixProof(
     summary.unavailableReasonCounts.builder_validation_failed > 0,
     "Matrix must bound compressed low-availability plans as builder_validation_failed.",
   );
+}
+
+function validateBeginnerHalfMarathonBridgeMatrix(summary: CoachReviewScenarioSummary) {
+  const beginnerHalfEntries = summary.scenarioComparison.filter(
+    (entry) => entry.family === "Half Marathon" && entry.runnerLevel === "beginner_new_runner",
+  );
+  const unsupportedBeginnerHalfEntries = beginnerHalfEntries.filter(
+    (entry) =>
+      entry.status === "preview_unavailable" &&
+      entry.unavailableReason?.code === "unsupported_runner_level_for_family",
+  );
+
+  assert.deepEqual(
+    unsupportedBeginnerHalfEntries,
+    [],
+    "Coach-plausible beginner Half scenarios must not be blocked by runner level alone.",
+  );
+
+  for (const daysPerWeek of [3, 4, 5] as const) {
+    for (const bodyLoadProfile of ["standard_load", "conservative_load"] as const) {
+      const ready = beginnerHalfEntries.find(
+        (entry) =>
+          entry.status === "preview_ready" &&
+          entry.daysPerWeek === daysPerWeek &&
+          entry.bodyLoadProfile === bodyLoadProfile,
+      );
+      assert.ok(
+        ready,
+        `Beginner Half matrix must include preview-ready ${daysPerWeek}d ${bodyLoadProfile}.`,
+      );
+
+      const expectedWeeks =
+        bodyLoadProfile === "conservative_load"
+          ? ({ 3: 36, 4: 32, 5: 28 } as const)[daysPerWeek]
+          : ({ 3: 32, 4: 28, 5: 24 } as const)[daysPerWeek];
+      assert.equal(ready.weekCount, expectedWeeks);
+      assert.equal(ready.endpointProof.endpointDistanceMeters, 21_100);
+      assert.equal(ready.workoutKindCounts.threshold ?? 0, 0);
+      assert.equal(ready.workoutKindCounts.intervals ?? 0, 0);
+      assert.equal(ready.workoutKindCounts.hills ?? 0, 0);
+      assert.ok(ready.workoutKindCounts.strides >= 2);
+      assert.ok(ready.workoutKindCounts.cutback_long_run >= 4);
+      assert.ok(
+        ready.compositionGrammar.familySignals.some((signal) =>
+          [
+            "half_specific_durability",
+            "half_long_run_durability",
+            "half_long_run_steady_finish",
+          ].includes(signal),
+        ),
+        `${ready.scenarioId} must preserve Half durability identity.`,
+      );
+    }
+  }
+}
+
+function validateUniversalNoDeadEndMatrix(summary: CoachReviewScenarioSummary) {
+  const unsupportedRunnerLevelEntries = summary.scenarioComparison.filter(
+    (entry) =>
+      entry.status === "preview_unavailable" &&
+      entry.unavailableReason?.code === "unsupported_runner_level_for_family",
+  );
+
+  assert.deepEqual(
+    unsupportedRunnerLevelEntries,
+    [],
+    "Normal running-plan previews must route through horizon selection instead of runner-level dead ends.",
+  );
+
+  const expectedWeeksByFamily: Record<
+    RunningPlanDistanceFamily,
+    {
+      standard_load: Record<RunningPlanDaysPerWeek, number>;
+      conservative_load: Record<RunningPlanDaysPerWeek, number>;
+    }
+  > = {
+    "10K": {
+      standard_load: { 3: 16, 4: 14, 5: 12 },
+      conservative_load: { 3: 20, 4: 18, 5: 16 },
+    },
+    "Half Marathon": {
+      standard_load: { 3: 32, 4: 28, 5: 24 },
+      conservative_load: { 3: 36, 4: 32, 5: 28 },
+    },
+    "Marathon Base": {
+      standard_load: { 3: 40, 4: 32, 5: 24 },
+      conservative_load: { 3: 52, 4: 40, 5: 32 },
+    },
+    "Marathon Completion": {
+      standard_load: { 3: 80, 4: 64, 5: 56 },
+      conservative_load: { 3: 96, 4: 76, 5: 68 },
+    },
+  };
+
+  for (const family of distanceFamilies) {
+    for (const daysPerWeek of [3, 4, 5] as const) {
+      for (const bodyLoadProfile of ["standard_load", "conservative_load"] as const) {
+        const ready = summary.scenarioComparison.find(
+          (entry) =>
+            entry.status === "preview_ready" &&
+            entry.family === family &&
+            entry.runnerLevel === "beginner_new_runner" &&
+            entry.daysPerWeek === daysPerWeek &&
+            entry.bodyLoadProfile === bodyLoadProfile,
+        );
+
+        assert.ok(
+          ready,
+          `Beginner ${family} matrix must include preview-ready ${daysPerWeek}d ${bodyLoadProfile}.`,
+        );
+        assert.equal(ready.weekCount, expectedWeeksByFamily[family][bodyLoadProfile][daysPerWeek]);
+
+        if (family === "10K") {
+          assert.equal(ready.endpointProof.endpointDistanceMeters, 10_000);
+        } else if (family === "Half Marathon") {
+          assert.equal(ready.endpointProof.endpointDistanceMeters, 21_100);
+        } else if (family === "Marathon Base") {
+          assert.equal(ready.endpointProof.endpointDistanceMeters, null);
+          assert.equal(ready.workoutKindCounts.threshold ?? 0, 0);
+          assert.equal(ready.workoutKindCounts.intervals ?? 0, 0);
+          assert.equal(ready.workoutKindCounts.hills ?? 0, 0);
+          assert.equal(ready.workoutKindCounts.tempo ?? 0, 0);
+        } else {
+          assert.equal(ready.endpointProof.endpointDistanceMeters, 42_195);
+          assert.equal(ready.workoutKindCounts.marathon_base_endpoint ?? 0, 0);
+          assert.equal(ready.workoutKindCounts.threshold ?? 0, 0);
+          assert.equal(ready.workoutKindCounts.intervals ?? 0, 0);
+          assert.equal(ready.workoutKindCounts.hills ?? 0, 0);
+        }
+      }
+    }
+  }
 }
 
 export function writeCoachReviewReadme(
@@ -542,7 +722,7 @@ export function writeCoachReviewReadme(
 
 Generated for Running Coach review on 2026-06-09.
 
-Scope: deterministic preview-only running plan engine for 10K, Half Marathon, and Marathon Base.
+Scope: deterministic preview-only running plan engine for 10K, Half Marathon, Marathon Base, and Marathon Completion.
 No Supabase mutation, no OpenAI, no create/confirm/persistence path.
 
 Run:
@@ -576,6 +756,7 @@ Proof snapshot:
 - unresolved executable segment count: ${summary.unresolvedExecutableSegmentCount}
 - fake precise pace scenario list: ${summary.metricTruthProof.fakePrecisePaceScenarioList.length}
 - fake personal HR scenario list: ${summary.metricTruthProof.fakePersonalHrScenarioList.length}
+- forbidden runner-facing language scenario list: ${summary.metricTruthProof.forbiddenRunnerFacingLanguageScenarioList.length}
 
 Review guidance:
 

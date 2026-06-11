@@ -18,6 +18,14 @@ export {
   type ValidateRunningPlanCompositionGrammarOptions,
 } from "@/lib/plan-creation-engine/composition-grammar";
 export {
+  resolveRunningPlanCutbackWeeks,
+  resolveRunningPlanEndpointWeek,
+  resolveRunningPlanHorizonSelection,
+  resolveRunningPlanTaperWeek,
+  RUNNING_PLAN_HORIZON_POLICY_VERSION,
+  type RunningPlanHorizonSelection,
+} from "@/lib/plan-creation-engine/horizon-policy";
+export {
   resolveRunningPlanPreviewSegments,
   runningPlanPrescriptionIsExact,
   type RunningPlanPrescriptionLoadContext,
@@ -61,6 +69,15 @@ export {
   type MarathonBasePlanEndpointProof,
   type MarathonBasePlanPreviewDraft,
 } from "@/lib/plan-creation-engine/marathon-base-builder";
+export {
+  buildMarathonCompletionPlanPreviewDraft,
+  MARATHON_COMPLETION_PLAN_BUILDER_SOURCE_KIND,
+  type BuildMarathonCompletionPlanPreviewInput,
+  type MarathonCompletionPlanBuilderResult,
+  type MarathonCompletionPlanCalendarRow,
+  type MarathonCompletionPlanEndpointProof,
+  type MarathonCompletionPlanPreviewDraft,
+} from "@/lib/plan-creation-engine/marathon-completion-builder";
 export type {
   BuildRunningPlanPreviewInput,
   RunningPlanPreviewCalendarRow,

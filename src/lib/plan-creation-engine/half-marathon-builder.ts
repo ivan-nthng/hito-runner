@@ -1,8 +1,6 @@
 import {
-  HALF_MARATHON_CUTBACK_WEEKS,
   HALF_MARATHON_ENDPOINT_DISTANCE_METERS,
-  HALF_MARATHON_ENDPOINT_WEEK,
-  HALF_MARATHON_PLAN_BUILDER_WEEKS,
+  resolveHalfMarathonCutbackWeeks,
   resolveHalfMarathonDevelopmentTouch,
   validateHalfMarathonDiversityPolicy,
 } from "@/lib/plan-creation-engine/half-marathon-diversity-policy";
@@ -93,9 +91,6 @@ export function buildHalfMarathonPlanPreviewDraft(
     input,
     family: "Half Marathon",
     sourceKind: HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
-    allowRunnerLevel: (runnerLevel) => runnerLevel !== "beginner_new_runner",
-    blockedRunnerLevelMessage:
-      "Half Marathon preview is not available for beginner_new_runner in deterministic v1.",
   });
   if (!normalized.ok) {
     return {
@@ -104,10 +99,17 @@ export function buildHalfMarathonPlanPreviewDraft(
     };
   }
 
+  const horizonWeeks = normalized.input.horizonSelection.horizonWeeks;
+  const cutbackWeeks = resolveHalfMarathonCutbackWeeks({
+    runnerLevel: normalized.input.runnerLevel,
+    loadContext: normalized.input.loadContext,
+    daysPerWeek: normalized.input.daysPerWeek,
+    horizonWeeks,
+  });
   const calendarRows = buildRunningPlanCalendarRows({
     input: normalized.input,
     family: "Half Marathon",
-    horizonWeeks: HALF_MARATHON_PLAN_BUILDER_WEEKS,
+    horizonWeeks,
     rowIdPrefix: "half-marathon",
     recoveryAfterKinds: ["long_run", "cutback_long_run", "threshold", "intervals", "hills"],
     selectWorkoutDayKind: ({
@@ -120,13 +122,11 @@ export function buildHalfMarathonPlanPreviewDraft(
       loadContext,
     }) => {
       if (weekday === longRunDay) {
-        if (weekNumber === HALF_MARATHON_ENDPOINT_WEEK) {
+        if (weekNumber === horizonWeeks) {
           return "final_selected_distance_day";
         }
 
-        return HALF_MARATHON_CUTBACK_WEEKS.includes(weekNumber as never)
-          ? "cutback_long_run"
-          : "long_run";
+        return cutbackWeeks.includes(weekNumber) ? "cutback_long_run" : "long_run";
       }
 
       if (weekday === nextAfterLongRunDay && weekNumber > 1) {
@@ -137,12 +137,9 @@ export function buildHalfMarathonPlanPreviewDraft(
         runnerLevel,
         loadContext,
         weekNumber,
+        horizonWeeks,
       });
-      if (
-        weekNumber < HALF_MARATHON_ENDPOINT_WEEK &&
-        weekday === developmentWeekday &&
-        developmentTouch
-      ) {
+      if (weekNumber < horizonWeeks && weekday === developmentWeekday && developmentTouch) {
         return developmentTouch;
       }
 
@@ -251,6 +248,7 @@ function validateHalfMarathonPlanPreview({
     ...validateHalfMarathonDiversityPolicy({
       runnerLevel: normalizedInputSummary.runnerLevel,
       loadContext: normalizedInputSummary.loadContext,
+      daysPerWeek: normalizedInputSummary.daysPerWeek,
       rows: calendarRows,
     }),
   );
@@ -269,7 +267,7 @@ function validateHalfMarathonPlanPreview({
       "fake_personal_hr",
       "user_provided_5k_benchmark_dependency",
       "watch_no_watch_gate",
-      "beginner_half_allowed",
+      "beginner_half_compressed_bridge",
       "sometimes_runs_threshold",
       "higher_support_no_threshold",
       "support_only_half_preview",

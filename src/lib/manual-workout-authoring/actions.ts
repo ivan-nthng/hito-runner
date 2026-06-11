@@ -1,20 +1,73 @@
-import { createHash } from "node:crypto";
+import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+  createFirstPlanFromReviewedCanonicalPlanForUser,
+  getActivePlan,
+} from "@/lib/active-plan-persistence";
+import { getRequestAuthContext } from "@/lib/backend/auth";
+import { type TrainingPlanV2 } from "@/lib/imported-plan";
+import {
+  buildManualWorkoutPersistenceMetadata,
+  buildManualWorkoutUserBuiltTrainingPlan,
+  deriveManualTargetTruthMode,
+} from "@/lib/manual-workout-authoring/persistence";
+import {
+  addReviewedManualWorkoutToActivePlanForUser,
+  type ManualWorkoutActivePlanAddDependencies,
+} from "@/lib/manual-workout-authoring/active-plan-add";
+import {
+  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+  MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
   manualWorkoutDraftInputSchema,
+  manualWorkoutConfirmInputSchema,
+  manualWorkoutAddToActivePlanInputSchema,
+  MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS,
+  MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
+  type ManualWorkoutAddToActivePlanResult,
   type ManualWorkoutCanonicalDraft,
+  type ManualWorkoutConfirmFailureReason,
+  type ManualWorkoutConfirmResult,
   type ManualWorkoutDraftConflict,
   type ManualWorkoutDraftIssue,
   type ManualWorkoutDraftReviewResult,
+  type ManualWorkoutTargetTruthMode,
   type ParsedManualWorkoutDraftInput,
 } from "@/lib/manual-workout-authoring/schema";
 import { normalizeManualWorkoutDraft } from "@/lib/manual-workout-authoring/normalize";
 import { validateManualWorkoutDraft } from "@/lib/manual-workout-authoring/validator";
+import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
+import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 
 type ManualWorkoutDraftRejectionReason = Extract<
   ManualWorkoutDraftReviewResult,
   { ok: false }
 >["reason"];
+
+const MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX = "manual-workout-review-v1.";
+
+type ManualWorkoutConfirmDependencies = {
+  getActivePlanForUser?: typeof getActivePlan;
+  createFirstPlanForUser?: typeof createFirstPlanFromReviewedCanonicalPlanForUser;
+};
+
+type ManualWorkoutAddToActivePlanDependencies = ManualWorkoutActivePlanAddDependencies;
+
+type ManualWorkoutReviewExactnessResult =
+  | {
+      ok: true;
+      draft: ManualWorkoutCanonicalDraft;
+      canonicalPlan: TrainingPlanV2;
+      reviewChecksum: string;
+      targetTruthMode: ManualWorkoutTargetTruthMode;
+      reviewWarnings: string[];
+      persistenceMetadata: AdditionalPlanPersistenceMetadata;
+    }
+  | {
+      ok: false;
+      reason: ManualWorkoutConfirmFailureReason;
+      message: string;
+    };
 
 export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftReviewResult {
   const parsed = manualWorkoutDraftInputSchema.safeParse(input);
@@ -69,7 +122,7 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
     entries: validation.entries,
   });
   const exactnessPayload = buildManualWorkoutReviewExactnessPayload(normalized.draft);
-  const reviewChecksum = stableSha256(exactnessPayload);
+  const reviewChecksum = stableChecksum64Hex(exactnessPayload);
 
   return {
     ok: true,
@@ -86,16 +139,287 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
       ],
       warnings: normalized.reviewWarnings,
     },
-    reviewToken: `manual-workout-review-v1.${reviewChecksum}`,
+    reviewToken: `${MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX}${reviewChecksum}`,
     reviewChecksum,
-    exactnessPayloadVersion: "manual_workout_review_payload_v1",
+    exactnessPayloadVersion: MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
     conflicts: [],
+  };
+}
+
+export const confirmManualWorkoutDraft = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => value)
+  .handler(async ({ data }): Promise<ManualWorkoutConfirmResult> => {
+    const auth = getRequestAuthContext();
+
+    if (!auth.userId) {
+      return buildManualWorkoutConfirmFailure({
+        reason: "unauthenticated",
+        message: "Sign in before creating a manual user-built plan.",
+      });
+    }
+
+    let userId: string | null = null;
+    try {
+      userId = await getPersistedUserIdForAuthContext(auth);
+    } catch {
+      return buildManualWorkoutConfirmFailure({
+        reason: "unauthenticated",
+        message: "This session cannot create a persisted manual plan yet.",
+      });
+    }
+
+    if (!userId) {
+      return buildManualWorkoutConfirmFailure({
+        reason: "unauthenticated",
+        message: "This session cannot create a persisted manual plan yet.",
+      });
+    }
+
+    return confirmManualWorkoutDraftForUser(userId, data);
+  });
+
+export const addManualWorkoutToActivePlan = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => value)
+  .handler(async ({ data }): Promise<ManualWorkoutAddToActivePlanResult> => {
+    const auth = getRequestAuthContext();
+
+    if (!auth.userId) {
+      return buildManualWorkoutAddToActivePlanFailure({
+        reason: "unauthenticated",
+        message: "Sign in before adding workouts to a manual user-built plan.",
+      });
+    }
+
+    let userId: string | null = null;
+    try {
+      userId = await getPersistedUserIdForAuthContext(auth);
+    } catch {
+      return buildManualWorkoutAddToActivePlanFailure({
+        reason: "unauthenticated",
+        message: "This session cannot update a persisted manual plan yet.",
+      });
+    }
+
+    if (!userId) {
+      return buildManualWorkoutAddToActivePlanFailure({
+        reason: "unauthenticated",
+        message: "This session cannot update a persisted manual plan yet.",
+      });
+    }
+
+    return addManualWorkoutToActivePlanForUser(userId, data);
+  });
+
+export async function confirmManualWorkoutDraftForUser(
+  userId: string,
+  input: unknown,
+  dependencies: ManualWorkoutConfirmDependencies = {},
+): Promise<ManualWorkoutConfirmResult> {
+  const parsed = manualWorkoutConfirmInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return buildManualWorkoutConfirmFailure({
+      reason: "invalid_review",
+      message: "The manual workout confirmation payload is invalid. Refresh the review.",
+    });
+  }
+
+  const request = parsed.data;
+  const getActivePlanForUser = dependencies.getActivePlanForUser ?? getActivePlan;
+  const createFirstPlanForUser =
+    dependencies.createFirstPlanForUser ?? createFirstPlanFromReviewedCanonicalPlanForUser;
+
+  let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
+  try {
+    activePlan = await getActivePlanForUser(userId);
+  } catch {
+    return buildManualWorkoutConfirmFailure({
+      reason: "persistence_failed",
+      message:
+        "The manual plan could not verify the current active-plan state. Try again before creating a plan.",
+    });
+  }
+
+  if (activePlan) {
+    return buildManualWorkoutConfirmFailure({
+      reason: "active_plan_exists",
+      message:
+        "Manual user-built plans can be created only when there is no active plan. Use Open plan to update or replace an existing plan.",
+    });
+  }
+
+  const exactness = validateManualWorkoutReviewExactness({
+    draftInput: request.draftInput,
+    reviewToken: request.reviewToken,
+    reviewChecksum: request.reviewChecksum,
+  });
+
+  if (!exactness.ok) {
+    return buildManualWorkoutConfirmFailure({
+      reason: exactness.reason,
+      message: exactness.message,
+    });
+  }
+
+  try {
+    const applyResult = await createFirstPlanForUser(
+      userId,
+      exactness.canonicalPlan,
+      null,
+      exactness.persistenceMetadata,
+    );
+
+    return {
+      ok: true,
+      status: "created",
+      persisted: true,
+      sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+      sourceStatus: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+      workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+      workoutSourceStatus: MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS,
+      schemaVersion: exactness.canonicalPlan.schema_version,
+      effectiveStartDate: applyResult.effectiveStartDate,
+      appliedStartDate: applyResult.appliedStartDate,
+      workoutCount: applyResult.workoutCount,
+      calendarRowCount: exactness.canonicalPlan.planned_workouts.length,
+      nonRestWorkoutCount: exactness.canonicalPlan.planned_workouts.filter(
+        (workout) => workout.workout_type !== "rest",
+      ).length,
+      workoutDate: exactness.draft.workoutDate,
+      templateKey: exactness.draft.templateKey,
+      reviewChecksum: exactness.reviewChecksum,
+      exactnessPayloadVersion: MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
+      sourceMetadata: {
+        templateKey: exactness.draft.templateKey,
+        workoutDate: exactness.draft.workoutDate,
+        rowCount: exactness.canonicalPlan.planned_workouts.length,
+        reviewChecksum: exactness.reviewChecksum,
+        metricTruthMode: exactness.targetTruthMode,
+        mappingGaps: exactness.draft.mappingGaps,
+      },
+      safety: {
+        requiresExplicitConfirm: true,
+        trustedClientRows: false,
+        serverRebuiltReview: true,
+        callsOpenAi: false,
+      },
+    };
+  } catch (error) {
+    if (error instanceof Error && /active plan/i.test(error.message)) {
+      return buildManualWorkoutConfirmFailure({
+        reason: "active_plan_exists",
+        message:
+          "Manual user-built plans can be created only when there is no active plan. Use Open plan to update or replace an existing plan.",
+      });
+    }
+
+    return buildManualWorkoutConfirmFailure({
+      reason: "persistence_failed",
+      message: "The manual user-built plan could not be created. The current plan is unchanged.",
+    });
+  }
+}
+
+export async function addManualWorkoutToActivePlanForUser(
+  userId: string,
+  input: unknown,
+  dependencies: ManualWorkoutAddToActivePlanDependencies = {},
+): Promise<ManualWorkoutAddToActivePlanResult> {
+  const parsed = manualWorkoutAddToActivePlanInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return buildManualWorkoutAddToActivePlanFailure({
+      reason: "invalid_review",
+      message: "The manual workout add payload is invalid. Refresh the review.",
+    });
+  }
+
+  const request = parsed.data;
+  const exactness = validateManualWorkoutReviewExactness({
+    draftInput: request.draftInput,
+    reviewToken: request.reviewToken,
+    reviewChecksum: request.reviewChecksum,
+  });
+
+  if (!exactness.ok) {
+    return buildManualWorkoutAddToActivePlanFailure({
+      reason: mapExactnessFailureToAddWorkoutFailure(exactness.reason),
+      message: exactness.message,
+    });
+  }
+
+  return addReviewedManualWorkoutToActivePlanForUser(
+    userId,
+    exactness,
+    dependencies,
+    request.activePlanId,
+  );
+}
+
+export function validateManualWorkoutReviewExactness(input: {
+  draftInput: unknown;
+  reviewToken: string;
+  reviewChecksum: string;
+}): ManualWorkoutReviewExactnessResult {
+  const review = reviewManualWorkoutDraft(input.draftInput);
+
+  if (!review.ok) {
+    return {
+      ok: false,
+      reason: review.reason,
+      message: review.message,
+    };
+  }
+
+  if (review.draft.workoutType === "rest") {
+    return {
+      ok: false,
+      reason: "manual_workout_required",
+      message:
+        "Create at least one reviewed workout before starting a manual user-built active plan.",
+    };
+  }
+
+  if (input.reviewChecksum !== review.reviewChecksum) {
+    return {
+      ok: false,
+      reason: "stale_review",
+      message:
+        "This manual workout review no longer matches the current draft. Refresh the review before creating a plan.",
+    };
+  }
+
+  const expectedToken = `${MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX}${review.reviewChecksum}`;
+  if (!safeTokenEqual(input.reviewToken, expectedToken)) {
+    return {
+      ok: false,
+      reason: "invalid_review",
+      message:
+        "This manual workout review token is invalid. Refresh the review before creating a plan.",
+    };
+  }
+
+  const canonicalPlan = buildManualWorkoutUserBuiltTrainingPlan(review.draft);
+
+  return {
+    ok: true,
+    draft: review.draft,
+    canonicalPlan,
+    reviewChecksum: review.reviewChecksum,
+    targetTruthMode: deriveManualTargetTruthMode(review.draft),
+    reviewWarnings: review.review.warnings,
+    persistenceMetadata: buildManualWorkoutPersistenceMetadata({
+      draft: review.draft,
+      canonicalPlan,
+      reviewChecksum: review.reviewChecksum,
+      warnings: review.review.warnings,
+    }),
   };
 }
 
 export function buildManualWorkoutReviewExactnessPayload(draft: ManualWorkoutCanonicalDraft) {
   return {
-    version: "manual_workout_review_payload_v1",
+    version: MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
     sourceKind: draft.sourceKind,
     sourceStatus: draft.sourceStatus,
     persisted: draft.persisted,
@@ -119,6 +443,49 @@ export function buildManualWorkoutReviewExactnessPayload(draft: ManualWorkoutCan
   };
 }
 
+function buildManualWorkoutConfirmFailure(input: {
+  reason: ManualWorkoutConfirmFailureReason;
+  message: string;
+}): Extract<ManualWorkoutConfirmResult, { ok: false }> {
+  return {
+    ok: false,
+    status: "blocked",
+    persisted: false,
+    reason: input.reason,
+    message: input.message,
+    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  };
+}
+
+function buildManualWorkoutAddToActivePlanFailure(input: {
+  reason: Extract<ManualWorkoutAddToActivePlanResult, { ok: false }>["reason"];
+  message: string;
+}): Extract<ManualWorkoutAddToActivePlanResult, { ok: false }> {
+  return {
+    ok: false,
+    status: "blocked",
+    persisted: false,
+    reason: input.reason,
+    message: input.message,
+    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  };
+}
+
+function safeTokenEqual(left: string, right: string) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  let mismatch = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+
+  return mismatch === 0;
+}
+
 function buildLifecycleConflict(
   input: ParsedManualWorkoutDraftInput,
 ): ManualWorkoutDraftConflict | null {
@@ -127,11 +494,14 @@ function buildLifecycleConflict(
     targetDateProtection: "none" as const,
   };
 
-  if (context.mode === "existing_active_plan") {
+  if (
+    context.mode === "existing_active_plan" &&
+    context.activePlanSourceKind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND
+  ) {
     return {
       code: "existing_active_plan_not_supported",
       message:
-        "Manual workout authoring v1 is review-only for no-active-plan or user-built-plan draft contexts.",
+        "Manual workout authoring v1 can only edit existing active plans that are manual user-built plans.",
       workoutDate: input.workoutDate,
       activePlanId: context.activePlanId ?? null,
     };
@@ -152,6 +522,17 @@ function buildLifecycleConflict(
     workoutDate: input.workoutDate,
     activePlanId: context.activePlanId ?? null,
   };
+}
+
+function mapExactnessFailureToAddWorkoutFailure(
+  reason: ManualWorkoutConfirmFailureReason,
+): Extract<ManualWorkoutAddToActivePlanResult, { ok: false }>["reason"] {
+  switch (reason) {
+    case "active_plan_exists":
+      return "active_plan_conflict";
+    default:
+      return reason;
+  }
 }
 
 function rejectManualWorkoutDraft(input: {
@@ -197,8 +578,24 @@ function zodIssueToManualIssue(issue: z.ZodIssue): ManualWorkoutDraftIssue {
   };
 }
 
-function stableSha256(value: unknown) {
-  return createHash("sha256").update(stableJsonStringify(value)).digest("hex");
+function stableChecksum64Hex(value: unknown) {
+  const payload = stableJsonStringify(value);
+  const seeds = [
+    0x811c9dc5, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35, 0x27d4eb2f, 0x165667b1, 0xd3a2646c, 0xfd7046c5,
+  ];
+
+  return seeds.map((seed) => fnv1a32Hex(payload, seed)).join("");
+}
+
+function fnv1a32Hex(payload: string, seed: number) {
+  let hash = seed >>> 0;
+
+  for (let index = 0; index < payload.length; index += 1) {
+    hash ^= payload.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function stableJsonStringify(value: unknown): string {

@@ -6,6 +6,7 @@ export const RUNNING_PLAN_DISTANCE_FAMILY_VALUES = [
   "10K",
   "Half Marathon",
   "Marathon Base",
+  "Marathon Completion",
 ] as const;
 
 export type RunningPlanDistanceFamily = (typeof RUNNING_PLAN_DISTANCE_FAMILY_VALUES)[number];
@@ -29,6 +30,8 @@ export const RUNNING_PLAN_WORKOUT_DAY_KIND_VALUES = [
   "long_run",
   "cutback_long_run",
   "strides",
+  "steady_aerobic_run",
+  "progression",
   "tempo",
   "threshold",
   "intervals",
@@ -45,6 +48,8 @@ export const RUNNING_PLAN_NON_ENDPOINT_WORKOUT_DAY_KIND_VALUES = [
   "long_run",
   "cutback_long_run",
   "strides",
+  "steady_aerobic_run",
+  "progression",
   "tempo",
   "threshold",
   "intervals",

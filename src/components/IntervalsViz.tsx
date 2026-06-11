@@ -2,9 +2,11 @@ import { useState } from "react";
 import type { Workout, Step, StepTarget } from "@/lib/training";
 import {
   displayExecutableTargetEntries,
+  displayStepStructureEntries,
   displayTargetSupportEntries,
   formatDistanceKm,
   formatDurationMin,
+  formatPrescriptionDistanceKm,
   segmentColorMeta,
   stepPlannedDurationMin,
 } from "@/lib/training";
@@ -87,6 +89,9 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
         {blocks.map((b, i) => {
           const colors = segmentColorMeta(b.semanticKind, b.target);
           const isActive = activeIndex === i;
+          const targetEntries = displayExecutableTargetEntries(b.target, workout.metricMode);
+          const structureEntries = targetEntries.length > 0 ? [] : b.structureEntries.slice(0, 2);
+          const readbackEntries = targetEntries.length > 0 ? targetEntries : structureEntries;
 
           return (
             <li
@@ -111,9 +116,9 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
                   <span className="hito-list-row-title capitalize">{b.kind.replace("_", " ")}</span>
                   <span className="hito-caption">{b.label}</span>
                 </div>
-                {b.target && (
+                {readbackEntries.length > 0 && (
                   <div className="hito-caption mt-0.5 space-x-3">
-                    {displayExecutableTargetEntries(b.target, workout.metricMode).map((entry) => (
+                    {readbackEntries.map((entry) => (
                       <span key={entry.key}>
                         <span className="opacity-60">{entry.label}:</span>{" "}
                         <span className="text-foreground/80">{entry.value}</span>
@@ -139,6 +144,7 @@ type Block = {
   title: string;
   semanticKind: string;
   target?: StepTarget;
+  structureEntries: Array<{ key: string; label: string; value: string }>;
 };
 
 function expand(workout: Workout): Block[] {
@@ -158,6 +164,7 @@ function expand(workout: Workout): Block[] {
               : `${i + 1}/${s.repeats}`,
           metric: workMetric,
           target: s.work.target,
+          structureEntries: displayStepStructureEntries(s.work),
         });
 
         const recoveryDuration = estimateVisualDurationMin(s.recovery, "easy");
@@ -171,6 +178,7 @@ function expand(workout: Workout): Block[] {
             label: "rec",
             metric: recoveryMetric,
             target: s.recovery.target,
+            structureEntries: displayStepStructureEntries(s.recovery),
           });
         }
       }
@@ -184,6 +192,7 @@ function expand(workout: Workout): Block[] {
         label: describeStepMetric(s),
         metric: describeStepMetric(s),
         target: s.target,
+        structureEntries: displayStepStructureEntries(s),
       });
     }
   }
@@ -204,8 +213,12 @@ function SegmentTooltip({
   metricMode: Workout["metricMode"];
 }) {
   const priorityEntries = displayExecutableTargetEntries(block.target, metricMode).slice(0, 3);
+  const structureEntries = priorityEntries.length > 0 ? [] : block.structureEntries.slice(0, 3);
   const supportEntries =
-    priorityEntries.length > 0 ? [] : displayTargetSupportEntries(block.target).slice(0, 1);
+    priorityEntries.length > 0 || structureEntries.length > 0
+      ? []
+      : displayTargetSupportEntries(block.target).slice(0, 1);
+  const readbackEntries = [...priorityEntries, ...structureEntries, ...supportEntries];
 
   return (
     <span
@@ -224,9 +237,9 @@ function SegmentTooltip({
         <span className="hito-tooltip-title">{block.title}</span>
       </span>
       <span className="hito-tooltip-meta mt-1 block font-mono-num">{block.metric}</span>
-      {(priorityEntries.length > 0 || supportEntries.length > 0) && (
+      {readbackEntries.length > 0 && (
         <span className="hito-tooltip-meta mt-1.5 block space-y-0.5">
-          {[...priorityEntries, ...supportEntries].map((entry) => (
+          {readbackEntries.map((entry) => (
             <span key={entry.key} className="block">
               <span className="opacity-65">{entry.label}:</span> <span>{entry.value}</span>
             </span>
@@ -239,11 +252,11 @@ function SegmentTooltip({
 
 function describeStepMetric(step: Step) {
   if (step.distance_km != null) {
-    return `${formatDistanceKm(step.distance_km)}km`;
+    return formatPrescriptionDistanceKm(step.distance_km);
   }
 
   if (step.duration_min != null) {
-    return formatDurationMin(step.duration_min, "prime");
+    return formatDurationMin(step.duration_min, "segment");
   }
 
   return "—";

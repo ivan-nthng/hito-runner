@@ -62,6 +62,14 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - Plan Presets are reusable for any no-active-plan state, not only a runner's literal first plan:
   they never silently replace an existing active plan, and active-plan replacement/refresh from a
   preset remains separate future work
+- signed-in users with no active plan can also choose `Build my plan myself`: the first reviewed
+  manual workout creates a `manual_user_built_plan_v1` active plan through backend review
+  token/checksum confirmation, and saved manual calendars can add additional reviewed workouts on
+  eligible future empty days through the existing compact calendar `Add` action. The final Add
+  confirmation repeats the selected date/weekday before mutation, persistence readback uses the same
+  date-only truth, and manual Add does not send client rows, segments, or persistence metadata.
+  Personal saved templates, copy/paste, recurrence, JSON export/share, edit/delete/clear, and
+  coach/organization authoring remain later manual-builder slices
 - the Advanced custom program path remains separate and secondary for target date/time, unusual
   constraints, injury/pain/caution, uncommon goals, and detailed comments; manual workout
   creation/edit/copy/paste/recurrence is not implemented by the Plan Preset release

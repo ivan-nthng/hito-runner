@@ -99,10 +99,27 @@ Default response shape for orchestration, prior-agent review, and handoff reques
 2. Task — name the exact task currently being worked on.
 3. Stage — name the current stage, for example `ARCHITECT plan`, `BACKEND implementation`, `QA validation`, or `handoff`.
 4. What we did — summarize the latest completed action or report received in plain language.
-5. Where we are — state whether the task is passed, failed, blocked, ready for next role, or waiting on validation.
+   When analyzing another agent's work, make this human-readable: explain what changed globally,
+   why it matters to the product, and how this slice fits the larger plan. Do not only restate file
+   names, counts, or role jargon.
+5. Where we are — state whether the task is passed, failed, blocked, ready for next role, or waiting
+   on validation. When analyzing another agent's work, write this in clear Russian context so the
+   user understands what capability is now real, what is still not real, and what the current gate
+   means in product terms.
 6. What we do next — explain the next role/action in plain language and then provide the exact prompt when a handoff is needed.
 
 This shape is mandatory when analyzing another agent's work, preparing the next prompt, or reporting progress on a task. Do not start with only the prompt. Casual questions, open-ended thinking, or simple Q&A may use a lighter conversational answer.
+
+Human-context rule for prior-agent reports:
+
+- Before writing a next-role prompt, translate the prior agent's report into understandable product
+  context for the user.
+- Say what problem the work was meant to solve, what is now actually possible, and what remains
+  future/blocked/out of scope.
+- Keep the language conversational and Russian in the user-facing shell; save dense technical detail
+  for the exact role prompt.
+- Avoid answers that read like copied status tables. The standard headings may stay, but the content
+  under them must help the user understand the story, not just the handoff mechanics.
 
 Language rule:
 
@@ -379,6 +396,12 @@ agents must still load any task-matching skill even if the role file does not me
 Do not duplicate routine report formats in every handoff prompt unless the task needs a stricter or
 custom format. Prompts may refer to the relevant standard format below.
 
+Exact next-role prompts should not end with routine lines like `Report using the Architecture /
+Cleanup / Plan Report format` or a copied numbered report outline. Every role agent reads
+`AGENTS.md` during startup and must use the matching standard format by default. Include report
+instructions inside a prompt only when the task needs custom evidence, stricter ordering, or a
+non-standard report shape.
+
 ### Orchestration / Prior-Agent Review / Handoff
 
 Use this shape when reviewing another agent's work, reporting current progress, or routing the next
@@ -533,20 +556,42 @@ Completion gate:
 ## 6.5) QA Browser Policy
 
 - QA must use the built-in Codex app/browser testing environment first whenever it can cover the task.
+- QA should prefer the persistent production-built local QA server over repeatedly starting
+  `npm run dev` for browser acceptance work.
+- The canonical local QA server is the built app served with `npm run serve:local` at
+  `http://127.0.0.1:3000/` / `http://localhost:3000/`.
+- Before starting a server, QA must check whether the canonical local QA server is already
+  responding and reuse it when it is healthy.
+- QA must not start duplicate local app servers for the same proof. If the server is stale, hung, or
+  serving the wrong build, restart the existing server intentionally and report that restart.
+- If source changes affect the browser-visible app, QA should rebuild before restarting the
+  persistent built server.
+- Use `npm run dev` only when the task specifically needs dev/HMR behavior or the built server
+  cannot cover the scope; state the reason in `Browser Path Preflight`.
+- Leave the persistent local QA server running after validation unless it is serving a known-bad
+  build, blocking the next task, or the user explicitly asks to stop it.
 - Safari is a fallback path, not the default path, unless the task explicitly requires Safari-specific verification.
 - When Safari is required, use Computer Use with Safari and reuse the existing Safari session whenever practical.
+- QA must preserve one browser context by default: one existing Safari window and, whenever possible,
+  one existing tab.
 - Do not open multiple Safari windows for QA.
-- Prefer navigating the current Safari tab; if a separate state is needed, open a new tab in the same Safari window.
+- Prefer navigating the current Safari tab and completing the whole validation flow in that tab.
+- Open a new Safari tab only when the test genuinely requires a separate state or navigation
+  context; if used, state why in the QA report.
 - Opening a new Safari window is prohibited unless the test explicitly requires multiple windows; if used, state why in the QA report.
 - Do not use private/incognito windows for routine QA unless the test specifically requires a clean unauthenticated session.
 - Preserve useful logged-in Safari sessions when possible so repeat QA passes do not require unnecessary username/password entry.
-- Chrome must not be used for QA browser testing except as a last-resort fallback when Safari is genuinely blocked.
-- Any Chrome fallback must be stated explicitly in the QA report with the reason Safari could not be used.
+- Chrome must not be used for QA browser testing unless the user explicitly requests or approves Chrome for that specific QA run.
 - Every QA browser report must include a `Browser Path Preflight` line stating:
   - whether the built-in Codex app/browser was used first
+  - which local app server URL was used
+  - whether the existing persistent server was reused, restarted, or replaced
   - if not, the concrete reason it could not cover the task
   - whether Safari was used as fallback or because Safari-specific verification was explicitly required
-- A QA browser report that skips this preflight, uses Safari first without justification, or opens extra Safari windows without a stated test requirement is invalid and must be redone.
+  - whether QA stayed in the existing Safari window/tab or why a new tab/window was required
+- A QA browser report that skips this preflight, uses Safari first without justification, opens extra
+  Safari windows, opens unnecessary tabs, or uses Chrome without explicit user approval is invalid
+  and must be redone.
 
 ## 6.6) QA Screenshot Artifact Policy
 

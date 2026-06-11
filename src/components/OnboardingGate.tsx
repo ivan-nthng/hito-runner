@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { DictateToPlanPanel, type VoiceStatus } from "@/components/onboarding/DictateToPlanPanel";
 import { JsonImportPanel } from "@/components/onboarding/JsonImportPanel";
+import { ManualUserBuiltPlanPanel } from "@/components/onboarding/ManualUserBuiltPlanPanel";
 import { PlanPresetPanel, type PlanPresetUiStatus } from "@/components/onboarding/PlanPresetPanel";
 import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPlanConstructor";
 import {
@@ -863,32 +864,35 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             clearStructuredReview();
           }}
           planPresetPanel={({ openAdvancedCustom }) => (
-            <PlanPresetPanel
-              cardsResult={presetCardsResult}
-              confirmResult={runningPlanConfirmResult}
-              previewResult={runningPlanPreviewResult}
-              createStatus={runningPlanCreateStatus}
-              error={presetError}
-              status={presetStatus}
-              isBusy={isBusy}
-              isPresetDiscoveryReady={isPresetDiscoveryReady}
-              selectedCardId={presetSelectedCardId}
-              previewOpen={runningPlanPreviewOpen}
-              onPreviewOpenChange={setRunningPlanPreviewOpen}
-              onLoadCards={() => {
-                void loadPlanPresetCards();
-              }}
-              onSelectPlan={(cardId) => {
-                selectPlanPresetPreview(cardId);
-              }}
-              onRefreshPreview={() => {
-                void refreshSelectedRunningPlanPreview();
-              }}
-              onCreatePlan={() => {
-                void confirmSelectedRunningPlan();
-              }}
-              onUseAdvancedCustom={openAdvancedCustom}
-            />
+            <>
+              <PlanPresetPanel
+                cardsResult={presetCardsResult}
+                confirmResult={runningPlanConfirmResult}
+                previewResult={runningPlanPreviewResult}
+                createStatus={runningPlanCreateStatus}
+                error={presetError}
+                status={presetStatus}
+                isBusy={isBusy}
+                isPresetDiscoveryReady={isPresetDiscoveryReady}
+                selectedCardId={presetSelectedCardId}
+                previewOpen={runningPlanPreviewOpen}
+                onPreviewOpenChange={setRunningPlanPreviewOpen}
+                onLoadCards={() => {
+                  void loadPlanPresetCards();
+                }}
+                onSelectPlan={(cardId) => {
+                  selectPlanPresetPreview(cardId);
+                }}
+                onRefreshPreview={() => {
+                  void refreshSelectedRunningPlanPreview();
+                }}
+                onCreatePlan={() => {
+                  void confirmSelectedRunningPlan();
+                }}
+                onUseAdvancedCustom={openAdvancedCustom}
+              />
+              <ManualUserBuiltPlanPanel isGlobalBusy={isBusy} onPlanCreated={openSavedHome} />
+            </>
           )}
         />
       )}

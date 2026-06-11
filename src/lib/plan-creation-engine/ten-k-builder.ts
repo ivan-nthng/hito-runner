@@ -9,10 +9,14 @@ import {
 } from "@/lib/plan-creation-engine/source-model";
 import {
   resolveTenKDevelopmentTouch,
-  TEN_K_ENDPOINT_WEEK,
   type TenKLoadContext,
   validateTenKDiversityPolicy,
 } from "@/lib/plan-creation-engine/ten-k-diversity-policy";
+import {
+  resolveRunningPlanHorizonSelection,
+  type RunningPlanHorizonSelection,
+} from "@/lib/plan-creation-engine/horizon-policy";
+import { findForbiddenRunnerFacingLanguageMatches } from "@/lib/plan-creation-engine/forbidden-runner-facing-language";
 import {
   RUNNING_PLAN_DAYS_PER_WEEK_VALUES,
   RUNNING_PLAN_DISTANCE_FAMILY_VALUES,
@@ -74,6 +78,7 @@ export interface TenKPlanNormalizedInputSummary extends RunningPlanBuilderInput 
   longRunDaySource: "runner_preference" | "backend_default" | "backend_fallback";
   trainingWeekdays: readonly WeekdayName[];
   loadContext: TenKLoadContext;
+  horizonSelection: RunningPlanHorizonSelection;
 }
 
 export interface TenKPlanEndpointProof {
@@ -280,6 +285,7 @@ function normalizeTenKPlanBuilderInput(input: BuildTenKPlanPreviewInput):
   if (!trainingWeekdays.ok) {
     return failure(trainingWeekdays.code, trainingWeekdays.message);
   }
+  const loadContext = resolveLoadContext(input);
 
   return {
     ok: true,
@@ -297,7 +303,13 @@ function normalizeTenKPlanBuilderInput(input: BuildTenKPlanPreviewInput):
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
       longRunDaySource: longRunResolution.source,
       trainingWeekdays: trainingWeekdays.weekdays,
-      loadContext: resolveLoadContext(input),
+      loadContext,
+      horizonSelection: resolveRunningPlanHorizonSelection({
+        family: "10K",
+        runnerLevel: input.runnerLevel,
+        loadContext,
+        daysPerWeek,
+      }),
     },
   };
 }
@@ -315,12 +327,14 @@ function buildTenKCalendarRows(
     input.trainingWeekdays,
     input.preferredLongRunDay,
   );
-  const finalEndpointDayNumber = resolveFinalEndpointDayNumber(
-    input.startDate,
-    input.preferredLongRunDay,
-  );
+  const horizonWeeks = input.horizonSelection.horizonWeeks;
+  const finalEndpointDayNumber = resolveFinalEndpointDayNumber({
+    startDate: input.startDate,
+    longRunDay: input.preferredLongRunDay,
+    horizonWeeks,
+  });
 
-  for (let dayOffset = 0; dayOffset < TEN_K_PLAN_BUILDER_WEEKS * 7; dayOffset += 1) {
+  for (let dayOffset = 0; dayOffset < horizonWeeks * 7; dayOffset += 1) {
     const date = addDaysIso(input.startDate, dayOffset);
     const weekday = weekdayLong(date) as WeekdayName;
     const weekNumber = Math.floor(dayOffset / 7) + 1;
@@ -343,6 +357,7 @@ function buildTenKCalendarRows(
       developmentWeekday,
       runnerLevel: input.runnerLevel,
       loadContext: input.loadContext,
+      horizonWeeks,
     });
 
     rows.push(
@@ -354,6 +369,7 @@ function buildTenKCalendarRows(
         workoutDayKind,
         runnerLevel: input.runnerLevel,
         loadContext: input.loadContext,
+        horizonWeeks,
       }),
     );
   }
@@ -369,6 +385,7 @@ function buildWorkoutRow({
   workoutDayKind,
   runnerLevel,
   loadContext,
+  horizonWeeks,
 }: {
   date: string;
   weekNumber: number;
@@ -377,6 +394,7 @@ function buildWorkoutRow({
   workoutDayKind: RunningPlanWorkoutDayKind;
   runnerLevel: RunningPlanRunnerLevel;
   loadContext: TenKPlanNormalizedInputSummary["loadContext"];
+  horizonWeeks: number;
 }): TenKPlanCalendarRow {
   const template =
     workoutDayKind === "final_selected_distance_day"
@@ -388,7 +406,7 @@ function buildWorkoutRow({
     runnerLevel,
     loadContext,
     weekNumber,
-    horizonWeeks: TEN_K_PLAN_BUILDER_WEEKS,
+    horizonWeeks,
     segments: template.segments,
   });
 
@@ -455,6 +473,7 @@ function selectWorkoutDayKind({
   developmentWeekday,
   runnerLevel,
   loadContext,
+  horizonWeeks,
 }: {
   weekNumber: number;
   weekday: WeekdayName;
@@ -463,9 +482,10 @@ function selectWorkoutDayKind({
   developmentWeekday: WeekdayName | null;
   runnerLevel: RunningPlanRunnerLevel;
   loadContext: TenKPlanNormalizedInputSummary["loadContext"];
+  horizonWeeks: number;
 }): RunningPlanWorkoutDayKind {
   if (weekday === longRunDay) {
-    if (weekNumber === TEN_K_PLAN_BUILDER_WEEKS) {
+    if (weekNumber === horizonWeeks) {
       return "final_selected_distance_day";
     }
 
@@ -476,8 +496,13 @@ function selectWorkoutDayKind({
     return "recovery";
   }
 
-  const developmentTouch = resolveTenKDevelopmentTouch({ runnerLevel, loadContext, weekNumber });
-  if (weekNumber < TEN_K_ENDPOINT_WEEK && weekday === developmentWeekday && developmentTouch) {
+  const developmentTouch = resolveTenKDevelopmentTouch({
+    runnerLevel,
+    loadContext,
+    weekNumber,
+    horizonWeeks,
+  });
+  if (weekNumber < horizonWeeks && weekday === developmentWeekday && developmentTouch) {
     return developmentTouch;
   }
 
@@ -524,6 +549,7 @@ function enforceRecoveryAfterStressors(
       workoutDayKind: "recovery",
       runnerLevel: input.runnerLevel,
       loadContext: input.loadContext,
+      horizonWeeks: input.horizonSelection.horizonWeeks,
     });
   }
 
@@ -679,9 +705,14 @@ function validateWatchExecutableRows(rows: readonly TenKPlanCalendarRow[], issue
 
 function validateForbiddenSignals(rows: readonly TenKPlanCalendarRow[], issues: string[]) {
   const text = JSON.stringify(rows);
+  const forbiddenRunnerFacingMatches = findForbiddenRunnerFacingLanguageMatches(rows);
 
-  if (/pace_min|pace_target|pace_range|race_pace|personal_hr|effort_only/i.test(text)) {
-    issues.push("Preview rows must not contain fake pace, personal HR, or effort-only targets.");
+  if (forbiddenRunnerFacingMatches.length > 0) {
+    issues.push(
+      `Preview rows must not contain forbidden runner-facing metric or race-readiness language: ${[
+        ...new Set(forbiddenRunnerFacingMatches.map((match) => match.signal)),
+      ].join(", ")}.`,
+    );
   }
 
   if (/recent5k|recent_5k|5k_benchmark|watchAccess|no_watch/i.test(text)) {
@@ -843,17 +874,25 @@ function requiresRecoveryAfter(kind: TenKPlanCalendarWorkoutDayKind) {
   );
 }
 
-function resolveFinalEndpointDayNumber(startDate: string, longRunDay: WeekdayName) {
-  const finalWeekStartOffset = (TEN_K_PLAN_BUILDER_WEEKS - 1) * 7;
+function resolveFinalEndpointDayNumber({
+  startDate,
+  longRunDay,
+  horizonWeeks,
+}: {
+  startDate: string;
+  longRunDay: WeekdayName;
+  horizonWeeks: number;
+}) {
+  const finalWeekStartOffset = (horizonWeeks - 1) * 7;
 
-  for (let offset = finalWeekStartOffset; offset < TEN_K_PLAN_BUILDER_WEEKS * 7; offset += 1) {
+  for (let offset = finalWeekStartOffset; offset < horizonWeeks * 7; offset += 1) {
     const date = addDaysIso(startDate, offset);
     if (weekdayLong(date) === longRunDay) {
       return offset + 1;
     }
   }
 
-  return TEN_K_PLAN_BUILDER_WEEKS * 7;
+  return horizonWeeks * 7;
 }
 
 function isAfterEndpointInFinalWeek(dayNumber: number, finalEndpointDayNumber: number) {

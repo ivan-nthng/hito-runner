@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import {
   buildTenKPlanPreviewDraft,
+  resolveRunningPlanCutbackWeeks,
+  RUNNING_PLAN_HORIZON_POLICY_VERSION,
   runningPlanPrescriptionIsExact,
   TEN_K_PLAN_BUILDER_SOURCE_KIND,
-  TEN_K_PLAN_BUILDER_WEEKS,
   type TenKPlanCalendarRow,
   type TenKPlanPreviewDraft,
 } from "../src/lib/plan-creation-engine";
+import { findForbiddenRunnerFacingLanguageMatches } from "../src/lib/plan-creation-engine/forbidden-runner-facing-language";
 import { validateTenKDiversityPolicy } from "../src/lib/plan-creation-engine/ten-k-diversity-policy";
 
 function main() {
@@ -24,7 +26,7 @@ function main() {
 
   console.log("Running plan engine 10K builder checks passed.", {
     sourceKind: draft.sourceKind,
-    weeks: TEN_K_PLAN_BUILDER_WEEKS,
+    weeks: draft.normalizedInputSummary.horizonSelection.horizonWeeks,
     calendarRows: draft.calendarRows.length,
     nonRestRows: draft.calendarRows.filter((row) => !row.isRestDay).length,
     endpointDistanceMeters: draft.endpointProof.endpointDistanceMeters,
@@ -73,8 +75,16 @@ function validateHappyPath() {
     "Friday",
     "Sunday",
   ]);
+  assert.deepEqual(draft.normalizedInputSummary.horizonSelection, {
+    policyVersion: RUNNING_PLAN_HORIZON_POLICY_VERSION,
+    horizonWeeks: 12,
+    selectionReason: "standard_preferred_horizon",
+  });
 
-  assert.equal(draft.calendarRows.length, TEN_K_PLAN_BUILDER_WEEKS * 7);
+  assert.equal(
+    draft.calendarRows.length,
+    draft.normalizedInputSummary.horizonSelection.horizonWeeks * 7,
+  );
   assert.ok(draft.validation.ok, `Validation issues: ${draft.validation.issues.join(", ")}`);
   assert.ok(draft.validation.forbiddenOutputGateIdsChecked.includes("no_fake_precise_pace"));
   assert.ok(draft.validation.forbiddenOutputGateIdsChecked.includes("no_fake_personal_hr"));
@@ -231,6 +241,11 @@ function validateBackendDefaults() {
   assert.deepEqual(result.draft.normalizedInputSummary.fixedRestDays, []);
   assert.equal(result.draft.normalizedInputSummary.preferredLongRunDay, "Sunday");
   assert.equal(result.draft.normalizedInputSummary.longRunDaySource, "backend_default");
+  assert.equal(result.draft.normalizedInputSummary.horizonSelection.horizonWeeks, 16);
+  assert.equal(
+    result.draft.normalizedInputSummary.horizonSelection.selectionReason,
+    "beginner_auto_extended_horizon",
+  );
 }
 
 function validateLongRunFallbackCorrection() {
@@ -395,7 +410,7 @@ function validateRecoveryAfterSharpening(rows: readonly TenKPlanCalendarRow[]) {
 }
 
 function validateCutbackWeeks(rows: readonly TenKPlanCalendarRow[]) {
-  for (const weekNumber of [4, 8]) {
+  for (const weekNumber of resolveRunningPlanCutbackWeeks(maxWeekNumber(rows))) {
     const weekRows = rows.filter((row) => row.weekNumber === weekNumber);
     assert.ok(
       weekRows.some((row) => row.workoutDayKind === "cutback_long_run"),
@@ -410,7 +425,8 @@ function validateCutbackWeeks(rows: readonly TenKPlanCalendarRow[]) {
 }
 
 function validateTaperSharpeningWeek(rows: readonly TenKPlanCalendarRow[]) {
-  const weekRows = rows.filter((row) => row.weekNumber === 9);
+  const taperWeek = maxWeekNumber(rows) - 1;
+  const weekRows = rows.filter((row) => row.weekNumber === taperWeek);
 
   assert.ok(weekRows.some((row) => row.workoutDayKind === "strides"));
   assert.equal(
@@ -418,12 +434,12 @@ function validateTaperSharpeningWeek(rows: readonly TenKPlanCalendarRow[]) {
       ["intervals", "hills", "tempo", "threshold"].includes(row.workoutDayKind),
     ),
     false,
-    "Week 9 must include strides without intervals, hills, tempo, or threshold.",
+    `Week ${taperWeek} must include strides without intervals, hills, tempo, or threshold.`,
   );
 }
 
 function validateSingleDevelopmentTouchPerWeek(rows: readonly TenKPlanCalendarRow[]) {
-  for (let weekNumber = 1; weekNumber <= TEN_K_PLAN_BUILDER_WEEKS; weekNumber += 1) {
+  for (let weekNumber = 1; weekNumber <= maxWeekNumber(rows); weekNumber += 1) {
     const developmentCount = rows.filter(
       (row) => row.weekNumber === weekNumber && isDevelopmentTouch(row.workoutDayKind),
     ).length;
@@ -482,9 +498,7 @@ function validateWatchExecutableSegments(rows: readonly TenKPlanCalendarRow[]) {
 function validateForbiddenOutputSignals(rows: readonly TenKPlanCalendarRow[]) {
   const text = JSON.stringify(rows);
 
-  assert.doesNotMatch(text, /pace_min|pace_target|pace_range|race_pace/i);
-  assert.doesNotMatch(text, /personal_hr|personal HR/i);
-  assert.doesNotMatch(text, /effort_only/i);
+  assert.deepEqual(findForbiddenRunnerFacingLanguageMatches(rows), []);
   assert.doesNotMatch(text, /recent5k|recent_5k|5k_benchmark/i);
   assert.doesNotMatch(text, /watchAccess|no_watch|noWatch/i);
   assert.doesNotMatch(text, /metadata_only_endpoint/i);
@@ -547,6 +561,10 @@ function assertWorkoutKinds(
 
 function workoutKindSet(rows: readonly TenKPlanCalendarRow[]) {
   return new Set(rows.filter((row) => !row.isRestDay).map((row) => row.workoutDayKind));
+}
+
+function maxWeekNumber(rows: readonly TenKPlanCalendarRow[]) {
+  return Math.max(...rows.map((row) => row.weekNumber));
 }
 
 function developmentSequence(rows: readonly TenKPlanCalendarRow[]) {

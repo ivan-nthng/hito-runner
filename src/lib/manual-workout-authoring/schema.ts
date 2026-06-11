@@ -9,6 +9,9 @@ import type { Step, WorkoutType } from "@/lib/training";
 
 export const MANUAL_WORKOUT_AUTHORING_SOURCE_KIND = "manual_workout_authoring_v1" as const;
 export const MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS = "manual_draft_reviewed" as const;
+export const MANUAL_USER_BUILT_PLAN_SOURCE_KIND = "manual_user_built_plan_v1" as const;
+export const MANUAL_USER_BUILT_PLAN_SOURCE_STATUS = "manual_user_built_plan_created" as const;
+export const MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION = "manual_workout_review_payload_v1" as const;
 
 export const MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES = [
   "structure_only",
@@ -181,6 +184,29 @@ export const manualWorkoutDraftInputSchema = z
 export type ManualWorkoutDraftInput = z.input<typeof manualWorkoutDraftInputSchema>;
 export type ParsedManualWorkoutDraftInput = z.output<typeof manualWorkoutDraftInputSchema>;
 
+export const manualWorkoutConfirmInputSchema = z
+  .object({
+    draftInput: z.unknown(),
+    reviewToken: z.string().trim().min(16),
+    reviewChecksum: z.string().trim().length(64),
+  })
+  .strict();
+
+export type ManualWorkoutConfirmInput = z.output<typeof manualWorkoutConfirmInputSchema>;
+
+export const manualWorkoutAddToActivePlanInputSchema = z
+  .object({
+    activePlanId: z.string().uuid().optional(),
+    draftInput: z.unknown(),
+    reviewToken: z.string().trim().min(16),
+    reviewChecksum: z.string().trim().length(64),
+  })
+  .strict();
+
+export type ManualWorkoutAddToActivePlanInput = z.output<
+  typeof manualWorkoutAddToActivePlanInputSchema
+>;
+
 export interface ManualWorkoutDraftIssue {
   code:
     | "invalid_input"
@@ -246,7 +272,7 @@ export type ManualWorkoutDraftReviewResult =
       review: ManualWorkoutReviewSummary;
       reviewToken: string;
       reviewChecksum: string;
-      exactnessPayloadVersion: "manual_workout_review_payload_v1";
+      exactnessPayloadVersion: typeof MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION;
       conflicts: ManualWorkoutDraftConflict[];
     }
   | {
@@ -264,4 +290,125 @@ export type ManualWorkoutDraftReviewResult =
       issues: ManualWorkoutDraftIssue[];
       conflicts: ManualWorkoutDraftConflict[];
       persisted: false;
+    };
+
+export type ManualWorkoutConfirmFailureReason =
+  | "unauthenticated"
+  | "active_plan_exists"
+  | "manual_workout_required"
+  | "invalid_review"
+  | "stale_review"
+  | "invalid_input"
+  | "unsupported_template"
+  | "unsupported_mapping"
+  | "unsafe_block_structure"
+  | "unsafe_metric_truth"
+  | "protected_date_conflict"
+  | "active_plan_conflict"
+  | "persistence_failed";
+
+export type ManualWorkoutAddToActivePlanFailureReason =
+  | "unauthenticated"
+  | "no_active_plan"
+  | "unsupported_active_plan_source"
+  | "manual_workout_required"
+  | "invalid_review"
+  | "stale_review"
+  | "invalid_input"
+  | "unsupported_template"
+  | "unsupported_mapping"
+  | "unsafe_block_structure"
+  | "unsafe_metric_truth"
+  | "protected_day"
+  | "protected_date_conflict"
+  | "active_plan_conflict"
+  | "occupied_day"
+  | "persistence_failed";
+
+export type ManualWorkoutConfirmResult =
+  | {
+      ok: true;
+      status: "created";
+      persisted: true;
+      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
+      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
+      workoutSourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
+      schemaVersion: "training-plan-v2";
+      effectiveStartDate: string;
+      appliedStartDate: string;
+      workoutCount: number;
+      calendarRowCount: number;
+      nonRestWorkoutCount: number;
+      workoutDate: string;
+      templateKey: ManualWorkoutTemplateKey;
+      reviewChecksum: string;
+      exactnessPayloadVersion: typeof MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION;
+      sourceMetadata: {
+        templateKey: ManualWorkoutTemplateKey;
+        workoutDate: string;
+        rowCount: number;
+        reviewChecksum: string;
+        metricTruthMode: ManualWorkoutTargetTruthMode;
+        mappingGaps: string[];
+      };
+      safety: {
+        requiresExplicitConfirm: true;
+        trustedClientRows: false;
+        serverRebuiltReview: true;
+        callsOpenAi: false;
+      };
+    }
+  | {
+      ok: false;
+      status: "blocked";
+      persisted: false;
+      reason: ManualWorkoutConfirmFailureReason;
+      message: string;
+      sourceKind?: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      workoutSourceKind?: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
+    };
+
+export type ManualWorkoutAddToActivePlanResult =
+  | {
+      ok: true;
+      status: "created";
+      persisted: true;
+      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
+      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
+      workoutSourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
+      activePlanId: string;
+      plannedWorkoutId: string;
+      workoutDate: string;
+      templateKey: ManualWorkoutTemplateKey;
+      reviewChecksum: string;
+      exactnessPayloadVersion: typeof MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION;
+      calendarRowCount: number;
+      nonRestWorkoutCount: number;
+      sourceMetadata: {
+        templateKey: ManualWorkoutTemplateKey;
+        workoutDate: string;
+        reviewChecksum: string;
+        metricTruthMode: ManualWorkoutTargetTruthMode;
+        mappingGaps: string[];
+        warnings: string[];
+      };
+      safety: {
+        requiresExplicitConfirm: true;
+        trustedClientRows: false;
+        serverRebuiltReview: true;
+        targetDayWasEmpty: true;
+        activePlanSourceVerified: true;
+        callsOpenAi: false;
+      };
+    }
+  | {
+      ok: false;
+      status: "blocked";
+      persisted: false;
+      reason: ManualWorkoutAddToActivePlanFailureReason;
+      message: string;
+      sourceKind?: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      workoutSourceKind?: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
     };

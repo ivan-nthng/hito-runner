@@ -51,4 +51,22 @@ export const distanceFamilyContracts: RunningPlanEngineSourceModel["supportedDis
     ],
     endpointGateId: "marathon_base_honest_endpoint",
   },
+  {
+    family: "Marathon Completion",
+    productMeaning:
+      "Finish-focused selected-distance full marathon completion build with a long honest runway.",
+    finalPromise: "Exact 42195m full-marathon completion endpoint without target-time claims.",
+    acceptedEndpointBehaviors: [
+      "42195m completion day",
+      "full marathon completion endpoint",
+      "finish-focused marathon endpoint",
+    ],
+    rejectedEndpointBehaviors: [
+      "Marathon Base endpoint",
+      "race-pace readiness",
+      "target-time implication",
+      "endpoint hidden only in metadata while rows stay generic",
+    ],
+    endpointGateId: "marathon_completion_selected_distance_endpoint",
+  },
 ] as const;

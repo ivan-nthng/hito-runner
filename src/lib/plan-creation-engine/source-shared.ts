@@ -14,4 +14,5 @@ export const ALL_SUPPORTED_RUNNING_PLAN_FAMILIES: readonly RunningPlanDistanceFa
   "10K",
   "Half Marathon",
   "Marathon Base",
+  "Marathon Completion",
 ] as const;

@@ -231,12 +231,17 @@ A good conservative profile should not just remove workouts. It should keep the 
 
 ## 9. Unavailable / Blocked Scenario Findings
 
+Historical scope note:
+
+- this 2026-06-09 audit reflects the pre-auto-extension matrix
+- runner-level unavailability for coach-plausible beginner Half or Marathon-Base scenarios is no longer canonical after:
+  - `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md`
+
 ### Appropriate unavailable cases
 
-`unsupported_runner_level_for_family` is appropriate:
+In that historical snapshot, `unsupported_runner_level_for_family` was only appropriate:
 
-- Half Marathon `beginner_new_runner`
-- Marathon Base `beginner_new_runner`
+- only where the family mapping itself is not yet implemented
 
 `long_run_day_blocked` is appropriate:
 

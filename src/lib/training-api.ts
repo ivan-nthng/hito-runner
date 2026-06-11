@@ -56,6 +56,10 @@ import type { Database, Json } from "@/lib/supabase/database";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { RUNNER_TRAINING_WEEKDAYS } from "@/lib/runner-training-preferences";
+import {
+  reviewManualWorkoutDraft as reviewManualWorkoutDraftForAction,
+  type ManualWorkoutDraftReviewResult,
+} from "@/lib/manual-workout-authoring";
 
 export {
   completeStructuredFirstPlanOnboarding,
@@ -77,6 +81,32 @@ export {
   type RunningPlanPreviewActionInput,
   type RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";
+export {
+  addManualWorkoutToActivePlan,
+  confirmManualWorkoutCopyPasteDraft,
+  confirmManualWorkoutDraft,
+  listManualWorkoutSavedTemplates,
+  reviewManualWorkoutCopyPasteDraft,
+  reviewManualWorkoutSavedTemplate,
+  saveManualWorkoutSavedTemplate,
+  type ManualWorkoutAddToActivePlanInput,
+  type ManualWorkoutAddToActivePlanResult,
+  type ManualWorkoutBlockInput,
+  type ManualWorkoutCopyPasteConfirmResult,
+  type ManualWorkoutCopyPasteReviewResult,
+  type ManualWorkoutConfirmInput,
+  type ManualWorkoutConfirmResult,
+  type ManualWorkoutTargetTruthMode,
+  type ManualWorkoutDraftInput,
+  type ManualWorkoutDraftReviewResult,
+  type ManualWorkoutSavedTemplateListResult,
+  type ManualWorkoutSavedTemplateReviewInput,
+  type ManualWorkoutSavedTemplateReviewResult,
+  type ManualWorkoutSavedTemplateSaveInput,
+  type ManualWorkoutSavedTemplateSaveResult,
+  type ManualWorkoutSavedTemplateView,
+  type ManualWorkoutTemplateKey,
+} from "@/lib/manual-workout-authoring";
 export {
   exportActivePlan,
   exportActivePlanForUser,
@@ -202,6 +232,12 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
     return saveWorkoutLogForUser(await requirePersistedUserIdForCurrentRequest(), data);
+  });
+
+export const reviewManualWorkoutDraftAction = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => value)
+  .handler(async ({ data }): Promise<ManualWorkoutDraftReviewResult> => {
+    return reviewManualWorkoutDraftForAction(data);
   });
 
 export function archiveActivePlanForUser(userId: string) {
@@ -494,6 +530,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
     backend: "supabase",
     currentDate,
     planMeta: {
+      id: planCycle.id,
       title: planCycle.title,
       createdFor: "You",
       createdAt: planCycle.created_at,
@@ -501,6 +538,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
       raceDate: planCycle.target_date ?? planCycle.end_date,
       goal: planCycle.goal_summary,
       source: "persisted",
+      sourceKind: planCycle.source_kind,
       schedulePreferences: buildPlanSchedulePreferencesSummary(planCycle.plan_preferences),
     },
     profile,

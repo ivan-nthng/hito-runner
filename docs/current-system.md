@@ -230,6 +230,22 @@
   `training-plan-v2` rows through the existing active-plan persistence seam. Presets apply only when
   there is no active plan and do not implement active-plan replacement, refresh, manual workout
   authoring, or target-date preset behavior.
+- Manual user-built plans are now a canonical no-active-plan and saved-calendar creation path:
+  `src/lib/manual-workout-authoring/*` owns draft validation, backend template registry, review
+  token/checksum exactness, first manual plan confirm, and adding one reviewed workout into an
+  existing `manual_user_built_plan_v1` active plan. `Calendar.tsx` exposes the existing compact
+  calendar `Add` affordance only on eligible future empty days for manual active plans, then renders
+  shared manual authoring controls that confirm with only `activePlanId`, `draftInput`,
+  `reviewToken`, and `reviewChecksum`. Runner-facing Add date labels use the shared date-only
+  helper and final confirmation repeats the selected date/weekday; backend persistence remains the
+  source for `workout_date`, weekday readback, source kind, row counts, and metric-truth metadata.
+  Backend personal saved-template truth is also implemented through the
+  `runner_manual_workout_templates` table and manual authoring saved-template actions: reviewed
+  manual workouts can be saved as current-user-owned templates with display name/icon metadata,
+  listed for the owner, protected by RLS/current-user ownership, and reconstructed into future
+  non-persisted manual drafts through `reviewManualWorkoutDraft(...)`. Frontend `Save as template`
+  and personal-template picker wiring, copy/paste, recurrence, JSON export/share, move-workout, and
+  edit/delete/clear are not implemented yet.
 - visible onboarding on `/` is now structured-first:
   authenticated users without setup answer the bounded first-plan constructor for required profile basics, progressive training preferences, bounded fitness-level benchmark context, execution preference, goal, conditional target/terrain context, strength/mobility support, and optional comment; the frontend calls `generateStructuredFirstPlanDraft` first, keeps `correction_required` inline near the form, opens a `Review your setup` modal only for `draft_ready`, and calls `confirmStructuredFirstPlanDraft` only from the modal `Yes, create plan` action
 - structured constructor review-before-create is now the visible manual onboarding path:

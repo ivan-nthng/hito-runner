@@ -1,0 +1,463 @@
+import {
+  getExistingPlanContext,
+  type ExistingPlanContext,
+  type PersistedPlannedWorkoutRow,
+} from "@/lib/active-plan-persistence";
+import type { ManualWorkoutActivePlanAddDependencies } from "@/lib/manual-workout-authoring/active-plan-add";
+import {
+  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+  MANUAL_WORKOUT_TEMPLATE_KEY_VALUES,
+  type ManualWorkoutAddToActivePlanResult,
+  type ManualWorkoutBlockInput,
+  type ManualWorkoutConstructorEntryInput,
+  type ManualWorkoutDraftInput,
+  type ManualWorkoutRepeatSafetyKind,
+  type ManualWorkoutTargetTruthMode,
+  type ManualWorkoutTemplateKey,
+} from "@/lib/manual-workout-authoring/schema";
+import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
+import type { Step, StepTarget } from "@/lib/training";
+
+export interface ManualWorkoutCopyPasteSourceInput {
+  activePlanId?: string;
+  sourceWorkoutId?: string;
+  sourceWorkoutDate?: string;
+  targetDate: string;
+}
+
+export type ManualWorkoutCopyPasteFailureReason =
+  | Extract<ManualWorkoutAddToActivePlanResult, { ok: false }>["reason"]
+  | "source_workout_not_found"
+  | "source_workout_not_in_active_plan"
+  | "source_workout_not_supported"
+  | "unsupported_payload";
+
+export type ManualWorkoutCopyPasteReconstructionResult =
+  | {
+      ok: true;
+      activePlanId: string;
+      sourceWorkout: PersistedPlannedWorkoutRow;
+      draftInput: ManualWorkoutDraftInput;
+    }
+  | {
+      ok: false;
+      reason: ManualWorkoutCopyPasteFailureReason;
+      message: string;
+    };
+
+export async function reconstructManualWorkoutCopyDraftForUser(
+  userId: string,
+  input: ManualWorkoutCopyPasteSourceInput,
+  dependencies: ManualWorkoutActivePlanAddDependencies,
+): Promise<ManualWorkoutCopyPasteReconstructionResult> {
+  const getContext = dependencies.getExistingPlanContextForUser ?? getExistingPlanContext;
+  let planContext: ExistingPlanContext;
+
+  try {
+    planContext = await getContext(userId);
+  } catch {
+    return {
+      ok: false,
+      reason: "persistence_failed",
+      message: "The manual plan could not verify the current active-plan state.",
+    };
+  }
+
+  const activePlan = planContext.activePlan;
+  if (!activePlan) {
+    return {
+      ok: false,
+      reason: "no_active_plan",
+      message: "Create a manual user-built active plan before copying workouts.",
+    };
+  }
+
+  if (input.activePlanId && activePlan.id !== input.activePlanId) {
+    return {
+      ok: false,
+      reason: "stale_review",
+      message: "The active manual plan changed. Refresh the calendar and review this copy again.",
+    };
+  }
+
+  if (activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+    return {
+      ok: false,
+      reason: "unsupported_active_plan_source",
+      message: "Manual workout copy/paste is available only for manual user-built active plans.",
+    };
+  }
+
+  const source = resolveSourceWorkout({
+    userId,
+    activePlanId: activePlan.id,
+    workouts: planContext.existingWorkouts.workouts,
+    sourceWorkoutId: input.sourceWorkoutId,
+    sourceWorkoutDate: input.sourceWorkoutDate,
+  });
+
+  if (!source.ok) {
+    return source;
+  }
+
+  const draft = buildDraftInputFromPersistedManualWorkout(source.workout, input.targetDate, {
+    activePlanId: activePlan.id,
+    activePlanSourceKind: activePlan.source_kind,
+  });
+
+  if (!draft.ok) {
+    return draft;
+  }
+
+  return {
+    ok: true,
+    activePlanId: activePlan.id,
+    sourceWorkout: source.workout,
+    draftInput: draft.draftInput,
+  };
+}
+
+function resolveSourceWorkout(input: {
+  userId: string;
+  activePlanId: string;
+  workouts: readonly PersistedPlannedWorkoutRow[];
+  sourceWorkoutId?: string;
+  sourceWorkoutDate?: string;
+}):
+  | { ok: true; workout: PersistedPlannedWorkoutRow }
+  | { ok: false; reason: ManualWorkoutCopyPasteFailureReason; message: string } {
+  const matches = input.workouts.filter((workout) => {
+    if (input.sourceWorkoutId) {
+      return workout.id === input.sourceWorkoutId;
+    }
+
+    return workout.workout_date === input.sourceWorkoutDate;
+  });
+
+  if (matches.length !== 1) {
+    return {
+      ok: false,
+      reason: "source_workout_not_found",
+      message: "The source workout was not found in the current manual plan.",
+    };
+  }
+
+  const workout = matches[0]!;
+  if (workout.user_id !== input.userId || workout.plan_cycle_id !== input.activePlanId) {
+    return {
+      ok: false,
+      reason: "source_workout_not_in_active_plan",
+      message: "The source workout is not part of the current runner's active manual plan.",
+    };
+  }
+
+  return { ok: true, workout };
+}
+
+function buildDraftInputFromPersistedManualWorkout(
+  workout: PersistedPlannedWorkoutRow,
+  targetDate: string,
+  context: {
+    activePlanId: string;
+    activePlanSourceKind: string | null;
+  },
+):
+  | { ok: true; draftInput: ManualWorkoutDraftInput }
+  | { ok: false; reason: ManualWorkoutCopyPasteFailureReason; message: string } {
+  if (workout.workout_type === "rest") {
+    return {
+      ok: false,
+      reason: "source_workout_not_supported",
+      message: "Rest-only source days cannot be copied as manual workouts.",
+    };
+  }
+
+  const templateKey = resolveSourceTemplateKey(workout);
+
+  if (!templateKey) {
+    return {
+      ok: false,
+      reason: "source_workout_not_supported",
+      message: "This source workout was not created from a supported manual workout template.",
+    };
+  }
+
+  const reconstructedEntries = persistedStepsToManualEntries(
+    readPersistedSteps(workout.steps),
+    templateKey,
+  );
+
+  if (!reconstructedEntries.ok) {
+    return reconstructedEntries;
+  }
+
+  const template = getManualWorkoutTemplate(templateKey);
+  const draftInput: ManualWorkoutDraftInput = {
+    templateKey,
+    workoutDate: targetDate,
+    title: workout.title || template.defaultTitle,
+    notes: workout.notes ?? template.defaultNotes,
+    targetTruthMode: deriveTargetTruthMode(workout),
+    entries: reconstructedEntries.entries,
+    context: {
+      mode: "existing_active_plan",
+      activePlanId: context.activePlanId,
+      activePlanSourceKind: context.activePlanSourceKind ?? undefined,
+      targetDateProtection: "none",
+    },
+  };
+
+  return { ok: true, draftInput };
+}
+
+function resolveSourceTemplateKey(
+  workout: PersistedPlannedWorkoutRow,
+): ManualWorkoutTemplateKey | null {
+  const sourceWorkoutType = workout.source_workout_type;
+
+  return isManualWorkoutTemplateKey(sourceWorkoutType) ? sourceWorkoutType : null;
+}
+
+function persistedStepsToManualEntries(
+  steps: Step[],
+  templateKey: ManualWorkoutTemplateKey,
+):
+  | { ok: true; entries: ManualWorkoutConstructorEntryInput[] }
+  | { ok: false; reason: ManualWorkoutCopyPasteFailureReason; message: string } {
+  if (steps.length === 0) {
+    return {
+      ok: false,
+      reason: "unsupported_payload",
+      message: "This source workout has no executable segment structure to copy.",
+    };
+  }
+
+  const entries: ManualWorkoutConstructorEntryInput[] = [];
+
+  for (const step of steps) {
+    const entry = persistedStepToEntry(step, templateKey);
+
+    if (!entry) {
+      return {
+        ok: false,
+        reason: "unsupported_payload",
+        message:
+          "This source workout has segment structure that cannot reconstruct a manual draft.",
+      };
+    }
+
+    entries.push(entry);
+  }
+
+  return { ok: true, entries };
+}
+
+function persistedStepToEntry(
+  step: Step,
+  templateKey: ManualWorkoutTemplateKey,
+): ManualWorkoutConstructorEntryInput | null {
+  if (step.repeats || step.prescription?.mode === "repeats") {
+    const workBlock = step.work ? persistedStepToBlock(step.work, templateKey, "work") : null;
+    const recoveryBlock = step.recovery
+      ? persistedStepToBlock(step.recovery, templateKey, "recovery")
+      : null;
+    const repeatCount = step.repeats ?? step.prescription?.repeat_count;
+
+    if (!repeatCount || repeatCount < 2 || !workBlock || !recoveryBlock) {
+      return null;
+    }
+
+    return {
+      kind: "repeat_group",
+      group: {
+        repeatCount,
+        safetyKind: repeatSafetyKindForStep(step, templateKey),
+        ...(step.label ? { groupLabel: step.label } : {}),
+        workBlock,
+        recoveryBlock,
+      },
+    };
+  }
+
+  const block = persistedStepToBlock(step, templateKey, "block");
+
+  return block ? { kind: "block", block } : null;
+}
+
+function persistedStepToBlock(
+  step: Step,
+  templateKey: ManualWorkoutTemplateKey,
+  role: "block" | "work" | "recovery",
+): ManualWorkoutBlockInput | null {
+  const blockKey = blockKeyForStep(step, templateKey, role);
+
+  if (!blockKey) {
+    return null;
+  }
+
+  const unit = blockUnitForStep(step);
+
+  if (!unit.durationSeconds && !unit.distanceMeters) {
+    return null;
+  }
+
+  const target = sanitizeStepTarget(step.target);
+
+  return {
+    blockKey,
+    ...(step.label ? { label: step.label } : {}),
+    ...unit,
+    ...(step.guidance ? { noteText: step.guidance } : {}),
+    ...(target ? { target } : {}),
+  };
+}
+
+function blockUnitForStep(step: Step) {
+  const durationMin = step.duration_min ?? step.prescription?.duration_min;
+  const distanceKm = step.distance_km ?? step.prescription?.distance_km;
+
+  return {
+    ...(durationMin ? { durationSeconds: Math.round(durationMin * 60) } : {}),
+    ...(distanceKm ? { distanceMeters: Math.round(distanceKm * 1000) } : {}),
+  };
+}
+
+function blockKeyForStep(
+  step: Step,
+  templateKey: ManualWorkoutTemplateKey,
+  role: "block" | "work" | "recovery",
+): ManualWorkoutBlockInput["blockKey"] | null {
+  if (role === "recovery") {
+    return templateKey === "uphill_repeats" || templateKey === "run_walk_adaptation"
+      ? "rest_walk_jog_recovery_block"
+      : "interval_recovery_block";
+  }
+
+  const signal = `${step.segment_type ?? ""} ${step.type ?? ""}`.toLowerCase();
+
+  if (role === "work" && templateKey === "easy_run_with_strides") {
+    return "strides_block";
+  }
+
+  if (signal.includes("warmup")) return "warmup_block";
+  if (signal.includes("cooldown")) return "cooldown_block";
+  if (signal.includes("stride")) return "strides_block";
+  if (signal.includes("tempo")) {
+    return templateKey === "half_marathon_threshold_durability" ? "threshold_block" : "tempo_block";
+  }
+  if (signal.includes("threshold")) return "threshold_block";
+  if (signal.includes("hill")) return "hill_work_block";
+  if (signal.includes("progression")) return "progression_block";
+  if (signal.includes("steady")) return "steady_run_block";
+  if (signal.includes("long_run_finish")) return "long_run_finish_block";
+  if (signal.includes("long_run_body")) return "long_run_body_block";
+  if (signal.includes("interval")) {
+    return templateKey === "uphill_repeats" ? "hill_work_block" : "interval_work_block";
+  }
+
+  switch (templateKey) {
+    case "steady_aerobic_run":
+    case "rolling_hills_session":
+      return "steady_run_block";
+    case "progression_run":
+      return "progression_block";
+    case "controlled_tempo_session":
+      return "tempo_block";
+    case "half_marathon_threshold_durability":
+      return "threshold_block";
+    case "time_intervals":
+    case "distance_intervals":
+      return role === "work" ? "interval_work_block" : "easy_run_block";
+    case "long_aerobic_run":
+    case "cutback_long_run":
+    case "taper_long_run":
+      return "long_run_body_block";
+    case "long_run_with_steady_finish":
+      return signal.includes("finish") ? "long_run_finish_block" : "long_run_body_block";
+    case "uphill_repeats":
+      return role === "work" ? "hill_work_block" : "steady_run_block";
+    case "technical_trail_easy":
+    case "run_walk_adaptation":
+    case "recovery_jog":
+    case "easy_aerobic_run":
+    case "easy_run_with_strides":
+      return "easy_run_block";
+    case "rest_day":
+      return null;
+  }
+}
+
+function repeatSafetyKindForStep(
+  step: Step,
+  templateKey: ManualWorkoutTemplateKey,
+): ManualWorkoutRepeatSafetyKind {
+  switch (templateKey) {
+    case "controlled_tempo_session":
+    case "half_marathon_threshold_durability":
+      return "tempo_repeats";
+    case "uphill_repeats":
+      return "hill_repeats";
+    case "run_walk_adaptation":
+      return "run_walk";
+    case "easy_run_with_strides":
+      return "strides";
+    default:
+      return step.type === "strides" || step.segment_type === "strides" ? "strides" : "intervals";
+  }
+}
+
+function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockInput["target"] {
+  if (!target) {
+    return undefined;
+  }
+
+  const sanitized: ManualWorkoutBlockInput["target"] = {
+    ...(target.intensity ? { intensity: target.intensity } : {}),
+    ...(target.label ? { label: target.label } : {}),
+    ...(target.source_note ? { sourceNote: target.source_note } : {}),
+    ...(target.cue ? { cue: target.cue } : {}),
+    ...(target.hint ? { hint: target.hint } : {}),
+    ...(target.rpe ? { rpe: target.rpe } : {}),
+  };
+
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
+function readPersistedSteps(value: unknown): Step[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isStepLike) as Step[];
+}
+
+function isStepLike(value: unknown): value is Step {
+  return Boolean(value && typeof value === "object" && "type" in value);
+}
+
+function deriveTargetTruthMode(workout: PersistedPlannedWorkoutRow): ManualWorkoutTargetTruthMode {
+  const metricMode = readRecord(workout.metric_mode);
+
+  if (metricMode.executable_mode === "none") {
+    return "none";
+  }
+
+  return metricMode.hr_target_source === "default_estimated_hr"
+    ? "editable_default_hr"
+    : "structure_only";
+}
+
+function isManualWorkoutTemplateKey(value: unknown): value is ManualWorkoutTemplateKey {
+  return (
+    typeof value === "string" &&
+    (MANUAL_WORKOUT_TEMPLATE_KEY_VALUES as readonly string[]).includes(value)
+  );
+}
+
+function readRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}

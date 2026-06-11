@@ -93,9 +93,12 @@ QA is allowed and expected to execute validation work directly.
 - hide coverage gaps
 - open multiple Safari windows for QA
 - open a new Safari window unless the test explicitly requires multiple windows and the report explains why
+- open new Safari tabs unless the test genuinely requires a separate state or navigation context and
+  the report explains why
 - skip the built-in Codex app/browser and go straight to Safari without a concrete reason
 - submit a browser QA report without `Browser Path Preflight`
-- use Chrome for browser testing or verification unless Safari is genuinely blocked and the fallback is stated explicitly in the report
+- use Chrome for browser testing or verification unless the user explicitly requests or approves
+  Chrome for that specific QA run
 - refuse to run validation commands simply because they are CLI/build/script based
 - pass validation back to BACKEND/FRONTEND unless the task requires an implementation fix, missing
   fixture capability, unsafe mutation, or access QA does not have
@@ -103,18 +106,42 @@ QA is allowed and expected to execute validation work directly.
 ## Browser Policy
 
 - The built-in Codex app/browser testing environment is the default browser QA path.
+- QA should prefer the persistent production-built local QA server over repeatedly starting
+  `npm run dev` for browser acceptance work.
+- The canonical local QA server is the built app served with `npm run serve:local` at
+  `http://127.0.0.1:3000/` / `http://localhost:3000/`.
+- Before starting a server, QA must check whether the canonical local QA server is already
+  responding and reuse it when it is healthy.
+- QA must not start duplicate local app servers for the same proof. If the server is stale, hung, or
+  serving the wrong build, restart the existing server intentionally and report that restart.
+- If source changes affect the browser-visible app, QA should rebuild before restarting the
+  persistent built server.
+- Use `npm run dev` only when the task specifically needs dev/HMR behavior or the built server
+  cannot cover the scope; state the reason in `Browser Path Preflight`.
+- Leave the persistent local QA server running after validation unless it is serving a known-bad
+  build, blocking the next task, or the user explicitly asks to stop it.
 - Safari is a fallback path, not the default path, unless the task explicitly requires Safari-specific verification.
 - When Safari is required, QA must use Computer Use with Safari.
 - QA must reuse the existing Safari session whenever practical.
-- QA should navigate the current Safari tab first; if a separate state is needed, open a new tab in the same Safari window.
+- QA must preserve one browser context by default: one existing Safari window and, whenever possible,
+  one existing tab.
+- QA should navigate the current Safari tab first and complete the whole validation flow in that tab.
+- QA may open a new Safari tab in the same Safari window only when the test genuinely requires a
+  separate state or navigation context; the QA report must state why.
 - QA must not open multiple Safari windows.
 - A new Safari window is allowed only when the test explicitly requires multiple windows; the QA report must state why.
 - Chrome is not an acceptable default or convenience choice.
-- Chrome is allowed only as a last-resort fallback when Safari is genuinely blocked.
-- Any Chrome fallback must be called out explicitly in the QA report with the reason Safari could not be used.
+- Chrome is prohibited for QA browser testing unless the user explicitly requests or approves Chrome
+  for that specific QA run.
 - `Browser Path Preflight` must state whether Codex app/browser was used first. If not, it must explain why.
+- `Browser Path Preflight` must state which local app server URL was used and whether the existing
+  persistent server was reused, restarted, or replaced.
 - If Safari was used, `Browser Path Preflight` must state whether it was required by the task or used because Codex app/browser was blocked.
-- A browser QA report that skips this preflight, uses Safari first without justification, or opens extra Safari windows without a stated test requirement is invalid and must be redone.
+- If Safari was used, `Browser Path Preflight` must state whether QA stayed in the existing
+  window/tab or why a new tab/window was required.
+- A browser QA report that skips this preflight, uses Safari first without justification, opens
+  extra Safari windows, opens unnecessary tabs, or uses Chrome without explicit user approval is
+  invalid and must be redone.
 
 ## Optional Continuity Footer
 

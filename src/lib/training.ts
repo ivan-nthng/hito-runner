@@ -113,6 +113,7 @@ export interface Workout {
 }
 
 export interface PlanMeta {
+  id: string | null;
   title: string;
   createdFor: string;
   createdAt: string;
@@ -120,6 +121,7 @@ export interface PlanMeta {
   raceDate: string | null;
   goal: string;
   source: "preview" | "persisted";
+  sourceKind: string | null;
   schedulePreferences: PlanSchedulePreferencesSummary | null;
 }
 
@@ -556,6 +558,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
     backend: "preview",
     currentDate,
     planMeta: {
+      id: null,
       title: previewPlan.meta.plan_name,
       createdFor: previewPlan.meta.created_for,
       createdAt: previewPlan.meta.created_at,
@@ -563,6 +566,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
       raceDate: previewPlan.meta.race_date ?? null,
       goal: previewPlan.meta.goal,
       source: "preview",
+      sourceKind: null,
       schedulePreferences: null,
     },
     profile: null,
@@ -734,21 +738,67 @@ export function formatDistanceKm(distanceKm: number | null | undefined): string 
   }).format(roundDistanceKm(distanceKm));
 }
 
+export function formatDistanceMeters(distanceMeters: number | null | undefined): string {
+  if (distanceMeters == null || !Number.isFinite(distanceMeters)) {
+    return "—";
+  }
+
+  return `${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(Math.round(distanceMeters))} m`;
+}
+
+export function formatPrescriptionDistanceKm(distanceKm: number | null | undefined): string {
+  if (distanceKm == null || !Number.isFinite(distanceKm)) {
+    return "—";
+  }
+
+  if (distanceKm > 0 && distanceKm < 2) {
+    return formatDistanceMeters(distanceKm * 1000);
+  }
+
+  return `${formatDistanceKm(distanceKm)} km`;
+}
+
 export function formatDurationMin(
   durationMin: number | null | undefined,
-  unit: "min" | "prime" = "min",
+  unit: "min" | "prime" | "segment" = "min",
 ): string {
   if (durationMin == null || !Number.isFinite(durationMin)) {
     return "—";
   }
 
-  const rounded = Math.round(durationMin * 10) / 10;
+  if (unit === "segment") {
+    return formatSegmentDurationMin(durationMin);
+  }
+
+  const rounded = Math.max(1, Math.round(durationMin));
   const value = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 0,
   }).format(rounded);
 
-  return unit === "prime" ? `${value}′` : `${value} min`;
+  return `${value} min`;
+}
+
+export function formatSegmentDurationMin(durationMin: number | null | undefined): string {
+  if (durationMin == null || !Number.isFinite(durationMin)) {
+    return "—";
+  }
+
+  const totalSeconds = Math.max(1, Math.round(durationMin * 60));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes <= 0) {
+    return `${seconds} sec`;
+  }
+
+  if (seconds === 0) {
+    return `${minutes} min`;
+  }
+
+  return `${minutes} min ${seconds} sec`;
 }
 
 export function segmentColorMeta(kind: string, target?: StepTarget): SegmentColorMeta {
@@ -809,7 +859,6 @@ export function displayTargetEntries(target: StepTarget | undefined) {
   };
 
   pushEntry("intensity", target.intensity);
-  pushEntry("label", target.label);
   pushEntry("hr_bpm_range", target.hr_bpm_range ?? target.hr_bpm);
   pushEntry("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
   pushEntry("pace", target.pace);
@@ -835,7 +884,6 @@ const EXECUTABLE_TARGET_ENTRY_KEYS = new Set([
   "cadence_spm_range",
   "rpe",
   "intensity",
-  "label",
 ]);
 
 const SUPPORT_TARGET_ENTRY_KEYS = new Set(["cue", "hint", "source_note", "coaching_hint"]);
@@ -844,17 +892,8 @@ export function displayExecutableTargetEntries(
   target: StepTarget | undefined,
   metricMode?: Pick<CanonicalMetricMode, "paceTargetsAllowed" | "hrTargetsAllowed"> | null,
 ) {
-  const hasBlockedHrTarget =
-    Boolean(target?.hr_bpm_range ?? target?.hr_bpm) &&
-    metricMode != null &&
-    !metricMode.hrTargetsAllowed;
-
   return displayTargetEntries(target).filter((entry) => {
     if (!EXECUTABLE_TARGET_ENTRY_KEYS.has(entry.key)) {
-      return false;
-    }
-
-    if (entry.key === "label" && hasBlockedHrTarget) {
       return false;
     }
 
@@ -872,6 +911,117 @@ export function displayExecutableTargetEntries(
 
 export function displayTargetSupportEntries(target: StepTarget | undefined) {
   return displayTargetEntries(target).filter((entry) => SUPPORT_TARGET_ENTRY_KEYS.has(entry.key));
+}
+
+export function displayStepStructureEntries(
+  step: Step,
+): Array<{ key: string; label: string; value: string }> {
+  const entries: Array<{ key: string; label: string; value: string }> = [];
+  const prescription = step.prescription;
+  const push = (key: string, label: string, value: string | null | undefined) => {
+    const trimmed = value?.trim();
+    if (!trimmed || trimmed === "—" || entries.some((entry) => entry.label === label)) {
+      return;
+    }
+
+    entries.push({ key, label, value: trimmed });
+  };
+
+  if (prescription?.mode === "time") {
+    push("duration", "Duration", formatDurationMin(prescription.duration_min, "segment"));
+  }
+
+  if (prescription?.mode === "distance") {
+    push("distance", "Distance", formatPrescriptionDistanceKm(prescription.distance_km));
+  }
+
+  if (prescription?.mode === "repeats") {
+    const repeatCount = prescription.repeat_count ?? step.repeats;
+    if (isPositiveNumber(repeatCount)) {
+      push("repeats", "Repeats", `${repeatCount} x`);
+    }
+
+    push("work", "Work", describeStepUnitPrescription(prescription.repeat_unit));
+    push("recovery", "Recovery", describeStepUnitPrescription(prescription.recovery_unit));
+  }
+
+  if (step.repeats && step.work) {
+    push("repeats", "Repeats", `${step.repeats} x`);
+    push("work", "Work", describeStepStructureUnit(step.work));
+    push("recovery", "Recovery", step.recovery ? describeStepStructureUnit(step.recovery) : null);
+  }
+
+  push("duration", "Duration", describeDurationStructure(step.duration_min));
+  push("distance", "Distance", describeDistanceStructure(step.distance_km));
+
+  if (!entries.some((entry) => entry.label === "Repeats") && isPositiveNumber(step.repeats)) {
+    push("repeats", "Repeats", `${step.repeats} x`);
+  }
+
+  return entries;
+}
+
+export function displayWorkoutStructureEntries(
+  workout: Pick<Workout, "steps" | "type">,
+): Array<{ key: string; label: string; value: string }> {
+  for (const step of workout.steps) {
+    const entries = displayStepStructureEntries(step);
+
+    if (entries.some((entry) => entry.label === "Repeats")) {
+      return entries;
+    }
+  }
+
+  const firstStructuredStep = workout.steps
+    .map((step) => displayStepStructureEntries(step))
+    .find((entries) => entries.length > 0);
+
+  if (firstStructuredStep?.length) {
+    return firstStructuredStep;
+  }
+
+  const duration = workoutDuration(workout);
+  return duration > 0
+    ? [{ key: "duration", label: "Duration", value: formatDurationMin(duration) }]
+    : [];
+}
+
+function describeStepUnitPrescription(
+  unit:
+    | { mode: "time" | "distance" | "none"; duration_min?: number; distance_km?: number }
+    | undefined,
+) {
+  if (!unit || typeof unit !== "object") {
+    return null;
+  }
+
+  if (unit.mode === "time") {
+    return describeDurationStructure(unit.duration_min);
+  }
+
+  if (unit.mode === "distance") {
+    return describeDistanceStructure(unit.distance_km);
+  }
+
+  return null;
+}
+
+function describeStepStructureUnit(step: Step) {
+  return (
+    describeDistanceStructure(step.distance_km) ?? describeDurationStructure(step.duration_min)
+  );
+}
+
+function describeDurationStructure(durationMin: number | null | undefined) {
+  return isPositiveNumber(durationMin) ? formatDurationMin(durationMin, "segment") : null;
+}
+
+function describeDistanceStructure(distanceKm: number | null | undefined) {
+  return isPositiveNumber(distanceKm) ? formatPrescriptionDistanceKm(distanceKm) : null;
+}
+
+function isPositiveNumber(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function isPaceTargetEntry(key: string) {

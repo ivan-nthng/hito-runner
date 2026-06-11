@@ -10,6 +10,12 @@ RUNNING COACH quality acceptance / rich composition matrix before create-path pl
 
 The rebuilt dynamic matrix is now coach-credible enough for create-path architecture planning.
 
+Historical scope note:
+
+- the unavailable counts in this 2026-06-09 acceptance pass reflect the state before the universal no-dead-end doctrine
+- runner-level `unsupported_runner_level_for_family` outcomes for coach-plausible beginner Half or Marathon-Base cases are no longer canonical after:
+  - `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md`
+
 This is a meaningful improvement over the earlier matrix audit:
 
 - 10K remains clearly differentiated by runner level and load context.

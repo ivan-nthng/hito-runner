@@ -223,6 +223,66 @@ export type Database = {
           },
         ];
       };
+      runner_manual_workout_templates: {
+        Row: {
+          created_at: string;
+          display_name: string;
+          draft_payload: Json;
+          icon_key: string;
+          id: string;
+          review_payload_version: string;
+          source_kind: string;
+          source_review_checksum: string;
+          source_status: string;
+          source_workout_family: string;
+          source_workout_identity: string;
+          target_truth_mode: string;
+          template_key: string;
+          template_version: string;
+          updated_at: string;
+          user_id: string;
+          workout_source_kind: string;
+        };
+        Insert: {
+          created_at?: string;
+          display_name: string;
+          draft_payload: Json;
+          icon_key: string;
+          id?: string;
+          review_payload_version?: string;
+          source_kind?: string;
+          source_review_checksum: string;
+          source_status?: string;
+          source_workout_family: string;
+          source_workout_identity: string;
+          target_truth_mode: string;
+          template_key: string;
+          template_version?: string;
+          updated_at?: string;
+          user_id: string;
+          workout_source_kind?: string;
+        };
+        Update: {
+          created_at?: string;
+          display_name?: string;
+          draft_payload?: Json;
+          icon_key?: string;
+          id?: string;
+          review_payload_version?: string;
+          source_kind?: string;
+          source_review_checksum?: string;
+          source_status?: string;
+          source_workout_family?: string;
+          source_workout_identity?: string;
+          target_truth_mode?: string;
+          template_key?: string;
+          template_version?: string;
+          updated_at?: string;
+          user_id?: string;
+          workout_source_kind?: string;
+        };
+        Relationships: [];
+      };
       runner_capability_usage: {
         Row: {
           capability_key: string;

@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -12,8 +12,10 @@ import {
 import { workoutGlyphKind } from "@/lib/workout-glyph";
 import {
   displayExecutableTargetEntries,
+  displayWorkoutStructureEntries,
   feedbackMarkerMeta,
   formatDistanceKm,
+  formatDurationMin,
   workoutDuration,
   workoutDistanceKm,
   workoutTypeMeta,
@@ -25,6 +27,8 @@ import {
   type TrainingSnapshot,
   type Workout,
 } from "@/lib/training";
+import { ManualWorkoutAddMenu } from "@/components/manual-workout/ManualWorkoutAuthoringControls";
+import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 
 type View = "month" | "week";
 type TooltipAnchor = {
@@ -40,6 +44,7 @@ const TOOLTIP_VIEWPORT_MARGIN = 12;
 const TOOLTIP_ANCHOR_GAP = 10;
 
 export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
+  const router = useRouter();
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(() => new Date(`${snapshot.currentDate}T00:00:00`));
   const [tooltipAnchor, setTooltipAnchor] = useState<TooltipAnchor | null>(null);
@@ -69,6 +74,11 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
     else date.setDate(date.getDate() + amount * 7);
     setCursor(date);
     setTooltipAnchor(null);
+  }
+
+  async function refreshAfterManualAdd() {
+    setTooltipAnchor(null);
+    await router.invalidate();
   }
 
   return (
@@ -139,16 +149,25 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
                   inMonth={
                     iso ? new Date(`${iso}T00:00:00`).getMonth() === cursor.getMonth() : false
                   }
+                  onManualWorkoutAdded={refreshAfterManualAdd}
                   onTooltipChange={setTooltipAnchor}
                   snapshot={snapshot}
                 />
               ))}
             </div>
           </div>
-          <MobileMonthList dates={mobileMonthDates} snapshot={snapshot} />
+          <MobileMonthList
+            dates={mobileMonthDates}
+            onManualWorkoutAdded={refreshAfterManualAdd}
+            snapshot={snapshot}
+          />
         </>
       ) : (
-        <WeekStrip dates={weekCells} snapshot={snapshot} />
+        <WeekStrip
+          dates={weekCells}
+          onManualWorkoutAdded={refreshAfterManualAdd}
+          snapshot={snapshot}
+        />
       )}
 
       {tooltipAnchor && tooltipWorkout ? (
@@ -226,7 +245,15 @@ function CalendarTooltipLayer({
   );
 }
 
-function MobileMonthList({ dates, snapshot }: { dates: string[]; snapshot: TrainingSnapshot }) {
+function MobileMonthList({
+  dates,
+  onManualWorkoutAdded,
+  snapshot,
+}: {
+  dates: string[];
+  onManualWorkoutAdded: () => Promise<void>;
+  snapshot: TrainingSnapshot;
+}) {
   const visibleDates = dates.filter((iso) => !isBeforePlanStart(iso, snapshot));
 
   return (
@@ -239,6 +266,35 @@ function MobileMonthList({ dates, snapshot }: { dates: string[]; snapshot: Train
         const hasWorkout = workout && workout.type !== "rest";
         const identity = workout ? calendarWorkoutIdentity(workout) : null;
         const baseState = calendarBaseState(workout);
+        const manualAddContext = getManualAddContext(snapshot, iso, workout);
+
+        if (manualAddContext) {
+          return (
+            <ManualWorkoutAddMenu
+              key={iso}
+              activePlanId={manualAddContext.activePlanId}
+              activePlanSourceKind={manualAddContext.activePlanSourceKind}
+              date={iso}
+              onAdded={onManualWorkoutAdded}
+            >
+              <button
+                type="button"
+                className="block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/25"
+                aria-label={`${weekdayShort(iso)} ${iso.slice(8)}. Add activity.`}
+              >
+                <HitoWorkoutDayRow
+                  action={calendarAddAction()}
+                  date={{ eyebrow: weekdayShort(iso), day: iso.slice(8) }}
+                  interactive
+                  state="empty"
+                  supportingText="Manual user-built plan"
+                  title="No workout planned"
+                  today={isToday}
+                />
+              </button>
+            </ManualWorkoutAddMenu>
+          );
+        }
 
         return (
           <div key={iso} className="relative">
@@ -335,10 +391,12 @@ function DayCell({
   iso,
   inMonth,
   onTooltipChange,
+  onManualWorkoutAdded,
   snapshot,
 }: {
   iso: string | null;
   inMonth: boolean;
+  onManualWorkoutAdded: () => Promise<void>;
   onTooltipChange: (value: TooltipAnchor | null) => void;
   snapshot: TrainingSnapshot;
 }) {
@@ -357,6 +415,40 @@ function DayCell({
   const hasWorkout = workout && workout.type !== "rest";
   const identity = workout ? calendarWorkoutIdentity(workout) : null;
   const baseState = calendarBaseState(workout);
+  const manualAddContext = inMonth ? getManualAddContext(snapshot, iso, workout) : null;
+
+  if (manualAddContext) {
+    return (
+      <div className="relative h-full min-w-0">
+        <ManualWorkoutAddMenu
+          activePlanId={manualAddContext.activePlanId}
+          activePlanSourceKind={manualAddContext.activePlanSourceKind}
+          date={iso}
+          onAdded={onManualWorkoutAdded}
+        >
+          <button
+            type="button"
+            className="group block h-full w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/25"
+            aria-label={`${formatDate(iso, {
+              month: "short",
+              day: "numeric",
+              weekday: "short",
+            })}. Add activity.`}
+          >
+            <HitoCalendarDayCell
+              action={calendarAddAction()}
+              day={String(day).padStart(2, "0")}
+              className="h-full"
+              interactive
+              state="empty"
+              supportingText="Manual plan"
+              today={isToday}
+            />
+          </button>
+        </ManualWorkoutAddMenu>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full min-w-0">
@@ -472,6 +564,10 @@ function Tooltip({ workout }: { workout: Workout }) {
   const targetEntries = displayExecutableTargetEntries(target, workout.metricMode).slice(0, 2);
   const showStructureOnly =
     targetEntries.length === 0 && workout.metricMode.executableMode === "structure_only_executable";
+  const structureEntries = showStructureOnly
+    ? displayWorkoutStructureEntries(workout).slice(0, 2)
+    : [];
+  const readbackEntries = targetEntries.length > 0 ? targetEntries : structureEntries;
 
   return (
     <div className="hito-tooltip w-72 max-w-72">
@@ -485,24 +581,18 @@ function Tooltip({ workout }: { workout: Workout }) {
       </div>
       <div className="hito-tooltip-title mt-2 font-display text-lg">{workout.title}</div>
       <div className="hito-metric-row mt-3 grid-cols-3">
-        <Stat label="Distance" value={km != null ? `${formatDistanceKm(km)}km` : "—"} />
-        <Stat label="Duration" value={duration ? `${duration}′` : "—"} />
+        <Stat label="Distance" value={km != null ? `${formatDistanceKm(km)} km` : "—"} />
+        <Stat label="Duration" value={duration ? formatDurationMin(duration) : "—"} />
         <Stat label="Status" value={status} />
       </div>
-      {(targetEntries.length > 0 || showStructureOnly) && (
+      {readbackEntries.length > 0 && (
         <div className="hito-caption mt-3 space-y-0.5 border-t border-hairline pt-3">
-          {targetEntries.map((entry) => (
+          {readbackEntries.map((entry) => (
             <div key={entry.key} className="flex justify-between gap-3">
               <span className="hito-metric-label">{entry.label}</span>
               <span className="text-foreground/80 truncate">{entry.value}</span>
             </div>
           ))}
-          {showStructureOnly && (
-            <div className="flex justify-between gap-3">
-              <span className="hito-metric-label">Structure</span>
-              <span className="text-foreground/80 truncate">Segment plan</span>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -518,7 +608,15 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSnapshot }) {
+function WeekStrip({
+  dates,
+  onManualWorkoutAdded,
+  snapshot,
+}: {
+  dates: string[];
+  onManualWorkoutAdded: () => Promise<void>;
+  snapshot: TrainingSnapshot;
+}) {
   return (
     <div className="hito-calendar-grid-month grid grid-cols-1 border-b border-hairline lg:grid-cols-7">
       {dates.map((iso) => {
@@ -533,6 +631,41 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
         const hasWorkout = workout && workout.type !== "rest";
         const identity = workout ? calendarWorkoutIdentity(workout) : null;
         const baseState = calendarBaseState(workout);
+        const manualAddContext = getManualAddContext(snapshot, iso, workout);
+
+        if (manualAddContext) {
+          return (
+            <ManualWorkoutAddMenu
+              key={iso}
+              activePlanId={manualAddContext.activePlanId}
+              activePlanSourceKind={manualAddContext.activePlanSourceKind}
+              date={iso}
+              onAdded={onManualWorkoutAdded}
+            >
+              <button
+                type="button"
+                className="group block h-full w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/25"
+                aria-label={`${formatDate(iso, {
+                  month: "short",
+                  day: "numeric",
+                  weekday: "short",
+                })}. Add activity.`}
+              >
+                <HitoCalendarDayCell
+                  action={calendarAddAction()}
+                  day={iso.slice(8)}
+                  className="h-full"
+                  interactive
+                  layout="week"
+                  state="empty"
+                  supportingText="Manual user-built plan"
+                  today={isToday}
+                  weekday={weekdayShort(iso)}
+                />
+              </button>
+            </ManualWorkoutAddMenu>
+          );
+        }
 
         return (
           <div key={iso} className="relative">
@@ -575,6 +708,38 @@ function WeekStrip({ dates, snapshot }: { dates: string[]; snapshot: TrainingSna
   );
 }
 
+function getManualAddContext(
+  snapshot: TrainingSnapshot,
+  iso: string,
+  workout: Workout | undefined,
+): { activePlanId: string; activePlanSourceKind: string } | null {
+  const planMeta = snapshot.planMeta;
+
+  if (
+    !planMeta?.id ||
+    planMeta.sourceKind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND ||
+    workout ||
+    iso <= snapshot.currentDate ||
+    isBeforePlanStart(iso, snapshot)
+  ) {
+    return null;
+  }
+
+  return {
+    activePlanId: planMeta.id,
+    activePlanSourceKind: planMeta.sourceKind,
+  };
+}
+
+function calendarAddAction() {
+  return {
+    label: "Add",
+    icon: "plus" as const,
+    tone: "muted" as const,
+    ariaLabel: "Add activity",
+  };
+}
+
 function CalendarFeedbackMarker({
   calendar = false,
   state,
@@ -605,15 +770,15 @@ function compactWorkoutSummary(workout: Workout) {
   const duration = workoutDuration(workout);
 
   if (km != null && duration > 0) {
-    return `${formatDistanceKm(km)}km · ${duration}′`;
+    return `${formatDistanceKm(km)} km · ${formatDurationMin(duration)}`;
   }
 
   if (km != null) {
-    return `${formatDistanceKm(km)}km`;
+    return `${formatDistanceKm(km)} km`;
   }
 
   if (duration > 0) {
-    return `${duration}′`;
+    return formatDurationMin(duration);
   }
 
   return workoutTypeMeta(workout).label;

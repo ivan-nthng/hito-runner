@@ -4,9 +4,8 @@
 
 in_progress — manual Add, Backend Slice 4 personal saved-template persistence, shared workout
 target display grammar cleanup, FRONTEND Slice 3 saved-template UI wiring, QA Slice 3B existing
-manual active-plan Add reuse, and Backend Slice 5 copy/paste review-confirm source validation are
-passed in the proved scope. Backend fixed the Slice 5 live canonical persisted-strides
-copy-review blocker; next gate is QA rerun for Backend Slice 5.
+manual active-plan Add reuse, and Backend Slice 5 copy/paste review-confirm are QA-passed in the
+proved scope. Next gate is FRONTEND Slice 4 copy/paste UI wiring over the accepted backend seam.
 
 ## Type
 
@@ -18,23 +17,99 @@ high
 
 ## Next Recommended Role
 
-QA
+FRONTEND
 
 ## Task
 
-Validate Backend Slice 5 copy/paste draft reconstruction and reviewed paste confirm for existing
-manual active plans.
+Implement Frontend Slice 4 copy/paste UI wiring for existing manual active plans.
 
 ## Stage
 
-QA validation / manual copy-paste review-confirm boundary.
+FRONTEND implementation / manual copy-paste interaction over backend review-confirm.
 
 ## Suggested Next Step
 
-QA should validate the new backend copy/paste primitive: copy one existing manual workout day into
-a new eligible future empty day by rebuilding a backend-reviewed draft and confirming the paste
-through the existing active-plan add seam. This must remain backend-owned and must not copy raw
-planned-workout rows or move schedule truth into the browser.
+Frontend should expose copy/paste interaction for existing manual active-plan days by calling the
+accepted backend copy review and confirm/paste seam. The UI must not copy raw calendar rows, derive
+schedule truth locally, or claim recurrence/export/move behavior.
+
+## Current Frontend Slice 4 Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+Task:
+Implement Frontend Slice 4 for manual user-built plans: copy/paste UI wiring over the accepted
+backend review-confirm seam.
+
+Stage:
+FRONTEND implementation / manual copy-paste interaction over backend truth.
+
+Context:
+Backend Slice 5 is QA-passed. It provides the accepted copy/paste primitive for existing
+`manual_user_built_plan_v1` active plans:
+- copy review reconstructs a backend-reviewed draft from a persisted source workout
+- confirm paste rebuilds server-side, validates review token/checksum exactness, verifies source
+  workout and target date, and persists through the existing manual active-plan add seam
+- client-sent rows, segments, source metadata, metric truth, and raw copied payloads are rejected
+- live disposable proof passed for canonical persisted `easy_run_with_strides`
+
+Root cause and architecture fit:
+The visible missing behavior is that runners still cannot use Copy/Paste from the calendar UI. The
+underlying cause is not a missing local row duplication helper; it was the need for a backend-owned
+review-confirm copy boundary, which is now accepted. Frontend must render interaction and call the
+backend seam only. Do not create frontend-owned copy state, schedule truth, metric truth, or
+persistence truth.
+
+Required preflight:
+- Read `AGENTS.md`.
+- Read `agents/frontend.agent.md`.
+- Load `skills/hito-frontend-design-system/SKILL.md`.
+- Read the active manual plan and manual flow spec.
+- Inspect existing calendar/manual authoring UI before editing:
+  - `src/components/Calendar.tsx`
+  - `src/components/ui/hito-calendar-day.tsx`
+  - `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`
+  - `src/components/manual-workout/manual-workout-authoring-utils.ts`
+  - `src/components/onboarding/ManualUserBuiltPlanPanel.tsx`
+  - `src/lib/manual-workout-authoring/actions.ts`
+  - `src/lib/training-api.ts`
+
+Implementation scope:
+- Add a Copy action only for eligible existing manual active-plan workout days.
+- Add a Paste flow only for eligible future empty manual active-plan days.
+- Use existing Hito calendar/menu/dialog/sheet/button/status patterns; do not introduce a new
+  calendar UI system.
+- Call the backend copy review action for selected source workout and target `YYYY-MM-DD`.
+- Render backend-shaped review state, including source date, target date, workout identity,
+  structure, metric policy, and bounded errors.
+- Confirm paste only by calling the accepted backend confirm/paste action with review token/checksum
+  and minimal identifiers.
+- Prevent duplicate clicks/loading races.
+- After success, invalidate/reload canonical plan data so the calendar reflects persisted truth.
+- Preserve date-only display correctness: use shared date helpers and never derive mutation targets
+  from localized labels.
+
+What not to do:
+- Do not copy planned workout rows in the browser.
+- Do not send client-side rows, segments, duration totals, source metadata, or metric truth.
+- Do not add recurrence.
+- Do not add move workout behavior.
+- Do not add JSON export.
+- Do not add edit/delete/clear behavior.
+- Do not mutate generated, preset, imported, or running-engine plans.
+- Do not add frontend-owned templates or copy buffers beyond minimal UI selection state.
+- Do not weaken no fake pace / no fake personal HR boundaries.
+
+Validation:
+- Targeted ESLint for changed frontend/manual authoring files.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`.
+- `npm run build`.
+- Scoped `git diff --check`.
+- Browser QA readiness: the UI should support manual active plan -> existing workout Copy -> future
+  empty day Paste -> backend review -> confirm paste -> persisted calendar update, with mobile
+  `375px` no-overflow.
+```
 
 ## Backend Slice 5 Implementation Notes
 
@@ -72,7 +147,64 @@ planned-workout rows or move schedule truth into the browser.
   - Blocker-fix validation also ran:
     `npm exec eslint -- src/lib/manual-workout-authoring/copy-paste-reconstruction.ts scripts/validate-manual-workout-authoring.ts`
 
-## Current Backend Slice 5 Handoff Prompt
+## Backend Slice 5 Copy/Paste Acceptance — 2026-06-11
+
+Status:
+
+QA-passed / accepted.
+
+Context:
+
+Backend Slice 5 implemented the manual copy/paste primitive behind a backend-owned review-confirm
+boundary. QA rerun passed after the canonical persisted `easy_run_with_strides` reconstruction fix.
+This accepts the backend primitive only; runner-facing calendar Copy/Paste UI is not shipped until
+FRONTEND Slice 4 passes browser QA.
+
+QA evidence:
+
+- Browser was not used because this was backend/source/CLI/Supabase disposable persistence
+  validation.
+- Targeted ESLint passed.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed.
+- `--require-persistence` without override blocked before remote mutation.
+- Guarded remote-disposable persistence harness passed and cleaned up.
+- QA-only live `easy_run_with_strides` copy/paste proof passed.
+- `npm run build` passed.
+- Scoped `git diff --check` passed.
+
+Live proof:
+
+- One disposable `manual_user_built_plan_v1` active plan was created through canonical
+  `confirmManualWorkoutDraftForUser`.
+- Source workout was canonical persisted `easy_run_with_strides` on `2026-06-18`.
+- Copy review to `2026-06-19` returned `draft_ready`, `persisted: false`,
+  `reconstructedFromPersistedWorkout: true`, and `trustedClientRows: false`.
+- Reconstruction mapped nested repeat work as `strides_block`.
+- Confirm paste succeeded with `serverRebuiltReview: true`, `sourceWorkoutVerified: true`, and
+  `reconstructedFromPersistedWorkout: true`.
+- DB readback showed exactly one active manual plan and exactly two planned workouts:
+  source `2026-06-18`, Thursday, `easy_run_with_strides`; pasted `2026-06-19`, Friday,
+  `easy_run_with_strides`.
+- Both rows preserved canonical persisted strides repeat anatomy.
+- Both rows remained `structure_only_executable`, with no pace targets and no HR targets.
+- No fake pace or fake personal HR appeared.
+- Negative live checks passed for changed target, invalid token, stale checksum, client row payload,
+  and occupied target.
+- Deterministic harness covers changed source, non-manual active plan, foreign source workout, and
+  unsupported source payload.
+- Cleanup returned scoped rows and auth user to zero/absent.
+- Artifact:
+  [copy-paste-strides-live-proof.json](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/manual-workout-copy-paste-slice5-rerun-qa/copy-paste-strides-live-proof.json).
+
+Acceptance decision:
+
+- Accept Backend Slice 5 as QA-passed.
+- Do not update [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md)
+  yet because this is backend-only acceptance; runner-facing Copy/Paste UI is not shipped.
+- Select FRONTEND Slice 4 as the next manual-builder gate: calendar Copy/Paste UI wiring over the
+  accepted backend seam.
+
+## Previous Backend Slice 5 Handoff Prompt
 
 ```text
 ROLE: BACKEND

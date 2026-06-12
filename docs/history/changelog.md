@@ -13,6 +13,30 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-12
+
+- Added manual Delete/Clear for existing manual active-plan calendars: runners can clear an eligible
+  planned workout through backend-shaped review and confirmation, the saved calendar refreshes from
+  persisted truth, the cleared day returns to `Add activity` instead of fake Rest, the active plan
+  remains active, and row/non-rest counts update. Browser and DB QA proved desktop pointer behavior,
+  workout-card navigation preservation, mobile `375px` no-overflow, cleanup, and no fake pace or
+  personal HR without shipping Restore/Put back/Redo undo UI, export, move, edit, recurrence, or
+  modal polish.
+- Added JSON/Markdown export for persisted manual active plans through the existing Open plan export
+  menu: exported `training-plan-v2` JSON preserves manual source metadata, safe export ids,
+  canonical workout rows, structure-only metric truth, and omits deleted rows, internal DB/auth ids,
+  provider tokens, fake pace, and fake personal HR. Browser/download/DB QA proved real JSON and
+  Markdown downloads, mobile `375px` no-overflow, source-boundary readback from persisted
+  active-plan truth, and cleanup without shipping QR codes, public share links, import from export,
+  PDF, watch export, or mobile deep-link behavior.
+- Added manual Move Workout for existing manual active-plan calendars: runners can move an eligible
+  planned workout to another empty day through backend-reviewed confirmation, the same persisted
+  `planned_workouts` row is moved, the source day returns to `Add activity`, and the target day
+  keeps the workout title, identity, structure, and metric truth. Browser and DB QA proved menu and
+  drag/drop-to-review paths, mobile `375px` no-overflow, cleanup, and no fake pace or personal HR
+  without shipping recurrence, edit workout, Restore UI, QR/share/import, or active-plan
+  replacement.
+
 ## 2026-06-11
 
 - Extended manual user-built plans beyond the first workout: saved `manual_user_built_plan_v1`
@@ -33,6 +57,12 @@ The public `/changelog` Highlights view is generated from the dated entries belo
   metadata, existing-plan Add reuse, two-workout readback after Add, strict `structure_only` target
   truth, mobile no-overflow, and disposable cleanup without adding copy/paste, recurrence, JSON
   export, move-workout behavior, or frontend-owned template rows.
+- Added manual Copy/Paste for existing manual active-plan calendars: runners can copy a manual
+  workout day, paste it onto an eligible future empty day, review backend-shaped source/target
+  dates, structure, and metric policy, then persist through the accepted backend copy/paste seam.
+  Browser and DB QA proved desktop hover/click, mobile `375px` no-overflow, two-workout readback,
+  cleanup, and no raw row duplication without adding export, move, recurrence, delete/clear, or
+  final modal design polish.
 
 ## 2026-06-10
 

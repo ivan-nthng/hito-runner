@@ -40,6 +40,8 @@ export const V2_IMPORT_ROOT_KEYS = [
   "plan_id",
   "plan_name",
   "source_kind",
+  "source_status",
+  "export_metadata",
   "_ml_agent_template",
   "created_at",
   "generated_for",
@@ -151,6 +153,31 @@ const v2GoalSchema = z
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
           .optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+const v2ExportMetadataSchema = z
+  .object({
+    export_format_version: z.string().trim().min(1).optional(),
+    exported_at: z.string().datetime().optional(),
+    source_kind: z.string().trim().min(1).optional(),
+    source_status: z.string().trim().min(1).optional(),
+    row_counts: z
+      .object({
+        day_count: z.number().int().nonnegative(),
+        workout_count: z.number().int().nonnegative(),
+        weeks_count: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
+    privacy: z
+      .object({
+        internal_database_ids_omitted: z.boolean().optional(),
+        auth_ids_omitted: z.boolean().optional(),
+        provider_tokens_omitted: z.boolean().optional(),
       })
       .strict()
       .optional(),
@@ -465,6 +492,8 @@ export const trainingPlanV2Schema = z
     schema_version: z.literal(FUTURE_TEMPLATE_VERSION),
     plan_name: z.string().trim().min(1),
     source_kind: z.string().trim().min(1).optional(),
+    source_status: z.string().trim().min(1).optional(),
+    export_metadata: v2ExportMetadataSchema.optional(),
     [ML_AGENT_TEMPLATE_META_KEY]: z.unknown().optional(),
     created_at: z.string().datetime().optional(),
     generated_for: z.string().trim().min(1),

@@ -30,23 +30,34 @@ import { CALENDAR_ICON_KEY_VALUES, type CalendarIconKey } from "@/lib/rich-worko
 import { formatDurationMin, formatDistanceMeters } from "@/lib/training";
 import {
   addManualWorkoutToActivePlan,
+  confirmManualWorkoutCopyPasteDraft,
+  confirmManualWorkoutDeleteClear,
   listManualWorkoutSavedTemplates,
+  reviewManualWorkoutCopyPasteDraft,
+  reviewManualWorkoutDeleteClear,
   reviewManualWorkoutDraftAction,
   reviewManualWorkoutSavedTemplate,
   saveManualWorkoutSavedTemplate,
   type ManualWorkoutBlockInput,
+  type ManualWorkoutCopyPasteReviewResult,
   type ManualWorkoutConstructorEntryInput,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
+  type ManualWorkoutDeleteClearReviewResult,
   type ManualWorkoutSavedTemplateReviewResult,
   type ManualWorkoutSavedTemplateSaveResult,
   type ManualWorkoutSavedTemplateView,
   type ManualWorkoutTargetTruthMode,
 } from "@/lib/training-api";
 import { type ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
+import {
+  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+  MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+} from "@/lib/manual-workout-authoring/schema";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import {
   buildManualDraftInput,
+  formatManualDraftStructure,
   formatReadableDate,
   getDefaultManualWorkoutTemplate,
   groupManualTemplates,
@@ -88,7 +99,16 @@ export type ManualSavedTemplatesState = {
   message: string | null;
 };
 
+export type ManualCopiedWorkoutSource = {
+  activePlanId: string;
+  sourceWorkoutId: string;
+  sourceWorkoutDate: string;
+  title: string;
+};
+
 const MANUAL_ADD_TOAST_ID = "manual-active-plan-add";
+const MANUAL_COPY_PASTE_TOAST_ID = "manual-workout-copy-paste";
+const MANUAL_DELETE_CLEAR_TOAST_ID = "manual-workout-delete-clear";
 const EMPTY_SAVED_TEMPLATES_STATE: ManualSavedTemplatesState = {
   status: "idle",
   templates: [],
@@ -99,18 +119,28 @@ export function ManualWorkoutAddMenu({
   activePlanId,
   activePlanSourceKind,
   children,
+  copiedWorkoutSource = null,
   date,
   disabled = false,
   onAdded,
+  onMoveCanceled,
+  onMoveTargetSelected,
+  moveWorkoutSource = null,
 }: {
   activePlanId: string;
   activePlanSourceKind: string;
   children: ReactNode;
+  copiedWorkoutSource?: ManualCopiedWorkoutSource | null;
   date: string;
   disabled?: boolean;
   onAdded: () => void | Promise<void>;
+  onMoveCanceled?: () => void;
+  onMoveTargetSelected?: (targetDate: string) => void;
+  moveWorkoutSource?: ManualCopiedWorkoutSource | null;
 }) {
   const reviewManualWorkoutDraftFn = useServerFn(reviewManualWorkoutDraftAction);
+  const reviewManualWorkoutCopyPasteDraftFn = useServerFn(reviewManualWorkoutCopyPasteDraft);
+  const confirmManualWorkoutCopyPasteDraftFn = useServerFn(confirmManualWorkoutCopyPasteDraft);
   const listManualWorkoutSavedTemplatesFn = useServerFn(listManualWorkoutSavedTemplates);
   const reviewManualWorkoutSavedTemplateFn = useServerFn(reviewManualWorkoutSavedTemplate);
   const saveManualWorkoutSavedTemplateFn = useServerFn(saveManualWorkoutSavedTemplate);
@@ -126,11 +156,19 @@ export function ManualWorkoutAddMenu({
   const [status, setStatus] = useState<ManualDraftStatus>("idle");
   const [reviewResult, setReviewResult] = useState<ManualWorkoutDraftReviewResult | null>(null);
   const [reviewedDraft, setReviewedDraft] = useState<ReviewedManualDraft | null>(null);
+  const [pasteReview, setPasteReview] = useState<ManualWorkoutCopyPasteReady | null>(null);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const [savedTemplatesState, setSavedTemplatesState] = useState<ManualSavedTemplatesState>(
     EMPTY_SAVED_TEMPLATES_STATE,
   );
   const isBusy = status !== "idle";
+  const canPasteCopiedWorkout = Boolean(
+    copiedWorkoutSource && copiedWorkoutSource.activePlanId === activePlanId,
+  );
+  const canMoveSelectedWorkout = Boolean(
+    moveWorkoutSource?.activePlanId === activePlanId &&
+    moveWorkoutSource.sourceWorkoutDate !== date,
+  );
 
   const openConstructor = (template: ManualWorkoutTemplate) => {
     setSelection({ kind: "registry", date, template });
@@ -139,6 +177,7 @@ export function ManualWorkoutAddMenu({
     setTargetTruthMode(template.defaultTargetTruthMode);
     setReviewResult(null);
     setReviewedDraft(null);
+    setPasteReview(null);
     setConfirmMessage(null);
     setConstructorOpen(true);
   };
@@ -227,6 +266,7 @@ export function ManualWorkoutAddMenu({
     setStatus("reviewing");
     setReviewResult(null);
     setReviewedDraft(null);
+    setPasteReview(null);
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_ADD_TOAST_ID,
@@ -283,6 +323,7 @@ export function ManualWorkoutAddMenu({
     setStatus("reviewing");
     setReviewResult(null);
     setReviewedDraft(null);
+    setPasteReview(null);
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_ADD_TOAST_ID,
@@ -351,6 +392,7 @@ export function ManualWorkoutAddMenu({
     setTargetTruthMode(template.targetTruthMode);
     setReviewResult(null);
     setReviewedDraft(null);
+    setPasteReview(null);
     setConfirmMessage(null);
     setConstructorOpen(true);
     void submitSavedTemplateReview(nextSelection, nextTitle, nextNotes);
@@ -460,6 +502,122 @@ export function ManualWorkoutAddMenu({
     }
   };
 
+  const submitPasteReview = async () => {
+    if (!copiedWorkoutSource || !canPasteCopiedWorkout || status !== "idle") return;
+
+    setStatus("reviewing");
+    setReviewResult(null);
+    setReviewedDraft(null);
+    setPasteReview(null);
+    setConfirmMessage(null);
+    hitoToast.working({
+      id: MANUAL_COPY_PASTE_TOAST_ID,
+      title: "Reviewing paste",
+      description: "Hito is reconstructing the copied workout from saved plan truth.",
+    });
+
+    try {
+      const result = await reviewManualWorkoutCopyPasteDraftFn({
+        data: {
+          activePlanId,
+          sourceWorkoutId: copiedWorkoutSource.sourceWorkoutId,
+          targetDate: date,
+        },
+      });
+      setStatus("idle");
+
+      if (!result.ok) {
+        setConfirmMessage(result.message);
+        hitoToast.error({
+          id: MANUAL_COPY_PASTE_TOAST_ID,
+          title: "Paste needs review",
+          description: result.message,
+        });
+        return;
+      }
+
+      setPasteReview(result);
+      hitoToast.success({
+        id: MANUAL_COPY_PASTE_TOAST_ID,
+        title: "Paste reviewed",
+        description: "Confirm the backend-reviewed copy before it is saved.",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not review this copied workout yet.";
+      setStatus("idle");
+      setConfirmMessage(message);
+      hitoToast.error({
+        id: MANUAL_COPY_PASTE_TOAST_ID,
+        title: "Paste review failed",
+        description: message,
+      });
+    }
+  };
+
+  const confirmPasteReview = async () => {
+    if (!pasteReview || confirmInFlightRef.current) return;
+
+    confirmInFlightRef.current = true;
+    setStatus("creating");
+    setConfirmMessage(null);
+    hitoToast.working({
+      id: MANUAL_COPY_PASTE_TOAST_ID,
+      title: "Pasting workout",
+      description: "Hito is confirming the reviewed paste server-side.",
+    });
+
+    try {
+      const result = await confirmManualWorkoutCopyPasteDraftFn({
+        data: {
+          activePlanId,
+          sourceWorkoutId: pasteReview.sourceWorkoutId,
+          targetDate: pasteReview.targetDate,
+          reviewToken: pasteReview.review.reviewToken,
+          reviewChecksum: pasteReview.review.reviewChecksum,
+        },
+      });
+
+      if (!result.ok) {
+        confirmInFlightRef.current = false;
+        setStatus("idle");
+        setConfirmMessage(result.message);
+        hitoToast.error({
+          id: MANUAL_COPY_PASTE_TOAST_ID,
+          title: "Workout not pasted",
+          description: result.message,
+        });
+        return;
+      }
+
+      hitoToast.success({
+        id: MANUAL_COPY_PASTE_TOAST_ID,
+        title: "Workout pasted",
+        description: "Refreshing the calendar from saved plan truth.",
+      });
+      confirmInFlightRef.current = false;
+      setStatus("idle");
+      setConstructorOpen(false);
+      setTemplatePickerOpen(false);
+      setReviewedDraft(null);
+      setPasteReview(null);
+      setReviewResult(null);
+      setConfirmMessage(null);
+      await onAdded();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "The copied workout could not be pasted.";
+      confirmInFlightRef.current = false;
+      setStatus("idle");
+      setConfirmMessage(message);
+      hitoToast.error({
+        id: MANUAL_COPY_PASTE_TOAST_ID,
+        title: "Workout not pasted",
+        description: message,
+      });
+    }
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -469,6 +627,28 @@ export function ManualWorkoutAddMenu({
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuLabel>{formatReadableDate(date)}</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {canMoveSelectedWorkout ? (
+            <>
+              <DropdownMenuItem disabled={isBusy} onSelect={() => onMoveTargetSelected?.(date)}>
+                <Icon name="arrow-right" size="xs" />
+                Move selected workout here
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={isBusy} onSelect={onMoveCanceled}>
+                <Icon name="close" size="xs" />
+                Cancel move
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          {canPasteCopiedWorkout ? (
+            <>
+              <DropdownMenuItem disabled={isBusy} onSelect={() => void submitPasteReview()}>
+                <Icon name="copy" size="xs" />
+                Paste copied workout
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           <DropdownMenuItem
             disabled={isBusy}
             onSelect={() => openConstructor(getDefaultManualWorkoutTemplate("easy_aerobic_run"))}
@@ -542,6 +722,262 @@ export function ManualWorkoutAddMenu({
           status={status}
           supportCopy="Backend returned `draft_ready`. Add sends only active plan id, draft input, review token, and checksum."
           safetyCopy="No client rows, segments, or persistence metadata are sent to the add-workout seam."
+        />
+      ) : null}
+
+      {pasteReview ? (
+        <ManualCopyPasteReviewDialog
+          confirmMessage={confirmMessage}
+          isBusy={isBusy}
+          onConfirm={() => void confirmPasteReview()}
+          onOpenChange={(open) => {
+            if (!open && !isBusy) {
+              setPasteReview(null);
+              setConfirmMessage(null);
+            }
+          }}
+          open={Boolean(pasteReview)}
+          review={pasteReview}
+          status={status}
+        />
+      ) : null}
+    </>
+  );
+}
+
+type ManualWorkoutCopyPasteReady = Extract<ManualWorkoutCopyPasteReviewResult, { ok: true }>;
+type ManualWorkoutDeleteClearReady = Extract<ManualWorkoutDeleteClearReviewResult, { ok: true }>;
+
+export function ManualWorkoutCopyMenu({
+  activePlanId,
+  canClear = false,
+  canMove = false,
+  children,
+  disabled = false,
+  onCleared,
+  onCopy,
+  onMove,
+  sourceWorkoutDate,
+  sourceWorkoutId,
+  title,
+}: {
+  activePlanId: string;
+  canClear?: boolean;
+  canMove?: boolean;
+  children: ReactNode;
+  disabled?: boolean;
+  onCleared?: () => void | Promise<void>;
+  onCopy: (source: ManualCopiedWorkoutSource) => void;
+  onMove?: (source: ManualCopiedWorkoutSource) => void;
+  sourceWorkoutDate: string;
+  sourceWorkoutId: string;
+  title: string;
+}) {
+  const reviewManualWorkoutDeleteClearFn = useServerFn(reviewManualWorkoutDeleteClear);
+  const confirmManualWorkoutDeleteClearFn = useServerFn(confirmManualWorkoutDeleteClear);
+  const confirmInFlightRef = useRef(false);
+  const [status, setStatus] = useState<ManualDraftStatus>("idle");
+  const [deleteReviewResult, setDeleteReviewResult] =
+    useState<ManualWorkoutDeleteClearReviewResult | null>(null);
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
+  const isBusy = status !== "idle";
+
+  const copySource = () => {
+    const source = {
+      activePlanId,
+      sourceWorkoutDate,
+      sourceWorkoutId,
+      title,
+    };
+    onCopy(source);
+    hitoToast.success({
+      id: MANUAL_COPY_PASTE_TOAST_ID,
+      title: "Workout copied",
+      description: `${title} is ready to paste into an empty future day.`,
+    });
+  };
+
+  const moveSource = () => {
+    onMove?.({
+      activePlanId,
+      sourceWorkoutDate,
+      sourceWorkoutId,
+      title,
+    });
+    hitoToast.success({
+      id: MANUAL_COPY_PASTE_TOAST_ID,
+      title: "Move source selected",
+      description: "Choose an empty future day and use Add to move this workout there.",
+    });
+  };
+
+  const submitDeleteReview = async () => {
+    if (disabled || !canClear || status !== "idle") return;
+
+    setStatus("reviewing");
+    setDeleteReviewResult(null);
+    setConfirmMessage(null);
+    hitoToast.working({
+      id: MANUAL_DELETE_CLEAR_TOAST_ID,
+      title: "Reviewing clear",
+      description: "Hito is checking whether this manual workout can be cleared.",
+    });
+
+    try {
+      const result = await reviewManualWorkoutDeleteClearFn({
+        data: {
+          activePlanId,
+          plannedWorkoutId: sourceWorkoutId,
+        },
+      });
+      setStatus("idle");
+      setDeleteReviewResult(result);
+
+      if (!result.ok) {
+        hitoToast.error({
+          id: MANUAL_DELETE_CLEAR_TOAST_ID,
+          title: "Clear blocked",
+          description: result.message,
+        });
+        return;
+      }
+
+      hitoToast.success({
+        id: MANUAL_DELETE_CLEAR_TOAST_ID,
+        title: "Clear reviewed",
+        description: "Confirm before Hito removes this planned workout.",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not review this workout for clearing.";
+      setStatus("idle");
+      setDeleteReviewResult({
+        ok: false,
+        status: "blocked",
+        reason: "invalid_input",
+        message,
+        persisted: false,
+        sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+        workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+      });
+      hitoToast.error({
+        id: MANUAL_DELETE_CLEAR_TOAST_ID,
+        title: "Clear review failed",
+        description: message,
+      });
+    }
+  };
+
+  const confirmDeleteReview = async () => {
+    if (!deleteReviewResult?.ok || confirmInFlightRef.current) return;
+
+    confirmInFlightRef.current = true;
+    setStatus("creating");
+    setConfirmMessage(null);
+    hitoToast.working({
+      id: MANUAL_DELETE_CLEAR_TOAST_ID,
+      title: "Clearing workout",
+      description: "Hito is confirming the reviewed delete server-side.",
+    });
+
+    try {
+      const result = await confirmManualWorkoutDeleteClearFn({
+        data: {
+          activePlanId,
+          plannedWorkoutId: deleteReviewResult.plannedWorkoutId,
+          reviewToken: deleteReviewResult.review.reviewToken,
+          reviewChecksum: deleteReviewResult.review.reviewChecksum,
+        },
+      });
+
+      if (!result.ok) {
+        confirmInFlightRef.current = false;
+        setStatus("idle");
+        setConfirmMessage(result.message);
+        setDeleteReviewResult(result);
+        hitoToast.error({
+          id: MANUAL_DELETE_CLEAR_TOAST_ID,
+          title: "Workout not cleared",
+          description: result.message,
+        });
+        return;
+      }
+
+      hitoToast.success({
+        id: MANUAL_DELETE_CLEAR_TOAST_ID,
+        title: "Workout cleared",
+        description: "Refreshing the calendar from saved plan truth.",
+      });
+      confirmInFlightRef.current = false;
+      setStatus("idle");
+      setDeleteReviewResult(null);
+      setConfirmMessage(null);
+      await onCleared?.();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "The planned workout could not be cleared.";
+      confirmInFlightRef.current = false;
+      setStatus("idle");
+      setConfirmMessage(message);
+      hitoToast.error({
+        id: MANUAL_DELETE_CLEAR_TOAST_ID,
+        title: "Workout not cleared",
+        description: message,
+      });
+    }
+  };
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild disabled={disabled}>
+          {children}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>{formatReadableDate(sourceWorkoutDate)}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={disabled || isBusy} onSelect={copySource}>
+            <Icon name="copy" size="xs" />
+            Copy workout
+          </DropdownMenuItem>
+          {canMove ? (
+            <DropdownMenuItem disabled={disabled || isBusy} onSelect={moveSource}>
+              <Icon name="arrow-right" size="xs" />
+              Move workout
+            </DropdownMenuItem>
+          ) : null}
+          {canClear ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive"
+                disabled={disabled || isBusy}
+                onSelect={() => void submitDeleteReview()}
+              >
+                <Icon name="trash" size="xs" />
+                Clear workout
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {deleteReviewResult ? (
+        <ManualDeleteClearReviewDialog
+          confirmMessage={confirmMessage}
+          fallbackDate={sourceWorkoutDate}
+          fallbackTitle={title}
+          isBusy={isBusy}
+          onConfirm={() => void confirmDeleteReview()}
+          onOpenChange={(open) => {
+            if (!open && !isBusy) {
+              setDeleteReviewResult(null);
+              setConfirmMessage(null);
+            }
+          }}
+          open={Boolean(deleteReviewResult)}
+          result={deleteReviewResult}
+          status={status}
         />
       ) : null}
     </>
@@ -1003,6 +1439,294 @@ function ManualReviewSummaryDialog({
   );
 }
 
+function ManualCopyPasteReviewDialog({
+  confirmMessage,
+  isBusy,
+  onConfirm,
+  onOpenChange,
+  open,
+  review,
+  status,
+}: {
+  confirmMessage: string | null;
+  isBusy: boolean;
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  review: ManualWorkoutCopyPasteReady;
+  status: ManualDraftStatus;
+}) {
+  const draft = review.review.draft;
+  const sourceLabel = formatReadableDate(review.sourceWorkoutDate);
+  const targetLabel = formatReadableDate(review.targetDate);
+  const metricPolicy = targetTruthModeLabel(review.draftInput.targetTruthMode ?? "structure_only");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="hito-product-dialog max-w-2xl">
+        <DialogHeader className="hito-product-dialog-header">
+          <DialogTitle className="hito-modal-title">Review paste</DialogTitle>
+          <DialogDescription className="hito-body">
+            Confirm this backend-reviewed copy before it is saved into the active manual plan.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="hito-product-dialog-body space-y-4">
+          <div className="hito-row-group">
+            <div className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">Copy source</p>
+                <p className="hito-list-row-copy">{sourceLabel}</p>
+              </div>
+              <span className="hito-status-pill shrink-0" data-tone="muted">
+                Verified
+              </span>
+            </div>
+            <div className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">Paste target</p>
+                <p className="hito-list-row-copy">{targetLabel}</p>
+              </div>
+              <span className="hito-status-pill shrink-0" data-tone="success">
+                Empty day
+              </span>
+            </div>
+            <div className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">{draft.title}</p>
+                <p className="hito-list-row-copy">
+                  {formatManualDraftStructure(draft.totalDurationMin, draft.totalDistanceKm)} ·{" "}
+                  {metricPolicy}
+                </p>
+              </div>
+              <span className="hito-status-pill shrink-0" data-tone="muted">
+                {draft.templateKey.replaceAll("_", " ")}
+              </span>
+            </div>
+          </div>
+
+          <ManualReviewSummary
+            confirmLabel="Paste workout"
+            confirmMessage={confirmMessage}
+            isBusy={isBusy}
+            onConfirm={onConfirm}
+            pendingLabel="Pasting workout..."
+            review={review.review}
+            safetyCopy="Paste confirm sends only active plan id, source workout id, target date, review token, and checksum."
+            status={status}
+            supportCopy="Backend reconstructed this draft from the persisted source workout and reviewed it for the selected target date."
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ManualDeleteClearReviewDialog({
+  confirmMessage,
+  fallbackDate,
+  fallbackTitle,
+  isBusy,
+  onConfirm,
+  onOpenChange,
+  open,
+  result,
+  status,
+}: {
+  confirmMessage: string | null;
+  fallbackDate: string;
+  fallbackTitle: string;
+  isBusy: boolean;
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  result: ManualWorkoutDeleteClearReviewResult;
+  status: ManualDraftStatus;
+}) {
+  const dateLabel = formatReadableDate(result.ok ? result.workoutDate : fallbackDate);
+
+  if (!result.ok) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="hito-product-dialog max-w-xl">
+          <DialogHeader className="hito-product-dialog-header">
+            <DialogTitle className="hito-modal-title">Clear blocked</DialogTitle>
+            <DialogDescription className="hito-body">
+              Hito could not approve clearing this planned manual workout.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="hito-product-dialog-body">
+            <div className="hito-row-group">
+              <div className="hito-list-row items-start">
+                <div className="min-w-0">
+                  <p className="hito-list-row-title">{fallbackTitle}</p>
+                  <p className="hito-list-row-copy">{dateLabel}</p>
+                </div>
+                <span className="hito-status-pill shrink-0" data-tone="warning">
+                  Blocked
+                </span>
+              </div>
+              <div className="hito-list-row items-start">
+                <div className="min-w-0">
+                  <p className="hito-list-row-title">{clearBlockedReasonLabel(result.reason)}</p>
+                  <p className="hito-list-row-copy">{result.message}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-md"
+              onClick={() => onOpenChange(false)}
+            >
+              Close
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <ManualDeleteClearReadyDialog
+      confirmMessage={confirmMessage}
+      dateLabel={dateLabel}
+      isBusy={isBusy}
+      onConfirm={onConfirm}
+      onOpenChange={onOpenChange}
+      open={open}
+      result={result}
+      status={status}
+    />
+  );
+}
+
+function ManualDeleteClearReadyDialog({
+  confirmMessage,
+  dateLabel,
+  isBusy,
+  onConfirm,
+  onOpenChange,
+  open,
+  result,
+  status,
+}: {
+  confirmMessage: string | null;
+  dateLabel: string;
+  isBusy: boolean;
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  result: ManualWorkoutDeleteClearReady;
+  status: ManualDraftStatus;
+}) {
+  const draft = result.restore.review.draft;
+  const metricPolicy = targetTruthModeLabel(result.restore.draftInput.targetTruthMode);
+  const restoreLabels = [result.restore.label, ...result.restore.alternateLabels].join(" / ");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="hito-product-dialog max-w-2xl">
+        <DialogHeader className="hito-product-dialog-header">
+          <DialogTitle className="hito-modal-title">Review clear workout</DialogTitle>
+          <DialogDescription className="hito-body">
+            Confirm before Hito removes this planned workout from your manual active plan.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="hito-product-dialog-body space-y-4">
+          <div className="hito-row-group">
+            <div className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">{dateLabel}</p>
+                <p className="hito-list-row-copy">
+                  Selected calendar day for the planned workout being cleared.
+                </p>
+              </div>
+              <span className="hito-status-pill shrink-0" data-tone="muted">
+                Verified
+              </span>
+            </div>
+
+            <div className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">{result.title}</p>
+                <p className="hito-list-row-copy">
+                  {formatManualDraftStructure(draft.totalDurationMin, draft.totalDistanceKm)} ·{" "}
+                  {metricPolicy}
+                </p>
+              </div>
+              <span className="hito-status-pill shrink-0" data-tone="muted">
+                {result.templateKey.replaceAll("_", " ")}
+              </span>
+            </div>
+
+            <div className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">What changes</p>
+                <p className="hito-list-row-copy">
+                  Hito deletes exactly this planned workout row. The active plan remains active and
+                  the calendar refreshes from persisted plan truth.
+                </p>
+              </div>
+              <span className="hito-status-pill shrink-0" data-tone="warning">
+                Planned only
+              </span>
+            </div>
+
+            <div className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">Restore affordance</p>
+                <p className="hito-list-row-copy">
+                  Backend returned reviewed next-step data for {restoreLabels}. Actual restore must
+                  go back through the manual Add review flow.
+                </p>
+              </div>
+              <span className="hito-status-pill shrink-0" data-tone="muted">
+                {result.restore.label}
+              </span>
+            </div>
+
+            {confirmMessage ? (
+              <div className="hito-list-row items-start">
+                <p className="hito-field-error min-w-0">{confirmMessage}</p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
+          <button
+            type="button"
+            className="hito-button hito-button-secondary hito-button-md"
+            disabled={isBusy}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="hito-button hito-button-primary hito-button-md"
+            data-tone="error"
+            disabled={isBusy}
+            onClick={onConfirm}
+          >
+            {status === "creating" ? (
+              <>
+                <Icon name="loader" size="xs" className="animate-spin" />
+                Clearing workout...
+              </>
+            ) : (
+              <>
+                <Icon name="trash" size="xs" />
+                Clear workout
+              </>
+            )}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ManualSaveTemplateAction({
   defaultName,
   disabled,
@@ -1217,6 +1941,23 @@ function mapSavedTemplateReviewReason(
   }
 
   return "invalid_input";
+}
+
+function clearBlockedReasonLabel(
+  reason: Extract<ManualWorkoutDeleteClearReviewResult, { ok: false }>["reason"],
+) {
+  if (reason === "last_workout_not_deletable") return "Last workout is protected";
+  if (reason === "protected_day") return "Protected day";
+  if (reason === "target_workout_not_found") return "Workout not found";
+  if (reason === "target_workout_not_in_active_plan") return "Workout is not in this plan";
+  if (reason === "target_workout_not_supported") return "Workout cannot be cleared here";
+  if (reason === "unsupported_active_plan_source") return "Only manual plans can be changed here";
+  if (reason === "stale_review") return "Review is stale";
+  if (reason === "invalid_review") return "Review needs refresh";
+  if (reason === "unauthenticated") return "Sign in required";
+  if (reason === "persistence_failed") return "Could not save the change";
+  if (reason === "no_active_plan") return "No active manual plan";
+  return "Clear needs review";
 }
 
 function savedTemplateSummary(template: ManualWorkoutSavedTemplateView) {

@@ -5,7 +5,10 @@ const isVercelBuild = process.env.VERCEL === "1" || process.env.NOW_BUILDER === 
 const generatedBuildPaths = [
   ".output",
   "node_modules/.nitro",
-  ...(isVercelBuild ? [".vercel/output"] : []),
+  ".vercel/output",
+  "logs/build-output-finalized",
+  "logs/build-output-finalize-backup",
+  "logs/build-output-public-snapshot",
 ];
 
 console.warn(

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
@@ -27,7 +27,15 @@ import {
   type TrainingSnapshot,
   type Workout,
 } from "@/lib/training";
-import { ManualWorkoutAddMenu } from "@/components/manual-workout/ManualWorkoutAuthoringControls";
+import {
+  ManualWorkoutAddMenu,
+  ManualWorkoutCopyMenu,
+  type ManualCopiedWorkoutSource,
+} from "@/components/manual-workout/ManualWorkoutAuthoringControls";
+import {
+  ManualWorkoutMoveController,
+  type ManualWorkoutMoveRequest,
+} from "@/components/manual-workout/ManualWorkoutMoveControls";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 
 type View = "month" | "week";
@@ -39,6 +47,19 @@ type TooltipPosition = {
   left: number;
   top: number;
 };
+type ManualCalendarActionState = {
+  copiedWorkoutSource: ManualCopiedWorkoutSource | null;
+  moveWorkoutSource: ManualCopiedWorkoutSource | null;
+  onCancelMoveWorkout: () => void;
+  onCopyWorkout: (source: ManualCopiedWorkoutSource) => void;
+  onManualPlanChanged: () => Promise<void>;
+  onMoveTargetSelected: (targetDate: string) => void;
+  onMoveWorkout: (source: ManualCopiedWorkoutSource) => void;
+};
+type ManualWorkoutCalendarActionContext = ManualCopiedWorkoutSource & {
+  canRequestClearReview: boolean;
+  canRequestMoveReview: boolean;
+};
 
 const TOOLTIP_VIEWPORT_MARGIN = 12;
 const TOOLTIP_ANCHOR_GAP = 10;
@@ -48,6 +69,9 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(() => new Date(`${snapshot.currentDate}T00:00:00`));
   const [tooltipAnchor, setTooltipAnchor] = useState<TooltipAnchor | null>(null);
+  const [manualCopySource, setManualCopySource] = useState<ManualCopiedWorkoutSource | null>(null);
+  const [manualMoveSource, setManualMoveSource] = useState<ManualCopiedWorkoutSource | null>(null);
+  const [manualMoveRequest, setManualMoveRequest] = useState<ManualWorkoutMoveRequest | null>(null);
 
   const cells = useMemo(() => buildMonth(cursor), [cursor]);
   const mobileMonthDates = useMemo(() => buildMonthDays(cursor), [cursor]);
@@ -76,13 +100,41 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
     setTooltipAnchor(null);
   }
 
-  async function refreshAfterManualAdd() {
+  async function refreshAfterManualPlanChange() {
     setTooltipAnchor(null);
+    setManualMoveSource(null);
+    setManualMoveRequest(null);
     await router.invalidate();
   }
 
+  function requestManualWorkoutMove(targetDate: string) {
+    if (!manualMoveSource) return;
+
+    setManualMoveRequest({
+      ...manualMoveSource,
+      targetDate,
+      requestId: `${manualMoveSource.sourceWorkoutId}:${targetDate}:${Date.now()}`,
+    });
+  }
+
+  const manualCalendarActionState: ManualCalendarActionState = {
+    copiedWorkoutSource: manualCopySource,
+    moveWorkoutSource: manualMoveSource,
+    onCancelMoveWorkout: () => setManualMoveSource(null),
+    onCopyWorkout: setManualCopySource,
+    onManualPlanChanged: refreshAfterManualPlanChange,
+    onMoveTargetSelected: requestManualWorkoutMove,
+    onMoveWorkout: setManualMoveSource,
+  };
+
   return (
     <div>
+      <ManualWorkoutMoveController
+        onMoved={refreshAfterManualPlanChange}
+        onRequestHandled={() => setManualMoveRequest(null)}
+        request={manualMoveRequest}
+      />
+
       <div className="hito-section-header mb-6">
         <div>
           <h1 className="hito-section-title text-4xl lg:text-5xl">{monthLabel}</h1>
@@ -149,7 +201,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
                   inMonth={
                     iso ? new Date(`${iso}T00:00:00`).getMonth() === cursor.getMonth() : false
                   }
-                  onManualWorkoutAdded={refreshAfterManualAdd}
+                  manualCalendarActionState={manualCalendarActionState}
                   onTooltipChange={setTooltipAnchor}
                   snapshot={snapshot}
                 />
@@ -158,14 +210,14 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
           </div>
           <MobileMonthList
             dates={mobileMonthDates}
-            onManualWorkoutAdded={refreshAfterManualAdd}
+            manualCalendarActionState={manualCalendarActionState}
             snapshot={snapshot}
           />
         </>
       ) : (
         <WeekStrip
           dates={weekCells}
-          onManualWorkoutAdded={refreshAfterManualAdd}
+          manualCalendarActionState={manualCalendarActionState}
           snapshot={snapshot}
         />
       )}
@@ -247,11 +299,11 @@ function CalendarTooltipLayer({
 
 function MobileMonthList({
   dates,
-  onManualWorkoutAdded,
+  manualCalendarActionState,
   snapshot,
 }: {
   dates: string[];
-  onManualWorkoutAdded: () => Promise<void>;
+  manualCalendarActionState: ManualCalendarActionState;
   snapshot: TrainingSnapshot;
 }) {
   const visibleDates = dates.filter((iso) => !isBeforePlanStart(iso, snapshot));
@@ -269,25 +321,39 @@ function MobileMonthList({
         const manualAddContext = getManualAddContext(snapshot, iso, workout);
 
         if (manualAddContext) {
+          const canMoveHere = canMoveToManualTarget(
+            manualCalendarActionState,
+            manualAddContext.activePlanId,
+            iso,
+          );
+
           return (
             <ManualWorkoutAddMenu
               key={iso}
               activePlanId={manualAddContext.activePlanId}
               activePlanSourceKind={manualAddContext.activePlanSourceKind}
+              copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
               date={iso}
-              onAdded={onManualWorkoutAdded}
+              moveWorkoutSource={manualCalendarActionState.moveWorkoutSource}
+              onAdded={manualCalendarActionState.onManualPlanChanged}
+              onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
+              onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
             >
               <button
                 type="button"
                 className="block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/25"
                 aria-label={`${weekdayShort(iso)} ${iso.slice(8)}. Add activity.`}
+                onDragOver={(event) => handleManualMoveDragOver(event, canMoveHere)}
+                onDrop={(event) =>
+                  handleManualMoveDrop(event, canMoveHere, iso, manualCalendarActionState)
+                }
               >
                 <HitoWorkoutDayRow
-                  action={calendarAddAction()}
+                  action={canMoveHere ? calendarMoveTargetAction() : calendarAddAction()}
                   date={{ eyebrow: weekdayShort(iso), day: iso.slice(8) }}
                   interactive
                   state="empty"
-                  supportingText="Manual user-built plan"
+                  supportingText={canMoveHere ? "Move target" : "Manual user-built plan"}
                   title="No workout planned"
                   today={isToday}
                 />
@@ -296,8 +362,18 @@ function MobileMonthList({
           );
         }
 
+        const manualCopyContext = getManualCopyContext(snapshot, iso, workout);
+        const canDragMove = Boolean(manualCopyContext?.canRequestMoveReview);
+
         return (
-          <div key={iso} className="relative">
+          <div
+            key={iso}
+            className="group/manual-day relative"
+            draggable={canDragMove}
+            onDragStart={(event) =>
+              handleManualMoveDragStart(event, manualCopyContext, manualCalendarActionState)
+            }
+          >
             <Link
               to="/workout/$date"
               params={{ date: iso }}
@@ -327,6 +403,16 @@ function MobileMonthList({
                 <CalendarFeedbackMarker state={feedbackMeta.state} />
               </Link>
             )}
+
+            {manualCopyContext ? (
+              <ManualWorkoutCopyAction
+                context={manualCopyContext}
+                layout="row"
+                onCleared={manualCalendarActionState.onManualPlanChanged}
+                onCopyWorkout={manualCalendarActionState.onCopyWorkout}
+                onMoveWorkout={manualCalendarActionState.onMoveWorkout}
+              />
+            ) : null}
           </div>
         );
       })}
@@ -390,13 +476,13 @@ function buildMonth(cursor: Date): (string | null)[] {
 function DayCell({
   iso,
   inMonth,
+  manualCalendarActionState,
   onTooltipChange,
-  onManualWorkoutAdded,
   snapshot,
 }: {
   iso: string | null;
   inMonth: boolean;
-  onManualWorkoutAdded: () => Promise<void>;
+  manualCalendarActionState: ManualCalendarActionState;
   onTooltipChange: (value: TooltipAnchor | null) => void;
   snapshot: TrainingSnapshot;
 }) {
@@ -418,13 +504,23 @@ function DayCell({
   const manualAddContext = inMonth ? getManualAddContext(snapshot, iso, workout) : null;
 
   if (manualAddContext) {
+    const canMoveHere = canMoveToManualTarget(
+      manualCalendarActionState,
+      manualAddContext.activePlanId,
+      iso,
+    );
+
     return (
       <div className="relative h-full min-w-0">
         <ManualWorkoutAddMenu
           activePlanId={manualAddContext.activePlanId}
           activePlanSourceKind={manualAddContext.activePlanSourceKind}
+          copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
           date={iso}
-          onAdded={onManualWorkoutAdded}
+          moveWorkoutSource={manualCalendarActionState.moveWorkoutSource}
+          onAdded={manualCalendarActionState.onManualPlanChanged}
+          onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
+          onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
         >
           <button
             type="button"
@@ -434,14 +530,18 @@ function DayCell({
               day: "numeric",
               weekday: "short",
             })}. Add activity.`}
+            onDragOver={(event) => handleManualMoveDragOver(event, canMoveHere)}
+            onDrop={(event) =>
+              handleManualMoveDrop(event, canMoveHere, iso, manualCalendarActionState)
+            }
           >
             <HitoCalendarDayCell
-              action={calendarAddAction()}
+              action={canMoveHere ? calendarMoveTargetAction() : calendarAddAction()}
               day={String(day).padStart(2, "0")}
-              className="h-full"
+              className={cn("h-full", canMoveHere && "ring-2 ring-signal/25")}
               interactive
               state="empty"
-              supportingText="Manual plan"
+              supportingText={canMoveHere ? "Move target" : "Manual plan"}
               today={isToday}
             />
           </button>
@@ -450,8 +550,17 @@ function DayCell({
     );
   }
 
+  const manualCopyContext = inMonth ? getManualCopyContext(snapshot, iso, workout) : null;
+  const canDragMove = Boolean(manualCopyContext?.canRequestMoveReview);
+
   return (
-    <div className="relative h-full min-w-0">
+    <div
+      className="group/manual-day relative h-full min-w-0"
+      draggable={canDragMove}
+      onDragStart={(event) =>
+        handleManualMoveDragStart(event, manualCopyContext, manualCalendarActionState)
+      }
+    >
       <Link
         to="/workout/$date"
         params={{ date: iso }}
@@ -490,6 +599,16 @@ function DayCell({
           <CalendarFeedbackMarker calendar state={feedbackMeta.state} />
         </Link>
       )}
+
+      {manualCopyContext ? (
+        <ManualWorkoutCopyAction
+          context={manualCopyContext}
+          layout="cell"
+          onCleared={manualCalendarActionState.onManualPlanChanged}
+          onCopyWorkout={manualCalendarActionState.onCopyWorkout}
+          onMoveWorkout={manualCalendarActionState.onMoveWorkout}
+        />
+      ) : null}
     </div>
   );
 }
@@ -610,11 +729,11 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function WeekStrip({
   dates,
-  onManualWorkoutAdded,
+  manualCalendarActionState,
   snapshot,
 }: {
   dates: string[];
-  onManualWorkoutAdded: () => Promise<void>;
+  manualCalendarActionState: ManualCalendarActionState;
   snapshot: TrainingSnapshot;
 }) {
   return (
@@ -634,13 +753,23 @@ function WeekStrip({
         const manualAddContext = getManualAddContext(snapshot, iso, workout);
 
         if (manualAddContext) {
+          const canMoveHere = canMoveToManualTarget(
+            manualCalendarActionState,
+            manualAddContext.activePlanId,
+            iso,
+          );
+
           return (
             <ManualWorkoutAddMenu
               key={iso}
               activePlanId={manualAddContext.activePlanId}
               activePlanSourceKind={manualAddContext.activePlanSourceKind}
+              copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
               date={iso}
-              onAdded={onManualWorkoutAdded}
+              moveWorkoutSource={manualCalendarActionState.moveWorkoutSource}
+              onAdded={manualCalendarActionState.onManualPlanChanged}
+              onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
+              onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
             >
               <button
                 type="button"
@@ -650,15 +779,19 @@ function WeekStrip({
                   day: "numeric",
                   weekday: "short",
                 })}. Add activity.`}
+                onDragOver={(event) => handleManualMoveDragOver(event, canMoveHere)}
+                onDrop={(event) =>
+                  handleManualMoveDrop(event, canMoveHere, iso, manualCalendarActionState)
+                }
               >
                 <HitoCalendarDayCell
-                  action={calendarAddAction()}
+                  action={canMoveHere ? calendarMoveTargetAction() : calendarAddAction()}
                   day={iso.slice(8)}
-                  className="h-full"
+                  className={cn("h-full", canMoveHere && "ring-2 ring-signal/25")}
                   interactive
                   layout="week"
                   state="empty"
-                  supportingText="Manual user-built plan"
+                  supportingText={canMoveHere ? "Move target" : "Manual user-built plan"}
                   today={isToday}
                   weekday={weekdayShort(iso)}
                 />
@@ -667,8 +800,10 @@ function WeekStrip({
           );
         }
 
+        const manualCopyContext = getManualCopyContext(snapshot, iso, workout);
+
         return (
-          <div key={iso} className="relative">
+          <div key={iso} className="group/manual-day relative">
             <Link
               to="/workout/$date"
               params={{ date: iso }}
@@ -701,6 +836,16 @@ function WeekStrip({
                 <CalendarFeedbackMarker state={feedbackMeta.state} />
               </Link>
             )}
+
+            {manualCopyContext ? (
+              <ManualWorkoutCopyAction
+                context={manualCopyContext}
+                layout="week"
+                onCleared={manualCalendarActionState.onManualPlanChanged}
+                onCopyWorkout={manualCalendarActionState.onCopyWorkout}
+                onMoveWorkout={manualCalendarActionState.onMoveWorkout}
+              />
+            ) : null}
           </div>
         );
       })}
@@ -731,6 +876,80 @@ function getManualAddContext(
   };
 }
 
+function getManualCopyContext(
+  snapshot: TrainingSnapshot,
+  iso: string,
+  workout: Workout | undefined,
+): ManualWorkoutCalendarActionContext | null {
+  const planMeta = snapshot.planMeta;
+
+  if (
+    !planMeta?.id ||
+    planMeta.sourceKind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND ||
+    !workout ||
+    workout.type === "rest"
+  ) {
+    return null;
+  }
+
+  return {
+    activePlanId: planMeta.id,
+    canRequestClearReview: iso > snapshot.currentDate && !isBeforePlanStart(iso, snapshot),
+    canRequestMoveReview: iso > snapshot.currentDate && !isBeforePlanStart(iso, snapshot),
+    sourceWorkoutDate: iso,
+    sourceWorkoutId: workout.id,
+    title: workout.title || workoutTypeMeta(workout).label,
+  };
+}
+
+function ManualWorkoutCopyAction({
+  context,
+  layout,
+  onCleared,
+  onCopyWorkout,
+  onMoveWorkout,
+}: {
+  context: ManualWorkoutCalendarActionContext;
+  layout: "cell" | "row" | "week";
+  onCleared: () => Promise<void>;
+  onCopyWorkout: (source: ManualCopiedWorkoutSource) => void;
+  onMoveWorkout: (source: ManualCopiedWorkoutSource) => void;
+}) {
+  const mobile = layout === "row";
+
+  return (
+    <ManualWorkoutCopyMenu
+      activePlanId={context.activePlanId}
+      canClear={context.canRequestClearReview}
+      canMove={context.canRequestMoveReview}
+      onCleared={onCleared}
+      onCopy={onCopyWorkout}
+      onMove={onMoveWorkout}
+      sourceWorkoutDate={context.sourceWorkoutDate}
+      sourceWorkoutId={context.sourceWorkoutId}
+      title={context.title}
+    >
+      <button
+        type="button"
+        className={cn(
+          "hito-button hito-button-ghost hito-button-xs absolute z-30 aspect-square p-0",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/25",
+          mobile
+            ? "right-3 top-3"
+            : "opacity-0 transition-opacity group-hover/manual-day:opacity-100 focus-visible:opacity-100",
+          layout === "cell" && "right-2 top-2",
+          layout === "week" && "right-3 top-3",
+        )}
+        aria-label={`More activity actions for ${context.title}`}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <Icon name="more-horizontal" size="xs" />
+      </button>
+    </ManualWorkoutCopyMenu>
+  );
+}
+
 function calendarAddAction() {
   return {
     label: "Add",
@@ -738,6 +957,59 @@ function calendarAddAction() {
     tone: "muted" as const,
     ariaLabel: "Add activity",
   };
+}
+
+function calendarMoveTargetAction() {
+  return {
+    label: "Move",
+    icon: "arrow-right" as const,
+    tone: "signal" as const,
+    ariaLabel: "Move selected workout here",
+  };
+}
+
+function canMoveToManualTarget(
+  manualCalendarActionState: ManualCalendarActionState,
+  activePlanId: string,
+  targetDate: string,
+) {
+  const source = manualCalendarActionState.moveWorkoutSource;
+
+  return Boolean(
+    source && source.activePlanId === activePlanId && source.sourceWorkoutDate !== targetDate,
+  );
+}
+
+function handleManualMoveDragStart(
+  event: DragEvent<HTMLElement>,
+  context: ManualWorkoutCalendarActionContext | null,
+  manualCalendarActionState: ManualCalendarActionState,
+) {
+  if (!context?.canRequestMoveReview) return;
+
+  manualCalendarActionState.onMoveWorkout(context);
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", context.sourceWorkoutId);
+}
+
+function handleManualMoveDragOver(event: DragEvent<HTMLElement>, canMoveHere: boolean) {
+  if (!canMoveHere) return;
+
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+}
+
+function handleManualMoveDrop(
+  event: DragEvent<HTMLElement>,
+  canMoveHere: boolean,
+  targetDate: string,
+  manualCalendarActionState: ManualCalendarActionState,
+) {
+  if (!canMoveHere) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  manualCalendarActionState.onMoveTargetSelected(targetDate);
 }
 
 function CalendarFeedbackMarker({

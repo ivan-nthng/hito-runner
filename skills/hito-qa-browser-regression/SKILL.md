@@ -43,6 +43,9 @@ Verify Hito behavior with real browser evidence and honest coverage.
   browser acceptance work.
 - The canonical local QA server is the built app served with `npm run serve:local` at
   `http://127.0.0.1:3000/` / `http://localhost:3000/`.
+- Use `npm run qa:server:status`, `npm run qa:server:start`, `npm run qa:server:restart`, and
+  `npm run qa:server:stop` to manage that built server lifecycle without starting duplicate
+  processes.
 - Before starting a server, check whether the canonical local QA server is already responding and
   reuse it when it is healthy.
 - Do not start duplicate local app servers for the same proof. If the server is stale, hung, or

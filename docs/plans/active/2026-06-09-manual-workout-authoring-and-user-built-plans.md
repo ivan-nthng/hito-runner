@@ -2,10 +2,12 @@
 
 ## Status
 
-in_progress — manual Add, Backend Slice 4 personal saved-template persistence, shared workout
-target display grammar cleanup, FRONTEND Slice 3 saved-template UI wiring, QA Slice 3B existing
-manual active-plan Add reuse, and Backend Slice 5 copy/paste review-confirm are QA-passed in the
-proved scope. Next gate is FRONTEND Slice 4 copy/paste UI wiring over the accepted backend seam.
+in_progress — manual Add, personal saved templates, manual Copy/Paste, manual Delete/Clear, manual
+Move Workout, and Backend / Export Slice 7 manual active-plan JSON/Markdown export are QA-passed in
+the proved scope. The manual builder functional MVP is complete enough for code-freeze/refactor
+planning. Next gate is ARCHITECT cleanup inventory / freeze-readiness audit using the canonical
+functional map. QR/share-import, recurrence, edit workout, Restore UI, and deeper modal polish
+remain future-only unless selected by a separate architecture contract.
 
 ## Type
 
@@ -17,23 +19,802 @@ high
 
 ## Next Recommended Role
 
-FRONTEND
+ARCHITECT
 
 ## Task
 
-Implement Frontend Slice 4 copy/paste UI wiring for existing manual active plans.
+Run cleanup inventory / code-freeze readiness audit from the current functional map.
 
 ## Stage
 
-FRONTEND implementation / manual copy-paste interaction over backend review-confirm.
+ARCHITECT cleanup inventory / code-freeze readiness audit.
 
 ## Suggested Next Step
 
-Frontend should expose copy/paste interaction for existing manual active-plan days by calling the
-accepted backend copy review and confirm/paste seam. The UI must not copy raw calendar rows, derive
-schedule truth locally, or claim recurrence/export/move behavior.
+Architect should use the canonical functional map to inventory which backend/frontend/scripts are
+required by shipped or QA-accepted flows, which are validation-only, and which are suspect
+cleanup/decomposition candidates. First verify whether
+`docs/current-functional-map.md` needs a small alignment update now that Move Workout is
+browser-QA-passed. Do not start cleanup implementation in this closeout.
 
-## Current Frontend Slice 4 Handoff Prompt
+## Current ARCHITECT Freeze-Readiness Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+Task:
+Run the Hito code-freeze cleanup inventory using the canonical functional map after manual builder
+Move Workout acceptance.
+
+Stage:
+ARCHITECT cleanup inventory / code-freeze readiness audit.
+
+Context:
+Manual user-built plans now support first create, adding workouts, personal saved templates,
+existing-plan saved-template reuse, Copy/Paste, Delete/Clear, Move Workout, and JSON/Markdown
+export in proved browser/DB/download scope. The manual builder functional MVP is complete enough
+for code-freeze/refactor planning. The next step is not another product feature and not cleanup
+implementation yet; it is a source-of-truth inventory that starts from real shipped/accepted flows.
+
+Root cause and architecture fit:
+The visible symptom is that the service has grown quickly after several plan-creation and manual
+builder slices. The likely underlying cause is that cleanup can drift into file-size hunting instead
+of preserving canonical business flows. The canonical owner is documentation/source-of-truth first,
+then architecture cleanup selection. Use the functional map to decide what is required, validation
+only, compatibility-only, future-only, or suspect before recommending deletion/decomposition.
+
+Required reading:
+- `AGENTS.md`
+- `agents/architect.agent.md`
+- `skills/hito-architecture-audit/SKILL.md`
+- `skills/hito-plan-writing-and-closeout/SKILL.md`
+- `skills/hito-prompt-handoff/SKILL.md`
+- `docs/current-functional-map.md`
+- `docs/current-product.md`
+- `docs/current-system.md`
+- `docs/current-state.md`
+- `docs/history/changelog.md`
+- `docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md`
+- `docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md`
+- `docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
+- `docs/tasks/frontend-specs/2026-06-10-manual-user-built-plan-flow-spec.md`
+
+Accepted manual-builder capabilities to preserve:
+- no-active-plan manual first create
+- existing manual active-plan Add activity
+- personal saved templates and saved-template reuse
+- Copy/Paste
+- Delete/Clear
+- Move Workout
+- JSON/Markdown export
+- backend-owned review/confirm boundaries, date-only truth, metric truth, and persisted readback
+
+Scope:
+- Verify whether `docs/current-functional-map.md` needs a docs-only alignment update because Move
+  Workout is now user-facing in the proved scope.
+- Build or update the cleanup inventory from the functional map, not from vibes or line count alone.
+- Classify backend, frontend, scripts, validators, QA artifacts, and docs into required,
+  validation-only, compatibility-only, future-only, suspect/decompose, or delete/demote candidates.
+- Identify the highest-impact safe cleanup gate for one next implementation role.
+- Prefer deletion/demotion over abstraction and source-of-truth reduction over cosmetic movement.
+- Keep manual builder, selected running-plan creation, active-plan export, Admin Work Items, and
+  Hito DS boundaries separate.
+- Produce exactly one next owner/gate and one execution-ready prompt if implementation is selected.
+
+Validation:
+- If docs are changed, run scoped `git diff --check -- <changed docs>`.
+- No build, browser QA, Supabase mutation, or migrations are required for docs-only architecture
+  inventory.
+
+What not to do:
+- Do not edit product code.
+- Do not start cleanup implementation.
+- Do not run browser QA.
+- Do not mutate Supabase or run migrations.
+- Do not select QR/share/import, recurrence, edit workout, Restore UI, generated/preset/imported
+  plan mutation, active-plan replacement, or modal polish as part of this inventory.
+- Do not delete validation coverage just to reduce line count.
+- Do not collapse backend truth into frontend or create a new parallel persistence path.
+```
+
+## Frontend Slice 6 Move Workout Acceptance — 2026-06-12
+
+Status:
+
+QA-passed / accepted as user-facing manual-plan capability in the proved scope.
+
+Acceptance decision:
+
+- Accept FRONTEND Slice 6 as QA-passed.
+- Manual Move Workout is now user-facing for existing `manual_user_built_plan_v1` active plans in
+  the proved scope.
+- This does not ship recurrence, edit workout, Restore UI, QR/share/import, generated/preset/imported
+  plan mutation, active-plan replacement, or deeper modal polish.
+- Record this as shipped user-facing history in
+  [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md).
+
+QA evidence:
+
+- Built-in Codex Browser was tried first, but login submit hit a CDP timeout; non-Chrome Playwright
+  WebKit completed the full proof.
+- Disposable user: `qa-manual-move-rerun-031409@example.test`.
+- `Review move` rendered after `Move workout` -> `Move selected workout here`.
+- No `Preview mode`, `Sign in to save progress`, or `couldn't load plan` appeared after review.
+- Review dialog showed source `Thu, Jun 18`, target `Fri, Jun 19 · Friday`, title
+  `QA export easy opener`, structure `45 min · Structure only`, identity `EASY AEROBIC RUN`, and
+  copy saying Hito moves exactly the existing planned workout row.
+- No fake pace or fake personal HR appeared.
+- Confirm moved the same `planned_workouts` row id `2d188d1e-7687-4f87-9279-f0818c85f358` from
+  `2026-06-18` to `2026-06-19`.
+- Row count stayed `3`.
+- Target weekday became `Friday`.
+- Title, identity, structure, metric mode, active plan state, and other workouts were preserved.
+- Fresh saved-calendar readback showed Jun 18 empty/Add and Jun 19 containing the moved workout.
+- Drag/drop proof passed: real WebKit coordinate drag from Jun 20 workout to Jun 21 empty target
+  reached the same backend-reviewed `Review move` state; QA stopped before second confirm as
+  allowed.
+- Mobile proof passed at `innerWidth: 375` with no horizontal overflow for calendar, occupied-day
+  menu, move-source state, target menu, and review state.
+- Blocked-state proof covered occupied target, unchanged target, stale review, unsupported
+  active-plan source, and client-row rejection by source/harness.
+- Cleanup returned disposable data to zero/absent.
+- Artifacts:
+  [manual-move-workout-rerun-qa](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-06-12/manual-move-workout-rerun-qa/).
+
+Next gate:
+
+- ARCHITECT cleanup inventory / code-freeze readiness audit using
+  [docs/current-functional-map.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-functional-map.md).
+- Do not start cleanup implementation in this closeout.
+
+## Backend Slice 8 Move Workout Implementation Notes — 2026-06-12
+
+Status:
+
+Implemented / QA-passed / accepted for backend boundary.
+
+Root cause:
+
+Move Workout is a date-only mutation on an existing persisted manual active plan. Implementing it
+as frontend row cloning, copy+delete, or drag state would duplicate schedule truth and bypass
+review exactness. The canonical owner is backend validation, protected-source/target checks,
+review-token/checksum exactness, and persisted `planned_workouts` date updates.
+
+What changed:
+
+- Added `src/lib/manual-workout-authoring/move-workout.ts` as the focused owner for manual move
+  review/confirm.
+- Reused existing manual add/copy/delete seams:
+  active plan/source guard, source reconstruction support, protected logged/evidence checks,
+  date-only target validation, stable checksum helper, and canonical Supabase persistence.
+- Added `reviewManualWorkoutMove` and `confirmManualWorkoutMove` through
+  `src/lib/manual-workout-authoring/index.ts` and the thin `training-api.ts` facade.
+- Confirm rebuilds the move review server-side, validates token/checksum, rejects client rows, and
+  updates exactly one existing `planned_workouts` row to the target date/weekday/week number.
+- Move preserves title, workout identity/family/icon, executable segment structure, and metric
+  truth; it does not trust client-sent rows or segments.
+- Move allows the last workout only because the workout remains in the same active manual plan.
+
+Validation evidence:
+
+- Targeted ESLint passed for manual authoring action/add/copy/delete/move/persistence/export seams
+  and the manual validator.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed.
+- Guarded persistence preflight with `--require-persistence` blocked before mutation because no
+  disposable Supabase env was configured.
+- Guarded disposable Supabase persistence proof passed against project `dltfjwexyctmihclcjqj`.
+- `npm run build` passed.
+
+Out of scope:
+
+No frontend move UI, drag-and-drop, schema migration, generated/preset/imported/running-engine
+mutation, recurrence, edit, Restore UI, QR/share-import, PDF/watch export, OpenAI, fake pace, or
+fake personal HR was added.
+
+## Backend Slice 8 Move Workout Acceptance — 2026-06-12
+
+Status:
+
+QA-passed / accepted for backend mutation boundary.
+
+Acceptance decision:
+
+- Accept Backend Slice 8 as the backend-owned date-only Move Workout boundary for existing
+  `manual_user_built_plan_v1` active plans.
+- At Backend Slice 8 closeout, this accepted the backend primitive only. Runner-facing acceptance is
+  recorded in the Frontend Slice 6 section above.
+- No changelog entry was added for this backend-only closeout; shipped-history wording was deferred
+  until runner-facing Move Workout UI passed browser QA.
+
+QA evidence:
+
+- Target disposable Supabase project: `dltfjwexyctmihclcjqj`.
+- Review was non-mutating and returned `review_ready`, `persisted: false`, target weekday
+  `Monday`, and `trustedClientRows: false`.
+- Confirm returned `moved`, `persisted: true`, `serverRebuiltReview: true`, and
+  `movedExactlyOneRow: true`.
+- DB readback proved the same `planned_workouts` row id moved from `2026-06-18` to `2026-06-22`.
+- Source date became empty and target date contained the moved workout.
+- Target weekday was derived as `Monday`.
+- Row count stayed `2`; the other workout remained unchanged.
+- Title, identity, structure, and metric mode were preserved.
+- The plan remained active.
+- Metadata recorded latest move checksum, source date, and target date.
+- No fake pace or fake personal HR appeared.
+- Cleanup returned `workout_logs`, `planned_workouts`, `plan_cycles`,
+  `runner_manual_workout_templates`, and `runner_profiles` to `0`; the disposable auth user was
+  absent.
+- Deterministic/source proof covered occupied target, non-manual plan, missing/foreign source,
+  logged/evidence/protected source, past target, changed source/target, invalid token, stale
+  checksum, client row payload rejection, persistence failure, and no fake pace/HR.
+
+Historical next gate at backend closeout:
+
+- FRONTEND Slice 6: Move Workout UI wiring over the accepted backend review/confirm seam.
+- Frontend must not implement move as copy+delete, drag-only local state, client row mutation, or
+  local schedule truth.
+
+## Backend / Export Slice 7 Implementation Notes — 2026-06-12
+
+Status:
+
+Implemented / QA-passed / accepted.
+
+Root cause:
+
+Manual-plan export did not need a new manual export system. The canonical owner is the existing
+active-plan export seam, but the JSON projection lacked explicit source-status/export metadata and
+could expose internal persisted UUIDs as exported plan/workout identifiers. That made the export
+less safe as a future Hito exchange artifact and left manual-plan compatibility unproved.
+
+What changed:
+
+- Reused `exportActivePlanForUser(...)`, `buildActivePlanExportPayload(...)`,
+  `buildPlanExportDocument(...)`, JSON rendering, Markdown rendering, and the existing Open plan
+  export route/menu.
+- Added backend-owned source-status readback from persisted plan metadata into the active-plan
+  export payload.
+- Changed exported JSON `plan_id` and fallback `workout_id` values to safe Hito export identifiers
+  instead of raw persisted Supabase UUIDs.
+- Added additive `source_status` and `export_metadata` support to `training-plan-v2`, including
+  export format version, exported timestamp, source kind/status, row counts, and privacy flags.
+- Kept JSON export re-importable through the canonical `training-plan-v2` schema.
+- Extended `scripts/validate-manual-workout-authoring.ts` with a deterministic manual active-plan
+  export proof covering multi-workout manual plans, saved-template-shaped rows, copied-workout rows,
+  deleted-row absence, row counts, structure-only executable segments, no fake pace/HR, no internal
+  Supabase IDs, and Markdown readability without internal/debug source labels.
+
+Validation evidence:
+
+- `npm exec eslint -- src/lib/plan-export.ts src/lib/imported-plan.ts scripts/validate-manual-workout-authoring.ts`
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
+
+QA closeout:
+
+- Browser/download validation passed against the existing Open plan export menu on a disposable
+  persisted manual active plan, including JSON parse/readback, Markdown content proof, mobile
+  no-overflow, cleanup, and source-boundary proof.
+- ARCHITECT should separately decide the future public Hito plan exchange / QR share-import
+  contract. This slice only hardens the existing authenticated active-plan export seam.
+
+## Backend / Export Slice 7 Acceptance — 2026-06-12
+
+Status:
+
+QA-passed / accepted.
+
+Context:
+
+Backend / Export Slice 7 proved JSON/Markdown export for persisted manual active plans through the
+existing active-plan export seam. This accepts authenticated manual-plan JSON/Markdown export in the
+proved scope. It does not ship QR codes, public share links, import from export, applying someone
+else's plan, PDF export, watch export, or mobile deep-link flow.
+
+QA evidence:
+
+- Built-in Codex Browser was used first.
+- The canonical QA server was rebuilt/restarted on the same managed `:3000` server and ended
+  `current` / `healthy`.
+- Built-in Browser showed export UI but cannot capture downloads, so Playwright WebKit fallback
+  captured real downloads.
+- Safari and Chrome were not used.
+- Targeted ESLint passed.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed.
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` passed.
+- `npm run build` passed.
+- Scoped `git diff --check` passed.
+- Disposable persisted manual plan was created with three remaining workouts and one
+  deleted/cleared workout.
+- Browser UI showed saved plan -> `Open plan` -> `Export` -> `Export as JSON` /
+  `Export as Markdown`.
+- WebKit captured real files:
+  - `manual-user-built-plan-2026-06-18.json`
+  - `manual-user-built-plan-2026-06-18.md`
+- JSON proof:
+  - `schema_version: training-plan-v2`
+  - `source_kind: manual_user_built_plan_v1`
+  - `source_status: manual_user_built_plan_created`
+  - safe export plan id, not raw persisted UUID
+  - three workouts on `2026-06-18`, `2026-06-20`, and `2026-06-22`
+  - workout ids are safe export ids, not raw persisted UUIDs
+  - metric modes are `structure_only_executable`
+  - pace/HR target allowed flags are false
+  - internal DB ids, auth ids, and provider tokens are omitted
+  - deleted workout row is absent
+  - raw internal plan/workout/auth UUID matches are absent
+- Markdown proof:
+  - runner-readable title/source context is present
+  - readable dates and workout titles are present
+  - structure/execution summaries are present
+  - deleted row is absent
+  - fake pace is absent
+  - fake personal HR is absent
+  - private ids are absent
+  - QR/share/import/PDF/watch claims are absent
+- Source proof confirmed export reads persisted active plan through `/api/plan/export` ->
+  `exportActivePlanForUser(...)`, not a frontend calendar snapshot.
+- Mobile `375px` proof passed for Open Plan / Export menu with JSON and Markdown actions and no
+  horizontal overflow.
+- Cleanup returned both disposable users and all scoped DB rows to zero/absent.
+- No product issues were found.
+
+Acceptance decision:
+
+- Accept Backend / Export Slice 7 as QA-passed.
+- Record this as shipped user-facing history in
+  [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md)
+  because manual-plan JSON/Markdown export is now browser/download/DB-QA-passed.
+- Do not claim QR codes, public share links, import from export, applying someone else's plan, PDF
+  export, watch export, or mobile deep-link flow.
+- This previous QR/share-import next-gate idea is superseded by Slice 8 Move Workout sequencing;
+  QR/share-import remains future-only until a separate architecture contract is selected.
+
+## Previous Backend / Export Slice 7 Handoff Prompt
+
+```text
+ROLE: BACKEND
+
+Task:
+Implement Backend / Export Slice 7 for manual user-built plans: JSON/Markdown export compatibility
+through the existing active-plan export seam.
+
+Stage:
+BACKEND implementation / manual active-plan export compatibility.
+
+Context:
+Manual user-built plans now support first create, adding workouts, personal saved templates,
+existing-plan saved-template reuse, Copy/Paste, and Delete/Clear in the proved browser/DB scope.
+The next functional completeness gate is export/share for persisted manual plans.
+
+Root cause and architecture fit:
+The visible missing behavior is manual-plan export confidence. The underlying owner is not a new
+manual export UI or formatter; Hito already has canonical active-plan export through
+`exportActivePlanForUser(...)`, `buildActivePlanExportPayload(...)`, `buildPlanExportDocument(...)`,
+JSON, Markdown, and the existing `Open plan` export menu. Backend must prove manual plans preserve
+manual source metadata, canonical workout rows, structure-only metric truth, and deleted-row absence
+through that existing seam before any further UI claim.
+
+Required preflight:
+- Read `AGENTS.md`.
+- Read `agents/backend.agent.md`.
+- Load `skills/hito-backend-supabase-contract/SKILL.md`.
+- Read the active manual plan and manual flow spec.
+- Inspect existing export and manual seams before editing:
+  - `src/lib/active-plan-export-actions.ts`
+  - `src/lib/plan-export.ts`
+  - `src/components/PlanManagementDialog.tsx`
+  - `src/components/plan-management/PlanExportMenu.tsx`
+  - `src/components/plan-management/PlanSummaryHeader.tsx`
+  - `src/lib/manual-workout-authoring/*`
+  - `src/lib/active-plan-persistence.ts`
+  - `scripts/validate-manual-workout-authoring.ts`
+  - `scripts/validate-plan-authoring-doctrine.ts`
+
+Implementation scope:
+- Prefer a proof/validation slice. If existing export already handles manual plans correctly, add
+  only the smallest harness/source proof needed.
+- Use the existing `exportActivePlanForUser(...)` and `buildActivePlanExportPayload(...)` path.
+- Prove JSON export preserves `manual_user_built_plan_v1` source kind, plan id/title/date range,
+  canonical workout rows, workout identities, segment anatomy, and `structure_only_executable`
+  metric truth.
+- Prove Markdown export renders readable manual workout summaries without internal/debug labels,
+  raw floats, fake pace, or fake personal HR.
+- Prove deleted/cleared workouts are absent from export and remaining row/non-rest counts match
+  persisted active-plan truth.
+- Prove saved-template/copied/manual-added workouts export from canonical persisted rows, not
+  frontend state or template rows.
+- Keep the existing export menu and authenticated server action model; add no new route-local export
+  system.
+
+What not to do:
+- Do not add PDF export.
+- Do not add watch/provider export.
+- Do not add frontend export UI unless a tiny type/status widening is required by an existing seam.
+- Do not add move workout, edit workout, recurrence, or Restore UI.
+- Do not create a manual-specific export payload separate from canonical active-plan export.
+- Do not mutate Supabase outside a guarded disposable validation path.
+- Do not weaken metric-truth guardrails.
+
+Validation:
+- Targeted ESLint for changed backend/script files.
+- Manual authoring validator if touched: `node --import tsx ./scripts/validate-manual-workout-authoring.ts`.
+- Export/doctrine validator if touched: `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`.
+- `npm run build` if imports, public exports, or frontend-facing export types change.
+- Scoped `git diff --check`.
+- If live persistence/export proof is needed, use only the existing guarded disposable Supabase
+  pattern and prove cleanup.
+```
+
+## Previous Frontend Slice 5 Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+Task:
+Implement Frontend Slice 5 for manual user-built plans: delete/clear UI wiring over the accepted
+backend review-confirm seam.
+
+Stage:
+FRONTEND implementation / manual delete-clear interaction over backend truth.
+
+Context:
+Backend Slice 6 is QA-passed. It provides the accepted delete/clear primitive for existing
+`manual_user_built_plan_v1` active plans:
+- delete/clear review validates an eligible target workout and returns backend-shaped confirmation
+  copy
+- confirm delete/clear re-checks active plan lifecycle, target workout id/date, protection state,
+  and review token/checksum exactness
+- only one eligible planned workout row is removed
+- active manual plan remains active and metadata/non-rest counts update
+- logged/provider-evidence-backed, past/protected, non-manual, generated/imported/running-engine,
+  stale-review, invalid-token, mismatched-target, client-payload, and last-workout delete cases are
+  rejected
+- restore affordance data is returned by backend, but Restore/Put back/Redo UI is not shipped yet
+
+Root cause and architecture fit:
+The visible missing behavior is that runners cannot delete a manually added workout from the manual
+calendar UI. The underlying cause has now been fixed at the backend mutation boundary. Frontend
+must only render the destructive interaction, call backend review/confirm, and re-read persisted
+calendar truth after success. Do not implement local row deletion, local protection rules, local
+schedule truth, or restore/undo behavior.
+
+Required preflight:
+- Read `AGENTS.md`.
+- Read `agents/frontend.agent.md`.
+- Load `skills/hito-frontend-design-system/SKILL.md`.
+- Read the active manual plan and manual flow spec.
+- Inspect existing calendar/manual authoring UI before editing:
+  - `src/components/Calendar.tsx`
+  - `src/components/ui/hito-calendar-day.tsx`
+  - `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`
+  - `src/components/manual-workout/manual-workout-authoring-utils.ts`
+  - `src/components/onboarding/ManualUserBuiltPlanPanel.tsx`
+  - `src/lib/manual-workout-authoring/actions.ts`
+  - `src/lib/training-api.ts`
+
+Implementation scope:
+- Add a Delete/Clear action only for eligible future manual active-plan workout days as shaped by
+  existing calendar/manual plan state.
+- Use existing Hito calendar/menu/dialog/sheet/button/status patterns; do not introduce a new
+  calendar UI system.
+- Call the backend delete/clear review action with minimal identifiers only.
+- Render backend-shaped confirmation state: target date, workout title/identity, warning copy,
+  protection/error state, and metric/source summary if provided.
+- Confirm only by calling the accepted backend confirm delete/clear action with review
+  token/checksum and minimal identifiers.
+- Prevent duplicate clicks/loading races.
+- After success, invalidate/reload canonical plan data so the calendar reflects persisted truth.
+- Surface backend bounded errors for protected/logged/evidence-backed, past, last-workout,
+  stale-review, invalid-token, and mismatched-target cases.
+
+What not to do:
+- Do not remove planned workout rows locally.
+- Do not send client-side rows, segments, source metadata, duration totals, or metric truth.
+- Do not ship Restore/Put back/Redo UI in this slice.
+- Do not add recurrence.
+- Do not add move workout behavior.
+- Do not add edit workout behavior.
+- Do not add JSON export.
+- Do not mutate generated, preset, imported, or running-engine plans.
+- Do not create frontend-owned schedule, metric, template, or persistence truth.
+- Do not create a new calendar UI system.
+- Do not weaken backend review/confirm boundaries.
+
+Validation:
+- Targeted ESLint for changed frontend/manual authoring files.
+- Run `node --import tsx ./scripts/validate-manual-workout-authoring.ts`.
+- Run `npm run build`.
+- Run scoped `git diff --check`.
+- Browser QA readiness: existing manual active plan -> eligible future manual workout day ->
+  Delete/Clear action -> backend review confirmation -> confirm -> persisted calendar removes that
+  workout, active plan remains active, protected cases stay blocked, and mobile `375px` has no
+  horizontal overflow.
+```
+
+## Frontend Slice 5 Build Blocker Fix — 2026-06-11
+
+Status:
+
+Fixed / QA-passed with Frontend Slice 5 acceptance below.
+
+Root cause:
+
+The Delete/Clear UI was not the build blocker. The failing source-of-truth boundary was the local
+Nitro/TanStack build output lifecycle: client public assets and Nitro server output were generated
+successfully, but late build cleanup left `.output/public` and `.output/server` missing while the QA
+server status logic could still treat an old process as current.
+
+What changed:
+
+- Local clean now removes stale generated Vercel output and local build snapshots before a build.
+- Vite captures the client `.output/public` asset snapshot and restores it before Nitro public-assets
+  scanning, so hashed client assets, `favicon.svg`, and the training-plan template stay available.
+- Nitro SSR service output cleanup is centralized under `prebuild`, avoiding service chunk deletion
+  while Nitro consumes the SSR build.
+- Local postbuild finalization stores stable finalized `server` and `public` output under
+  gitignored `logs/build-output-finalized/` and exposes them through `.output/server` and
+  `.output/public`, which keeps the canonical local server path stable.
+- QA server status now requires the real build artifacts before reporting `current`.
+
+Validation evidence:
+
+- `npm exec eslint -- vite.config.ts scripts/clean-build-output.mjs scripts/finalize-build-output.mjs scripts/qa-local-server.mjs`
+- `node --check scripts/clean-build-output.mjs`
+- `node --check scripts/finalize-build-output.mjs`
+- `node --check scripts/qa-local-server.mjs`
+- `npm run build` passed repeatedly after the lifecycle fix.
+- `node ./scripts/validate-build-output-integrity.mjs` passed with
+  `mjsFiles=184` and `relativeMjsImports=2498`.
+- `npm run qa:server:restart` started the canonical built QA server on `http://127.0.0.1:3000/`.
+- `npm run qa:server:status` reports `current`, `healthy`, and `build: present`.
+- `curl -I --max-time 10 http://127.0.0.1:3000/` returned `HTTP/1.1 200`.
+
+Next gate:
+
+Passed. Frontend Slice 5 Delete/Clear UI browser acceptance is recorded below.
+
+## Frontend Slice 5 Delete/Clear UI Acceptance — 2026-06-12
+
+Status:
+
+QA-passed / accepted.
+
+Context:
+
+FRONTEND Slice 5 exposed the accepted Backend Slice 6 delete/clear review-confirm seam in the
+saved manual active-plan calendar. This accepts Delete/Clear as a user-facing manual-plan
+capability in the proved scope. Restore/Put back/Redo remains affordance copy/data only and is not
+a shipped undo UI unless separately implemented and QA-passed.
+
+QA evidence:
+
+- Built-in Codex Browser was used first.
+- The canonical QA server was rebuilt/restarted on the same managed `:3000` server and confirmed
+  `current` / `healthy`.
+- Safari and Chrome were not used.
+- Targeted ESLint passed.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed.
+- `npm run build` passed.
+- Scoped `git diff --check` passed.
+- Disposable DB seed/readback/cleanup passed.
+- Desktop real pointer interaction passed:
+  - clicking `More activity actions for QA clear candidate strides` opened the menu
+  - the menu showed `Copy workout` and `Clear workout`
+  - the route stayed `/`
+  - clicking the workout card outside the action button still navigated to
+    `/workout/2026-06-21?tab=overview`
+- Delete/Clear happy path passed:
+  - `Clear workout` opened backend-shaped `Review clear workout`
+  - review showed `Sun, Jun 21`, the workout title, planned-row-only warning, and restore
+    affordance copy
+  - confirm refreshed the saved calendar from persisted truth
+  - the cleared day became `Sun, Jun 21. Add activity.`
+  - the cleared day did not become fake Rest
+  - the remaining workout stayed unchanged
+- DB proof passed:
+  - before delete, one active `manual_user_built_plan_v1` plan had two planned workouts
+  - after delete, the same active plan had one planned workout
+  - the deleted workout id/date was absent
+  - `latestDeletedWorkout` metadata was present
+  - row/non-rest counts updated to `1`
+  - no fake pace or fake personal HR signals appeared
+- Mobile `375px` regression passed:
+  - occupied-day menu had no horizontal overflow
+  - post-delete calendar had no horizontal overflow
+  - delete/clear blocked dialog for the remaining last workout had no horizontal overflow
+- Cleanup returned all disposable rows and auth/local user to zero/absent.
+
+Tooling notes:
+
+- Mobile screenshot capture timed out, but DOM and DB proof passed.
+- One transient locator wait hit DOM detach during canonical refresh, but final state was confirmed.
+- No product issues were found.
+
+Acceptance decision:
+
+- Accept FRONTEND Slice 5 as QA-passed.
+- Record this as shipped user-facing history in
+  [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md)
+  because functional manual Delete/Clear is now browser-QA-passed with DB readback and cleanup.
+- Do not claim Restore/Put back/Redo undo UI.
+- Do not claim export, move, edit, recurrence, or final modal design polish.
+- Select BACKEND / EXPORT Slice 7 as the next gate: manual active-plan JSON/Markdown export
+  compatibility through the existing canonical active-plan export seam.
+
+## Backend Slice 6 Implementation Notes — 2026-06-11
+
+Status:
+
+Implemented / QA-passed.
+
+Root cause:
+
+The missing runner behavior was “remove this manual workout day,” but the true owner is backend
+mutation safety and canonical calendar readback, not frontend row hiding. Backend now owns
+delete/clear review, exactness, revalidation, persistence, and restore affordance shaping.
+
+What changed:
+
+- Added `src/lib/manual-workout-authoring/delete-clear.ts` as the focused review/confirm owner for
+  deleting exactly one eligible future manual planned workout from an existing
+  `manual_user_built_plan_v1` active plan.
+- Reused existing active-plan context, protected-day/evidence checks, manual draft review, and
+  persisted manual row reconstruction instead of adding route-local or frontend-owned truth.
+- Confirm rebuilds the delete target server-side, validates active plan id, target workout id/date,
+  review token/checksum exactness, protected status, and active plan source before persistence.
+- Persistence hard-deletes one `planned_workouts` row and updates manual plan metadata/readback
+  counts. It does not create fake rest/generated placeholder rows.
+- Deleting the last non-rest manual workout is intentionally blocked in this slice with
+  `last_workout_not_deletable`, because empty persisted manual active plans are not yet an accepted
+  product lifecycle state.
+- Successful review/confirm returns a backend-shaped restore affordance:
+  `Restore` with alternate labels `Put back` and `Redo`.
+- Restore affordance is not a new mutation path. It contains a reconstructed `ManualWorkoutDraftInput`
+  and reviewed manual draft, so frontend can later wire Restore through the existing Add activity
+  review/confirm seam without cloning raw rows.
+- Extracted a shared browser-safe manual review checksum helper in
+  `src/lib/manual-workout-authoring/review-exactness.ts` so delete/clear does not import
+  `node:crypto` into client-visible bundles and existing manual review exactness stays canonical.
+- Exported delete/clear actions and result types through `src/lib/manual-workout-authoring/index.ts`
+  and `src/lib/training-api.ts` as the existing thin facade seams.
+
+Deterministic harness coverage:
+
+- Happy-path delete/clear review and confirm.
+- Exact one-row deletion through fake persistence.
+- Metadata/readback count proof via returned row counts.
+- `Restore` / `Put back` / `Redo` affordance with reviewed manual draft.
+- Changed target, invalid token, stale checksum, and client-sent row payload rejections.
+- Missing active plan, non-manual active plan, missing target, foreign target, unsupported target,
+  logged target, evidence-backed target, protected past target, last-workout, and persistence failure
+  rejections.
+- No fake pace or fake personal HR in restore review.
+
+Validation run by Backend:
+
+- `npm exec eslint -- src/lib/manual-workout-authoring/actions.ts src/lib/manual-workout-authoring/active-plan-add.ts src/lib/manual-workout-authoring/copy-paste.ts src/lib/manual-workout-authoring/copy-paste-reconstruction.ts src/lib/manual-workout-authoring/delete-clear.ts src/lib/manual-workout-authoring/persistence.ts src/lib/manual-workout-authoring/review-exactness.ts src/lib/manual-workout-authoring/saved-templates.ts src/lib/manual-workout-authoring/schema.ts src/lib/manual-workout-authoring/index.ts src/lib/training-api.ts scripts/validate-manual-workout-authoring.ts scripts/manual-workout-authoring/persistence-proof.ts`
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts --require-persistence`
+  blocked before mutation because no disposable Supabase env was configured.
+- `node --env-file=.env.local --import tsx ./scripts/validate-manual-workout-authoring.ts --require-persistence`
+  blocked remote Supabase mutation for `dltfjwexyctmihclcjqj` without explicit disposable override.
+- `npm run build`
+
+QA closeout:
+
+Backend source/harness validation and guarded remote-disposable persistence proof passed. The next
+gate is frontend wiring, not another backend validation pass.
+
+## Backend Slice 6 Delete/Clear Acceptance — 2026-06-11
+
+Status:
+
+QA-passed / accepted.
+
+Context:
+
+Backend Slice 6 implemented the delete/clear primitive behind a backend-owned review-confirm
+boundary. This accepts the backend primitive only. Runner-facing Delete/Clear UI is not shipped yet.
+Restore/Put back/Redo is backend-shaped affordance data, not a shipped undo UI.
+
+QA evidence:
+
+- Browser was not used because this was backend/source/CLI/Supabase validation only.
+- Targeted ESLint passed.
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts` passed.
+- `--require-persistence` without override blocked remote mutation before writes.
+- Guarded remote override validator passed and cleaned up.
+- QA-only live delete/clear proof passed.
+- `npm run build` passed.
+- Scoped `git diff --check` passed.
+- Live disposable proof against approved project `dltfjwexyctmihclcjqj` created a manual plan with
+  two planned workouts.
+- Delete/clear removed exactly one workout on `2026-06-21`.
+- DB readback after delete showed exactly one remaining planned workout on `2026-06-18`.
+- Active manual plan remained active.
+- Manual metadata row/non-rest counts updated to `1`.
+- Invalid token, stale checksum, mismatched target, client payload, and last-workout delete were
+  rejected.
+- Source/deterministic proof covered non-manual active plans, protected/logged/evidence/past
+  targets, generated/imported/running-engine guards, and strict client payload rejection.
+- Restore affordance returned `Restore`, `Put back`, `Redo`, reviewed draft data, and
+  `trustedClientRows: false`.
+- Cleanup returned `workout_logs`, `planned_workouts`, `plan_cycles`,
+  `runner_manual_workout_templates`, `runner_profiles`, and auth user to zero/absent.
+
+Acceptance decision:
+
+- Accept Backend Slice 6 as QA-passed.
+- Do not update [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md)
+  yet because this is backend-only acceptance; runner-facing Delete/Clear UI is not shipped.
+- Select FRONTEND Slice 5 as the next manual-builder gate: Delete/Clear UI wiring over the accepted
+  backend seam.
+
+## Frontend Slice 4 Implementation Notes
+
+- Wired occupied manual active-plan workout days to an existing Hito DS dropdown more-action with
+  `Copy workout`.
+- The copy buffer stores only minimal UI source selection: active plan id, source workout id, source
+  workout date, and title.
+- Wired eligible future empty manual active-plan days to show `Paste copied workout` inside the
+  existing `Add activity` menu when the copied source belongs to the same active plan.
+- Paste review calls the accepted backend copy/paste review seam with only active plan id, source
+  workout id, and target `YYYY-MM-DD`.
+- Paste confirm calls the accepted backend confirm seam with only active plan id, source workout id,
+  target date, review token, and review checksum.
+- Paste review renders backend-shaped source/target dates, workout title/template, structure, metric
+  policy, review bullets, warnings, and bounded backend errors.
+- Calendar refresh still uses route invalidation so the pasted workout appears from canonical
+  persisted plan truth.
+- No recurrence, move, edit, delete/clear, JSON export, generated/preset/imported mutation, or
+  frontend-owned row duplication was added.
+
+## Frontend Slice 4 Copy/Paste UI Acceptance — 2026-06-11
+
+Status:
+
+QA-passed / accepted.
+
+Context:
+
+FRONTEND Slice 4 exposed the accepted Backend Slice 5 copy/paste review-confirm seam in the saved
+manual active-plan calendar. This accepts functional Copy/Paste UI wiring; deeper desktop/mobile
+manual workout modal design polish remains a later dedicated pass after functional flows are
+complete.
+
+QA evidence:
+
+- Canonical built QA server on `:3000` was healthy and reused.
+- Non-Chrome Playwright WebKit was used outside the repo.
+- One disposable user was used and fully cleaned up.
+- Desktop real hover changed the source Copy trigger from hidden/non-interactive to
+  visible/interactable.
+- Real click opened `Copy workout`.
+- Before copy, the empty target menu had no `Paste copied workout`.
+- After copy, the empty target menu showed `Paste copied workout`.
+- Paste opened backend-shaped `Review paste` with source date, target date, structure summary,
+  metric policy, and bounded confirm copy.
+- Desktop confirm persisted the paste.
+- DB readback showed one active `manual_user_built_plan_v1` plan and two planned workouts.
+- Mobile `375px` proof passed for copied state/source action, target Add/Paste menu, and paste
+  review modal with no horizontal overflow.
+- Cleanup returned templates, logs, workouts, plan cycle, runner profile, auth user, and local
+  account to zero/absent.
+- No product issues were found.
+- Coverage gaps: none for the requested rerun scope.
+
+Acceptance decision:
+
+- Accept FRONTEND Slice 4 as QA-passed.
+- Record this as shipped user-facing history in
+  [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md)
+  because functional calendar Copy/Paste is now browser-QA-passed.
+- Do not claim final manual workout modal design polish.
+- Backend Slice 6 later closed the next backend-owned delete/clear boundary; see the acceptance
+  section above.
+
+## Frontend Slice 4 Implementation Handoff Prompt (Historical)
 
 ```text
 ROLE: FRONTEND
@@ -157,8 +938,8 @@ Context:
 
 Backend Slice 5 implemented the manual copy/paste primitive behind a backend-owned review-confirm
 boundary. QA rerun passed after the canonical persisted `easy_run_with_strides` reconstruction fix.
-This accepts the backend primitive only; runner-facing calendar Copy/Paste UI is not shipped until
-FRONTEND Slice 4 passes browser QA.
+This accepted the backend primitive only at that checkpoint; runner-facing calendar Copy/Paste UI
+was later accepted in FRONTEND Slice 4 above.
 
 QA evidence:
 
@@ -200,7 +981,8 @@ Acceptance decision:
 
 - Accept Backend Slice 5 as QA-passed.
 - Do not update [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md)
-  yet because this is backend-only acceptance; runner-facing Copy/Paste UI is not shipped.
+  at this backend-only checkpoint; the later FRONTEND Slice 4 browser pass is the user-facing
+  changelog gate.
 - Select FRONTEND Slice 4 as the next manual-builder gate: calendar Copy/Paste UI wiring over the
   accepted backend seam.
 
@@ -1769,8 +2551,8 @@ Acceptance decision:
   manual active-plan Add reuse.
 - Update the changelog entry because the accepted user-facing saved-template behavior now extends
   beyond the previous first-create-only proof.
-- Select BACKEND Slice 5 as the next manual-builder gate: copy/paste draft reconstruction and
-  reviewed paste confirm for existing manual active plans.
+- Backend Slice 5 later closed the next backend-owned copy/paste boundary; see the acceptance
+  section above.
 
 ## Manual Plan Builder MVP Slice Order
 
@@ -1816,19 +2598,38 @@ Acceptance decision:
    `addManualWorkoutToActivePlan(...)` persistence and cleanup. Passed and accepted on 2026-06-11.
 13. BACKEND Slice 5:
    copy/paste draft reconstruction and reviewed paste confirm for existing manual active plans,
-   including target-date conflict/protected-day validation. Selected as the next implementation
-   gate.
+   including target-date conflict/protected-day validation. Implemented and QA-passed after guarded
+   disposable live proof.
 14. FRONTEND Slice 4:
    day more-menu copy/paste interaction and paste review flow, with no raw row duplication.
-15. BACKEND / EXPORT Slice 6:
-   JSON export/share for manual plans through the existing canonical active-plan export owner,
+   Implemented and QA-passed with focused browser/DB readback proof.
+15. BACKEND Slice 6:
+   delete/clear one eligible manual workout day through backend-owned review/confirm, preserving
+   manual active-plan lifecycle, protection rules, and source boundaries. Implemented and QA-passed
+   after guarded disposable live proof.
+16. FRONTEND Slice 5:
+   delete/clear day UI wiring over the accepted backend seam. Implemented and QA-passed with
+   focused browser/DB readback proof.
+17. BACKEND / EXPORT Slice 7:
+   JSON/Markdown export for manual plans through the existing canonical active-plan export owner,
    preserving `manual_user_built_plan_v1` source metadata and canonical workout rows.
-16. QA:
-   end-to-end manual builder MVP browser proof across multiple consecutive days, rest day, saved
-   template, custom icon/glyph, copy/paste, JSON export, cleanup, and mobile `375px`.
-17. Future-only:
-   recurrence/batch expansion architecture, edit/delete/clear persisted manual days, generated or
-   preset plan manual mutation, and advanced/performance-only manual templates.
+   Implemented and QA-passed with browser/download/DB proof.
+18. BACKEND Slice 8:
+   move one existing manual workout to another eligible date through backend-owned date-only
+   review/confirm, preserving the same persisted workout row and rejecting unsafe targets/payloads.
+   Implemented and QA-passed with guarded disposable live proof.
+19. FRONTEND Slice 6:
+   Move Workout UI wiring over the accepted backend seam. Implemented and QA-passed with
+   browser/DB readback, same-row move proof, drag/drop-to-review proof, mobile no-overflow, and
+   cleanup.
+20. ARCHITECT:
+   cleanup inventory / code-freeze readiness audit using the canonical functional map. Selected as
+   the next gate. This should classify required, validation-only, compatibility-only, future-only,
+   suspect, and delete/demote candidates before any cleanup implementation begins.
+21. Future-only:
+   Hito plan exchange / QR share-import contract and implementation, recurrence/batch expansion
+   architecture, edit persisted manual days, generated or preset plan manual mutation, and
+   advanced/performance-only manual templates.
 
 ## Frontend Boundaries For Later
 
@@ -1856,8 +2657,14 @@ This plan can close when:
 - Personal saved templates with runner-provided name and icon/glyph are persisted by backend and
   reappear in the `Add activity` picker.
 - Copy/paste works through backend-reviewed draft reconstruction, not raw row duplication.
-- Manual plan JSON export/share uses canonical active-plan export truth and preserves
+- Delete/clear of eligible manual workout days works through backend-owned review/confirm, not
+  frontend row removal.
+- Move Workout works through backend-owned date-only review/confirm and browser-QA-passed UI, not
+  copy+delete, local drag state, or frontend-owned schedule truth.
+- Manual plan JSON/Markdown export uses canonical active-plan export truth and preserves
   `manual_user_built_plan_v1` source metadata.
+- Public/share/import exchange behavior has an accepted architecture contract before any
+  implementation.
 - Manual workouts render correctly in calendar, workout detail, and export readback.
 - Protected logged/evidence-backed workouts cannot be silently overwritten.
 - Recurrence is explicitly preserved as future-only unless a separate batch-review architecture is
@@ -1963,6 +2770,16 @@ Validation:
 - No blocker for shared workout target display grammar cleanup.
 - No blocker for saved personal template reuse in the scoped manual builder paths: first-create and
   existing manual active-plan Add reuse are both QA-passed.
-- Copy/paste persistence, JSON export, edit/delete/clear, recurrence, and
+- No blocker for manual Copy/Paste in the scoped browser/DB-proved path.
+- No blocker for manual Delete/Clear in the scoped browser/DB-proved path.
+- No blocker for manual JSON/Markdown export in the scoped browser/download/DB-proved path.
+- No blocker for the backend Move Workout mutation boundary; it is QA-passed in backend/source/DB
+  scope.
+- No blocker for runner-facing Move Workout in the scoped browser/DB-proved path.
+- Next selected gate is ARCHITECT cleanup inventory / code-freeze readiness audit using the
+  canonical functional map.
+- Hito plan exchange / QR share-import is future-only and is not the next selected gate.
+- QR codes, public share links, import from export, applying someone else's plan, mobile deep-link
+  flow, edit workout, Restore/Put back/Redo UI, recurrence, PDF/watch export, modal polish, and
   generated/preset/imported/running-engine manual mutation remain intentionally out of scope.
 - Recurrence remains blocked until a separate batch-review architecture decision.

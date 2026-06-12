@@ -38,6 +38,7 @@ export interface ActivePlanExportPayload {
     effectiveEndDate: string;
     targetDate: string | null;
     sourceKind: string | null;
+    sourceStatus: string | null;
     exportedAt: string;
   };
   summary: {
@@ -100,7 +101,7 @@ export function buildActivePlanExportPayload(args: {
   return {
     plan: {
       schemaVersion: "training-plan-v2",
-      planId: args.planCycle.id,
+      planId: buildSafePlanExportId(args.planCycle, firstWorkoutDate),
       title: args.planCycle.title,
       goalSummary: args.planCycle.goal_summary,
       createdFor: "Hito saved runner",
@@ -108,6 +109,7 @@ export function buildActivePlanExportPayload(args: {
       effectiveEndDate: lastWorkoutDate,
       targetDate: args.planCycle.target_date,
       sourceKind: args.planCycle.source_kind,
+      sourceStatus: resolvePlanSourceStatus(args.planCycle.goal_metadata),
       exportedAt: args.exportedAt ?? new Date().toISOString(),
     },
     summary: {
@@ -219,8 +221,10 @@ export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayloa
     plan_id: payload.plan.planId,
     plan_name: payload.plan.title,
     source_kind: payload.plan.sourceKind ?? "hito_active_plan_export",
+    ...(payload.plan.sourceStatus ? { source_status: payload.plan.sourceStatus } : {}),
     created_at: payload.plan.exportedAt,
     generated_for: payload.plan.createdFor,
+    export_metadata: buildPlanExportMetadata(payload),
     goal: {
       goal_type: "distance_build",
       goal_label: payload.plan.goalSummary,
@@ -290,7 +294,7 @@ function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanE
   });
 
   return {
-    workoutId: row.source_workout_id ?? row.id,
+    workoutId: row.source_workout_id ?? buildSafeWorkoutExportId(row),
     date: row.workout_date,
     weekday: row.weekday,
     weekNumber: row.week_number,
@@ -310,6 +314,64 @@ function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanE
     primaryTarget: displayExecutableTargetEntries(primaryTarget, richWorkout.metricMode),
     primaryGuidance: findPrimaryGuidance(steps),
   };
+}
+
+function buildPlanExportMetadata(payload: ActivePlanExportPayload) {
+  return {
+    export_format_version: "hito_active_plan_export_v1",
+    exported_at: payload.plan.exportedAt,
+    source_kind: payload.plan.sourceKind ?? "hito_active_plan_export",
+    ...(payload.plan.sourceStatus ? { source_status: payload.plan.sourceStatus } : {}),
+    row_counts: {
+      day_count: payload.summary.dayCount,
+      workout_count: payload.summary.workoutCount,
+      weeks_count: payload.summary.weeksCount,
+    },
+    privacy: {
+      internal_database_ids_omitted: true,
+      auth_ids_omitted: true,
+      provider_tokens_omitted: true,
+    },
+  };
+}
+
+function resolvePlanSourceStatus(goalMetadata: unknown) {
+  const root = asRecord(goalMetadata);
+  const direct = stringValue(root.source_status);
+
+  if (direct) {
+    return direct;
+  }
+
+  const manualPlan = asRecord(root.manual_user_built_plan);
+  const manualSourceStatus = stringValue(manualPlan.source_status);
+
+  return manualSourceStatus;
+}
+
+function buildSafePlanExportId(planCycle: PersistedPlanCycleRow, firstWorkoutDate: string) {
+  const source = planCycle.source_kind ?? "active_plan";
+  const sourceSlug = slugify(source) || "active-plan";
+  const dateSlug = slugify(firstWorkoutDate) || "undated";
+  const titleSlug = slugify(planCycle.title).slice(0, 40) || "plan";
+
+  return `hito-export-${sourceSlug}-${dateSlug}-${titleSlug}`;
+}
+
+function buildSafeWorkoutExportId(row: PersistedPlannedWorkoutRow) {
+  const dateSlug = slugify(row.workout_date) || "undated";
+  const typeSlug = slugify(row.source_workout_type ?? row.workout_identity ?? row.workout_type);
+  const order = Number.isFinite(row.display_order) ? row.display_order : 0;
+
+  return `hito-workout-${dateSlug}-${typeSlug || "workout"}-${order}`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
 }
 
 function toExportGoalContext(goalContext: CanonicalGoalContext) {

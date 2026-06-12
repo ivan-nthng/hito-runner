@@ -67,12 +67,20 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   token/checksum confirmation, and saved manual calendars can add additional reviewed workouts on
   eligible future empty days through the existing compact calendar `Add` action. The final Add
   confirmation repeats the selected date/weekday before mutation, persistence readback uses the same
-  date-only truth, and manual Add does not send client rows, segments, or persistence metadata.
-  Personal saved templates, copy/paste, recurrence, JSON export/share, edit/delete/clear, and
-  coach/organization authoring remain later manual-builder slices
+  date-only truth, and manual Add does not send client rows, segments, or persistence metadata;
+  runners can save reviewed manual workouts as personal templates, reuse those templates from
+  `Add activity`, copy/paste manual workout days through backend-reviewed draft reconstruction, and
+  clear eligible manual workout days through backend-shaped Delete/Clear review while the active
+  manual plan remains active. Runners can also move eligible manual workout days to another empty
+  day through backend-reviewed Move Workout confirmation; the same persisted row moves, source and
+  target dates refresh from saved truth, and frontend never owns schedule mutation truth.
+  JSON/Markdown export for persisted manual active plans is available through `Open plan` and uses
+  the canonical active-plan export seam with safe export ids. Recurrence, edit persisted manual
+  workouts, Restore/Put back/Redo UI, QR/share/import, PDF/watch export, coach/organization
+  authoring, and deeper modal polish remain future-only
 - the Advanced custom program path remains separate and secondary for target date/time, unusual
-  constraints, injury/pain/caution, uncommon goals, and detailed comments; manual workout
-  creation/edit/copy/paste/recurrence is not implemented by the Plan Preset release
+  constraints, injury/pain/caution, uncommon goals, and detailed comments; Plan Presets do not own
+  manual-builder behavior, and current manual-builder capabilities are described separately above
 - setup-required accounts now see `Create a Plan` in the home header where saved-mode accounts see `Open plan`
 - the backend now also supports one first-pass free-text authoring seam:
   one user message is turned into validated canonical plan data server-side through OpenAI before the saved weekly plan opens; the saved-mode text replacement action explicitly opts into a separate rich workout-structure draft after structured intent validates, but backend normalization remains the only path to persisted `training-plan-v2` truth and falls back to the deterministic generator if the draft is unsafe or malformed
@@ -143,7 +151,9 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   the UI calls the backend clear-upcoming lifecycle first, then applies the validated imported plan through the same requested-start-date seam, without per-day schedule editing
 - the backend now owns the first active-plan export model for the upcoming `Open plan` export action:
   JSON export is shaped as canonical `training-plan-v2` truth using the active saved schedule dates, now including rich workout family, exact identity, calendar icon key, goal context, and metric mode; Markdown export is derived from the same payload for readable sharing with a compact workout focus line, and both omit completion, Garmin, comparison, AI, and other runtime-only saved-mode state
-  visible export controls and PDF remain later slices
+  visible JSON/Markdown export controls are now available from `Open plan`, including proved manual
+  active-plan export; PDF, watch export, QR/public sharing, and import-from-share remain later
+  slices
 - home and calendar now default to the real current day instead of a frozen demo start date
 - today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
 - when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero

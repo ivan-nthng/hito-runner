@@ -11,6 +11,7 @@ const isDevServerCommand =
   process.argv.some((argument) => argument === "dev" || argument === "serve");
 
 const nitroPublicOutputDir = resolve(process.cwd(), ".output/public");
+const clientPublicSnapshotDir = resolve(process.cwd(), "logs/build-output-public-snapshot");
 const sourcePublicDir = resolve(process.cwd(), "public");
 
 function hitoNitroPublicAssetsVirtualRestore(): PluginOption {
@@ -38,6 +39,13 @@ function hitoNitroPublicAssetsVirtualRestore(): PluginOption {
         return null;
       },
     },
+    writeBundle() {
+      if (this.environment.name !== "client") {
+        return;
+      }
+
+      snapshotClientPublicOutput();
+    },
   };
 }
 
@@ -58,17 +66,52 @@ function hitoNitroPublicAssetsRestore(): PluginOption {
   };
 }
 
+function hitoNitroServiceOutputLifecycle(): PluginOption {
+  return {
+    name: "hito:nitro-service-output-lifecycle",
+    enforce: "post",
+    configEnvironment(name, config) {
+      if (
+        name !== "ssr" ||
+        !config.build?.outDir?.includes("node_modules/.nitro/vite/services/ssr")
+      ) {
+        return;
+      }
+
+      config.build.emptyOutDir = false;
+    },
+  };
+}
+
 function restoreNitroPublicAssets(): void {
   mkdirSync(nitroPublicOutputDir, { recursive: true });
+
+  if (existsSync(clientPublicSnapshotDir)) {
+    cpSync(clientPublicSnapshotDir, nitroPublicOutputDir, { recursive: true });
+  }
 
   if (existsSync(sourcePublicDir)) {
     cpSync(sourcePublicDir, nitroPublicOutputDir, { recursive: true });
   }
 }
 
+function snapshotClientPublicOutput(): void {
+  if (!existsSync(nitroPublicOutputDir)) {
+    return;
+  }
+
+  mkdirSync(clientPublicSnapshotDir, { recursive: true });
+  cpSync(nitroPublicOutputDir, clientPublicSnapshotDir, { recursive: true });
+}
+
 export default defineConfig({
   cloudflare: false,
-  plugins: [hitoNitroPublicAssetsVirtualRestore(), ...nitro(), hitoNitroPublicAssetsRestore()],
+  plugins: [
+    hitoNitroPublicAssetsVirtualRestore(),
+    ...nitro(),
+    hitoNitroServiceOutputLifecycle(),
+    hitoNitroPublicAssetsRestore(),
+  ],
   vite: {
     nitro: isDevServerCommand
       ? {

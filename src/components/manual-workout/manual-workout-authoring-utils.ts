@@ -1,5 +1,6 @@
 import type { ManualWorkoutDraftInput, ManualWorkoutTargetTruthMode } from "@/lib/training-api";
 import { hitoDateFromIso } from "@/components/ui/hito-date-time-utils";
+import { formatDistanceMeters, formatDurationMin } from "@/lib/training";
 import {
   listManualWorkoutTemplates,
   type ManualWorkoutTemplate,
@@ -174,6 +175,20 @@ export function targetTruthModeCopy(mode: ManualWorkoutTargetTruthMode) {
   }
 
   return "Duration, distance, repeat, work, and recovery structure without pace or HR targets.";
+}
+
+export function formatManualDraftStructure(totalDurationMin: number, totalDistanceKm: number) {
+  const parts: string[] = [];
+
+  if (totalDurationMin > 0) {
+    parts.push(formatDurationMin(totalDurationMin));
+  }
+
+  if (totalDistanceKm > 0) {
+    parts.push(formatDistanceMeters(totalDistanceKm * 1000));
+  }
+
+  return parts.length ? parts.join(" · ") : "Reviewed structure";
 }
 
 function parseIsoDateAsLocalCalendarDay(iso: string) {

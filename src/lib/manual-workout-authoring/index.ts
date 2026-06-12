@@ -20,6 +20,30 @@ export {
   type ManualWorkoutCopyPasteReviewResult,
 } from "@/lib/manual-workout-authoring/copy-paste";
 export {
+  confirmManualWorkoutDeleteClear,
+  confirmManualWorkoutDeleteClearForUser,
+  manualWorkoutDeleteClearConfirmInputSchema,
+  manualWorkoutDeleteClearReviewInputSchema,
+  reviewManualWorkoutDeleteClear,
+  reviewManualWorkoutDeleteClearForUser,
+  type ManualWorkoutDeleteClearConfirmResult,
+  type ManualWorkoutDeleteClearDependencies,
+  type ManualWorkoutDeleteClearFailureReason,
+  type ManualWorkoutDeleteClearReviewResult,
+} from "@/lib/manual-workout-authoring/delete-clear";
+export {
+  confirmManualWorkoutMove,
+  confirmManualWorkoutMoveForUser,
+  manualWorkoutMoveConfirmInputSchema,
+  manualWorkoutMoveReviewInputSchema,
+  reviewManualWorkoutMove,
+  reviewManualWorkoutMoveForUser,
+  type ManualWorkoutMoveConfirmResult,
+  type ManualWorkoutMoveDependencies,
+  type ManualWorkoutMoveFailureReason,
+  type ManualWorkoutMoveReviewResult,
+} from "@/lib/manual-workout-authoring/move-workout";
+export {
   MANUAL_SAVED_WORKOUT_TEMPLATE_PAYLOAD_VERSION,
   MANUAL_SAVED_WORKOUT_TEMPLATE_SOURCE_KIND,
   MANUAL_SAVED_WORKOUT_TEMPLATE_SOURCE_STATUS,

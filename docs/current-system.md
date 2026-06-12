@@ -6,7 +6,7 @@
 - the imported baseline structure remains preserved in `src/`, including generated route tree, shell, components, UI primitives, and styles
 - build and dev commands come from `package.json`
 - local production-like `npm run start` now explicitly loads `.env.local` so server-only admin and Supabase env reaches the built server path
-- local QA on `localhost:3000` should use the current built output through `npm run serve:local` after `npm run build`; long-lived server processes must be restarted after rebuilds so HTML and hashed assets come from the same `.output`
+- local QA on `localhost:3000` uses the current built output through `npm run serve:local` after `npm run build`; `npm run qa:server:start|status|restart|stop` manages that canonical built server lifecycle, keeps PID/log state under gitignored `logs/`, and restarts stale build output so HTML and hashed assets come from the same `.output`
 - the canonical deployment runtime is now Nitro for Vercel:
   `npm run build` emits `.output/` locally
   `vercel build` emits `.vercel/output/` with Vercel functions
@@ -243,9 +243,13 @@
   `runner_manual_workout_templates` table and manual authoring saved-template actions: reviewed
   manual workouts can be saved as current-user-owned templates with display name/icon metadata,
   listed for the owner, protected by RLS/current-user ownership, and reconstructed into future
-  non-persisted manual drafts through `reviewManualWorkoutDraft(...)`. Frontend `Save as template`
-  and personal-template picker wiring, copy/paste, recurrence, JSON export/share, move-workout, and
-  edit/delete/clear are not implemented yet.
+  non-persisted manual drafts through `reviewManualWorkoutDraft(...)`. Saved manual calendars now
+  also support personal-template picker reuse, backend-reviewed Copy/Paste, Delete/Clear, and Move
+  Workout through manual authoring review/confirm seams. Move updates the same persisted
+  `planned_workouts` row date/weekday/week truth after backend review; frontend renders the menu,
+  drag/drop-to-review affordance, review dialog, and refresh from persisted state without owning
+  schedule mutation truth. Recurrence, edit persisted manual workouts, Restore/Put back/Redo UI,
+  QR/share/import, PDF/watch export, and coach/organization templates are not implemented yet.
 - visible onboarding on `/` is now structured-first:
   authenticated users without setup answer the bounded first-plan constructor for required profile basics, progressive training preferences, bounded fitness-level benchmark context, execution preference, goal, conditional target/terrain context, strength/mobility support, and optional comment; the frontend calls `generateStructuredFirstPlanDraft` first, keeps `correction_required` inline near the form, opens a `Review your setup` modal only for `draft_ready`, and calls `confirmStructuredFirstPlanDraft` only from the modal `Yes, create plan` action
 - structured constructor review-before-create is now the visible manual onboarding path:

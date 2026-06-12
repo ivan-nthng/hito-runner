@@ -1,5 +1,5 @@
-import { cpSync, existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import {
   validateLocalBuildOutput,
   validateVercelBuildOutput,
@@ -12,6 +12,13 @@ const sourcePublicDir = resolve(rootDir, "public");
 const outputPublicDir = resolve(rootDir, ".output/public");
 const outputServerDir = resolve(rootDir, ".output/server");
 const outputNitroManifest = resolve(rootDir, ".output/nitro.json");
+const localFinalizeBackupDir = resolve(rootDir, "logs/build-output-finalize-backup");
+const localFinalizeServerBackupDir = resolve(localFinalizeBackupDir, "server");
+const localFinalizePublicBackupDir = resolve(localFinalizeBackupDir, "public");
+const localFinalizedOutputDir = resolve(rootDir, "logs/build-output-finalized");
+const localFinalizedServerDir = resolve(localFinalizedOutputDir, "server");
+const localFinalizedPublicDir = resolve(localFinalizedOutputDir, "public");
+const clientPublicSnapshotDir = resolve(rootDir, "logs/build-output-public-snapshot");
 const vercelOutputDir = resolve(rootDir, ".vercel/output");
 const vercelStaticDir = resolve(vercelOutputDir, "static");
 const vercelFunctionDir = resolve(vercelOutputDir, "functions/__server.func");
@@ -42,23 +49,21 @@ const vercelRequiredOutputs = [
 ];
 
 if (shouldFinalizeVercelOutput()) {
-  finalizeVercelOutput();
+  await finalizeVercelOutput();
 } else {
-  finalizeLocalOutput();
+  await finalizeLocalOutput();
 }
 
 function shouldFinalizeVercelOutput() {
   const hasVercelOutput = existsSync(vercelOutputDir);
-  const hasLocalOutput = existsSync(outputNitroManifest) || existsSync(outputServerDir);
   const isVercelBuild = process.env.VERCEL === "1" || process.env.NOW_BUILDER === "1";
 
-  return hasVercelOutput && (isVercelBuild || !hasLocalOutput);
+  return isVercelBuild && hasVercelOutput;
 }
 
-function finalizeLocalOutput() {
-  copyDirectory(stagedPublicDir, outputPublicDir);
-  copyDirectory(sourcePublicDir, outputPublicDir);
-  copyPlanPresetProgramArtifacts(localPlanPresetProgramOutputDir);
+async function finalizeLocalOutput() {
+  snapshotLocalOutputForLateNitroCleanup();
+  await restoreLocalOutputAfterLateNitroCleanup();
 
   for (const outputPath of localRequiredOutputs) {
     if (!existsSync(outputPath)) {
@@ -71,7 +76,7 @@ function finalizeLocalOutput() {
   validateLocalBuildOutput({ rootDir });
 }
 
-function finalizeVercelOutput() {
+async function finalizeVercelOutput() {
   copyDirectory(sourcePublicDir, vercelStaticDir);
   copyPlanPresetProgramArtifacts(vercelPlanPresetProgramOutputDir);
 
@@ -93,6 +98,52 @@ function copyDirectory(sourceDir, destinationDir) {
 
   mkdirSync(destinationDir, { recursive: true });
   cpSync(sourceDir, destinationDir, { recursive: true });
+}
+
+function snapshotLocalOutputForLateNitroCleanup() {
+  rmSync(localFinalizeBackupDir, { recursive: true, force: true });
+  rmSync(localFinalizedOutputDir, { recursive: true, force: true });
+
+  copyDirectory(outputServerDir, localFinalizeServerBackupDir);
+  copyDirectory(outputPublicDir, localFinalizePublicBackupDir);
+}
+
+async function restoreLocalOutputAfterLateNitroCleanup() {
+  const settleWindowsMs = [250, 750, 1500];
+
+  for (const settleMs of settleWindowsMs) {
+    await new Promise((resolvePromise) => {
+      setTimeout(resolvePromise, settleMs);
+    });
+
+    restoreLocalOutputSnapshot();
+    restoreLocalPublicOutput();
+    copyPlanPresetProgramArtifacts(localPlanPresetProgramOutputDir);
+  }
+}
+
+function restoreLocalOutputSnapshot() {
+  copyDirectory(localFinalizeServerBackupDir, localFinalizedServerDir);
+  copyDirectory(localFinalizePublicBackupDir, localFinalizedPublicDir);
+  linkLocalOutputDirectory(localFinalizedServerDir, outputServerDir);
+  linkLocalOutputDirectory(localFinalizedPublicDir, outputPublicDir);
+}
+
+function restoreLocalPublicOutput() {
+  copyDirectory(clientPublicSnapshotDir, localFinalizedPublicDir);
+  copyDirectory(stagedPublicDir, localFinalizedPublicDir);
+  copyDirectory(sourcePublicDir, localFinalizedPublicDir);
+  linkLocalOutputDirectory(localFinalizedPublicDir, outputPublicDir);
+}
+
+function linkLocalOutputDirectory(sourceDir, outputPath) {
+  if (!existsSync(sourceDir)) {
+    return;
+  }
+
+  rmSync(outputPath, { recursive: true, force: true });
+  mkdirSync(dirname(outputPath), { recursive: true });
+  symlinkSync(relative(dirname(outputPath), sourceDir), outputPath, "dir");
 }
 
 function copyPlanPresetProgramArtifacts(destinationDir) {

@@ -8,9 +8,13 @@ import {
   addManualWorkoutToActivePlanForUser,
   buildManualWorkoutUserBuiltTrainingPlan,
   confirmManualWorkoutCopyPasteDraftForUser,
+  confirmManualWorkoutDeleteClearForUser,
   confirmManualWorkoutDraftForUser,
+  confirmManualWorkoutMoveForUser,
   listManualWorkoutSavedTemplatesForUser,
   reviewManualWorkoutCopyPasteDraftForUser,
+  reviewManualWorkoutDeleteClearForUser,
+  reviewManualWorkoutMoveForUser,
   reviewManualWorkoutSavedTemplateForUser,
   reviewManualWorkoutDraft,
   saveManualWorkoutSavedTemplateForUser,
@@ -19,8 +23,12 @@ import {
   type ManualWorkoutConfirmResult,
   type ManualWorkoutCopyPasteConfirmResult,
   type ManualWorkoutCopyPasteReviewResult,
+  type ManualWorkoutDeleteClearConfirmResult,
+  type ManualWorkoutDeleteClearReviewResult,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
+  type ManualWorkoutMoveConfirmResult,
+  type ManualWorkoutMoveReviewResult,
   type ManualWorkoutSavedTemplateRepository,
   type ManualWorkoutSavedTemplateSaveResult,
 } from "../src/lib/manual-workout-authoring";
@@ -30,8 +38,18 @@ import type {
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
 } from "../src/lib/active-plan-persistence";
-import { buildImportedPlanSeed, type TrainingPlanV2 } from "../src/lib/imported-plan";
+import {
+  buildImportedPlanSeed,
+  importedPlanSchema,
+  type TrainingPlanV2,
+} from "../src/lib/imported-plan";
 import type { AdditionalPlanPersistenceMetadata } from "../src/lib/plan-authoring-snapshot";
+import {
+  activePlanExportToTrainingPlanV2,
+  buildActivePlanExportPayload,
+  renderPlanExportJson,
+  renderPlanExportMarkdown,
+} from "../src/lib/plan-export";
 import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
 import type { Step } from "../src/lib/training";
 import { formatReadableDate } from "../src/components/manual-workout/manual-workout-authoring-utils";
@@ -54,6 +72,9 @@ async function main() {
   await validateManualConfirmPersistenceContract();
   await validateManualActivePlanAddWorkoutContract();
   await validateManualCopyPasteContract();
+  await validateManualDeleteClearContract();
+  await validateManualMoveWorkoutContract();
+  validateManualActivePlanExportContract();
 
   const persistenceInput: ManualWorkoutDraftInput = {
     templateKey: "easy_aerobic_run",
@@ -799,6 +820,1005 @@ async function validateManualCopyPasteContract() {
   );
 }
 
+async function validateManualDeleteClearContract() {
+  const userId = "00000000-0000-4000-8000-000000000501";
+  const activePlan = buildFakePlanCycle({
+    userId,
+    id: "99999999-9999-4999-8999-000000000501",
+    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    startDate: "2026-06-18",
+    endDate: "2026-06-21",
+  });
+  const targetInput: ManualWorkoutDraftInput = {
+    templateKey: "easy_run_with_strides",
+    workoutDate: "2026-06-18",
+    title: "Delete candidate strides",
+    notes: "This is safe to remove and restore.",
+  };
+  const targetReview = assertReady("delete/clear target review", targetInput);
+  const targetWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000502",
+    review: targetReview,
+  });
+  const keptReview = assertReady("delete/clear kept review", {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-21",
+    title: "Keep this easy run",
+  });
+  const keptWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000503",
+    review: keptReview,
+  });
+  const review = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [targetWorkout, keptWorkout] }),
+  );
+
+  assert.equal(review.ok, true, formatDeleteReviewResult(review));
+  if (review.ok) {
+    assert.equal(review.status, "review_ready");
+    assert.equal(review.persisted, false);
+    assert.equal(review.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(review.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
+    assert.equal(review.activePlanId, activePlan.id);
+    assert.equal(review.plannedWorkoutId, targetWorkout.id);
+    assert.equal(review.workoutDate, targetInput.workoutDate);
+    assert.equal(review.templateKey, targetInput.templateKey);
+    assert.equal(review.review.reviewToken.startsWith("manual-workout-delete-review-v1."), true);
+    assert.equal(review.review.reviewChecksum.length, 64);
+    assert.equal(review.restore.available, true);
+    assert.equal(review.restore.label, "Restore");
+    assert.deepEqual(review.restore.alternateLabels, ["Put back", "Redo"]);
+    assert.equal(review.restore.draftInput.workoutDate, targetWorkout.workout_date);
+    assert.equal(review.restore.draftInput.title, targetInput.title);
+    assert.equal(review.restore.review.draft.workoutDate, targetWorkout.workout_date);
+    assert.equal(review.restore.review.draft.title, targetInput.title);
+    assert.equal(review.restore.safety.reviewedThroughManualAuthoring, true);
+    assert.equal(review.restore.safety.trustedClientRows, false);
+    assert.equal(review.restore.safety.targetDateDerivedServerSide, true);
+    assertRepeatWithRecovery(review.restore.review.draft.steps, "delete restore review");
+    assertNoFakePaceOrHr(review.restore.review.draft.steps, "delete restore review");
+    assert.equal(review.safety.trustedClientRows, false);
+    assert.equal(review.safety.lastWorkoutProtected, true);
+  }
+
+  const persistedDeletes: Array<{
+    targetWorkoutId: string;
+    remainingWorkoutIds: string[];
+    reviewChecksum: string;
+  }> = [];
+  const success = await confirmManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+      ...(review.ok
+        ? {
+            reviewToken: review.review.reviewToken,
+            reviewChecksum: review.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeDeleteDependencies({
+      activePlan,
+      workouts: [targetWorkout, keptWorkout],
+      onPersist: ({
+        targetWorkout: persistedTarget,
+        remainingWorkouts,
+        review: persistedReview,
+      }) => {
+        persistedDeletes.push({
+          targetWorkoutId: persistedTarget.id,
+          remainingWorkoutIds: remainingWorkouts.map((workout) => workout.id),
+          reviewChecksum: persistedReview.reviewChecksum,
+        });
+      },
+    }),
+  );
+
+  assert.equal(success.ok, true, formatDeleteConfirmResult(success));
+  if (success.ok) {
+    assert.equal(success.status, "deleted");
+    assert.equal(success.persisted, true);
+    assert.equal(success.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(success.sourceStatus, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
+    assert.equal(success.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
+    assert.equal(success.activePlanId, activePlan.id);
+    assert.equal(success.plannedWorkoutId, targetWorkout.id);
+    assert.equal(success.workoutDate, targetWorkout.workout_date);
+    assert.equal(success.calendarRowCount, 1);
+    assert.equal(success.nonRestWorkoutCount, 1);
+    assert.equal(success.restore.label, "Restore");
+    assert.equal(success.restore.review.draft.workoutDate, targetWorkout.workout_date);
+    assert.equal(success.safety.deletedExactlyOneRow, true);
+    assert.equal(success.safety.activePlanRemainsActive, true);
+    assert.equal(success.safety.serverRebuiltReview, true);
+    assert.equal(success.safety.trustedClientRows, false);
+  }
+
+  assert.deepEqual(persistedDeletes, [
+    {
+      targetWorkoutId: targetWorkout.id,
+      remainingWorkoutIds: [keptWorkout.id],
+      reviewChecksum: review.ok ? review.review.reviewChecksum : "",
+    },
+  ]);
+
+  const changedTarget = await confirmManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: keptWorkout.id,
+      ...(review.ok
+        ? {
+            reviewToken: review.review.reviewToken,
+            reviewChecksum: review.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [targetWorkout, keptWorkout] }),
+  );
+  assertDeleteConfirmBlocked(changedTarget, "stale_review", "changed delete target workout");
+
+  const invalidToken = await confirmManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+      reviewToken: review.ok
+        ? `${review.review.reviewToken.slice(0, -1)}${
+            review.review.reviewToken.endsWith("0") ? "1" : "0"
+          }`
+        : "invalid-token",
+      reviewChecksum: review.ok ? review.review.reviewChecksum : "0".repeat(64),
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [targetWorkout, keptWorkout] }),
+  );
+  assertDeleteConfirmBlocked(invalidToken, "invalid_review", "invalid delete token");
+
+  const staleChecksum = await confirmManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+      reviewToken: review.ok ? review.review.reviewToken : "invalid-token",
+      reviewChecksum: "0".repeat(64),
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [targetWorkout, keptWorkout] }),
+  );
+  assertDeleteConfirmBlocked(staleChecksum, "stale_review", "stale delete checksum");
+
+  const clientRowsAttempt = await confirmManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+      ...(review.ok
+        ? {
+            reviewToken: review.review.reviewToken,
+            reviewChecksum: review.review.reviewChecksum,
+          }
+        : {}),
+      plannedWorkout: { workoutDate: targetWorkout.workout_date, steps: [] },
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [targetWorkout, keptWorkout] }),
+  );
+  assertDeleteConfirmBlocked(clientRowsAttempt, "invalid_review", "client-sent delete row");
+
+  const nonManualPlan = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+    },
+    buildFakeDeleteDependencies({
+      activePlan: buildFakePlanCycle({
+        userId,
+        id: activePlan.id,
+        sourceKind: "plan_preset_v1",
+        startDate: "2026-06-18",
+        endDate: "2026-06-21",
+      }),
+      workouts: [targetWorkout, keptWorkout],
+    }),
+  );
+  assertDeleteReviewBlocked(
+    nonManualPlan,
+    "unsupported_active_plan_source",
+    "non-manual delete plan",
+  );
+
+  const foreignWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId: "00000000-0000-4000-8000-000000000599",
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000504",
+    review: targetReview,
+  });
+  const foreignTarget = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: foreignWorkout.id,
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [foreignWorkout, keptWorkout] }),
+  );
+  assertDeleteReviewBlocked(
+    foreignTarget,
+    "target_workout_not_in_active_plan",
+    "foreign delete target workout",
+  );
+
+  const missingTarget = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: "99999999-9999-4999-8999-000000000505",
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [targetWorkout, keptWorkout] }),
+  );
+  assertDeleteReviewBlocked(
+    missingTarget,
+    "target_workout_not_found",
+    "missing delete target workout",
+  );
+
+  const unsupportedTarget = buildFakePlannedWorkout({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000506",
+    date: "2026-06-24",
+    displayOrder: 2,
+    sourceWorkoutType: "legacy_easy",
+    steps: targetWorkout.steps,
+  });
+  const unsupported = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: unsupportedTarget.id,
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [unsupportedTarget, keptWorkout] }),
+  );
+  assertDeleteReviewBlocked(
+    unsupported,
+    "target_workout_not_supported",
+    "unsupported delete target payload",
+  );
+
+  const loggedTarget = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+    },
+    buildFakeDeleteDependencies({
+      activePlan,
+      workouts: [targetWorkout, keptWorkout],
+      logsByWorkoutId: new Map([
+        [
+          targetWorkout.id,
+          buildFakeWorkoutLog({
+            userId,
+            plannedWorkoutId: targetWorkout.id,
+          }),
+        ],
+      ]),
+    }),
+  );
+  assertDeleteReviewBlocked(loggedTarget, "protected_day", "logged delete target");
+
+  const evidenceTarget = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+    },
+    buildFakeDeleteDependencies({
+      activePlan,
+      workouts: [targetWorkout, keptWorkout],
+      evidenceWorkoutIds: new Set([targetWorkout.id]),
+    }),
+  );
+  assertDeleteReviewBlocked(evidenceTarget, "protected_day", "evidence delete target");
+
+  const pastReview = assertReady("past delete target review", {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-09",
+    title: "Past easy run",
+  });
+  const pastTarget = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000507",
+    review: pastReview,
+  });
+  const protectedPast = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: pastTarget.id,
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [pastTarget, keptWorkout] }),
+  );
+  assertDeleteReviewBlocked(protectedPast, "protected_day", "past delete target");
+
+  const lastWorkout = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [targetWorkout] }),
+  );
+  assertDeleteReviewBlocked(
+    lastWorkout,
+    "last_workout_not_deletable",
+    "last manual workout delete",
+  );
+
+  const persistenceFailure = await confirmManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+      ...(review.ok
+        ? {
+            reviewToken: review.review.reviewToken,
+            reviewChecksum: review.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeDeleteDependencies({
+      activePlan,
+      workouts: [targetWorkout, keptWorkout],
+      persistError: new Error("simulated delete failure"),
+    }),
+  );
+  assertDeleteConfirmBlocked(
+    persistenceFailure,
+    "persistence_failed",
+    "delete persistence failure",
+  );
+}
+
+async function validateManualMoveWorkoutContract() {
+  const userId = "00000000-0000-4000-8000-000000000701";
+  const activePlan = buildFakePlanCycle({
+    userId,
+    id: "99999999-9999-4999-8999-000000000701",
+    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    startDate: "2026-06-18",
+    endDate: "2026-06-21",
+  });
+  const sourceInput: ManualWorkoutDraftInput = {
+    templateKey: "easy_run_with_strides",
+    workoutDate: "2026-06-18",
+    title: "Move candidate strides",
+    notes: "Move this structure to another empty day.",
+  };
+  const sourceReview = assertReady("move source review", sourceInput);
+  const sourceWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000702",
+    review: sourceReview,
+  });
+  const keptReview = assertReady("move kept review", {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-21",
+    title: "Keep this easy run",
+  });
+  const keptWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000703",
+    review: keptReview,
+  });
+  const targetDate = "2026-06-22";
+  const moveReview = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+
+  assert.equal(moveReview.ok, true, formatMoveReviewResult(moveReview));
+  if (moveReview.ok) {
+    assert.equal(moveReview.status, "review_ready");
+    assert.equal(moveReview.persisted, false);
+    assert.equal(moveReview.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(moveReview.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
+    assert.equal(moveReview.activePlanId, activePlan.id);
+    assert.equal(moveReview.sourceWorkoutId, sourceWorkout.id);
+    assert.equal(moveReview.sourceWorkoutDate, sourceInput.workoutDate);
+    assert.equal(moveReview.targetDate, targetDate);
+    assert.equal(moveReview.targetWeekday, "Monday");
+    assert.equal(moveReview.draftInput.workoutDate, targetDate);
+    assert.equal(moveReview.targetReview.draft.weekday, "Monday");
+    assert.notEqual(moveReview.targetReview.draft.weekday, sourceWorkout.weekday);
+    assert.equal(moveReview.title, sourceInput.title);
+    assert.equal(moveReview.templateKey, sourceInput.templateKey);
+    assert.equal(moveReview.targetReview.draft.workoutIdentity, sourceReview.draft.workoutIdentity);
+    assertRepeatWithRecovery(moveReview.targetReview.draft.steps, "move review");
+    assertNoFakePaceOrHr(moveReview.targetReview.draft.steps, "move review");
+    assert.equal(moveReview.review.reviewToken.startsWith("manual-workout-move-review-v1."), true);
+    assert.equal(moveReview.review.reviewChecksum.length, 64);
+    assert.equal(moveReview.safety.sourceWorkoutVerified, true);
+    assert.equal(moveReview.safety.targetDayWasEmpty, true);
+    assert.equal(moveReview.safety.targetWeekdayDerivedServerSide, true);
+    assert.equal(moveReview.safety.lastWorkoutMoveAllowedWithinSamePlan, true);
+    assert.equal(moveReview.safety.trustedClientRows, false);
+  }
+
+  const sourceDateReview = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutDate: sourceWorkout.workout_date,
+      targetDate: "2026-06-23",
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assert.equal(sourceDateReview.ok, true, formatMoveReviewResult(sourceDateReview));
+
+  const persistedMoves: Array<{
+    sourceWorkoutId: string;
+    sourceDate: string;
+    targetDate: string;
+    targetWeekday: string;
+    targetWeekNumber: number;
+    sourceDateEmpty: boolean;
+    targetContainsMoved: boolean;
+    reviewChecksum: string;
+    title: string;
+    workoutIdentity: string | null;
+    metricMode: PersistedPlannedWorkoutRow["metric_mode"];
+    steps: PersistedPlannedWorkoutRow["steps"];
+  }> = [];
+  const success = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      ...(moveReview.ok
+        ? {
+            reviewToken: moveReview.review.reviewToken,
+            reviewChecksum: moveReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeMoveDependencies({
+      activePlan,
+      workouts: [sourceWorkout, keptWorkout],
+      onPersist: ({ sourceWorkout: persistedSource, otherWorkouts, review, targetWeekNumber }) => {
+        const movedWorkout = {
+          ...persistedSource,
+          workout_date: review.targetDate,
+          weekday: review.targetWeekday,
+          week_number: targetWeekNumber,
+        };
+        const movedRows = [...otherWorkouts, movedWorkout];
+        persistedMoves.push({
+          sourceWorkoutId: persistedSource.id,
+          sourceDate: persistedSource.workout_date,
+          targetDate: review.targetDate,
+          targetWeekday: review.targetWeekday,
+          targetWeekNumber,
+          sourceDateEmpty: movedRows.every(
+            (workout) => workout.workout_date !== persistedSource.workout_date,
+          ),
+          targetContainsMoved: movedRows.some(
+            (workout) => workout.id === persistedSource.id && workout.workout_date === targetDate,
+          ),
+          reviewChecksum: review.reviewChecksum,
+          title: movedWorkout.title,
+          workoutIdentity: movedWorkout.workout_identity,
+          metricMode: movedWorkout.metric_mode,
+          steps: movedWorkout.steps,
+        });
+      },
+    }),
+  );
+
+  assert.equal(success.ok, true, formatMoveConfirmResult(success));
+  if (success.ok) {
+    assert.equal(success.status, "moved");
+    assert.equal(success.persisted, true);
+    assert.equal(success.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(success.sourceStatus, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
+    assert.equal(success.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
+    assert.equal(success.activePlanId, activePlan.id);
+    assert.equal(success.plannedWorkoutId, sourceWorkout.id);
+    assert.equal(success.sourceWorkoutDate, sourceWorkout.workout_date);
+    assert.equal(success.targetDate, targetDate);
+    assert.equal(success.targetWeekday, "Monday");
+    assert.equal(success.title, sourceInput.title);
+    assert.equal(success.templateKey, sourceInput.templateKey);
+    assert.equal(success.calendarRowCount, 2);
+    assert.equal(success.nonRestWorkoutCount, 2);
+    assert.equal(success.safety.movedExactlyOneRow, true);
+    assert.equal(success.safety.sourceDateBecameEmpty, true);
+    assert.equal(success.safety.targetDayWasEmpty, true);
+    assert.equal(success.safety.targetWeekdayDerivedServerSide, true);
+    assert.equal(success.safety.lastWorkoutMoveAllowedWithinSamePlan, true);
+    assert.equal(success.safety.serverRebuiltReview, true);
+    assert.equal(success.safety.trustedClientRows, false);
+  }
+
+  assert.equal(persistedMoves.length, 1);
+  const persistedMove = persistedMoves[0]!;
+  assert.deepEqual(
+    {
+      sourceWorkoutId: persistedMove.sourceWorkoutId,
+      sourceDate: persistedMove.sourceDate,
+      targetDate: persistedMove.targetDate,
+      targetWeekday: persistedMove.targetWeekday,
+      targetWeekNumber: persistedMove.targetWeekNumber,
+      sourceDateEmpty: persistedMove.sourceDateEmpty,
+      targetContainsMoved: persistedMove.targetContainsMoved,
+      reviewChecksum: persistedMove.reviewChecksum,
+      title: persistedMove.title,
+      workoutIdentity: persistedMove.workoutIdentity,
+    },
+    {
+      sourceWorkoutId: sourceWorkout.id,
+      sourceDate: sourceInput.workoutDate,
+      targetDate,
+      targetWeekday: "Monday",
+      targetWeekNumber: 1,
+      sourceDateEmpty: true,
+      targetContainsMoved: true,
+      reviewChecksum: moveReview.ok ? moveReview.review.reviewChecksum : "",
+      title: sourceInput.title,
+      workoutIdentity: sourceReview.draft.workoutIdentity,
+    },
+  );
+  assert.deepEqual(persistedMove.metricMode, sourceWorkout.metric_mode);
+  assert.deepEqual(persistedMove.steps, sourceWorkout.steps);
+  assertNoFakePaceOrHr(readStepsForAssertion(persistedMove.steps), "persisted move");
+
+  const changedTarget = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate: "2026-06-23",
+      ...(moveReview.ok
+        ? {
+            reviewToken: moveReview.review.reviewToken,
+            reviewChecksum: moveReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertMoveConfirmBlocked(changedTarget, "stale_review", "changed move target date");
+
+  const otherSourceReview = assertReady("move changed source review", {
+    templateKey: "steady_aerobic_run",
+    workoutDate: "2026-06-20",
+    title: "Other source",
+  });
+  const otherSourceWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000704",
+    review: otherSourceReview,
+  });
+  const changedSource = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: otherSourceWorkout.id,
+      targetDate,
+      ...(moveReview.ok
+        ? {
+            reviewToken: moveReview.review.reviewToken,
+            reviewChecksum: moveReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeMoveDependencies({
+      activePlan,
+      workouts: [sourceWorkout, keptWorkout, otherSourceWorkout],
+    }),
+  );
+  assertMoveConfirmBlocked(changedSource, "stale_review", "changed move source workout");
+
+  const invalidToken = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      reviewToken: moveReview.ok
+        ? `${moveReview.review.reviewToken.slice(0, -1)}${
+            moveReview.review.reviewToken.endsWith("0") ? "1" : "0"
+          }`
+        : "invalid-token",
+      reviewChecksum: moveReview.ok ? moveReview.review.reviewChecksum : "0".repeat(64),
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertMoveConfirmBlocked(invalidToken, "invalid_review", "invalid move token");
+
+  const staleChecksum = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      reviewToken: moveReview.ok ? moveReview.review.reviewToken : "invalid-token",
+      reviewChecksum: "0".repeat(64),
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertMoveConfirmBlocked(staleChecksum, "stale_review", "stale move checksum");
+
+  const occupiedWorkout = buildFakePlannedWorkout({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000705",
+    date: targetDate,
+    displayOrder: 2,
+  });
+  const occupiedTarget = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      ...(moveReview.ok
+        ? {
+            reviewToken: moveReview.review.reviewToken,
+            reviewChecksum: moveReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeMoveDependencies({
+      activePlan,
+      workouts: [sourceWorkout, keptWorkout, occupiedWorkout],
+    }),
+  );
+  assertMoveConfirmBlocked(occupiedTarget, "occupied_day", "occupied move target");
+
+  const nonManualPlan = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+    },
+    buildFakeMoveDependencies({
+      activePlan: buildFakePlanCycle({
+        userId,
+        id: activePlan.id,
+        sourceKind: "plan_preset_v1",
+        startDate: "2026-06-18",
+        endDate: "2026-06-21",
+      }),
+      workouts: [sourceWorkout, keptWorkout],
+    }),
+  );
+  assertMoveReviewBlocked(nonManualPlan, "unsupported_active_plan_source", "non-manual move plan");
+
+  const foreignSourceWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId: "00000000-0000-4000-8000-000000000799",
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000706",
+    review: sourceReview,
+  });
+  const foreignSource = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: foreignSourceWorkout.id,
+      targetDate,
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [foreignSourceWorkout, keptWorkout] }),
+  );
+  assertMoveReviewBlocked(
+    foreignSource,
+    "source_workout_not_in_active_plan",
+    "foreign move source workout",
+  );
+
+  const missingSource = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: "99999999-9999-4999-8999-000000000707",
+      targetDate,
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertMoveReviewBlocked(missingSource, "source_workout_not_found", "missing move source workout");
+
+  const clientRowsAttempt = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      ...(moveReview.ok
+        ? {
+            reviewToken: moveReview.review.reviewToken,
+            reviewChecksum: moveReview.review.reviewChecksum,
+          }
+        : {}),
+      plannedWorkout: { workoutDate: targetDate, steps: [] },
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertMoveConfirmBlocked(clientRowsAttempt, "invalid_review", "client-sent move row");
+
+  const loggedSource = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+    },
+    buildFakeMoveDependencies({
+      activePlan,
+      workouts: [sourceWorkout, keptWorkout],
+      logsByWorkoutId: new Map([
+        [
+          sourceWorkout.id,
+          buildFakeWorkoutLog({
+            userId,
+            plannedWorkoutId: sourceWorkout.id,
+          }),
+        ],
+      ]),
+    }),
+  );
+  assertMoveReviewBlocked(loggedSource, "protected_day", "logged move source");
+
+  const evidenceSource = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+    },
+    buildFakeMoveDependencies({
+      activePlan,
+      workouts: [sourceWorkout, keptWorkout],
+      evidenceWorkoutIds: new Set([sourceWorkout.id]),
+    }),
+  );
+  assertMoveReviewBlocked(evidenceSource, "protected_day", "evidence move source");
+
+  const protectedPastTarget = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate: "2026-06-09",
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertMoveReviewBlocked(protectedPastTarget, "protected_day", "past move target");
+
+  const sameDate = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate: sourceWorkout.workout_date,
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertMoveReviewBlocked(sameDate, "target_date_unchanged", "same-date move");
+
+  const unsupportedSource = buildFakePlannedWorkout({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000708",
+    date: "2026-06-24",
+    displayOrder: 2,
+    sourceWorkoutType: "legacy_easy",
+    steps: sourceWorkout.steps,
+  });
+  const unsupported = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: unsupportedSource.id,
+      targetDate,
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [unsupportedSource, keptWorkout] }),
+  );
+  assertMoveReviewBlocked(unsupported, "source_workout_not_supported", "unsupported move source");
+
+  const lastWorkoutMove = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate: "2026-06-23",
+    },
+    buildFakeMoveDependencies({ activePlan, workouts: [sourceWorkout] }),
+  );
+  assert.equal(lastWorkoutMove.ok, true, formatMoveReviewResult(lastWorkoutMove));
+  if (lastWorkoutMove.ok) {
+    assert.equal(lastWorkoutMove.safety.lastWorkoutMoveAllowedWithinSamePlan, true);
+  }
+
+  const persistenceFailure = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      ...(moveReview.ok
+        ? {
+            reviewToken: moveReview.review.reviewToken,
+            reviewChecksum: moveReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeMoveDependencies({
+      activePlan,
+      workouts: [sourceWorkout, keptWorkout],
+      persistError: new Error("simulated move failure"),
+    }),
+  );
+  assertMoveConfirmBlocked(persistenceFailure, "persistence_failed", "move persistence failure");
+}
+
+function validateManualActivePlanExportContract() {
+  const userId = "00000000-0000-4000-8000-000000000601";
+  const activePlan = buildFakePlanCycle({
+    userId,
+    id: "99999999-9999-4999-8999-000000000601",
+    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    startDate: "2026-06-18",
+    endDate: "2026-06-22",
+  });
+  const firstReview = assertReady("manual export first workout", {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-18",
+    title: "First manual easy run",
+  });
+  const savedTemplateReview = assertReady("manual export saved-template workout", {
+    templateKey: "steady_aerobic_run",
+    workoutDate: "2026-06-20",
+    title: "Saved steady template",
+  });
+  const copiedReview = assertReady("manual export copied workout", {
+    templateKey: "easy_run_with_strides",
+    workoutDate: "2026-06-22",
+    title: "Copied strides workout",
+  });
+  const deletedReview = assertReady("manual export deleted workout", {
+    templateKey: "long_aerobic_run",
+    workoutDate: "2026-06-19",
+    title: "Deleted long run",
+  });
+  const exportedWorkouts = [
+    buildCanonicalPersistedPlannedWorkoutFromReview({
+      userId,
+      planCycleId: activePlan.id,
+      id: "99999999-9999-4999-8999-000000000602",
+      review: firstReview,
+    }),
+    buildCanonicalPersistedPlannedWorkoutFromReview({
+      userId,
+      planCycleId: activePlan.id,
+      id: "99999999-9999-4999-8999-000000000603",
+      review: savedTemplateReview,
+    }),
+    buildCanonicalPersistedPlannedWorkoutFromReview({
+      userId,
+      planCycleId: activePlan.id,
+      id: "99999999-9999-4999-8999-000000000604",
+      review: copiedReview,
+    }),
+  ];
+  const deletedWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000605",
+    review: deletedReview,
+  });
+  const payload = buildActivePlanExportPayload({
+    planCycle: activePlan,
+    workouts: exportedWorkouts,
+    exportedAt: "2026-06-12T12:00:00.000Z",
+  });
+
+  assert.equal(payload.plan.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+  assert.equal(payload.plan.sourceStatus, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
+  assert.notEqual(payload.plan.planId, activePlan.id);
+  assertNoUuid(payload.plan.planId, "manual export safe plan id");
+  assert.equal(payload.summary.dayCount, 3);
+  assert.equal(payload.summary.workoutCount, 3);
+  assert.equal(payload.summary.weeksCount, 1);
+  assert.deepEqual(
+    payload.workouts.map((workout) => workout.date),
+    ["2026-06-18", "2026-06-20", "2026-06-22"],
+  );
+  assert.equal(
+    payload.workouts.some((workout) => workout.date === deletedWorkout.workout_date),
+    false,
+    "manual export should omit deleted/cleared workouts because it uses persisted active rows",
+  );
+
+  const exportedPlan = activePlanExportToTrainingPlanV2(payload);
+  const parsedExport = importedPlanSchema.parse(exportedPlan);
+
+  assert.equal(parsedExport.schema_version, "training-plan-v2");
+  assert.equal(parsedExport.source_kind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+  assert.equal(parsedExport.source_status, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
+  assert.equal(parsedExport.export_metadata?.export_format_version, "hito_active_plan_export_v1");
+  assert.equal(parsedExport.export_metadata?.row_counts?.day_count, 3);
+  assert.equal(parsedExport.export_metadata?.row_counts?.workout_count, 3);
+  assert.equal(parsedExport.export_metadata?.privacy?.internal_database_ids_omitted, true);
+  assert.equal(parsedExport.planned_workouts.length, 3);
+  assert.equal(
+    parsedExport.planned_workouts.some((workout) => workout.date === deletedWorkout.workout_date),
+    false,
+    "manual JSON export should not resurrect a deleted workout",
+  );
+
+  for (const workout of parsedExport.planned_workouts) {
+    assert.ok(workout.workout_id.startsWith("manual-"), "manual workout ids should be source ids.");
+    assert.ok(workout.weekday, `${workout.workout_id} should preserve weekday truth.`);
+    assert.ok(workout.workout_identity, `${workout.workout_id} should preserve identity.`);
+    assert.equal(workout.metric_mode?.executable_mode, "structure_only_executable");
+    assert.ok(workout.segments.length > 0, `${workout.workout_id} should export segments.`);
+
+    for (const segment of workout.segments) {
+      assert.ok(segment.prescription, `${workout.workout_id} segment should have prescription.`);
+      assert.notEqual(
+        segment.prescription?.mode,
+        "none",
+        `${workout.workout_id} non-rest segment should remain executable.`,
+      );
+    }
+  }
+
+  const json = renderPlanExportJson(payload);
+  const markdown = renderPlanExportMarkdown(payload);
+
+  assert.doesNotThrow(() => importedPlanSchema.parse(JSON.parse(json)));
+  assertNoPrivateManualExportData(json, userId, activePlan, exportedWorkouts, "manual JSON export");
+  assertNoFakePaceOrHrInSerialized(json, "manual JSON export");
+  assert.match(json, /"source_status": "manual_user_built_plan_created"/);
+  assert.match(json, /"export_format_version": "hito_active_plan_export_v1"/);
+
+  assert.match(markdown, /First manual easy run/);
+  assert.match(markdown, /Saved steady template/);
+  assert.match(markdown, /Copied strides workout/);
+  assert.doesNotMatch(markdown, /Deleted long run/);
+  assert.match(
+    markdown,
+    /Executable duration, distance, repeat, work, or recovery structure; no pace or personal HR target\./,
+  );
+  assert.doesNotMatch(markdown, /manual_user_built_plan_v1|manual_workout_authoring_v1/);
+  assertNoPrivateManualExportData(
+    markdown,
+    userId,
+    activePlan,
+    exportedWorkouts,
+    "manual Markdown export",
+  );
+}
+
 function validateAcceptedFixtures() {
   const rest = assertReady("rest day", {
     templateKey: "rest_day",
@@ -1201,6 +2221,8 @@ function assertRejected(
 
 type ConfirmDependencies = NonNullable<Parameters<typeof confirmManualWorkoutDraftForUser>[2]>;
 type AddDependencies = NonNullable<Parameters<typeof addManualWorkoutToActivePlanForUser>[2]>;
+type DeleteDependencies = NonNullable<Parameters<typeof reviewManualWorkoutDeleteClearForUser>[2]>;
+type MoveDependencies = NonNullable<Parameters<typeof reviewManualWorkoutMoveForUser>[2]>;
 type SavedTemplateRow = Awaited<ReturnType<ManualWorkoutSavedTemplateRepository["insertTemplate"]>>;
 type SavedTemplateInsert = Parameters<ManualWorkoutSavedTemplateRepository["insertTemplate"]>[0];
 type FakeSavedTemplateRepository = ManualWorkoutSavedTemplateRepository & {
@@ -1349,6 +2371,98 @@ function buildFakeAddDependencies(input: {
             record.workoutSeed.workoutDate > record.activePlan.end_date
               ? record.workoutSeed.workoutDate
               : record.activePlan.end_date,
+        },
+      };
+    },
+  };
+}
+
+function buildFakeDeleteDependencies(input: {
+  activePlan: PersistedPlanCycleRow | null;
+  workouts: PersistedPlannedWorkoutRow[];
+  logsByWorkoutId?: Map<string, PersistedWorkoutLogRow>;
+  evidenceWorkoutIds?: Set<string>;
+  persistError?: Error;
+  onPersist?: (
+    record: Parameters<NonNullable<DeleteDependencies["persistWorkoutDelete"]>>[0],
+  ) => void;
+}): DeleteDependencies {
+  return {
+    currentDate: "2026-06-10",
+    getExistingPlanContextForUser: async () =>
+      ({
+        activePlan: input.activePlan,
+        existingWorkouts: {
+          workouts: input.workouts,
+          logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
+        },
+      }) satisfies ExistingPlanContext,
+    fetchEvidenceWorkoutIds: async () => input.evidenceWorkoutIds ?? new Set(),
+    persistWorkoutDelete: async (record) => {
+      if (input.persistError) {
+        throw input.persistError;
+      }
+
+      input.onPersist?.(record);
+
+      return {
+        deletedWorkout: record.targetWorkout,
+        planCycle: {
+          ...record.activePlan,
+          end_date:
+            record.remainingWorkouts
+              .map((workout) => workout.workout_date)
+              .sort()
+              .at(-1) ?? record.activePlan.start_date,
+        },
+      };
+    },
+  };
+}
+
+function buildFakeMoveDependencies(input: {
+  activePlan: PersistedPlanCycleRow | null;
+  workouts: PersistedPlannedWorkoutRow[];
+  logsByWorkoutId?: Map<string, PersistedWorkoutLogRow>;
+  evidenceWorkoutIds?: Set<string>;
+  persistError?: Error;
+  onPersist?: (record: Parameters<NonNullable<MoveDependencies["persistWorkoutMove"]>>[0]) => void;
+}): MoveDependencies {
+  return {
+    currentDate: "2026-06-10",
+    getExistingPlanContextForUser: async () =>
+      ({
+        activePlan: input.activePlan,
+        existingWorkouts: {
+          workouts: input.workouts,
+          logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
+        },
+      }) satisfies ExistingPlanContext,
+    fetchEvidenceWorkoutIds: async () => input.evidenceWorkoutIds ?? new Set(),
+    persistWorkoutMove: async (record) => {
+      if (input.persistError) {
+        throw input.persistError;
+      }
+
+      input.onPersist?.(record);
+
+      return {
+        movedWorkout: {
+          ...record.sourceWorkout,
+          workout_date: record.review.targetDate,
+          weekday: record.review.targetWeekday,
+          week_number: record.targetWeekNumber,
+        },
+        planCycle: {
+          ...record.activePlan,
+          end_date: [...record.otherWorkouts, record.sourceWorkout]
+            .map((workout) =>
+              workout.id === record.sourceWorkout.id
+                ? record.review.targetDate
+                : workout.workout_date,
+            )
+            .sort()
+            .at(-1)!,
         },
       };
     },
@@ -1624,6 +2738,66 @@ function assertCopyPasteBlocked(
   }
 }
 
+function assertDeleteReviewBlocked(
+  result: ManualWorkoutDeleteClearReviewResult,
+  reason: Extract<ManualWorkoutDeleteClearReviewResult, { ok: false }>["reason"],
+  label: string,
+) {
+  assert.equal(result.ok, false, `${label} should be blocked: ${formatDeleteReviewResult(result)}`);
+
+  if (!result.ok) {
+    assert.equal(result.status, "blocked");
+    assert.equal(result.persisted, false);
+    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
+  }
+}
+
+function assertDeleteConfirmBlocked(
+  result: ManualWorkoutDeleteClearConfirmResult,
+  reason: Extract<ManualWorkoutDeleteClearConfirmResult, { ok: false }>["reason"],
+  label: string,
+) {
+  assert.equal(
+    result.ok,
+    false,
+    `${label} should be blocked: ${formatDeleteConfirmResult(result)}`,
+  );
+
+  if (!result.ok) {
+    assert.equal(result.status, "blocked");
+    assert.equal(result.persisted, false);
+    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
+  }
+}
+
+function assertMoveReviewBlocked(
+  result: ManualWorkoutMoveReviewResult,
+  reason: Extract<ManualWorkoutMoveReviewResult, { ok: false }>["reason"],
+  label: string,
+) {
+  assert.equal(result.ok, false, `${label} should be blocked: ${formatMoveReviewResult(result)}`);
+
+  if (!result.ok) {
+    assert.equal(result.status, "blocked");
+    assert.equal(result.persisted, false);
+    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
+  }
+}
+
+function assertMoveConfirmBlocked(
+  result: ManualWorkoutMoveConfirmResult,
+  reason: Extract<ManualWorkoutMoveConfirmResult, { ok: false }>["reason"],
+  label: string,
+) {
+  assert.equal(result.ok, false, `${label} should be blocked: ${formatMoveConfirmResult(result)}`);
+
+  if (!result.ok) {
+    assert.equal(result.status, "blocked");
+    assert.equal(result.persisted, false);
+    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
+  }
+}
+
 function assertNumericV2Segments(plan: TrainingPlanV2, label: string) {
   for (const workout of plan.planned_workouts) {
     if (workout.workout_type === "rest") {
@@ -1771,6 +2945,43 @@ function assertNoFakePaceOrHrInSerialized(value: unknown, label: string) {
   );
 }
 
+function assertNoPrivateManualExportData(
+  serialized: string,
+  userId: string,
+  activePlan: PersistedPlanCycleRow,
+  exportedWorkouts: PersistedPlannedWorkoutRow[],
+  label: string,
+) {
+  assert.doesNotMatch(serialized, new RegExp(escapeRegExp(userId)), `${label} leaked user id.`);
+  assert.doesNotMatch(
+    serialized,
+    new RegExp(escapeRegExp(activePlan.id)),
+    `${label} leaked internal plan id.`,
+  );
+
+  for (const workout of exportedWorkouts) {
+    assert.doesNotMatch(
+      serialized,
+      new RegExp(escapeRegExp(workout.id)),
+      `${label} leaked internal workout id ${workout.id}.`,
+    );
+  }
+
+  assert.doesNotMatch(serialized, /supabase\.co|service_role|anon[_-]?key|access_token/i);
+}
+
+function assertNoUuid(value: string, label: string) {
+  assert.doesNotMatch(
+    value,
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i,
+    `${label} should not expose a raw UUID.`,
+  );
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function hasExecutableStructure(step: Step) {
   if (step.duration_min || step.distance_km) {
     return true;
@@ -1791,6 +3002,10 @@ function flattenSteps(steps: Step[]): Step[] {
   ]);
 }
 
+function readStepsForAssertion(value: PersistedPlannedWorkoutRow["steps"]): Step[] {
+  return Array.isArray(value) ? (value as Step[]) : [];
+}
+
 function formatResult(result: ManualWorkoutDraftReviewResult) {
   return JSON.stringify(result, null, 2);
 }
@@ -1808,6 +3023,22 @@ function formatCopyPasteReviewResult(result: ManualWorkoutCopyPasteReviewResult)
 }
 
 function formatCopyPasteConfirmResult(result: ManualWorkoutCopyPasteConfirmResult) {
+  return JSON.stringify(result, null, 2);
+}
+
+function formatDeleteReviewResult(result: ManualWorkoutDeleteClearReviewResult) {
+  return JSON.stringify(result, null, 2);
+}
+
+function formatDeleteConfirmResult(result: ManualWorkoutDeleteClearConfirmResult) {
+  return JSON.stringify(result, null, 2);
+}
+
+function formatMoveReviewResult(result: ManualWorkoutMoveReviewResult) {
+  return JSON.stringify(result, null, 2);
+}
+
+function formatMoveConfirmResult(result: ManualWorkoutMoveConfirmResult) {
   return JSON.stringify(result, null, 2);
 }
 

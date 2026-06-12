@@ -100,7 +100,7 @@ export async function reconstructManualWorkoutCopyDraftForUser(
     return source;
   }
 
-  const draft = buildDraftInputFromPersistedManualWorkout(source.workout, input.targetDate, {
+  const draft = buildManualWorkoutDraftInputFromPersistedWorkout(source.workout, input.targetDate, {
     activePlanId: activePlan.id,
     activePlanSourceKind: activePlan.source_kind,
   });
@@ -154,7 +154,7 @@ function resolveSourceWorkout(input: {
   return { ok: true, workout };
 }
 
-function buildDraftInputFromPersistedManualWorkout(
+export function buildManualWorkoutDraftInputFromPersistedWorkout(
   workout: PersistedPlannedWorkoutRow,
   targetDate: string,
   context: {

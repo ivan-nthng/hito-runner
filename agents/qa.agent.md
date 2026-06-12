@@ -110,6 +110,9 @@ QA is allowed and expected to execute validation work directly.
   `npm run dev` for browser acceptance work.
 - The canonical local QA server is the built app served with `npm run serve:local` at
   `http://127.0.0.1:3000/` / `http://localhost:3000/`.
+- QA should manage that server through `npm run qa:server:status`,
+  `npm run qa:server:start`, `npm run qa:server:restart`, and `npm run qa:server:stop` so the
+  built runtime stays durable without duplicate port `3000` processes.
 - Before starting a server, QA must check whether the canonical local QA server is already
   responding and reuse it when it is healthy.
 - QA must not start duplicate local app servers for the same proof. If the server is stale, hung, or

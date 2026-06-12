@@ -26,7 +26,10 @@ import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { diffDaysIso, todayIso } from "@/lib/training";
 
-type ManualWorkoutEvidenceFetcher = (userId: string, workoutIds: string[]) => Promise<Set<string>>;
+export type ManualWorkoutEvidenceFetcher = (
+  userId: string,
+  workoutIds: string[],
+) => Promise<Set<string>>;
 
 export interface ReviewedManualWorkoutForActivePlanAdd {
   draft: ManualWorkoutCanonicalDraft;
@@ -278,7 +281,7 @@ export async function persistManualWorkoutActivePlanAdd({
   };
 }
 
-async function fetchManualWorkoutEvidenceWorkoutIds(userId: string, workoutIds: string[]) {
+export async function fetchManualWorkoutEvidenceWorkoutIds(userId: string, workoutIds: string[]) {
   if (workoutIds.length === 0) {
     return new Set<string>();
   }
@@ -354,7 +357,7 @@ function resolveNextDisplayOrder(existingWorkouts: readonly PersistedPlannedWork
   return Math.max(...existingWorkouts.map((workout) => workout.display_order)) + 1;
 }
 
-function isProtectedManualWorkoutTarget(
+export function isProtectedManualWorkoutTarget(
   workout: PersistedPlannedWorkoutRow,
   currentDate: string,
   logsByWorkoutId: Map<string, PersistedWorkoutLogRow>,

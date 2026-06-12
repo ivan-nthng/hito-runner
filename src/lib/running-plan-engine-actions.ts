@@ -8,15 +8,19 @@ import { getRequestAuthContext } from "@/lib/backend/auth";
 import {
   buildHalfMarathonPlanPreviewDraft,
   buildMarathonBasePlanPreviewDraft,
+  buildMarathonCompletionPlanPreviewDraft,
   buildTenKPlanPreviewDraft,
   HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
   MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
+  MARATHON_COMPLETION_PLAN_BUILDER_SOURCE_KIND,
   TEN_K_PLAN_BUILDER_SOURCE_KIND,
   type BuildRunningPlanPreviewInput,
   type HalfMarathonPlanBuilderResult,
   type HalfMarathonPlanPreviewDraft,
   type MarathonBasePlanBuilderResult,
   type MarathonBasePlanPreviewDraft,
+  type MarathonCompletionPlanBuilderResult,
+  type MarathonCompletionPlanPreviewDraft,
   type TenKPlanBuilderResult,
   type TenKPlanPreviewDraft,
 } from "@/lib/plan-creation-engine";
@@ -56,6 +60,7 @@ const runningPlanSourceKindSchema = z.enum([
   TEN_K_PLAN_BUILDER_SOURCE_KIND,
   HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
   MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
+  MARATHON_COMPLETION_PLAN_BUILDER_SOURCE_KIND,
 ]);
 
 const runningPlanConfirmInputSchema = z
@@ -80,13 +85,18 @@ type RunningPlanPreviewActionReadyResult =
   | {
       ok: true;
       draft: RunningPlanReviewedPreviewDraft<MarathonBasePlanPreviewDraft>;
+    }
+  | {
+      ok: true;
+      draft: RunningPlanReviewedPreviewDraft<MarathonCompletionPlanPreviewDraft>;
     };
 
 export type RunningPlanPreviewActionResult =
   | RunningPlanPreviewActionReadyResult
   | Extract<TenKPlanBuilderResult, { ok: false }>
   | Extract<HalfMarathonPlanBuilderResult, { ok: false }>
-  | Extract<MarathonBasePlanBuilderResult, { ok: false }>;
+  | Extract<MarathonBasePlanBuilderResult, { ok: false }>
+  | Extract<MarathonCompletionPlanBuilderResult, { ok: false }>;
 export type RunningPlanPreviewActionInput = z.output<typeof runningPlanPreviewInputSchema>;
 export type RunningPlanConfirmActionInput = z.output<typeof runningPlanConfirmInputSchema>;
 
@@ -339,7 +349,11 @@ export async function buildReviewedRunningPlanPreview(
 
 export function buildRunningPlanPreview(
   data: RunningPlanPreviewActionInput,
-): TenKPlanBuilderResult | HalfMarathonPlanBuilderResult | MarathonBasePlanBuilderResult {
+):
+  | TenKPlanBuilderResult
+  | HalfMarathonPlanBuilderResult
+  | MarathonBasePlanBuilderResult
+  | MarathonCompletionPlanBuilderResult {
   const input: BuildRunningPlanPreviewInput = {
     ...data,
     daysPerWeek: data.daysPerWeek as BuildRunningPlanPreviewInput["daysPerWeek"],
@@ -352,6 +366,8 @@ export function buildRunningPlanPreview(
       return buildHalfMarathonPlanPreviewDraft(input);
     case "Marathon Base":
       return buildMarathonBasePlanPreviewDraft(input);
+    case "Marathon Completion":
+      return buildMarathonCompletionPlanPreviewDraft(input);
   }
 }
 

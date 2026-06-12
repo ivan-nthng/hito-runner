@@ -1,6 +1,6 @@
 ---
 name: hito-frontend-design-system
-description: Use for Hito frontend work touching UI layout, components, dialogs, forms, typography, spacing, tabs, shell, onboarding, settings, admin, workout detail, or any design-system consistency question.
+description: Use for Hito frontend work touching UI layout, components, dialogs, forms, typography, spacing, tabs, shell, onboarding, settings, admin, workout detail, Figma design-system bridge/export/import planning, or any design-system consistency question.
 ---
 
 # Hito Frontend Design System
@@ -16,6 +16,10 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 3. relevant active plan/spec
 4. `src/routes/hitoDS.tsx` when design-system behavior is relevant
 5. nearby components/surfaces before creating new UI
+
+For Figma bridge tasks, also read the relevant official Figma REST API, Plugin API, variables,
+libraries, scopes, and Dev Resources docs before planning or execution. If using Figma MCP/Plugin
+API tools, load the applicable Figma plugin skills first.
 
 ## Workflow
 
@@ -33,6 +37,51 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 4. Render backend-shaped data; do not compute canonical business truth locally.
 5. Handle loading, empty, error, success, disabled, and destructive confirmation states.
 6. Verify mobile width and Safari-sensitive controls when relevant.
+
+## Figma Bridge Workflow
+
+Use this when the task mentions Figma, Figma API, Figma MCP, design-system export/import,
+variables, published libraries, Code Connect, Dev Resources, or code <-> Figma synchronization.
+
+1. Direction:
+   identify whether the work is `code -> Figma`, `Figma -> code`, or bidirectional reconciliation.
+2. Source inventory:
+   inspect Hito DS owners before mapping anything:
+   `src/styles.css`, `src/routes/hitoDS.tsx`, `src/components/ui/*`, `src/components/hito-ds/*`,
+   and the affected product/admin route specimens.
+3. Figma discovery:
+   inspect the target Figma file/library/page/variable collection/component set before writing.
+   Use read-only discovery first whenever possible.
+4. Official docs:
+   consult current Figma REST/API/library/variables/scopes docs and the Figma plugin skills that
+   match the operation.
+5. Mapping:
+   create or update a mapping table for Hito token/component owner -> Figma variable/style/component
+   -> code syntax/source path -> validation owner.
+6. Scope approval:
+   lock the exact token families, modes, components, pages, and file/library target before any
+   mutating Figma operation.
+7. Incremental sync:
+   export/import one foundation or component family at a time. Validate after each step.
+8. Reconciliation:
+   if Figma and code disagree, report the conflict and route the smallest correct owner. Do not
+   silently choose Figma over implemented code.
+9. Validation:
+   prove naming, variable scopes, modes, code syntax, component variants/properties, descriptions,
+   Dev Resources/Code Connect links when used, and screenshots/metadata for changed Figma pages.
+
+Figma bridge ownership rules:
+
+- Hito runtime code and `/hitoDS` remain canonical for implemented behavior unless an active plan
+  explicitly changes the source hierarchy.
+- Figma is a design-system artifact, review surface, and handoff/sync target; it is not shipped
+  runtime behavior by itself.
+- Figma-to-code changes require a reviewed mapping and the correct execution role before touching
+  product code.
+- Design-system Figma work should prefer variables, styles, component sets, descriptions, and
+  Dev Resources over static screenshots when building a reusable library.
+- Use least-privilege Figma scopes and never expose tokens, credentials, private file keys, or
+  secrets in docs, logs, screenshots, prompts, or source.
 
 ## Designer Spec Depth Gate
 
@@ -94,6 +143,20 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 - Keep frontend extraction DS-first: extracted components must reuse existing Hito DS/admin primitives and must not become a new local UI kit.
 - Do not split by arbitrary line count, and do not combine broad decomposition with redesign unless the active plan explicitly scopes both.
 
+## Design System Engineer Figma Contract
+
+When acting as Design System Engineer, treat Figma as part of the DS workflow:
+
+- study official Figma docs/API before giving or executing Figma bridge instructions
+- plan reusable Hito DS export into Figma variables, styles, components, and documentation pages
+- plan safe Figma-to-code import as reconciliation, not direct runtime truth
+- define exact file/library targets, direction, API scopes, dry-run discovery, approval checkpoints,
+  validation evidence, and rollback notes
+- keep all bridge plans compatible with Hito DS naming, tokens, `/hitoDS`, and implemented runtime
+  behavior
+- hand off implementation to the right role when code, CSS, Figma file mutation, QA, or migration is
+  needed
+
 ## Do Not
 
 - add route-local color/typography/spacing recipes when Hito DS covers the need
@@ -103,6 +166,10 @@ Build UI from Hito DS primitives and backend-shaped truth instead of adding loca
 - ship custom admin/product UI when an existing Hito DS primitive or wrapper can do the job
 - hide a new component behind "temporary" without a removal plan
 - leave abandoned local components, classes, or wrappers after changing approach
+- treat Figma output as shipped Hito behavior without code/docs/QA proof
+- mutate shared Figma libraries without explicit scoped approval
+- import Figma changes into code without a reviewed source mapping and execution owner
+- use broad Figma API scopes, credentials, or private file keys in source/docs/prompts
 
 ## Validation
 
@@ -111,6 +178,14 @@ After meaningful frontend changes:
 - run relevant static checks/build if product code changed
 - use the built-in browser for local visual verification when practical
 - hand off to Safari QA for final browser verification when the task is user-facing or Safari-sensitive
+
+After meaningful Figma bridge changes:
+
+- capture the Figma file/library/page target and direction
+- record official docs/API references consulted
+- provide the token/component mapping artifact or summary
+- validate Figma metadata/screenshots when the Figma file changed
+- run code checks only when product code changed
 
 ## Output
 

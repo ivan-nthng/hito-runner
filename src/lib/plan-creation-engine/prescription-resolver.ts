@@ -736,7 +736,12 @@ function resolveDurationRange(
     return exactRange(specialDuration);
   }
 
-  return exactRange(pickRangeValue(range, context, "work_duration"));
+  return exactRange(
+    roundDurationForPrescription(pickRangeValue(range, context, "work_duration"), {
+      context,
+      durationRole: "work",
+    }),
+  );
 }
 
 function resolveRecoveryDurationRange(
@@ -747,7 +752,12 @@ function resolveRecoveryDurationRange(
     return range;
   }
 
-  return exactRange(pickRangeValue(range, context, "recovery_duration"));
+  return exactRange(
+    roundDurationForPrescription(pickRangeValue(range, context, "recovery_duration"), {
+      context,
+      durationRole: "recovery",
+    }),
+  );
 }
 
 function resolveDistanceRange(
@@ -898,6 +908,43 @@ function pickRangeValue(
     purpose === "recovery_duration" ? 1 - runnerLoadFactor(context) : runnerLoadFactor(context);
 
   return clampToRange(range.min + (range.max - range.min) * factor, range);
+}
+
+function roundDurationForPrescription(
+  valueSeconds: number,
+  input: {
+    context: PrescriptionContext;
+    durationRole: "work" | "recovery";
+  },
+) {
+  const rounded = roundToStep(valueSeconds, durationStepSeconds(input));
+  return Math.max(1, rounded);
+}
+
+function durationStepSeconds({
+  context,
+  durationRole,
+}: {
+  context: PrescriptionContext;
+  durationRole: "work" | "recovery";
+}) {
+  if (
+    context.segmentRole === "work" &&
+    durationRole === "work" &&
+    (context.workoutDayKind === "strides" || context.workoutDayKind === "hills")
+  ) {
+    return 15;
+  }
+
+  if (
+    context.segmentRole === "work" &&
+    durationRole === "recovery" &&
+    (context.workoutDayKind === "strides" || context.workoutDayKind === "hills")
+  ) {
+    return 15;
+  }
+
+  return 60;
 }
 
 function runnerLoadFactor(context: PrescriptionContext) {

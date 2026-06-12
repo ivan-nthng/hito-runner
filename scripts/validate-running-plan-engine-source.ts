@@ -272,18 +272,18 @@ function validateCompositionGrammarContract() {
     weekNumber: 11,
     horizonWeeks: 14,
   });
-  assert.equal(supportedHalf.developmentTouch, "tempo");
-  assert.ok(supportedHalf.familySignals.includes("half_specific_durability"));
+  assert.equal(supportedHalf.developmentTouch, "progression");
+  assert.ok(supportedHalf.familySignals.includes("half_sustained_support"));
 
-  const conservativeHalfTempo = resolveRunningPlanCompositionWeek({
+  const conservativeHalfProgression = resolveRunningPlanCompositionWeek({
     family: "Half Marathon",
     runnerLevel: "runs_a_lot",
     loadContext: "conservative",
     weekNumber: 11,
     horizonWeeks: 14,
   });
-  assert.equal(conservativeHalfTempo.developmentTouch, "tempo");
-  assert.ok(conservativeHalfTempo.familySignals.includes("half_specific_durability"));
+  assert.equal(conservativeHalfProgression.developmentTouch, "progression");
+  assert.ok(conservativeHalfProgression.familySignals.includes("half_sustained_support"));
 
   const conservativeHalfLongRun = resolveRunningPlanCompositionWeek({
     family: "Half Marathon",
@@ -324,9 +324,9 @@ function validateCompositionGrammarContract() {
     weekNumber: 22,
     horizonWeeks: 32,
   });
-  assert.equal(conservativeMarathonBase.developmentTouch, null);
-  assert.equal(conservativeMarathonBase.longRunRole, "steady_finish");
-  assert.ok(conservativeMarathonBase.familySignals.includes("marathon_base_steady_finish"));
+  assert.equal(conservativeMarathonBase.developmentTouch, "steady_aerobic_run");
+  assert.equal(conservativeMarathonBase.longRunRole, "support");
+  assert.ok(conservativeMarathonBase.familySignals.includes("marathon_base_steady_support"));
 
   const beginnerMarathonBaseBridge = resolveRunningPlanCompositionWeek({
     family: "Marathon Base",

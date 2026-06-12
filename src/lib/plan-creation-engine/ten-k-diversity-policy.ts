@@ -8,6 +8,7 @@ import {
   resolveRunningPlanEndpointWeek,
   resolveRunningPlanTaperWeek,
 } from "@/lib/plan-creation-engine/horizon-policy";
+import { collectRunnerFacingPreviewRichnessIssues } from "@/lib/plan-creation-engine/runner-facing-richness";
 import type {
   RunningPlanRunnerLevel,
   RunningPlanWorkoutDayKind,
@@ -83,6 +84,14 @@ export function validateTenKDiversityPolicy({
       runnerLevel,
       loadContext,
       horizonWeeks,
+      rows,
+    }),
+  );
+  issues.push(
+    ...collectRunnerFacingPreviewRichnessIssues({
+      family: "10K",
+      runnerLevel,
+      loadContext,
       rows,
     }),
   );

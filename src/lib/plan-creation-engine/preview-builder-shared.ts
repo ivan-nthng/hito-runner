@@ -25,6 +25,7 @@ import {
   type RunningPlanTargetTruthMode,
   type RunningPlanWorkoutDayKind,
 } from "@/lib/plan-creation-engine/source-types";
+import { collectRunningPlanPreviewPrescriptionGrammarIssues } from "@/lib/plan-creation-engine/prescription-quality";
 import { addDaysIso, todayIso, weekdayLong } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
 
@@ -410,6 +411,7 @@ export function validateCommonPreviewRows({
   validateFixedRestDays(rows, fixedRestDays, issues);
   validateWatchExecutableRows(rows, issues);
   validateForbiddenSignals(rows, issues);
+  issues.push(...collectRunningPlanPreviewPrescriptionGrammarIssues(rows));
 
   const finalNonRestRow = rows.filter((row) => !row.isRestDay).at(-1);
   if (!finalNonRestRow) {

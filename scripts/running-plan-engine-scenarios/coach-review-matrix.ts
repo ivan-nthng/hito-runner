@@ -7,7 +7,9 @@ import {
   type BuildTenKPlanPreviewInput,
   type RunningPlanDaysPerWeek,
   type RunningPlanDistanceFamily,
+  type RunningPlanPrescriptionGrammarSummary,
   type RunningPlanRunnerLevel,
+  type RunnerFacingRichnessSummary,
 } from "../../src/lib/plan-creation-engine";
 import type { WeekdayName } from "../../src/lib/weekday-rest-invariants";
 
@@ -52,6 +54,8 @@ export interface CoachReviewScenarioComparisonEntry {
     code: string;
     message: string;
   };
+  runnerFacingRichness?: RunnerFacingRichnessSummary;
+  prescriptionGrammar?: RunningPlanPrescriptionGrammarSummary;
 }
 
 export interface CoachReviewScenarioSummary {
@@ -73,6 +77,18 @@ export interface CoachReviewScenarioSummary {
   compositionGrammarProof: {
     scenariosWithForbiddenCombinationHits: readonly unknown[];
     scenariosWithMultipleDevelopmentTouches: readonly string[];
+  };
+  runnerFacingRichnessProof: {
+    scenariosWithIssues: readonly unknown[];
+    maxIdentityDesertByScenario: Record<string, number>;
+    distinctNonLongRunSignalsByScenario: Record<string, readonly string[]>;
+  };
+  prescriptionGrammarProof: {
+    scenariosWithIssues: readonly unknown[];
+    awkwardStandardDurationScenarioList: readonly string[];
+    vagueEffortOnlyTargetScenarioList: readonly string[];
+    fakePaceTargetScenarioList: readonly string[];
+    fakePersonalHrTargetScenarioList: readonly string[];
   };
   createConfirmPersistBoundaryProof: {
     createPathEnabled: boolean;
@@ -547,6 +563,12 @@ export function validateCoachReviewMatrixProof(
   assert.deepEqual(summary.metricTruthProof.forbiddenRunnerFacingLanguageScenarioList, []);
   assert.deepEqual(summary.compositionGrammarProof.scenariosWithForbiddenCombinationHits, []);
   assert.deepEqual(summary.compositionGrammarProof.scenariosWithMultipleDevelopmentTouches, []);
+  assert.deepEqual(summary.runnerFacingRichnessProof.scenariosWithIssues, []);
+  assert.deepEqual(summary.prescriptionGrammarProof.scenariosWithIssues, []);
+  assert.deepEqual(summary.prescriptionGrammarProof.awkwardStandardDurationScenarioList, []);
+  assert.deepEqual(summary.prescriptionGrammarProof.vagueEffortOnlyTargetScenarioList, []);
+  assert.deepEqual(summary.prescriptionGrammarProof.fakePaceTargetScenarioList, []);
+  assert.deepEqual(summary.prescriptionGrammarProof.fakePersonalHrTargetScenarioList, []);
   assert.equal(summary.createConfirmPersistBoundaryProof.createPathEnabled, false);
   assert.equal(summary.createConfirmPersistBoundaryProof.confirmPathEnabled, false);
   assert.equal(summary.createConfirmPersistBoundaryProof.persistPathEnabled, false);

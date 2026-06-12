@@ -2,7 +2,7 @@
 
 ## Status
 
-universal_selected_distance_product_contract_defined_backend_confirm_next
+quality_blocker_closed_cleanup_unblocked
 
 ## Type
 
@@ -18,13 +18,97 @@ BACKEND
 
 ## Task
 
-Extend selected running-plan confirm/persist to Marathon Completion.
+Run Slice 13A: manual workout authoring validator lifecycle extraction.
 
 ## Stage
 
-BACKEND implementation / Marathon Completion selected-plan confirm-persist boundary.
+BACKEND cleanup / code-freeze proof-infrastructure decomposition after running-plan quality unblock.
 
-## Exact Handoff Prompt
+## Universal Runner-Facing Richness And Prescription Quality Closeout
+
+Status update, 2026-06-12:
+
+- Accepted as QA-passed and Running Coach accepted.
+- Root cause fixed at the backend/canonical generation layer. This was not a frontend copy patch:
+  the accepted fix makes the selected-plan engine reject runner-facing flatness and poor executable
+  prescription grammar in backend-owned scenario, canonical review, confirm exactness,
+  `training-plan-v2`, and imported-plan/export-shaped proof surfaces.
+- Scenario pack proof covered `17` acceptance scenarios, all preview-ready, across `10K`,
+  `Half Marathon`, `Marathon Base`, and `Marathon Completion`.
+- QA and Running Coach acceptance recorded `0` unresolved ranges, `0` unresolved executable
+  segments, `0` richness issues, `0` prescription grammar issues, `0` awkward standard durations,
+  `0` vague effort-only targets, `0` fake pace, `0` fake personal HR, and `0` forbidden
+  runner-facing language.
+- `Marathon Base` remains base-only and must not become hidden Marathon Completion.
+- `Marathon Completion` remains exact `42195m`, completion-focused, and not a
+  performance-marathon path.
+- Standard prescription grammar is now device-friendly in backend-owned artifacts.
+- Proof boundary: authenticated browser selected-plan UI was not the acceptance surface for this
+  gate. The proof surface was backend/source artifact based: scenario JSON, canonical review,
+  confirm exactness, `training-plan-v2`, and imported-plan/export-shaped readback.
+- Marathon Completion runner-facing selected-option exposure remains separate unless a later
+  product/UI gate explicitly accepts it.
+
+Evidence:
+
+- Running Coach source: [running-plan-universal-richness-bar-audit.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-12-running-plan-universal-richness-bar-audit.md>).
+- QA artifacts: [running-plan-richness-prescription-qa](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-06-12/running-plan-richness-prescription-qa/>).
+
+Decision:
+
+- The running-plan quality blocker that paused code-freeze cleanup is closed.
+- Code-freeze cleanup may resume through the
+  [Hito Stack Simplification Strike](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md>).
+
+Changelog decision:
+
+- Add a concise [changelog](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md>)
+  entry because this materially changes QA-accepted runner-facing generated plan quality.
+- Boundary: the changelog entry must not claim a new authenticated browser UI exposure,
+  production rollout, or Marathon Completion selected-option release.
+
+## Backend Supported-Family Richness And Prescription Grammar Result
+
+Status update, 2026-06-12:
+
+- Backend fixed the source-of-truth boundary for awkward executable durations and runner-facing
+  target grammar.
+- Normal selected-plan time prescriptions now resolve to device-friendly whole-minute durations;
+  short repeat-style work/recovery remains intentionally short and numeric.
+- Added `running_plan_prescription_grammar_gate_v1` as the shared executable prescription grammar
+  validator for preview and canonical review rows.
+- Wired prescription grammar validation into common preview validation, canonical selected-plan
+  review exactness, generated scenario summaries, coach-review matrix proof, and confirm harness
+  proof.
+- Extended selected-plan review/confirm typing to include `Marathon Completion` through the
+  existing R8 review-token/checksum and active-plan persistence seam; no parallel persistence path
+  was added.
+- Added `selected_distance_completion_or_checkpoint` as the neutral canonical endpoint identity so
+  Half Marathon and Marathon Completion selected-distance endpoints no longer have to emit
+  `race_pace_session`.
+- Preserved strict metric truth: no fake pace targets, no fake personal HR targets, and
+  `structure_only_executable` remains numeric structure plus runner-friendly RPE/effort target.
+
+Validation:
+
+- `npm exec eslint -- src/lib/plan-creation-engine/*.ts src/lib/running-plan-engine-review.ts src/lib/running-plan-engine-actions.ts src/lib/rich-workout-model.ts scripts/validate-running-plan-engine-source.ts scripts/validate-running-plan-engine-10k-builder.ts scripts/validate-running-plan-engine-r6-builders.ts scripts/generate-running-plan-engine-scenarios.ts scripts/running-plan-engine-scenarios/coach-review-matrix.ts scripts/validate-running-plan-engine-confirm.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts` passed.
+- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts` passed:
+  `17` acceptance scenarios, `624` coach-review matrix scenarios, `171` preview-ready,
+  `453` unavailable, `0` unresolved ranges, `0` unresolved executable segments.
+- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts` passed for `10K`,
+  `Half Marathon`, `Marathon Base`, and `Marathon Completion` stable review drafts.
+- `npm run build` passed.
+
+Next recommended role:
+
+- QA should validate the selected-plan review/readback/export surface on the persistent built server
+  and confirm that runner-facing copy no longer shows awkward seconds, internal executable labels,
+  fake pace, fake personal HR, or `race_pace_session` for supported selected-distance endpoints.
+
+## Previous Exact Handoff Prompt
 
 ```text
 ROLE: BACKEND
@@ -2377,6 +2461,70 @@ Validation evidence:
   - Marathon Base: `112` rows, `endpointMainDistanceMeters: null`, final kind
     `marathon_base_endpoint`, source kind `running_plan_engine_marathon_base_builder_v1`
 - `npm run build`
+
+### Slice R9F: Universal Runner-Facing Richness Gates
+
+Owner:
+
+BACKEND.
+
+Status:
+
+implemented / validation passed.
+
+Scope:
+
+- encode the Running Coach universal runner-facing richness bar in backend preview and canonical
+  review validation
+- reject selected/generated plans with long visible identity deserts, long-run-only richness, or
+  missing canonical `source_workout_type` readback
+- preserve selected-distance endpoint truth:
+  - `10K` remains exact `10000m`
+  - `Half Marathon` remains exact `21100m`
+  - `Marathon Base` remains base-only with no `42195m` selected-distance endpoint
+  - `Marathon Completion` remains the only exact `42195m` family
+- preserve no fake pace, no fake personal HR, no 5K benchmark dependency, and no watch/no-watch
+  gate
+
+Implementation notes:
+
+- Added `runner_facing_richness_gate_v1` as the shared backend validator for preview rows and
+  canonical review rows.
+- Wired the gate into 10K, Half Marathon, Marathon Base, and Marathon Completion diversity
+  validators.
+- Wired canonical richness validation into selected running-plan review exactness so accepted
+  preview richness must survive canonical review/export shape.
+- Added runner-facing richness summaries to generated scenario artifacts and coach-review matrix
+  proof.
+- Added canonical `steady_aerobic_run` mapping to selected-plan review rows as
+  `workout_type: steady_or_easy`, `workout_family: steady`, and
+  `workout_identity: steady_aerobic_run`.
+- Repaired safe non-long-run bridge placement in the composition owner:
+  - beginner 10K uses recurring safe strides bridges without adding tempo/intervals
+  - conservative/standard Marathon Base beginner plans add earlier strides and steady bridges
+  - beginner Marathon Completion adds post-adaptation and early-build strides bridges
+  - supported 10K adds a late tempo refresh before taper
+  - Half Marathon progression is treated as visible sustained support
+
+Validation evidence:
+
+- `npm exec eslint -- src/lib/plan-creation-engine/*.ts src/lib/running-plan-engine-review.ts scripts/generate-running-plan-engine-scenarios.ts scripts/running-plan-engine-scenarios/coach-review-matrix.ts scripts/validate-running-plan-engine-confirm.ts scripts/validate-running-plan-engine-source.ts scripts/validate-running-plan-engine-10k-builder.ts scripts/validate-running-plan-engine-r6-builders.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
+- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts`
+  - acceptance matrix: `17` scenarios / `17` preview-ready / `0` unavailable
+  - coach-review matrix: `624` scenarios / `171` preview-ready / `453` unavailable
+  - unresolved ranges: `0`
+  - unresolved executable segments: `0`
+  - coach-review subset: `22`
+- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
+  - 10K canonical review: `84` rows / `60` non-rest
+  - Half Marathon canonical review: `168` rows / `120` non-rest
+  - Marathon Base canonical review: `168` rows / `120` non-rest
+  - persistence mode remained non-mutating because Supabase env was not configured
+- `npm run build`
+- `git diff --check -- src/lib/plan-creation-engine src/lib/running-plan-engine-review.ts scripts/generate-running-plan-engine-scenarios.ts scripts/running-plan-engine-scenarios/coach-review-matrix.ts scripts/validate-running-plan-engine-confirm.ts scripts/validate-running-plan-engine-source.ts docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md`
 
 ### Slice R10: Controlled Deletion Of Failed Builder Artifacts
 

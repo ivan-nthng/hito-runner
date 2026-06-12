@@ -26,7 +26,11 @@ import {
   loadWorkoutRouteData,
   workoutRouteInputSchema,
 } from "@/lib/route-data-actions";
-import { getActivePlan, getResolvedPlanWorkoutsWithLogs } from "@/lib/active-plan-persistence";
+import {
+  getActivePlan,
+  getResolvedPlanWorkoutsWithLogs,
+  type PersistedPlanCycleRow,
+} from "@/lib/active-plan-persistence";
 import {
   archiveActivePlanForUser as archiveActivePlanForUserWithSnapshot,
   clearUpcomingScheduleForUser as clearUpcomingScheduleForUserWithSnapshot,
@@ -36,6 +40,11 @@ import {
   getPersistedUserIdForAuthContext,
   requirePersistedUserIdForCurrentRequest,
 } from "@/lib/request-persisted-user";
+import {
+  resolveActivePlanWorkoutEditability,
+  type ActivePlanWorkoutEditOperation,
+  type ActivePlanWorkoutEditabilityResult,
+} from "@/lib/active-plan-workout-editing/policy";
 import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import {
   deriveWeekStatus,
@@ -44,6 +53,8 @@ import {
   inferWorkoutStatus,
   normalizeExecutableStepInstructions,
   todayIso,
+  type ActivePlanWorkoutEditingCapabilities,
+  type ActivePlanWorkoutEditingCapability,
   type RunnerProfileSummary,
   type PlanSchedulePreferencesSummary,
   type Step,
@@ -548,10 +559,51 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
       source: "persisted",
       sourceKind: planCycle.source_kind,
       schedulePreferences: buildPlanSchedulePreferencesSummary(planCycle.plan_preferences),
+      workoutEditing: buildActivePlanWorkoutEditingCapabilities(planCycle),
     },
     profile,
     workouts,
     weekStatus: deriveWeekStatus(workouts, currentDate),
+  };
+}
+
+function buildActivePlanWorkoutEditingCapabilities(
+  planCycle: PersistedPlanCycleRow,
+): ActivePlanWorkoutEditingCapabilities {
+  return {
+    addWorkout: mapActivePlanWorkoutEditingCapability(
+      "add_workout",
+      resolveActivePlanWorkoutEditability(planCycle, "add_workout"),
+    ),
+    clearWorkout: mapActivePlanWorkoutEditingCapability(
+      "clear_workout",
+      resolveActivePlanWorkoutEditability(planCycle, "clear_workout"),
+    ),
+    moveWorkout: mapActivePlanWorkoutEditingCapability(
+      "move_workout",
+      resolveActivePlanWorkoutEditability(planCycle, "move_workout"),
+    ),
+  };
+}
+
+function mapActivePlanWorkoutEditingCapability(
+  operation: ActivePlanWorkoutEditOperation,
+  editability: ActivePlanWorkoutEditabilityResult,
+): ActivePlanWorkoutEditingCapability {
+  if (!editability.ok) {
+    return {
+      allowed: false,
+      operation,
+      reason: editability.reason,
+      message: editability.message,
+    };
+  }
+
+  return {
+    allowed: true,
+    operation,
+    sourceKind: editability.sourceKind,
+    sourceStatus: editability.sourceStatus,
   };
 }
 

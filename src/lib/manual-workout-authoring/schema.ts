@@ -311,6 +311,7 @@ export type ManualWorkoutAddToActivePlanFailureReason =
   | "unauthenticated"
   | "no_active_plan"
   | "unsupported_active_plan_source"
+  | "unsupported_source_metadata"
   | "manual_workout_required"
   | "invalid_review"
   | "stale_review"
@@ -330,8 +331,8 @@ export type ManualWorkoutConfirmResult =
       ok: true;
       status: "created";
       persisted: true;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
+      sourceKind: string;
+      sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       workoutSourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
       schemaVersion: "training-plan-v2";
@@ -345,6 +346,10 @@ export type ManualWorkoutConfirmResult =
       reviewChecksum: string;
       exactnessPayloadVersion: typeof MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION;
       sourceMetadata: {
+        editSourceKind: "active_plan_user_edit_v1";
+        mutationKind: "user_added_workout";
+        originalPlanSourceKind: string;
+        originalPlanSourceStatus: string | null;
         templateKey: ManualWorkoutTemplateKey;
         workoutDate: string;
         rowCount: number;
@@ -409,6 +414,6 @@ export type ManualWorkoutAddToActivePlanResult =
       persisted: false;
       reason: ManualWorkoutAddToActivePlanFailureReason;
       message: string;
-      sourceKind?: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceKind?: string | null;
       workoutSourceKind?: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
     };

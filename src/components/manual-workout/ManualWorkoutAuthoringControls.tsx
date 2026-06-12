@@ -231,12 +231,12 @@ export function ManualWorkoutAddMenu({
     }));
 
     try {
-      const result = await listManualWorkoutSavedTemplatesFn();
-      if (!result.ok) {
+      const result = await listManualWorkoutSavedTemplatesFn({ data: undefined });
+      if (!result?.ok) {
         setSavedTemplatesState({
           status: "failed",
           templates: [],
-          message: result.message,
+          message: result?.message ?? "Personal workout templates are not available right now.",
         });
         return;
       }
@@ -750,6 +750,7 @@ type ManualWorkoutDeleteClearReady = Extract<ManualWorkoutDeleteClearReviewResul
 
 export function ManualWorkoutCopyMenu({
   activePlanId,
+  canCopy = true,
   canClear = false,
   canMove = false,
   children,
@@ -762,6 +763,7 @@ export function ManualWorkoutCopyMenu({
   title,
 }: {
   activePlanId: string;
+  canCopy?: boolean;
   canClear?: boolean;
   canMove?: boolean;
   children: ReactNode;
@@ -936,10 +938,12 @@ export function ManualWorkoutCopyMenu({
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>{formatReadableDate(sourceWorkoutDate)}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={disabled || isBusy} onSelect={copySource}>
-            <Icon name="copy" size="xs" />
-            Copy workout
-          </DropdownMenuItem>
+          {canCopy ? (
+            <DropdownMenuItem disabled={disabled || isBusy} onSelect={copySource}>
+              <Icon name="copy" size="xs" />
+              Copy workout
+            </DropdownMenuItem>
+          ) : null}
           {canMove ? (
             <DropdownMenuItem disabled={disabled || isBusy} onSelect={moveSource}>
               <Icon name="arrow-right" size="xs" />
@@ -948,7 +952,7 @@ export function ManualWorkoutCopyMenu({
           ) : null}
           {canClear ? (
             <>
-              <DropdownMenuSeparator />
+              {canCopy || canMove ? <DropdownMenuSeparator /> : null}
               <DropdownMenuItem
                 className="text-destructive"
                 disabled={disabled || isBusy}
@@ -1551,7 +1555,7 @@ function ManualDeleteClearReviewDialog({
           <DialogHeader className="hito-product-dialog-header">
             <DialogTitle className="hito-modal-title">Clear blocked</DialogTitle>
             <DialogDescription className="hito-body">
-              Hito could not approve clearing this planned manual workout.
+              Hito could not approve clearing this planned workout.
             </DialogDescription>
           </DialogHeader>
           <div className="hito-product-dialog-body">
@@ -1630,7 +1634,7 @@ function ManualDeleteClearReadyDialog({
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Review clear workout</DialogTitle>
           <DialogDescription className="hito-body">
-            Confirm before Hito removes this planned workout from your manual active plan.
+            Confirm before Hito removes this planned workout from your active plan.
           </DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body space-y-4">
@@ -1678,7 +1682,7 @@ function ManualDeleteClearReadyDialog({
                 <p className="hito-list-row-title">Restore affordance</p>
                 <p className="hito-list-row-copy">
                   Backend returned reviewed next-step data for {restoreLabels}. Actual restore must
-                  go back through the manual Add review flow.
+                  go back through the active-plan Add review flow.
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
@@ -1951,7 +1955,7 @@ function clearBlockedReasonLabel(
   if (reason === "target_workout_not_found") return "Workout not found";
   if (reason === "target_workout_not_in_active_plan") return "Workout is not in this plan";
   if (reason === "target_workout_not_supported") return "Workout cannot be cleared here";
-  if (reason === "unsupported_active_plan_source") return "Only manual plans can be changed here";
+  if (reason === "unsupported_active_plan_source") return "This active plan cannot be changed here";
   if (reason === "stale_review") return "Review is stale";
   if (reason === "invalid_review") return "Review needs refresh";
   if (reason === "unauthenticated") return "Sign in required";

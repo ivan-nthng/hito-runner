@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+  ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
+  ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+  appendActivePlanUserEditMetadataToRecord,
+  buildActivePlanUserEditMetadata,
+  resolveActivePlanSourceStatus,
+  resolveActivePlanWorkoutEditability,
+} from "@/lib/active-plan-workout-editing/policy";
+import {
   getExistingPlanContext,
   type ExistingPlanContext,
   type PersistedPlanCycleRow,
@@ -87,6 +95,7 @@ export type ManualWorkoutDeleteClearFailureReason =
   | "invalid_input"
   | "no_active_plan"
   | "unsupported_active_plan_source"
+  | "unsupported_source_metadata"
   | "target_workout_not_found"
   | "target_workout_not_in_active_plan"
   | "target_workout_not_supported"
@@ -108,7 +117,7 @@ type ManualWorkoutDeleteClearBlockedResult = {
   persisted: false;
   reason: ManualWorkoutDeleteClearFailureReason;
   message: string;
-  sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+  sourceKind: string | null;
   workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
 };
 
@@ -140,7 +149,7 @@ export type ManualWorkoutDeleteClearReviewResult =
       ok: true;
       status: "review_ready";
       persisted: false;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceKind: string;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
       plannedWorkoutId: string;
@@ -166,8 +175,8 @@ export type ManualWorkoutDeleteClearConfirmResult =
       ok: true;
       status: "deleted";
       persisted: true;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
+      sourceKind: string;
+      sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
       plannedWorkoutId: string;
@@ -277,7 +286,7 @@ export async function reviewManualWorkoutDeleteClearForUser(
     ok: true,
     status: "review_ready",
     persisted: false,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: target.activePlan.source_kind ?? ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
     activePlanId: target.activePlan.id,
     plannedWorkoutId: target.targetWorkout.id,
@@ -348,8 +357,8 @@ export async function confirmManualWorkoutDeleteClearForUser(
       ok: true,
       status: "deleted",
       persisted: true,
-      sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-      sourceStatus: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+      sourceKind: target.activePlan.source_kind ?? ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+      sourceStatus: resolveActivePlanSourceStatus(target.activePlan),
       workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
       activePlanId: persisted.planCycle.id,
       plannedWorkoutId: target.targetWorkout.id,
@@ -409,11 +418,13 @@ export async function persistManualWorkoutDeleteClear({
     .update({
       end_date: resolveManualPlanEndDateAfterDelete(activePlan, remainingWorkouts),
       goal_metadata: buildManualWorkoutDeleteGoalMetadata({
+        activePlan,
         existingGoalMetadata: activePlan.goal_metadata,
         remainingWorkouts,
         review,
       }),
       plan_preferences: buildManualWorkoutDeletePlanPreferences({
+        activePlan,
         existingPlanPreferences: activePlan.plan_preferences,
         review,
       }),
@@ -421,7 +432,7 @@ export async function persistManualWorkoutDeleteClear({
     .eq("id", activePlan.id)
     .eq("user_id", userId)
     .eq("status", "active")
-    .eq("source_kind", MANUAL_USER_BUILT_PLAN_SOURCE_KIND)
+    .eq("source_kind", activePlan.source_kind)
     .select("*")
     .single();
 
@@ -462,7 +473,7 @@ async function resolveManualWorkoutDeleteClearTarget(
     return {
       ok: false,
       reason: "no_active_plan",
-      message: "Create a manual user-built active plan before deleting workouts.",
+      message: "Create or open an active plan before deleting workouts.",
     };
   }
 
@@ -474,11 +485,15 @@ async function resolveManualWorkoutDeleteClearTarget(
     };
   }
 
-  if (activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+  const editability = resolveActivePlanWorkoutEditability(activePlan, "clear_workout");
+  if (!editability.ok) {
     return {
       ok: false,
-      reason: "unsupported_active_plan_source",
-      message: "Manual workout deletion is available only for manual user-built active plans.",
+      reason:
+        editability.reason === "unsupported_source_metadata"
+          ? "unsupported_source_metadata"
+          : "unsupported_active_plan_source",
+      message: editability.message,
     };
   }
 
@@ -498,7 +513,7 @@ async function resolveManualWorkoutDeleteClearTarget(
     return {
       ok: false,
       reason: "target_workout_not_supported",
-      message: "Only manually authored workout rows can be deleted in this flow.",
+      message: "This planned workout row cannot be safely cleared through this flow.",
     };
   }
 
@@ -672,7 +687,7 @@ function buildDeleteClearExactnessPayload(input: {
 }) {
   return {
     version: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
     activePlanId: input.activePlan.id,
     activePlanSourceKind: input.activePlan.source_kind,
     plannedWorkoutId: input.targetWorkout.id,
@@ -696,9 +711,28 @@ function buildManualWorkoutDeleteGoalMetadata(input: {
   existingGoalMetadata: Json | null;
   remainingWorkouts: readonly PersistedPlannedWorkoutRow[];
   review: ManualWorkoutDeleteClearReview;
+  activePlan: PersistedPlanCycleRow;
 }): Json {
-  const root = asJsonRecord(input.existingGoalMetadata);
+  const editMetadata = buildActivePlanUserEditMetadata({
+    activePlan: input.activePlan,
+    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.clearWorkout,
+    plannedWorkoutId: input.review.plannedWorkoutId,
+    previousWorkoutDate: input.review.workoutDate,
+    reviewChecksum: input.review.reviewChecksum,
+    reviewPayloadVersion: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
+    templateKey: input.review.templateKey,
+    title: input.review.title,
+    workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  });
+  const root = appendActivePlanUserEditMetadataToRecord(
+    asJsonRecord(input.existingGoalMetadata),
+    editMetadata,
+  );
   const manualPlan = asJsonRecord(root.manual_user_built_plan);
+
+  if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+    return toJson(root);
+  }
 
   return toJson({
     ...root,
@@ -727,8 +761,23 @@ function buildManualWorkoutDeleteGoalMetadata(input: {
 function buildManualWorkoutDeletePlanPreferences(input: {
   existingPlanPreferences: Json | null;
   review: ManualWorkoutDeleteClearReview;
+  activePlan: PersistedPlanCycleRow;
 }): Json {
-  const root = asJsonRecord(input.existingPlanPreferences);
+  const editMetadata = buildActivePlanUserEditMetadata({
+    activePlan: input.activePlan,
+    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.clearWorkout,
+    plannedWorkoutId: input.review.plannedWorkoutId,
+    previousWorkoutDate: input.review.workoutDate,
+    reviewChecksum: input.review.reviewChecksum,
+    reviewPayloadVersion: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
+    templateKey: input.review.templateKey,
+    title: input.review.title,
+    workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  });
+  const root = appendActivePlanUserEditMetadataToRecord(
+    asJsonRecord(input.existingPlanPreferences),
+    editMetadata,
+  );
   const deleteHistory = Array.isArray(root.manual_workout_authoring_deletions)
     ? root.manual_workout_authoring_deletions
     : [];
@@ -740,6 +789,10 @@ function buildManualWorkoutDeletePlanPreferences(input: {
     review_payload_version: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
     review_checksum: input.review.reviewChecksum,
   };
+
+  if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+    return toJson(root);
+  }
 
   return toJson({
     ...root,

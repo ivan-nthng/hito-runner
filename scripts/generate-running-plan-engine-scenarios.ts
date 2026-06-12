@@ -10,6 +10,8 @@ import {
   resolveRunningPlanCompositionWeek,
   RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION,
   runningPlanPrescriptionIsExact,
+  summarizeRunnerFacingPreviewRichness,
+  summarizeRunningPlanPreviewPrescriptionGrammar,
   type BuildRunningPlanPreviewInput,
   type BuildTenKPlanPreviewInput,
   type RunningPlanCompositionSignal,
@@ -251,6 +253,13 @@ function buildScenarioOutput(definition: ScenarioDefinition) {
   const draft = result.draft;
   const exactness = summarizeExactness(draft.calendarRows);
   const metricTruthScan = scanRunnerFacingMetricTruth(draft.calendarRows);
+  const runnerFacingRichness = summarizeRunnerFacingPreviewRichness({
+    family: draft.planFamily,
+    runnerLevel: definition.input.runnerLevel,
+    loadContext: draft.normalizedInputSummary.loadContext,
+    rows: draft.calendarRows,
+  });
+  const prescriptionGrammar = summarizeRunningPlanPreviewPrescriptionGrammar(draft.calendarRows);
 
   return {
     scenarioId: definition.scenarioId,
@@ -283,6 +292,8 @@ function buildScenarioOutput(definition: ScenarioDefinition) {
     }),
     durabilitySignals: summarizeDurabilitySignals(draft.calendarRows),
     longRunDetailVariety: summarizeLongRunDetailVariety(draft.calendarRows),
+    runnerFacingRichness,
+    prescriptionGrammar,
     endpointProof: draft.endpointProof,
     exactness,
     fakePrecisePaceAppears: metricTruthScan.fakePrecisePaceMatches.length > 0,
@@ -396,6 +407,46 @@ function buildSummary(
         readyOutputs.map((output) => [output.scenarioId, output.compositionGrammar.familySignals]),
       ),
     },
+    runnerFacingRichnessProof: {
+      scenariosWithIssues: readyOutputs
+        .filter((output) => output.runnerFacingRichness.issues.length > 0)
+        .map((output) => ({
+          scenarioId: output.scenarioId,
+          issues: output.runnerFacingRichness.issues,
+        })),
+      maxIdentityDesertByScenario: Object.fromEntries(
+        readyOutputs.map((output) => [
+          output.scenarioId,
+          output.runnerFacingRichness.longestIdentityDesertWeeks,
+        ]),
+      ),
+      distinctNonLongRunSignalsByScenario: Object.fromEntries(
+        readyOutputs.map((output) => [
+          output.scenarioId,
+          output.runnerFacingRichness.distinctNonLongRunSignals,
+        ]),
+      ),
+    },
+    prescriptionGrammarProof: {
+      scenariosWithIssues: readyOutputs
+        .filter((output) => output.prescriptionGrammar.issueCount > 0)
+        .map((output) => ({
+          scenarioId: output.scenarioId,
+          issues: output.prescriptionGrammar.issues,
+        })),
+      awkwardStandardDurationScenarioList: readyOutputs
+        .filter((output) => output.prescriptionGrammar.awkwardStandardDurationCount > 0)
+        .map((output) => output.scenarioId),
+      vagueEffortOnlyTargetScenarioList: readyOutputs
+        .filter((output) => output.prescriptionGrammar.vagueEffortOnlyTargetCount > 0)
+        .map((output) => output.scenarioId),
+      fakePaceTargetScenarioList: readyOutputs
+        .filter((output) => output.prescriptionGrammar.fakePaceTargetCount > 0)
+        .map((output) => output.scenarioId),
+      fakePersonalHrTargetScenarioList: readyOutputs
+        .filter((output) => output.prescriptionGrammar.fakePersonalHrTargetCount > 0)
+        .map((output) => output.scenarioId),
+    },
     endpointProof: {
       tenKExactEndpointScenarios: readyOutputs
         .filter(
@@ -501,6 +552,8 @@ function buildSummary(
         compositionGrammar: output.compositionGrammar,
         durabilitySignals: output.durabilitySignals,
         longRunDetailVariety: output.longRunDetailVariety,
+        runnerFacingRichness: output.runnerFacingRichness,
+        prescriptionGrammar: output.prescriptionGrammar,
         endpointProof: output.endpointProof,
         exactness: output.exactness,
         fakePrecisePaceAppears: output.fakePrecisePaceAppears,
@@ -577,6 +630,16 @@ function validateScenarioProof(summary: ReturnType<typeof buildSummary>) {
   assert.equal(summary.unresolvedRangeCount, 0);
   assert.equal(summary.unresolvedExecutableSegmentCount, 0);
   assert.deepEqual(summary.unavailableScenarios, []);
+  assert.deepEqual(
+    summary.runnerFacingRichnessProof.scenariosWithIssues,
+    [],
+    "Acceptance scenarios must satisfy runner-facing richness gates.",
+  );
+  assert.deepEqual(
+    summary.prescriptionGrammarProof.scenariosWithIssues,
+    [],
+    "Acceptance scenarios must satisfy executable prescription grammar gates.",
+  );
 
   const comparison = new Map(
     summary.scenarioComparison.map((entry) => [entry.scenarioId, entry] as const),
@@ -727,6 +790,7 @@ function validateScenarioProof(summary: ReturnType<typeof buildSummary>) {
     assert.equal(entry.fakePrecisePaceAppears, false);
     assert.equal(entry.fakePersonalHrAppears, false);
     assert.equal(entry.forbiddenRunnerFacingLanguageAppears, false);
+    assert.equal(entry.prescriptionGrammar.issueCount, 0);
   }
 
   assert.ok(

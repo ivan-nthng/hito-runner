@@ -352,7 +352,32 @@ function resolveTenKDevelopmentTouch({
   horizonWeeks: number;
 }): RunningPlanCompositionDevelopmentTouch | null {
   if (runnerLevel === "beginner_new_runner") {
-    return weekNumber === 2 || weekNumber === 5 || weekNumber === 7 ? "strides" : null;
+    const earlyMiddleRefreshWeek =
+      horizonWeeks >= 18
+        ? resolveSoftBridgeWeek({
+            horizonWeeks,
+            targetWeek: Math.ceil(horizonWeeks * 0.5),
+          })
+        : null;
+    const midRefreshWeek =
+      horizonWeeks >= 14
+        ? resolveSoftBridgeWeek({
+            horizonWeeks,
+            targetWeek: Math.ceil(horizonWeeks * 0.62),
+          })
+        : null;
+    const lateRefreshWeek = resolveSoftBridgeWeek({
+      horizonWeeks,
+      targetWeek: Math.ceil(horizonWeeks * 0.82),
+    });
+    return weekNumber === 2 ||
+      weekNumber === 5 ||
+      weekNumber === 7 ||
+      weekNumber === earlyMiddleRefreshWeek ||
+      weekNumber === midRefreshWeek ||
+      weekNumber === lateRefreshWeek
+      ? "strides"
+      : null;
   }
 
   if (loadContext === "conservative") {
@@ -365,6 +390,14 @@ function resolveTenKDevelopmentTouch({
     }
 
     return weekNumber === 3 || weekNumber === 7 || weekNumber === lateReminderWeek ? "tempo" : null;
+  }
+
+  const lateRefreshWeek = resolveSoftBridgeWeek({
+    horizonWeeks,
+    targetWeek: Math.ceil(horizonWeeks * 0.82),
+  });
+  if (weekNumber === lateRefreshWeek) {
+    return "tempo";
   }
 
   switch (weekNumber) {
@@ -396,20 +429,45 @@ function resolveHalfMarathonDevelopmentTouch({
   weekNumber: number;
   horizonWeeks: number;
 }): RunningPlanCompositionDevelopmentTouch | null {
-  const lateDurabilityWeek = Math.ceil(horizonWeeks * 0.7);
+  const lateDurabilityWeek = resolveSoftBridgeWeek({
+    horizonWeeks,
+    targetWeek: Math.ceil(horizonWeeks * 0.7),
+  });
+  const midBlockBridgeWeek = resolveSoftBridgeWeek({
+    horizonWeeks,
+    targetWeek: Math.ceil(horizonWeeks * 0.58),
+  });
+  const conservativeMiddleBridgeWeek = resolveSoftBridgeWeek({
+    horizonWeeks,
+    targetWeek: Math.ceil(horizonWeeks * 0.5),
+  });
+  const lateRefreshWeek = resolveSoftBridgeWeek({
+    horizonWeeks,
+    targetWeek: Math.ceil(horizonWeeks * 0.86),
+  });
 
   if (loadContext === "conservative") {
     if (weekNumber === 2) {
       return "strides";
     }
 
+    if (weekNumber === lateRefreshWeek) {
+      return "progression";
+    }
+
     return weekNumber === 3 ||
       weekNumber === 6 ||
       weekNumber === 9 ||
       weekNumber === 11 ||
+      weekNumber === conservativeMiddleBridgeWeek ||
+      weekNumber === midBlockBridgeWeek ||
       weekNumber === lateDurabilityWeek
       ? "tempo"
       : null;
+  }
+
+  if (weekNumber === midBlockBridgeWeek || weekNumber === lateRefreshWeek) {
+    return weekNumber === lateRefreshWeek ? "progression" : "tempo";
   }
 
   if (weekNumber === lateDurabilityWeek) {
@@ -462,23 +520,36 @@ function resolveMarathonBaseDevelopmentTouch({
       : null;
   }
 
+  let fixedTouch: RunningPlanCompositionDevelopmentTouch | null = null;
   switch (weekNumber) {
     case 2:
-      return "strides";
+      fixedTouch = "strides";
+      break;
     case 3:
     case 10:
-      return "tempo";
+      fixedTouch = "tempo";
+      break;
     case 6:
-      return runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive"
-        ? "threshold"
-        : "strides";
+      fixedTouch =
+        runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive"
+          ? "threshold"
+          : "strides";
+      break;
     case 13:
-      return runnerLevel === "sometimes_runs" ? "tempo" : "hills";
+      fixedTouch = runnerLevel === "sometimes_runs" ? "tempo" : "hills";
+      break;
     case 14:
-      return runnerLevel === "professional_competitive" ? "threshold" : null;
-    default:
-      return null;
+      fixedTouch = runnerLevel === "professional_competitive" ? "threshold" : null;
+      break;
   }
+
+  if (fixedTouch) {
+    return fixedTouch;
+  }
+
+  return resolveStandardMarathonBaseBridgeWeeks(horizonWeeks).includes(weekNumber)
+    ? "steady_aerobic_run"
+    : null;
 }
 
 function resolveBeginnerMarathonBaseDevelopmentTouch({
@@ -492,12 +563,23 @@ function resolveBeginnerMarathonBaseDevelopmentTouch({
 }): RunningPlanCompositionDevelopmentTouch | null {
   const bridgeWeeks = resolveBeginnerMarathonBaseBridgeWeeks({ loadContext, horizonWeeks });
 
-  if (weekNumber === bridgeWeeks.earlyTurnoverWeek || weekNumber === bridgeWeeks.midTurnoverWeek) {
+  if (
+    weekNumber === bridgeWeeks.earlyTurnoverWeek ||
+    weekNumber === bridgeWeeks.earlyMidTurnoverWeek ||
+    weekNumber === bridgeWeeks.middleTurnoverWeek ||
+    (bridgeWeeks.preMidTurnoverWeek !== null && weekNumber === bridgeWeeks.preMidTurnoverWeek) ||
+    weekNumber === bridgeWeeks.midTurnoverWeek ||
+    (bridgeWeeks.lateTurnoverWeek !== null && weekNumber === bridgeWeeks.lateTurnoverWeek)
+  ) {
     return "strides";
   }
 
   if (
+    (bridgeWeeks.preSteadyBridgeWeek !== null && weekNumber === bridgeWeeks.preSteadyBridgeWeek) ||
+    weekNumber === bridgeWeeks.middleSteadyBridgeWeek ||
     weekNumber === bridgeWeeks.steadyBridgeWeek ||
+    (bridgeWeeks.lateMidSteadyBridgeWeek !== null &&
+      weekNumber === bridgeWeeks.lateMidSteadyBridgeWeek) ||
     (bridgeWeeks.lateSteadyBridgeWeek !== null && weekNumber === bridgeWeeks.lateSteadyBridgeWeek)
   ) {
     return "steady_aerobic_run";
@@ -516,28 +598,86 @@ function resolveBeginnerMarathonBaseBridgeWeeks({
   return {
     earlyTurnoverWeek: resolveSoftBridgeWeek({
       horizonWeeks,
-      targetWeek: Math.ceil(horizonWeeks * (loadContext === "conservative" ? 0.2 : 0.18)),
+      targetWeek: Math.ceil(horizonWeeks * 0.1),
     }),
+    earlyMidTurnoverWeek: resolveSoftBridgeWeek({
+      horizonWeeks,
+      targetWeek: Math.ceil(horizonWeeks * 0.18),
+    }),
+    middleTurnoverWeek: resolveSoftBridgeWeek({
+      horizonWeeks,
+      targetWeek: Math.ceil(horizonWeeks * 0.28),
+    }),
+    preMidTurnoverWeek:
+      horizonWeeks >= 40
+        ? resolveSoftBridgeWeek({
+            horizonWeeks,
+            targetWeek: Math.ceil(horizonWeeks * 0.35),
+          })
+        : null,
     midTurnoverWeek: resolveSoftBridgeWeek({
       horizonWeeks,
       targetWeek: Math.ceil(horizonWeeks * 0.42),
+    }),
+    preSteadyBridgeWeek:
+      horizonWeeks >= 40
+        ? resolveSoftBridgeWeek({
+            horizonWeeks,
+            targetWeek: Math.ceil(horizonWeeks * 0.48),
+          })
+        : null,
+    middleSteadyBridgeWeek: resolveSoftBridgeWeek({
+      horizonWeeks,
+      targetWeek: Math.ceil(horizonWeeks * 0.55),
     }),
     steadyBridgeWeek: resolveSoftBridgeWeek({
       horizonWeeks,
       targetWeek: Math.ceil(horizonWeeks * 0.62),
     }),
-    lateSteadyBridgeWeek:
+    lateMidSteadyBridgeWeek:
       horizonWeeks >= 32
         ? resolveSoftBridgeWeek({
             horizonWeeks,
-            targetWeek: Math.ceil(horizonWeeks * 0.82),
+            targetWeek: Math.ceil(horizonWeeks * 0.7),
+          })
+        : null,
+    lateSteadyBridgeWeek:
+      horizonWeeks >= 24
+        ? resolveSoftBridgeWeek({
+            horizonWeeks,
+            targetWeek: Math.ceil(horizonWeeks * 0.78),
+          })
+        : null,
+    lateTurnoverWeek:
+      horizonWeeks >= 32
+        ? resolveSoftBridgeWeek({
+            horizonWeeks,
+            targetWeek: Math.ceil(horizonWeeks * 0.9),
           })
         : null,
   };
 }
 
 function resolveConservativeMarathonBaseBridgeWeeks(horizonWeeks: number) {
-  const bridgeTargets = horizonWeeks >= 40 ? [0.32, 0.5, 0.68, 0.84] : [0.5, 0.72];
+  const bridgeTargets =
+    horizonWeeks >= 40
+      ? [0.32, 0.5, 0.68, 0.84]
+      : horizonWeeks >= 32
+        ? [0.42, 0.56, 0.68, 0.8]
+        : [0.5, 0.72];
+
+  return uniqueNumbers(
+    bridgeTargets.map((ratio) =>
+      resolveSoftBridgeWeek({
+        horizonWeeks,
+        targetWeek: Math.ceil(horizonWeeks * ratio),
+      }),
+    ),
+  );
+}
+
+function resolveStandardMarathonBaseBridgeWeeks(horizonWeeks: number) {
+  const bridgeTargets = horizonWeeks >= 24 ? [0.58, 0.72, 0.86] : [0.86];
 
   return uniqueNumbers(
     bridgeTargets.map((ratio) =>
@@ -778,6 +918,9 @@ function resolveFamilySignals({
       signals.add("half_turnover");
     }
     if (developmentTouch === "tempo") {
+      signals.add("half_sustained_support");
+    }
+    if (developmentTouch === "progression") {
       signals.add("half_sustained_support");
     }
     if (

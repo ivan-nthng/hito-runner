@@ -9,6 +9,7 @@ import {
   resolveRunningPlanEndpointWeek,
   resolveRunningPlanTaperWeek,
 } from "@/lib/plan-creation-engine/horizon-policy";
+import { collectRunnerFacingPreviewRichnessIssues } from "@/lib/plan-creation-engine/runner-facing-richness";
 import type {
   RunningPlanPreviewCalendarRow,
   RunningPlanPreviewCalendarWorkoutDayKind,
@@ -96,6 +97,14 @@ export function validateMarathonBaseDiversityPolicy({
       runnerLevel,
       loadContext,
       horizonWeeks,
+      rows,
+    }),
+  );
+  issues.push(
+    ...collectRunnerFacingPreviewRichnessIssues({
+      family: "Marathon Base",
+      runnerLevel,
+      loadContext,
       rows,
     }),
   );

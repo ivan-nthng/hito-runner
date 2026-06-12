@@ -317,7 +317,7 @@ function ManualWorkoutMoveReadyDialog({
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Review move</DialogTitle>
           <DialogDescription className="hito-body">
-            Confirm this backend-reviewed move before Hito changes your manual active plan.
+            Confirm this backend-reviewed move before Hito changes your active plan.
           </DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body space-y-4">
@@ -363,7 +363,7 @@ function ManualWorkoutMoveReadyDialog({
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
-                Manual plan
+                Active plan
               </span>
             </div>
             {confirmMessage ? (
@@ -415,7 +415,7 @@ function moveBlockedReasonLabel(
   if (reason === "source_workout_not_found") return "Workout not found";
   if (reason === "source_workout_not_in_active_plan") return "Workout is not in this plan";
   if (reason === "source_workout_not_supported") return "Workout cannot be moved here";
-  if (reason === "unsupported_active_plan_source") return "Only manual plans can be changed here";
+  if (reason === "unsupported_active_plan_source") return "This active plan cannot be changed here";
   if (reason === "stale_review") return "Review is stale";
   if (reason === "invalid_review") return "Review needs refresh";
   if (reason === "unauthenticated") return "Sign in required";

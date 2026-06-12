@@ -3,8 +3,13 @@ import {
   RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION,
   isRunningPlanCompositionDevelopmentTouch,
   resolveRunningPlanCompositionWeek,
+  collectRunnerFacingCanonicalRichnessIssues,
+  collectRunningPlanCanonicalPrescriptionGrammarIssues,
+  summarizeRunnerFacingCanonicalRichness,
+  summarizeRunningPlanCanonicalPrescriptionGrammar,
   type HalfMarathonPlanPreviewDraft,
   type MarathonBasePlanPreviewDraft,
+  type MarathonCompletionPlanPreviewDraft,
   type RunningPlanPreviewCalendarRow,
   type RunningPlanSegmentPrescription,
   type RunningPlanWatchExecutableSegmentTemplate,
@@ -28,7 +33,8 @@ export const RUNNING_PLAN_CONFIRMED_SOURCE_STATUS = "confirmed_selected_plan" as
 export type RunningPlanPreviewDraft =
   | TenKPlanPreviewDraft
   | HalfMarathonPlanPreviewDraft
-  | MarathonBasePlanPreviewDraft;
+  | MarathonBasePlanPreviewDraft
+  | MarathonCompletionPlanPreviewDraft;
 
 export type RunningPlanReviewProof = {
   reviewToken: string;
@@ -86,6 +92,34 @@ export async function validateRunningPlanReviewExactness(input: {
     }
 > {
   const canonicalPlan = buildRunningPlanCanonicalPlan(input.draft);
+  const richnessIssues = collectRunnerFacingCanonicalRichnessIssues({
+    family: input.draft.planFamily,
+    runnerLevel: input.draft.normalizedInputSummary.runnerLevel,
+    loadContext: input.draft.normalizedInputSummary.loadContext,
+    rows: canonicalPlan.planned_workouts,
+  });
+
+  if (richnessIssues.length > 0) {
+    return {
+      ok: false,
+      reason: "invalid_review",
+      message:
+        "This selected-plan review no longer satisfies Hito's runner-facing richness gates. Refresh the preview before creating a plan.",
+    };
+  }
+
+  const prescriptionGrammarIssues = collectRunningPlanCanonicalPrescriptionGrammarIssues(
+    canonicalPlan.planned_workouts,
+  );
+  if (prescriptionGrammarIssues.length > 0) {
+    return {
+      ok: false,
+      reason: "invalid_review",
+      message:
+        "This selected-plan review no longer satisfies Hito's executable workout prescription grammar. Refresh the preview before creating a plan.",
+    };
+  }
+
   const reviewPayload = buildRunningPlanReviewPayload(input.draft, canonicalPlan);
   const expectedChecksum = await digestSha256Hex(stableJsonStringify(reviewPayload));
 
@@ -213,6 +247,15 @@ export function buildRunningPlanPersistenceMetadata(input: {
   const { draft, canonicalPlan, reviewChecksum } = input;
   const nonRestRows = draft.calendarRows.filter((row) => !row.isRestDay);
   const compositionGrammar = summarizeRunningPlanCompositionGrammar(draft);
+  const runnerFacingRichness = summarizeRunnerFacingCanonicalRichness({
+    family: draft.planFamily,
+    runnerLevel: draft.normalizedInputSummary.runnerLevel,
+    loadContext: draft.normalizedInputSummary.loadContext,
+    rows: canonicalPlan.planned_workouts,
+  });
+  const prescriptionGrammar = summarizeRunningPlanCanonicalPrescriptionGrammar(
+    canonicalPlan.planned_workouts,
+  );
   const metricPolicy = summarizeMetricPolicy(draft.calendarRows);
 
   return {
@@ -232,6 +275,8 @@ export function buildRunningPlanPersistenceMetadata(input: {
         row_count: canonicalPlan.planned_workouts.length,
         non_rest_row_count: nonRestRows.length,
         endpoint_proof: draft.endpointProof,
+        runner_facing_richness: runnerFacingRichness,
+        prescription_grammar: prescriptionGrammar,
         metric_policy: metricPolicy,
       },
     }),
@@ -262,6 +307,8 @@ export function runningPlanSourceKindForFamily(family: RunningPlanDistanceFamily
       return "running_plan_engine_half_marathon_builder_v1";
     case "Marathon Base":
       return "running_plan_engine_marathon_base_builder_v1";
+    case "Marathon Completion":
+      return "running_plan_engine_marathon_completion_builder_v1";
   }
 }
 
@@ -405,22 +452,56 @@ function buildSegmentTarget(
   prescription: RunningPlanSegmentPrescription,
   targetTruthMode: RunningPlanWatchExecutableSegmentTemplate["targetTruthMode"],
 ) {
-  const intensity = prescriptionIntensityLabel(prescription);
+  const effortTarget = resolveEffortTarget(prescriptionIntensityLabel(prescription));
+  const baseTarget = {
+    intensity: effortTarget.intensity,
+    rpe: effortTarget.rpe,
+    label: "Effort and RPE target",
+  };
 
   if (targetTruthMode === "editable_default_hr") {
     return {
-      intensity,
-      label: "Editable Hito default HR guidance",
+      ...baseTarget,
+      label: "Estimated HR guidance",
       hr_target_source: "default_estimated_hr",
-      source_note: "Default estimate only; not personal HR-zone truth.",
+      source_note: "Estimate only; not personal HR-zone truth.",
     };
   }
 
   return {
-    intensity,
-    label: "Structure-only executable target",
+    ...baseTarget,
     source_note: "No pace or personal HR target is inferred.",
   };
+}
+
+function resolveEffortTarget(intensityLabel: string): { intensity: string; rpe: string } {
+  const normalized = intensityLabel.toLowerCase();
+
+  if (/stride|quick|turnover|fast/.test(normalized)) {
+    return { intensity: "Quick but relaxed / RPE 7-8", rpe: "7-8" };
+  }
+
+  if (/threshold/.test(normalized)) {
+    return { intensity: "Strong controlled / RPE 7", rpe: "7" };
+  }
+
+  if (/tempo/.test(normalized)) {
+    return { intensity: "Controlled tempo / RPE 6-7", rpe: "6-7" };
+  }
+
+  if (/hill|uphill/.test(normalized)) {
+    return { intensity: "Controlled hill effort / RPE 6-7", rpe: "6-7" };
+  }
+
+  if (/progression|steady|durable|completion|checkpoint/.test(normalized)) {
+    return { intensity: "Steady controlled / RPE 4-6", rpe: "4-6" };
+  }
+
+  if (/recovery|walk|jog|settle|cool|finish|easy|adaptation/.test(normalized)) {
+    return { intensity: "Easy / RPE 2-3", rpe: "2-3" };
+  }
+
+  return { intensity: "Comfortably controlled / RPE 3-5", rpe: "3-5" };
 }
 
 function resolveSegmentType(
@@ -488,6 +569,20 @@ function resolveWorkoutMapping(
         workoutIdentity: "easy_run_with_strides",
         calendarIconKey: "easy",
       };
+    case "steady_aerobic_run":
+      return {
+        workoutType: "steady_or_easy",
+        workoutFamily: "steady",
+        workoutIdentity: "steady_aerobic_run",
+        calendarIconKey: "steady",
+      };
+    case "progression":
+      return {
+        workoutType: "progression",
+        workoutFamily: "progression",
+        workoutIdentity: "progression_run",
+        calendarIconKey: "progression",
+      };
     case "tempo":
       return {
         workoutType: "tempo",
@@ -517,19 +612,15 @@ function resolveWorkoutMapping(
         calendarIconKey: "hills",
       };
     case "final_selected_distance_day":
-      return family === "10K"
-        ? {
-            workoutType: "race",
-            workoutFamily: "race",
-            workoutIdentity: "tenk_completion_or_checkpoint",
-            calendarIconKey: "race",
-          }
-        : {
-            workoutType: "race",
-            workoutFamily: "race",
-            workoutIdentity: "race_pace_session",
-            calendarIconKey: "race",
-          };
+      return {
+        workoutType: "race",
+        workoutFamily: "race",
+        workoutIdentity:
+          family === "10K"
+            ? "tenk_completion_or_checkpoint"
+            : "selected_distance_completion_or_checkpoint",
+        calendarIconKey: "race",
+      };
     case "marathon_base_endpoint":
       return {
         workoutType: "long_run",
@@ -679,6 +770,8 @@ function runningPlanName(family: RunningPlanDistanceFamily) {
       return "Half Marathon Balanced";
     case "Marathon Base":
       return "Marathon Base";
+    case "Marathon Completion":
+      return "Marathon Completion";
   }
 }
 
@@ -690,6 +783,8 @@ function runningPlanGoalType(family: RunningPlanDistanceFamily) {
       return "half_marathon";
     case "Marathon Base":
       return "distance_build";
+    case "Marathon Completion":
+      return "marathon";
   }
 }
 
@@ -701,6 +796,8 @@ function runningPlanGoalLabel(family: RunningPlanDistanceFamily) {
       return "Complete a Half Marathon checkpoint";
     case "Marathon Base":
       return "Build marathon-base durability";
+    case "Marathon Completion":
+      return "Complete a marathon";
   }
 }
 

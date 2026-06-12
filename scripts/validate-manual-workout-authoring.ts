@@ -39,6 +39,12 @@ import type {
   PersistedWorkoutLogRow,
 } from "../src/lib/active-plan-persistence";
 import {
+  ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
+  ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+  isEditableActivePlanSourceKind,
+  resolveActivePlanWorkoutEditability,
+} from "../src/lib/active-plan-workout-editing/policy";
+import {
   buildImportedPlanSeed,
   importedPlanSchema,
   type TrainingPlanV2,
@@ -68,6 +74,7 @@ async function main() {
   validateStableReviewExactness();
   validateProtectedConflictShape();
   validateManualDateOnlyLabels();
+  validateUniversalActivePlanEditabilityPolicy();
   await validateManualSavedTemplateContract();
   await validateManualConfirmPersistenceContract();
   await validateManualActivePlanAddWorkoutContract();
@@ -107,6 +114,73 @@ function validateManualDateOnlyLabels() {
     "Sun, Jun 14",
     "manual date-only labels must not drift through UTC timezone conversion",
   );
+}
+
+function validateUniversalActivePlanEditabilityPolicy() {
+  const userId = "00000000-0000-4000-8000-000000000010";
+  const editableSources = [
+    MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    "structured_authoring_v1",
+    "ai_first_plan_blueprint_v1",
+    "ai_first_plan_envelope_v1",
+    "running_plan_engine_10k_builder_v1",
+    "running_plan_engine_half_marathon_builder_v1",
+    "running_plan_engine_marathon_base_builder_v1",
+    "running_plan_engine_marathon_completion_builder_v1",
+    "plan_preset_v1",
+    "training_plan_v2_import",
+    "active_plan_refresh_v1",
+  ];
+
+  for (const sourceKind of editableSources) {
+    const activePlan = buildFakePlanCycle({
+      userId,
+      id: "00000000-0000-4000-8000-000000000011",
+      sourceKind,
+      startDate: "2026-06-16",
+      endDate: "2026-06-30",
+    });
+
+    assert.equal(
+      isEditableActivePlanSourceKind(sourceKind, activePlan),
+      true,
+      `${sourceKind} should be an editable active-plan source`,
+    );
+
+    const editability = resolveActivePlanWorkoutEditability(activePlan, "add_workout");
+    assert.equal(editability.ok, true, `${sourceKind} add editability should pass.`);
+    if (editability.ok) {
+      assert.equal(editability.sourceKind, sourceKind);
+    }
+  }
+
+  const unknownPlan = buildFakePlanCycle({
+    userId,
+    id: "00000000-0000-4000-8000-000000000012",
+    sourceKind: "legacy_unreviewed_plan_v0",
+    startDate: "2026-06-16",
+    endDate: "2026-06-30",
+  });
+  const unknown = resolveActivePlanWorkoutEditability(unknownPlan, "add_workout");
+  assert.equal(unknown.ok, false, "unknown active-plan source should stay blocked");
+  if (!unknown.ok) {
+    assert.equal(unknown.reason, "unsupported_active_plan_source");
+  }
+
+  const missingSource = resolveActivePlanWorkoutEditability(
+    buildFakePlanCycle({
+      userId,
+      id: "00000000-0000-4000-8000-000000000013",
+      sourceKind: null,
+      startDate: "2026-06-16",
+      endDate: "2026-06-30",
+    }),
+    "add_workout",
+  );
+  assert.equal(missingSource.ok, false, "missing source metadata should stay blocked");
+  if (!missingSource.ok) {
+    assert.equal(missingSource.reason, "unsupported_source_metadata");
+  }
 }
 
 async function validateManualSavedTemplateContract() {
@@ -351,6 +425,12 @@ async function validateManualActivePlanAddWorkoutContract() {
     assert.equal(success.calendarRowCount, 2);
     assert.equal(success.nonRestWorkoutCount, 2);
     assert.equal(success.reviewChecksum, reviewed.reviewChecksum);
+    assert.equal(success.sourceMetadata.editSourceKind, ACTIVE_PLAN_USER_EDIT_SOURCE_KIND);
+    assert.equal(
+      success.sourceMetadata.mutationKind,
+      ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
+    );
+    assert.equal(success.sourceMetadata.originalPlanSourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
     assert.equal(success.sourceMetadata.reviewChecksum, reviewed.reviewChecksum);
     assert.equal(success.sourceMetadata.metricTruthMode, "structure_only");
     assert.equal(success.safety.targetDayWasEmpty, true);
@@ -402,29 +482,48 @@ async function validateManualActivePlanAddWorkoutContract() {
   );
   assertAddBlocked(noActivePlan, "no_active_plan", "missing active plan");
 
-  const unsupportedSources = [
-    "ai_first_plan_blueprint_v1",
-    "plan_preset_v1",
-    "running_plan_engine_v1",
-    "training_plan_v2_import",
-  ];
-  for (const sourceKind of unsupportedSources) {
-    const result = await addManualWorkoutToActivePlanForUser(
-      userId,
-      buildConfirmInput(input, reviewed),
-      buildFakeAddDependencies({
-        activePlan: buildFakePlanCycle({
-          userId,
-          id: "33333333-3333-4333-8333-333333333333",
-          sourceKind,
-          startDate: "2026-06-16",
-          endDate: "2026-06-16",
-        }),
-        workouts: [firstWorkout],
-      }),
+  const presetPlan = buildFakePlanCycle({
+    userId,
+    id: "33333333-3333-4333-8333-333333333333",
+    sourceKind: "plan_preset_v1",
+    startDate: "2026-06-16",
+    endDate: "2026-06-16",
+  });
+  const presetAdd = await addManualWorkoutToActivePlanForUser(
+    userId,
+    buildConfirmInput(input, reviewed),
+    buildFakeAddDependencies({ activePlan: presetPlan, workouts: [firstWorkout] }),
+  );
+  assert.equal(presetAdd.ok, true, formatAddResult(presetAdd));
+  if (presetAdd.ok) {
+    assert.equal(presetAdd.sourceKind, "plan_preset_v1");
+    assert.equal(presetAdd.sourceMetadata.editSourceKind, ACTIVE_PLAN_USER_EDIT_SOURCE_KIND);
+    assert.equal(presetAdd.sourceMetadata.originalPlanSourceKind, "plan_preset_v1");
+    assert.equal(
+      presetAdd.sourceMetadata.mutationKind,
+      ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
     );
-    assertAddBlocked(result, "unsupported_active_plan_source", `unsupported source ${sourceKind}`);
   }
+
+  const unsupportedSource = await addManualWorkoutToActivePlanForUser(
+    userId,
+    buildConfirmInput(input, reviewed),
+    buildFakeAddDependencies({
+      activePlan: buildFakePlanCycle({
+        userId,
+        id: "33333333-3333-4333-8333-333333333334",
+        sourceKind: "legacy_unreviewed_plan_v0",
+        startDate: "2026-06-16",
+        endDate: "2026-06-16",
+      }),
+      workouts: [firstWorkout],
+    }),
+  );
+  assertAddBlocked(
+    unsupportedSource,
+    "unsupported_active_plan_source",
+    "unsupported active-plan source",
+  );
 
   const occupiedWorkout = buildFakePlannedWorkout({
     userId,
@@ -890,6 +989,64 @@ async function validateManualDeleteClearContract() {
     assert.equal(review.safety.lastWorkoutProtected, true);
   }
 
+  const overlongPersistedGuidance = "Stay steady and controlled without chasing pace. ".repeat(15);
+  const overlongPersistedHint = "Use the numeric duration as the target. ".repeat(8);
+  const boundedRestoreReview = assertReady("delete/clear bounded restore source review", {
+    templateKey: "steady_aerobic_run",
+    workoutDate: "2026-06-20",
+    title: "QA export steady structure",
+  });
+  const boundedRestoreTarget = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000508",
+    review: boundedRestoreReview,
+  });
+  const boundedRestoreSteps = (cloneJson(boundedRestoreTarget.steps) as Step[]).map((step) =>
+    step.segment_type === "main"
+      ? {
+          ...step,
+          guidance: overlongPersistedGuidance,
+          target: {
+            ...(step.target ?? {}),
+            hint: overlongPersistedHint,
+          },
+        }
+      : step,
+  );
+  const boundedRestoreTargetWithRichCopy: PersistedPlannedWorkoutRow = {
+    ...boundedRestoreTarget,
+    steps: boundedRestoreSteps as PersistedPlannedWorkoutRow["steps"],
+  };
+  const boundedRestore = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: boundedRestoreTargetWithRichCopy.id,
+    },
+    buildFakeDeleteDependencies({
+      activePlan,
+      workouts: [boundedRestoreTargetWithRichCopy, keptWorkout],
+    }),
+  );
+
+  assert.equal(boundedRestore.ok, true, formatDeleteReviewResult(boundedRestore));
+  if (boundedRestore.ok) {
+    const steadyEntry = boundedRestore.restore.draftInput.entries?.find(
+      (entry) => entry.kind === "block" && entry.block.blockKey === "steady_run_block",
+    );
+
+    assert.equal(steadyEntry?.kind, "block");
+    if (steadyEntry?.kind === "block") {
+      assert.equal(steadyEntry.block.noteText?.length, 500);
+      assert.equal(steadyEntry.block.target?.hint?.length, 200);
+    }
+
+    assert.equal(boundedRestore.restore.review.status, "draft_ready");
+    assert.equal(boundedRestore.restore.review.draft.title, "QA export steady structure");
+    assertNoFakePaceOrHr(boundedRestore.restore.review.draft.steps, "bounded delete restore");
+  }
+
   const persistedDeletes: Array<{
     targetWorkoutId: string;
     remainingWorkoutIds: string[];
@@ -1013,7 +1170,50 @@ async function validateManualDeleteClearContract() {
   );
   assertDeleteConfirmBlocked(clientRowsAttempt, "invalid_review", "client-sent delete row");
 
-  const nonManualPlan = await reviewManualWorkoutDeleteClearForUser(
+  const presetPlan = buildFakePlanCycle({
+    userId,
+    id: activePlan.id,
+    sourceKind: "plan_preset_v1",
+    startDate: "2026-06-18",
+    endDate: "2026-06-21",
+  });
+  const presetReview = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+    },
+    buildFakeDeleteDependencies({ activePlan: presetPlan, workouts: [targetWorkout, keptWorkout] }),
+  );
+  assert.equal(presetReview.ok, true, formatDeleteReviewResult(presetReview));
+  if (presetReview.ok) {
+    assert.equal(presetReview.sourceKind, "plan_preset_v1");
+    assert.equal(presetReview.restore.available, true);
+    assert.deepEqual(presetReview.restore.alternateLabels, ["Put back", "Redo"]);
+  }
+
+  const presetConfirm = await confirmManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: targetWorkout.id,
+      ...(presetReview.ok
+        ? {
+            reviewToken: presetReview.review.reviewToken,
+            reviewChecksum: presetReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeDeleteDependencies({ activePlan: presetPlan, workouts: [targetWorkout, keptWorkout] }),
+  );
+  assert.equal(presetConfirm.ok, true, formatDeleteConfirmResult(presetConfirm));
+  if (presetConfirm.ok) {
+    assert.equal(presetConfirm.sourceKind, "plan_preset_v1");
+    assert.equal(presetConfirm.sourceStatus, null);
+    assert.equal(presetConfirm.safety.deletedExactlyOneRow, true);
+  }
+
+  const unsupportedSource = await reviewManualWorkoutDeleteClearForUser(
     userId,
     {
       activePlanId: activePlan.id,
@@ -1023,7 +1223,7 @@ async function validateManualDeleteClearContract() {
       activePlan: buildFakePlanCycle({
         userId,
         id: activePlan.id,
-        sourceKind: "plan_preset_v1",
+        sourceKind: "legacy_unreviewed_plan_v0",
         startDate: "2026-06-18",
         endDate: "2026-06-21",
       }),
@@ -1031,9 +1231,9 @@ async function validateManualDeleteClearContract() {
     }),
   );
   assertDeleteReviewBlocked(
-    nonManualPlan,
+    unsupportedSource,
     "unsupported_active_plan_source",
-    "non-manual delete plan",
+    "unsupported delete plan source",
   );
 
   const foreignWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
@@ -1494,7 +1694,53 @@ async function validateManualMoveWorkoutContract() {
   );
   assertMoveConfirmBlocked(occupiedTarget, "occupied_day", "occupied move target");
 
-  const nonManualPlan = await reviewManualWorkoutMoveForUser(
+  const presetPlan = buildFakePlanCycle({
+    userId,
+    id: activePlan.id,
+    sourceKind: "plan_preset_v1",
+    startDate: "2026-06-18",
+    endDate: "2026-06-21",
+  });
+  const presetMoveReview = await reviewManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+    },
+    buildFakeMoveDependencies({ activePlan: presetPlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assert.equal(presetMoveReview.ok, true, formatMoveReviewResult(presetMoveReview));
+  if (presetMoveReview.ok) {
+    assert.equal(presetMoveReview.sourceKind, "plan_preset_v1");
+    assert.equal(presetMoveReview.targetWeekday, "Monday");
+    assert.equal(presetMoveReview.safety.targetWeekdayDerivedServerSide, true);
+  }
+
+  const presetMoveConfirm = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      ...(presetMoveReview.ok
+        ? {
+            reviewToken: presetMoveReview.review.reviewToken,
+            reviewChecksum: presetMoveReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeMoveDependencies({ activePlan: presetPlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assert.equal(presetMoveConfirm.ok, true, formatMoveConfirmResult(presetMoveConfirm));
+  if (presetMoveConfirm.ok) {
+    assert.equal(presetMoveConfirm.sourceKind, "plan_preset_v1");
+    assert.equal(presetMoveConfirm.sourceStatus, null);
+    assert.equal(presetMoveConfirm.targetWeekday, "Monday");
+    assert.equal(presetMoveConfirm.safety.movedExactlyOneRow, true);
+  }
+
+  const unsupportedPlanSource = await reviewManualWorkoutMoveForUser(
     userId,
     {
       activePlanId: activePlan.id,
@@ -1505,14 +1751,18 @@ async function validateManualMoveWorkoutContract() {
       activePlan: buildFakePlanCycle({
         userId,
         id: activePlan.id,
-        sourceKind: "plan_preset_v1",
+        sourceKind: "legacy_unreviewed_plan_v0",
         startDate: "2026-06-18",
         endDate: "2026-06-21",
       }),
       workouts: [sourceWorkout, keptWorkout],
     }),
   );
-  assertMoveReviewBlocked(nonManualPlan, "unsupported_active_plan_source", "non-manual move plan");
+  assertMoveReviewBlocked(
+    unsupportedPlanSource,
+    "unsupported_active_plan_source",
+    "unsupported move plan source",
+  );
 
   const foreignSourceWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
     userId: "00000000-0000-4000-8000-000000000799",
@@ -2542,6 +2792,8 @@ function buildFakePlanCycle({
   startDate: string;
   endDate: string;
 }): PersistedPlanCycleRow {
+  const isManualPlan = sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+
   return {
     id,
     user_id: userId,
@@ -2554,15 +2806,19 @@ function buildFakePlanCycle({
     start_date: startDate,
     end_date: endDate,
     target_date: null,
-    goal_metadata: {
-      manual_user_built_plan: {
-        source_kind: sourceKind,
-        source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-      },
-    },
-    plan_preferences: {
-      manual_workout_authoring_reviews: [],
-    },
+    goal_metadata: isManualPlan
+      ? {
+          manual_user_built_plan: {
+            source_kind: sourceKind,
+            source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+          },
+        }
+      : {},
+    plan_preferences: isManualPlan
+      ? {
+          manual_workout_authoring_reviews: [],
+        }
+      : {},
     created_at: "2026-06-10T00:00:00.000Z",
     updated_at: "2026-06-10T00:00:00.000Z",
   };

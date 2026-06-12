@@ -347,7 +347,8 @@ Current project skills:
 - `skills/hito-backend-supabase-contract/SKILL.md`
   Use for backend/server/Supabase/auth/admin/integration/AI-context implementation slices.
 - `skills/hito-frontend-design-system/SKILL.md`
-  Use for frontend UI work that touches components, Hito DS, layout, dialogs, forms, typography, or route surfaces.
+  Use for frontend UI work that touches components, Hito DS, layout, dialogs, forms, typography,
+  route surfaces, or Hito DS <-> Figma bridge/export/import planning.
 - `skills/hito-qa-browser-regression/SKILL.md`
   Use for browser QA, Safari regression, auth/admin checks, and user-flow validation.
 - `skills/hito-prompt-handoff/SKILL.md`

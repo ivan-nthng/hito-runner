@@ -14,7 +14,10 @@ import {
 import {
   HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
   MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
+  MARATHON_COMPLETION_PLAN_BUILDER_SOURCE_KIND,
   TEN_K_PLAN_BUILDER_SOURCE_KIND,
+  summarizeRunningPlanCanonicalPrescriptionGrammar,
+  summarizeRunnerFacingCanonicalRichness,
 } from "../src/lib/plan-creation-engine";
 import type { RunningPlanDistanceFamily } from "../src/lib/plan-creation-engine";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
@@ -93,7 +96,8 @@ const supportedFixtures: readonly Array<{
   sourceKind:
     | typeof TEN_K_PLAN_BUILDER_SOURCE_KIND
     | typeof HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND
-    | typeof MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND;
+    | typeof MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND
+    | typeof MARATHON_COMPLETION_PLAN_BUILDER_SOURCE_KIND;
   runnerLevel: RunningPlanPreviewActionInput["runnerLevel"];
   expectedRows: number;
   expectedNonRestRows: number;
@@ -104,8 +108,8 @@ const supportedFixtures: readonly Array<{
     family: "10K",
     sourceKind: TEN_K_PLAN_BUILDER_SOURCE_KIND,
     runnerLevel: "sometimes_runs",
-    expectedRows: 70,
-    expectedNonRestRows: 50,
+    expectedRows: 84,
+    expectedNonRestRows: 60,
     expectedEndpointMeters: 10_000,
     expectedFinalSourceWorkoutType: "final_selected_distance_day",
   },
@@ -113,8 +117,8 @@ const supportedFixtures: readonly Array<{
     family: "Half Marathon",
     sourceKind: HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
     runnerLevel: "runs_a_lot",
-    expectedRows: 98,
-    expectedNonRestRows: 70,
+    expectedRows: 168,
+    expectedNonRestRows: 120,
     expectedEndpointMeters: 21_100,
     expectedFinalSourceWorkoutType: "final_selected_distance_day",
   },
@@ -122,10 +126,19 @@ const supportedFixtures: readonly Array<{
     family: "Marathon Base",
     sourceKind: MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
     runnerLevel: "runs_a_lot",
-    expectedRows: 112,
-    expectedNonRestRows: 80,
+    expectedRows: 168,
+    expectedNonRestRows: 120,
     expectedEndpointMeters: null,
     expectedFinalSourceWorkoutType: "marathon_base_endpoint",
+  },
+  {
+    family: "Marathon Completion",
+    sourceKind: MARATHON_COMPLETION_PLAN_BUILDER_SOURCE_KIND,
+    runnerLevel: "professional_competitive",
+    expectedRows: 168,
+    expectedNonRestRows: 120,
+    expectedEndpointMeters: 42_195,
+    expectedFinalSourceWorkoutType: "final_selected_distance_day",
   },
 ] as const;
 
@@ -170,6 +183,15 @@ async function validateStableReviewContract() {
     const draft = result.draft;
     const canonicalPlan = buildRunningPlanCanonicalPlan(draft);
     const importedSeed = buildImportedPlanSeed(canonicalPlan);
+    const runnerFacingRichness = summarizeRunnerFacingCanonicalRichness({
+      family: draft.planFamily,
+      runnerLevel: draft.normalizedInputSummary.runnerLevel,
+      loadContext: draft.normalizedInputSummary.loadContext,
+      rows: canonicalPlan.planned_workouts,
+    });
+    const prescriptionGrammar = summarizeRunningPlanCanonicalPrescriptionGrammar(
+      canonicalPlan.planned_workouts,
+    );
     const nonRestRows = canonicalPlan.planned_workouts.filter(
       (workout) => workout.workout_type !== "rest",
     );
@@ -197,6 +219,21 @@ async function validateStableReviewContract() {
 
     validateNoFakePaceOrPersonalHr(canonicalPlan.planned_workouts);
     validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts);
+    assert.deepEqual(
+      runnerFacingRichness.issues,
+      [],
+      `${fixture.family} canonical rows must satisfy runner-facing richness gates.`,
+    );
+    assert.deepEqual(
+      prescriptionGrammar.issues,
+      [],
+      `${fixture.family} canonical rows must satisfy executable prescription grammar gates.`,
+    );
+    assert.equal(
+      runnerFacingRichness.missingSourceWorkoutTypeCount,
+      0,
+      `${fixture.family} canonical rows must preserve source_workout_type for export/readback.`,
+    );
 
     const exactness = await validateRunningPlanReviewExactness({
       draft,
@@ -331,16 +368,14 @@ async function validateFailureBoundaries(
     assert.equal(clientRowsPayload.reason, "invalid_review");
   }
 
-  const unsupportedPreview = await buildReviewedRunningPlanPreview({
-    ...buildFixtureInput({
-      ...supportedFixtures[1],
-      runnerLevel: "beginner_new_runner",
-    }),
+  const invalidBasicsPreview = await buildReviewedRunningPlanPreview({
+    ...buildFixtureInput(supportedFixtures[0]),
+    age: -1,
   });
-  assert.equal(unsupportedPreview.ok, false);
-  if (!unsupportedPreview.ok) {
-    assert.equal(unsupportedPreview.unavailable.sourceStatus, "preview_unavailable");
-    assert.equal(unsupportedPreview.unavailable.persisted, false);
+  assert.equal(invalidBasicsPreview.ok, false);
+  if (!invalidBasicsPreview.ok) {
+    assert.equal(invalidBasicsPreview.unavailable.sourceStatus, "preview_unavailable");
+    assert.equal(invalidBasicsPreview.unavailable.persisted, false);
   }
 }
 
@@ -631,6 +666,7 @@ function validateNoFakePaceOrPersonalHr(rows: readonly unknown[]) {
   const serialized = JSON.stringify(rows);
 
   assert.doesNotMatch(serialized, /"pace_min_per_km_range"|"pace_range_min_km"|"pace"/i);
+  assert.doesNotMatch(serialized, /race_pace_session/i);
   assert.doesNotMatch(
     serialized,
     /personal_hr|personalized_hr|hr_zone_truth|"hr_targets_allowed":true/i,

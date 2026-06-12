@@ -246,7 +246,14 @@ function selectBeginnerHalfMarathonStrideWeeks({
   tempoWeeks: readonly number[];
 }) {
   return selectAvailableWeeks({
-    rawTargets: [adaptationWeeks + 1, Math.ceil(horizonWeeks * 0.5)],
+    rawTargets: [
+      adaptationWeeks + 1,
+      Math.ceil(horizonWeeks * 0.36),
+      Math.ceil(horizonWeeks * 0.5),
+      Math.ceil(horizonWeeks * 0.58),
+      Math.ceil(horizonWeeks * 0.65),
+      Math.ceil(horizonWeeks * 0.82),
+    ],
     minWeek: adaptationWeeks + 1,
     maxWeek: taperWeek - 1,
     blockedWeeks: [...cutbackWeeks, ...tempoWeeks],

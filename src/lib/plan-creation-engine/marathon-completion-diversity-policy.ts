@@ -12,6 +12,7 @@ import {
   resolveMarathonCompletionTaperWeek,
   type MarathonCompletionDevelopmentTouch,
 } from "@/lib/plan-creation-engine/marathon-completion-policy";
+import { collectRunnerFacingPreviewRichnessIssues } from "@/lib/plan-creation-engine/runner-facing-richness";
 import type {
   RunningPlanPreviewCalendarRow,
   RunningPlanPreviewCalendarWorkoutDayKind,
@@ -75,6 +76,14 @@ export function validateMarathonCompletionDiversityPolicy({
       runnerLevel,
       loadContext,
       horizonWeeks,
+      rows,
+    }),
+  );
+  issues.push(
+    ...collectRunnerFacingPreviewRichnessIssues({
+      family: "Marathon Completion",
+      runnerLevel,
+      loadContext,
       rows,
     }),
   );

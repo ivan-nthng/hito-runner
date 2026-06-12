@@ -18,124 +18,537 @@ BACKEND
 
 ## Task
 
-Run Slice 12A: plan-authoring doctrine validator ownership extraction.
+Run Slice 13A: manual workout authoring validator lifecycle extraction.
 
 ## Stage
 
-BACKEND cleanup / doctrine validator decomposition without behavior changes.
+BACKEND cleanup / manual MVP proof-infrastructure decomposition without behavior changes.
 
-## Exact Handoff Prompt
+## Running-Plan Quality Blocker Resolved — Cleanup Resumed
+
+Status update, 2026-06-12:
+
+- The running-plan quality blocker that paused code-freeze cleanup after Slice 12C is closed.
+- QA passed the universal runner-facing richness and executable prescription grammar repair.
+- Running Coach accepted the final quality rerun.
+- Proof covered `17` acceptance scenarios across `10K`, `Half Marathon`, `Marathon Base`, and
+  `Marathon Completion`, all preview-ready.
+- Accepted proof recorded `0` unresolved ranges, `0` unresolved executable segments, `0` richness
+  issues, `0` prescription grammar issues, `0` awkward standard durations,
+  `0` vague effort-only targets, `0` fake pace, `0` fake personal HR, and
+  `0` forbidden runner-facing language.
+- `Marathon Base` remains base-only.
+- `Marathon Completion` remains exact `42195m` and completion-focused, not performance-marathon.
+- This was a backend/canonical generation fix, not a frontend copy patch.
+- Proof boundary was backend-owned scenario, canonical review, confirm exactness,
+  `training-plan-v2`, and imported-plan/export-shaped artifact proof. Authenticated browser
+  selected-plan UI was not the proof surface for this gate.
+
+Architecture decision:
+
+- Resume code-freeze cleanup.
+- Do not resume with runtime frontend/backend refactors yet.
+- Select the next cleanup gate from proof infrastructure, where behavior can be preserved and
+  validated without touching accepted runner-facing UI or persistence.
+
+Current proof-infrastructure hotspot snapshot:
+
+| File | Current lines | Decision |
+| --- | ---: | --- |
+| [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts) | `3308` | Selected next cleanup gate. |
+| [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | `3382` | Keep stable after Slices 12A-12C; do not continue broad extraction until the manual MVP validator is split. |
+| [AI first-plan blueprint/envelope proof owner](../../../scripts/plan-authoring-doctrine/ai-first-plan-blueprint-envelope.ts) | `2546` | Keep; extracted owner from Slice 12C. |
+| [first-plan release gates](../../../scripts/plan-authoring-doctrine/first-plan-release-gates.ts) | `1366` | Keep; already focused release-gate owner. |
+
+Selected next gate:
+
+`BACKEND Slice 13A: manual workout authoring validator lifecycle extraction`.
+
+Why this is next:
+
+- The manual builder MVP is now QA-passed in the proved scope: first create, add activity, personal
+  saved templates, copy/paste, delete/clear, move workout, and JSON/Markdown export.
+- The validator is now a larger proof-infrastructure hotspot than the remaining main doctrine
+  validator.
+- It mixes multiple accepted manual lifecycle proof islands in one file, including review fixtures,
+  saved templates, first-create persistence, add-to-existing-plan, copy/paste, delete/clear,
+  move-workout, export, active-plan editability, date-only labels, and disposable persistence
+  preflight.
+- This is safer than touching [ManualWorkoutAuthoringControls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx),
+  [Calendar](../../../src/components/Calendar.tsx), [training-api](../../../src/lib/training-api.ts),
+  or accepted persistence/runtime seams during code-freeze cleanup.
+
+Expected implementation shape:
+
+- Keep `node --import tsx ./scripts/validate-manual-workout-authoring.ts` as the stable public
+  command.
+- Extract exactly one coherent lifecycle proof island into
+  `scripts/manual-workout-authoring/`.
+- Recommended first island: saved-template review/save/reconstruct proof, because it is cohesive,
+  already has a persistence-adjacent helper folder, and is lower-risk than copy/paste/delete/move
+  mutation assertions.
+- Preserve every assertion and fixture. Do not reduce coverage for line-count optics.
+- Keep disposable persistence harness behavior unchanged.
+- Update this plan with line-count impact, extracted owner, preserved command, and remaining manual
+  validator hotspots.
+
+Exact handoff prompt:
 
 ```text
 ROLE: BACKEND
 
 Task:
-Run Slice 12A: plan-authoring doctrine validator ownership extraction.
+Run Slice 13A: manual workout authoring validator lifecycle extraction.
 
 Stage:
-BACKEND cleanup / doctrine validator decomposition without behavior changes.
+BACKEND cleanup / manual MVP proof-infrastructure decomposition without behavior changes.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
 
 Context:
-This is a parallel service-size cleanup track. Do not block or touch the running-plan R8/R8B
-confirm/persist create-path work. Architecture re-audited the current service after the Plan Preset
-builder deletion and running-plan preview work:
-- `src` TS/TSX/CSS: about `91,990` lines across `221` files.
-- `scripts`: about `23,977` lines across `27` files.
-- The largest script hotspot is `scripts/validate-plan-authoring-doctrine.ts` at about `6788`
-  lines.
-- Prior slices already deleted the strict nested draft runtime module and old Plan Preset
-  algorithmic builder/review path.
-- There is no safe broad runtime deletion candidate that should preempt R8.
+Code-freeze cleanup may resume because the running-plan universal runner-facing richness and
+prescription-quality blocker is QA-passed and Running Coach accepted. Do not touch running-plan
+runtime behavior in this slice.
 
-Root cause and architecture fit:
-The root issue for this slice is not product runtime behavior. It is that the main plan-authoring
-doctrine validator has become a multi-domain safety net that mixes rich workout normalization,
-import/export/readback, active-plan refresh, structured authoring, blueprint, envelope, and release
-gate assertions in one 6.7k-line file. Keep the stable top-level validator command, but move
-assertion ownership into focused `scripts/plan-authoring-doctrine/` modules so future cleanup can
-delete stale assertion groups safely instead of editing one giant file.
+The next selected cleanup gate is proof-infrastructure only:
+- scripts/validate-manual-workout-authoring.ts is now about 3308 lines.
+- The manual builder MVP is QA-passed in the proved scope: first create, add activity, personal
+  saved templates, copy/paste, delete/clear, move workout, and JSON/Markdown export.
+- The validator mixes accepted manual lifecycle proof islands in one file.
+
+Root cause:
+The visible symptom is code-size/reviewability growth in the manual authoring validator.
+The underlying cause is that multiple accepted lifecycle proofs accumulated in one public
+validation command.
+The canonical owner is scripts/proof infrastructure. Keep runtime source and UI untouched.
 
 Required reading:
 1. AGENTS.md
 2. agents/backend.agent.md
-3. skills/hito-architecture-audit/SKILL.md
+3. skills/hito-backend-supabase-contract/SKILL.md
 4. skills/hito-plan-writing-and-closeout/SKILL.md
-5. docs/context.md
-6. docs/glossary.md
-7. docs/current-system.md
-8. docs/current-product.md
-9. docs/current-state.md
-10. docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
-
-Inspect:
-- scripts/validate-plan-authoring-doctrine.ts
-- scripts/plan-authoring-doctrine/
-- src/lib/rich-workout-draft-authoring.ts
-- src/lib/rich-workout-model.ts
-- src/lib/plan-export.ts
-- src/lib/active-plan-refresh-draft.ts
-- src/lib/plan-refresh-proposal.ts
-- src/lib/ai-first-plan-blueprint-*
-- src/lib/ai-first-plan-envelope-*
-- src/lib/structured-plan-authoring*
+5. docs/current-functional-map.md
+6. docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
+7. docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
+8. scripts/validate-manual-workout-authoring.ts
+9. scripts/manual-workout-authoring/persistence-proof.ts
+10. src/lib/manual-workout-authoring/*
 
 Scope:
-1. Keep `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts` as the stable
-   entrypoint.
-2. Extract one focused assertion island from `scripts/validate-plan-authoring-doctrine.ts` into
-   `scripts/plan-authoring-doctrine/`.
-3. Recommended first extraction: rich workout/readback/refresh assertions and helpers, including
-   rich workout draft normalization, rich compatibility mapping, persistence/readback,
-   import/export roundtrip, saved-mode QA fixture, and active-plan refresh rich draft / apply /
-   timeout-fallback assertions.
-4. Keep behavior and assertion coverage unchanged.
-5. Do not turn this into a broad doctrine rewrite. If the first extraction reveals a smaller safer
-   seam, take the smaller seam and report why.
-6. Keep shared helper extraction minimal and real-ownership based.
-7. Update this active plan with the Slice 12A result, line-count impact, extracted module ownership,
-   and remaining validator hotspots.
+1. Keep `node --import tsx ./scripts/validate-manual-workout-authoring.ts` as the stable public
+   command.
+2. Extract exactly one coherent lifecycle assertion island into `scripts/manual-workout-authoring/`.
+3. Preferred first island: saved-template review/save/reconstruct proof, including user scoping,
+   display name/icon validation, backend review reconstruction, fake pace/HR rejection, and
+   unsupported payload rejection.
+4. Preserve every assertion, fixture, source-boundary check, and strict metric-truth check.
+5. Keep disposable persistence preflight and guarded remote override behavior unchanged.
+6. Update the active simplification strike plan with Slice 13A result, line-count impact, extracted
+   owner, preserved command, and remaining validator hotspots.
 
-What not to do:
-- Do not touch R8/R8B running-plan confirm/persist source unless source audit proves a direct
-  conflict.
-- Do not change product runtime behavior.
-- Do not remove assertions to reduce line count.
-- Do not run Supabase mutations, migrations, provider sync, browser QA, or live imports.
-- Do not edit frontend UI, Hito DS, CSS, Plan Preset card discovery, manual workout authoring,
-  active-plan persistence, or running-plan preview builders.
-- Do not delete `structured_authoring_v1` compatibility or blueprint/envelope safety gates.
-- Do not revive old Plan Preset review/confirm.
+What must not change:
+- No product runtime behavior.
+- No frontend UI.
+- No Supabase mutation except existing validator behavior when explicitly invoked with approved
+  guarded persistence flags.
+- No migrations.
+- No browser QA.
+- No deletion of validation coverage.
+- No copy/paste, delete/clear, move, export, recurrence, edit, Restore UI, QR/share/import, or
+  manual-builder product behavior changes.
+- No changes to running-plan engine runtime/source behavior.
 
 Validation:
+- `npm exec eslint -- scripts/validate-manual-workout-authoring.ts scripts/manual-workout-authoring/*.ts`
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- Scoped `git diff --check` for changed files.
+- New-file whitespace check if a new helper file is created.
+- No build is required unless runtime imports/config changed unexpectedly.
+```
+
+## Slice 12C Closeout — 2026-06-12
+
+Status: accepted / complete.
+
+Slice:
+
+`BACKEND Slice 12C: AI first-plan blueprint/envelope doctrine extraction`.
+
+What changed:
+
+- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) remains
+  the stable public entrypoint for the doctrine proof command.
+- [AI first-plan blueprint/envelope proof owner](../../../scripts/plan-authoring-doctrine/ai-first-plan-blueprint-envelope.ts)
+  is the new focused module for the AI first-plan blueprint/envelope doctrine assertion island.
+- The extracted island covers AI first-plan authoring input builders, blueprint fixtures,
+  blueprint workout-template helpers, goal-family cadence assertions, blueprint prompt/schema and
+  normalization/failure assertions, envelope decode/expand/trace assertions, and road-specificity
+  envelope assertions.
+- The main validator now calls the AI proof owner through dependency injection for shared fixed-rest,
+  metric, rich-workout, and long-run assertions.
+- Shared broader specificity/repair checks that still belong to surrounding cadence doctrine stayed
+  in the main validator for this slice.
+- The main validator went from `5677` lines to `3382` lines.
+- The new focused AI first-plan proof owner is `2546` lines.
+
+Acceptance evidence:
+
 - `npm exec eslint -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/*.ts`
-- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope`
-- `npm run author-ai-first-plan-draft -- --contract strict-draft`
+  passed.
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` passed with
+  `Plan authoring doctrine fixtures passed.`
+- Scoped `git diff --check` and new-file whitespace checks passed.
+- `npm run build` was not required unless imports/config/runtime compilation changed; this slice
+  only moved proof scripts/docs and executed the TSX validator directly.
+
+Cleanup progress:
+
+- Code-freeze proof-infrastructure cleanup has now extracted three coherent doctrine islands:
+  rich workout import/export, active-plan refresh, and AI first-plan blueprint/envelope.
+- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) has
+  been reduced from `6855` lines before Slice 12A to `3382` lines after Slice 12C.
+- The new focused proof owners total:
+  [rich workout import/export](../../../scripts/plan-authoring-doctrine/rich-workout-import-export.ts)
+  at `436` lines,
+  [active-plan refresh](../../../scripts/plan-authoring-doctrine/active-plan-refresh.ts) at `888`
+  lines, and
+  [AI first-plan blueprint/envelope](../../../scripts/plan-authoring-doctrine/ai-first-plan-blueprint-envelope.ts)
+  at `2546` lines.
+- This is a reviewability/source-ownership cleanup, not shipped runner-facing behavior and not a
+  product-size deletion claim.
+
+Architecture decision:
+
+- Accept Slice 12C as complete.
+- Treat Slice 12C as internal proof-infrastructure cleanup, not shipped user-facing behavior.
+- Do not add a [changelog](../../history/changelog.md) entry.
+- Pause further cleanup implementation gates behind the active running-plan quality blocker.
+- Do not select another cleanup slice until the confirmed Marathon Base export flatness incident is
+  either accepted by Running Coach as coach-credible or routed to Backend for a bounded
+  composition/diversity fix.
+- Runtime refactor, frontend cleanup, manual validator decomposition, and additional doctrine
+  extraction remain blocked while the plan engine may still produce coach-poor confirmed plans.
+
+Selected next gate:
+
+`RUNNING COACH: Marathon Base confirmed-export flatness quality blocker follow-up`.
+
+Why this is next:
+
+- The visible symptom is a confirmed Marathon Base export that QA classified as too flat.
+- The likely underlying cause is backend composition truth, not validator file shape.
+- The canonical first owner is Running Coach quality acceptance unless that incident has already
+  reported a precise Backend fix.
+- Continuing broad code-freeze cleanup would optimize proof infrastructure while a runner-facing
+  plan-quality blocker remains unresolved.
+
+## Slice 12B Closeout — 2026-06-12
+
+Status: accepted / complete.
+
+Slice:
+
+`BACKEND Slice 12B: active-plan refresh doctrine assertion extraction`.
+
+What changed:
+
+- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) remains
+  the stable public entrypoint for the doctrine proof command.
+- [active-plan refresh proof owner](../../../scripts/plan-authoring-doctrine/active-plan-refresh.ts)
+  is the new focused module for the active-plan refresh doctrine assertion island.
+- The extracted island covers rich draft normalization/fallback, apply-source non-generation proof,
+  proposal/rich-draft timeout fallback, review metadata checksum proof, stored authoring truth
+  preference, protected-history mutable guards, mountain refresh doctrine, and refresh fixture
+  builders.
+- The main validator now calls the new owner through dependency injection.
+- Shared helpers such as fixed-rest-day assertions, metric checks, trail doctrine, and rich workout
+  contract checks remain shared instead of duplicated.
+- The main validator went from `6458` lines to `5677` lines.
+- The new focused owner is `888` lines.
+
+Acceptance evidence:
+
+- `npm exec eslint -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/*.ts`
+  passed.
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` passed with
+  `Plan authoring doctrine fixtures passed.`
+- Scoped `git diff --check` passed.
+- New-file whitespace checks passed.
+- `npm run build` was skipped appropriately because only proof scripts/docs changed and the TSX
+  validator entrypoint was executed directly.
+
+Architecture decision:
+
+- Accept Slice 12B as complete.
+- Treat this as internal proof-infrastructure cleanup, not shipped user-facing behavior.
+- Do not add a [changelog](../../history/changelog.md) entry.
+- Continue one more backend/script proof-infrastructure cleanup slice before moving to runtime
+  frontend cleanup or manual validator decomposition.
+
+Selected next gate:
+
+`BACKEND Slice 12C: AI first-plan blueprint/envelope doctrine extraction`.
+
+Why this is next:
+
+- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) is still
+  `5677` lines and remains the largest proof-infrastructure hotspot.
+- AI first-plan blueprint/envelope prompt, schema, fixture, normalization, trace, and failure checks
+  form a coherent remaining assertion island in the main validator.
+- This remains lower-risk than decomposing the newer
+  [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts) or touching
+  accepted runtime UI such as
+  [manual authoring controls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
+  and [Calendar](../../../src/components/Calendar.tsx).
+- The next slice is still script-only and must preserve validation coverage.
+
+## Slice 12A Closeout — 2026-06-12
+
+Status: accepted / complete.
+
+Slice:
+
+`BACKEND Slice 12A: plan-authoring doctrine validator ownership extraction`.
+
+What changed:
+
+- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) remains
+  the stable public entrypoint for the doctrine proof command.
+- [rich workout import/export proof owner](../../../scripts/plan-authoring-doctrine/rich-workout-import-export.ts)
+  is the new focused module for one extracted assertion island.
+- The extracted island covers rich persistence readback, carry-forward, import/export roundtrip,
+  template validation, reference import identity preservation, saved-mode QA fixture checks, compact
+  fallback, and no fake pace/HR fixture proof.
+- The main validator went from `6855` lines to `6458` lines.
+- The new focused owner is `436` lines.
+- Backend intentionally chose this smaller island instead of active-plan refresh checks because
+  refresh has broader draft/proposal fixture coupling and should remain a separate cleanup slice.
+
+Acceptance evidence:
+
+- `npm exec eslint -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/*.ts`
+  passed.
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` passed with
+  `Plan authoring doctrine fixtures passed.`
+- New-file whitespace check passed.
+- Scoped `git diff --check` passed.
+- `npm run build` was skipped appropriately because only script/docs proof infrastructure changed
+  and the TSX entrypoint was validated directly.
+
+Architecture decision:
+
+- Accept Slice 12A as complete.
+- Treat this as internal proof-infrastructure cleanup, not shipped user-facing behavior.
+- Do not add a [changelog](../../history/changelog.md) entry.
+- Continue backend/script proof-infrastructure cleanup before moving to runtime frontend cleanup.
+
+Selected next gate:
+
+`BACKEND Slice 12B: active-plan refresh doctrine assertion extraction`.
+
+Why this is next:
+
+- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) is still
+  `6458` lines and remains the largest proof-infrastructure hotspot.
+- Active-plan refresh rich-draft/proposal assertions are still a coherent proof island inside the
+  same monolith.
+- This keeps the cleanup path low-risk: script-only, behavior-preserving, and no Supabase/browser
+  surface.
+- It is safer than decomposing [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts)
+  immediately after the manual MVP acceptance, and safer than touching
+  [manual authoring controls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
+  or [Calendar](../../../src/components/Calendar.tsx), which are accepted runtime UI surfaces.
+
+## Code-Freeze Cleanup Inventory — 2026-06-12
+
+Primary source of truth:
+
+- [current functional map](../../current-functional-map.md)
+
+Decision:
+
+The first code-freeze cleanup implementation gate is still
+`BACKEND Slice 12A: plan-authoring doctrine validator ownership extraction`, but the selection is
+now re-accepted against the updated functional map and current source size baseline.
+
+Root-cause framing:
+
+- Visible symptom: Hito grew quickly while selected-distance plan creation, manual user-built
+  plans, manual calendar editing, active-plan export, QA server tooling, AI first-plan authoring,
+  and running-plan engine validation shipped in parallel.
+- Underlying cause: accepted capability now spans several source-of-truth seams, so cleanup must
+  start from shipped business flows rather than line count alone.
+- Canonical owner for this pass: architecture inventory first, then one bounded backend cleanup
+  slice that preserves every accepted flow.
+
+Current measured baseline:
+
+| Area | Count | Notes |
+| --- | ---: | --- |
+| `src` TS/TSX/CSS files | `240` | Runtime, product UI, admin, Hito DS, and internal helpers. |
+| `src` TS/TSX/CSS lines | `103883` | Source size is now above the earlier simplification-strike baseline. |
+| `scripts` TS/TSX/MJS/JS files | `29` | Validators, proof harnesses, importers, and ops scripts. |
+| `scripts` TS/TSX/MJS/JS lines | `29292` | Proof infrastructure is a major growth area. |
+
+Largest audited hotspots:
+
+| File | Lines | Classification | Freeze decision |
+| --- | ---: | --- | --- |
+| [training API facade](../../../src/lib/training-api.ts) | `698` | required runtime / compatibility facade | Keep; audit later for export narrowing only after route imports are mapped. |
+| [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts) | `3052` | required validation/proof infrastructure | Keep; decompose later by first-create/add/templates/copy/delete/move/export after Slice 12A. |
+| [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | `6855` | required validation/proof infrastructure / decomposition hotspot | Selected first cleanup gate. |
+| [manual authoring controls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx) | `2032` | required frontend runtime / decomposition hotspot | Defer; requires frontend DS preflight and browser regression. |
+| [Calendar](../../../src/components/Calendar.tsx) | `1057` | required frontend runtime | Keep; avoid changing accepted manual calendar behavior during freeze inventory. |
+| [PlanManagementDialog](../../../src/components/PlanManagementDialog.tsx) | `1152` | required frontend runtime / plan lifecycle shell | Keep; decompose only through existing panel seams. |
+| [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | `1591` | required runtime according to current docs | Keep; audit later as schedule-edit owner, not manual Move replacement. |
+| [active-plan schedule edit validator](../../../scripts/validate-active-plan-schedule-edit-preview.ts) | `560` | required validation/proof infrastructure | Keep with schedule-edit preview until a dedicated audit says otherwise. |
+
+Cleanup inventory:
+
+### Backend Runtime
+
+Required runtime:
+
+- manual workout authoring modules under [manual-workout-authoring](../../../src/lib/manual-workout-authoring/)
+- [active-plan persistence](../../../src/lib/active-plan-persistence.ts)
+- [active-plan export actions](../../../src/lib/active-plan-export-actions.ts)
+- [plan export](../../../src/lib/plan-export.ts)
+- [running-plan engine actions](../../../src/lib/running-plan-engine-actions.ts)
+- [first-plan actions](../../../src/lib/first-plan-actions.ts)
+- [plan replacement actions](../../../src/lib/plan-replacement-actions.ts)
+- [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts)
+- [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts)
+
+Compatibility-only or audit-first:
+
+- [training API facade](../../../src/lib/training-api.ts): keep as route/server-function compatibility
+  facade; shrink only after import consumers are mapped.
+- AI strict/envelope/draft ops files: keep only as doctrine/proof/internal ops paths; do not treat
+  strict nested draft as normal product runtime.
+- old Plan Preset review/confirm behavior: keep only as bounded blocked/preview-only compatibility.
+
+Safe deletion/demotion candidates:
+
+- No backend runtime deletion is selected in this pass. The functional map does not yet prove a
+  runtime path is dead enough to delete safely.
+
+### Frontend Runtime
+
+Required runtime:
+
+- [OnboardingGate](../../../src/components/OnboardingGate.tsx)
+- [StructuredPlanConstructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx)
+- [ManualUserBuiltPlanPanel](../../../src/components/onboarding/ManualUserBuiltPlanPanel.tsx)
+- [selected-plan preview dialog](../../../src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx)
+- [Calendar](../../../src/components/Calendar.tsx)
+- [Hito calendar day primitive](../../../src/components/ui/hito-calendar-day.tsx)
+- [ManualWorkoutAuthoringControls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
+- [ManualWorkoutMoveControls](../../../src/components/manual-workout/ManualWorkoutMoveControls.tsx)
+- [PlanManagementDialog](../../../src/components/PlanManagementDialog.tsx)
+- [plan-management panel components](../../../src/components/plan-management/)
+
+Suspect/decompose:
+
+- [ManualWorkoutAuthoringControls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
+  should be the first manual UI decomposition candidate after the backend validator cleanup, but
+  not before freeze inventory because it is accepted runtime UI and needs browser QA.
+- [Calendar](../../../src/components/Calendar.tsx) can be audited for action-menu extraction later,
+  but must not become a local schedule-truth owner.
+- [PlanManagementDialog](../../../src/components/PlanManagementDialog.tsx) should continue splitting
+  only through already-established panel seams.
+
+Safe deletion/demotion candidates:
+
+- No frontend runtime deletion is selected in this pass. UI cleanup is intentionally deferred behind
+  proof-infrastructure cleanup.
+
+### Scripts, Validators, and Proof Infrastructure
+
+Required validation/proof infrastructure:
+
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
 - `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
 - `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
 - `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
-- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
+- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts`
+- `node --import tsx ./scripts/validate-active-plan-schedule-edit-preview.ts`
 - `npm run validate-admin-capture-backlog`
-- `git diff --check -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
-- `npm run build` only if imports or package-level script behavior changed.
+- `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000`
 
-Report format:
-1. Task
-2. Stage
-3. Root cause
-4. Files inspected
-5. Files changed
-6. Assertion ownership extracted
-7. Behavior preserved
-8. Line-count/reviewability impact
-9. Remaining validator hotspots
-10. Validation results
-11. Blockers
-```
+Suspect/decompose:
+
+- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) is the
+  first selected cleanup gate. It should keep the public command stable while moving one assertion
+  island into [plan-authoring-doctrine modules](../../../scripts/plan-authoring-doctrine/).
+- [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts) is the next
+  likely script decomposition candidate after Slice 12A. Do not split it before the manual MVP
+  acceptance remains stable in cleanup QA.
+- [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) remains internal ops
+  proof; audit later after blueprint/envelope ownership is settled.
+
+### Docs, Plans, and Backlog
+
+Required docs/source of truth:
+
+- [current functional map](../../current-functional-map.md)
+- [current product](../../current-product.md)
+- [current system](../../current-system.md)
+- [current state](../../current-state.md)
+- [changelog](../../history/changelog.md)
+- [manual workout authoring active plan](2026-06-09-manual-workout-authoring-and-user-built-plans.md)
+- [running-plan creation engine active plan](2026-06-08-running-plan-creation-engine-rebuild.md)
+- [this simplification strike](2026-06-07-hito-stack-simplification-strike.md)
+
+Audit-first docs:
+
+- [heart-rate zones active plan](2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md)
+- [voice-to-plan authoring active plan](2026-05-18-voice-to-plan-authoring-plan.md)
+- [Polar auto sync active plan](2026-05-21-polar-auto-sync-integration-plan.md)
+
+These older active plans are source-of-truth hygiene candidates, not the first code-freeze cleanup
+implementation gate. They should be classified separately as active, backlog, or archive before
+freeze.
+
+### Future-Only Artifacts
+
+Keep out of the first cleanup implementation gate:
+
+- QR/share/import
+- recurrence
+- edit workout
+- Restore/Put back/Redo UI
+- PDF/watch export
+- generated/preset/imported/running-engine manual mutation
+- active-plan replacement/refresh expansion
+- route/modal polish
+- new preset families
+
+Candidate table:
+
+| Candidate | Type | Impact | Risk | Decision |
+| --- | --- | --- | --- | --- |
+| Plan-authoring doctrine validator ownership extraction | Decompose proof infrastructure | High reviewability; isolates largest script hotspot | Low runtime risk if assertions stay unchanged | Selected |
+| Manual workout validator decomposition | Decompose proof infrastructure | Medium/high; aligns with completed manual MVP | Medium because manual MVP is newly accepted and validator protects many flows | Defer until after Slice 12A |
+| Manual authoring controls decomposition | Frontend runtime decomposition | High UI reviewability | Requires browser QA and risks accepted manual builder surface | Defer |
+| Training API facade narrowing | Runtime facade cleanup | Medium | Requires full import/route audit; can break server-function consumers | Defer |
+| Active-plan schedule edit preview audit | Runtime/source-of-truth audit | Medium | Current docs say it is implemented product behavior | Keep/audit later |
+| Older active-plan archive cleanup | Docs/source-of-truth hygiene | Low runtime impact | Requires canonical-plan comparison | Defer behind runtime/proof cleanup |
+
+Selected first cleanup gate:
+
+`BACKEND Slice 12A: plan-authoring doctrine validator ownership extraction`.
+
+Expected implementation shape:
+
+- Keep `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` as the stable command.
+- Extract exactly one assertion island into [scripts/plan-authoring-doctrine](../../../scripts/plan-authoring-doctrine/).
+- Prefer the rich workout/readback/refresh assertion island because it is cohesive and already
+  conceptually separate from first-plan release gates.
+- Preserve every assertion; do not reduce validation coverage just to lower line count.
+- Record line-count/reviewability impact and remaining validator hotspots in this plan.
 
 ## Parallel Cleanup Audit After R8 Confirm/Persist Work
 
@@ -259,6 +672,52 @@ Forbidden in Slice 12A:
   discovery, manual workout authoring, active-plan persistence, or running-plan preview builders.
 - Do not delete `structured_authoring_v1` compatibility, blueprint/envelope gates, or current
   first-plan release gates.
+
+Slice 12A implementation result:
+
+- Implemented on 2026-06-12 as a no-behavior-change proof-infrastructure extraction.
+- Extracted one coherent assertion island from
+  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) into
+  [rich workout import/export doctrine owner](../../../scripts/plan-authoring-doctrine/rich-workout-import-export.ts).
+- Extracted ownership covers rich workout persistence readback, persisted-row carry-forward,
+  import/export roundtrip, training-plan-v2 template rich-field validation, reference-style import
+  identity preservation, saved-mode QA fixture rich-field checks, compact fallback readback, and
+  no fake pace/HR fixture assertions.
+- Chose this smaller island instead of also moving active-plan refresh rich draft checks in the same
+  slice because refresh assertions depend on broader refresh proposal/draft fixtures and should be a
+  separate bounded extraction.
+- Line-count impact: main validator reduced from `6855` to `6458` lines; new rich import/export
+  doctrine owner is `436` lines.
+- Validation evidence: targeted ESLint, full plan-authoring doctrine validator, new-file whitespace
+  check, and scoped `git diff --check` passed.
+- Remaining validator hotspots: active-plan refresh rich draft/apply/timeout fallback checks,
+  structured/running-doctrine helper clusters, blueprint/envelope contract blocks, and the broad
+  metric/rich workout helper area in the top half of the validator.
+- Stable entrypoint preserved:
+  `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`.
+
+Slice 12B implementation result:
+
+- Implemented on 2026-06-12 as a second no-behavior-change proof-infrastructure extraction.
+- Extracted the active-plan refresh doctrine island from
+  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) into
+  [active-plan refresh doctrine owner](../../../scripts/plan-authoring-doctrine/active-plan-refresh.ts).
+- Extracted ownership covers refresh rich draft normalization/fallback, apply-source non-generation
+  proof, proposal/rich-draft timeout fallback, review metadata checksum proof, stored structured
+  authoring truth preference, protected-history mutable guard behavior, mountain refresh doctrine,
+  and refresh fixture row/context builders.
+- Kept shared non-refresh helpers in the main validator and passed them into the refresh owner as
+  dependencies so fixed-rest, metric-target, rich-workout, trail doctrine, and plan-shaping helpers
+  remain single-source within the top-level doctrine harness.
+- Line-count impact after Slice 12B: main validator reduced from `6458` to `5677` lines; new
+  active-plan refresh doctrine owner is `888` lines.
+- Validation evidence: targeted ESLint, full plan-authoring doctrine validator, new-file whitespace
+  check, and scoped `git diff --check` passed.
+- Remaining validator hotspots: structured/running-doctrine helper clusters, blueprint/envelope
+  contract blocks, rich workout draft normalizer checks, text/voice compatibility checks, and the
+  broad metric/rich workout helper area in the top half of the validator.
+- Stable entrypoint preserved:
+  `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`.
 
 ## Slice 14A Global CSS Cleanup Result
 

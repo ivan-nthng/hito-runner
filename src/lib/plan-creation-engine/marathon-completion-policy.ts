@@ -89,6 +89,56 @@ export function resolveMarathonCompletionDevelopmentTouch({
   const phaseProgress = weekNumber / Math.max(1, horizonWeeks);
 
   if (runnerLevel === "beginner_new_runner") {
+    if (
+      weekNumber ===
+      resolveMarathonCompletionSoftBridgeWeek({
+        horizonWeeks,
+        targetWeek: Math.ceil(horizonWeeks * 0.23),
+      })
+    ) {
+      return "strides";
+    }
+
+    if (
+      weekNumber ===
+      resolveMarathonCompletionSoftBridgeWeek({
+        horizonWeeks,
+        targetWeek: Math.ceil(horizonWeeks * 0.27),
+      })
+    ) {
+      return "strides";
+    }
+
+    if (
+      weekNumber ===
+      resolveMarathonCompletionSoftBridgeWeek({
+        horizonWeeks,
+        targetWeek: Math.ceil(horizonWeeks * 0.32),
+      })
+    ) {
+      return "strides";
+    }
+
+    if (
+      weekNumber ===
+      resolveMarathonCompletionSoftBridgeWeek({
+        horizonWeeks,
+        targetWeek: Math.ceil(horizonWeeks * 0.37),
+      })
+    ) {
+      return "strides";
+    }
+
+    if (
+      weekNumber ===
+      resolveMarathonCompletionSoftBridgeWeek({
+        horizonWeeks,
+        targetWeek: Math.ceil(horizonWeeks * 0.42),
+      })
+    ) {
+      return "strides";
+    }
+
     if (weekNumber % 10 === 2 || weekNumber % 10 === 3) {
       return "strides";
     }
@@ -98,6 +148,26 @@ export function resolveMarathonCompletionDevelopmentTouch({
     }
 
     return null;
+  }
+
+  if (
+    weekNumber ===
+    resolveMarathonCompletionSoftBridgeWeek({
+      horizonWeeks,
+      targetWeek: Math.ceil(horizonWeeks * 0.32),
+    })
+  ) {
+    return "steady_aerobic_run";
+  }
+
+  if (
+    weekNumber ===
+    resolveMarathonCompletionSoftBridgeWeek({
+      horizonWeeks,
+      targetWeek: Math.ceil(horizonWeeks * 0.72),
+    })
+  ) {
+    return "progression";
   }
 
   if (runnerLevel === "sometimes_runs") {
@@ -126,7 +196,7 @@ export function resolveMarathonCompletionDevelopmentTouch({
   }
 
   if (developmentSlot === 5 || (loadContext === "conservative" && developmentSlot === 6)) {
-    if (phaseProgress >= 0.72) {
+    if (phaseProgress >= (runnerLevel === "professional_competitive" ? 0.66 : 0.72)) {
       return "tempo";
     }
 
@@ -134,6 +204,33 @@ export function resolveMarathonCompletionDevelopmentTouch({
   }
 
   return null;
+}
+
+function resolveMarathonCompletionSoftBridgeWeek({
+  horizonWeeks,
+  targetWeek,
+}: {
+  horizonWeeks: number;
+  targetWeek: number;
+}) {
+  const blockedWeeks = new Set([
+    ...resolveMarathonCompletionCutbackWeeks(horizonWeeks),
+    resolveMarathonCompletionTaperWeek(horizonWeeks),
+    resolveMarathonCompletionEndpointWeek(horizonWeeks),
+  ]);
+  const minimumWeek = 2;
+  const maximumWeek = Math.max(minimumWeek, horizonWeeks - 2);
+  let candidate = Math.min(Math.max(targetWeek, minimumWeek), maximumWeek);
+
+  while (blockedWeeks.has(candidate) && candidate < maximumWeek) {
+    candidate += 1;
+  }
+
+  while (blockedWeeks.has(candidate) && candidate > minimumWeek) {
+    candidate -= 1;
+  }
+
+  return candidate;
 }
 
 export function resolveMarathonCompletionLongRunRole({

@@ -15,6 +15,15 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 
 ## 2026-06-12
 
+- Improved generated selected-plan quality in the rebuilt running-plan engine: backend-owned
+  scenario, canonical review, confirm exactness, `training-plan-v2`, and imported/export-shaped
+  artifacts now enforce the universal runner-facing richness bar and device-friendly prescription
+  grammar across 10K, Half Marathon, Marathon Base, and Marathon Completion. QA and Running Coach
+  acceptance proved zero unresolved ranges, unresolved executable segments, richness issues,
+  prescription grammar issues, awkward standard durations, vague effort-only targets, fake pace,
+  fake personal HR, and forbidden runner-facing language while preserving Marathon Base as base-only
+  and Marathon Completion as exact `42195m` completion-focused output; this does not claim a new
+  browser UI exposure or production rollout.
 - Added manual Delete/Clear for existing manual active-plan calendars: runners can clear an eligible
   planned workout through backend-shaped review and confirmation, the saved calendar refreshes from
   persisted truth, the cleared day returns to `Add activity` instead of fake Rest, the active plan

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { isEditableActivePlanSourceKind } from "@/lib/active-plan-workout-editing/policy";
 import {
   createFirstPlanFromReviewedCanonicalPlanForUser,
   getActivePlan,
@@ -497,12 +498,11 @@ function buildLifecycleConflict(
 
   if (
     context.mode === "existing_active_plan" &&
-    context.activePlanSourceKind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND
+    !isEditableActivePlanSourceKind(context.activePlanSourceKind)
   ) {
     return {
       code: "existing_active_plan_not_supported",
-      message:
-        "Manual workout authoring v1 can only edit existing active plans that are manual user-built plans.",
+      message: "This active plan source is not supported for manual workout authoring yet.",
       workoutDate: input.workoutDate,
       activePlanId: context.activePlanId ?? null,
     };

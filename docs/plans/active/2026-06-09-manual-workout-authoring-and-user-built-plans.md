@@ -4,10 +4,11 @@
 
 in_progress — manual Add, personal saved templates, manual Copy/Paste, manual Delete/Clear, manual
 Move Workout, and Backend / Export Slice 7 manual active-plan JSON/Markdown export are QA-passed in
-the proved scope. The manual builder functional MVP is complete enough for code-freeze/refactor
-planning. Next gate is ARCHITECT cleanup inventory / freeze-readiness audit using the canonical
-functional map. QR/share-import, recurrence, edit workout, Restore UI, and deeper modal polish
-remain future-only unless selected by a separate architecture contract.
+the proved scope. A post-universal-editability QA rerun found a manual Clear restore/review
+reconstruction regression; Backend fixed the persisted-workout reconstruction boundary on
+2026-06-12. Next gate is QA rerun for universal active-plan editability acceptance. QR/share-import,
+recurrence, edit workout, Restore UI, and deeper modal polish remain future-only unless selected by
+a separate architecture contract.
 
 ## Type
 
@@ -19,25 +20,62 @@ high
 
 ## Next Recommended Role
 
-ARCHITECT
+QA
 
 ## Task
 
-Run cleanup inventory / code-freeze readiness audit from the current functional map.
+Rerun universal active-plan editability acceptance for manual Clear after backend reconstruction fix.
 
 ## Stage
 
-ARCHITECT cleanup inventory / code-freeze readiness audit.
+QA validation / universal active-plan editability rerun.
 
 ## Suggested Next Step
 
-Architect should use the canonical functional map to inventory which backend/frontend/scripts are
-required by shipped or QA-accepted flows, which are validation-only, and which are suspect
-cleanup/decomposition candidates. First verify whether
-`docs/current-functional-map.md` needs a small alignment update now that Move Workout is
-browser-QA-passed. Do not start cleanup implementation in this closeout.
+QA should rerun the focused universal active-plan editability proof for manual Clear on a persisted
+manual active-plan workout, including review modal, Restore/Put back/Redo affordance copy/data,
+confirm delete, fresh DB readback, and cleanup. Resume ARCHITECT cleanup inventory only after this
+rerun passes.
 
-## Current ARCHITECT Freeze-Readiness Handoff Prompt
+## Backend Manual Clear Restore Reconstruction Fix — 2026-06-12
+
+Status:
+
+Implemented / ready for focused QA rerun.
+
+Root cause:
+
+The visible symptom was a `Clear blocked` dialog with `Manual workout draft input is invalid.`
+The failing source-of-truth boundary was persisted workout reconstruction for manual restore
+affordance review. `reviewManualWorkoutDeleteClearForUser(...)` correctly used minimal identifiers
+and rebuilt the restore draft server-side, but the shared persisted-workout reconstruction seam could
+copy rich persisted labels/guidance/target hints into `ManualWorkoutDraftInput` without enforcing
+the bounded manual draft schema lengths. That let backend create a draft that
+`reviewManualWorkoutDraft(...)` then rejected.
+
+What changed:
+
+- Updated `src/lib/manual-workout-authoring/copy-paste-reconstruction.ts` to normalize persisted
+  text fields into the manual draft contract limits when reconstructing a draft.
+- Kept numeric structure, repeat/work/recovery anatomy, source template identity, date derivation,
+  and metric-truth policy unchanged.
+- Added deterministic manual harness coverage proving a persisted `steady_aerobic_run` with rich
+  overlong guidance/target hint can still produce a Clear restore review instead of
+  `invalid_input`.
+
+Validation evidence:
+
+- `npm exec eslint -- src/lib/manual-workout-authoring/copy-paste-reconstruction.ts src/lib/manual-workout-authoring/delete-clear.ts src/lib/manual-workout-authoring/actions.ts src/lib/manual-workout-authoring/schema.ts scripts/validate-manual-workout-authoring.ts`
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- `git diff --check -- src/lib/manual-workout-authoring/copy-paste-reconstruction.ts scripts/validate-manual-workout-authoring.ts`
+- `npm run build`
+
+Next gate:
+
+- QA rerun universal active-plan editability acceptance, with focus on manual Clear review/confirm
+  over a persisted manual active-plan workout.
+
+## Paused ARCHITECT Freeze-Readiness Handoff Prompt
 
 ```text
 ROLE: ARCHITECT

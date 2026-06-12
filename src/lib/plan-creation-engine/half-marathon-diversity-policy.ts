@@ -15,6 +15,7 @@ import {
   resolveRunningPlanCutbackWeeks,
   resolveRunningPlanHorizonSelection,
 } from "@/lib/plan-creation-engine/horizon-policy";
+import { collectRunnerFacingPreviewRichnessIssues } from "@/lib/plan-creation-engine/runner-facing-richness";
 import type {
   RunningPlanPreviewCalendarRow,
   RunningPlanPreviewCalendarWorkoutDayKind,
@@ -33,6 +34,7 @@ export const HALF_MARATHON_ENDPOINT_DISTANCE_METERS = 21_100 as const;
 
 export const HALF_MARATHON_DEVELOPMENT_TOUCH_VALUES = [
   "strides",
+  "progression",
   "tempo",
   "threshold",
   "intervals",
@@ -127,6 +129,14 @@ export function validateHalfMarathonDiversityPolicy({
       runnerLevel,
       loadContext,
       horizonWeeks,
+      rows,
+    }),
+  );
+  issues.push(
+    ...collectRunnerFacingPreviewRichnessIssues({
+      family: "Half Marathon",
+      runnerLevel,
+      loadContext,
       rows,
     }),
   );
@@ -360,7 +370,7 @@ function validateHalfWeekRules({
 
     const forbiddenCutbackKinds: readonly RunningPlanPreviewCalendarWorkoutDayKind[] =
       isBeginnerHalfMarathonRunner(runnerLevel)
-        ? ["tempo", "threshold", "intervals", "hills"]
+        ? ["progression", "tempo", "threshold", "intervals", "hills"]
         : ["threshold", "intervals"];
     for (const forbiddenKind of forbiddenCutbackKinds) {
       if (weekRows.some((row) => row.workoutDayKind === forbiddenKind)) {
@@ -373,7 +383,13 @@ function validateHalfWeekRules({
   if (!penultimateRows.some((row) => row.workoutDayKind === "strides")) {
     issues.push("Half Marathon penultimate week must include strides.");
   }
-  for (const forbiddenKind of ["tempo", "threshold", "intervals", "hills"] as const) {
+  for (const forbiddenKind of [
+    "progression",
+    "tempo",
+    "threshold",
+    "intervals",
+    "hills",
+  ] as const) {
     if (penultimateRows.some((row) => row.workoutDayKind === forbiddenKind)) {
       issues.push(`Half Marathon penultimate week must not include ${forbiddenKind}.`);
     }
@@ -411,6 +427,7 @@ function validateHalfRecoverySpacing(
   const recoveryRequiredAfter: readonly RunningPlanPreviewCalendarWorkoutDayKind[] = [
     "long_run",
     "cutback_long_run",
+    "progression",
     "threshold",
     "intervals",
     "hills",

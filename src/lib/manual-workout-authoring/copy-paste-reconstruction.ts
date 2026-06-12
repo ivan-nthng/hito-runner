@@ -18,6 +18,14 @@ import {
 import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import type { Step, StepTarget } from "@/lib/training";
 
+const MANUAL_DRAFT_TITLE_MAX_LENGTH = 120;
+const MANUAL_DRAFT_NOTES_MAX_LENGTH = 1_000;
+const MANUAL_DRAFT_LABEL_MAX_LENGTH = 120;
+const MANUAL_DRAFT_NOTE_TEXT_MAX_LENGTH = 500;
+const MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH = 200;
+const MANUAL_DRAFT_TARGET_LABEL_MAX_LENGTH = 120;
+const MANUAL_DRAFT_TARGET_RPE_MAX_LENGTH = 32;
+
 export interface ManualWorkoutCopyPasteSourceInput {
   activePlanId?: string;
   sourceWorkoutId?: string;
@@ -195,8 +203,12 @@ export function buildManualWorkoutDraftInputFromPersistedWorkout(
   const draftInput: ManualWorkoutDraftInput = {
     templateKey,
     workoutDate: targetDate,
-    title: workout.title || template.defaultTitle,
-    notes: workout.notes ?? template.defaultNotes,
+    title:
+      normalizeManualDraftText(workout.title, MANUAL_DRAFT_TITLE_MAX_LENGTH) ??
+      template.defaultTitle,
+    notes:
+      normalizeManualDraftText(workout.notes, MANUAL_DRAFT_NOTES_MAX_LENGTH) ??
+      template.defaultNotes,
     targetTruthMode: deriveTargetTruthMode(workout),
     entries: reconstructedEntries.entries,
     context: {
@@ -272,7 +284,10 @@ function persistedStepToEntry(
       group: {
         repeatCount,
         safetyKind: repeatSafetyKindForStep(step, templateKey),
-        ...(step.label ? { groupLabel: step.label } : {}),
+        ...optionalStringField(
+          "groupLabel",
+          normalizeManualDraftText(step.label, MANUAL_DRAFT_LABEL_MAX_LENGTH),
+        ),
         workBlock,
         recoveryBlock,
       },
@@ -305,9 +320,15 @@ function persistedStepToBlock(
 
   return {
     blockKey,
-    ...(step.label ? { label: step.label } : {}),
+    ...optionalStringField(
+      "label",
+      normalizeManualDraftText(step.label, MANUAL_DRAFT_LABEL_MAX_LENGTH),
+    ),
     ...unit,
-    ...(step.guidance ? { noteText: step.guidance } : {}),
+    ...optionalStringField(
+      "noteText",
+      normalizeManualDraftText(step.guidance, MANUAL_DRAFT_NOTE_TEXT_MAX_LENGTH),
+    ),
     ...(target ? { target } : {}),
   };
 }
@@ -412,12 +433,27 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
   }
 
   const sanitized: ManualWorkoutBlockInput["target"] = {
-    ...(target.intensity ? { intensity: target.intensity } : {}),
-    ...(target.label ? { label: target.label } : {}),
-    ...(target.source_note ? { sourceNote: target.source_note } : {}),
-    ...(target.cue ? { cue: target.cue } : {}),
-    ...(target.hint ? { hint: target.hint } : {}),
-    ...(target.rpe ? { rpe: target.rpe } : {}),
+    ...optionalStringField(
+      "intensity",
+      normalizeManualDraftText(target.intensity, MANUAL_DRAFT_TARGET_LABEL_MAX_LENGTH),
+    ),
+    ...optionalStringField(
+      "label",
+      normalizeManualDraftText(target.label, MANUAL_DRAFT_TARGET_LABEL_MAX_LENGTH),
+    ),
+    ...optionalStringField(
+      "sourceNote",
+      normalizeManualDraftText(target.source_note, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH),
+    ),
+    ...optionalStringField(
+      "cue",
+      normalizeManualDraftText(target.cue, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH),
+    ),
+    ...optionalStringField(
+      "hint",
+      normalizeManualDraftText(target.hint, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH),
+    ),
+    ...(normalizeManualDraftRpe(target.rpe) ? { rpe: normalizeManualDraftRpe(target.rpe) } : {}),
   };
 
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
@@ -460,4 +496,29 @@ function readRecord(value: unknown): Record<string, unknown> {
   }
 
   return value as Record<string, unknown>;
+}
+
+function normalizeManualDraftText(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return trimmed.slice(0, maxLength);
+}
+
+function normalizeManualDraftRpe(value: StepTarget["rpe"]): StepTarget["rpe"] | undefined {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  return normalizeManualDraftText(value, MANUAL_DRAFT_TARGET_RPE_MAX_LENGTH);
+}
+
+function optionalStringField<Key extends string>(key: Key, value: string | undefined) {
+  return value ? ({ [key]: value } as Record<Key, string>) : {};
 }

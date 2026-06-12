@@ -144,12 +144,12 @@ export function ManualUserBuiltPlanPanel({
     }));
 
     try {
-      const result = await listManualWorkoutSavedTemplatesFn();
-      if (!result.ok) {
+      const result = await listManualWorkoutSavedTemplatesFn({ data: undefined });
+      if (!result?.ok) {
         setSavedTemplatesState({
           status: "failed",
           templates: [],
-          message: result.message,
+          message: result?.message ?? "Personal workout templates are not available right now.",
         });
         return;
       }

@@ -57,6 +57,7 @@ type ManualCalendarActionState = {
   onMoveWorkout: (source: ManualCopiedWorkoutSource) => void;
 };
 type ManualWorkoutCalendarActionContext = ManualCopiedWorkoutSource & {
+  canRequestCopyReview: boolean;
   canRequestClearReview: boolean;
   canRequestMoveReview: boolean;
 };
@@ -353,7 +354,7 @@ function MobileMonthList({
                   date={{ eyebrow: weekdayShort(iso), day: iso.slice(8) }}
                   interactive
                   state="empty"
-                  supportingText={canMoveHere ? "Move target" : "Manual user-built plan"}
+                  supportingText={canMoveHere ? "Move target" : "Editable active plan"}
                   title="No workout planned"
                   today={isToday}
                 />
@@ -541,7 +542,7 @@ function DayCell({
               className={cn("h-full", canMoveHere && "ring-2 ring-signal/25")}
               interactive
               state="empty"
-              supportingText={canMoveHere ? "Move target" : "Manual plan"}
+              supportingText={canMoveHere ? "Move target" : "Editable active plan"}
               today={isToday}
             />
           </button>
@@ -791,7 +792,7 @@ function WeekStrip({
                   interactive
                   layout="week"
                   state="empty"
-                  supportingText={canMoveHere ? "Move target" : "Manual user-built plan"}
+                  supportingText={canMoveHere ? "Move target" : "Editable active plan"}
                   today={isToday}
                   weekday={weekdayShort(iso)}
                 />
@@ -860,19 +861,19 @@ function getManualAddContext(
 ): { activePlanId: string; activePlanSourceKind: string } | null {
   const planMeta = snapshot.planMeta;
 
-  if (
-    !planMeta?.id ||
-    planMeta.sourceKind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND ||
-    workout ||
-    iso <= snapshot.currentDate ||
-    isBeforePlanStart(iso, snapshot)
-  ) {
+  const addCapability = planMeta?.workoutEditing?.addWorkout;
+
+  if (!planMeta?.id || !addCapability?.allowed || workout || iso <= snapshot.currentDate) {
+    return null;
+  }
+
+  if (isBeforePlanStart(iso, snapshot)) {
     return null;
   }
 
   return {
     activePlanId: planMeta.id,
-    activePlanSourceKind: planMeta.sourceKind,
+    activePlanSourceKind: addCapability.sourceKind,
   };
 }
 
@@ -883,19 +884,28 @@ function getManualCopyContext(
 ): ManualWorkoutCalendarActionContext | null {
   const planMeta = snapshot.planMeta;
 
-  if (
-    !planMeta?.id ||
-    planMeta.sourceKind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND ||
-    !workout ||
-    workout.type === "rest"
-  ) {
+  if (!planMeta?.id || !workout || workout.type === "rest") {
+    return null;
+  }
+
+  const editableFutureWorkout = iso > snapshot.currentDate && !isBeforePlanStart(iso, snapshot);
+  const canRequestCopyReview = planMeta.sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+  const canRequestClearReview = Boolean(
+    planMeta.workoutEditing?.clearWorkout.allowed && editableFutureWorkout,
+  );
+  const canRequestMoveReview = Boolean(
+    planMeta.workoutEditing?.moveWorkout.allowed && editableFutureWorkout,
+  );
+
+  if (!canRequestCopyReview && !canRequestClearReview && !canRequestMoveReview) {
     return null;
   }
 
   return {
     activePlanId: planMeta.id,
-    canRequestClearReview: iso > snapshot.currentDate && !isBeforePlanStart(iso, snapshot),
-    canRequestMoveReview: iso > snapshot.currentDate && !isBeforePlanStart(iso, snapshot),
+    canRequestCopyReview,
+    canRequestClearReview,
+    canRequestMoveReview,
     sourceWorkoutDate: iso,
     sourceWorkoutId: workout.id,
     title: workout.title || workoutTypeMeta(workout).label,
@@ -920,6 +930,7 @@ function ManualWorkoutCopyAction({
   return (
     <ManualWorkoutCopyMenu
       activePlanId={context.activePlanId}
+      canCopy={context.canRequestCopyReview}
       canClear={context.canRequestClearReview}
       canMove={context.canRequestMoveReview}
       onCleared={onCleared}

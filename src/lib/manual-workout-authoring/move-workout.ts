@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+  ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
+  ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+  appendActivePlanUserEditMetadataToRecord,
+  buildActivePlanUserEditMetadata,
+  resolveActivePlanSourceStatus,
+  resolveActivePlanWorkoutEditability,
+} from "@/lib/active-plan-workout-editing/policy";
+import {
   getExistingPlanContext,
   type ExistingPlanContext,
   type PersistedPlanCycleRow,
@@ -85,6 +93,7 @@ export type ManualWorkoutMoveFailureReason =
   | "invalid_input"
   | "no_active_plan"
   | "unsupported_active_plan_source"
+  | "unsupported_source_metadata"
   | "source_workout_not_found"
   | "source_workout_not_in_active_plan"
   | "source_workout_not_supported"
@@ -107,7 +116,7 @@ type ManualWorkoutMoveBlockedResult = {
   persisted: false;
   reason: ManualWorkoutMoveFailureReason;
   message: string;
-  sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+  sourceKind: string | null;
   workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
 };
 
@@ -128,7 +137,7 @@ export type ManualWorkoutMoveReviewResult =
       ok: true;
       status: "review_ready";
       persisted: false;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceKind: string;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
       sourceWorkoutId: string;
@@ -159,8 +168,8 @@ export type ManualWorkoutMoveConfirmResult =
       ok: true;
       status: "moved";
       persisted: true;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
+      sourceKind: string;
+      sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
       plannedWorkoutId: string;
@@ -274,7 +283,7 @@ export async function reviewManualWorkoutMoveForUser(
     ok: true,
     status: "review_ready",
     persisted: false,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: target.activePlan.source_kind ?? ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
     activePlanId: target.activePlan.id,
     sourceWorkoutId: target.sourceWorkout.id,
@@ -357,8 +366,8 @@ export async function confirmManualWorkoutMoveForUser(
       ok: true,
       status: "moved",
       persisted: true,
-      sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-      sourceStatus: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+      sourceKind: target.activePlan.source_kind ?? ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+      sourceStatus: resolveActivePlanSourceStatus(target.activePlan),
       workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
       activePlanId: target.activePlan.id,
       plannedWorkoutId: target.sourceWorkout.id,
@@ -430,11 +439,13 @@ export async function persistManualWorkoutMove({
     .update({
       end_date: resolveManualPlanEndDateAfterMove(activePlan, movedWorkouts),
       goal_metadata: buildManualWorkoutMoveGoalMetadata({
+        activePlan,
         existingGoalMetadata: activePlan.goal_metadata,
         movedWorkouts,
         review,
       }),
       plan_preferences: buildManualWorkoutMovePlanPreferences({
+        activePlan,
         existingPlanPreferences: activePlan.plan_preferences,
         review,
       }),
@@ -442,7 +453,7 @@ export async function persistManualWorkoutMove({
     .eq("id", activePlan.id)
     .eq("user_id", userId)
     .eq("status", "active")
-    .eq("source_kind", MANUAL_USER_BUILT_PLAN_SOURCE_KIND)
+    .eq("source_kind", activePlan.source_kind)
     .select("*")
     .single();
 
@@ -493,7 +504,7 @@ async function resolveManualWorkoutMoveTarget(
     return {
       ok: false,
       reason: "no_active_plan",
-      message: "Create a manual user-built active plan before moving workouts.",
+      message: "Create or open an active plan before moving workouts.",
     };
   }
 
@@ -505,11 +516,15 @@ async function resolveManualWorkoutMoveTarget(
     };
   }
 
-  if (activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+  const editability = resolveActivePlanWorkoutEditability(activePlan, "move_workout");
+  if (!editability.ok) {
     return {
       ok: false,
-      reason: "unsupported_active_plan_source",
-      message: "Manual workout moves are available only for manual user-built active plans.",
+      reason:
+        editability.reason === "unsupported_source_metadata"
+          ? "unsupported_source_metadata"
+          : "unsupported_active_plan_source",
+      message: editability.message,
     };
   }
 
@@ -529,7 +544,7 @@ async function resolveManualWorkoutMoveTarget(
     return {
       ok: false,
       reason: "source_workout_not_supported",
-      message: "Only manually authored workout rows can be moved in this flow.",
+      message: "This planned workout row cannot be safely moved through this flow.",
     };
   }
 
@@ -561,8 +576,7 @@ async function resolveManualWorkoutMoveTarget(
     return {
       ok: false,
       reason: "protected_day",
-      message:
-        "Manual workout moves can only target future empty days inside the current manual plan.",
+      message: "Workout moves can only target future empty days inside the current active plan.",
     };
   }
 
@@ -739,7 +753,7 @@ function buildMoveExactnessPayload(input: {
 }) {
   return {
     version: MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
     activePlanId: input.activePlan.id,
     activePlanSourceKind: input.activePlan.source_kind,
     sourceWorkoutId: input.sourceWorkout.id,
@@ -784,9 +798,29 @@ function buildManualWorkoutMoveGoalMetadata(input: {
   existingGoalMetadata: Json | null;
   movedWorkouts: readonly PersistedPlannedWorkoutRow[];
   review: ManualWorkoutMoveReview;
+  activePlan: PersistedPlanCycleRow;
 }): Json {
-  const root = asJsonRecord(input.existingGoalMetadata);
+  const editMetadata = buildActivePlanUserEditMetadata({
+    activePlan: input.activePlan,
+    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.moveWorkout,
+    plannedWorkoutId: input.review.sourceWorkoutId,
+    previousWorkoutDate: input.review.sourceWorkoutDate,
+    reviewChecksum: input.review.reviewChecksum,
+    reviewPayloadVersion: MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION,
+    targetDate: input.review.targetDate,
+    templateKey: input.review.templateKey,
+    title: input.review.title,
+    workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  });
+  const root = appendActivePlanUserEditMetadataToRecord(
+    asJsonRecord(input.existingGoalMetadata),
+    editMetadata,
+  );
   const manualPlan = asJsonRecord(root.manual_user_built_plan);
+
+  if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+    return toJson(root);
+  }
 
   return toJson({
     ...root,
@@ -816,8 +850,24 @@ function buildManualWorkoutMoveGoalMetadata(input: {
 function buildManualWorkoutMovePlanPreferences(input: {
   existingPlanPreferences: Json | null;
   review: ManualWorkoutMoveReview;
+  activePlan: PersistedPlanCycleRow;
 }): Json {
-  const root = asJsonRecord(input.existingPlanPreferences);
+  const editMetadata = buildActivePlanUserEditMetadata({
+    activePlan: input.activePlan,
+    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.moveWorkout,
+    plannedWorkoutId: input.review.sourceWorkoutId,
+    previousWorkoutDate: input.review.sourceWorkoutDate,
+    reviewChecksum: input.review.reviewChecksum,
+    reviewPayloadVersion: MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION,
+    targetDate: input.review.targetDate,
+    templateKey: input.review.templateKey,
+    title: input.review.title,
+    workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  });
+  const root = appendActivePlanUserEditMetadataToRecord(
+    asJsonRecord(input.existingPlanPreferences),
+    editMetadata,
+  );
   const moveHistory = Array.isArray(root.manual_workout_authoring_moves)
     ? root.manual_workout_authoring_moves
     : [];
@@ -831,6 +881,10 @@ function buildManualWorkoutMovePlanPreferences(input: {
     review_payload_version: MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION,
     review_checksum: input.review.reviewChecksum,
   };
+
+  if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+    return toJson(root);
+  }
 
   return toJson({
     ...root,

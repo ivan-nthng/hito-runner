@@ -123,12 +123,35 @@ export interface PlanMeta {
   source: "preview" | "persisted";
   sourceKind: string | null;
   schedulePreferences: PlanSchedulePreferencesSummary | null;
+  workoutEditing: ActivePlanWorkoutEditingCapabilities | null;
 }
 
 export interface PlanSchedulePreferencesSummary {
   fixedRestDays: string[];
   runningDaysPerWeek: number | null;
   preferredLongRunDay: string | null;
+}
+
+export type ActivePlanWorkoutEditingOperation = "add_workout" | "clear_workout" | "move_workout";
+
+export type ActivePlanWorkoutEditingCapability =
+  | {
+      allowed: true;
+      operation: ActivePlanWorkoutEditingOperation;
+      sourceKind: string;
+      sourceStatus: string | null;
+    }
+  | {
+      allowed: false;
+      operation: ActivePlanWorkoutEditingOperation;
+      reason: "no_active_plan" | "unsupported_active_plan_source" | "unsupported_source_metadata";
+      message: string;
+    };
+
+export interface ActivePlanWorkoutEditingCapabilities {
+  addWorkout: ActivePlanWorkoutEditingCapability;
+  clearWorkout: ActivePlanWorkoutEditingCapability;
+  moveWorkout: ActivePlanWorkoutEditingCapability;
 }
 
 export interface RunnerProfileSummary {
@@ -568,6 +591,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
       source: "preview",
       sourceKind: null,
       schedulePreferences: null,
+      workoutEditing: null,
     },
     profile: null,
     workouts,

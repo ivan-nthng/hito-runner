@@ -31,10 +31,29 @@ export {
   type RunningPlanPrescriptionLoadContext,
 } from "@/lib/plan-creation-engine/prescription-resolver";
 export {
+  collectRunningPlanCanonicalPrescriptionGrammarIssues,
+  collectRunningPlanPreviewPrescriptionGrammarIssues,
+  RUNNING_PLAN_PRESCRIPTION_GRAMMAR_GATE_VERSION,
+  summarizeRunningPlanCanonicalPrescriptionGrammar,
+  summarizeRunningPlanPreviewPrescriptionGrammar,
+  type RunningPlanPrescriptionGrammarSummary,
+} from "@/lib/plan-creation-engine/prescription-quality";
+export {
   getRunningPlanWorkoutDayTemplate,
   RUNNING_PLAN_SOURCE_MODEL,
   resolveRunningPlanEndpointTemplate,
 } from "@/lib/plan-creation-engine/source-model";
+export {
+  collectRunnerFacingCanonicalRichnessIssues,
+  collectRunnerFacingPreviewRichnessIssues,
+  RUNNER_FACING_RICHNESS_GATE_VERSION,
+  summarizeRunnerFacingCanonicalRichness,
+  summarizeRunnerFacingPreviewRichness,
+  type RunnerFacingRichnessCanonicalRow,
+  type RunnerFacingRichnessInput,
+  type RunnerFacingRichnessPreviewRow,
+  type RunnerFacingRichnessSummary,
+} from "@/lib/plan-creation-engine/runner-facing-richness";
 export {
   assertRunningPlanSourceModel,
   collectRunningPlanSourceModelIssues,

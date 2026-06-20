@@ -1,8 +1,3 @@
-import type { ReactNode } from "react";
-
-type SpecimenStatus = "Core" | "Pattern" | "Exception" | "Legacy" | "In rollout";
-type SpecimenStatusTone = "signal" | "neutral" | "warning" | "destructive" | "rollout";
-
 export function SectionIntro({
   label,
   title,
@@ -52,58 +47,6 @@ export function ReferenceListRow({
   );
 }
 
-export function SpecimenSection({
-  id,
-  label,
-  title,
-  body,
-  status = "Core",
-  preview,
-  controls,
-  contract,
-  children,
-}: {
-  id: string;
-  label: string;
-  title: string;
-  body: string;
-  status?: SpecimenStatus;
-  preview: ReactNode;
-  controls: ReactNode;
-  contract: Array<{ label: string; body: ReactNode }>;
-  children?: ReactNode;
-}) {
-  const statusTone = getSpecimenStatusTone(status);
-
-  return (
-    <section id={id} className="ds-section">
-      <div className="hito-specimen-header">
-        <SectionIntro label={label} title={title} body={body} />
-        <span className="hito-status-pill" data-tone={statusTone}>
-          {status}
-        </span>
-      </div>
-      <div className="hito-specimen">
-        <div className="hito-specimen-grid">
-          <article className="hito-specimen-preview">{preview}</article>
-          <aside className="hito-specimen-controls" aria-label={`${title} controls`}>
-            {controls}
-          </aside>
-        </div>
-        <div className="hito-specimen-contract">
-          {contract.map((row) => (
-            <div key={row.label} className="hito-specimen-contract-row">
-              <p className="hito-micro-label">{row.label}</p>
-              <div className="hito-list-row-copy">{row.body}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 export function ProductLinks({ links }: { links: Array<{ href: string; label: string }> }) {
   return (
     <span className="hito-specimen-links">
@@ -114,19 +57,4 @@ export function ProductLinks({ links }: { links: Array<{ href: string; label: st
       ))}
     </span>
   );
-}
-
-function getSpecimenStatusTone(status: SpecimenStatus): SpecimenStatusTone {
-  switch (status) {
-    case "Core":
-      return "signal";
-    case "Pattern":
-      return "neutral";
-    case "Exception":
-      return "warning";
-    case "Legacy":
-      return "destructive";
-    case "In rollout":
-      return "rollout";
-  }
 }

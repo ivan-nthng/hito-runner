@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { exchangeCodeForSession } from "@/lib/training-api";
+import { exchangeCodeForSession } from "@/lib/auth-actions";
 
 export const Route = createFileRoute("/api/auth/confirm")({
   server: {

@@ -18,8 +18,10 @@ export type HitoCalendarWorkoutIdentity = {
 type HitoCalendarActionVisual = {
   label: string;
   icon?: HitoIconName;
+  trailingIcon?: HitoIconName;
   tone?: "signal" | "muted" | "warning" | "rollout";
   button?: "secondary" | "ghost" | "icon-ghost" | "outlined";
+  visual?: "pill" | "button";
   disabled?: boolean;
   ariaLabel?: string;
   focusDemo?: boolean;
@@ -36,6 +38,7 @@ type SharedVisualProps = {
   workout?: HitoCalendarWorkoutIdentity | null;
   title?: string;
   supportingText?: string | null;
+  pendingLabel?: string | null;
   result?: HitoCalendarDayResultState;
   feedback?: HitoCalendarFeedbackState;
   action?: HitoCalendarActionVisual | null;
@@ -44,6 +47,7 @@ type SharedVisualProps = {
   focused?: boolean;
   muted?: boolean;
   interactive?: boolean;
+  stateLabel?: string | null;
   ariaLabel?: string;
   className?: string;
 };
@@ -70,9 +74,11 @@ export function HitoCalendarDayCell({
   interactive = false,
   layout = "month",
   muted = false,
+  pendingLabel,
   result = "none",
   selected = false,
   state,
+  stateLabel,
   supportingText,
   title,
   today = false,
@@ -82,6 +88,7 @@ export function HitoCalendarDayCell({
   const week = layout === "week";
   const showWorkoutMarkers = state === "workout";
   const cornerAction = action?.button === "icon-ghost";
+  const calmSelected = selected && (state === "rest" || state === "outside-month");
 
   return (
     <div
@@ -90,25 +97,24 @@ export function HitoCalendarDayCell({
       tabIndex={focused ? 0 : undefined}
       aria-label={ariaLabel}
       className={cn(
-        "relative h-full min-w-0 border-hairline text-left transition-colors",
+        "relative h-full min-w-0 border-hairline bg-transparent text-left transition-colors",
         action && "group/hito-calendar-day",
         week
           ? "flex min-h-[170px] flex-col border-b p-4 lg:border-r lg:border-b-0"
           : "flex min-h-[8rem] flex-col border-r border-b p-2.5 xl:p-3",
         dense && !week && "min-h-0 p-2",
-        interactive && "hover:bg-accent/40 group-hover:bg-accent/40",
+        interactive &&
+          "hover:outline hover:outline-1 hover:outline-offset-[-1px] hover:outline-foreground/10 group-hover:outline group-hover:outline-1 group-hover:outline-offset-[-1px] group-hover:outline-foreground/10",
         muted && "opacity-30",
         state === "outside-month" && "bg-foreground/[0.012]",
-        state === "rest" && !dense && "bg-foreground/[0.012]",
-        state === "empty" && "bg-background/20",
         today && "relative z-10 outline outline-1 outline-offset-[-1px] outline-signal/60",
-        selected && "relative z-10 bg-signal/[0.055] ring-1 ring-inset ring-signal/40",
+        selected &&
+          (calmSelected
+            ? "relative z-10 ring-1 ring-inset ring-foreground/10"
+            : "relative z-10 ring-1 ring-inset ring-signal/40"),
         focused && "relative z-10 outline outline-2 outline-offset-[-2px] outline-signal/40",
         interactive &&
           "group-focus-visible:outline group-focus-visible:outline-2 group-focus-visible:outline-offset-[-2px] group-focus-visible:outline-signal/40",
-        result === "completed" && showWorkoutMarkers && "bg-success/[0.04]",
-        result === "partial" && showWorkoutMarkers && "bg-warn/[0.04]",
-        result === "skipped" && showWorkoutMarkers && "bg-destructive/[0.035]",
         action?.focusDemo && "outline outline-1 outline-offset-[-2px] outline-signal/40",
         action?.tone === "warning" && "opacity-75",
         className,
@@ -118,7 +124,7 @@ export function HitoCalendarDayCell({
         day={day}
         dense={dense}
         result={showWorkoutMarkers ? result : "none"}
-        reserveActionSpace={cornerAction}
+        reserveActionSpace={cornerAction || Boolean(pendingLabel)}
         today={today}
         week={week}
         weekday={weekday}
@@ -129,10 +135,17 @@ export function HitoCalendarDayCell({
         layout={layout}
         result={result}
         state={state}
+        stateLabel={stateLabel}
         supportingText={supportingText}
         title={title}
         workout={workout}
       />
+
+      {pendingLabel ? (
+        <div className={cn("absolute z-20", week ? "right-3 top-3" : "right-2 top-2")}>
+          <PendingMarker label={pendingLabel} />
+        </div>
+      ) : null}
 
       {!dense && action && !cornerAction ? (
         <div
@@ -175,9 +188,11 @@ export function HitoWorkoutDayRow({
   focused = false,
   interactive = false,
   muted = false,
+  pendingLabel,
   result = "none",
   selected = false,
   state,
+  stateLabel,
   supportingText,
   title,
   today = false,
@@ -186,6 +201,8 @@ export function HitoWorkoutDayRow({
   const outside = state === "outside-month";
   const showWorkoutMarkers = state === "workout" && !outside;
   const cornerAction = action?.button === "icon-ghost";
+  const hasRightChrome = cornerAction || Boolean(pendingLabel);
+  const calmSelected = selected && (state === "rest" || outside);
 
   return (
     <div
@@ -197,12 +214,9 @@ export function HitoWorkoutDayRow({
         "hito-calendar-mobile-row relative w-full items-start",
         interactive && "group-focus-visible:border-signal/45",
         today && "hito-calendar-mobile-row-today",
-        result === "completed" && showWorkoutMarkers && "hito-calendar-mobile-row-completed",
         outside && "hito-calendar-mobile-row-muted",
         muted && "opacity-60",
-        selected && "border-signal/45 bg-signal/[0.055]",
-        result === "partial" && showWorkoutMarkers && "bg-warn/[0.045]",
-        result === "skipped" && showWorkoutMarkers && "bg-destructive/[0.035]",
+        selected && (calmSelected ? "border-foreground/15" : "border-signal/45"),
         className,
       )}
     >
@@ -219,17 +233,22 @@ export function HitoWorkoutDayRow({
 
       <div className="min-w-0 flex-1">
         <div
-          className={cn("flex min-w-0 flex-wrap items-center gap-2 pr-8", cornerAction && "pr-10")}
+          className={cn(
+            "flex min-w-0 flex-wrap items-center gap-2 pr-8",
+            hasRightChrome && "pr-10",
+          )}
         >
           {state === "workout" && workout ? <WorkoutLabel workout={workout} /> : null}
-          {state !== "workout" ? <StateLabel state={state} workout={workout} /> : null}
+          {state !== "workout" ? (
+            <StateLabel label={stateLabel} state={state} workout={workout} />
+          ) : null}
         </div>
 
         {title ? (
           <p
             className={cn(
               "mt-1 min-w-0 text-sm leading-snug text-foreground/90",
-              cornerAction && "pr-10",
+              hasRightChrome && "pr-10",
               result === "skipped" && "line-through opacity-50",
             )}
           >
@@ -250,6 +269,12 @@ export function HitoWorkoutDayRow({
       {cornerAction ? (
         <div className="absolute right-3 top-3 z-20">
           <ActionVisual action={action} compact />
+        </div>
+      ) : null}
+
+      {pendingLabel ? (
+        <div className="absolute right-3 top-3 z-20">
+          <PendingMarker label={pendingLabel} />
         </div>
       ) : null}
     </div>
@@ -311,6 +336,7 @@ function CalendarDayBody({
   layout,
   result,
   state,
+  stateLabel,
   supportingText,
   title,
   workout,
@@ -319,6 +345,7 @@ function CalendarDayBody({
   layout: "month" | "week";
   result: HitoCalendarDayResultState;
   state: HitoCalendarDayBaseState;
+  stateLabel?: string | null;
   supportingText?: string | null;
   title?: string;
   workout?: HitoCalendarWorkoutIdentity | null;
@@ -347,7 +374,7 @@ function CalendarDayBody({
         </>
       ) : (
         <>
-          <StateLabel dense={dense} state={state} workout={workout} />
+          <StateLabel dense={dense} label={stateLabel} state={state} workout={workout} />
           {!dense ? <SupportingText technical={false}>{supportingText}</SupportingText> : null}
         </>
       )}
@@ -401,20 +428,24 @@ function WorkoutLabel({
 
 function StateLabel({
   dense = false,
+  label,
   state,
   workout,
 }: {
   dense?: boolean;
+  label?: string | null;
   state: HitoCalendarDayBaseState;
   workout?: HitoCalendarWorkoutIdentity | null;
 }) {
+  if (label === null) return null;
+
   if (state === "rest" && workout) {
     return <WorkoutLabel workout={workout} />;
   }
 
   return (
     <span className={cn("hito-label text-muted-foreground", dense && "text-[0.625rem]")}>
-      {stateLabel(state, dense)}
+      {label ?? stateLabel(state, dense)}
     </span>
   );
 }
@@ -475,6 +506,18 @@ function FeedbackMarker({
   );
 }
 
+function PendingMarker({ label }: { label: string }) {
+  return (
+    <span
+      className="hito-label inline-flex items-center gap-1 text-muted-foreground"
+      aria-label={label}
+    >
+      <Icon name="loader" size="xs" className="animate-spin text-muted-foreground/80" />
+      <span>{label}</span>
+    </span>
+  );
+}
+
 function ActionVisual({
   action,
   compact = false,
@@ -482,6 +525,8 @@ function ActionVisual({
   action: HitoCalendarActionVisual;
   compact?: boolean;
 }) {
+  const label = compact && !action.trailingIcon ? null : action.label;
+
   if (action.button) {
     const iconOnly = action.button === "icon-ghost";
 
@@ -498,8 +543,27 @@ function ActionVisual({
         disabled={action.disabled}
       >
         {action.icon ? <Icon name={action.icon} size="xs" /> : null}
-        {!compact && !iconOnly ? action.label : action.icon ? null : action.label}
+        {!iconOnly ? label : action.icon ? null : action.label}
+        {!iconOnly && action.trailingIcon ? <Icon name={action.trailingIcon} size="xs" /> : null}
       </button>
+    );
+  }
+
+  if (action.visual === "button") {
+    return (
+      <span
+        className={cn(
+          "hito-button hito-button-secondary hito-button-xs pointer-events-none",
+          compact && "px-2",
+        )}
+        aria-hidden="true"
+        data-demo-state={action.focusDemo ? "focus" : undefined}
+        data-tone={action.tone}
+      >
+        {action.icon ? <Icon name={action.icon} size="xs" /> : null}
+        {label}
+        {action.trailingIcon ? <Icon name={action.trailingIcon} size="xs" /> : null}
+      </span>
     );
   }
 

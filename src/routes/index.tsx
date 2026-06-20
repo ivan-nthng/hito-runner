@@ -28,7 +28,6 @@ export const Route = createFileRoute("/")({
 function Index() {
   const { snapshot, viewer, onboardingDefaults, localBypassEnabled, magicLinkEnabled } =
     Route.useLoaderData();
-  const hasPlannedWorkouts = snapshot.workouts.some((workout) => workout.type !== "rest");
 
   if (snapshot.mode === "preview") {
     return (
@@ -43,7 +42,7 @@ function Index() {
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="px-6 py-8 lg:px-10 lg:py-10">
-        {snapshot.mode === "onboarding" || !hasPlannedWorkouts ? (
+        {snapshot.mode === "onboarding" ? (
           <OnboardingGate defaults={onboardingDefaults} />
         ) : (
           <div className="hito-route-stack">

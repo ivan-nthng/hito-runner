@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
-import { exportActivePlanForUser } from "@/lib/training-api";
+import { exportActivePlanForUser } from "@/lib/active-plan-export-actions";
 
 const planExportQuerySchema = z.object({
   format: z.enum(["json", "markdown"]),

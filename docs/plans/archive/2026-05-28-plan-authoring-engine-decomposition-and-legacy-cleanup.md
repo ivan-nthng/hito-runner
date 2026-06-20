@@ -63,7 +63,7 @@ ARCHITECT / BACKEND / QA
 Archived on 2026-06-03 during active-plan cleanup. The blueprint authoring facade decomposition and
 structured-plan-authoring decomposition milestones are complete with behavior-preservation evidence.
 The remaining doctrine-validator cleanup is now owned by the active optimization strike plan:
-`docs/plans/active/2026-05-29-hito-optimization-strike-plan.md`.
+`docs/plans/archive/2026-05-29-hito-optimization-strike-plan.md`.
 
 ## Context
 

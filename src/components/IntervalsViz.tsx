@@ -1,12 +1,9 @@
 import { useState } from "react";
 import type { Workout, Step, StepTarget } from "@/lib/training";
 import {
-  displayExecutableTargetEntries,
   displayStepStructureEntries,
-  displayTargetSupportEntries,
-  formatDistanceKm,
+  displayStepTargetReadbackEntries,
   formatDurationMin,
-  formatPrescriptionDistanceKm,
   segmentColorMeta,
   stepPlannedDurationMin,
 } from "@/lib/training";
@@ -89,9 +86,10 @@ export function IntervalsViz({ workout }: { workout: Workout }) {
         {blocks.map((b, i) => {
           const colors = segmentColorMeta(b.semanticKind, b.target);
           const isActive = activeIndex === i;
-          const targetEntries = displayExecutableTargetEntries(b.target, workout.metricMode);
-          const structureEntries = targetEntries.length > 0 ? [] : b.structureEntries.slice(0, 2);
-          const readbackEntries = targetEntries.length > 0 ? targetEntries : structureEntries;
+          const readbackEntries = displayStepTargetReadbackEntries(b.step, workout.metricMode, {
+            limit: 2,
+            omitStructureLabels: visibleMetricStructureLabels(b.step),
+          });
 
           return (
             <li
@@ -144,7 +142,7 @@ type Block = {
   title: string;
   semanticKind: string;
   target?: StepTarget;
-  structureEntries: Array<{ key: string; label: string; value: string }>;
+  step: Step;
 };
 
 function expand(workout: Workout): Block[] {
@@ -164,7 +162,7 @@ function expand(workout: Workout): Block[] {
               : `${i + 1}/${s.repeats}`,
           metric: workMetric,
           target: s.work.target,
-          structureEntries: displayStepStructureEntries(s.work),
+          step: s.work,
         });
 
         const recoveryDuration = estimateVisualDurationMin(s.recovery, "easy");
@@ -178,7 +176,7 @@ function expand(workout: Workout): Block[] {
             label: "rec",
             metric: recoveryMetric,
             target: s.recovery.target,
-            structureEntries: displayStepStructureEntries(s.recovery),
+            step: s.recovery,
           });
         }
       }
@@ -192,7 +190,7 @@ function expand(workout: Workout): Block[] {
         label: describeStepMetric(s),
         metric: describeStepMetric(s),
         target: s.target,
-        structureEntries: displayStepStructureEntries(s),
+        step: s,
       });
     }
   }
@@ -212,13 +210,11 @@ function SegmentTooltip({
   leftPercent: number;
   metricMode: Workout["metricMode"];
 }) {
-  const priorityEntries = displayExecutableTargetEntries(block.target, metricMode).slice(0, 3);
-  const structureEntries = priorityEntries.length > 0 ? [] : block.structureEntries.slice(0, 3);
-  const supportEntries =
-    priorityEntries.length > 0 || structureEntries.length > 0
-      ? []
-      : displayTargetSupportEntries(block.target).slice(0, 1);
-  const readbackEntries = [...priorityEntries, ...structureEntries, ...supportEntries];
+  const readbackEntries = displayStepTargetReadbackEntries(block.step, metricMode, {
+    limit: 3,
+    omitStructureLabels: visibleMetricStructureLabels(block.step),
+    supportFallbackLimit: 1,
+  });
 
   return (
     <span
@@ -250,16 +246,25 @@ function SegmentTooltip({
   );
 }
 
+function visibleMetricStructureLabels(step: Step) {
+  const visibleMetricEntry = primaryVisibleStructureMetricEntry(step);
+
+  return visibleMetricEntry ? [visibleMetricEntry.key, visibleMetricEntry.label] : [];
+}
+
 function describeStepMetric(step: Step) {
-  if (step.distance_km != null) {
-    return formatPrescriptionDistanceKm(step.distance_km);
-  }
+  return primaryVisibleStructureMetricEntry(step)?.value ?? "—";
+}
 
-  if (step.duration_min != null) {
-    return formatDurationMin(step.duration_min, "segment");
-  }
+function primaryVisibleStructureMetricEntry(step: Step) {
+  const entries = displayStepStructureEntries(step);
 
-  return "—";
+  return (
+    entries.find((entry) => entry.key === "distance" || entry.key === "duration") ??
+    entries.find((entry) => entry.key === "work" || entry.key === "recovery") ??
+    entries.find((entry) => entry.key === "repeats") ??
+    null
+  );
 }
 
 function estimateVisualDurationMin(step: Step, workoutType: Workout["type"]) {

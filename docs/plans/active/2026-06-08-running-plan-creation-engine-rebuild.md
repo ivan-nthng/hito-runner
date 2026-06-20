@@ -2,7 +2,7 @@
 
 ## Status
 
-quality_blocker_closed_cleanup_unblocked
+in_progress
 
 ## Type
 
@@ -14,15 +14,134 @@ high
 
 ## Next Recommended Role
 
-BACKEND
+architect
 
 ## Task
 
-Run Slice 13A: manual workout authoring validator lifecycle extraction.
+Resume bounded cleanup routing through the simplification strike after the accepted benchmark-backed
+pace truth closeout.
 
 ## Stage
 
-BACKEND cleanup / code-freeze proof-infrastructure decomposition after running-plan quality unblock.
+ARCHITECT checkpoint / post-benchmark-truth closeout and cleanup return.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+Task:
+Resume bounded cleanup routing through the simplification strike after the accepted benchmark-backed
+pace truth closeout.
+
+Stage:
+ARCHITECT checkpoint / post-benchmark-truth closeout and cleanup return.
+
+Context:
+The selected-plan benchmark-backed pace truth path is now accepted end-to-end in the proved scope:
+- backend benchmark seam is QA-passed
+- frontend metric-surface cleanup is implemented
+- Quick setup benchmark collection is implemented
+- QA proved:
+  - no-benchmark preview stays structure-only
+  - benchmark-backed preview shows `Recent 5K benchmark pace 5:00/km · personal HR targets blocked`
+  - persisted workout detail shows pace where backend allows it
+  - no fake pace and no personal HR target truth appear
+
+Root cause and architecture fit:
+The benchmark-backed metric-truth track is no longer the blocker. We should now return to bounded
+cleanup selection rather than expand running-plan UI or metric work by inertia.
+
+Required reading:
+- AGENTS.md
+- agents/architect.agent.md
+- skills/hito-architecture-audit/SKILL.md
+- skills/hito-plan-writing-and-closeout/SKILL.md
+- docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
+- docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md
+- docs/tasks/backlog/2026-06-15-workout-metric-enrichment-truth-audit.md
+- docs/current-functional-map.md
+- docs/current-system.md
+- docs/current-product.md
+
+Scope:
+1. Accept the benchmark-backed pace truth track as closed in the proved scope.
+2. Select the next bounded cleanup gate through the simplification strike.
+3. Do not reopen benchmark/UI work unless fresh source or QA evidence shows a regression.
+
+Validation:
+- docs-only `git diff --check` if plan/map files change
+```
+
+## Benchmark-Backed Pace Truth Closeout — 2026-06-17
+
+Status:
+
+Accepted / backend seam, frontend wiring, and runner-facing QA proof all passed.
+
+Acceptance evidence:
+
+- Backend R14A pace-truth seam was QA-passed.
+- Frontend removed duplicated duration-only readback and rendered benchmark-backed pace honestly.
+- Quick setup now visibly exposes optional `Fitness benchmark`, `Recent 5K time`, and
+  `Recent 5K pace`.
+- QA proved:
+  - no-benchmark preview shows `No benchmark pace supplied · structure-only targets`
+  - benchmark-backed preview with `25:00` shows
+    `Recent 5K benchmark pace 5:00/km · personal HR targets blocked`
+  - persisted workout detail shows `Pace: 6:30-7:30/km` where backend pace truth exists
+  - no fake pace and no personal HR target truth appear
+  - desktop and `375px` no-overflow passed in the checked surfaces
+
+Decision:
+
+- Accept benchmark-backed pace truth as closed in the proved scope.
+- Keep provider-derived pace truth and personal HR-zone executable truth as future-only.
+- Return the project to bounded cleanup routing through the
+  [Hito Stack Simplification Strike](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md>).
+
+## Selected-Plan Metric Truth Expansion Decision
+
+Status update, 2026-06-15:
+
+- Backend audit proved selected running-plan saved readback is honest: the path is not dropping
+  valid pace or HR targets.
+- The current selected-plan engine emits `structure_only_executable` because selected-plan
+  creation has no benchmark pace truth input seam and no personal HR-zone truth seam.
+- Decision: selected-plan creation should gain an optional backend-owned metric-truth seam, but it
+  must remain structure-only by default when truth is absent.
+- First bounded implementation gate: benchmark-backed pace truth only.
+- Provider-derived pace truth remains future until provider evidence is promoted to canonical,
+  freshness-gated, auditable pace truth.
+- Executable HR targets remain future until runner-level personal HR-zone truth exists; age/default
+  HR is advisory/readback-only.
+- Target time, selected distance, runner level, ambition, comments, and AI inference must not unlock
+  pace targets.
+- Frontend remains a renderer/collector only. It must not compute pace, HR, schedule, endpoint, or
+  persistence truth locally.
+
+Backend Slice R14A implementation result, 2026-06-15:
+
+- Added an optional selected-plan benchmark input seam for `recent_5k_time`,
+  `recent_5k_pace`, and `unknown`; benchmark remains optional and no-benchmark selected-plan
+  output remains `structure_only_executable`.
+- Normalized benchmark truth is signed inside the selected-plan review/checksum payload, so changed
+  benchmark input fails as stale review during server-side rebuild.
+- Canonical selected-plan rows now emit broad `pace_min_per_km_range` only when recent-5K
+  benchmark truth exists and the segment/workout kind safely supports pace. Endpoint, hill, stride,
+  warmup/cooldown, and recovery-unit targets do not receive inferred pace in this slice.
+- Executable HR remains blocked; age/default HR can remain advisory/readback-only and does not set
+  `hr_targets_allowed`.
+- Validation evidence:
+  - no-benchmark 10K/Half/Marathon Base/Marathon Completion review fixtures stayed structure-only
+  - benchmark-backed 10K fixture emitted 57 pace-capable canonical rows and 57 export-shaped
+    readback workouts
+  - target-time-only diagnostic input emitted zero pace targets
+  - source, 10K, R6, confirm, doctrine, ESLint, and build gates passed
+
+Source artifact:
+
+- [workout-metric-enrichment-truth-audit.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-15-workout-metric-enrichment-truth-audit.md>)
 
 ## Universal Runner-Facing Richness And Prescription Quality Closeout
 

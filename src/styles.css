@@ -459,58 +459,12 @@
     gap: 0.5rem 0.75rem;
   }
 
-  .hito-specimen {
-    display: grid;
-    gap: 1rem;
-  }
-
   .hito-specimen-header {
     display: flex;
     flex-wrap: wrap;
     align-items: start;
     justify-content: space-between;
     gap: 1rem;
-  }
-
-  .hito-specimen-grid {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .hito-specimen-preview,
-  .hito-specimen-controls,
-  .hito-specimen-contract {
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-xl);
-    background: color-mix(in oklch, var(--color-background) 42%, transparent);
-  }
-
-  .hito-specimen-preview {
-    display: grid;
-    gap: 1rem;
-    align-content: start;
-    min-width: 0;
-    padding: 1.25rem;
-  }
-
-  .hito-specimen-controls {
-    align-self: start;
-    overflow: hidden;
-  }
-
-  .hito-specimen-contract {
-    overflow: hidden;
-  }
-
-  .hito-specimen-contract-row {
-    display: grid;
-    gap: 0.35rem;
-    border-top: 1px solid var(--color-hairline);
-    padding: 0.875rem 1rem;
-  }
-
-  .hito-specimen-contract-row:first-child {
-    border-top: 0;
   }
 
   .hito-specimen-links {
@@ -551,43 +505,90 @@
   .hito-ds-playground {
     display: grid;
     min-width: 0;
-    gap: 1rem;
+    gap: 1.4rem;
+  }
+
+  .hito-ds-playground-tabs {
+    display: flex;
+    min-width: 0;
+    justify-content: flex-start;
+    padding-top: 0.35rem;
   }
 
   .hito-ds-playground-shell {
     display: grid;
     min-width: 0;
-    gap: 1rem;
+    gap: 1.25rem;
   }
 
   .hito-ds-playground-stage {
-    order: 2;
     min-width: 0;
+  }
+
+  .hito-ds-playground-stage[data-mode="demo"] {
+    display: grid;
+    min-height: clamp(20rem, 38vw, 29rem);
+    place-items: center;
     border-radius: var(--radius-xl);
+    border: 1px solid color-mix(in oklch, var(--color-hairline) 46%, transparent);
     background:
       radial-gradient(
         ellipse at 18% 0%,
-        color-mix(in oklch, var(--color-signal) 7%, transparent),
+        color-mix(in oklch, var(--color-signal) 5%, transparent),
         transparent 48%
       ),
-      color-mix(in oklch, var(--color-background) 28%, transparent);
-    padding: 1rem;
+      color-mix(in oklch, var(--color-background) 18%, transparent);
+    padding: clamp(1.75rem, 4vw, 3rem);
+  }
+
+  .hito-ds-playground-stage[data-mode="variants"] {
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  .hito-ds-playground-panel {
+    min-width: 0;
+  }
+
+  .hito-ds-playground-panel[data-mode="demo"] {
+    display: grid;
+    width: min(100%, 54rem);
+    justify-items: center;
+    gap: 1rem;
+  }
+
+  .hito-ds-playground-panel[data-mode="variants"] {
+    width: 100%;
   }
 
   .hito-ds-playground-controls {
-    order: 1;
     min-width: 0;
     align-self: start;
-    border-bottom: 1px solid var(--color-hairline);
-    padding-bottom: 1rem;
+    padding: 0;
+  }
+
+  .hito-ds-playground-controls[data-mode="demo"] {
+    background: transparent;
+  }
+
+  .hito-ds-playground-controls[data-mode="variants"] {
+    background: transparent;
+  }
+
+  .hito-ds-playground-controls .hito-row-group {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 
   .hito-ds-playground-caption {
     display: grid;
     min-width: 0;
-    gap: 0.85rem;
+    gap: 1rem;
     border-top: 1px solid var(--color-hairline);
-    padding-top: 0.95rem;
+    padding-top: 1.1rem;
   }
 
   .hito-ds-playground-caption-item {
@@ -595,27 +596,19 @@
   }
 
   @media (min-width: 1024px) {
-    .hito-specimen-grid {
-      grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
-      align-items: start;
-    }
-
     .hito-ds-playground-shell {
-      grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+      grid-template-columns: minmax(0, 1fr) minmax(19rem, 23rem);
       align-items: start;
+      gap: 1.5rem;
     }
 
-    .hito-ds-playground-stage {
-      order: 1;
-      padding: 1.25rem;
+    .hito-ds-playground-stage[data-mode="demo"] {
+      padding: clamp(2.25rem, 4vw, 3.5rem);
     }
 
     .hito-ds-playground-controls {
-      order: 2;
-      border-bottom: 0;
-      border-left: 1px solid var(--color-hairline);
-      padding-bottom: 0;
-      padding-left: 1rem;
+      position: sticky;
+      top: 1rem;
     }
 
     .hito-ds-playground-caption {
@@ -1041,6 +1034,21 @@
     outline: none;
   }
 
+  .hito-ui-menu-item[data-selected="true"] {
+    background: color-mix(in oklch, var(--color-signal) 10%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-ui-menu-item[data-tone="destructive"] {
+    color: color-mix(in oklch, var(--color-destructive) 88%, var(--color-foreground));
+  }
+
+  .hito-ui-menu-item[data-tone="destructive"]:focus,
+  .hito-ui-menu-item[data-tone="destructive"][data-highlighted] {
+    background: color-mix(in oklch, var(--color-destructive) 10%, transparent);
+    color: color-mix(in oklch, var(--color-destructive) 90%, var(--color-foreground));
+  }
+
   .hito-ui-menu-item[data-disabled] {
     color: color-mix(in oklch, var(--color-muted-foreground) 58%, transparent);
     cursor: default;
@@ -1082,13 +1090,15 @@
       box-shadow 160ms ease;
   }
 
-  .hito-ui-select-trigger:hover {
+  .hito-ui-select-trigger:hover,
+  .hito-ui-select-trigger[data-demo-state="hover"] {
     border-color: color-mix(in oklch, var(--color-foreground) 20%, transparent);
     background: color-mix(in oklch, var(--color-background) 72%, transparent);
   }
 
   .hito-ui-select-trigger:focus,
-  .hito-ui-select-trigger[data-state="open"] {
+  .hito-ui-select-trigger[data-state="open"],
+  .hito-ui-select-trigger[data-demo-state="focus"] {
     border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
     outline: none;
@@ -1382,6 +1392,11 @@
     gap: 0.75rem;
     width: 100%;
     min-width: 0;
+  }
+
+  .hito-ds-toast-specimen {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   .hito-toast-title {
@@ -2161,7 +2176,7 @@
   .hito-selected-plan-calendar-weeks {
     display: grid;
     min-width: 0;
-    grid-template-columns: repeat(auto-fit, minmax(10.25rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
     gap: 0.85rem 1rem;
   }
 
@@ -2177,80 +2192,8 @@
   .hito-selected-plan-calendar-week-grid {
     display: grid;
     min-width: 0;
-    grid-template-columns: repeat(7, minmax(1rem, 1fr));
+    grid-template-columns: repeat(7, minmax(2.2rem, 1fr));
     gap: 0.25rem;
-  }
-
-  .hito-selected-plan-calendar-cell {
-    position: relative;
-    display: grid;
-    aspect-ratio: 1;
-    min-width: 0;
-    min-height: 1.65rem;
-    place-items: center;
-    border: 0;
-    border-radius: 0.48rem;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 78%, white 6%),
-        color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 62%, var(--color-background))
-      );
-    color: color-mix(in oklch, var(--color-background) 82%, black);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in oklch, white 18%, transparent),
-      0 7px 18px color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 12%, transparent);
-    transition:
-      box-shadow 160ms ease,
-      transform 160ms ease,
-      background 160ms ease;
-  }
-
-  .hito-selected-plan-calendar-cell:hover {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in oklch, white 28%, transparent),
-      0 10px 24px color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 22%, transparent);
-    transform: translateY(-1px);
-  }
-
-  .hito-selected-plan-calendar-cell:focus-visible {
-    outline: 2px solid color-mix(in oklch, var(--hito-selected-plan-calendar-tone) 62%, transparent);
-    outline-offset: 2px;
-  }
-
-  .hito-selected-plan-calendar-cell-day {
-    position: absolute;
-    top: 0.16rem;
-    left: 0.22rem;
-    font-size: 0.48rem;
-    font-weight: 800;
-    line-height: 1;
-    color: color-mix(in oklch, currentColor 56%, transparent);
-  }
-
-  .hito-selected-plan-calendar-cell-glyph {
-    width: 0.72rem;
-    height: 0.72rem;
-    opacity: 0.9;
-  }
-
-  .hito-selected-plan-calendar-cell-trophy {
-    width: 0.9rem;
-    height: 0.9rem;
-    color: var(--color-signal-foreground);
-  }
-
-  .hito-selected-plan-calendar-cell-endpoint {
-    position: absolute;
-    right: 0.16rem;
-    bottom: 0.13rem;
-    border-radius: 999px;
-    background: color-mix(in oklch, var(--color-background) 82%, transparent);
-    padding: 0.08rem 0.18rem;
-    font-size: 0.4rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.01em;
   }
 
   .hito-selected-plan-calendar [data-preview-tone="easy"] {
@@ -2283,17 +2226,6 @@
 
   .hito-selected-plan-calendar [data-preview-tone="final"] {
     --hito-selected-plan-calendar-tone: var(--orange-500);
-  }
-
-  .hito-selected-plan-calendar-cell[data-preview-tone="rest"] {
-    color: color-mix(in oklch, var(--color-muted-foreground) 88%, transparent);
-  }
-
-  .hito-selected-plan-calendar-cell[data-preview-tone="final"] {
-    color: var(--color-signal-foreground);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in oklch, white 26%, transparent),
-      0 10px 30px color-mix(in oklch, var(--orange-500) 28%, transparent);
   }
 
   .hito-selected-plan-segment-card {
@@ -2333,28 +2265,6 @@
 
     .hito-selected-plan-calendar-week-grid {
       gap: 0.28rem;
-    }
-
-    .hito-selected-plan-calendar-cell {
-      min-height: 1.6rem;
-      border-radius: var(--radius-sm);
-    }
-
-    .hito-selected-plan-calendar-cell-day {
-      top: 0.16rem;
-      left: 0.22rem;
-      font-size: 0.55rem;
-    }
-
-    .hito-selected-plan-calendar-cell-glyph {
-      width: 0.74rem;
-      height: 0.74rem;
-    }
-
-    .hito-selected-plan-calendar-cell-endpoint {
-      right: 0.14rem;
-      bottom: 0.13rem;
-      font-size: 0.42rem;
     }
   }
 
@@ -2950,7 +2860,8 @@
     transform: translateY(-1px);
   }
 
-  .hito-button:active {
+  .hito-button:active,
+  .hito-button[data-demo-state="active"] {
     transform: translateY(0);
   }
 
@@ -3010,6 +2921,11 @@
     background: color-mix(in oklch, var(--color-signal) 90%, white);
   }
 
+  .hito-button-primary:active,
+  .hito-button-primary[data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-signal) 82%, black);
+  }
+
   .hito-button-primary[data-tone="success"] {
     background: var(--color-success);
     color: var(--color-success-foreground);
@@ -3020,7 +2936,8 @@
     background: color-mix(in oklch, var(--color-success) 88%, white);
   }
 
-  .hito-button-primary[data-tone="success"]:active {
+  .hito-button-primary[data-tone="success"]:active,
+  .hito-button-primary[data-tone="success"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-success) 82%, black);
   }
 
@@ -3034,7 +2951,8 @@
     background: color-mix(in oklch, var(--color-destructive) 88%, white);
   }
 
-  .hito-button-primary[data-tone="error"]:active {
+  .hito-button-primary[data-tone="error"]:active,
+  .hito-button-primary[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 82%, black);
   }
 
@@ -3049,7 +2967,8 @@
     color: var(--color-foreground);
   }
 
-  .hito-button-secondary:active {
+  .hito-button-secondary:active,
+  .hito-button-secondary[data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-muted) 60%, transparent);
   }
 
@@ -3063,7 +2982,8 @@
     color: color-mix(in oklch, var(--color-success) 72%, var(--color-foreground));
   }
 
-  .hito-button-secondary[data-tone="success"]:active {
+  .hito-button-secondary[data-tone="success"]:active,
+  .hito-button-secondary[data-tone="success"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-success) 26%, transparent);
   }
 
@@ -3077,7 +2997,8 @@
     color: color-mix(in oklch, var(--color-destructive) 74%, var(--color-foreground));
   }
 
-  .hito-button-secondary[data-tone="error"]:active {
+  .hito-button-secondary[data-tone="error"]:active,
+  .hito-button-secondary[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 25%, transparent);
   }
 
@@ -3093,7 +3014,8 @@
     color: var(--color-foreground);
   }
 
-  .hito-button-outlined:active {
+  .hito-button-outlined:active,
+  .hito-button-outlined[data-demo-state="active"] {
     border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
     background: color-mix(in oklch, var(--color-foreground) 9%, transparent);
   }
@@ -3109,7 +3031,8 @@
     color: color-mix(in oklch, var(--color-success) 78%, var(--color-foreground));
   }
 
-  .hito-button-outlined[data-tone="success"]:active {
+  .hito-button-outlined[data-tone="success"]:active,
+  .hito-button-outlined[data-tone="success"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-success) 15%, transparent);
   }
 
@@ -3124,7 +3047,8 @@
     color: color-mix(in oklch, var(--color-destructive) 80%, var(--color-foreground));
   }
 
-  .hito-button-outlined[data-tone="error"]:active {
+  .hito-button-outlined[data-tone="error"]:active,
+  .hito-button-outlined[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 15%, transparent);
   }
 
@@ -3138,6 +3062,12 @@
     color: var(--color-foreground);
   }
 
+  .hito-button-ghost:active,
+  .hito-button-ghost[data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-foreground) 10%, transparent);
+    color: var(--color-foreground);
+  }
+
   .hito-button-ghost[data-tone="success"] {
     color: var(--color-success);
   }
@@ -3147,7 +3077,8 @@
     color: color-mix(in oklch, var(--color-success) 78%, var(--color-foreground));
   }
 
-  .hito-button-ghost[data-tone="success"]:active {
+  .hito-button-ghost[data-tone="success"]:active,
+  .hito-button-ghost[data-tone="success"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-success) 15%, transparent);
   }
 
@@ -3160,7 +3091,8 @@
     color: color-mix(in oklch, var(--color-destructive) 80%, var(--color-foreground));
   }
 
-  .hito-button-ghost[data-tone="error"]:active {
+  .hito-button-ghost[data-tone="error"]:active,
+  .hito-button-ghost[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 15%, transparent);
   }
 
@@ -3803,6 +3735,13 @@
     color: var(--color-warn);
   }
 
+  .hito-metadata-tag[data-tone="destructive"],
+  .hito-metadata-tag[data-tone="error"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 24%, transparent);
+    background: color-mix(in oklch, var(--color-destructive) 7%, transparent);
+    color: var(--color-destructive);
+  }
+
   .hito-metadata-tag[data-tone="signal"],
   .hito-metadata-tag[data-tone="rollout"] {
     border-color: color-mix(in oklch, var(--color-signal) 18%, transparent);
@@ -3878,11 +3817,11 @@
 
   .hito-shell-brand-kicker {
     margin-top: 0.5rem;
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.28em;
-    line-height: 1;
-    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    text-transform: none;
     color: var(--color-muted-foreground);
   }
 
@@ -4050,6 +3989,13 @@
     background: color-mix(in oklch, var(--color-background) 95%, transparent);
     padding: 0.375rem;
     backdrop-filter: blur(18px);
+  }
+
+  .hito-shell-profile-menu-label {
+    letter-spacing: normal;
+    line-height: 1.25;
+    text-transform: none;
+    color: inherit;
   }
 
   .hito-shell-menu-item {
@@ -4613,34 +4559,21 @@
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
-    gap: 0.4rem;
+    gap: 0.35rem;
     max-width: 100%;
     border: 1px solid var(--color-hairline);
-    border-radius: 999px;
+    border-radius: var(--radius-md);
     background: color-mix(in oklch, var(--color-foreground) 5%, transparent);
     padding: 0.25rem 0.55rem;
     font-size: 0.625rem;
     font-weight: 500;
     line-height: 1;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--color-muted-foreground);
-  }
-
-  .hito-status-pill::before {
-    content: "";
-    width: 0.375rem;
-    height: 0.375rem;
-    flex: 0 0 auto;
-    border-radius: 999px;
-    background: currentColor;
-  }
-
-  .hito-status-pill[data-icon="false"]::before {
-    display: none;
   }
 
   .hito-status-pill[data-tone="success"] {
@@ -4826,7 +4759,7 @@
     gap: 0.875rem;
     border: 1px solid var(--color-hairline);
     border-radius: var(--radius-xl);
-    background: color-mix(in oklch, var(--color-background) 48%, transparent);
+    background: transparent;
     padding: 0.875rem;
     transition:
       background-color 160ms ease,
@@ -4836,7 +4769,7 @@
 
   .hito-calendar-mobile-row:hover {
     border-color: color-mix(in oklch, var(--color-foreground) 18%, transparent);
-    background: color-mix(in oklch, var(--color-accent) 34%, transparent);
+    background: transparent;
   }
 
   .hito-calendar-mobile-row:focus-visible {
@@ -4850,16 +4783,12 @@
     box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-signal) 34%, transparent);
   }
 
-  .hito-calendar-mobile-row-completed {
-    background: color-mix(in oklch, var(--color-success) 5%, transparent);
-  }
-
   .hito-calendar-mobile-row-muted,
   .hito-calendar-mobile-row-muted:hover {
     min-height: 3.75rem;
     cursor: default;
     border-color: color-mix(in oklch, var(--color-hairline) 78%, transparent);
-    background: color-mix(in oklch, var(--color-background) 34%, transparent);
+    background: transparent;
     box-shadow: none;
   }
 

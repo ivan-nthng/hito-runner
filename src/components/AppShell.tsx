@@ -12,7 +12,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -49,27 +48,21 @@ export function AppShell({
   const weekStatus = WEEK_STATUS_META[shellSnapshot.weekStatus];
   const modeLabel =
     shellSnapshot.mode === "authenticated"
-      ? "Beta"
+      ? "Saved plan"
       : shellSnapshot.mode === "onboarding"
-        ? "Setup required"
-        : "Preview mode";
+        ? "Create plan"
+        : "Preview";
   const profileName = viewer?.name
     ? viewer.name
     : shellSnapshot.mode === "authenticated"
-      ? "Runner profile"
+      ? "Runner"
       : shellSnapshot.mode === "onboarding"
-        ? "Setup in progress"
-        : "Preview runner";
+        ? "Runner setup"
+        : "Guest runner";
   const profileDetail = getProfileDetail(snapshot, shellSnapshot.mode);
   const profileInitials = buildInitials(profileName);
   const showUploadAction = shellSnapshot.mode !== "preview";
   const showSettingsAction = shellSnapshot.mode !== "preview";
-  const modeTag =
-    shellSnapshot.mode === "authenticated"
-      ? "saved"
-      : shellSnapshot.mode === "onboarding"
-        ? "setup"
-        : "preview";
   const useFreshHomeRequest = shellSnapshot.mode !== "preview";
 
   return (
@@ -153,10 +146,9 @@ export function AppShell({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="hito-shell-menu w-[208px]">
-              <DropdownMenuLabel className="pb-1">
+              <DropdownMenuLabel className="hito-shell-profile-menu-label pb-1">
                 <div className="hito-menu-text">{profileName}</div>
                 <div className="hito-menu-meta mt-1 truncate">{profileDetail}</div>
-                <div className="hito-micro-label mt-2">{modeTag}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
               {showUploadAction && (
@@ -182,8 +174,7 @@ export function AppShell({
               <DropdownMenuItem className="hito-shell-menu-item" asChild>
                 <Link to="/integrations">
                   <Icon name="connections" size="sm" />
-                  Connections status
-                  <DropdownMenuShortcut>Utility</DropdownMenuShortcut>
+                  Connections
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
@@ -259,7 +250,7 @@ export function AppShell({
               )}
               <Link
                 to="/integrations"
-                aria-label="Open connections status"
+                aria-label="Open Connections"
                 className="hito-button hito-button-ghost hito-button-sm aspect-square p-0 md:hidden"
               >
                 <Icon name="connections" size="sm" />
@@ -356,17 +347,39 @@ function getProfileDetail(
   snapshot: TrainingSnapshot | null | undefined,
   mode: ReturnType<typeof getShellSnapshot>["mode"],
 ) {
-  if (snapshot?.planMeta?.title) {
-    return snapshot.planMeta.title;
+  if (snapshot?.planMeta) {
+    return getShellPlanContext(snapshot.planMeta);
   }
 
   if (mode === "authenticated") {
-    return "Saved plan active";
+    return "Saved plan";
   }
 
   if (mode === "onboarding") {
-    return snapshot?.profile ? "No active plan" : "Create a plan on home";
+    return snapshot?.profile ? "No active plan" : "Profile setup";
   }
 
-  return "Sign in to save progress";
+  return "Preview only";
+}
+
+function getShellPlanContext(planMeta: NonNullable<TrainingSnapshot["planMeta"]>) {
+  if (planMeta.source === "preview") {
+    return "Preview plan";
+  }
+
+  if (planMeta.sourceKind === "manual_user_built_plan_v1") {
+    return "Manual plan";
+  }
+
+  const title = planMeta.title.trim();
+
+  if (!title || isTechnicalShellPlanTitle(title)) {
+    return "Saved plan";
+  }
+
+  return title;
+}
+
+function isTechnicalShellPlanTitle(title: string) {
+  return title.includes("_") || /^[A-Z0-9\s-]{10,}$/.test(title);
 }

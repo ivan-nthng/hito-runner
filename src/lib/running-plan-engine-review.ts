@@ -1,5 +1,9 @@
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import {
+  buildSelectedPlanSegmentPaceTarget,
+  selectedPlanSegmentsContainPaceTargets,
+} from "@/lib/plan-creation-engine/benchmark-pace-truth";
+import {
   RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION,
   isRunningPlanCompositionDevelopmentTouch,
   resolveRunningPlanCompositionWeek,
@@ -344,7 +348,10 @@ function buildCanonicalWorkout({
   displayIndex: number;
 }): TrainingPlanV2["planned_workouts"][number] {
   const mapping = resolveWorkoutMapping(row, draft.planFamily);
-  const metricMode = buildMetricMode(row);
+  const segments = row.isRestDay
+    ? [buildRestSegment(row)]
+    : row.segments.map((segment) => buildCanonicalSegment({ draft, row, segment }));
+  const metricMode = buildMetricMode({ row, segments });
 
   return {
     workout_id: row.rowId,
@@ -352,7 +359,7 @@ function buildCanonicalWorkout({
     weekday: row.weekday,
     week_number: row.weekNumber,
     phase: resolveRunningPlanPhase(row.weekNumber, maxWeekNumber(draft.calendarRows)),
-    segments: row.isRestDay ? [buildRestSegment(row)] : row.segments.map(buildCanonicalSegment),
+    segments,
     workout_type: mapping.workoutType,
     source_workout_type: row.workoutDayKind,
     workout_family: mapping.workoutFamily,
@@ -389,10 +396,25 @@ function buildRestSegment(
   };
 }
 
-function buildCanonicalSegment(
-  segment: RunningPlanWatchExecutableSegmentTemplate,
-): TrainingPlanV2["planned_workouts"][number]["segments"][number] {
+function buildCanonicalSegment({
+  draft,
+  row,
+  segment,
+}: {
+  draft: RunningPlanPreviewDraft;
+  row: RunningPlanPreviewCalendarRow;
+  segment: RunningPlanWatchExecutableSegmentTemplate;
+}): TrainingPlanV2["planned_workouts"][number]["segments"][number] {
+  if (row.workoutDayKind === "rest") {
+    throw new Error("Rest rows cannot be converted into running-plan workout segments.");
+  }
+
   const prescription = buildCanonicalPrescription(segment.primaryPrescription);
+  const paceTarget = buildSelectedPlanSegmentPaceTarget({
+    workoutDayKind: row.workoutDayKind,
+    segment,
+    benchmarkPaceTruth: draft.normalizedInputSummary.benchmarkPaceTruth,
+  });
 
   return {
     segment_id: segment.id,
@@ -401,7 +423,7 @@ function buildCanonicalSegment(
     sequence: segment.order,
     guidance: segment.secondaryCue,
     prescription,
-    target: buildSegmentTarget(segment.primaryPrescription, segment.targetTruthMode),
+    target: buildSegmentTarget(segment.primaryPrescription, segment.targetTruthMode, paceTarget),
   };
 }
 
@@ -451,26 +473,34 @@ function buildCanonicalPrescription(
 function buildSegmentTarget(
   prescription: RunningPlanSegmentPrescription,
   targetTruthMode: RunningPlanWatchExecutableSegmentTemplate["targetTruthMode"],
+  paceTarget: string | null,
 ) {
   const effortTarget = resolveEffortTarget(prescriptionIntensityLabel(prescription));
   const baseTarget = {
     intensity: effortTarget.intensity,
     rpe: effortTarget.rpe,
-    label: "Effort and RPE target",
+    label: paceTarget ? "Benchmark-backed pace and RPE target" : "Effort and RPE target",
+    ...(paceTarget ? { pace_min_per_km_range: paceTarget } : {}),
   };
 
   if (targetTruthMode === "editable_default_hr") {
     return {
       ...baseTarget,
-      label: "Estimated HR guidance",
+      label: paceTarget
+        ? "Benchmark-backed pace with estimated HR guidance"
+        : "Estimated HR guidance",
       hr_target_source: "default_estimated_hr",
-      source_note: "Estimate only; not personal HR-zone truth.",
+      source_note: paceTarget
+        ? "Broad pace range comes from a recent 5K benchmark; HR remains an estimate only."
+        : "Estimate only; not personal HR-zone truth.",
     };
   }
 
   return {
     ...baseTarget,
-    source_note: "No pace or personal HR target is inferred.",
+    source_note: paceTarget
+      ? "Broad pace range comes from a recent 5K benchmark; no personal HR target is inferred."
+      : "No pace or personal HR target is inferred.",
   };
 }
 
@@ -631,8 +661,33 @@ function resolveWorkoutMapping(
   }
 }
 
-function buildMetricMode(row: RunningPlanPreviewCalendarRow): CanonicalMetricModeJson {
+function buildMetricMode({
+  row,
+  segments,
+}: {
+  row: RunningPlanPreviewCalendarRow;
+  segments: TrainingPlanV2["planned_workouts"][number]["segments"];
+}): CanonicalMetricModeJson {
   const hasEditableDefaultHr = row.targetTruthModes.includes("editable_default_hr");
+  const hasPaceTargets = selectedPlanSegmentsContainPaceTargets(segments);
+
+  if (hasPaceTargets) {
+    return {
+      guidance: "pace",
+      executable_mode: "pace_executable",
+      pace_targets_allowed: true,
+      hr_targets_allowed: false,
+      hr_target_source: hasEditableDefaultHr ? "default_estimated_hr" : "effort_only",
+      ...(hasEditableDefaultHr
+        ? {
+            hr_target_label: "Editable estimated HR guidance",
+            hr_target_source_note: "Default estimate only; not personal HR-zone truth.",
+          }
+        : {}),
+      reason:
+        "Recent 5K benchmark truth allows broad selected-plan pace targets; HR targets remain blocked.",
+    };
+  }
 
   return {
     guidance: hasEditableDefaultHr ? "mixed" : "effort",

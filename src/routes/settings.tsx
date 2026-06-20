@@ -13,11 +13,8 @@ import { EditableValueChip } from "@/components/ui/editable-value-chip";
 import { Icon } from "@/components/ui/icon";
 import { APP_NAME } from "@/lib/app-config";
 import { type RunnerFitnessLevel } from "@/lib/runner-training-preferences";
-import {
-  getSettingsRouteData,
-  saveUserSettings,
-  type UserSettingsSummary,
-} from "@/lib/training-api";
+import { saveUserSettings, type UserSettingsSummary } from "@/lib/user-settings-actions";
+import { getSettingsRouteData } from "@/lib/training-api";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({

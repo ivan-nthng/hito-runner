@@ -38,6 +38,34 @@ Permanent backlog evidence lives under:
 Use `qa-artifacts/` only for routine QA screenshots. Use the backlog `assets/` folder when the
 screenshot or attachment is part of the backlog item itself and should travel with the task.
 
+## Admin Backlog Import Compatibility
+
+Backlog items under `docs/tasks/backlog/` are mirrored into the admin Backlog, so every new or
+materially updated backlog item must include one canonical import-ready metadata block in the
+markdown itself before any extended human-facing sections.
+
+Required canonical sections:
+
+- `Status`
+- `Type`
+- `Priority`
+- `Next Recommended Role`
+- `Task`
+- `Stage`
+- `Exact Handoff Prompt`
+
+Allowed canonical values:
+
+- `Status`: `backlog`, `in_progress`, `completed`, `closed`, `archived`
+- `Type`: `bug`, `change_request`, `context_capture`, `plan`, `frontend_spec`, `product_brief`
+- `Priority`: `low`, `medium`, `high`, `urgent`
+- `Next Recommended Role`: `architect`, `backend`, `frontend`, `designer`, `copy`, `qa`,
+  `product`, `running_coach`
+
+Backlog-specific fields such as `Severity`, `Owner`, `Reported`, `Evidence`, `Observed Behavior`,
+and `Validation Expectations` remain required for human triage, but they do not replace the
+canonical import-ready block.
+
 ## Workflow
 
 1. Read the user's report carefully and preserve the core complaint.
@@ -78,6 +106,8 @@ Every backlog item should include:
 
 - `Status`
 - `Type`
+- `Task`
+- `Stage`
 - `Severity`
 - `Priority`
 - `Owner`

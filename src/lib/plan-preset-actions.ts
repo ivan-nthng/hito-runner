@@ -19,16 +19,6 @@ export type PlanPresetCardsActionResult =
   | PlanPresetEligibilityResult
   | PlanPresetActivePlanBlockedResult;
 
-type PlanPresetPreviewOnlyBlockedResult = {
-  ok: false;
-  status: "blocked";
-  reason: "preview_only";
-  message: string;
-};
-
-export type PlanPresetReviewDraftActionResult = PlanPresetPreviewOnlyBlockedResult;
-export type PlanPresetConfirmActionResult = PlanPresetPreviewOnlyBlockedResult;
-
 export const getPlanPresetCards = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => planPresetCardInputSchema.parse(value))
   .handler(async ({ data }): Promise<PlanPresetCardsActionResult> => {
@@ -40,28 +30,6 @@ export const getPlanPresetCards = createServerFn({ method: "POST" })
 
     return resolvePlanPresetCards(data, { recommendationMode: "neutral" });
   });
-
-export const reviewPlanPresetDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
-  .handler(async (): Promise<PlanPresetReviewDraftActionResult> => {
-    return buildPlanPresetPreviewOnlyBlockedResult();
-  });
-
-export const confirmPlanPresetDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
-  .handler(async (): Promise<PlanPresetConfirmActionResult> => {
-    return buildPlanPresetPreviewOnlyBlockedResult();
-  });
-
-function buildPlanPresetPreviewOnlyBlockedResult(): PlanPresetPreviewOnlyBlockedResult {
-  return {
-    ok: false,
-    status: "blocked",
-    reason: "preview_only",
-    message:
-      "Plan presets are preview-only in this flow. Review the selected-plan preview; creating a plan from this legacy preset seam is not available.",
-  };
-}
 
 async function requireNoActivePlanForPresetAction(): Promise<
   | { ok: true; userId: string }

@@ -3,6 +3,7 @@ import type {
   StructuredFirstPlanOnboardingRequestInput,
 } from "@/lib/structured-first-plan-onboarding";
 import { isHitoIsoDate } from "@/components/ui/hito-date-time-utils";
+import { parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { VoiceToPlanSupplement } from "@/lib/voice-to-plan-authoring";
 
@@ -91,7 +92,7 @@ export const FITNESS_LEVEL_OPTIONS: {
   {
     value: "custom",
     label: "I know my recent 5K",
-    copy: "Use a recent 5K time between 18:00 and 55:00.",
+    copy: "Use a recent 5K time or pace when you have one.",
   },
 ];
 
@@ -178,6 +179,7 @@ export function buildStructuredInput({
   heightCm,
   fitnessLevel,
   recent5kTime,
+  recent5kPace,
   fixedRestDays,
   restDaysAnswered,
   maxRunningDaysPerWeek,
@@ -238,13 +240,32 @@ export function buildStructuredInput({
   }
 
   const trimmed5kTime = recent5kTime.trim();
+  const trimmed5kPace = recent5kPace.trim();
   const trimmedTargetTime = targetTime.trim();
   const trimmedStartDate = startDate.trim();
   const trimmedTargetDate = targetDate.trim();
   const trimmedComment = comment.trim();
+  const hasRecent5kTime = trimmed5kTime.length > 0;
+  const hasRecent5kPace = trimmed5kPace.length > 0;
+  const recent5kTimeValid = isRecent5kTimeInAcceptedRange(trimmed5kTime);
+  const recent5kPaceValid = isRecent5kPaceInAcceptedRange(trimmed5kPace);
 
-  if (fitnessLevel === "custom" && !isRecent5kTimeInAcceptedRange(trimmed5kTime)) {
-    return { ok: false, error: "Use a recent 5K time between 18:00 and 55:00." };
+  if (fitnessLevel === "custom") {
+    if (hasRecent5kTime && !recent5kTimeValid) {
+      return { ok: false, error: "Use a recent 5K time between 18:00 and 55:00." };
+    }
+
+    if (hasRecent5kPace && !recent5kPaceValid) {
+      return { ok: false, error: "Use a recent 5K pace between 2:00/km and 15:00/km." };
+    }
+
+    if (!recent5kTimeValid && !recent5kPaceValid) {
+      return {
+        ok: false,
+        error:
+          "Use a recent 5K time between 18:00 and 55:00, or pace between 2:00/km and 15:00/km.",
+      };
+    }
   }
 
   if (goalStyle === "target_time" && !trimmedTargetTime) {
@@ -287,10 +308,15 @@ export function buildStructuredInput({
         weightKg: profileNumbers.weightKg.value,
         heightCm: profileNumbers.heightCm.value,
       },
-      benchmark: {
-        fitnessLevel,
-        recent5kTime: fitnessLevel === "custom" ? trimmed5kTime : null,
-      },
+      benchmark:
+        fitnessLevel === "custom"
+          ? buildStructuredBenchmarkInput(trimmed5kTime, trimmed5kPace)
+          : {
+              kind: "unknown",
+              recent5kTime: null,
+              recent5kPace: null,
+              fitnessLevel,
+            },
       availability: {
         runningDaysPerWeek,
         fixedRestDays,
@@ -449,6 +475,7 @@ export function isStructuredConstructorReady({
   heightCm,
   fitnessLevel,
   recent5kTime,
+  recent5kPace,
   fixedRestDays,
   restDaysAnswered,
   maxRunningDaysPerWeek,
@@ -461,6 +488,7 @@ export function isStructuredConstructorReady({
   | "heightCm"
   | "fitnessLevel"
   | "recent5kTime"
+  | "recent5kPace"
   | "fixedRestDays"
   | "restDaysAnswered"
   | "maxRunningDaysPerWeek"
@@ -472,7 +500,9 @@ export function isStructuredConstructorReady({
     requiredNumber(weightKg, "Weight", { min: 30, max: 250, increment: 0.5 }).ok &&
     requiredNumber(heightCm, "Height", { min: 120, max: 230, integer: true }).ok;
   const benchmarkComplete =
-    fitnessLevel !== "custom" || isRecent5kTimeInAcceptedRange(recent5kTime.trim());
+    fitnessLevel !== "custom" ||
+    isRecent5kTimeInAcceptedRange(recent5kTime.trim()) ||
+    isRecent5kPaceInAcceptedRange(recent5kPace.trim());
   const hasTrainingDay = fixedRestDays.length < WEEKDAY_OPTIONS.length;
   const runningDaysPerWeek = resolveRunningDaysPerWeek(fixedRestDays, maxRunningDaysPerWeek);
   const runningDaysAnswered = maxRunningDaysPerWeek.trim().length > 0;
@@ -511,6 +541,30 @@ export function isRecent5kTimeInAcceptedRange(value: string) {
   const seconds = parseDurationSeconds(value);
 
   return seconds != null && seconds >= 18 * 60 && seconds <= 55 * 60;
+}
+
+export function isRecent5kPaceInAcceptedRange(value: string) {
+  const seconds = parsePaceSecondsPerKm(value);
+
+  return seconds != null && seconds >= 2 * 60 && seconds <= 15 * 60;
+}
+
+function buildStructuredBenchmarkInput(recent5kTime: string, recent5kPace: string) {
+  if (isRecent5kTimeInAcceptedRange(recent5kTime)) {
+    return {
+      kind: "recent_5k_time" as const,
+      recent5kTime,
+      recent5kPace: null,
+      fitnessLevel: "custom" as const,
+    };
+  }
+
+  return {
+    kind: "recent_5k_pace" as const,
+    recent5kTime: null,
+    recent5kPace,
+    fitnessLevel: "custom" as const,
+  };
 }
 
 function parseDurationSeconds(value: string) {

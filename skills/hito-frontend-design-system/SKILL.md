@@ -24,7 +24,10 @@ API tools, load the applicable Figma plugin skills first.
 ## Workflow
 
 1. Inspect existing Hito DS roles/classes/components before implementing.
-2. Reuse shared primitives for:
+2. Use subagents when safe for independent read-only DS/source scans, route/component inventories,
+   screenshot/spec comparison, or non-mutating validation checks. Reuse open subagents for similar
+   follow-ups, close them when done, and integrate findings yourself.
+3. Reuse shared primitives for:
    - buttons
    - fields
    - tabs
@@ -33,10 +36,10 @@ API tools, load the applicable Figma plugin skills first.
    - surfaces/dividers
    - typography roles
    - spacing rhythm
-3. Keep frontend logic presentational unless the plan explicitly assigns client-side draft state.
-4. Render backend-shaped data; do not compute canonical business truth locally.
-5. Handle loading, empty, error, success, disabled, and destructive confirmation states.
-6. Verify mobile width and Safari-sensitive controls when relevant.
+4. Keep frontend logic presentational unless the plan explicitly assigns client-side draft state.
+5. Render backend-shaped data; do not compute canonical business truth locally.
+6. Handle loading, empty, error, success, disabled, and destructive confirmation states.
+7. Verify mobile width and Safari-sensitive controls when relevant.
 
 ## Figma Bridge Workflow
 

@@ -20,6 +20,13 @@ Ship bounded slices across backend, frontend, and validation without unnecessary
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For fullstack implementation, debugging, source/import audits, and non-mutating validation checks,
+follow the subagent delegation discipline in `AGENTS.md`: use read-only subagents for independent
+evidence and bounded workers only for disjoint write scopes, reuse open subagents for related
+follow-ups, close completed subagents, and integrate results before final validation.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

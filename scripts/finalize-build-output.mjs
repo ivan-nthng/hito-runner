@@ -4,6 +4,7 @@ import {
   validateLocalBuildOutput,
   validateVercelBuildOutput,
 } from "./validate-build-output-integrity.mjs";
+import { releaseBuildOutputLock } from "./lib/build-output-lock.mjs";
 
 const rootDir = process.cwd();
 
@@ -31,6 +32,10 @@ const planPresetProgramFiles = [
   "preset-goal-contract-matrix.csv",
 ];
 const localPlanPresetProgramOutputDir = resolve(outputServerDir, "src/lib/plan-presets");
+const localFinalizedPlanPresetProgramOutputDir = resolve(
+  localFinalizedServerDir,
+  "src/lib/plan-presets",
+);
 const vercelPlanPresetProgramOutputDir = resolve(vercelFunctionDir, "src/lib/plan-presets");
 
 const localRequiredOutputs = [
@@ -48,10 +53,14 @@ const vercelRequiredOutputs = [
   vercelNitroManifest,
 ];
 
-if (shouldFinalizeVercelOutput()) {
-  await finalizeVercelOutput();
-} else {
-  await finalizeLocalOutput();
+try {
+  if (shouldFinalizeVercelOutput()) {
+    await finalizeVercelOutput();
+  } else {
+    await finalizeLocalOutput();
+  }
+} finally {
+  releaseBuildOutputLock({ rootDir });
 }
 
 function shouldFinalizeVercelOutput() {
@@ -101,8 +110,8 @@ function copyDirectory(sourceDir, destinationDir) {
 }
 
 function snapshotLocalOutputForLateNitroCleanup() {
-  rmSync(localFinalizeBackupDir, { recursive: true, force: true });
-  rmSync(localFinalizedOutputDir, { recursive: true, force: true });
+  removeGeneratedPath(localFinalizeBackupDir);
+  removeGeneratedPath(localFinalizedOutputDir);
 
   copyDirectory(outputServerDir, localFinalizeServerBackupDir);
   copyDirectory(outputPublicDir, localFinalizePublicBackupDir);
@@ -118,12 +127,12 @@ async function restoreLocalOutputAfterLateNitroCleanup() {
 
     restoreLocalOutputSnapshot();
     restoreLocalPublicOutput();
-    copyPlanPresetProgramArtifacts(localPlanPresetProgramOutputDir);
   }
 }
 
 function restoreLocalOutputSnapshot() {
   copyDirectory(localFinalizeServerBackupDir, localFinalizedServerDir);
+  copyPlanPresetProgramArtifacts(localFinalizedPlanPresetProgramOutputDir);
   copyDirectory(localFinalizePublicBackupDir, localFinalizedPublicDir);
   linkLocalOutputDirectory(localFinalizedServerDir, outputServerDir);
   linkLocalOutputDirectory(localFinalizedPublicDir, outputPublicDir);
@@ -141,7 +150,7 @@ function linkLocalOutputDirectory(sourceDir, outputPath) {
     return;
   }
 
-  rmSync(outputPath, { recursive: true, force: true });
+  removeGeneratedPath(outputPath);
   mkdirSync(dirname(outputPath), { recursive: true });
   symlinkSync(relative(dirname(outputPath), sourceDir), outputPath, "dir");
 }
@@ -164,4 +173,13 @@ function validatePlanPresetProgramArtifacts(destinationDir) {
       throw new Error(`Expected finalized Plan Preset program artifact is missing: ${outputPath}`);
     }
   }
+}
+
+function removeGeneratedPath(path) {
+  rmSync(path, {
+    recursive: true,
+    force: true,
+    maxRetries: 8,
+    retryDelay: 125,
+  });
 }

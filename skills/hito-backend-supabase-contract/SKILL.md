@@ -19,13 +19,16 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 ## Workflow
 
 1. Confirm the canonical table/entity owner.
-2. Validate inputs at server boundaries.
-3. Persist raw provider/input truth before normalized truth when provenance matters.
-4. Normalize into existing canonical entities instead of creating provider-specific product models.
-5. Keep mutation safety explicit: stale checks, admin checks, entitlement checks, review/confirm boundaries.
-6. Return bounded result/error shapes for frontend and QA.
-7. Update generated/local database types only when schema actually changes.
-8. Update permanent docs only for implemented behavior.
+2. Use subagents when safe for independent read-only import/source audits, validator inventory,
+   non-mutating command checks, or disjoint implementation subtasks. Reuse open subagents for
+   related follow-ups, close them when done, and integrate findings yourself.
+3. Validate inputs at server boundaries.
+4. Persist raw provider/input truth before normalized truth when provenance matters.
+5. Normalize into existing canonical entities instead of creating provider-specific product models.
+6. Keep mutation safety explicit: stale checks, admin checks, entitlement checks, review/confirm boundaries.
+7. Return bounded result/error shapes for frontend and QA.
+8. Update generated/local database types only when schema actually changes.
+9. Update permanent docs only for implemented behavior.
 
 ## Root-Cause Backend Fix Gate
 

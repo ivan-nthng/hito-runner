@@ -259,7 +259,7 @@ Surface rules:
 - Compact utility icon: `14px`
 - Large leading visual icon: `20px` to `24px`
 - Icons support labels; they should not replace them in core product actions.
-- Use Lucide stroke weight consistently around `1.5`
+- Use the Hito Tabler-backed icon stroke weight consistently around `1.5`
 - Do not introduce decorative icon noise into already information-dense panels.
 
 ### Motion And Interaction Principles

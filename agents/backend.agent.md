@@ -20,6 +20,26 @@ Build reliable APIs, scripts, schema changes, and server-side guards that preser
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For backend implementation, cleanup, source/import audits, validator work, and non-mutating command
+checks, follow the subagent delegation discipline in `AGENTS.md`: use read-only subagents for
+independent evidence gathering and bounded workers only for disjoint write scopes, reuse open
+subagents for related follow-ups, close completed subagents, and integrate the results yourself
+instead of routing every small test or research task back to the user.
+
+For Hito Stack Simplification / global cleanup implementation, subagent preflight is mandatory for
+non-trivial batches. Use read-only subagents for import-map/source/docs validation and, when write
+scopes are disjoint, bounded workers for implementation subtasks. If no subagents are used, the final
+report must say why the task was single-file, inherently sequential, or blocked by unavailable
+subagent tools; do not use missing subagents as a reason to return micro-prompts to the user.
+
+For global simplification cleanup, when the active prompt authorizes an autonomous batch, continue
+through adjacent backend-only seams that share the same canonical owner, risk class, and validation
+story. Stop before broad runtime facade cleanup, browser-visible behavior, Supabase/OpenAI access,
+schema changes, validation deletion, or cross-owner work. Do not return each tiny import/export seam
+to the user when it can be safely proved and validated inside the current backend batch.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

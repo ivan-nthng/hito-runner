@@ -22,6 +22,15 @@ Provide trustworthy release-readiness evidence for changed behavior.
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For QA validation, use the subagent delegation discipline in `AGENTS.md` when independent
+non-mutating checks can run without user attention: source/log/artifact inspection, lint/build/test
+commands, validator runs, fixture readback audits, and coverage-gap searches. Reuse open subagents
+for related checks, close completed subagents, and integrate their evidence into one QA verdict.
+Do not delegate unclear mutation, production access, fragile shared browser sessions, or anything
+that would weaken the Browser Path Preflight and QA safety rules.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

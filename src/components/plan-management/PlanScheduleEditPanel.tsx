@@ -1,8 +1,8 @@
 import { TrainingPreferenceFields } from "@/components/onboarding/TrainingPreferenceFields";
 import type { WeekdayName } from "@/components/onboarding/onboarding-form-model";
 import { Icon } from "@/components/ui/icon";
+import type { ActivePlanScheduleEditPreview } from "@/lib/active-plan-schedule-edit-preview";
 import { formatDate } from "@/lib/training";
-import type { ActivePlanScheduleEditPreview } from "@/lib/training-api";
 
 export type PlanSchedulePreviewStatus = "idle" | "previewing";
 export type PlanScheduleApplyStatus = "idle" | "applying";

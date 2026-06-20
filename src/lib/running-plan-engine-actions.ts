@@ -5,6 +5,7 @@ import {
   getActivePlan,
 } from "@/lib/active-plan-persistence";
 import { getRequestAuthContext } from "@/lib/backend/auth";
+import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import {
   buildHalfMarathonPlanPreviewDraft,
   buildMarathonBasePlanPreviewDraft,
@@ -41,6 +42,25 @@ import {
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
 const weekdayNameSchema = z.enum(WEEKDAY_NAMES);
+const recent5kTimeSchema = z
+  .string()
+  .trim()
+  .refine((value) => {
+    const seconds = parseDurationSeconds(value);
+    return seconds != null && seconds >= 10 * 60 && seconds <= 2 * 60 * 60;
+  }, "Use a recent 5K time between 10:00 and 2:00:00.");
+const recent5kPaceSchema = z
+  .string()
+  .trim()
+  .refine((value) => {
+    const seconds = parsePaceSecondsPerKm(value);
+    return seconds != null && seconds >= 2 * 60 && seconds <= 15 * 60;
+  }, "Use a recent 5K pace between 2:00/km and 15:00/km.");
+const runningPlanBenchmarkSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("recent_5k_time"), recent5kTime: recent5kTimeSchema }).strict(),
+  z.object({ kind: z.literal("recent_5k_pace"), recent5kPace: recent5kPaceSchema }).strict(),
+  z.object({ kind: z.literal("unknown") }).strict(),
+]);
 
 const runningPlanPreviewInputSchema = z
   .object({
@@ -53,6 +73,7 @@ const runningPlanPreviewInputSchema = z
     fixedRestDays: z.array(weekdayNameSchema).optional().nullable(),
     preferredLongRunDay: weekdayNameSchema.optional().nullable(),
     startDate: z.string().trim().optional().nullable(),
+    benchmark: runningPlanBenchmarkSchema.optional().nullable(),
   })
   .strict();
 

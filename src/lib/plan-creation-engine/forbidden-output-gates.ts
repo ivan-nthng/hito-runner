@@ -64,7 +64,7 @@ export const forbiddenOutputGates: RunningPlanEngineSourceModel["forbiddenOutput
   {
     gateId: "no_5k_benchmark_normal_path_dependency",
     description: "Normal happy path must not require a user-provided 5K benchmark.",
-    rejectedSignals: ["missing recent 5K benchmark", "benchmark_required", "recent5kTime"],
+    rejectedSignals: ["missing recent 5K benchmark", "benchmark_required"],
     failureAction: "route_to_custom",
   },
   {

@@ -6,12 +6,19 @@ export const ACTIVE_PLAN_USER_EDIT_MUTATION_KIND = {
   addWorkout: "user_added_workout",
   clearWorkout: "user_cleared_workout",
   moveWorkout: "user_moved_workout",
+  copyWorkout: "user_copied_workout",
+  editWorkout: "user_edited_workout",
 } as const;
 
 export type ActivePlanUserEditMutationKind =
   (typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND)[keyof typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND];
 
-export type ActivePlanWorkoutEditOperation = "add_workout" | "clear_workout" | "move_workout";
+export type ActivePlanWorkoutEditOperation =
+  | "add_workout"
+  | "clear_workout"
+  | "move_workout"
+  | "copy_workout"
+  | "edit_workout";
 
 export type ActivePlanWorkoutEditabilityResult =
   | {
@@ -34,9 +41,16 @@ export interface ActivePlanUserEditMetadataInput {
   workoutAuthoringSourceKind?: string | null;
   plannedWorkoutId?: string | null;
   previousWorkoutDate?: string | null;
+  sourceWorkoutId?: string | null;
+  sourceWorkoutDate?: string | null;
+  targetWorkoutId?: string | null;
   targetDate?: string | null;
   templateKey?: string | null;
   title?: string | null;
+  mutationMode?: "direct_manual_edit" | null;
+  mutationPayloadVersion?: string | null;
+  mutationChecksum?: string | null;
+  trustedClientRows?: boolean | null;
 }
 
 export interface ActivePlanUserEditMetadata {
@@ -47,11 +61,18 @@ export interface ActivePlanUserEditMetadata {
   workout_authoring_source_kind?: string;
   planned_workout_id?: string;
   previous_workout_date?: string;
+  source_workout_id?: string;
+  source_workout_date?: string;
+  target_workout_id?: string;
   target_date?: string;
   template_key?: string;
   title?: string;
   review_payload_version: string;
   review_checksum: string;
+  mutation_mode?: "direct_manual_edit";
+  mutation_payload_version?: string;
+  mutation_checksum?: string;
+  trusted_client_rows?: boolean;
 }
 
 const EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS = new Set([
@@ -163,13 +184,20 @@ export function resolveActivePlanSourceStatus(activePlan: PersistedPlanCycleRow)
 export function buildActivePlanUserEditMetadata({
   activePlan,
   mutationKind,
+  mutationMode,
+  mutationPayloadVersion,
+  mutationChecksum,
   plannedWorkoutId,
   previousWorkoutDate,
   reviewChecksum,
   reviewPayloadVersion,
+  sourceWorkoutId,
+  sourceWorkoutDate,
+  targetWorkoutId,
   targetDate,
   templateKey,
   title,
+  trustedClientRows,
   workoutAuthoringSourceKind,
 }: ActivePlanUserEditMetadataInput): ActivePlanUserEditMetadata {
   const sourceKind = activePlan.source_kind?.trim();
@@ -186,11 +214,18 @@ export function buildActivePlanUserEditMetadata({
     workout_authoring_source_kind: workoutAuthoringSourceKind?.trim() || undefined,
     planned_workout_id: plannedWorkoutId?.trim() || undefined,
     previous_workout_date: previousWorkoutDate?.trim() || undefined,
+    source_workout_id: sourceWorkoutId?.trim() || undefined,
+    source_workout_date: sourceWorkoutDate?.trim() || undefined,
+    target_workout_id: targetWorkoutId?.trim() || undefined,
     target_date: targetDate?.trim() || undefined,
     template_key: templateKey?.trim() || undefined,
     title: title?.trim() || undefined,
     review_payload_version: reviewPayloadVersion,
     review_checksum: reviewChecksum,
+    mutation_mode: mutationMode ?? undefined,
+    mutation_payload_version: mutationPayloadVersion?.trim() || undefined,
+    mutation_checksum: mutationChecksum?.trim() || undefined,
+    trusted_client_rows: trustedClientRows ?? undefined,
   });
 }
 

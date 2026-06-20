@@ -170,11 +170,6 @@ function AdminWorkspaceAccountMenu({
           <div className="hito-micro-label mt-2">Admin workspace</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="hito-shell-menu-separator" />
-        <DropdownMenuItem className="hito-shell-menu-item" disabled>
-          <Icon name="settings" size="sm" />
-          Account settings
-          <span className="ml-auto hito-menu-meta">Soon</span>
-        </DropdownMenuItem>
         <DropdownMenuItem className="hito-shell-menu-item" asChild>
           <Link to="/">
             <Icon name="arrow-left" size="sm" />

@@ -22,11 +22,13 @@ import {
   applyActivePlanScheduleReflowPreview,
   previewActivePlanScheduleEdit,
   proposeActivePlanRefresh,
-  type ActivePlanScheduleEditInput,
-  type ActivePlanScheduleEditPreview,
-  type ProposeActivePlanRefreshResult,
   type ViewerSummary,
 } from "@/lib/training-api";
+import type { ProposeActivePlanRefreshResult } from "@/lib/active-plan-refresh-contract";
+import type {
+  ActivePlanScheduleEditInput,
+  ActivePlanScheduleEditPreview,
+} from "@/lib/active-plan-schedule-edit-preview";
 import type { TrainingSnapshot, Workout } from "@/lib/training";
 import { WEEKDAY_OPTIONS, type WeekdayName } from "@/components/onboarding/onboarding-form-model";
 import {

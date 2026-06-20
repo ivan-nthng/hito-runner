@@ -3,7 +3,12 @@ import {
   type ExistingPlanContext,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
-import type { ManualWorkoutActivePlanAddDependencies } from "@/lib/manual-workout-authoring/active-plan-add";
+import {
+  fetchManualWorkoutEvidenceWorkoutIds,
+  isProtectedManualWorkoutTarget,
+  type ManualWorkoutActivePlanAddDependencies,
+} from "@/lib/manual-workout-authoring/active-plan-add";
+import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_WORKOUT_TEMPLATE_KEY_VALUES,
@@ -16,7 +21,7 @@ import {
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
 import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
-import type { Step, StepTarget } from "@/lib/training";
+import { todayIso, type Step, type StepTarget } from "@/lib/training";
 
 const MANUAL_DRAFT_TITLE_MAX_LENGTH = 120;
 const MANUAL_DRAFT_NOTES_MAX_LENGTH = 1_000;
@@ -38,6 +43,8 @@ export type ManualWorkoutCopyPasteFailureReason =
   | "source_workout_not_found"
   | "source_workout_not_in_active_plan"
   | "source_workout_not_supported"
+  | "source_date_changed"
+  | "client_payload_rejected"
   | "unsupported_payload";
 
 export type ManualWorkoutCopyPasteReconstructionResult =
@@ -59,6 +66,9 @@ export async function reconstructManualWorkoutCopyDraftForUser(
   dependencies: ManualWorkoutActivePlanAddDependencies,
 ): Promise<ManualWorkoutCopyPasteReconstructionResult> {
   const getContext = dependencies.getExistingPlanContextForUser ?? getExistingPlanContext;
+  const fetchEvidence =
+    dependencies.fetchEvidenceWorkoutIds ?? fetchManualWorkoutEvidenceWorkoutIds;
+  const currentDate = dependencies.currentDate ?? todayIso();
   let planContext: ExistingPlanContext;
 
   try {
@@ -106,6 +116,30 @@ export async function reconstructManualWorkoutCopyDraftForUser(
 
   if (!source.ok) {
     return source;
+  }
+
+  const sourceEvidenceIds = await fetchEvidence(userId, [source.workout.id]);
+  if (
+    isProtectedManualWorkoutTarget(
+      source.workout,
+      currentDate,
+      planContext.existingWorkouts.logsByWorkoutId,
+      sourceEvidenceIds,
+    )
+  ) {
+    return {
+      ok: false,
+      reason: "protected_day",
+      message: "This source workout has protected history or evidence and cannot be copied here.",
+    };
+  }
+
+  if (persistedManualWorkoutHasUnsafeMetricTruth(source.workout)) {
+    return {
+      ok: false,
+      reason: "source_workout_not_supported",
+      message: "This source workout has metric targets that cannot be copied safely.",
+    };
   }
 
   const draft = buildManualWorkoutDraftInputFromPersistedWorkout(source.workout, input.targetDate, {
@@ -156,6 +190,14 @@ function resolveSourceWorkout(input: {
       ok: false,
       reason: "source_workout_not_in_active_plan",
       message: "The source workout is not part of the current runner's active manual plan.",
+    };
+  }
+
+  if (input.sourceWorkoutDate && workout.workout_date !== input.sourceWorkoutDate) {
+    return {
+      ok: false,
+      reason: "source_date_changed",
+      message: "The source workout is no longer on the copied date. Refresh the calendar.",
     };
   }
 

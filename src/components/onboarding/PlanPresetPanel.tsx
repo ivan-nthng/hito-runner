@@ -6,11 +6,11 @@ import type {
   PlanPresetCardState,
   PlanPresetCardViewModel,
 } from "@/lib/plan-presets/schema";
+import type { PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
 import type {
-  PlanPresetCardsActionResult,
   RunningPlanConfirmActionResult,
   RunningPlanPreviewActionResult,
-} from "@/lib/training-api";
+} from "@/lib/running-plan-engine-actions";
 import { cn } from "@/lib/utils";
 
 export type PlanPresetUiStatus = "idle" | "loading_cards" | "previewing_plan";
@@ -32,7 +32,6 @@ interface PlanPresetPanelProps {
   onSelectPlan: (cardId: PlanPresetCardId) => void;
   onRefreshPreview: () => void;
   onCreatePlan: () => void;
-  onUseAdvancedCustom: () => void;
 }
 
 export function PlanPresetPanel({
@@ -47,7 +46,6 @@ export function PlanPresetPanel({
   onPreviewOpenChange,
   onRefreshPreview,
   onSelectPlan,
-  onUseAdvancedCustom,
   previewOpen,
   previewResult,
   selectedCardId,
@@ -64,10 +62,9 @@ export function PlanPresetPanel({
           <p className="hito-micro-label" data-tone="signal">
             Plan Presets
           </p>
-          <h2 className="hito-panel-title mt-2">Choose a starting distance.</h2>
+          <h2 className="hito-panel-title mt-2">Choose a guided starting point.</h2>
           <p className="hito-helper mt-2">
-            Hito uses the accepted running-plan engine for selected preview families. Nothing is
-            saved, and the selected-plan preview does not call OpenAI.
+            Pick a starting plan and review it before you create anything.
           </p>
         </div>
         <button
@@ -83,20 +80,18 @@ export function PlanPresetPanel({
       <div className="mt-5 grid gap-4">
         {!isPresetDiscoveryReady ? (
           <div className="hito-surface-wash">
-            <p className="hito-list-row-title">Add profile basics to shape recommendations</p>
+            <p className="hito-list-row-title">Add a few basics to see plan options</p>
             <p className="hito-list-row-copy">
-              Age, height, and weight let the backend shape selected-plan previews. Weekly rhythm
-              can stay open and use backend defaults.
+              Age, height, and weight help Hito show better starting plans. Weekly rhythm can stay
+              open for now.
             </p>
           </div>
         ) : null}
 
         {loadingCards && !eligibility ? (
           <div className="hito-surface-wash" data-tone="signal">
-            <p className="hito-list-row-title">Loading Plan Presets</p>
-            <p className="hito-list-row-copy">
-              Checking backend-owned availability, card copy, and setup fit.
-            </p>
+            <p className="hito-list-row-title">Loading plan options</p>
+            <p className="hito-list-row-copy">Checking which starting plans fit your setup.</p>
           </div>
         ) : null}
 
@@ -113,31 +108,8 @@ export function PlanPresetPanel({
                 selected={selectedCardId === card.cardId}
                 disabled={isBusy}
                 onSelectPlan={() => onSelectPlan(card.cardId)}
-                onUseAdvancedCustom={onUseAdvancedCustom}
               />
             ))}
-          </div>
-        ) : null}
-
-        {eligibility?.advancedCustom.recommended ? (
-          <div className="hito-surface-wash" data-tone="signal">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">Advanced custom recommended</p>
-                <p className="hito-list-row-copy">
-                  {eligibility.advancedCustom.reason?.message ??
-                    "This setup is better handled by Advanced custom program."}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="hito-button hito-button-secondary hito-button-sm"
-                disabled={isBusy}
-                onClick={onUseAdvancedCustom}
-              >
-                Open Advanced custom
-              </button>
-            </div>
           </div>
         ) : null}
       </div>
@@ -161,13 +133,11 @@ function PlanPresetCard({
   card,
   disabled,
   onSelectPlan,
-  onUseAdvancedCustom,
   selected,
 }: {
   card: PlanPresetCardViewModel;
   disabled: boolean;
   onSelectPlan: () => void;
-  onUseAdvancedCustom: () => void;
   selected: boolean;
 }) {
   const canSelectPlan = card.state !== "custom_fit" && card.state !== "unavailable" && !disabled;
@@ -191,7 +161,7 @@ function PlanPresetCard({
           <h3 className="hito-plan-preset-family mt-2">{familyLabel}</h3>
         </div>
         <div className="hito-plan-preset-meta-row">
-          <span>Preview exact plan</span>
+          <span>Preview plan</span>
           <span>{card.daysPerWeek} days/week</span>
         </div>
         <p className="hito-field-helper">{durationReadback()}</p>
@@ -226,17 +196,6 @@ function PlanPresetCard({
           ) : (
             <PlanPresetUnavailableSelectAction reason={disabledReason} />
           )}
-
-          {card.state === "custom_fit" ? (
-            <button
-              type="button"
-              className="hito-button hito-button-ghost hito-button-sm w-full"
-              disabled={disabled}
-              onClick={onUseAdvancedCustom}
-            >
-              Open Advanced custom
-            </button>
-          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -253,9 +212,7 @@ function PlanPresetCardStateNote({ card }: { card: PlanPresetCardViewModel }) {
 
   if (card.state === "recommended" || card.state === "available") {
     return (
-      <p className="hito-field-helper">
-        Opens a backend-shaped calendar preview. Create confirms the reviewed plan server-side.
-      </p>
+      <p className="hito-field-helper">Opens a full preview. Create uses the plan you reviewed.</p>
     );
   }
 
@@ -298,12 +255,12 @@ function selectDisabledReason(card: PlanPresetCardViewModel) {
     card.customRoutingReason?.message ??
     card.disabledReasonSummary ??
     card.customReasonSummary ??
-    "The backend did not mark this setup as selectable."
+    "This option is not available for this setup yet."
   );
 }
 
 function durationReadback() {
-  return "Open preview for backend-built weeks, rows, endpoint proof, and calendar details.";
+  return "Open the preview to see the full plan and details.";
 }
 
 function distanceIdentityLabel(cardId: PlanPresetCardId) {
@@ -328,7 +285,7 @@ function stateLabel(state: PlanPresetCardState) {
     case "not_ideal":
       return "Not ideal";
     case "custom_fit":
-      return "Custom fit";
+      return "Not available in Quick setup";
     case "unavailable":
       return "Unavailable";
   }

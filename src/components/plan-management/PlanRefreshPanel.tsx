@@ -1,4 +1,4 @@
-import type { ProposeActivePlanRefreshResult } from "@/lib/training-api";
+import type { ProposeActivePlanRefreshResult } from "@/lib/active-plan-refresh-contract";
 import { formatDate } from "@/lib/training";
 import { Icon } from "@/components/ui/icon";
 

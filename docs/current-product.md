@@ -34,7 +34,7 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - login `/login`
   provides the current `Hito.` login-first surface, where loopback local development may still show temporary username/password login, while email sign-in appears only when the runtime can resolve a real non-loopback app URL for auth callbacks and the Supabase-hosted passwordless email path can return through the SSR callback route
 - internal design-system reference `/hitoDS`
-  uses a dedicated design-system sidebar and compact reference surface to document the simplified live Hito product language: semantic and primitive color tabs, canonical typography roles, the Hito icon registry, open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure patterns, bounded modal anatomy, controls, shell navigation, calendar/workout day specimen states, and documented visualization geometry exceptions; the calendar/workout playground is static display only, with future manual-workout states shown as visual specimens rather than shipped CRUD, recurrence, or production route wiring, and it shares the presentational `HitoCalendarDayCell` / `HitoWorkoutDayRow` visual seam with the real product calendar while product route links, tooltips, feedback routing, and backend-shaped schedule truth stay product-owned; `/hitoDS` is the internal reference baseline for future UI inspection and primitive extension, not a runner-facing capability
+  uses a dedicated design-system sidebar and compact reference surface to document the simplified live Hito product language: semantic and primitive color tabs, canonical typography roles, the Hito icon registry, open route rhythm, divider-based grouping, restrained markers, quiet support copy, utility/disclosure patterns, bounded modal anatomy, controls, shell navigation, calendar/workout day specimen states, and documented visualization geometry exceptions; the calendar/workout playground is static display only, with manual-workout state specimens shown as visual references rather than proof of CRUD, recurrence, or production route wiring, and it shares the presentational `HitoCalendarDayCell` / `HitoWorkoutDayRow` visual seam with the real product calendar while product route links, tooltips, feedback routing, and backend-shaped schedule truth stay product-owned; shipped manual-plan editing lives in the product calendar, not in `/hitoDS`; `/hitoDS` is the internal reference baseline for future UI inspection and primitive extension, not a runner-facing capability
 
 ## Interaction Contracts
 
@@ -54,11 +54,11 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - authenticated users without setup complete are gated into a compact structured first-plan constructor on `/`
 - the primary onboarding surface now collects required profile basics, one bounded fitness benchmark, fixed rest days, goal distance/style, conditional target and terrain context, strength/mobility preference, and one optional supporting comment before creating the first saved plan
 - if a signed-in user has no active saved plan yet, the app now stays honestly in that setup state instead of silently assigning a preview-derived plan
-- signed-in users with no active plan can now start from backend-owned Plan Preset cards for
-  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`; cards and review show
-  backend-shaped eligibility, duration, start/end dates, workout mix, metric honesty, and fit
-  reasons, then `Create preset plan` persists the exact reviewed canonical plan through the existing
-  active-plan seam
+- signed-in users with no active plan can now start from backend-owned Plan Preset discovery cards
+  for `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`; cards show backend-shaped
+  eligibility, duration, workout mix, metric honesty, and fit reasons, then selection opens the
+  selected running-plan preview/create path owned by the running-plan engine; the old Plan Preset
+  review/confirm creation seam has been removed from runtime
 - Plan Presets are reusable for any no-active-plan state, not only a runner's literal first plan:
   they never silently replace an existing active plan, and active-plan replacement/refresh from a
   preset remains separate future work
@@ -69,28 +69,38 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   confirmation repeats the selected date/weekday before mutation, persistence readback uses the same
   date-only truth, and manual Add does not send client rows, segments, or persistence metadata;
   runners can save reviewed manual workouts as personal templates, reuse those templates from
-  `Add activity`, copy/paste manual workout days through backend-reviewed draft reconstruction, and
+  `Add activity`, copy/paste manual workout days through direct backend-owned reconstruction, and
   clear eligible manual workout days through backend-shaped Delete/Clear review while the active
   manual plan remains active. Runners can also move eligible manual workout days to another empty
-  day through backend-reviewed Move Workout confirmation; the same persisted row moves, source and
+  day through direct backend-owned Move Workout mutation; the same persisted row moves, source and
   target dates refresh from saved truth, and frontend never owns schedule mutation truth.
   JSON/Markdown export for persisted manual active plans is available through `Open plan` and uses
-  the canonical active-plan export seam with safe export ids. Recurrence, edit persisted manual
-  workouts, Restore/Put back/Redo UI, QR/share/import, PDF/watch export, coach/organization
-  authoring, and deeper modal polish remain future-only
+  the canonical active-plan export seam with safe export ids. Recurrence, runner-facing
+  `Edit training`, Restore/Put back/Redo UI, QR/share/import, PDF/watch export, coach/organization
+  authoring, and deeper modal polish remain future-only until their own QA/front-end gates accept
+  them
+- saved active-plan calendars now use backend-shaped editability/capability metadata for
+  Add/Clear/Move in the proved scope instead of treating manual and non-manual plans as separate
+  calendar products:
+  supported active-plan sources can expose eligible future empty-day Add, eligible planned-workout
+  Clear, and eligible Move actions while preserving the original active-plan `source_kind` and
+  adding `active_plan_user_edit_v1` audit metadata; backend protection can still block specific
+  rows, dates, source metadata, logged/evidence-backed workouts, occupied targets, stale reviews,
+  or unsafe reconstruction. Universal Copy/Paste, recurrence, runner-facing `Edit training`,
+  Restore UI, active-plan replacement semantics expansion, and broader generated-row mutation
+  matrices remain future-only
 - the Advanced custom program path remains separate and secondary for target date/time, unusual
   constraints, injury/pain/caution, uncommon goals, and detailed comments; Plan Presets do not own
   manual-builder behavior, and current manual-builder capabilities are described separately above
 - setup-required accounts now see `Create a Plan` in the home header where saved-mode accounts see `Open plan`
 - the backend now also supports one first-pass free-text authoring seam:
   one user message is turned into validated canonical plan data server-side through OpenAI before the saved weekly plan opens; the saved-mode text replacement action explicitly opts into a separate rich workout-structure draft after structured intent validates, but backend normalization remains the only path to persisted `training-plan-v2` truth and falls back to the deterministic generator if the draft is unsafe or malformed
-- the backend now also supports one first-pass voice-to-plan transcript draft seam:
+- the backend now also supports one first-pass voice-to-plan transcript draft seam, but it is not a current visible onboarding flow:
   a confirmed transcript can be checked against `voice_to_plan`, validated for bounded length/usefulness and essential planning truth, and returned as either `clarification_required` with missing fields/questions or `draft_ready` with a runner-facing review of what Hito understood and the broad plan shape
   when Hito proposes a different goal style than an obvious dictated cue, such as changing balanced to relaxed, the review assumptions now call out that style change before the runner can confirm creation
   target-time voice drafts also call out when benchmark support is missing or the requested target looks aggressive instead of implying unsupported pace specificity
   transcript review is non-mutating; the separate explicit `confirmVoiceToPlanDraft` backend action creates a first active plan only after confirmation, rechecks entitlement, blocks if an active plan already exists, and still does not persist the raw transcript
-  the no-plan onboarding surface now exposes this as a compact Pro `AI setup` assist above the structured constructor: the runner pastes or types what they would say out loud, asks Hito to review it, sees either missing-detail clarification or a `draft_ready` review, and only `Yes, create plan` calls the mutating confirm action
-  this first UI slice still has no microphone UI, no raw audio upload, no transcript persistence as profile truth, no usage counting, and no silent plan creation or replacement
+  current no-plan onboarding does not expose a compact Pro `AI setup`, microphone UI, raw audio upload, transcript paste panel, transcript persistence as profile truth, usage counting, or silent plan creation/replacement; the visible choices are Manual setup, Quick setup structured review, and backend-owned Plan Preset / selected-plan review/create
 - the visible onboarding UI now consumes the structured first-plan constructor contract:
   profile measurements, progressive training preferences, one bounded fitness-level benchmark, goal distance/style/target, conditional terrain focus, strength preference, and an optional supporting comment can be submitted through one authenticated draft action
   the shared preference controls reveal fixed rest days first, then default running-days/week, then optional preferred long-run day, with fixed rest days disabled in the long-run selector and `No fixed rest days` as an explicit state
@@ -115,7 +125,7 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   `npm run import-admin-backlog-work-items` scans approved markdown task/spec/brief/plan folders and upserts bounded indexed rows into `admin_capture_items`; when docs provide canonical sections for status, type, priority, next recommended role, task, stage, and exact handoff prompt, those values drive the mirrored admin fields and copied prompt, with the first `Task` line shown as the human-readable Backlog title while source path stays metadata; older archive docs are imported conservatively with missing-metadata markers; the importer reports repo-derived mirror rows whose markdown source path no longer exists and can archive those stale mirrors only through explicit `--archive-stale`; repo-derived rows are read-only through admin mutation actions, markdown remains canonical for those repo-authored items, Supabase remains canonical for admin-created quick notes/captures, and there is still no automatic two-way sync or Codex dispatch
 - `/admin/login` now provides a dedicated owner admin sign-in page:
   local/dev admin login can still use the protected local fixture, but both local fixture and deployed/runtime admin login now create signed admin-only `hito_admin_session` access for admin surfaces; valid tester/product credentials are refused with an admin-specific error instead of creating a normal product session, redirects stay limited to sanitized admin paths, admin surfaces use explicit `/api/admin/auth/logout`, and normal `/login`, Magic Link, product local-login, and runner/product logout behavior remain separate; `/admin/analytics` admin-required states now point to this admin login path
-- onboarding keeps the structured constructor as the reliable primary setup path while placing the compact Pro AI assist above it, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
+- onboarding keeps Manual setup and Quick setup as the visible creation paths, with structured review and Plan Preset / selected-plan review inside Quick setup, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
 - `/settings` now separates `Personal data` from `Training preferences` with Hito tabs; personal age/height/weight use the same editable value chips as Quick setup, the personal page shows default estimated heart-rate starting ranges when profile age supports them while clearly labelling them as non-personalized, and training preferences use the same weekday choice rhythm as plan creation to save fixed rest days, default running-days/week, and preferred long-run day as future-plan defaults only, with backend validation preventing impossible rest-day and long-run combinations
 - the backend-owned training-preference contract now uses one mapping between runner-facing names and storage truth:
   `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` map to stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day`; zero fixed rest days is valid, all seven fixed rest days is blocked, default running days must fit the available weekdays, and the default long-run fallback is Sunday, then Saturday, then the latest available weekday without being stored as an explicit preference
@@ -123,8 +133,8 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - the internal structured authoring slice remains backend-only:
   it validates goal, schedule, runner basics, recent result context, available days, constraints, preferences, and execution mode, then generates one canonical `training-plan-v2` plan into the same persisted saved-mode seam without changing routes; generated workout details now avoid generic interval labels by carrying exact session identity, phase-aware Base/Build/Specific/Taper workout choices, cutback-week simplification, credible long-run progression for longer goals, and appropriate later long-run steady-finish structure while keeping compact calendar families stable
 - the first OpenAI-backed text authoring slice is also backend-only for now:
-  it treats the user message as intent only, asks OpenAI for bounded structured authoring input using the same expanded goal, terrain, execution-mode, and recent-benchmark contract as structured setup, validates that output, then the saved-mode text replacement action opts into a second bounded rich workout draft that must pass backend taxonomy, rest-day, segment-structure, and metric-safety normalization before persistence; default helper usage and Dictate-to-Plan stay deterministic until their own rich-drafting slices
-- setup writes one profile and creates one active plan only after the structured constructor or AI setup draft is explicitly confirmed, with JSON import retained only as an advanced fallback
+  it treats the user message as intent only, asks OpenAI for bounded structured authoring input using the same expanded goal, terrain, execution-mode, and recent-benchmark contract as structured setup, validates that output, then the saved-mode text replacement action opts into a second bounded rich workout draft that must pass backend taxonomy, rest-day, segment-structure, and metric-safety normalization before persistence; default helper usage stays deterministic, and voice-to-plan remains a separate backend action without a current visible onboarding caller
+- setup writes one profile and creates one active plan only after manual empty-plan creation, structured constructor confirmation, or selected-plan confirmation, with JSON import retained only as an advanced fallback
 - applying a generated or imported plan now uses one shared backend start-date policy:
   explicit future starts are preserved, past or non-future starts normalize to today, and the plan is persisted only after those effective dates are resolved
 - saved-mode JSON import can now use one explicit chosen start day as the apply authority:
@@ -176,6 +186,13 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - saved runner profiles now also have a backend-owned training preference slot for stable defaults such as fixed rest days, preferred long-run day, and default running days per week; the current backend can read and save those preferences without mutating the active plan, and the shared contract prevents settings and first-plan setup from drifting into different scheduling rules
 - the workout-detail `Week Status` surface is now progress-based and reports completed non-rest workouts in the current week
 - workout detail now separates manual `Log result` from `Feedback`: `Log result` stays focused on completion truth, notes, and manual actuals, while `Feedback` owns the live Garmin `.fit` / `.zip` upload path, parsed evidence summary, and deterministic planned-vs-actual comparison readback
+- workout detail is now lifecycle-driven instead of showing one static tab family across all workout states:
+  future planned workouts show planned readback plus `Plan actions`
+  today's planned workout leads with overview plus completion action
+  past unlogged workouts stay actionable without pretending completed or evidence-backed state
+  completed manual-result workouts show real saved result truth only when a real log exists
+  evidence-backed workouts expose `Result` and `Feedback` only when evidence/comparison truth exists
+  and rest days stay sparse and calm instead of inheriting the full workout-detail action family
 - the workout-detail feedback surface now reads in plain language for normal runners:
   it explains that upload compares the planned workout with the uploaded run, keeps factual `Plan vs run` comparison above the bounded recommendation, and uses a lighter divided hierarchy instead of stacked nested cards
 - the near-upload area inside `Feedback` now gives one compact state-aware payoff summary:
@@ -264,7 +281,7 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
 - auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress summary metrics, legends, and bar chrome, body severity micro-UI, preserved integration utility rows, public changelog editorial timeline chrome, launcher/auth/admin atmospheric shells, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share Hito component primitives for canonical typography roles, low-card surfaces, open/divider grouping, tiered controls, helper/error text, grouped rows, metric rows, compact legends, compact tooltips, compact chart notes, comparison-bar fills, editorial date rails, highlight tags, timeline entries, bounded canvas/photo/launch/state/editorial overlay recipes, Hito-native dialog/sheet/menu/select/progress/card/sidebar wrapper defaults, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, disclosure, labels, captions, tabs, and dividers, keeping structured first-plan onboarding primary and advanced JSON import secondary
 - the first typography canonicalization pass is implemented for the highest-drift runner-facing surfaces: `Open plan`, saved-mode JSON import, workout `Log result`/`Feedback`, and `User settings` now use shared modal title, panel title, body/body-small, form-label, feedback, and technical-mono roles instead of local heading and helper/body recipes where practical
-- the first icon canonicalization pass is implemented on top of `lucide-react`: product surfaces now consume stable Hito icon names through the shared `Icon` primitive, `/hitoDS` documents approved icon names, categories, and sizes, and raw SVG icon folders are not part of the product design-system source
+- the icon canonicalization pass is implemented on top of the Tabler-backed Hito `Icon` primitive: product surfaces consume stable Hito icon names through the shared registry, `/hitoDS` documents approved icon names, categories, and sizes, and raw SVG icon folders are not part of the product design-system source
 - remaining chart heights/widths, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are treated as product visualization geometry, not runner-facing component chrome
 - from the visible product perspective, the interface is now treated as normalized into Hito DS ownership, and future UI work should reuse shared Hito primitives or documented geometry exceptions instead of adding new custom route-local chrome
 

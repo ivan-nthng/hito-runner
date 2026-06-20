@@ -23,6 +23,7 @@ function main() {
   validateBlockedLongRunPreferenceFailsBeforeReview();
   validateInvalidRunnerBasicsFailBeforeReview();
   validateInvalidFixedRestDayFailsBeforeReview();
+  validateOptionalBenchmarkPaceTruth();
 
   console.log("Running plan engine 10K builder checks passed.", {
     sourceKind: draft.sourceKind,
@@ -508,8 +509,40 @@ function validateNoNormalPathInputGates(inputSummary: object) {
   assert.equal(Object.hasOwn(inputSummary, "watchAccess"), false);
   assert.equal(Object.hasOwn(inputSummary, "noWatchOrNoApp"), false);
   assert.equal(Object.hasOwn(inputSummary, "recent5kBenchmark"), false);
+  assert.equal(
+    (inputSummary as { benchmarkPaceTruth?: unknown }).benchmarkPaceTruth,
+    null,
+    "Default 10K selected-plan path must remain structure-only without a benchmark.",
+  );
   assert.equal(Object.hasOwn(inputSummary, "targetTime"), false);
   assert.equal(Object.hasOwn(inputSummary, "personalHrZones"), false);
+}
+
+function validateOptionalBenchmarkPaceTruth() {
+  const result = buildTenKPlanPreviewDraft({
+    age: 36,
+    heightCm: 178,
+    weightKg: 74,
+    runnerLevel: "sometimes_runs",
+    distanceFamily: "10K",
+    daysPerWeek: 5,
+    fixedRestDays: ["Wednesday", "Saturday"],
+    preferredLongRunDay: "Sunday",
+    startDate: "2026-06-08",
+    benchmark: {
+      kind: "recent_5k_time",
+      recent5kTime: "25:00",
+    },
+  });
+
+  assert.equal(result.ok, true, "10K optional benchmark fixture must still build.");
+  if (!result.ok) {
+    throw new Error(result.unavailable.error.message);
+  }
+
+  assert.equal(result.draft.normalizedInputSummary.benchmarkPaceTruth?.kind, "recent_5k");
+  assert.equal(result.draft.normalizedInputSummary.benchmarkPaceTruth.source, "recent_5k_time");
+  assert.equal(result.draft.normalizedInputSummary.benchmarkPaceTruth.paceSecondsPerKm, 300);
 }
 
 function buildValidDraft(

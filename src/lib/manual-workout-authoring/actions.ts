@@ -2,12 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { isEditableActivePlanSourceKind } from "@/lib/active-plan-workout-editing/policy";
 import {
+  createEmptyActivePlanForUser,
   createFirstPlanFromReviewedCanonicalPlanForUser,
   getActivePlan,
 } from "@/lib/active-plan-persistence";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
+  buildManualEmptyActivePlanCreationInput,
   buildManualWorkoutPersistenceMetadata,
   buildManualWorkoutUserBuiltTrainingPlan,
   deriveManualTargetTruthMode,
@@ -23,11 +25,15 @@ import {
   manualWorkoutDraftInputSchema,
   manualWorkoutConfirmInputSchema,
   manualWorkoutAddToActivePlanInputSchema,
+  manualEmptyPlanSetupInputSchema,
+  MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS,
   MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
   type ManualWorkoutAddToActivePlanResult,
   type ManualWorkoutCanonicalDraft,
+  type ManualEmptyPlanCreateFailureReason,
+  type ManualEmptyPlanCreateResult,
   type ManualWorkoutConfirmFailureReason,
   type ManualWorkoutConfirmResult,
   type ManualWorkoutDraftConflict,
@@ -40,6 +46,7 @@ import { normalizeManualWorkoutDraft } from "@/lib/manual-workout-authoring/norm
 import { validateManualWorkoutDraft } from "@/lib/manual-workout-authoring/validator";
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { todayIso } from "@/lib/training";
 
 type ManualWorkoutDraftRejectionReason = Extract<
   ManualWorkoutDraftReviewResult,
@@ -51,6 +58,12 @@ const MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX = "manual-workout-review-v1.";
 type ManualWorkoutConfirmDependencies = {
   getActivePlanForUser?: typeof getActivePlan;
   createFirstPlanForUser?: typeof createFirstPlanFromReviewedCanonicalPlanForUser;
+};
+
+type ManualEmptyPlanCreateDependencies = {
+  getActivePlanForUser?: typeof getActivePlan;
+  createEmptyPlanForUser?: typeof createEmptyActivePlanForUser;
+  currentDate?: string;
 };
 
 type ManualWorkoutAddToActivePlanDependencies = ManualWorkoutActivePlanAddDependencies;
@@ -178,6 +191,38 @@ export const confirmManualWorkoutDraft = createServerFn({ method: "POST" })
     }
 
     return confirmManualWorkoutDraftForUser(userId, data);
+  });
+
+export const createEmptyManualActivePlan = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => value)
+  .handler(async ({ data }): Promise<ManualEmptyPlanCreateResult> => {
+    const auth = getRequestAuthContext();
+
+    if (!auth.userId) {
+      return buildManualEmptyPlanCreateFailure({
+        reason: "unauthenticated",
+        message: "Sign in before creating a manual user-built plan.",
+      });
+    }
+
+    let userId: string | null = null;
+    try {
+      userId = await getPersistedUserIdForAuthContext(auth);
+    } catch {
+      return buildManualEmptyPlanCreateFailure({
+        reason: "unauthenticated",
+        message: "This session cannot create a persisted manual plan yet.",
+      });
+    }
+
+    if (!userId) {
+      return buildManualEmptyPlanCreateFailure({
+        reason: "unauthenticated",
+        message: "This session cannot create a persisted manual plan yet.",
+      });
+    }
+
+    return createEmptyManualActivePlanForUser(userId, data);
   });
 
 export const addManualWorkoutToActivePlan = createServerFn({ method: "POST" })
@@ -318,6 +363,96 @@ export async function confirmManualWorkoutDraftForUser(
     return buildManualWorkoutConfirmFailure({
       reason: "persistence_failed",
       message: "The manual user-built plan could not be created. The current plan is unchanged.",
+    });
+  }
+}
+
+export async function createEmptyManualActivePlanForUser(
+  userId: string,
+  input: unknown,
+  dependencies: ManualEmptyPlanCreateDependencies = {},
+): Promise<ManualEmptyPlanCreateResult> {
+  const parsed = manualEmptyPlanSetupInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return buildManualEmptyPlanCreateFailure({
+      reason: "invalid_input",
+      message: "Manual setup input is invalid.",
+    });
+  }
+
+  const getActivePlanForUser = dependencies.getActivePlanForUser ?? getActivePlan;
+  const createEmptyPlanForUser =
+    dependencies.createEmptyPlanForUser ?? createEmptyActivePlanForUser;
+  const currentDate = dependencies.currentDate ?? todayIso();
+
+  let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
+  try {
+    activePlan = await getActivePlanForUser(userId);
+  } catch {
+    return buildManualEmptyPlanCreateFailure({
+      reason: "persistence_failed",
+      message:
+        "The manual plan could not verify the current active-plan state. Try again before creating a plan.",
+    });
+  }
+
+  if (activePlan) {
+    return buildManualEmptyPlanCreateFailure({
+      reason: "active_plan_exists",
+      message:
+        "Manual user-built plans can be created only when there is no active plan. Open the existing plan to add workouts.",
+    });
+  }
+
+  const creationInput = buildManualEmptyActivePlanCreationInput({
+    setup: parsed.data,
+    currentDate,
+  });
+
+  try {
+    const applyResult = await createEmptyPlanForUser(userId, creationInput);
+
+    return {
+      ok: true,
+      status: "created",
+      persisted: true,
+      sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+      sourceStatus: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+      schemaVersion: "training-plan-v2",
+      activePlanId: applyResult.planCycle.id,
+      effectiveStartDate: applyResult.effectiveStartDate,
+      appliedStartDate: applyResult.appliedStartDate,
+      workoutCount: 0,
+      calendarRowCount: 0,
+      nonRestWorkoutCount: 0,
+      setup: parsed.data,
+      sourceMetadata: {
+        creationMode: "empty_manual_setup",
+        setupPayloadVersion: MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
+        rowCount: 0,
+        nonRestRowCount: 0,
+        runningLevel: parsed.data.runningLevel,
+      },
+      safety: {
+        createsFakeWorkout: false,
+        trustedClientRows: false,
+        callsOpenAi: false,
+        readyForManualAdd: true,
+      },
+    };
+  } catch (error) {
+    if (error instanceof Error && /active plan/i.test(error.message)) {
+      return buildManualEmptyPlanCreateFailure({
+        reason: "active_plan_exists",
+        message:
+          "Manual user-built plans can be created only when there is no active plan. Open the existing plan to add workouts.",
+      });
+    }
+
+    return buildManualEmptyPlanCreateFailure({
+      reason: "persistence_failed",
+      message: "The empty manual user-built plan could not be created. No plan was changed.",
     });
   }
 }
@@ -472,6 +607,20 @@ function buildManualWorkoutAddToActivePlanFailure(input: {
     message: input.message,
     sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  };
+}
+
+function buildManualEmptyPlanCreateFailure(input: {
+  reason: ManualEmptyPlanCreateFailureReason;
+  message: string;
+}): Extract<ManualEmptyPlanCreateResult, { ok: false }> {
+  return {
+    ok: false,
+    status: "blocked",
+    persisted: false,
+    reason: input.reason,
+    message: input.message,
+    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   };
 }
 

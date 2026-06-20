@@ -388,9 +388,104 @@ Every project-work final report must name:
 - role file read
 - project skill or skills used, or `none` with a reason
 - active plan/spec/task file used, or `none`
+- subagents used/reused/closed, or `none` with a short reason when the task was too small,
+  inherently sequential, or subagent tools were unavailable
 
 Role files should list their most common skills, but `AGENTS.md` remains the higher-level rule:
 agents must still load any task-matching skill even if the role file does not mention it.
+
+## 2.85) Subagent Delegation And Lifecycle Discipline
+
+Agents should reduce user copy-paste and routing work by using subagents for safe parallel work when
+subagent tools are available. On global simplification cleanup, this is not optional process polish:
+ARCHITECT and BACKEND agents must perform an explicit subagent preflight before selecting or
+executing a non-trivial cleanup batch.
+
+This applies especially to agents that write code, validate behavior, inspect source, perform
+cleanup audits, investigate bugs, review artifacts, or prepare source-of-truth decisions:
+`ARCHITECT`, `BACKEND`, `FRONTEND`, `FULLSTACK`, `QA`, `DESIGNER`, `DESIGN SYSTEM`, `LAYOUT`,
+`DATA QUALITY`, `BACKLOG MANAGER`, `PRODUCT`, `SYSTEM ADVISOR`, and `RUNNING COACH`.
+
+Use subagents when all of these are true:
+
+- the subtask is concrete, bounded, and useful to the current assignment
+- the subtask can run without user attention or approval
+- the subtask is independent enough to run in parallel or on a reused open subagent
+- the subtask has a clear read-only or disjoint write scope
+- the main agent can integrate the result and remain accountable for the final decision
+
+For `ARCHITECT` and `BACKEND` on the Hito Stack Simplification / global cleanup track, a final report
+is incomplete unless it includes one of:
+
+- subagents used/reused/closed with a short summary of what each one checked
+- `none — single-file or inherently sequential task`
+- `none — subagent tools unavailable`, plus a note that the agent still completed safe local
+  sequential audits instead of asking the user to copy-paste micro-prompts
+
+Good default subagent work:
+
+- read-only source/import/reference audits
+- docs/source-of-truth drift checks
+- file-size and ownership hotspot scans
+- non-mutating lint, build, test, validator, fixture, or script checks
+- log, artifact, screenshot-folder, and generated-output inspection
+- independent browser/source research that does not require user credentials, production data, or
+  a fragile shared session
+- comparing candidate cleanup seams or implementation options
+- bounded implementation subtasks only when write scopes are disjoint and the active plan clearly
+  allows parallel implementation
+
+Do not use subagents for:
+
+- destructive commands, migrations, production mutation, production data access, secrets, or live
+  OpenAI/provider calls unless the user and active plan explicitly authorize that exact delegated
+  work
+- Supabase mutation, browser sessions, or local fixture mutation when the safety boundary is unclear
+- broad rewrites, vague exploration, or work that would be faster and safer to inspect directly
+- replacing the main agent's architectural judgment, QA verdict, or final integration
+
+Lifecycle rules:
+
+- Reuse an already-open subagent for a similar follow-up instead of spawning a duplicate.
+- Close completed or no-longer-needed subagents so they do not remain open and consume capacity.
+- If a subagent fails, times out, or returns unclear evidence, continue locally when possible and
+  report that limitation.
+- If subagent tools are unavailable in the current environment, do not fall back to asking the user
+  to copy-paste every small research or cleanup step. Continue with safe local sequential audits
+  inside the current role's scope, batch adjacent same-owner seams when validation can cover them,
+  and report `none — subagent tools unavailable` only in the final evidence.
+- Do not ask the user to route every small research, test, or read-only audit when it belongs inside
+  the current role's scope.
+- The main agent owns integration: summarize relevant subagent findings, verify critical claims when
+  risk is high, and make one coherent recommendation or implementation result.
+
+Global cleanup autonomous batch mode:
+
+- For the Hito Stack Simplification / global cleanup track, do not default to returning control to
+  the user after every tiny same-owner seam.
+- ARCHITECT must prefer selecting a coherent same-owner cleanup batch when fresh source proof shows
+  multiple adjacent seams share one canonical owner, risk class, and validation story.
+- ARCHITECT checkpoints should not select a single micro-gate when the next execution owner can
+  safely continue through a batch. In that case, write one execution prompt that authorizes the next
+  role to complete the full bounded batch and return only on validation failure, owner-boundary
+  crossing, mutation/browser-risk escalation, or product decision need.
+- BACKEND cleanup prompts should explicitly authorize the role to use subagents and continue through
+  several same-owner bounded seams without another user copy-paste step, as long as the active plan
+  scopes that batch and validation covers it. FRONTEND, DEVTOOLS, and QA prompts may do the same
+  when their scope is similarly bounded.
+- BACKEND, FRONTEND, DEVTOOLS, and QA agents working on global cleanup should finish the scoped
+  autonomous batch end-to-end when safe. They should not stop after the first tiny seam merely to ask
+  Product/user for another prompt if the next adjacent seam is already in scope and has the same
+  owner, risk class, and validation story.
+- Stop and return to Product/user only when the next candidate crosses owner boundaries, becomes
+  browser-visible, touches mutation safety, requires Supabase/OpenAI/production access, weakens
+  validation coverage, or needs a product decision.
+- Autonomous cleanup batches must still report progress estimate, completed gates, remaining gates,
+  subagents used/reused/closed, validation evidence, and any deferred risks.
+
+Final reports for non-trivial work must state whether subagents were used, reused, and closed. If no
+subagents were used, give a short reason such as `none — single-file change`, `none — sequential
+browser session`, or `none — subagent tools unavailable`.
 
 ## 2.9) Standard Report Formats
 
@@ -545,6 +640,46 @@ Completion gate:
 - Keep future plans, backlog-only intake, unimplemented specs, and reopened visual/specimen work out
   of the changelog until they are complete and QA-passed.
 - When work completes, archive plans from `docs/plans/active/` to `docs/plans/archive/`.
+
+## 5.5) Repo-Derived Admin Backlog Import Contract
+
+The admin Backlog importer mirrors repo-authored markdown from these roots:
+
+- `docs/tasks/backlog`
+- `docs/tasks/product-briefs`
+- `docs/tasks/frontend-specs`
+- `docs/plans/active`
+- `docs/plans/archive`
+
+For any new or materially updated work item inside those roots, agents must keep one canonical
+import-ready metadata block in the markdown itself. Extra human-facing sections are allowed, but they
+must not replace this block.
+
+Required canonical sections:
+
+- `Status`
+- `Type`
+- `Priority`
+- `Next Recommended Role`
+- `Task`
+- `Stage`
+- `Exact Handoff Prompt`
+
+Canonical value expectations:
+
+- `Status`: `backlog`, `in_progress`, `completed`, `closed`, or `archived`
+- `Type`: `bug`, `change_request`, `context_capture`, `plan`, `frontend_spec`, or `product_brief`
+- `Priority`: `low`, `medium`, `high`, or `urgent`
+- `Next Recommended Role`: `architect`, `backend`, `frontend`, `designer`, `copy`, `qa`,
+  `product`, or `running_coach`
+- `Exact Handoff Prompt`: one execution-ready fenced prompt beginning with `ROLE: <ROLE>`
+
+Additional sections such as `Severity`, `Owner`, `Reported`, `Evidence`, `Context`, `Risks`, or
+`QA Expectations` remain valid when the document type needs them, but they are secondary metadata
+and must not be used instead of the canonical import-ready block.
+
+If a role creates or updates backlog items, plans, frontend specs, or product briefs without this
+canonical block, the work is incomplete because admin Backlog mirroring and prompt copy can drift.
 
 ## 6) Change Safety And Guardrails
 

@@ -45,6 +45,7 @@ import {
   type ActivePlanWorkoutEditOperation,
   type ActivePlanWorkoutEditabilityResult,
 } from "@/lib/active-plan-workout-editing/policy";
+import { resolveActivePlanWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
 import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import {
   deriveWeekStatus,
@@ -68,90 +69,36 @@ import { getRequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { RUNNER_TRAINING_WEEKDAYS } from "@/lib/runner-training-preferences";
 import {
+  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   reviewManualWorkoutDraft as reviewManualWorkoutDraftForAction,
   type ManualWorkoutDraftReviewResult,
 } from "@/lib/manual-workout-authoring";
+import { fetchManualWorkoutEvidenceWorkoutIds } from "@/lib/manual-workout-authoring/active-plan-add";
 
 export {
-  completeStructuredFirstPlanOnboarding,
-  completeStructuredFirstPlanOnboardingForUser,
   confirmStructuredFirstPlanDraft,
-  confirmVoiceToPlanDraft,
   generateStructuredFirstPlanDraft,
-  generateVoiceToPlanDraft,
-  type ConfirmStructuredFirstPlanDraftResult,
-  type ConfirmVoiceToPlanDraftResult,
-  type StructuredFirstPlanDraftResult,
 } from "@/lib/first-plan-actions";
-export { getPlanPresetCards, type PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
 export {
   confirmRunningPlanDraft,
   previewRunningPlanDraft,
-  type RunningPlanConfirmActionInput,
-  type RunningPlanConfirmActionResult,
-  type RunningPlanPreviewActionInput,
-  type RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";
 export {
   addManualWorkoutToActivePlan,
-  confirmManualWorkoutCopyPasteDraft,
+  createEmptyManualActivePlan,
   confirmManualWorkoutDeleteClear,
   confirmManualWorkoutDraft,
-  confirmManualWorkoutMove,
+  confirmManualWorkoutPersistedEdit,
+  copyManualWorkoutWithinActivePlan,
   listManualWorkoutSavedTemplates,
-  reviewManualWorkoutCopyPasteDraft,
+  moveManualWorkoutWithinActivePlan,
+  reconstructManualWorkoutPersistedEditDraft,
   reviewManualWorkoutDeleteClear,
-  reviewManualWorkoutMove,
+  reviewManualWorkoutPersistedEditDraft,
   reviewManualWorkoutSavedTemplate,
   saveManualWorkoutSavedTemplate,
-  type ManualWorkoutAddToActivePlanInput,
-  type ManualWorkoutAddToActivePlanResult,
-  type ManualWorkoutBlockInput,
-  type ManualWorkoutCopyPasteConfirmResult,
-  type ManualWorkoutCopyPasteReviewResult,
-  type ManualWorkoutDeleteClearConfirmResult,
-  type ManualWorkoutDeleteClearReviewResult,
-  type ManualWorkoutMoveConfirmResult,
-  type ManualWorkoutMoveReviewResult,
-  type ManualWorkoutConfirmInput,
-  type ManualWorkoutConfirmResult,
-  type ManualWorkoutTargetTruthMode,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
-  type ManualWorkoutSavedTemplateListResult,
-  type ManualWorkoutSavedTemplateReviewInput,
-  type ManualWorkoutSavedTemplateReviewResult,
-  type ManualWorkoutSavedTemplateSaveInput,
-  type ManualWorkoutSavedTemplateSaveResult,
-  type ManualWorkoutSavedTemplateView,
-  type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring";
-export {
-  exportActivePlan,
-  exportActivePlanForUser,
-  type ExportActivePlanResult,
-} from "@/lib/active-plan-export-actions";
-export type {
-  ClearUpcomingScheduleResult,
-  DeleteActivePlanResult,
-} from "@/lib/active-plan-lifecycle-actions";
-export { saveUserSettings, type UserSettingsSummary } from "@/lib/user-settings-actions";
-export { exchangeCodeForSession } from "@/lib/auth-actions";
-export {
-  completeOnboarding,
-  completeTextOnboarding,
-  persistImportedPlanForCurrentRequest,
-} from "@/lib/plan-replacement-actions";
-export type {
-  ApplyActivePlanRefreshProposalResult,
-  ProposeActivePlanRefreshResult,
-} from "@/lib/active-plan-refresh-contract";
-export type {
-  ActivePlanScheduleEditInput,
-  ActivePlanScheduleEditPreview,
-  ActivePlanScheduleReflowApplyResult,
-} from "@/lib/active-plan-schedule-edit-preview";
-
+export { completeOnboarding, completeTextOnboarding } from "@/lib/plan-replacement-actions";
 export interface ViewerSummary {
   name: string | null;
   email: string | null;
@@ -259,21 +206,6 @@ export const reviewManualWorkoutDraftAction = createServerFn({ method: "POST" })
     return reviewManualWorkoutDraftForAction(data);
   });
 
-export function archiveActivePlanForUser(userId: string) {
-  return archiveActivePlanForUserWithSnapshot(userId, getPersistedSnapshot);
-}
-
-export function clearUpcomingScheduleForUser(userId: string, clearedFromDate: string = todayIso()) {
-  return clearUpcomingScheduleForUserWithSnapshot(userId, getPersistedSnapshot, clearedFromDate);
-}
-
-export async function applyActivePlanRefreshProposalForUser(
-  userId: string,
-  proposal: ActivePlanRefreshApplyPayload,
-): Promise<ApplyActivePlanRefreshProposalResult> {
-  return applyActivePlanRefreshProposalForUserServer({ userId, proposal });
-}
-
 const proposeActivePlanRefreshForCurrentRequestServer = createServerOnlyFn(
   async (data: ActivePlanRefreshProposalInput): Promise<ProposeActivePlanRefreshResult> => {
     const { proposeActivePlanRefreshForCurrentRequest } =
@@ -291,21 +223,6 @@ const applyActivePlanRefreshProposalForCurrentRequestServer = createServerOnlyFn
       await import("@/lib/active-plan-refresh-actions");
 
     return applyActivePlanRefreshProposalForCurrentRequest(proposal, getPersistedSnapshot);
-  },
-);
-
-const applyActivePlanRefreshProposalForUserServer = createServerOnlyFn(
-  async ({
-    userId,
-    proposal,
-  }: {
-    userId: string;
-    proposal: ActivePlanRefreshApplyPayload;
-  }): Promise<ApplyActivePlanRefreshProposalResult> => {
-    const { applyActivePlanRefreshProposalForUser: applyWithSnapshot } =
-      await import("@/lib/active-plan-refresh-actions");
-
-    return applyWithSnapshot(userId, proposal, getPersistedSnapshot);
   },
 );
 
@@ -531,15 +448,25 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
     planCycle,
   );
   const currentDate = todayIso();
-  const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMapForServer(
-    persistedWorkouts.map((workout) => workout.id),
-  );
+  const persistedWorkoutIds = persistedWorkouts.map((workout) => workout.id);
+  const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMapForServer(persistedWorkoutIds);
+  const evidenceWorkoutIds =
+    planCycle.source_kind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND
+      ? await fetchManualWorkoutEvidenceWorkoutIds(userId, persistedWorkoutIds)
+      : new Set<string>();
   const workouts = persistedWorkouts.map((workout) =>
     dbWorkoutToView(
       workout,
       logsByWorkoutId.get(workout.id) ?? null,
       currentDate,
       feedbackMarkerByWorkoutId.get(workout.id) ?? null,
+      resolveActivePlanWorkoutSourceEditingCapabilities({
+        activePlan: planCycle,
+        workout,
+        log: logsByWorkoutId.get(workout.id) ?? null,
+        evidenceWorkoutIds,
+        currentDate,
+      }),
     ),
   );
 
@@ -582,6 +509,10 @@ function buildActivePlanWorkoutEditingCapabilities(
     moveWorkout: mapActivePlanWorkoutEditingCapability(
       "move_workout",
       resolveActivePlanWorkoutEditability(planCycle, "move_workout"),
+    ),
+    editWorkout: mapActivePlanWorkoutEditingCapability(
+      "edit_workout",
+      resolveActivePlanWorkoutEditability(planCycle, "edit_workout"),
     ),
   };
 }
@@ -645,6 +576,7 @@ function dbWorkoutToView(
   log: Database["public"]["Tables"]["workout_logs"]["Row"] | null,
   currentDate: string,
   feedbackMarker: Workout["feedbackMarker"],
+  sourceEditing: Workout["sourceEditing"],
 ): Workout {
   const mappedLog = log ? logRowToView(log) : null;
   const steps = normalizeExecutableStepInstructions((workout.steps as Step[] | null) ?? []);
@@ -672,6 +604,7 @@ function dbWorkoutToView(
     notes: workout.notes,
     steps,
     feedbackMarker,
+    sourceEditing,
     log: mappedLog,
     status: inferWorkoutStatus(workout.workout_type, workout.workout_date, currentDate, mappedLog),
   };

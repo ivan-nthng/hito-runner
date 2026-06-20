@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TestCalendarRouteImport } from './routes/test-calendar'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as LoginRouteImport } from './routes/login'
@@ -19,9 +20,13 @@ import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
+import { Route as HitoDSPatternsRouteImport } from './routes/hitoDS_.patterns'
+import { Route as HitoDSFoundationsRouteImport } from './routes/hitoDS_.foundations'
+import { Route as HitoDSComponentsRouteImport } from './routes/hitoDS_.components'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminCaptureRouteImport } from './routes/admin.capture'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
+import { Route as HitoDSExportFigmaRouteImport } from './routes/hitoDS_.export.figma'
 import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
 import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
 import { Route as ApiProfileAvatarUploadRouteImport } from './routes/api.profile-avatar.upload'
@@ -32,6 +37,11 @@ import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
 import { Route as ApiAdminAuthLogoutRouteImport } from './routes/api.admin.auth.logout'
 import { Route as ApiAdminAuthLoginRouteImport } from './routes/api.admin.auth.login'
 
+const TestCalendarRoute = TestCalendarRouteImport.update({
+  id: '/test-calendar',
+  path: '/test-calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -82,6 +92,21 @@ const WorkoutDateRoute = WorkoutDateRouteImport.update({
   path: '/workout/$date',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HitoDSPatternsRoute = HitoDSPatternsRouteImport.update({
+  id: '/hitoDS_/patterns',
+  path: '/hitoDS/patterns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HitoDSFoundationsRoute = HitoDSFoundationsRouteImport.update({
+  id: '/hitoDS_/foundations',
+  path: '/hitoDS/foundations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HitoDSComponentsRoute = HitoDSComponentsRouteImport.update({
+  id: '/hitoDS_/components',
+  path: '/hitoDS/components',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin/login',
   path: '/admin/login',
@@ -95,6 +120,11 @@ const AdminCaptureRoute = AdminCaptureRouteImport.update({
 const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
   id: '/admin/analytics',
   path: '/admin/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HitoDSExportFigmaRoute = HitoDSExportFigmaRouteImport.update({
+  id: '/hitoDS_/export/figma',
+  path: '/hitoDS/export/figma',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWorkoutResultUploadRoute = ApiWorkoutResultUploadRouteImport.update({
@@ -153,9 +183,13 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/test-calendar': typeof TestCalendarRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
+  '/hitoDS/components': typeof HitoDSComponentsRoute
+  '/hitoDS/foundations': typeof HitoDSFoundationsRoute
+  '/hitoDS/patterns': typeof HitoDSPatternsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -164,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
+  '/hitoDS/export/figma': typeof HitoDSExportFigmaRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
   '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
 }
@@ -177,9 +212,13 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/test-calendar': typeof TestCalendarRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
+  '/hitoDS/components': typeof HitoDSComponentsRoute
+  '/hitoDS/foundations': typeof HitoDSFoundationsRoute
+  '/hitoDS/patterns': typeof HitoDSPatternsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -188,6 +227,7 @@ export interface FileRoutesByTo {
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
+  '/hitoDS/export/figma': typeof HitoDSExportFigmaRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
   '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
 }
@@ -202,9 +242,13 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
+  '/test-calendar': typeof TestCalendarRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
+  '/hitoDS_/components': typeof HitoDSComponentsRoute
+  '/hitoDS_/foundations': typeof HitoDSFoundationsRoute
+  '/hitoDS_/patterns': typeof HitoDSPatternsRoute
   '/workout/$date': typeof WorkoutDateRoute
   '/api/auth/confirm': typeof ApiAuthConfirmRoute
   '/api/auth/local-login': typeof ApiAuthLocalLoginRoute
@@ -213,6 +257,7 @@ export interface FileRoutesById {
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
+  '/hitoDS_/export/figma': typeof HitoDSExportFigmaRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
   '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
 }
@@ -228,9 +273,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
+    | '/test-calendar'
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
+    | '/hitoDS/components'
+    | '/hitoDS/foundations'
+    | '/hitoDS/patterns'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -239,6 +288,7 @@ export interface FileRouteTypes {
     | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
+    | '/hitoDS/export/figma'
     | '/api/admin/auth/login'
     | '/api/admin/auth/logout'
   fileRoutesByTo: FileRoutesByTo
@@ -252,9 +302,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
+    | '/test-calendar'
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
+    | '/hitoDS/components'
+    | '/hitoDS/foundations'
+    | '/hitoDS/patterns'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -263,6 +317,7 @@ export interface FileRouteTypes {
     | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
+    | '/hitoDS/export/figma'
     | '/api/admin/auth/login'
     | '/api/admin/auth/logout'
   id:
@@ -276,9 +331,13 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
+    | '/test-calendar'
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
+    | '/hitoDS_/components'
+    | '/hitoDS_/foundations'
+    | '/hitoDS_/patterns'
     | '/workout/$date'
     | '/api/auth/confirm'
     | '/api/auth/local-login'
@@ -287,6 +346,7 @@ export interface FileRouteTypes {
     | '/api/profile-avatar/upload'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
+    | '/hitoDS_/export/figma'
     | '/api/admin/auth/login'
     | '/api/admin/auth/logout'
   fileRoutesById: FileRoutesById
@@ -301,9 +361,13 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
+  TestCalendarRoute: typeof TestCalendarRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminCaptureRoute: typeof AdminCaptureRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  HitoDSComponentsRoute: typeof HitoDSComponentsRoute
+  HitoDSFoundationsRoute: typeof HitoDSFoundationsRoute
+  HitoDSPatternsRoute: typeof HitoDSPatternsRoute
   WorkoutDateRoute: typeof WorkoutDateRoute
   ApiAuthConfirmRoute: typeof ApiAuthConfirmRoute
   ApiAuthLocalLoginRoute: typeof ApiAuthLocalLoginRoute
@@ -312,12 +376,20 @@ export interface RootRouteChildren {
   ApiProfileAvatarUploadRoute: typeof ApiProfileAvatarUploadRoute
   ApiWorkoutResultRemoveRoute: typeof ApiWorkoutResultRemoveRoute
   ApiWorkoutResultUploadRoute: typeof ApiWorkoutResultUploadRoute
+  HitoDSExportFigmaRoute: typeof HitoDSExportFigmaRoute
   ApiAdminAuthLoginRoute: typeof ApiAdminAuthLoginRoute
   ApiAdminAuthLogoutRoute: typeof ApiAdminAuthLogoutRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/test-calendar': {
+      id: '/test-calendar'
+      path: '/test-calendar'
+      fullPath: '/test-calendar'
+      preLoaderRoute: typeof TestCalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -388,6 +460,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkoutDateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hitoDS_/patterns': {
+      id: '/hitoDS_/patterns'
+      path: '/hitoDS/patterns'
+      fullPath: '/hitoDS/patterns'
+      preLoaderRoute: typeof HitoDSPatternsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hitoDS_/foundations': {
+      id: '/hitoDS_/foundations'
+      path: '/hitoDS/foundations'
+      fullPath: '/hitoDS/foundations'
+      preLoaderRoute: typeof HitoDSFoundationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hitoDS_/components': {
+      id: '/hitoDS_/components'
+      path: '/hitoDS/components'
+      fullPath: '/hitoDS/components'
+      preLoaderRoute: typeof HitoDSComponentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/login': {
       id: '/admin/login'
       path: '/admin/login'
@@ -407,6 +500,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/analytics'
       fullPath: '/admin/analytics'
       preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hitoDS_/export/figma': {
+      id: '/hitoDS_/export/figma'
+      path: '/hitoDS/export/figma'
+      fullPath: '/hitoDS/export/figma'
+      preLoaderRoute: typeof HitoDSExportFigmaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workout-result/upload': {
@@ -485,9 +585,13 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
+  TestCalendarRoute: TestCalendarRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminCaptureRoute: AdminCaptureRoute,
   AdminLoginRoute: AdminLoginRoute,
+  HitoDSComponentsRoute: HitoDSComponentsRoute,
+  HitoDSFoundationsRoute: HitoDSFoundationsRoute,
+  HitoDSPatternsRoute: HitoDSPatternsRoute,
   WorkoutDateRoute: WorkoutDateRoute,
   ApiAuthConfirmRoute: ApiAuthConfirmRoute,
   ApiAuthLocalLoginRoute: ApiAuthLocalLoginRoute,
@@ -496,6 +600,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProfileAvatarUploadRoute: ApiProfileAvatarUploadRoute,
   ApiWorkoutResultRemoveRoute: ApiWorkoutResultRemoveRoute,
   ApiWorkoutResultUploadRoute: ApiWorkoutResultUploadRoute,
+  HitoDSExportFigmaRoute: HitoDSExportFigmaRoute,
   ApiAdminAuthLoginRoute: ApiAdminAuthLoginRoute,
   ApiAdminAuthLogoutRoute: ApiAdminAuthLogoutRoute,
 }

@@ -12,10 +12,12 @@ import {
   type RunningPlanHorizonSelection,
 } from "@/lib/plan-creation-engine/horizon-policy";
 import { findForbiddenRunnerFacingLanguageMatches } from "@/lib/plan-creation-engine/forbidden-runner-facing-language";
+import { normalizeRunningPlanBenchmarkPaceTruth } from "@/lib/plan-creation-engine/benchmark-pace-truth";
 import {
   RUNNING_PLAN_DAYS_PER_WEEK_VALUES,
   RUNNING_PLAN_DISTANCE_FAMILY_VALUES,
   RUNNING_PLAN_RUNNER_LEVEL_VALUES,
+  type RunningPlanBenchmarkInput,
   type RunningPlanBuilderInput,
   type RunningPlanDaysPerWeek,
   type RunningPlanDistanceFamily,
@@ -48,6 +50,7 @@ export interface BuildRunningPlanPreviewInput {
   fixedRestDays?: readonly WeekdayName[] | null;
   preferredLongRunDay?: WeekdayName | null;
   startDate?: string | null;
+  benchmark?: RunningPlanBenchmarkInput | null;
 }
 
 export interface RunningPlanPreviewCalendarRow {
@@ -194,6 +197,7 @@ export function normalizeRunningPlanPreviewInput({
       fixedRestDays,
       preferredLongRunDay: longRunResolution.longRunDay,
       startDate,
+      benchmarkPaceTruth: normalizeRunningPlanBenchmarkPaceTruth(input.benchmark),
       normalizedBy: sourceKind,
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
       longRunDaySource: longRunResolution.source,

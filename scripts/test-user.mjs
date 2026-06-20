@@ -2,7 +2,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { buildImportedPlanSeed } from "./lib/imported-plan-seed.mjs";
+import { tsImport } from "tsx/esm/api";
+
+const { buildImportedPlanSeed } = await tsImport("../src/lib/imported-plan.ts", import.meta.url);
+const { applyImportedSeedAsActivePlanForOps } = await tsImport(
+  "./lib/ops-plan-apply.ts",
+  import.meta.url,
+);
 
 const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 
@@ -351,101 +357,17 @@ async function importPlanForUser(userId, email, planPath) {
   const plan = JSON.parse(rawPlan);
   const importedSeed = buildImportedPlanSeed(plan);
 
-  const profileUpsert = await supabase
-    .from("runner_profiles")
-    .upsert({
-      user_id: userId,
-      goal_type: importedSeed.profile.goalType,
-      goal_label: importedSeed.profile.goalLabel,
-      baseline_sessions_per_week: importedSeed.profile.baselineSessionsPerWeek,
-      baseline_long_run_km: importedSeed.profile.baselineLongRunKm,
-      baseline_notes: importedSeed.profile.baselineNotes ?? `Imported from JSON for ${email}.`,
-      setup_state: "completed",
-    })
-    .select("user_id")
-    .single();
-
-  if (profileUpsert.error) {
-    throw new Error(profileUpsert.error.message);
-  }
-
-  const archived = await supabase
-    .from("plan_cycles")
-    .update({ status: "archived" })
-    .eq("user_id", userId)
-    .eq("status", "active");
-
-  if (archived.error) {
-    throw new Error(archived.error.message);
-  }
-
-  const planInsert = await supabase
-    .from("plan_cycles")
-    .insert({
-      user_id: userId,
-      status: "active",
-      title: importedSeed.title,
-      goal_summary: importedSeed.goalSummary,
-      source_template: importedSeed.sourceTemplate,
-      schema_version: importedSeed.schemaVersion,
-      source_kind: importedSeed.sourceKind,
-      start_date: importedSeed.startDate,
-      end_date: importedSeed.endDate,
-      target_date: importedSeed.targetDate,
-      goal_metadata: importedSeed.goalMetadata,
-      plan_preferences: importedSeed.planPreferences,
-    })
-    .select("id, title, start_date, end_date")
-    .single();
-
-  if (planInsert.error) {
-    throw new Error(planInsert.error.message);
-  }
-
-  const workouts = importedSeed.workouts.map((workout) => ({
-    plan_cycle_id: planInsert.data.id,
-    user_id: userId,
-    workout_date: workout.workoutDate,
-    weekday: workout.weekday,
-    week_number: workout.weekNumber,
-    phase: workout.phase,
-    workout_type: workout.workoutType,
-    source_workout_id: workout.sourceWorkoutId,
-    source_workout_type: workout.sourceWorkoutType ?? null,
-    workout_family: workout.workoutFamily ?? null,
-    workout_identity: workout.workoutIdentity ?? null,
-    calendar_icon_key: workout.calendarIconKey ?? null,
-    goal_context: workout.goalContext ?? null,
-    metric_mode: workout.metricMode ?? null,
-    title: workout.title,
-    notes: workout.notes,
-    planned_rpe: workout.plannedRpe,
-    estimated_fatigue: workout.estimatedFatigue,
-    recovery_priority: workout.recoveryPriority,
-    steps: workout.steps,
-    display_order: workout.displayOrder,
-  }));
-  const workoutInsert = await supabase.from("planned_workouts").insert(workouts);
-
-  if (workoutInsert.error) {
-    throw new Error(workoutInsert.error.message);
-  }
-
-  const verifyPlan = await supabase
-    .from("planned_workouts")
-    .select(
+  const appliedPlan = await applyImportedSeedAsActivePlanForOps({
+    supabase,
+    userId,
+    importedSeed,
+    profileBaselineNotes: importedSeed.profile.baselineNotes ?? `Imported from JSON for ${email}.`,
+    planSelect: "id, title, start_date, end_date",
+    workoutSelect:
       "id, workout_date, title, source_workout_type, workout_family, workout_identity, calendar_icon_key, goal_context, metric_mode",
-      { count: "exact" },
-    )
-    .eq("plan_cycle_id", planInsert.data.id)
-    .order("workout_date", { ascending: true })
-    .order("display_order", { ascending: true });
+  });
 
-  if (verifyPlan.error) {
-    throw new Error(verifyPlan.error.message);
-  }
-
-  const richWorkoutCount = verifyPlan.data.filter(
+  const richWorkoutCount = appliedPlan.workouts.filter(
     (workout) =>
       workout.workout_family &&
       workout.workout_identity &&
@@ -453,7 +375,7 @@ async function importPlanForUser(userId, email, planPath) {
       workout.goal_context &&
       workout.metric_mode,
   ).length;
-  const compactFallbackCount = verifyPlan.data.filter(
+  const compactFallbackCount = appliedPlan.workouts.filter(
     (workout) =>
       !workout.source_workout_type &&
       !workout.workout_family &&
@@ -463,14 +385,14 @@ async function importPlanForUser(userId, email, planPath) {
 
   return {
     planPath: path.resolve(process.cwd(), planPath),
-    activePlanId: planInsert.data.id,
-    title: planInsert.data.title,
-    startDate: planInsert.data.start_date,
-    endDate: planInsert.data.end_date,
-    workoutCount: verifyPlan.count ?? 0,
+    activePlanId: appliedPlan.planCycle.id,
+    title: appliedPlan.planCycle.title,
+    startDate: appliedPlan.planCycle.start_date,
+    endDate: appliedPlan.planCycle.end_date,
+    workoutCount: appliedPlan.workoutCount,
     richWorkoutCount,
     compactFallbackCount,
-    previewWorkouts: verifyPlan.data.map((workout) => ({
+    previewWorkouts: appliedPlan.workouts.map((workout) => ({
       date: workout.workout_date,
       title: workout.title,
       sourceWorkoutType: workout.source_workout_type,

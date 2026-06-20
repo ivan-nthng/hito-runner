@@ -8,6 +8,7 @@ import {
   resolveActivePlanSourceStatus,
   resolveActivePlanWorkoutEditability,
 } from "@/lib/active-plan-workout-editing/policy";
+import { MISSED_UNLOGGED_MOVE_WINDOW_DAYS } from "@/lib/active-plan-workout-editing/source-capabilities";
 import {
   getExistingPlanContext,
   type ExistingPlanContext,
@@ -32,6 +33,7 @@ import {
   type ManualWorkoutDraftReviewResult,
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
+import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
 import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import type { Json } from "@/lib/supabase/database";
@@ -40,6 +42,7 @@ import { diffDaysIso, todayIso, weekdayLong } from "@/lib/training";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION = "manual_workout_move_review_payload_v1" as const;
+const MANUAL_WORKOUT_DIRECT_MOVE_PAYLOAD_VERSION = "manual_workout_direct_move_v1" as const;
 const MANUAL_WORKOUT_MOVE_REVIEW_TOKEN_PREFIX = "manual-workout-move-review-v1.";
 
 const manualWorkoutMoveBaseInputSchema = z
@@ -86,6 +89,15 @@ export const manualWorkoutMoveConfirmInputSchema = z
     }
   });
 
+export const manualWorkoutDirectMoveInputSchema = z
+  .object({
+    activePlanId: z.string().uuid(),
+    sourceWorkoutId: z.string().uuid(),
+    sourceWorkoutDate: isoDateSchema,
+    targetDate: isoDateSchema,
+  })
+  .strict();
+
 export type ManualWorkoutMoveFailureReason =
   | "unauthenticated"
   | "invalid_review"
@@ -97,7 +109,11 @@ export type ManualWorkoutMoveFailureReason =
   | "source_workout_not_found"
   | "source_workout_not_in_active_plan"
   | "source_workout_not_supported"
+  | "source_date_changed"
+  | "client_payload_rejected"
   | "target_date_unchanged"
+  | "target_today_requires_missed_source"
+  | "missed_window_expired"
   | "protected_day"
   | "occupied_day"
   | "persistence_failed";
@@ -130,6 +146,10 @@ type ManualWorkoutMoveReview = {
   reviewToken: string;
   reviewChecksum: string;
   exactnessPayloadVersion: typeof MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION;
+  mutationMode?: "direct_manual_edit";
+  mutationPayloadVersion?: typeof MANUAL_WORKOUT_DIRECT_MOVE_PAYLOAD_VERSION;
+  mutationChecksum?: string;
+  trustedClientRows?: false;
 };
 
 export type ManualWorkoutMoveReviewResult =
@@ -200,6 +220,45 @@ export type ManualWorkoutMoveConfirmResult =
     }
   | ManualWorkoutMoveBlockedResult;
 
+export type ManualWorkoutDirectMoveResult =
+  | {
+      ok: true;
+      status: "moved";
+      persisted: true;
+      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
+      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
+      activePlanId: string;
+      plannedWorkoutId: string;
+      sourceWorkoutDate: string;
+      targetDate: string;
+      targetWeekday: string;
+      title: string;
+      templateKey: ManualWorkoutTemplateKey;
+      mutationMode: "direct_manual_edit";
+      mutationPayloadVersion: typeof MANUAL_WORKOUT_DIRECT_MOVE_PAYLOAD_VERSION;
+      mutationChecksum: string;
+      calendarRowCount: number;
+      nonRestWorkoutCount: number;
+      safety: {
+        requiresExplicitConfirm: false;
+        directMutation: true;
+        sourceWorkoutVerified: true;
+        activePlanSourceVerified: true;
+        protectedHistoryChecked: true;
+        movedExactlyOneRow: true;
+        sourceDateBecameEmpty: true;
+        targetDayWasEmpty: true;
+        targetWeekdayDerivedServerSide: true;
+        activePlanRemainsActive: true;
+        lastWorkoutMoveAllowedWithinSamePlan: true;
+        trustedClientRows: false;
+        serverRebuiltReview: true;
+        callsOpenAi: false;
+      };
+    }
+  | ManualWorkoutMoveBlockedResult;
+
 type ManualWorkoutMoveReviewInput = z.output<typeof manualWorkoutMoveReviewInputSchema>;
 type ManualWorkoutMoveConfirmInput = z.output<typeof manualWorkoutMoveConfirmInputSchema>;
 
@@ -227,6 +286,10 @@ type PersistManualWorkoutMoveInput = {
   otherWorkouts: readonly PersistedPlannedWorkoutRow[];
   review: ManualWorkoutMoveReview;
   targetWeekNumber: number;
+};
+
+type ManualWorkoutMoveResolutionOptions = {
+  allowRecentMissedUnloggedSource?: boolean;
 };
 
 export const reviewManualWorkoutMove = createServerFn({ method: "POST" })
@@ -257,6 +320,21 @@ export const confirmManualWorkoutMove = createServerFn({ method: "POST" })
     }
 
     return confirmManualWorkoutMoveForUser(userId, data);
+  });
+
+export const moveManualWorkoutWithinActivePlan = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => value)
+  .handler(async ({ data }): Promise<ManualWorkoutDirectMoveResult> => {
+    const userId = await getCurrentPersistedUserId();
+
+    if (!userId) {
+      return buildMoveBlocked({
+        reason: "unauthenticated",
+        message: "Sign in before moving manual workouts.",
+      });
+    }
+
+    return moveManualWorkoutWithinActivePlanForUser(userId, data);
   });
 
 export async function reviewManualWorkoutMoveForUser(
@@ -405,6 +483,116 @@ export async function confirmManualWorkoutMoveForUser(
   }
 }
 
+export async function moveManualWorkoutWithinActivePlanForUser(
+  userId: string,
+  input: unknown,
+  dependencies: ManualWorkoutMoveDependencies = {},
+): Promise<ManualWorkoutDirectMoveResult> {
+  const parsed = manualWorkoutDirectMoveInputSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return buildMoveBlocked({
+      reason: inputHasClientPayload(parsed.error) ? "client_payload_rejected" : "invalid_input",
+      message: inputHasClientPayload(parsed.error)
+        ? "Manual workout direct move accepts only source and target identifiers."
+        : "The manual workout direct move payload is invalid.",
+    });
+  }
+
+  const target = await resolveManualWorkoutMoveTarget(userId, parsed.data, dependencies, {
+    allowRecentMissedUnloggedSource: true,
+  });
+
+  if (!target.ok) {
+    return buildMoveBlocked(target);
+  }
+
+  if (target.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+    return buildMoveBlocked({
+      reason: "unsupported_active_plan_source",
+      message: "Direct manual workout moves are available only for manual user-built plans.",
+    });
+  }
+
+  const mutationChecksum = buildDirectMoveMutationChecksum({
+    activePlanId: target.activePlan.id,
+    sourceWorkoutId: target.sourceWorkout.id,
+    sourceWorkoutDate: target.sourceWorkout.workout_date,
+    targetDate: target.review.targetDate,
+    targetWeekday: target.review.targetWeekday,
+    templateKey: target.review.templateKey,
+    reviewChecksum: target.review.reviewChecksum,
+  });
+  const directReview: ManualWorkoutMoveReview = {
+    ...target.review,
+    mutationMode: "direct_manual_edit",
+    mutationPayloadVersion: MANUAL_WORKOUT_DIRECT_MOVE_PAYLOAD_VERSION,
+    mutationChecksum,
+    trustedClientRows: false,
+  };
+  const persistMove = dependencies.persistWorkoutMove ?? persistManualWorkoutMove;
+
+  try {
+    await persistMove({
+      userId,
+      activePlan: target.activePlan,
+      sourceWorkout: target.sourceWorkout,
+      otherWorkouts: target.otherWorkouts,
+      review: directReview,
+      targetWeekNumber: target.targetWeekNumber,
+    });
+
+    const movedWorkouts = buildMovedWorkoutSet({
+      sourceWorkout: target.sourceWorkout,
+      otherWorkouts: target.otherWorkouts,
+      review: directReview,
+    });
+
+    return {
+      ok: true,
+      status: "moved",
+      persisted: true,
+      sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+      sourceStatus: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+      workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+      activePlanId: target.activePlan.id,
+      plannedWorkoutId: target.sourceWorkout.id,
+      sourceWorkoutDate: target.sourceWorkout.workout_date,
+      targetDate: directReview.targetDate,
+      targetWeekday: directReview.targetWeekday,
+      title: target.sourceWorkout.title,
+      templateKey: directReview.templateKey,
+      mutationMode: "direct_manual_edit",
+      mutationPayloadVersion: MANUAL_WORKOUT_DIRECT_MOVE_PAYLOAD_VERSION,
+      mutationChecksum,
+      calendarRowCount: movedWorkouts.length,
+      nonRestWorkoutCount: movedWorkouts.filter((workout) => workout.workout_type !== "rest")
+        .length,
+      safety: {
+        requiresExplicitConfirm: false,
+        directMutation: true,
+        sourceWorkoutVerified: true,
+        activePlanSourceVerified: true,
+        protectedHistoryChecked: true,
+        movedExactlyOneRow: true,
+        sourceDateBecameEmpty: true,
+        targetDayWasEmpty: true,
+        targetWeekdayDerivedServerSide: true,
+        activePlanRemainsActive: true,
+        lastWorkoutMoveAllowedWithinSamePlan: true,
+        trustedClientRows: false,
+        serverRebuiltReview: true,
+        callsOpenAi: false,
+      },
+    };
+  } catch {
+    return buildMoveBlocked({
+      reason: "persistence_failed",
+      message: "The manual workout could not be moved. The active plan is unchanged.",
+    });
+  }
+}
+
 export async function persistManualWorkoutMove({
   userId,
   activePlan,
@@ -482,6 +670,7 @@ async function resolveManualWorkoutMoveTarget(
   userId: string,
   input: ManualWorkoutMoveReviewInput | ManualWorkoutMoveConfirmInput,
   dependencies: ManualWorkoutMoveDependencies,
+  options: ManualWorkoutMoveResolutionOptions = {},
 ): Promise<ManualWorkoutMoveTarget> {
   const getContext = dependencies.getExistingPlanContextForUser ?? getExistingPlanContext;
   const fetchEvidence =
@@ -548,35 +737,37 @@ async function resolveManualWorkoutMoveTarget(
     };
   }
 
-  if (source.workout.workout_date === input.targetDate) {
-    return {
-      ok: false,
-      reason: "target_date_unchanged",
-      message: "Choose a different empty date before moving this workout.",
-    };
+  const datePolicy = resolveManualWorkoutMoveDatePolicy({
+    sourceWorkoutDate: source.workout.workout_date,
+    targetDate: input.targetDate,
+    currentDate,
+    activePlanStartDate: activePlan.start_date,
+    allowRecentMissedUnloggedSource: options.allowRecentMissedUnloggedSource === true,
+  });
+
+  if (!datePolicy.ok) {
+    return datePolicy;
   }
 
   const sourceEvidenceIds = await fetchEvidence(userId, [source.workout.id]);
-  if (
-    isProtectedManualWorkoutTarget(
-      source.workout,
-      currentDate,
-      planContext.existingWorkouts.logsByWorkoutId,
-      sourceEvidenceIds,
-    )
-  ) {
+  const sourceHasLoggedOrEvidenceHistory =
+    planContext.existingWorkouts.logsByWorkoutId.has(source.workout.id) ||
+    sourceEvidenceIds.has(source.workout.id);
+  const sourceIsProtected =
+    datePolicy.recentMissedUnloggedSource === true
+      ? sourceHasLoggedOrEvidenceHistory
+      : isProtectedManualWorkoutTarget(
+          source.workout,
+          currentDate,
+          planContext.existingWorkouts.logsByWorkoutId,
+          sourceEvidenceIds,
+        );
+
+  if (sourceIsProtected) {
     return {
       ok: false,
       reason: "protected_day",
       message: "This workout has protected history or evidence and cannot be moved here.",
-    };
-  }
-
-  if (input.targetDate <= currentDate || input.targetDate < activePlan.start_date) {
-    return {
-      ok: false,
-      reason: "protected_day",
-      message: "Workout moves can only target future empty days inside the current active plan.",
     };
   }
 
@@ -585,6 +776,15 @@ async function resolveManualWorkoutMoveTarget(
   );
 
   if (targetDateWorkouts.length > 0) {
+    if (datePolicy.recentMissedUnloggedSource) {
+      return {
+        ok: false,
+        reason: "occupied_day",
+        message:
+          "The target date already has a planned workout. Choose an empty day before moving.",
+      };
+    }
+
     const targetEvidenceIds = await fetchEvidence(
       userId,
       targetDateWorkouts.map((workout) => workout.id),
@@ -607,10 +807,7 @@ async function resolveManualWorkoutMoveTarget(
     };
   }
 
-  if (
-    hasUnsafeMetricTruth(source.workout.metric_mode) ||
-    hasUnsafeMetricTruth(source.workout.steps)
-  ) {
+  if (persistedManualWorkoutHasUnsafeMetricTruth(source.workout)) {
     return {
       ok: false,
       reason: "source_workout_not_supported",
@@ -668,6 +865,64 @@ async function resolveManualWorkoutMoveTarget(
   };
 }
 
+function resolveManualWorkoutMoveDatePolicy(input: {
+  sourceWorkoutDate: string;
+  targetDate: string;
+  currentDate: string;
+  activePlanStartDate: string;
+  allowRecentMissedUnloggedSource: boolean;
+}):
+  | { ok: true; recentMissedUnloggedSource: boolean }
+  | { ok: false; reason: ManualWorkoutMoveFailureReason; message: string } {
+  if (input.sourceWorkoutDate === input.targetDate) {
+    return {
+      ok: false,
+      reason: "target_date_unchanged",
+      message: "Choose a different empty date before moving this workout.",
+    };
+  }
+
+  if (input.targetDate < input.currentDate || input.targetDate < input.activePlanStartDate) {
+    return {
+      ok: false,
+      reason: "protected_day",
+      message: "Workout moves can only target future empty days inside the current active plan.",
+    };
+  }
+
+  const missedAgeDays = diffDaysIso(input.currentDate, input.sourceWorkoutDate);
+
+  if (missedAgeDays >= 1) {
+    if (!input.allowRecentMissedUnloggedSource) {
+      return {
+        ok: false,
+        reason: "protected_day",
+        message: "Workout moves can only target future empty days inside the current active plan.",
+      };
+    }
+
+    if (missedAgeDays > MISSED_UNLOGGED_MOVE_WINDOW_DAYS) {
+      return {
+        ok: false,
+        reason: "missed_window_expired",
+        message: "This missed workout is outside the recent move window.",
+      };
+    }
+
+    return { ok: true, recentMissedUnloggedSource: true };
+  }
+
+  if (input.targetDate === input.currentDate) {
+    return {
+      ok: false,
+      reason: "target_today_requires_missed_source",
+      message: "Moving to today is available only for a recent missed unlogged workout.",
+    };
+  }
+
+  return { ok: true, recentMissedUnloggedSource: false };
+}
+
 function resolveMoveSourceWorkout(input: {
   userId: string;
   activePlanId: string;
@@ -699,6 +954,14 @@ function resolveMoveSourceWorkout(input: {
       ok: false,
       reason: "source_workout_not_in_active_plan",
       message: "The source workout is not part of the current runner's active manual plan.",
+    };
+  }
+
+  if (input.sourceWorkoutDate && workout.workout_date !== input.sourceWorkoutDate) {
+    return {
+      ok: false,
+      reason: "source_date_changed",
+      message: "The source workout is no longer on the moved date. Refresh the calendar.",
     };
   }
 
@@ -803,13 +1066,20 @@ function buildManualWorkoutMoveGoalMetadata(input: {
   const editMetadata = buildActivePlanUserEditMetadata({
     activePlan: input.activePlan,
     mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.moveWorkout,
+    mutationMode: input.review.mutationMode,
+    mutationPayloadVersion: input.review.mutationPayloadVersion,
+    mutationChecksum: input.review.mutationChecksum ?? input.review.reviewChecksum,
     plannedWorkoutId: input.review.sourceWorkoutId,
     previousWorkoutDate: input.review.sourceWorkoutDate,
+    sourceWorkoutId: input.review.sourceWorkoutId,
+    sourceWorkoutDate: input.review.sourceWorkoutDate,
+    targetWorkoutId: input.review.sourceWorkoutId,
     reviewChecksum: input.review.reviewChecksum,
     reviewPayloadVersion: MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION,
     targetDate: input.review.targetDate,
     templateKey: input.review.templateKey,
     title: input.review.title,
+    trustedClientRows: input.review.trustedClientRows,
     workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   });
   const root = appendActivePlanUserEditMetadataToRecord(
@@ -842,6 +1112,10 @@ function buildManualWorkoutMoveGoalMetadata(input: {
         title: input.review.title,
         template_key: input.review.templateKey,
         review_checksum: input.review.reviewChecksum,
+        mutation_mode: input.review.mutationMode,
+        mutation_payload_version: input.review.mutationPayloadVersion,
+        mutation_checksum: input.review.mutationChecksum,
+        trusted_client_rows: input.review.trustedClientRows,
       },
     },
   });
@@ -855,13 +1129,20 @@ function buildManualWorkoutMovePlanPreferences(input: {
   const editMetadata = buildActivePlanUserEditMetadata({
     activePlan: input.activePlan,
     mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.moveWorkout,
+    mutationMode: input.review.mutationMode,
+    mutationPayloadVersion: input.review.mutationPayloadVersion,
+    mutationChecksum: input.review.mutationChecksum ?? input.review.reviewChecksum,
     plannedWorkoutId: input.review.sourceWorkoutId,
     previousWorkoutDate: input.review.sourceWorkoutDate,
+    sourceWorkoutId: input.review.sourceWorkoutId,
+    sourceWorkoutDate: input.review.sourceWorkoutDate,
+    targetWorkoutId: input.review.sourceWorkoutId,
     reviewChecksum: input.review.reviewChecksum,
     reviewPayloadVersion: MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION,
     targetDate: input.review.targetDate,
     templateKey: input.review.templateKey,
     title: input.review.title,
+    trustedClientRows: input.review.trustedClientRows,
     workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   });
   const root = appendActivePlanUserEditMetadataToRecord(
@@ -880,6 +1161,10 @@ function buildManualWorkoutMovePlanPreferences(input: {
     template_key: input.review.templateKey,
     review_payload_version: MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION,
     review_checksum: input.review.reviewChecksum,
+    mutation_mode: input.review.mutationMode,
+    mutation_payload_version: input.review.mutationPayloadVersion,
+    mutation_checksum: input.review.mutationChecksum,
+    trusted_client_rows: input.review.trustedClientRows,
   };
 
   if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
@@ -918,29 +1203,32 @@ function buildMovedSourceWorkoutId(workout: PersistedPlannedWorkoutRow, targetDa
   return `manual-${targetDate}-${sourceWorkoutType}`;
 }
 
-function hasUnsafeMetricTruth(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.some(hasUnsafeMetricTruth);
-  }
+function buildDirectMoveMutationChecksum(input: {
+  activePlanId: string;
+  sourceWorkoutId: string;
+  sourceWorkoutDate: string;
+  targetDate: string;
+  targetWeekday: string;
+  templateKey: ManualWorkoutTemplateKey;
+  reviewChecksum: string;
+}) {
+  return stableManualWorkoutChecksum64Hex({
+    version: MANUAL_WORKOUT_DIRECT_MOVE_PAYLOAD_VERSION,
+    sourceKind: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.moveWorkout,
+    activePlanId: input.activePlanId,
+    sourceWorkoutId: input.sourceWorkoutId,
+    sourceWorkoutDate: input.sourceWorkoutDate,
+    targetDate: input.targetDate,
+    targetWeekday: input.targetWeekday,
+    templateKey: input.templateKey,
+    reviewChecksum: input.reviewChecksum,
+    trustedClientRows: false,
+  });
+}
 
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const record = value as Record<string, unknown>;
-  if (
-    "pace" in record ||
-    "pace_min_per_km_range" in record ||
-    "paceMinPerKmRange" in record ||
-    "hr_bpm_range" in record ||
-    "hrBpmRange" in record ||
-    record.hr_target_source === "personal_hr_zone" ||
-    record.hrTargetSource === "personal_hr_zone"
-  ) {
-    return true;
-  }
-
-  return Object.values(record).some(hasUnsafeMetricTruth);
+function inputHasClientPayload(error: z.ZodError) {
+  return error.issues.some((issue) => issue.code === "unrecognized_keys");
 }
 
 function mapMoveDraftFailureReason(reason: string): ManualWorkoutMoveFailureReason {

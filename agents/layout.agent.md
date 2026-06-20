@@ -18,6 +18,13 @@ Ship markup/styling/layout fixes without changing logic, state, or backend behav
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For layout audits, responsive evidence gathering, DS/source scans, and screenshot comparison, follow
+the subagent delegation discipline in `AGENTS.md`: use read-only subagents where safe, reuse open
+subagents for similar checks, close them when done, and integrate findings into one layout decision
+or implementation report.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

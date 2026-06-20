@@ -14,6 +14,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
@@ -30,52 +33,77 @@ import { CALENDAR_ICON_KEY_VALUES, type CalendarIconKey } from "@/lib/rich-worko
 import { formatDurationMin, formatDistanceMeters } from "@/lib/training";
 import {
   addManualWorkoutToActivePlan,
-  confirmManualWorkoutCopyPasteDraft,
-  confirmManualWorkoutDeleteClear,
+  copyManualWorkoutWithinActivePlan,
   listManualWorkoutSavedTemplates,
-  reviewManualWorkoutCopyPasteDraft,
-  reviewManualWorkoutDeleteClear,
   reviewManualWorkoutDraftAction,
   reviewManualWorkoutSavedTemplate,
   saveManualWorkoutSavedTemplate,
-  type ManualWorkoutBlockInput,
-  type ManualWorkoutCopyPasteReviewResult,
-  type ManualWorkoutConstructorEntryInput,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
-  type ManualWorkoutDeleteClearReviewResult,
-  type ManualWorkoutSavedTemplateReviewResult,
-  type ManualWorkoutSavedTemplateSaveResult,
-  type ManualWorkoutSavedTemplateView,
-  type ManualWorkoutTargetTruthMode,
 } from "@/lib/training-api";
+import type {
+  ManualWorkoutDirectCopyResult,
+  ManualWorkoutDraftInput,
+  ManualWorkoutDraftReviewResult,
+  ManualWorkoutSavedTemplateReviewResult,
+  ManualWorkoutSavedTemplateSaveResult,
+  ManualWorkoutSavedTemplateView,
+  ManualWorkoutTemplateKey,
+  ManualWorkoutTargetTruthMode,
+} from "@/lib/manual-workout-authoring";
 import { type ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  type ManualWorkoutBlockInput,
+  type ManualWorkoutConstructorEntryInput,
 } from "@/lib/manual-workout-authoring/schema";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import {
   buildManualDraftInput,
+  cloneManualWorkoutEntries,
   formatManualDraftStructure,
   formatReadableDate,
   getDefaultManualWorkoutTemplate,
+  MANUAL_WORKOUT_TEMPLATES,
   groupManualTemplates,
   targetTruthModeCopy,
   targetTruthModeLabel,
   templateShortLabel,
+  templateIconKind,
+  templateIconTone,
   workoutToneColor,
 } from "@/components/manual-workout/manual-workout-authoring-utils";
+import {
+  ManualWorkoutConstructorEditor,
+  type ManualWorkoutConstructorSource,
+} from "@/components/manual-workout/ManualWorkoutConstructorEditor";
+import {
+  MANUAL_COPY_PASTE_TOAST_ID,
+  type ManualCopiedWorkoutSource,
+} from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
+
+export { ManualWorkoutSourceActionMenu } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
+export type { ManualCopiedWorkoutSource } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
 
 export type ManualReviewReady = Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
 export type ManualReviewRejected = Extract<ManualWorkoutDraftReviewResult, { ok: false }>;
 export type ManualDraftStatus = "idle" | "reviewing" | "creating";
+
+const MANUAL_ADD_MENU_CONTENT_CLASS = "w-[min(20rem,calc(100vw-2rem))] p-2";
+const MANUAL_ADD_MENU_SUBCONTENT_CLASS =
+  "w-[min(24rem,calc(100vw-2rem))] max-h-[min(32rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto p-2";
+const MANUAL_ADD_MENU_ITEM_CLASS = "min-h-14 items-start gap-3 px-3 py-2.5 text-left";
+const MANUAL_ADD_MENU_ICON_CLASS = "mt-0.5 shrink-0";
 
 export type ManualDraftSelection =
   | {
       kind: "registry";
       date: string;
       template: ManualWorkoutTemplate;
+    }
+  | {
+      kind: "scratch";
+      date: string;
+      template: ManualWorkoutTemplate | null;
     }
   | {
       kind: "saved";
@@ -99,16 +127,9 @@ export type ManualSavedTemplatesState = {
   message: string | null;
 };
 
-export type ManualCopiedWorkoutSource = {
-  activePlanId: string;
-  sourceWorkoutId: string;
-  sourceWorkoutDate: string;
-  title: string;
-};
-
 const MANUAL_ADD_TOAST_ID = "manual-active-plan-add";
-const MANUAL_COPY_PASTE_TOAST_ID = "manual-workout-copy-paste";
-const MANUAL_DELETE_CLEAR_TOAST_ID = "manual-workout-delete-clear";
+const PASTE_UNAVAILABLE_MESSAGE =
+  "Hito could not paste this workout yet. Try again from the calendar.";
 const EMPTY_SAVED_TEMPLATES_STATE: ManualSavedTemplatesState = {
   status: "idle",
   templates: [],
@@ -126,6 +147,7 @@ export function ManualWorkoutAddMenu({
   onMoveCanceled,
   onMoveTargetSelected,
   moveWorkoutSource = null,
+  moveOnly = false,
 }: {
   activePlanId: string;
   activePlanSourceKind: string;
@@ -135,28 +157,28 @@ export function ManualWorkoutAddMenu({
   disabled?: boolean;
   onAdded: () => void | Promise<void>;
   onMoveCanceled?: () => void;
-  onMoveTargetSelected?: (targetDate: string) => void;
+  onMoveTargetSelected?: (targetDate: string, source?: ManualCopiedWorkoutSource | null) => void;
   moveWorkoutSource?: ManualCopiedWorkoutSource | null;
+  moveOnly?: boolean;
 }) {
   const reviewManualWorkoutDraftFn = useServerFn(reviewManualWorkoutDraftAction);
-  const reviewManualWorkoutCopyPasteDraftFn = useServerFn(reviewManualWorkoutCopyPasteDraft);
-  const confirmManualWorkoutCopyPasteDraftFn = useServerFn(confirmManualWorkoutCopyPasteDraft);
+  const copyManualWorkoutWithinActivePlanFn = useServerFn(copyManualWorkoutWithinActivePlan);
   const listManualWorkoutSavedTemplatesFn = useServerFn(listManualWorkoutSavedTemplates);
   const reviewManualWorkoutSavedTemplateFn = useServerFn(reviewManualWorkoutSavedTemplate);
   const saveManualWorkoutSavedTemplateFn = useServerFn(saveManualWorkoutSavedTemplate);
   const addManualWorkoutToActivePlanFn = useServerFn(addManualWorkoutToActivePlan);
   const confirmInFlightRef = useRef(false);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [constructorOpen, setConstructorOpen] = useState(false);
   const [selection, setSelection] = useState<ManualDraftSelection | null>(null);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [targetTruthMode, setTargetTruthMode] =
     useState<ManualWorkoutTargetTruthMode>("structure_only");
+  const [entries, setEntries] = useState<ManualWorkoutConstructorEntryInput[]>([]);
   const [status, setStatus] = useState<ManualDraftStatus>("idle");
   const [reviewResult, setReviewResult] = useState<ManualWorkoutDraftReviewResult | null>(null);
   const [reviewedDraft, setReviewedDraft] = useState<ReviewedManualDraft | null>(null);
-  const [pasteReview, setPasteReview] = useState<ManualWorkoutCopyPasteReady | null>(null);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const [savedTemplatesState, setSavedTemplatesState] = useState<ManualSavedTemplatesState>(
     EMPTY_SAVED_TEMPLATES_STATE,
@@ -170,41 +192,71 @@ export function ManualWorkoutAddMenu({
     moveWorkoutSource.sourceWorkoutDate !== date,
   );
 
+  const openConstructorDialog = () => {
+    setAddMenuOpen(false);
+
+    if (typeof window === "undefined") {
+      setConstructorOpen(true);
+      return;
+    }
+
+    window.requestAnimationFrame(() => setConstructorOpen(true));
+  };
+
   const openConstructor = (template: ManualWorkoutTemplate) => {
     setSelection({ kind: "registry", date, template });
     setTitle(template.defaultTitle);
     setNotes(template.defaultNotes ?? "");
     setTargetTruthMode(template.defaultTargetTruthMode);
+    setEntries(cloneManualWorkoutEntries(template.defaultEntries));
     setReviewResult(null);
     setReviewedDraft(null);
-    setPasteReview(null);
     setConfirmMessage(null);
-    setConstructorOpen(true);
+    openConstructorDialog();
   };
 
-  const openTemplatePicker = () => {
-    setSelection({
-      kind: "registry",
-      date,
-      template: getDefaultManualWorkoutTemplate("easy_aerobic_run"),
-    });
-    setTemplatePickerOpen(true);
-    void loadSavedTemplates();
+  const openScratchConstructor = () => {
+    setSelection({ kind: "scratch", date, template: null });
+    setTitle("");
+    setNotes("");
+    setTargetTruthMode("structure_only");
+    setEntries([]);
+    setReviewResult(null);
+    setReviewedDraft(null);
+    setConfirmMessage(null);
+    openConstructorDialog();
+  };
+
+  const handleAddMenuOpenChange = (open: boolean) => {
+    setAddMenuOpen(open);
+
+    if (
+      open &&
+      (savedTemplatesState.status === "idle" || savedTemplatesState.status === "failed")
+    ) {
+      void loadSavedTemplates();
+    }
   };
 
   const buildRegistryInput = (
-    draftSelection: Extract<ManualDraftSelection, { kind: "registry" }>,
-  ) =>
-    buildManualDraftInput({
+    draftSelection: Extract<ManualDraftSelection, { kind: "registry" | "scratch" }>,
+  ) => {
+    if (!draftSelection.template) {
+      throw new Error("Choose a backend-supported workout type before review.");
+    }
+
+    return buildManualDraftInput({
       activePlanId,
       activePlanSourceKind,
       contextMode: "existing_active_plan",
       date: draftSelection.date,
+      entries,
       notes,
       targetTruthMode,
       template: draftSelection.template,
       title,
     });
+  };
 
   const buildSavedTemplateReviewInput = (
     draftSelection: Extract<ManualDraftSelection, { kind: "saved" }>,
@@ -259,14 +311,20 @@ export function ManualWorkoutAddMenu({
   };
 
   const submitRegistryReview = async (
-    draftSelection: Extract<ManualDraftSelection, { kind: "registry" }>,
+    draftSelection: Extract<ManualDraftSelection, { kind: "registry" | "scratch" }>,
   ) => {
+    if (!draftSelection.template) {
+      setReviewResult(
+        buildManualReviewRejected("Choose a backend-supported workout type before review."),
+      );
+      return;
+    }
+
     const input = buildRegistryInput(draftSelection);
 
     setStatus("reviewing");
     setReviewResult(null);
     setReviewedDraft(null);
-    setPasteReview(null);
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_ADD_TOAST_ID,
@@ -323,7 +381,6 @@ export function ManualWorkoutAddMenu({
     setStatus("reviewing");
     setReviewResult(null);
     setReviewedDraft(null);
-    setPasteReview(null);
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_ADD_TOAST_ID,
@@ -385,16 +442,15 @@ export function ManualWorkoutAddMenu({
     const nextTitle = template.displayName;
     const nextNotes = template.draftPayload.sourceNotes ?? "";
 
-    setTemplatePickerOpen(false);
     setSelection(nextSelection);
     setTitle(nextTitle);
     setNotes(nextNotes);
     setTargetTruthMode(template.targetTruthMode);
+    setEntries(cloneManualWorkoutEntries(template.draftPayload.entries));
     setReviewResult(null);
     setReviewedDraft(null);
-    setPasteReview(null);
     setConfirmMessage(null);
-    setConstructorOpen(true);
+    openConstructorDialog();
     void submitSavedTemplateReview(nextSelection, nextTitle, nextNotes);
   };
 
@@ -483,7 +539,6 @@ export function ManualWorkoutAddMenu({
       confirmInFlightRef.current = false;
       setStatus("idle");
       setConstructorOpen(false);
-      setTemplatePickerOpen(false);
       setReviewedDraft(null);
       setReviewResult(null);
       setConfirmMessage(null);
@@ -502,89 +557,37 @@ export function ManualWorkoutAddMenu({
     }
   };
 
-  const submitPasteReview = async () => {
+  const pasteCopiedWorkout = async () => {
     if (!copiedWorkoutSource || !canPasteCopiedWorkout || status !== "idle") return;
 
-    setStatus("reviewing");
+    setStatus("creating");
     setReviewResult(null);
     setReviewedDraft(null);
-    setPasteReview(null);
-    setConfirmMessage(null);
-    hitoToast.working({
-      id: MANUAL_COPY_PASTE_TOAST_ID,
-      title: "Reviewing paste",
-      description: "Hito is reconstructing the copied workout from saved plan truth.",
-    });
-
-    try {
-      const result = await reviewManualWorkoutCopyPasteDraftFn({
-        data: {
-          activePlanId,
-          sourceWorkoutId: copiedWorkoutSource.sourceWorkoutId,
-          targetDate: date,
-        },
-      });
-      setStatus("idle");
-
-      if (!result.ok) {
-        setConfirmMessage(result.message);
-        hitoToast.error({
-          id: MANUAL_COPY_PASTE_TOAST_ID,
-          title: "Paste needs review",
-          description: result.message,
-        });
-        return;
-      }
-
-      setPasteReview(result);
-      hitoToast.success({
-        id: MANUAL_COPY_PASTE_TOAST_ID,
-        title: "Paste reviewed",
-        description: "Confirm the backend-reviewed copy before it is saved.",
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Could not review this copied workout yet.";
-      setStatus("idle");
-      setConfirmMessage(message);
-      hitoToast.error({
-        id: MANUAL_COPY_PASTE_TOAST_ID,
-        title: "Paste review failed",
-        description: message,
-      });
-    }
-  };
-
-  const confirmPasteReview = async () => {
-    if (!pasteReview || confirmInFlightRef.current) return;
-
-    confirmInFlightRef.current = true;
-    setStatus("creating");
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_COPY_PASTE_TOAST_ID,
       title: "Pasting workout",
-      description: "Hito is confirming the reviewed paste server-side.",
+      description: "Hito is copying from the saved source workout server-side.",
     });
 
     try {
-      const result = await confirmManualWorkoutCopyPasteDraftFn({
+      const response = await copyManualWorkoutWithinActivePlanFn({
         data: {
           activePlanId,
-          sourceWorkoutId: pasteReview.sourceWorkoutId,
-          targetDate: pasteReview.targetDate,
-          reviewToken: pasteReview.review.reviewToken,
-          reviewChecksum: pasteReview.review.reviewChecksum,
+          sourceWorkoutId: copiedWorkoutSource.sourceWorkoutId,
+          sourceWorkoutDate: copiedWorkoutSource.sourceWorkoutDate,
+          targetDate: date,
         },
       });
+      const result = isManualWorkoutDirectCopyResult(response)
+        ? response
+        : buildPasteUnavailableResult();
+      setStatus("idle");
 
       if (!result.ok) {
-        confirmInFlightRef.current = false;
-        setStatus("idle");
-        setConfirmMessage(result.message);
         hitoToast.error({
           id: MANUAL_COPY_PASTE_TOAST_ID,
-          title: "Workout not pasted",
+          title: "Paste blocked",
           description: result.message,
         });
         return;
@@ -595,19 +598,13 @@ export function ManualWorkoutAddMenu({
         title: "Workout pasted",
         description: "Refreshing the calendar from saved plan truth.",
       });
-      confirmInFlightRef.current = false;
-      setStatus("idle");
       setConstructorOpen(false);
-      setTemplatePickerOpen(false);
       setReviewedDraft(null);
-      setPasteReview(null);
       setReviewResult(null);
       setConfirmMessage(null);
       await onAdded();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "The copied workout could not be pasted.";
-      confirmInFlightRef.current = false;
+    } catch {
+      const message = PASTE_UNAVAILABLE_MESSAGE;
       setStatus("idle");
       setConfirmMessage(message);
       hitoToast.error({
@@ -620,70 +617,127 @@ export function ManualWorkoutAddMenu({
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={addMenuOpen} onOpenChange={handleAddMenuOpenChange}>
         <DropdownMenuTrigger asChild disabled={disabled}>
           {children}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuLabel>{formatReadableDate(date)}</DropdownMenuLabel>
+        <DropdownMenuContent align="start" className={MANUAL_ADD_MENU_CONTENT_CLASS}>
+          <DropdownMenuLabel className="px-3 py-2">{formatReadableDate(date)}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {canMoveSelectedWorkout ? (
             <>
-              <DropdownMenuItem disabled={isBusy} onSelect={() => onMoveTargetSelected?.(date)}>
-                <Icon name="arrow-right" size="xs" />
-                Move selected workout here
+              <DropdownMenuItem
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
+                disabled={isBusy}
+                onSelect={() => onMoveTargetSelected?.(date, moveWorkoutSource)}
+              >
+                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="arrow-right" size="xs" />
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">Move selected workout here</span>
+                  <span className="hito-list-row-copy block">
+                    Use this empty day as the target.
+                  </span>
+                </span>
               </DropdownMenuItem>
-              <DropdownMenuItem disabled={isBusy} onSelect={onMoveCanceled}>
-                <Icon name="close" size="xs" />
-                Cancel move
+              <DropdownMenuItem
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
+                disabled={isBusy}
+                onSelect={onMoveCanceled}
+              >
+                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="close" size="xs" />
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">Cancel move</span>
+                  <span className="hito-list-row-copy block">
+                    Keep the source workout where it is.
+                  </span>
+                </span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           ) : null}
-          {canPasteCopiedWorkout ? (
+          {!moveOnly && canPasteCopiedWorkout ? (
             <>
-              <DropdownMenuItem disabled={isBusy} onSelect={() => void submitPasteReview()}>
-                <Icon name="copy" size="xs" />
-                Paste copied workout
+              <DropdownMenuItem
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
+                disabled={isBusy}
+                onSelect={() => void pasteCopiedWorkout()}
+              >
+                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="copy" size="xs" />
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">Paste copied workout</span>
+                  <span className="hito-list-row-copy block">
+                    Save into this empty day from backend truth.
+                  </span>
+                </span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           ) : null}
-          <DropdownMenuItem
-            disabled={isBusy}
-            onSelect={() => openConstructor(getDefaultManualWorkoutTemplate("easy_aerobic_run"))}
-          >
-            <Icon name="edit" size="xs" />
-            Create workout
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled={isBusy} onSelect={openTemplatePicker}>
-            <Icon name="workout" size="xs" />
-            Choose template
-          </DropdownMenuItem>
+          {!moveOnly ? (
+            <>
+              <DropdownMenuItem
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
+                disabled={isBusy}
+                onSelect={openScratchConstructor}
+              >
+                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="edit" size="xs" />
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">Start from scratch</span>
+                  <span className="hito-list-row-copy block">Open an empty constructor.</span>
+                </span>
+              </DropdownMenuItem>
+              <ManualTemplateSubmenu
+                disabled={isBusy}
+                onSelectSavedTemplate={openSavedTemplate}
+                onSelectTemplate={openConstructor}
+                savedTemplatesState={savedTemplatesState}
+              />
+              <DropdownMenuItem
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
+                disabled={isBusy}
+                onSelect={() => openConstructor(getDefaultManualWorkoutTemplate("rest_day"))}
+              >
+                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="minus" size="xs" />
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">Add rest day</span>
+                  <span className="hito-list-row-copy block">
+                    Create an intentional no-run day.
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ManualTemplatePickerDialog
-        open={templatePickerOpen}
-        onOpenChange={setTemplatePickerOpen}
-        onSelectTemplate={(template) => {
-          setTemplatePickerOpen(false);
-          openConstructor(template);
-        }}
-        onRefreshSavedTemplates={() => void loadSavedTemplates()}
-        onSelectSavedTemplate={openSavedTemplate}
-        savedTemplatesState={savedTemplatesState}
-      />
-
       <ManualWorkoutConstructorDialog
+        entries={entries}
         isBusy={isBusy}
         notes={notes}
+        onEntriesChange={(nextEntries) => {
+          setEntries(nextEntries);
+          setReviewResult(null);
+          setReviewedDraft(null);
+        }}
         onNotesChange={(value) => {
           setNotes(value);
           setReviewResult(null);
           setReviewedDraft(null);
         }}
         onOpenChange={setConstructorOpen}
+        onScratchTemplateChange={(templateKey) => {
+          const template = getDefaultManualWorkoutTemplate(templateKey);
+          setSelection((current) =>
+            current?.kind === "scratch" ? { ...current, template } : current,
+          );
+          setTargetTruthMode(template.defaultTargetTruthMode);
+          setTitle((current) => current || template.defaultTitle);
+          if (template.workoutType === "rest") {
+            setEntries([]);
+          }
+          setReviewResult(null);
+          setReviewedDraft(null);
+        }}
         onReview={() => void submitReview()}
         onTargetTruthModeChange={(value) => {
           setTargetTruthMode(value);
@@ -724,267 +778,121 @@ export function ManualWorkoutAddMenu({
           safetyCopy="No client rows, segments, or persistence metadata are sent to the add-workout seam."
         />
       ) : null}
-
-      {pasteReview ? (
-        <ManualCopyPasteReviewDialog
-          confirmMessage={confirmMessage}
-          isBusy={isBusy}
-          onConfirm={() => void confirmPasteReview()}
-          onOpenChange={(open) => {
-            if (!open && !isBusy) {
-              setPasteReview(null);
-              setConfirmMessage(null);
-            }
-          }}
-          open={Boolean(pasteReview)}
-          review={pasteReview}
-          status={status}
-        />
-      ) : null}
     </>
   );
 }
 
-type ManualWorkoutCopyPasteReady = Extract<ManualWorkoutCopyPasteReviewResult, { ok: true }>;
-type ManualWorkoutDeleteClearReady = Extract<ManualWorkoutDeleteClearReviewResult, { ok: true }>;
-
-export function ManualWorkoutCopyMenu({
-  activePlanId,
-  canCopy = true,
-  canClear = false,
-  canMove = false,
-  children,
-  disabled = false,
-  onCleared,
-  onCopy,
-  onMove,
-  sourceWorkoutDate,
-  sourceWorkoutId,
-  title,
+function ManualTemplateSubmenu({
+  disabled,
+  onSelectSavedTemplate,
+  onSelectTemplate,
+  savedTemplatesState,
 }: {
-  activePlanId: string;
-  canCopy?: boolean;
-  canClear?: boolean;
-  canMove?: boolean;
-  children: ReactNode;
-  disabled?: boolean;
-  onCleared?: () => void | Promise<void>;
-  onCopy: (source: ManualCopiedWorkoutSource) => void;
-  onMove?: (source: ManualCopiedWorkoutSource) => void;
-  sourceWorkoutDate: string;
-  sourceWorkoutId: string;
-  title: string;
+  disabled: boolean;
+  onSelectSavedTemplate: (template: ManualWorkoutSavedTemplateView) => void;
+  onSelectTemplate: (template: ManualWorkoutTemplate) => void;
+  savedTemplatesState: ManualSavedTemplatesState;
 }) {
-  const reviewManualWorkoutDeleteClearFn = useServerFn(reviewManualWorkoutDeleteClear);
-  const confirmManualWorkoutDeleteClearFn = useServerFn(confirmManualWorkoutDeleteClear);
-  const confirmInFlightRef = useRef(false);
-  const [status, setStatus] = useState<ManualDraftStatus>("idle");
-  const [deleteReviewResult, setDeleteReviewResult] =
-    useState<ManualWorkoutDeleteClearReviewResult | null>(null);
-  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
-  const isBusy = status !== "idle";
-
-  const copySource = () => {
-    const source = {
-      activePlanId,
-      sourceWorkoutDate,
-      sourceWorkoutId,
-      title,
-    };
-    onCopy(source);
-    hitoToast.success({
-      id: MANUAL_COPY_PASTE_TOAST_ID,
-      title: "Workout copied",
-      description: `${title} is ready to paste into an empty future day.`,
-    });
-  };
-
-  const moveSource = () => {
-    onMove?.({
-      activePlanId,
-      sourceWorkoutDate,
-      sourceWorkoutId,
-      title,
-    });
-    hitoToast.success({
-      id: MANUAL_COPY_PASTE_TOAST_ID,
-      title: "Move source selected",
-      description: "Choose an empty future day and use Add to move this workout there.",
-    });
-  };
-
-  const submitDeleteReview = async () => {
-    if (disabled || !canClear || status !== "idle") return;
-
-    setStatus("reviewing");
-    setDeleteReviewResult(null);
-    setConfirmMessage(null);
-    hitoToast.working({
-      id: MANUAL_DELETE_CLEAR_TOAST_ID,
-      title: "Reviewing clear",
-      description: "Hito is checking whether this manual workout can be cleared.",
-    });
-
-    try {
-      const result = await reviewManualWorkoutDeleteClearFn({
-        data: {
-          activePlanId,
-          plannedWorkoutId: sourceWorkoutId,
-        },
-      });
-      setStatus("idle");
-      setDeleteReviewResult(result);
-
-      if (!result.ok) {
-        hitoToast.error({
-          id: MANUAL_DELETE_CLEAR_TOAST_ID,
-          title: "Clear blocked",
-          description: result.message,
-        });
-        return;
-      }
-
-      hitoToast.success({
-        id: MANUAL_DELETE_CLEAR_TOAST_ID,
-        title: "Clear reviewed",
-        description: "Confirm before Hito removes this planned workout.",
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Could not review this workout for clearing.";
-      setStatus("idle");
-      setDeleteReviewResult({
-        ok: false,
-        status: "blocked",
-        reason: "invalid_input",
-        message,
-        persisted: false,
-        sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-        workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-      });
-      hitoToast.error({
-        id: MANUAL_DELETE_CLEAR_TOAST_ID,
-        title: "Clear review failed",
-        description: message,
-      });
-    }
-  };
-
-  const confirmDeleteReview = async () => {
-    if (!deleteReviewResult?.ok || confirmInFlightRef.current) return;
-
-    confirmInFlightRef.current = true;
-    setStatus("creating");
-    setConfirmMessage(null);
-    hitoToast.working({
-      id: MANUAL_DELETE_CLEAR_TOAST_ID,
-      title: "Clearing workout",
-      description: "Hito is confirming the reviewed delete server-side.",
-    });
-
-    try {
-      const result = await confirmManualWorkoutDeleteClearFn({
-        data: {
-          activePlanId,
-          plannedWorkoutId: deleteReviewResult.plannedWorkoutId,
-          reviewToken: deleteReviewResult.review.reviewToken,
-          reviewChecksum: deleteReviewResult.review.reviewChecksum,
-        },
-      });
-
-      if (!result.ok) {
-        confirmInFlightRef.current = false;
-        setStatus("idle");
-        setConfirmMessage(result.message);
-        setDeleteReviewResult(result);
-        hitoToast.error({
-          id: MANUAL_DELETE_CLEAR_TOAST_ID,
-          title: "Workout not cleared",
-          description: result.message,
-        });
-        return;
-      }
-
-      hitoToast.success({
-        id: MANUAL_DELETE_CLEAR_TOAST_ID,
-        title: "Workout cleared",
-        description: "Refreshing the calendar from saved plan truth.",
-      });
-      confirmInFlightRef.current = false;
-      setStatus("idle");
-      setDeleteReviewResult(null);
-      setConfirmMessage(null);
-      await onCleared?.();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "The planned workout could not be cleared.";
-      confirmInFlightRef.current = false;
-      setStatus("idle");
-      setConfirmMessage(message);
-      hitoToast.error({
-        id: MANUAL_DELETE_CLEAR_TOAST_ID,
-        title: "Workout not cleared",
-        description: message,
-      });
-    }
-  };
-
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild disabled={disabled}>
-          {children}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>{formatReadableDate(sourceWorkoutDate)}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {canCopy ? (
-            <DropdownMenuItem disabled={disabled || isBusy} onSelect={copySource}>
-              <Icon name="copy" size="xs" />
-              Copy workout
-            </DropdownMenuItem>
-          ) : null}
-          {canMove ? (
-            <DropdownMenuItem disabled={disabled || isBusy} onSelect={moveSource}>
-              <Icon name="arrow-right" size="xs" />
-              Move workout
-            </DropdownMenuItem>
-          ) : null}
-          {canClear ? (
-            <>
-              {canCopy || canMove ? <DropdownMenuSeparator /> : null}
-              <DropdownMenuItem
-                className="text-destructive"
-                disabled={disabled || isBusy}
-                onSelect={() => void submitDeleteReview()}
-              >
-                <Icon name="trash" size="xs" />
-                Clear workout
-              </DropdownMenuItem>
-            </>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className={MANUAL_ADD_MENU_ITEM_CLASS} disabled={disabled}>
+        <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="workout" size="xs" />
+        <span className="min-w-0">
+          <span className="hito-list-row-title block">Choose template</span>
+          <span className="hito-list-row-copy block">Pick a workout type and keep editing.</span>
+        </span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className={MANUAL_ADD_MENU_SUBCONTENT_CLASS}>
+        <DropdownMenuLabel className="px-3 py-2">Choose template</DropdownMenuLabel>
+        <DropdownMenuSeparator />
 
-      {deleteReviewResult ? (
-        <ManualDeleteClearReviewDialog
-          confirmMessage={confirmMessage}
-          fallbackDate={sourceWorkoutDate}
-          fallbackTitle={title}
-          isBusy={isBusy}
-          onConfirm={() => void confirmDeleteReview()}
-          onOpenChange={(open) => {
-            if (!open && !isBusy) {
-              setDeleteReviewResult(null);
-              setConfirmMessage(null);
-            }
-          }}
-          open={Boolean(deleteReviewResult)}
-          result={deleteReviewResult}
-          status={status}
-        />
-      ) : null}
-    </>
+        {savedTemplatesState.status === "loading" || savedTemplatesState.status === "idle" ? (
+          <DropdownMenuItem className={MANUAL_ADD_MENU_ITEM_CLASS} disabled>
+            <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
+              Saved
+            </span>
+            <span className="min-w-0">
+              <span className="hito-list-row-title block">Checking saved templates</span>
+              <span className="hito-list-row-copy block">Personal templates will appear here.</span>
+            </span>
+          </DropdownMenuItem>
+        ) : null}
+
+        {savedTemplatesState.status === "failed" ? (
+          <DropdownMenuItem className={MANUAL_ADD_MENU_ITEM_CLASS} disabled>
+            <span className="hito-status-pill mt-0.5 shrink-0" data-tone="warning">
+              Saved
+            </span>
+            <span className="min-w-0">
+              <span className="hito-list-row-title block">Saved templates unavailable</span>
+              <span className="hito-list-row-copy block">
+                {savedTemplatesState.message ?? "Use a built-in template for now."}
+              </span>
+            </span>
+          </DropdownMenuItem>
+        ) : null}
+
+        {savedTemplatesState.status === "ready" && savedTemplatesState.templates.length ? (
+          <>
+            <DropdownMenuLabel className="px-3 py-2">My saved templates</DropdownMenuLabel>
+            {savedTemplatesState.templates.map((template) => (
+              <DropdownMenuItem
+                key={template.id}
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onSelectSavedTemplate(template);
+                }}
+              >
+                <span
+                  className="hito-status-pill mt-0.5 shrink-0"
+                  data-icon="false"
+                  style={{ color: calendarIconToneColor(template.iconKey) }}
+                >
+                  <WorkoutGlyph kind={template.iconKey as WorkoutGlyphKind} className="h-3 w-3" />
+                  {calendarIconLabel(template.iconKey)}
+                </span>
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">{template.displayName}</span>
+                  <span className="hito-list-row-copy block">{savedTemplateSummary(template)}</span>
+                </span>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
+
+        {groupManualTemplates().map((group) => (
+          <div key={group.id}>
+            <DropdownMenuLabel className="px-3 py-2">{group.label}</DropdownMenuLabel>
+            {group.templates.map((template) => (
+              <DropdownMenuItem
+                key={template.templateKey}
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  onSelectTemplate(template);
+                }}
+              >
+                <span
+                  className="hito-status-pill mt-0.5 shrink-0"
+                  data-icon="false"
+                  style={{ color: workoutToneColor(template) }}
+                >
+                  {templateShortLabel(template)}
+                </span>
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">{template.label}</span>
+                  <span className="hito-list-row-copy block">
+                    {targetTruthModeCopy(template.defaultTargetTruthMode)}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </div>
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }
 
@@ -1005,7 +913,10 @@ export function ManualTemplatePickerDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="hito-product-dialog max-h-[85vh] max-w-3xl overflow-y-auto">
+      <DialogContent
+        className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        overlayClassName="hito-dialog-overlay-stable"
+      >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Choose template</DialogTitle>
           <DialogDescription className="hito-body">
@@ -1014,7 +925,7 @@ export function ManualTemplatePickerDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="hito-product-dialog-body grid gap-4">
+        <div className="hito-product-dialog-body-scroll-fill grid gap-4">
           {onSelectSavedTemplate ? (
             <section className="grid gap-2">
               <div className="flex items-center justify-between gap-3">
@@ -1134,11 +1045,14 @@ export function ManualTemplatePickerDialog({
 }
 
 export function ManualWorkoutConstructorDialog({
+  entries,
   isBusy,
   notes,
+  onEntriesChange,
   onNotesChange,
   onOpenChange,
   onReview,
+  onScratchTemplateChange,
   onTargetTruthModeChange,
   onTitleChange,
   open,
@@ -1148,11 +1062,14 @@ export function ManualWorkoutConstructorDialog({
   targetTruthMode,
   title,
 }: {
+  entries: ManualWorkoutConstructorEntryInput[];
   isBusy: boolean;
   notes: string;
+  onEntriesChange: (entries: ManualWorkoutConstructorEntryInput[]) => void;
   onNotesChange: (value: string) => void;
   onOpenChange: (open: boolean) => void;
   onReview: () => void;
+  onScratchTemplateChange: (templateKey: ManualWorkoutTemplateKey) => void;
   onTargetTruthModeChange: (value: ManualWorkoutTargetTruthMode) => void;
   onTitleChange: (value: string) => void;
   open: boolean;
@@ -1162,12 +1079,25 @@ export function ManualWorkoutConstructorDialog({
   targetTruthMode: ManualWorkoutTargetTruthMode;
   title: string;
 }) {
-  const canReview = Boolean(selection && title.trim()) && !isBusy;
-  const entries = selection ? selectionEntries(selection) : [];
+  const selectedTemplate = selectionTemplate(selection);
+  const canReview =
+    Boolean(
+      selection &&
+      (selection.kind === "saved" ||
+        (selectedTemplate && isReviewableEntries(selectedTemplate, entries))),
+    ) && !isBusy;
+  const reviewDisabledReason = selection
+    ? constructorReviewDisabledReason(selection, selectedTemplate, entries)
+    : "Choose a date before review.";
+  const statusLabel = constructorStatusLabel(status, reviewResult);
+  const source = constructorSource(selection);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="hito-product-dialog max-h-[90vh] max-w-3xl overflow-y-auto">
+      <DialogContent
+        className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        overlayClassName="hito-dialog-overlay-stable"
+      >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">
             {selection ? selectionLabel(selection) : "Manual workout"}
@@ -1179,104 +1109,46 @@ export function ManualWorkoutConstructorDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {selection ? (
-          <div className="hito-product-dialog-body grid gap-5">
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem]">
-              <label className="grid gap-2">
-                <span className="hito-form-label">Workout title</span>
-                <input
-                  className="hito-field hito-field-primary hito-field-md"
-                  value={title}
-                  onChange={(event) => onTitleChange(event.target.value)}
-                  placeholder={selectionDefaultTitle(selection)}
-                />
-              </label>
-
-              {selection.kind === "registry" ? (
-                <label className="grid gap-2">
-                  <span className="hito-form-label">Target truth</span>
-                  <Select
-                    value={targetTruthMode}
-                    onValueChange={(value) =>
-                      onTargetTruthModeChange(value as ManualWorkoutTargetTruthMode)
-                    }
-                  >
-                    <SelectTrigger aria-label="Target truth mode">
-                      <SelectValue placeholder="Target truth" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selection.template.allowedTargetTruthModes.map((mode) => (
-                        <SelectItem key={mode} value={mode}>
-                          {targetTruthModeLabel(mode)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <span className="hito-field-helper">{targetTruthModeCopy(targetTruthMode)}</span>
-                </label>
-              ) : (
-                <div className="grid gap-2">
-                  <span className="hito-form-label">Target truth</span>
-                  <div className="hito-list-row items-start">
-                    <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
-                      Saved
-                    </span>
-                    <div className="min-w-0">
-                      <p className="hito-list-row-title">
-                        {targetTruthModeLabel(selection.template.targetTruthMode)}
-                      </p>
-                      <p className="hito-list-row-copy">
-                        {targetTruthModeCopy(selection.template.targetTruthMode)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <label className="grid gap-2">
-              <span className="hito-form-label">Notes or cues</span>
-              <textarea
-                className="hito-field hito-field-primary hito-textarea-md resize-none"
-                rows={3}
-                value={notes}
-                onChange={(event) => onNotesChange(event.target.value)}
-                placeholder="Optional note for this manual workout."
+        <div className="hito-product-dialog-body-scroll-fill">
+          {selection ? (
+            <div className="grid gap-4">
+              <ManualWorkoutConstructorEditor
+                allowedTargetTruthModes={allowedTargetTruthModes(selection, selectedTemplate)}
+                dateLabel={formatReadableDate(selection.date)}
+                entries={entries}
+                entriesLocked={selection.kind === "saved"}
+                iconKey={constructorIconKey(selection, selectedTemplate)}
+                iconTone={constructorIconTone(selection, selectedTemplate)}
+                isRestDraft={
+                  selection.kind === "saved"
+                    ? selection.template.targetTruthMode === "none"
+                    : selectedTemplate?.workoutType === "rest"
+                }
+                notes={notes}
+                onEntriesChange={onEntriesChange}
+                onNotesChange={onNotesChange}
+                onScratchTemplateChange={onScratchTemplateChange}
+                onTargetTruthModeChange={
+                  selection.kind === "saved" ? undefined : onTargetTruthModeChange
+                }
+                onTitleChange={onTitleChange}
+                reviewDisabledReason={!canReview ? reviewDisabledReason : null}
+                selectedTemplateKey={selectedTemplate?.templateKey ?? null}
+                source={source}
+                sourceLabel={constructorSourceLabel(selection)}
+                statusLabel={statusLabel}
+                targetTruthMode={targetTruthMode}
+                templateOptions={MANUAL_WORKOUT_TEMPLATES}
+                title={title}
               />
-            </label>
-
-            <section className="grid gap-2">
-              <p className="hito-label">Structure</p>
-              <div className="hito-row-group">
-                {entries.length ? (
-                  entries.map((entry, index) => (
-                    <div
-                      key={`${selectionKey(selection)}-${index}`}
-                      className="hito-list-row items-start"
-                    >
-                      <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="hito-list-row-title">{entryLabel(entry)}</p>
-                        <p className="hito-list-row-copy">{entrySummary(entry)}</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="hito-list-row items-start">
-                    <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
-                      Rest
-                    </span>
-                    <p className="hito-list-row-copy">No executable run targets.</p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {reviewResult ? <ManualReviewResultNotice result={reviewResult} /> : null}
-          </div>
-        ) : null}
+              {reviewResult ? (
+                <div>
+                  <ManualReviewResultNotice result={reviewResult} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           <button
@@ -1293,7 +1165,7 @@ export function ManualWorkoutConstructorDialog({
             disabled={!canReview}
             onClick={onReview}
           >
-            {status === "reviewing" ? "Reviewing workout..." : "Review workout"}
+            {status === "reviewing" ? "Reviewing workout..." : "Save Workout"}
           </button>
         </DialogFooter>
       </DialogContent>
@@ -1417,7 +1289,10 @@ function ManualReviewSummaryDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="hito-product-dialog max-w-2xl">
+      <DialogContent
+        className="hito-dialog-stable hito-product-dialog max-w-2xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        overlayClassName="hito-dialog-overlay-stable"
+      >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Review add</DialogTitle>
           <DialogDescription className="hito-body">
@@ -1438,294 +1313,6 @@ function ManualReviewSummaryDialog({
             supportCopy={supportCopy}
           />
         </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ManualCopyPasteReviewDialog({
-  confirmMessage,
-  isBusy,
-  onConfirm,
-  onOpenChange,
-  open,
-  review,
-  status,
-}: {
-  confirmMessage: string | null;
-  isBusy: boolean;
-  onConfirm: () => void;
-  onOpenChange: (open: boolean) => void;
-  open: boolean;
-  review: ManualWorkoutCopyPasteReady;
-  status: ManualDraftStatus;
-}) {
-  const draft = review.review.draft;
-  const sourceLabel = formatReadableDate(review.sourceWorkoutDate);
-  const targetLabel = formatReadableDate(review.targetDate);
-  const metricPolicy = targetTruthModeLabel(review.draftInput.targetTruthMode ?? "structure_only");
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="hito-product-dialog max-w-2xl">
-        <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Review paste</DialogTitle>
-          <DialogDescription className="hito-body">
-            Confirm this backend-reviewed copy before it is saved into the active manual plan.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="hito-product-dialog-body space-y-4">
-          <div className="hito-row-group">
-            <div className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">Copy source</p>
-                <p className="hito-list-row-copy">{sourceLabel}</p>
-              </div>
-              <span className="hito-status-pill shrink-0" data-tone="muted">
-                Verified
-              </span>
-            </div>
-            <div className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">Paste target</p>
-                <p className="hito-list-row-copy">{targetLabel}</p>
-              </div>
-              <span className="hito-status-pill shrink-0" data-tone="success">
-                Empty day
-              </span>
-            </div>
-            <div className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">{draft.title}</p>
-                <p className="hito-list-row-copy">
-                  {formatManualDraftStructure(draft.totalDurationMin, draft.totalDistanceKm)} ·{" "}
-                  {metricPolicy}
-                </p>
-              </div>
-              <span className="hito-status-pill shrink-0" data-tone="muted">
-                {draft.templateKey.replaceAll("_", " ")}
-              </span>
-            </div>
-          </div>
-
-          <ManualReviewSummary
-            confirmLabel="Paste workout"
-            confirmMessage={confirmMessage}
-            isBusy={isBusy}
-            onConfirm={onConfirm}
-            pendingLabel="Pasting workout..."
-            review={review.review}
-            safetyCopy="Paste confirm sends only active plan id, source workout id, target date, review token, and checksum."
-            status={status}
-            supportCopy="Backend reconstructed this draft from the persisted source workout and reviewed it for the selected target date."
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ManualDeleteClearReviewDialog({
-  confirmMessage,
-  fallbackDate,
-  fallbackTitle,
-  isBusy,
-  onConfirm,
-  onOpenChange,
-  open,
-  result,
-  status,
-}: {
-  confirmMessage: string | null;
-  fallbackDate: string;
-  fallbackTitle: string;
-  isBusy: boolean;
-  onConfirm: () => void;
-  onOpenChange: (open: boolean) => void;
-  open: boolean;
-  result: ManualWorkoutDeleteClearReviewResult;
-  status: ManualDraftStatus;
-}) {
-  const dateLabel = formatReadableDate(result.ok ? result.workoutDate : fallbackDate);
-
-  if (!result.ok) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="hito-product-dialog max-w-xl">
-          <DialogHeader className="hito-product-dialog-header">
-            <DialogTitle className="hito-modal-title">Clear blocked</DialogTitle>
-            <DialogDescription className="hito-body">
-              Hito could not approve clearing this planned workout.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="hito-product-dialog-body">
-            <div className="hito-row-group">
-              <div className="hito-list-row items-start">
-                <div className="min-w-0">
-                  <p className="hito-list-row-title">{fallbackTitle}</p>
-                  <p className="hito-list-row-copy">{dateLabel}</p>
-                </div>
-                <span className="hito-status-pill shrink-0" data-tone="warning">
-                  Blocked
-                </span>
-              </div>
-              <div className="hito-list-row items-start">
-                <div className="min-w-0">
-                  <p className="hito-list-row-title">{clearBlockedReasonLabel(result.reason)}</p>
-                  <p className="hito-list-row-copy">{result.message}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-md"
-              onClick={() => onOpenChange(false)}
-            >
-              Close
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  return (
-    <ManualDeleteClearReadyDialog
-      confirmMessage={confirmMessage}
-      dateLabel={dateLabel}
-      isBusy={isBusy}
-      onConfirm={onConfirm}
-      onOpenChange={onOpenChange}
-      open={open}
-      result={result}
-      status={status}
-    />
-  );
-}
-
-function ManualDeleteClearReadyDialog({
-  confirmMessage,
-  dateLabel,
-  isBusy,
-  onConfirm,
-  onOpenChange,
-  open,
-  result,
-  status,
-}: {
-  confirmMessage: string | null;
-  dateLabel: string;
-  isBusy: boolean;
-  onConfirm: () => void;
-  onOpenChange: (open: boolean) => void;
-  open: boolean;
-  result: ManualWorkoutDeleteClearReady;
-  status: ManualDraftStatus;
-}) {
-  const draft = result.restore.review.draft;
-  const metricPolicy = targetTruthModeLabel(result.restore.draftInput.targetTruthMode);
-  const restoreLabels = [result.restore.label, ...result.restore.alternateLabels].join(" / ");
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="hito-product-dialog max-w-2xl">
-        <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Review clear workout</DialogTitle>
-          <DialogDescription className="hito-body">
-            Confirm before Hito removes this planned workout from your active plan.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="hito-product-dialog-body space-y-4">
-          <div className="hito-row-group">
-            <div className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">{dateLabel}</p>
-                <p className="hito-list-row-copy">
-                  Selected calendar day for the planned workout being cleared.
-                </p>
-              </div>
-              <span className="hito-status-pill shrink-0" data-tone="muted">
-                Verified
-              </span>
-            </div>
-
-            <div className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">{result.title}</p>
-                <p className="hito-list-row-copy">
-                  {formatManualDraftStructure(draft.totalDurationMin, draft.totalDistanceKm)} ·{" "}
-                  {metricPolicy}
-                </p>
-              </div>
-              <span className="hito-status-pill shrink-0" data-tone="muted">
-                {result.templateKey.replaceAll("_", " ")}
-              </span>
-            </div>
-
-            <div className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">What changes</p>
-                <p className="hito-list-row-copy">
-                  Hito deletes exactly this planned workout row. The active plan remains active and
-                  the calendar refreshes from persisted plan truth.
-                </p>
-              </div>
-              <span className="hito-status-pill shrink-0" data-tone="warning">
-                Planned only
-              </span>
-            </div>
-
-            <div className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">Restore affordance</p>
-                <p className="hito-list-row-copy">
-                  Backend returned reviewed next-step data for {restoreLabels}. Actual restore must
-                  go back through the active-plan Add review flow.
-                </p>
-              </div>
-              <span className="hito-status-pill shrink-0" data-tone="muted">
-                {result.restore.label}
-              </span>
-            </div>
-
-            {confirmMessage ? (
-              <div className="hito-list-row items-start">
-                <p className="hito-field-error min-w-0">{confirmMessage}</p>
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-          <button
-            type="button"
-            className="hito-button hito-button-secondary hito-button-md"
-            disabled={isBusy}
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-md"
-            data-tone="error"
-            disabled={isBusy}
-            onClick={onConfirm}
-          >
-            {status === "creating" ? (
-              <>
-                <Icon name="loader" size="xs" className="animate-spin" />
-                Clearing workout...
-              </>
-            ) : (
-              <>
-                <Icon name="trash" size="xs" />
-                Clear workout
-              </>
-            )}
-          </button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1786,7 +1373,10 @@ function ManualSaveTemplateAction({
         <Icon name="workout" size="xs" />
         Save as template
       </button>
-      <DialogContent className="hito-product-dialog max-w-lg">
+      <DialogContent
+        className="hito-dialog-stable hito-product-dialog max-w-lg border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        overlayClassName="hito-dialog-overlay-stable"
+      >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Save as template</DialogTitle>
           <DialogDescription className="hito-body">
@@ -1890,23 +1480,103 @@ function ManualRejectedNotice({ result }: { result: ManualReviewRejected }) {
 }
 
 function selectionLabel(selection: ManualDraftSelection) {
-  return selection.kind === "registry" ? selection.template.label : selection.template.displayName;
+  if (selection.kind === "saved") return selection.template.displayName;
+  if (selection.kind === "scratch") return selection.template?.label ?? "Start from scratch";
+  return selection.template.label;
 }
 
-function selectionDefaultTitle(selection: ManualDraftSelection) {
-  return selection.kind === "registry"
-    ? selection.template.defaultTitle
-    : selection.template.displayName;
+function selectionTemplate(selection: ManualDraftSelection | null): ManualWorkoutTemplate | null {
+  if (!selection || selection.kind === "saved") return null;
+  return selection.template;
 }
 
-function selectionEntries(selection: ManualDraftSelection): ManualWorkoutConstructorEntryInput[] {
-  return selection.kind === "registry"
-    ? selection.template.defaultEntries
-    : selection.template.draftPayload.entries;
+function allowedTargetTruthModes(
+  selection: ManualDraftSelection,
+  selectedTemplate: ManualWorkoutTemplate | null,
+): ManualWorkoutTargetTruthMode[] {
+  if (selection.kind === "saved") return [selection.template.targetTruthMode];
+  return selectedTemplate?.allowedTargetTruthModes ?? ["structure_only"];
 }
 
-function selectionKey(selection: ManualDraftSelection) {
-  return selection.kind === "registry" ? selection.template.templateKey : selection.template.id;
+function constructorIconKey(
+  selection: ManualDraftSelection,
+  selectedTemplate: ManualWorkoutTemplate | null,
+): WorkoutGlyphKind {
+  if (selection.kind === "saved") return selection.template.iconKey as WorkoutGlyphKind;
+  return templateIconKind(selectedTemplate);
+}
+
+function constructorIconTone(
+  selection: ManualDraftSelection,
+  selectedTemplate: ManualWorkoutTemplate | null,
+) {
+  if (selection.kind === "saved") return calendarIconToneColor(selection.template.iconKey);
+  return templateIconTone(selectedTemplate);
+}
+
+function constructorSource(selection: ManualDraftSelection | null): ManualWorkoutConstructorSource {
+  if (selection?.kind === "saved") return "saved_template";
+  if (selection?.kind === "scratch") return "scratch";
+  return "template";
+}
+
+function constructorSourceLabel(selection: ManualDraftSelection) {
+  if (selection.kind === "saved") return "Saved template";
+  if (selection.kind === "scratch") return "Scratch";
+  return "Template";
+}
+
+function constructorStatusLabel(
+  status: ManualDraftStatus,
+  reviewResult: ManualWorkoutDraftReviewResult | null,
+) {
+  if (status === "reviewing") return "Reviewing";
+  if (reviewResult?.ok) return "Ready";
+  if (reviewResult && !reviewResult.ok) return "Rejected";
+  return "Draft";
+}
+
+function isReviewableEntries(
+  selectedTemplate: ManualWorkoutTemplate,
+  entries: ManualWorkoutConstructorEntryInput[],
+) {
+  if (selectedTemplate.workoutType === "rest") {
+    return entries.length === 0;
+  }
+
+  return entries.some(entryHasExecutableStructure);
+}
+
+function constructorReviewDisabledReason(
+  selection: ManualDraftSelection,
+  selectedTemplate: ManualWorkoutTemplate | null,
+  entries: ManualWorkoutConstructorEntryInput[],
+) {
+  if (selection.kind === "scratch" && !selectedTemplate) {
+    return "Choose a backend-supported workout type before review.";
+  }
+  if (selectedTemplate?.workoutType === "rest" && entries.length > 0) {
+    return "Rest/no-run drafts cannot include workout blocks.";
+  }
+  if (selectedTemplate && !isReviewableEntries(selectedTemplate, entries)) {
+    return "Add at least one duration or distance block, or choose Rest day for a no-run draft.";
+  }
+  return null;
+}
+
+function entryHasExecutableStructure(entry: ManualWorkoutConstructorEntryInput) {
+  if (entry.kind === "repeat_group") {
+    return (
+      blockHasExecutableStructure(entry.group.workBlock) ||
+      Boolean(entry.group.recoveryBlock && blockHasExecutableStructure(entry.group.recoveryBlock))
+    );
+  }
+
+  return blockHasExecutableStructure(entry.block);
+}
+
+function blockHasExecutableStructure(block: ManualWorkoutBlockInput) {
+  return Boolean(block.durationSeconds || block.distanceMeters);
 }
 
 function savedTemplateReviewToRejected(
@@ -1947,21 +1617,49 @@ function mapSavedTemplateReviewReason(
   return "invalid_input";
 }
 
-function clearBlockedReasonLabel(
-  reason: Extract<ManualWorkoutDeleteClearReviewResult, { ok: false }>["reason"],
-) {
-  if (reason === "last_workout_not_deletable") return "Last workout is protected";
-  if (reason === "protected_day") return "Protected day";
-  if (reason === "target_workout_not_found") return "Workout not found";
-  if (reason === "target_workout_not_in_active_plan") return "Workout is not in this plan";
-  if (reason === "target_workout_not_supported") return "Workout cannot be cleared here";
-  if (reason === "unsupported_active_plan_source") return "This active plan cannot be changed here";
-  if (reason === "stale_review") return "Review is stale";
-  if (reason === "invalid_review") return "Review needs refresh";
-  if (reason === "unauthenticated") return "Sign in required";
-  if (reason === "persistence_failed") return "Could not save the change";
-  if (reason === "no_active_plan") return "No active manual plan";
-  return "Clear needs review";
+function buildPasteUnavailableResult(): ManualWorkoutDirectCopyResult {
+  return {
+    ok: false,
+    status: "blocked",
+    persisted: false,
+    reason: "persistence_failed",
+    message: PASTE_UNAVAILABLE_MESSAGE,
+    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  };
+}
+
+function isManualWorkoutDirectCopyResult(value: unknown): value is ManualWorkoutDirectCopyResult {
+  if (!isRecord(value) || typeof value.ok !== "boolean") return false;
+  if (!value.ok) return isCopyPasteBlockedResult(value);
+
+  return (
+    value.status === "copied" &&
+    value.persisted === true &&
+    typeof value.activePlanId === "string" &&
+    typeof value.sourceWorkoutId === "string" &&
+    typeof value.sourceWorkoutDate === "string" &&
+    typeof value.targetWorkoutId === "string" &&
+    typeof value.targetDate === "string" &&
+    typeof value.title === "string" &&
+    value.mutationMode === "direct_manual_edit"
+  );
+}
+
+function isCopyPasteBlockedResult(
+  value: Record<string, unknown>,
+): value is Extract<ManualWorkoutDirectCopyResult, { ok: false }> {
+  return (
+    value.ok === false &&
+    value.status === "blocked" &&
+    value.persisted === false &&
+    typeof value.reason === "string" &&
+    typeof value.message === "string"
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object");
 }
 
 function savedTemplateSummary(template: ManualWorkoutSavedTemplateView) {
@@ -1993,44 +1691,4 @@ function calendarIconToneColor(iconKey: CalendarIconKey) {
   if (iconKey === "trail") return "var(--color-success)";
   if (iconKey === "recovery") return "var(--color-info)";
   return "var(--color-foreground)";
-}
-
-function entryLabel(entry: ManualWorkoutConstructorEntryInput) {
-  if (entry.kind === "repeat_group") {
-    return entry.group.groupLabel ?? `${entry.group.repeatCount} repeats`;
-  }
-
-  return entry.block.label ?? blockLabel(entry.block.blockKey);
-}
-
-function entrySummary(entry: ManualWorkoutConstructorEntryInput) {
-  if (entry.kind === "repeat_group") {
-    const recovery = entry.group.recoveryBlock
-      ? ` / ${blockUnit(entry.group.recoveryBlock)} recovery`
-      : "";
-    return `${entry.group.repeatCount} x ${blockUnit(entry.group.workBlock)}${recovery}`;
-  }
-
-  return blockUnit(entry.block);
-}
-
-function blockLabel(blockKey: string) {
-  return blockKey
-    .replace(/_block$/, "")
-    .split("_")
-    .map((part) => part[0]?.toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function blockUnit(block: ManualWorkoutBlockInput) {
-  if (block.durationSeconds) {
-    return formatDurationMin(block.durationSeconds / 60, "segment");
-  }
-  if (block.distanceMeters) {
-    return formatDistanceMeters(block.distanceMeters);
-  }
-  if (block.noteText) {
-    return block.noteText;
-  }
-  return "Structure";
 }

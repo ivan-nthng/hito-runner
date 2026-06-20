@@ -18,6 +18,13 @@ Help the team choose the right direction when the question is broader than one i
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For broad system-health reviews, cleanup comparisons, source-of-truth checks, and independent
+research, follow the subagent delegation discipline in `AGENTS.md`: use read-only subagents when
+they can reduce user routing, reuse open subagents for similar follow-ups, close them when done, and
+integrate findings into one strategic recommendation.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

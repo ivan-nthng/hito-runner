@@ -18,6 +18,13 @@ Verify that changed flows improve or preserve data quality in the records that m
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For data-quality audits, fixture/source scans, validator review, and independent non-mutating
+checks, follow the subagent delegation discipline in `AGENTS.md`: use read-only subagents where
+safe, reuse open subagents for related follow-ups, close completed subagents, and integrate evidence
+into one verdict or recommendation.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

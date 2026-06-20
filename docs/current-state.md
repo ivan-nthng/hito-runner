@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-06-07
+2026-06-17
 
 ## Where We Are Now
 
@@ -67,10 +67,11 @@ Active
 - The Hito DS calendar/workout playground is implemented:
   `/hitoDS#calendar-workout-playground` provides static desktop month-cell, mobile workout-row, and
   dense month-grid specimens across planned workout/rest, empty, outside-month, outside-plan,
-  result, evidence, identity, and title-overflow states. Future manual workout states such as add,
-  edit, copied source, paste target, repeats, protected, and fixed rest are visual specimens only and
-  do not implement CRUD, recurrence, production route wiring, backend mutations, persistence,
-  generation, row-count, or schedule-semantics changes. The accepted shared visual seam is
+  result, evidence, identity, and title-overflow states. Manual workout states such as add, edit,
+  copied source, paste target, repeats, protected, and fixed rest are visual specimens only and do
+  not implement CRUD, recurrence, production route wiring, backend mutations, persistence,
+  generation, row-count, or schedule-semantics changes; shipped manual and active-plan editing lives
+  in the product calendar plus backend review/confirm seams. The accepted shared visual seam is
   `HitoCalendarDayCell` / `HitoWorkoutDayRow`: product `Calendar.tsx` maps real
   backend-shaped snapshot/workout truth into display props and keeps product links, tooltips, and
   feedback routing, while `/hitoDS` maps local controls/specimen state into the same presentational
@@ -92,36 +93,46 @@ Active
   `SUPABASE_SERVICE_ROLE_KEY` has been removed from the active runtime and CLI env contract, so server-side Supabase admin/write access now resolves only from `SUPABASE_SECRET_KEY`.
 - The third actual deletion slice from the final Phase 5 plan is now implemented:
   deprecated single-account local auth env support has been removed from the active runtime and local tooling, so loopback local bypass now resolves only through `LOCAL_AUTH_BYPASS_ENABLED=true` plus `LOCAL_AUTH_BYPASS_ACCOUNTS_FILE=...`.
-- The unauthenticated root flow is now login-first, and first-time onboarding is now structured-first against the `generateStructuredFirstPlanDraft` / `confirmStructuredFirstPlanDraft` review-before-create seam, with JSON import visibly demoted to an advanced file-based fallback.
+- The unauthenticated root flow is now login-first, and first-time onboarding now offers Manual setup plus Quick setup; Quick setup uses the `generateStructuredFirstPlanDraft` / `confirmStructuredFirstPlanDraft` review-before-create seam, with JSON import visibly demoted to an advanced file-based fallback.
 - The product-path recovery fix is now implemented:
-  authenticated no-plan or no-workout states now show the same obvious text-entry plan creation surface, with advanced import kept secondary below it.
+  authenticated no-plan or no-workout states now show the same visible manual / structured / selected-plan creation surface, with advanced import kept secondary below it.
 - The onboarding post-submit transition fix is now implemented:
   successful plan creation now automatically opens a fresh saved-mode home request instead of leaving users stuck in the setup pending state.
 - The structured first-plan onboarding frontend slice is now implemented:
   the normal no-plan setup surface collects required age/weight/height, a bounded 5K benchmark or unknown state, fixed rest days through a compact weekday selector, compact execution preference, goal distance/style with ultra marathon and mountain running options, target time/date only for target-time goals, terrain only for marathon/ultra while mountain running implies mountain context, strength/mobility preference, and one optional `Comment`, then calls `generateStructuredFirstPlanDraft`; the review action stays in a sticky footer and remains disabled until required answers are complete, ready drafts show backend-owned runner/profile, goal, availability/rest-day, horizon, workout-mix, metric-policy, assumption, and safety copy, and only the explicit `Yes, create plan` action calls `confirmStructuredFirstPlanDraft`.
-- The Plan Preset vertical slice is implemented and QA-passed:
-  no-active-plan setup now exposes backend-owned Plan Preset cards for `10K Foundation`,
-  `Half Marathon Balanced`, and `Marathon Base`, with backend-shaped eligibility, duration,
-  start/end dates, workout mix, metric honesty, and fit summaries. The preset happy path avoids
-  OpenAI, opens a non-mutating review, and only `Create preset plan` persists exact reviewed
-  `training-plan-v2` rows through the existing active-plan persistence seam; final browser QA proved
-  the setup -> card -> review -> confirm -> saved active plan flow, exact `84`-row half-marathon
-  persistence, mobile no-overflow, Advanced custom separation, and cleanup of scoped QA records.
-  Preset active-plan replacement/refresh and additional preset families remain future backlog work;
-  manual user-built plan creation and manual calendar actions now live in the separate manual
-  builder track instead of the Plan Preset track, while edit/recurrence remain future-only.
+- The Plan Preset card slice is implemented and QA-passed as discovery, while creation now routes
+  through selected running-plan preview/create:
+  no-active-plan setup exposes backend-owned Plan Preset cards for `10K Foundation`,
+  `Half Marathon Balanced`, and `Marathon Base`, with backend-shaped eligibility, duration, workout
+  mix, metric honesty, and fit summaries. The legacy Plan Preset review/confirm seam has been
+  removed from runtime; onboarding now imports card discovery directly from
+  `src/lib/plan-preset-actions.ts` instead of through `training-api.ts`; selecting a card opens the
+  running-plan engine preview and backend-owned confirm/persist path. Preset active-plan
+  replacement/refresh and additional preset families remain future backlog work; manual user-built
+  plan creation and manual calendar actions live in the separate manual builder track, while
+  edit/recurrence remain future-only.
+- Universal active-plan Add/Clear/Move editability is accepted in the proved scope:
+  saved calendars now use backend-shaped capability metadata and
+  `active_plan_user_edit_v1` audit metadata for eligible future Add, Clear, and Move actions across
+  accepted active-plan sources, while preserving the original plan `source_kind`. Manual
+  Copy/Paste and Move are direct backend-owned mutations in the proved manual path; universal
+  Copy/Paste, recurrence, runner-facing `Edit training`, Restore UI, active-plan replacement
+  semantics expansion, and broader generated-row mutation matrices remain future-only until their
+  own backend/QA/frontend gates accept them.
 - The plan-authoring quality backend refinement has been hardened beyond the original slice 3:
   structured authoring accepts generation-only execution mode, uses an executable-mode resolver so numeric pace targets require execution support plus usable recent 5K truth, personal HR zones remain the only executable HR target truth, target time alone does not create pace targets, age-estimated HR remains advisory/readback-only, allowed non-pace/non-HR workouts use `structure_only_executable` numeric duration/distance/repeat/recovery anatomy instead of vague effort-only happy-path output, emits exact generated workout identity plus cutback/long-run steady-finish structure inside valid `training-plan-v2` workout data, and now adds goal-family long-run floors/peaks/ceilings, taper reductions aligned to the `Taper` phase boundary, Base/Build/Specific/Taper workout selection, runner-fit safety adjustments, target-time honesty assumptions for weak or aggressive benchmark support, long-distance review assumptions for low-support marathon/ultra/mountain contexts, mountain/trail-specific technical terrain/controlled descent/hike-run/time-on-feet doctrine without exact elevation prescriptions, sharper 5K/10K/half/marathon/ultra workout identities without changing hard-day frequency, a beginner/low-support `build_consistency` cap that keeps those plans out of tempo, interval, and race-like tune-up identities, richer opener/main/finish support-run structure for normal longer easy/steady/cutback/taper/long days, safe recovery/cutback identity variation for conservative low-support balanced plans, bounded plan-scoped authoring snapshots so refresh can preserve target-time, benchmark, execution-mode, rest-day, and metric-policy truth instead of degrading to legacy reconstruction, and rich canonical workout fields/mapping plus additive saved-mode persistence, import/export/template roundtrip, calendar/glyph rendering adoption, and workout/readback helpers that foreground backend-shaped executable target entries while keeping cues, focus, RPE, source copy, default/age-estimated HR, and legacy effort/cue-only rows secondary or legacy-readable.
 - The first OpenAI rich-workout draft backend slice is implemented behind text authoring only:
-  after the existing OpenAI structured-intent extraction validates, the saved-mode text replacement action can explicitly request a separate rich workout draft, but `src/lib/rich-workout-draft-authoring.ts` must normalize it back into canonical `training-plan-v2` by validating taxonomy values, fixed rest/rest-day boundaries, warmup/main/cooldown structure, and metric gates; default `generateCanonicalPlanFromText` usage and Dictate-to-Plan remain deterministic unless a caller opts in, and malformed or unavailable rich drafts fall back to the deterministic structured generator with bounded fallback metadata instead of persisting raw AI output.
-- The AI-authored structured first-plan pipeline Slice 1 foundation is implemented but not live:
-  `src/lib/ai-first-plan-draft-authoring.ts` defines `ai-first-plan-draft-v1`, an OpenAI response schema/prompt helper, and a pure validator/normalizer that can turn an accepted full week-by-week AI draft into canonical `training-plan-v2` while rejecting fixed-rest, taxonomy, one-block substantial workout, exact-elevation, medical-claim, low-support quality-cap, long-run/taper, and metric-safety violations; current visible structured setup still uses the deterministic generator until a later explicit integration slice.
+  after the existing OpenAI structured-intent extraction validates, the saved-mode text replacement action can explicitly request a separate rich workout draft, but `src/lib/rich-workout-draft-authoring.ts` must normalize it back into canonical `training-plan-v2` by validating taxonomy values, fixed rest/rest-day boundaries, warmup/main/cooldown structure, and metric gates; default `generateCanonicalPlanFromText` usage stays deterministic, voice-to-plan remains a separate backend seam with no current visible onboarding caller, and malformed or unavailable rich drafts fall back to the deterministic structured generator with bounded fallback metadata instead of persisting raw AI output.
+- The historical strict nested AI first-plan foundation has been removed from source:
+  no `src/lib/ai-first-plan-draft-authoring.ts` module remains. `ai-first-plan-draft-v1` now appears
+  only as bounded unsupported/negative-proof handling, while current AI first-plan preview work uses
+  blueprint/envelope modules through `src/lib/ai-first-plan-draft-service.ts`.
 - The AI-authored structured first-plan pipeline Slice 2A ops seam is implemented but not live:
   `src/lib/ai-first-plan-draft-service.ts` and `npm run author-ai-first-plan-draft` can run the non-mutating AI-authored draft path in mock, invalid, timeout, or live modes; blueprint mode now returns bounded `ai_authored` / `repaired_ai_draft` canonical samples on success or bounded `blueprint_unavailable` failure metadata on invalid/timeout/unavailable attempts, without persisting anything.
 - The AI-authored structured first-plan pipeline Slice 2B live-smoke hardening is implemented but not live:
   the service now uses bounded output controls, model-compatible minimal reasoning hints, stronger complete-horizon validation, stricter no-AI-HR prompt language, and request debug metadata for prompt/schema size, response mode, abort state, and request phase; default `gpt-5` compact smoke and the two-week compact strict-schema call can still time out safely, while `OPENAI_PLAN_MODEL=gpt-4.1-mini npm run author-ai-first-plan-draft -- --live --fixture one-week-smoke --no-reference --timeout-ms 120000 --max-output-tokens 10000` produced a live `sourceStatus: ai_authored` canonical `training-plan-v2` without persistence.
 - The AI-authored structured first-plan production contract pivot is implemented but not live:
-  `src/lib/ai-first-plan-blueprint-authoring.ts` adds `ai-first-plan-blueprint-v1`, where OpenAI returns compact weekly coaching intent instead of a full nested segment tree; `src/lib/ai-first-plan-draft-service.ts` now defaults the ops path to blueprint mode, backend validation expands accepted blueprints into canonical `training-plan-v2`, and the old strict nested draft contract has been removed from routine service/script contract selection while its module-level schema/prompt/normalizer checks remain doctrine-only. Live `gpt-4.1-mini` compact blueprint smoke returned `sourceStatus: ai_authored` in about 18s with `persisted: false`, while strict compact draft timed out at a 30s comparison cap.
+  `src/lib/ai-first-plan-blueprint-authoring.ts` adds `ai-first-plan-blueprint-v1`, where OpenAI returns compact weekly coaching intent instead of a full nested segment tree; `src/lib/ai-first-plan-draft-service.ts` now defaults the ops path to blueprint mode, backend validation expands accepted blueprints into canonical `training-plan-v2`, and the old strict nested draft contract has been removed from routine service/script contract selection with no strict nested source module remaining. Live `gpt-4.1-mini` compact blueprint smoke returned `sourceStatus: ai_authored` in about 18s with `persisted: false`, while strict compact draft timed out at a 30s comparison cap.
 - The AI-authored first-plan blueprint expander has full identity coverage and is now wired into structured draft/review, but still not saved during review:
   accepted `ai-first-plan-blueprint-v1` workouts expand into executable tempo/threshold, interval, hill, trail, ultra, long-run, cutback/taper, recovery, easy, steady, 5K sharpening, 10K rhythm, race-pace, taper tune-up, marathon-specific, controlled downhill, hike-run, and mountain time-on-feet segment structures with backend-owned cues, repeat prescriptions, terrain/time-on-feet guidance, and unchanged pace/default-HR safety gates; `generateStructuredFirstPlanDraft` now attempts this blueprint path with first-plan-specific model/timeout defaults and returns a signed reviewed canonical plan only when the source is `ai_first_plan_blueprint_v1` with `ai_authored` or `repaired_ai_draft` status. If blueprint authoring is unavailable, invalid, or timed out, the structured first-plan path returns a non-mutating retry/failure state instead of silently reviewing deterministic `structured_authoring_v1` output. The live onboarding-shaped blueprint path now gives OpenAI exact required date/weekday slots, schema-bounds each week to the validated running-day count, excludes rest identities from authored workouts, accepts safe post-cutback long-run rebounds, and applies a backend-owned goal-family identity matrix across beginner/consistency, 5K, 10K, half marathon, marathon, ultra, and mountain/trail plans. Supported plans get required week-aware quality or specialty cadence, required quality slots avoid the day before or after the preferred long run when another viable running day exists, supported balanced half-marathon plans get moderate cadence slots from Week 2, beginner/low-support plans avoid forced hard workouts, wrong-family identities are rejected, and generic support-filler collapse fails the blueprint attempt instead of becoming product truth. A linked-DB half-marathon target-time smoke now accepted a live `repaired_ai_draft` with zero validation issues and first-six-week quality cadence, then confirmed all 84 reviewed rows exactly with zero OpenAI calls; the successful full draft still took about 104.5s, so broad rollout remains gated on a latency/product decision.
 - The internal non-default `ai-first-plan-envelope-v1` structured-draft option is implemented and QA-passed:
@@ -145,7 +156,7 @@ Active
 - Active-plan schedule edit UI Slice 3A is implemented:
   `Open plan` now includes an `Edit schedule` disclosure that prefills from active-plan `plan_preferences` when available, reuses Hito weekday/running-day controls, calls the backend preview, renders `schedule_reflow` review details, applies only with the reviewed preview token, and routes `requires_regeneration` results into the existing `Update plan` prompt path without changing runner Settings defaults.
 - The text-authoring ops smoke path is now TS-backed:
-  `npm run author-plan-from-text` calls the real `src/lib/openai-plan-authoring.ts` seam, defaults to deterministic no-rich-draft output, accepts `--rich-draft` for the rich workout draft seam, accepts `--dry-run` and `--mock-openai` for bounded non-persistent validation, and reports bounded rich-draft status/fallback plus sample rich workout metadata instead of treating the legacy MJS shim as Slice 4A validation.
+  `npm run author-plan-from-text` calls the real `src/lib/openai-plan-authoring.ts` seam, defaults to deterministic no-rich-draft output, accepts `--rich-draft` for the rich workout draft seam, accepts `--dry-run` and `--mock-openai` for bounded non-persistent validation, and reports bounded rich-draft status/fallback plus sample rich workout metadata. The former legacy MJS text-authoring fallback has been removed and is no longer a validation path.
 - The structured review-before-create backend slice is now implemented:
   `generateStructuredFirstPlanDraft` produces a non-mutating structured setup review and canonical draft plan without creating profile, plan, workout, log, usage, or raw transient rows, while `confirmStructuredFirstPlanDraft` revalidates the draft, blocks if an active plan already exists, and creates the first active plan only after explicit confirmation.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
@@ -167,21 +178,46 @@ Active
   additive `runner_entitlements` and `runner_capability_usage` tables exist for backend-owned tier and metered usage truth, missing entitlement rows resolve to effective `Pro`, explicit Basic can enforce one lifetime included `ai_plan_update`, and `voice_to_plan` plus `garmin_ai_interpretation` are Pro-only capability keys without adding billing or pricing UI.
   `proposeActivePlanRefresh` now checks and records `ai_plan_update` usage only after successful proposal generation, apply does not increment usage, and Garmin upload/parse/deterministic comparison remain available when only AI interpretation is locked.
   The linked Supabase project has now received the entitlement migration, and local generated database types are aligned with that linked schema.
-- The first backend voice-to-plan authoring seam is now implemented:
+- The first backend voice-to-plan authoring seam is implemented, but it is not visible in current onboarding:
   authenticated callers can submit a bounded confirmed transcript to `generateVoiceToPlanDraft`, the backend checks `voice_to_plan` entitlement, validates essential planning sufficiency, returns `clarification_required` with missing fields/questions when needed, or returns `draft_ready` with runner-understanding and plan-shape review data.
   Transcript review remains non-mutating; `confirmVoiceToPlanDraft` is now the explicit first-plan creation seam and rechecks entitlement, blocks when an active plan already exists, persists the canonical structured plan plus profile basics only after confirmation, and still avoids raw audio handling, transcript profile persistence, usage counting, or silent plan replacement.
-- The compact Dictate-to-Plan Pro assist is now implemented:
-  no-plan onboarding shows a small `AI setup` transcript-text assist above the manual structured constructor, `Review AI setup` calls only the non-mutating draft seam, clarification responses show missing truths and recovery actions, draft-ready responses show what Hito understood plus goal, horizon, days/week, rest days, rough activity mix, assumptions, and safety copy, and only `Yes, create plan` calls the explicit confirm seam before reloading into the saved active plan.
+- The compact Dictate-to-Plan Pro assist is not accepted as a current visible UI:
+  the old `DictateToPlanPanel` UI residue is deleted, and the backend draft/confirm actions remain
+  available, but source proof shows no current caller from `OnboardingGate`; the no-plan surface
+  currently shows Manual setup and Quick setup with structured review plus Plan Preset /
+  selected-plan paths. Do not treat `AI setup` transcript UI as shipped until a future frontend gate
+  wires it and QA accepts it.
 - The no-plan onboarding frontend ownership has been refactored without changing product behavior:
-  `OnboardingGate` now orchestrates state and server actions while focused onboarding modules own the structured constructor UI, Dictate-to-Plan review UI, Advanced JSON panel, and shared constructor/voice form model, keeping manual structured setup and voice supplements on the same constants and helper functions.
+  `OnboardingGate` now orchestrates state and server actions while focused onboarding modules own the structured constructor UI, Plan Preset / selected-plan review, manual setup, and shared constructor form model.
 - The first backend ownership slice from the first-plan constructor architecture audit is now implemented:
   `src/lib/first-plan-actions.ts` owns the structured first-plan action plus voice draft/confirm actions, while `training-api.ts` keeps compatibility re-exports so existing product imports still compile; no generation, entitlement, fixed rest-day, persistence, or review/confirm behavior was intentionally changed.
 - The second backend ownership slice from the first-plan constructor architecture audit is now implemented:
   `src/lib/active-plan-persistence.ts` now owns the shared imported-plan apply/persistence primitives, and `first-plan-actions.ts` imports that lower-level seam directly instead of dynamically importing back into `training-api.ts`; public compatibility exports remain intact.
 - The first-plan simplification and server-boundary cleanup slice is now implemented:
   the unused `completeStructuredOnboarding` action and unused `training-api.ts` apply re-export are removed, duplicated first-plan weekday/goal/duration/pace helpers now live in `src/lib/first-plan-authoring-utils.ts`, and Garmin feedback readback no longer imports the Node-only FIT/ZIP ingest module from the shared training API path.
-- The next `training-api.ts` narrowing slice is now implemented:
-  active-plan export action ownership has moved into `src/lib/active-plan-export-actions.ts`, while `training-api.ts` remains a compatibility facade for the same public `exportActivePlan` and `exportActivePlanForUser` names.
+- The active-plan export facade narrowing slice is now implemented:
+  active-plan export action ownership lives in `src/lib/active-plan-export-actions.ts`, the export
+  API route imports that canonical owner directly, and `training-api.ts` no longer keeps
+  `exportActivePlan` / `exportActivePlanForUser` compatibility re-exports.
+- The Plan Preset card facade narrowing slice is now implemented:
+  Plan Preset card discovery remains owned by `src/lib/plan-preset-actions.ts`, onboarding imports
+  that owner directly, and `training-api.ts` no longer keeps Plan Preset card discovery
+  compatibility re-exports.
+- The auth callback exchange facade narrowing slice is now implemented:
+  `/api/auth/confirm` imports `exchangeCodeForSession` directly from `src/lib/auth-actions.ts`, and
+  `training-api.ts` no longer keeps the auth callback exchange compatibility re-export.
+- The Open plan type-contract facade narrowing slice is now implemented:
+  plan-management refresh and schedule-edit components import refresh/reflow contract types directly
+  from `src/lib/active-plan-refresh-contract.ts` and
+  `src/lib/active-plan-schedule-edit-preview.ts`, while `training-api.ts` keeps only the runtime
+  server-function wrappers for those flows.
+- The bundled type-only `training-api.ts` facade narrowing slice is now implemented:
+  settings, structured first-plan, selected running-plan, first-plan confirm, selected-plan confirm
+  input, and active-plan lifecycle result types now import from canonical owner modules or no longer
+  need `training-api.ts` compatibility re-exports. Later G7C source proof also removed no-caller
+  manual Copy/Paste and Move review/confirm compatibility re-exports from `training-api.ts`, while
+  direct manual Copy/Paste and Move runtime wrappers plus Delete/Clear, Add/Create/Templates, and
+  persisted-edit actions remain in the facade.
 - The first `PlanManagementDialog` decomposition slice is now implemented:
   the saved-mode `Open plan` export dropdown UI now lives in `src/components/plan-management/PlanExportMenu.tsx`, while the parent dialog still owns export status, error handling, the authenticated iframe download path, and all existing plan-management actions.
 - The second `PlanManagementDialog` decomposition slice is now implemented:
@@ -220,12 +256,17 @@ Active
   `src/styles.css` loads Poppins through the canonical Hito font import and maps `--font-sans` to Poppins, while `/hitoDS#foundations` names Poppins for body, label, control, navigation, and feedback roles without changing typography sizes, line heights, spacing, Fraunces display roles, or JetBrains Mono technical roles.
 - The Hito selection-control DS slice is now implemented:
   `src/styles.css` owns checkbox, radio, and toggle-radio recipes for `sm` and `md` controls, `/hitoDS#selection-controls` documents default, selected, disabled, invalid, and destructive-confirmation examples, and the saved-mode plan/import confirmation checkboxes now use signal-selected Hito styling without changing their existing gating behavior.
-- The active-plan lifecycle action extraction slice is now implemented:
-  `src/lib/active-plan-lifecycle-actions.ts` owns delete/archive and clear-upcoming action behavior, while `training-api.ts` binds those actions to the existing persisted snapshot loader and preserves the same public `deleteActivePlan`, `clearUpcomingSchedule`, `archiveActivePlanForUser`, and `clearUpcomingScheduleForUser` names.
+- The active-plan lifecycle action extraction and G7B helper-export narrowing slices are now
+  implemented:
+  `src/lib/active-plan-lifecycle-actions.ts` owns delete/archive and clear-upcoming action behavior,
+  while `training-api.ts` binds the live top-level `deleteActivePlan` and `clearUpcomingSchedule`
+  server-action wrappers to the existing persisted snapshot loader. The no-caller user-scoped
+  `archiveActivePlanForUser` and `clearUpcomingScheduleForUser` compatibility exports were removed
+  from `training-api.ts`; canonical helper ownership remains in `active-plan-lifecycle-actions.ts`.
 - The active-plan lifecycle auth integration fix is now implemented:
   `deleteActivePlan` and `clearUpcomingSchedule` are top-level `training-api.ts` server-action wrappers again, resolving the current persisted user through the same request-auth seam as other working saved-mode mutations before delegating to `active-plan-lifecycle-actions.ts`.
-- The user-settings action extraction slice is now implemented:
-  `src/lib/user-settings-actions.ts` owns `/settings` route data, bounded profile readback, and profile-settings save behavior, while `training-api.ts` binds the existing snapshot/viewer loaders and preserves the same public `getSettingsRouteData`, `saveUserSettings`, and `UserSettingsSummary` imports.
+- The user-settings action extraction and G7A import-map narrowing slices are now implemented:
+  `src/lib/user-settings-actions.ts` owns `/settings` route data, bounded profile readback, profile-settings save behavior, `saveUserSettings`, and `UserSettingsSummary`; `training-api.ts` still binds the existing snapshot/viewer loaders for the public `getSettingsRouteData` route wrapper, while the settings route imports the save action directly from `user-settings-actions.ts`.
 - The runner training-preferences backend storage slice is now implemented:
   the linked Supabase project and local database type now include `runner_profiles.training_preferences jsonb`; `user-settings-actions.ts` validates and persists bounded `blocked_days`, `preferred_long_run_day`, and `max_running_days_per_week` values without changing existing personal-data saves, and structured first-plan confirmation now stores the same stable weekly defaults alongside age, weight, and height.
 - The runner training-preferences shared contract slice is now implemented:
@@ -238,14 +279,21 @@ Active
 - The workout-log save action extraction slice is now implemented:
   `src/lib/workout-log-actions.ts` owns manual workout-result validation and persistence for completed, partial, skipped, and workout-scoped body-note payloads, while `training-api.ts` keeps the same public `saveWorkoutLog` server-action wrapper used by `CompletionPanel`.
 - The auth/login action extraction slice is now implemented:
-  `src/lib/auth-actions.ts` owns login route data shaping, Magic Link validation/request behavior, auth callback exchange, and local-vs-public auth availability helpers, while `training-api.ts` keeps the same public `getLoginRouteData`, `requestMagicLink`, and `exchangeCodeForSession` import path.
+  `src/lib/auth-actions.ts` owns login route data shaping, Magic Link validation/request behavior, auth callback exchange, and local-vs-public auth availability helpers, while `training-api.ts` keeps the same public `getLoginRouteData` and `requestMagicLink` wrappers for current callers; `/api/auth/confirm` now imports the auth callback exchange owner directly.
 - The route-data loader extraction slice is now implemented:
   `src/lib/route-data-actions.ts` owns home, shell, workout-detail, and progress route data shaping behind injected snapshot/viewer/feedback loaders, while `training-api.ts` keeps the same public `getHomeRouteData`, `getShellRouteData`, `getWorkoutRouteData`, and `getProgressRouteData` server-function wrappers.
-- The active-plan refresh action extraction slice is now implemented:
-  `src/lib/active-plan-refresh-actions.ts` owns refresh proposal entitlement/usage behavior, exact proposal-time draft attachment, stale fingerprint/checksum checks, weekday rest-day validation, mutable-workout guard checks, and archive/replace persistence for approved updates, while `training-api.ts` keeps the same public `proposeActivePlanRefresh`, `applyActivePlanRefreshProposal`, and `applyActivePlanRefreshProposalForUser` compatibility names.
-- The plan-replacement action extraction slice is now implemented:
-  `src/lib/plan-replacement-actions.ts` owns advanced JSON/imported-plan replacement and saved-mode text replacement action behavior, while `training-api.ts` keeps the same public `completeOnboarding`, `completeTextOnboarding`, and `persistImportedPlanForCurrentRequest` compatibility names.
-- The Dictate-to-Plan review assumption clarity follow-up is now implemented:
+- The active-plan refresh action extraction and G7B helper-export narrowing slices are now
+  implemented:
+  `src/lib/active-plan-refresh-actions.ts` owns refresh proposal entitlement/usage behavior, exact
+  proposal-time draft attachment, stale fingerprint/checksum checks, weekday rest-day validation,
+  mutable-workout guard checks, and archive/replace persistence for approved updates, while
+  `training-api.ts` keeps the live public `proposeActivePlanRefresh` and
+  `applyActivePlanRefreshProposal` server-action wrappers. The no-caller
+  `applyActivePlanRefreshProposalForUser` compatibility export was removed from `training-api.ts`;
+  canonical user-scoped refresh apply ownership remains in `active-plan-refresh-actions.ts`.
+- The plan-replacement action extraction and G7A import-map narrowing slices are now implemented:
+  `src/lib/plan-replacement-actions.ts` owns advanced JSON/imported-plan replacement, saved-mode text replacement action behavior, and the internal `persistImportedPlanForCurrentRequest` helper, while `training-api.ts` keeps only the current public `completeOnboarding` and `completeTextOnboarding` compatibility names for route/component callers.
+- The backend voice-to-plan review assumption clarity follow-up is implemented:
   when an obvious dictated goal-style cue differs from the reviewed draft style, such as balanced becoming relaxed, the backend adds an explicit runner-facing assumption rather than forcing the requested style or silently hiding the change; the real frontend-shaped request path now compares transcript style cues before constructor supplement defaults, so the dictated cue cannot be masked by structured state.
 - The first immediate Garmin UX cleanup slice is now implemented:
   workout-detail `Feedback` now uses one calmer divided hierarchy with plain-language `Upload Garmin file`, `Plan vs run`, and `Recommendation` framing; `Log result` now includes one lightweight path into `Feedback` for deeper review; and `/integrations` no longer contradicts the live Garmin path with stale `Preview / View status / Not connected` placeholder language.
@@ -307,8 +355,8 @@ Active
   shared CSS roles now cover display, page, modal, section, panel, body, body-small, helper, caption, label, form-label, button, nav/menu, metric, status, error/success, and technical mono text; `/hitoDS` now documents those roles as the canonical reference, and the first high-drift surfaces (`Open plan`, saved-mode JSON import, workout `Log result`/`Feedback`, and `User settings`) use those roles for headings, form labels, helper/body copy, status feedback, and fixed-format metadata.
 - The shared dialog typography contract is now fixed:
   Radix-backed `DialogTitle` and `DialogDescription` no longer force generic shadcn typography defaults over product classes, so `Open plan`, saved-mode JSON import, and the workout body-note modal resolve their title/description rhythm from canonical Hito roles.
-- The first Hito icon-system normalization slice is now implemented:
-  Hito now owns one `lucide-react`-backed `Icon` primitive with stable product names, four canonical sizes, and documented `/hitoDS#icons` usage examples; product-level surfaces consume that layer, while generated UI infra remains the only direct lucide exception and the raw SVG icon folders have been removed.
+- The Hito icon-system normalization slice is now implemented:
+  Hito now owns one Tabler-backed `Icon` primitive with stable product names, four canonical sizes, and documented `/hitoDS#icons` usage examples; product-level surfaces consume that layer, and the raw SVG icon folders have been removed.
 - The first `/hitoDS` card-reduction slice is now implemented:
   the Overview, Typography, and Icons reference sections use open rhythm, divider-led rows, quiet support notes, and one shared usage/demo surface where useful instead of nested bordered card grids; live product component behavior is unchanged.
 - The first modal anatomy helper slice is now implemented:
@@ -403,9 +451,9 @@ Active
   That bounded contract remains a backend and ops asset behind the visible structured onboarding UI, and Backend plus ops can still validate and persist generated structured plans through `npm run author-structured-plan -- --email <tester-email> --input-file <absolute-json-path>`.
 - The first OpenAI-backed text-to-plan backend slice is now implemented:
   the service accepts one bounded free-text request, asks OpenAI for structured authoring input, validates that model output deterministically, then the saved-mode text replacement action explicitly opts into a rich workout draft that is accepted only after backend normalization into canonical `training-plan-v2`; the same Supabase seam used by JSON import and structured authoring remains the only persistence path.
-  The visible onboarding UI is now wired to this path, and local live validation is green with a working `OPENAI_API_KEY`.
-- The structured first-plan onboarding backend contract slice is now implemented:
-  a new authenticated `completeStructuredFirstPlanOnboarding` seam accepts the approved constructor contract, requires bounded age/weight/height profile basics, validates benchmark/target-time/terrain/rest-day combinations, accepts ultra marathon and mountain running goal options, normalizes omitted or hidden terrain to the canonical generation context, translates `runningDaysPerWeek + fixedRestDays` into deterministic preferred running days, preserves fixed rest days through the existing weekday invariant plan preferences, persists only age/weight/height to `runner_profiles`, and uses direct structured generation so terrain focus can produce rolling or mountain/hill-oriented workouts without free text as the primary contract.
+  Saved-mode text replacement can use this path; no-plan onboarding currently uses Manual setup, structured draft/confirm, and selected-plan preview/confirm rather than a visible free-text or voice setup panel.
+- The original direct structured plan-authoring backend contract slice is superseded for visible onboarding:
+  `completeStructuredFirstPlanOnboarding` still exists in first-plan actions, but current no-plan callers use `generateStructuredFirstPlanDraft` followed by `confirmStructuredFirstPlanDraft`; the backend still requires bounded age/weight/height profile basics, validates benchmark/target-time/terrain/rest-day combinations, accepts ultra marathon and mountain running goal options, normalizes omitted or hidden terrain to the canonical generation context, translates `runningDaysPerWeek + fixedRestDays` into deterministic preferred running days, preserves fixed rest days through the existing weekday invariant plan preferences, persists only age/weight/height to `runner_profiles`, and keeps terrain focus as generation context rather than profile truth.
 - The Phase 4 frontend cleanup slice has been superseded by the structured first-plan constructor:
   visible no-plan and shell surfaces present structured plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
 - The first Hito design-system implementation slices are now implemented:
@@ -424,18 +472,21 @@ Active
 
 ## Current Active Stream
 
-Plan Preset v1 is complete for no-active-plan creation:
-the product now has a backend-owned deterministic preset path for `10K Foundation`,
-`Half Marathon Balanced`, and `Marathon Base`, plus the existing Advanced custom program escape hatch
-for target-date/time and unusual cases. The next broad project stream is simplification and
-consolidation before adding more preset families or new mutation models.
+Code-freeze simplification is the current broad stream:
+the product has backend-owned Plan Preset discovery cards for `10K Foundation`,
+`Half Marathon Balanced`, and `Marathon Base`, selected running-plan preview/create for supported
+families, manual user-built plan creation/editing/export in the proved scope, and the existing
+Advanced custom program escape hatch for target-date/time and unusual cases. Cleanup now focuses on
+source-of-truth hygiene and carefully reassessed compatibility narrowing before adding more families
+or mutation models.
 
 ## Next Recommended Steps
 
-1. Start the Hito stack simplification strike after this Plan Preset archive if the team wants to
-   reduce framework/tool/code-path complexity before expanding product scope.
+1. Continue the Hito stack simplification strike from the current global teardown map before
+   expanding product scope.
 2. Use backlog-only follow-ups for additional Plan Preset families, preset-based active-plan
-   replacement/refresh, and manual workout creation/edit/copy/paste/recurrence.
+   replacement/refresh, recurrence, Restore UI, universal Copy/Paste, QR/share/import, and broader
+   persisted workout editing beyond the proved manual scope.
 3. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use
    `/hitoDS` as the inspection surface before shipping new visual patterns.
 
@@ -445,5 +496,5 @@ consolidation before adding more preset families or new mutation models.
 - `docs/current-system.md`
 - `docs/current-product.md`
 - `docs/glossary.md`
-- `docs/plans/active/2026-05-05-full-baseline-import-and-stabilization-plan.md`
+- `docs/plans/archive/2026-05-05-full-baseline-import-and-stabilization-plan.md`
 - relevant product briefs and frontend specs

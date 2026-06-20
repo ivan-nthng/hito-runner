@@ -857,6 +857,7 @@ function persistedWorkoutRowToView(
     notes: workout.notes,
     steps,
     feedbackMarker: null,
+    sourceEditing: null,
     log: mappedLog,
     status: inferWorkoutStatus(workout.workout_type, workout.workout_date, currentDate, mappedLog),
   };

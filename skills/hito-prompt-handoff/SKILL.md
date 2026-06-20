@@ -44,11 +44,13 @@ section. For QA prompts, this gate becomes explicit source-boundary proof and st
 3. Decide exactly one next recommended role.
 4. Include required reading order.
 5. List exact files/surfaces to inspect.
-6. State constraints and what not to touch.
-7. Specify validation requirements.
-8. Rely on the standard report formats in `AGENTS.md` by default. Specify custom output only when
+6. Add subagent guidance when the next role can safely run independent read-only audits, tests,
+   source scans, or non-mutating validation without user attention.
+7. State constraints and what not to touch.
+8. Specify validation requirements.
+9. Rely on the standard report formats in `AGENTS.md` by default. Specify custom output only when
    the task needs stricter evidence, unusual ordering, or a non-standard report shape.
-9. Do not include a long continuity footer by default. Use only the standard shell plus `Blockers`
+10. Do not include a long continuity footer by default. Use only the standard shell plus `Blockers`
    for routine Product prompt-routing.
 
 ## Product-Owned Direct Handoff
@@ -154,6 +156,26 @@ Blockers:
 - Do not let BACKEND or FRONTEND prompts ask for symptom patches only. They must direct the agent to
   find the canonical owner, reuse existing Hito seams, and fix the underlying cause when the slice can
   safely cover it.
+- For non-trivial prompts to agents that code, QA, audit, research, design, or route work, include
+  subagent expectations when useful: the next agent should use or reuse subagents for safe
+  independent read-only audits, tests, source scans, and non-mutating validation; close completed
+  subagents; integrate findings themselves; and avoid routing every small subtask back to the user.
+- For Hito Stack Simplification prompts to ARCHITECT or BACKEND, include subagent expectations by
+  default. If you intentionally omit them, state why the task is single-file, inherently sequential,
+  or blocked by unavailable subagent tooling.
+- For global simplification cleanup, prefer an autonomous same-owner batch prompt over a micro-gate
+  prompt when source proof shows several adjacent seams can be handled by one role with one
+  validation story. The prompt must include stop conditions, progress estimate reporting, and
+  subagent expectations so the user is not forced into a copy-paste operator loop.
+- If subagent/thread tools are unavailable to the current Product router, say that briefly in the
+  user-facing shell when relevant, but do not use it as an excuse to keep producing micro-prompts.
+  Instead, write the next prompt so the execution role uses subagents where available or performs
+  safe sequential audits locally, completes the bounded batch, and returns only on validation
+  failure, owner-boundary crossing, mutation/browser-risk escalation, or product decision need.
+- For Hito Stack Simplification routing, an ARCHITECT prompt should usually select an autonomous
+  execution batch, not merely one tiny next gate, unless fresh evidence shows only one safe seam
+  exists. If it must select only one seam, the prompt must explain the stop condition and why batching
+  would be unsafe.
 
 ## Required Handoff Shell
 
@@ -183,6 +205,8 @@ The prompt inside `Exact prompt for that role` must:
 - include `Root cause and architecture fit` for BACKEND or FRONTEND implementation/debugging prompts
 - list exact files/surfaces to inspect when relevant
 - list commands or browser policy when validation is required
+- include subagent/read-only audit guidance when independent checks can run safely inside the next
+  role's scope
 - rely on `AGENTS.md` standard report formats by default; include custom output requirements only
   when the task needs them
 - avoid optional second prompts or later-role prompts

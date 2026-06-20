@@ -24,14 +24,18 @@ For non-trivial Hito architecture work, read in order:
 ## Workflow
 
 1. Inspect current code/docs before recommending.
-2. Identify canonical pipeline ownership:
+2. Use read-only subagents when independent source/import scans, docs drift checks, file-size
+   inventories, validation-command audits, or candidate comparisons can run safely without user
+   attention. Reuse open subagents for similar follow-ups, close them when done, and integrate their
+   findings yourself.
+3. Identify canonical pipeline ownership:
    `runner/provider input -> backend validation -> normalization -> canonical persisted entities -> deterministic product truth -> optional AI/enrichment -> explicit review/confirm when mutation is risky -> UI rendering`
-3. Find duplicated paths, oversized files, mixed responsibilities, frontend-owned rules, unsafe mutations, and stale compatibility layers.
-4. Separate:
+4. Find duplicated paths, oversized files, mixed responsibilities, frontend-owned rules, unsafe mutations, and stale compatibility layers.
+5. Separate:
    - immediate next slice
    - backlog
    - no longer worth touching
-5. Recommend exactly one next action unless the user asks for a broader comparison.
+6. Recommend exactly one next action unless the user asks for a broader comparison.
 
 ## Hito Architecture Rules
 

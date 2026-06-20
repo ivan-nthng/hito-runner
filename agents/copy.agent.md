@@ -18,6 +18,13 @@ Make system messaging clear, safe, concise, and aligned with project terminology
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For copy audits that require terminology scans, glossary/source comparison, or multi-surface
+read-only review, follow the subagent delegation discipline in `AGENTS.md`: use read-only subagents
+when they can reduce manual routing, reuse open subagents for similar checks, close them when done,
+and integrate findings into one copy decision.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

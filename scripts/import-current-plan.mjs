@@ -1,143 +1,249 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
-import { buildImportedPlanSeed } from "./lib/imported-plan-seed.mjs";
+import { tsImport } from "tsx/esm/api";
 
-const PLAN_PATH = process.argv[2] ?? "/Users/ivan/Downloads/ivan_complete_half_marathon_plan.json";
-const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
-
-const supabaseUrl = readEnv("NEXT_PUBLIC_SUPABASE_URL");
-const supabaseServerKey = readEnv("SUPABASE_SECRET_KEY");
-
-if (!supabaseUrl || !supabaseServerKey) {
-  throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY for the plan import.");
-}
-
-const supabase = createClient(supabaseUrl, supabaseServerKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
-
-const plan = JSON.parse(await readFile(PLAN_PATH, "utf8"));
-const importedSeed = buildImportedPlanSeed(plan);
-const localAccount = await loadCanonicalLocalBypassAccount();
-const supabaseUserId = await ensureLocalBypassSupabaseUser({
-  email: localAccount.email,
-  displayName: localAccount.displayName,
-  role: localAccount.role,
-  userId: localAccount.userId,
-  username: localAccount.username,
-});
-
-const profileUpsert = await supabase
-  .from("runner_profiles")
-  .upsert({
-    user_id: supabaseUserId,
-    goal_type: importedSeed.profile.goalType,
-    goal_label: importedSeed.profile.goalLabel,
-    baseline_sessions_per_week: importedSeed.profile.baselineSessionsPerWeek,
-    baseline_long_run_km: importedSeed.profile.baselineLongRunKm,
-    baseline_notes: importedSeed.profile.baselineNotes ?? null,
-    setup_state: "completed",
-  })
-  .select("user_id")
-  .single();
-
-if (profileUpsert.error) {
-  throw new Error(profileUpsert.error.message);
-}
-
-const archived = await supabase
-  .from("plan_cycles")
-  .update({ status: "archived" })
-  .eq("user_id", supabaseUserId)
-  .eq("status", "active");
-
-if (archived.error) {
-  throw new Error(archived.error.message);
-}
-
-const planInsert = await supabase
-  .from("plan_cycles")
-  .insert({
-    user_id: supabaseUserId,
-    status: "active",
-    title: importedSeed.title,
-    goal_summary: importedSeed.goalSummary,
-    source_template: importedSeed.sourceTemplate,
-    schema_version: importedSeed.schemaVersion,
-    source_kind: importedSeed.sourceKind,
-    start_date: importedSeed.startDate,
-    end_date: importedSeed.endDate,
-    target_date: importedSeed.targetDate,
-    goal_metadata: importedSeed.goalMetadata,
-    plan_preferences: importedSeed.planPreferences,
-  })
-  .select("id, title, start_date, end_date")
-  .single();
-
-if (planInsert.error) {
-  throw new Error(planInsert.error.message);
-}
-
-const workouts = importedSeed.workouts.map((workout) => ({
-  plan_cycle_id: planInsert.data.id,
-  user_id: supabaseUserId,
-  workout_date: workout.workoutDate,
-  weekday: workout.weekday,
-  week_number: workout.weekNumber,
-  phase: workout.phase,
-  workout_type: workout.workoutType,
-  source_workout_id: workout.sourceWorkoutId,
-  source_workout_type: workout.sourceWorkoutType ?? null,
-  workout_family: workout.workoutFamily ?? null,
-  workout_identity: workout.workoutIdentity ?? null,
-  calendar_icon_key: workout.calendarIconKey ?? null,
-  goal_context: workout.goalContext ?? null,
-  metric_mode: workout.metricMode ?? null,
-  title: workout.title,
-  notes: workout.notes,
-  planned_rpe: workout.plannedRpe,
-  estimated_fatigue: workout.estimatedFatigue,
-  recovery_priority: workout.recoveryPriority,
-  steps: workout.steps,
-  display_order: workout.displayOrder,
-}));
-
-const workoutInsert = await supabase.from("planned_workouts").insert(workouts);
-
-if (workoutInsert.error) {
-  throw new Error(workoutInsert.error.message);
-}
-
-const verifyPlan = await supabase
-  .from("planned_workouts")
-  .select("id", { count: "exact", head: true })
-  .eq("plan_cycle_id", planInsert.data.id);
-
-if (verifyPlan.error) {
-  throw new Error(verifyPlan.error.message);
-}
-
-console.log(
-  JSON.stringify(
-    {
-      ok: true,
-      planPath: PLAN_PATH,
-      localUserId: localAccount.userId,
-      supabaseUserId,
-      activePlanId: planInsert.data.id,
-      workoutCount: verifyPlan.count ?? 0,
-      title: planInsert.data.title,
-      startDate: planInsert.data.start_date,
-      endDate: planInsert.data.end_date,
-    },
-    null,
-    2,
-  ),
+const { buildImportedPlanSeed } = await tsImport("../src/lib/imported-plan.ts", import.meta.url);
+const { applyImportedSeedAsActivePlanForOps } = await tsImport(
+  "./lib/ops-plan-apply.ts",
+  import.meta.url,
 );
+
+const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
+const LOCAL_MUTATION_FLAG = "--allow-local-supabase-mutation";
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const USAGE = `Usage:
+  npm run import:current-plan
+  npm run import:current-plan -- --dry-run --plan-file ./path/to/training-plan-v2.json
+  node --env-file=.env.local ./scripts/import-current-plan.mjs --apply --plan-file ./path/to/training-plan-v2.json ${LOCAL_MUTATION_FLAG}
+
+Safe defaults:
+  - No arguments prints this help and does not mutate.
+  - --dry-run validates the plan seed and local-bypass account without creating a Supabase client.
+  - --apply is blocked unless ${LOCAL_MUTATION_FLAG} is present and NEXT_PUBLIC_SUPABASE_URL is loopback.
+
+This helper is local ops tooling for canonical training-plan-v2 imports. It must not be used as a
+remote or production import path.`;
+
+main().catch((error) => {
+  console.error(
+    JSON.stringify(
+      {
+        ok: false,
+        mutation: false,
+        reason: "import_current_plan_failed",
+        message: getErrorMessage(error),
+      },
+      null,
+      2,
+    ),
+  );
+  process.exitCode = 1;
+});
+
+async function main() {
+  const options = parseCliArgs(process.argv.slice(2));
+
+  if (options.help || options.shouldPrintDefaultHelp) {
+    console.log(USAGE);
+    return;
+  }
+
+  if (!options.planPath) {
+    throw new Error("Missing plan file. Pass --plan-file <path> or a positional plan JSON path.");
+  }
+
+  const plan = JSON.parse(await readFile(options.planPath, "utf8"));
+  const importedSeed = buildImportedPlanSeed(plan);
+  const localAccount = await loadCanonicalLocalBypassAccount();
+
+  if (options.mode === "dry_run") {
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          mode: "dry_run",
+          mutation: false,
+          planPath: options.planPath,
+          localUserId: localAccount.userId,
+          localUserEmail: localAccount.email,
+          title: importedSeed.title,
+          sourceKind: importedSeed.sourceKind,
+          schemaVersion: importedSeed.schemaVersion,
+          startDate: importedSeed.startDate,
+          endDate: importedSeed.endDate,
+          targetDate: importedSeed.targetDate,
+          workoutCount: importedSeed.workouts.length,
+          supabaseTarget: describeSupabaseTarget(readEnv("NEXT_PUBLIC_SUPABASE_URL")),
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  const supabaseUrl = readEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const supabaseServerKey = readEnv("SUPABASE_SECRET_KEY");
+
+  if (!supabaseUrl || !supabaseServerKey) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY for apply mode.");
+  }
+
+  assertApplySafety({
+    supabaseUrl,
+    allowLocalSupabaseMutation: options.allowLocalSupabaseMutation,
+  });
+
+  const supabase = createClient(supabaseUrl, supabaseServerKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  const supabaseUserId = await ensureLocalBypassSupabaseUser({
+    supabase,
+    email: localAccount.email,
+    displayName: localAccount.displayName,
+    role: localAccount.role,
+    userId: localAccount.userId,
+    username: localAccount.username,
+  });
+
+  const appliedPlan = await applyImportedSeedAsActivePlanForOps({
+    supabase,
+    userId: supabaseUserId,
+    importedSeed,
+    planSelect: "id, title, start_date, end_date",
+    workoutSelect: "id",
+  });
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        mode: "apply",
+        mutation: true,
+        planPath: options.planPath,
+        localUserId: localAccount.userId,
+        supabaseUserId,
+        activePlanId: appliedPlan.planCycle.id,
+        workoutCount: appliedPlan.workoutCount,
+        title: appliedPlan.planCycle.title,
+        startDate: appliedPlan.planCycle.start_date,
+        endDate: appliedPlan.planCycle.end_date,
+        supabaseTarget: describeSupabaseTarget(supabaseUrl),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+function parseCliArgs(args) {
+  if (args.length === 0) {
+    return {
+      help: false,
+      shouldPrintDefaultHelp: true,
+      mode: "dry_run",
+      planPath: null,
+      allowLocalSupabaseMutation: false,
+    };
+  }
+
+  const options = {
+    help: false,
+    shouldPrintDefaultHelp: false,
+    mode: "dry_run",
+    planPath: null,
+    allowLocalSupabaseMutation: false,
+  };
+
+  let modeWasSet = false;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === "--help" || arg === "-h") {
+      options.help = true;
+      continue;
+    }
+
+    if (arg === "--dry-run" || arg === "--preflight") {
+      if (modeWasSet && options.mode !== "dry_run") {
+        throw new Error("Use only one of --dry-run or --apply.");
+      }
+      options.mode = "dry_run";
+      modeWasSet = true;
+      continue;
+    }
+
+    if (arg === "--apply") {
+      if (modeWasSet && options.mode !== "apply") {
+        throw new Error("Use only one of --dry-run or --apply.");
+      }
+      options.mode = "apply";
+      modeWasSet = true;
+      continue;
+    }
+
+    if (arg === LOCAL_MUTATION_FLAG) {
+      options.allowLocalSupabaseMutation = true;
+      continue;
+    }
+
+    if (arg === "--plan-file") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error("Missing value for --plan-file.");
+      }
+      options.planPath = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--plan-file=")) {
+      const value = arg.slice("--plan-file=".length).trim();
+      if (!value) {
+        throw new Error("Missing value for --plan-file.");
+      }
+      options.planPath = value;
+      continue;
+    }
+
+    if (arg.startsWith("--")) {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+
+    if (options.planPath) {
+      throw new Error("Only one plan file may be provided.");
+    }
+    options.planPath = arg;
+  }
+
+  return options;
+}
+
+function assertApplySafety({ supabaseUrl, allowLocalSupabaseMutation }) {
+  const target = parseSupabaseTarget(supabaseUrl);
+
+  if (!target) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not a valid URL; refusing to apply import.");
+  }
+
+  if (!allowLocalSupabaseMutation) {
+    throw new Error(
+      `Refusing to mutate ${target.url}. Pass ${LOCAL_MUTATION_FLAG} with --apply after confirming this is a disposable local Supabase target.`,
+    );
+  }
+
+  if (!target.isLoopback) {
+    throw new Error(
+      `Refusing to mutate non-local Supabase target ${target.url}. This ops helper only supports loopback Supabase apply mode.`,
+    );
+  }
+}
 
 async function loadCanonicalLocalBypassAccount() {
   const accountsFilePath = readEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE") ?? DEFAULT_ACCOUNTS_FILE;
@@ -155,8 +261,8 @@ async function loadCanonicalLocalBypassAccount() {
   return normalizedAccounts.find((account) => account.role === "admin") ?? normalizedAccounts[0];
 }
 
-async function ensureLocalBypassSupabaseUser(config) {
-  const existingUser = await findAuthUserByEmail(config.email);
+async function ensureLocalBypassSupabaseUser({ supabase, ...config }) {
+  const existingUser = await findAuthUserByEmail(supabase, config.email);
   const authUser =
     existingUser ??
     (await supabase.auth.admin
@@ -187,7 +293,7 @@ async function ensureLocalBypassSupabaseUser(config) {
   return authUser.id;
 }
 
-async function findAuthUserByEmail(email) {
+async function findAuthUserByEmail(supabase, email) {
   let page = 1;
   const perPage = 200;
 
@@ -210,6 +316,48 @@ async function findAuthUserByEmail(email) {
     }
 
     page += 1;
+  }
+}
+
+function describeSupabaseTarget(url) {
+  const target = parseSupabaseTarget(url);
+  if (!target) {
+    return {
+      configured: false,
+      url: null,
+      isLoopback: false,
+    };
+  }
+
+  return {
+    configured: true,
+    url: target.url,
+    hostname: target.hostname,
+    projectRef: target.projectRef,
+    isLoopback: target.isLoopback,
+  };
+}
+
+function parseSupabaseTarget(url) {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    const projectRef = hostname.endsWith(".supabase.co")
+      ? hostname.split(".supabase.co")[0] || null
+      : null;
+
+    return {
+      url: parsed.origin,
+      hostname,
+      projectRef,
+      isLoopback: LOOPBACK_HOSTNAMES.has(hostname),
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -248,4 +396,8 @@ function deriveUserId(username) {
 
 function humanizeUsername(username) {
   return username.charAt(0).toUpperCase() + username.slice(1);
+}
+
+function getErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }

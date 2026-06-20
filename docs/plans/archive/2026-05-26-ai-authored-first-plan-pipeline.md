@@ -109,7 +109,7 @@ Completed and QA-passed in this wave:
 Future tracks split out:
 
 - `docs/plans/active/2026-06-01-ai-first-plan-envelope-production-adoption-and-prompt-simplification.md`
-- `docs/plans/active/2026-06-01-advanced-performance-cadence-doctrine-and-implementation.md`
+- `docs/tasks/backlog/2026-06-01-advanced-performance-cadence-doctrine-and-implementation.md`
 - `docs/plans/active/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md`
 - `docs/tasks/backlog/2026-06-01-malformed-date-time-negative-path-browser-qa-hygiene.md`
 

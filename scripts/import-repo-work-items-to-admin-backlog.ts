@@ -10,6 +10,10 @@ import {
   type AdminRepoWorkItemLifecycle,
   type AdminRepoWorkItemSourceType,
 } from "../src/lib/admin-work-items";
+import {
+  adminCaptureTargetRoles,
+  type AdminCaptureTargetRole,
+} from "../src/lib/admin-capture-roles";
 import type { Database, Json } from "../src/lib/supabase/database";
 
 const IMPORT_VERSION = "repo-work-items-v1";
@@ -78,15 +82,7 @@ type AdminItemType = "bug" | "change_request" | "context_capture";
 type AdminStatus = "new" | "in_review" | "ready_for_codex" | "done" | "archived";
 type AdminPriority = "low" | "medium" | "high" | "urgent";
 type MarkdownItemType = AdminItemType | "plan" | "frontend_spec" | "product_brief";
-type TargetRole =
-  | "architect"
-  | "backend"
-  | "frontend"
-  | "designer"
-  | "copy"
-  | "qa"
-  | "product"
-  | "running_coach";
+type TargetRole = AdminCaptureTargetRole;
 type WorkItemStatus = "backlog" | "in_progress" | "completed" | "closed" | "archived";
 type CanonicalMarkdownField = (typeof CANONICAL_MARKDOWN_FIELDS)[number];
 type ItemInsert = Database["public"]["Tables"]["admin_capture_items"]["Insert"];
@@ -956,7 +952,9 @@ function inferTargetRole(
   searchText: string,
 ): TargetRole {
   const normalized = searchText.toLowerCase();
-  const explicit = normalized.match(/\brole:\s*(backend|frontend|qa|copy|designer|architect)\b/);
+  const explicit = normalized.match(
+    /\brole:\s*(backend|frontend|qa|copy|designer|architect|product|running[\s_-]*coach)\b/,
+  );
 
   if (explicit) {
     return normalizeRole(explicit[1]) ?? "architect";
@@ -1392,11 +1390,7 @@ function normalizeMarkdownPriority(input: string | null): AdminPriority | null {
 function normalizeCanonicalMarkdownRole(input: string | null): TargetRole | null {
   const normalized = normalizeScalarToken(input);
 
-  if (
-    ["architect", "backend", "frontend", "designer", "copy", "qa", "running_coach"].includes(
-      normalized,
-    )
-  ) {
+  if (adminCaptureTargetRoles.includes(normalized as TargetRole)) {
     return normalized as TargetRole;
   }
 
@@ -1467,18 +1461,7 @@ function normalizeSourcePath(input: string) {
 function normalizeRole(input: string): TargetRole | null {
   const normalized = input.toLowerCase().replace(/[\s-]+/g, "_");
 
-  if (
-    [
-      "architect",
-      "backend",
-      "frontend",
-      "designer",
-      "copy",
-      "qa",
-      "product",
-      "running_coach",
-    ].includes(normalized)
-  ) {
+  if (adminCaptureTargetRoles.includes(normalized as TargetRole)) {
     return normalized as TargetRole;
   }
 

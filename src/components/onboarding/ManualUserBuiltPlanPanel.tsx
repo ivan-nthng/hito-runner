@@ -18,13 +18,17 @@ import {
   reviewManualWorkoutDraftAction,
   reviewManualWorkoutSavedTemplate,
   saveManualWorkoutSavedTemplate,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
-  type ManualWorkoutSavedTemplateReviewResult,
-  type ManualWorkoutSavedTemplateSaveResult,
-  type ManualWorkoutSavedTemplateView,
-  type ManualWorkoutTargetTruthMode,
 } from "@/lib/training-api";
+import type {
+  ManualWorkoutSavedTemplateReviewResult,
+  ManualWorkoutSavedTemplateSaveResult,
+  ManualWorkoutSavedTemplateView,
+  ManualWorkoutTemplateKey,
+  ManualWorkoutTargetTruthMode,
+  ManualWorkoutDraftInput,
+  ManualWorkoutDraftReviewResult,
+} from "@/lib/manual-workout-authoring";
+import type { ManualWorkoutConstructorEntryInput } from "@/lib/manual-workout-authoring/schema";
 import type { ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import {
   ManualReviewSummary,
@@ -38,6 +42,7 @@ import {
 } from "@/components/manual-workout/ManualWorkoutAuthoringControls";
 import {
   buildManualDraftInput,
+  cloneManualWorkoutEntries,
   formatReadableDate,
   getDefaultManualWorkoutTemplate,
   targetTruthModeLabel,
@@ -46,8 +51,10 @@ import {
 import { addDaysIso, todayIso } from "@/lib/training";
 
 interface ManualUserBuiltPlanPanelProps {
+  canStartBuilding?: boolean;
   isGlobalBusy?: boolean;
   onPlanCreated: () => void;
+  startBlockedReason?: string;
 }
 
 const MANUAL_TOAST_ID = "manual-user-built-plan";
@@ -59,8 +66,10 @@ const EMPTY_SAVED_TEMPLATES_STATE: ManualSavedTemplatesState = {
 };
 
 export function ManualUserBuiltPlanPanel({
+  canStartBuilding = true,
   isGlobalBusy = false,
   onPlanCreated,
+  startBlockedReason = "Add the basics before opening the empty calendar.",
 }: ManualUserBuiltPlanPanelProps) {
   const reviewManualWorkoutDraftFn = useServerFn(reviewManualWorkoutDraftAction);
   const listManualWorkoutSavedTemplatesFn = useServerFn(listManualWorkoutSavedTemplates);
@@ -77,6 +86,7 @@ export function ManualUserBuiltPlanPanel({
   const [notes, setNotes] = useState("");
   const [targetTruthMode, setTargetTruthMode] =
     useState<ManualWorkoutTargetTruthMode>("structure_only");
+  const [entries, setEntries] = useState<ManualWorkoutConstructorEntryInput[]>([]);
   const [status, setStatus] = useState<ManualDraftStatus>("idle");
   const [reviewResult, setReviewResult] = useState<ManualWorkoutDraftReviewResult | null>(null);
   const [reviewedDraft, setReviewedDraft] = useState<ReviewedManualDraft | null>(null);
@@ -94,6 +104,18 @@ export function ManualUserBuiltPlanPanel({
     setTitle(template.defaultTitle);
     setNotes(template.defaultNotes ?? "");
     setTargetTruthMode(template.defaultTargetTruthMode);
+    setEntries(cloneManualWorkoutEntries(template.defaultEntries));
+    setReviewResult(null);
+    setConfirmMessage(null);
+    setConstructorOpen(true);
+  };
+
+  const openScratchConstructor = (date: string) => {
+    setSelection({ kind: "scratch", date, template: null });
+    setTitle("");
+    setNotes("");
+    setTargetTruthMode("structure_only");
+    setEntries([]);
     setReviewResult(null);
     setConfirmMessage(null);
     setConstructorOpen(true);
@@ -110,16 +132,22 @@ export function ManualUserBuiltPlanPanel({
   };
 
   const buildRegistryInput = (
-    draftSelection: Extract<ManualDraftSelection, { kind: "registry" }>,
-  ) =>
-    buildManualDraftInput({
+    draftSelection: Extract<ManualDraftSelection, { kind: "registry" | "scratch" }>,
+  ) => {
+    if (!draftSelection.template) {
+      throw new Error("Choose a backend-supported workout type before review.");
+    }
+
+    return buildManualDraftInput({
       contextMode: "no_active_plan_draft",
       date: draftSelection.date,
+      entries,
       notes,
       targetTruthMode,
       template: draftSelection.template,
       title,
     });
+  };
 
   const buildSavedTemplateReviewInput = (
     draftSelection: Extract<ManualDraftSelection, { kind: "saved" }>,
@@ -172,8 +200,15 @@ export function ManualUserBuiltPlanPanel({
   };
 
   const submitRegistryReview = async (
-    draftSelection: Extract<ManualDraftSelection, { kind: "registry" }>,
+    draftSelection: Extract<ManualDraftSelection, { kind: "registry" | "scratch" }>,
   ) => {
+    if (!draftSelection.template) {
+      setReviewResult(
+        buildManualReviewRejected("Choose a backend-supported workout type before review."),
+      );
+      return;
+    }
+
     const input = buildRegistryInput(draftSelection);
 
     setStatus("reviewing");
@@ -302,6 +337,7 @@ export function ManualUserBuiltPlanPanel({
     setTitle(nextTitle);
     setNotes(nextNotes);
     setTargetTruthMode(template.targetTruthMode);
+    setEntries(cloneManualWorkoutEntries(template.draftPayload.entries));
     setReviewResult(null);
     setReviewedDraft(null);
     setConfirmMessage(null);
@@ -412,21 +448,24 @@ export function ManualUserBuiltPlanPanel({
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <p className="hito-label" id="manual-plan-entry-title">
-              Build my plan myself
+              Manual setup
             </p>
             <p className="hito-list-row-copy mt-1 max-w-2xl">
-              Start with an empty calendar and add workouts day by day. Hito reviews each manual
-              workout before it can create an active plan.
+              Start with an empty calendar and add workouts yourself. Hito reviews each workout
+              before it becomes part of your plan.
             </p>
+            {!canStartBuilding ? (
+              <p className="hito-field-helper mt-2">{startBlockedReason}</p>
+            ) : null}
           </div>
           <button
             type="button"
             className="hito-button hito-button-secondary hito-button-md shrink-0"
-            disabled={isBusy}
+            disabled={isBusy || !canStartBuilding}
             onClick={() => setWorkspaceOpen((open) => !open)}
           >
             <Icon name="calendar-clock" size="sm" />
-            {workspaceOpen ? "Close manual draft" : "Build my plan myself"}
+            {workspaceOpen ? "Close builder" : "Start building"}
           </button>
         </div>
       </div>
@@ -437,8 +476,7 @@ export function ManualUserBuiltPlanPanel({
             <div className="min-w-0">
               <p className="hito-list-row-title">Build your plan</p>
               <p className="hito-list-row-copy">
-                Empty dates mean no activity planned yet. Nothing is saved until backend confirm
-                succeeds.
+                Empty dates mean nothing is planned yet. Nothing is saved until you confirm.
               </p>
             </div>
             <div className="w-full min-w-0 md:max-w-xs">
@@ -497,13 +535,9 @@ export function ManualUserBuiltPlanPanel({
                     <DropdownMenuContent align="start" className="w-56">
                       <DropdownMenuLabel>{formatReadableDate(date)}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() =>
-                          openConstructor(date, getDefaultManualWorkoutTemplate("easy_aerobic_run"))
-                        }
-                      >
+                      <DropdownMenuItem onSelect={() => openScratchConstructor(date)}>
                         <Icon name="edit" size="xs" />
-                        Create workout
+                        Start from scratch
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => openTemplatePicker(date)}>
                         <Icon name="workout" size="xs" />
@@ -539,8 +573,7 @@ export function ManualUserBuiltPlanPanel({
             />
           ) : (
             <p className="hito-field-helper">
-              Add one reviewed workout to create the first manual user-built active plan. Client
-              rows are not sent to persistence.
+              Review one workout to create your first manual plan.
             </p>
           )}
         </div>
@@ -560,14 +593,33 @@ export function ManualUserBuiltPlanPanel({
       />
 
       <ManualWorkoutConstructorDialog
+        entries={entries}
         isBusy={isBusy}
         notes={notes}
+        onEntriesChange={(nextEntries) => {
+          setEntries(nextEntries);
+          setReviewResult(null);
+          setReviewedDraft(null);
+        }}
         onNotesChange={(value) => {
           setNotes(value);
           setReviewResult(null);
           setReviewedDraft(null);
         }}
         onOpenChange={setConstructorOpen}
+        onScratchTemplateChange={(templateKey: ManualWorkoutTemplateKey) => {
+          const template = getDefaultManualWorkoutTemplate(templateKey);
+          setSelection((current) =>
+            current?.kind === "scratch" ? { ...current, template } : current,
+          );
+          setTargetTruthMode(template.defaultTargetTruthMode);
+          setTitle((current) => current || template.defaultTitle);
+          if (template.workoutType === "rest") {
+            setEntries([]);
+          }
+          setReviewResult(null);
+          setReviewedDraft(null);
+        }}
         onReview={() => void submitReview()}
         onTargetTruthModeChange={(value) => {
           setTargetTruthMode(value);

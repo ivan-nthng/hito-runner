@@ -70,6 +70,13 @@ export const builderInputContract: RunningPlanEngineSourceModel["builderInputCon
       source: "runner_input",
       purpose: "Preferred long-run anchor when viable; backend corrects conflicts before review.",
     },
+    {
+      field: "benchmarkPaceTruth",
+      required: false,
+      source: "runner_input",
+      purpose:
+        "Optional recent 5K benchmark truth can unlock broad pace ranges; absence keeps the plan structure-only.",
+    },
   ],
   backendDefaults: {
     daysPerWeek: 3,
@@ -84,10 +91,6 @@ export const builderInputContract: RunningPlanEngineSourceModel["builderInputCon
     {
       field: "noWatchOrNoApp",
       reason: "No-watch/no-app is not a selectable normal plan path.",
-    },
-    {
-      field: "recent5kBenchmark",
-      reason: "User-provided 5K benchmark is removed from the normal happy path.",
     },
     {
       field: "targetTime",

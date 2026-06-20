@@ -2,34 +2,29 @@ import { type DragEvent, type ReactNode, useEffect, useMemo, useRef, useState } 
 import { Link, useRouter } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/ui/icon";
+import { HitoCalendarDayCell, HitoWorkoutDayRow } from "@/components/ui/hito-calendar-day";
 import {
-  HitoCalendarDayCell,
-  HitoWorkoutDayRow,
-  type HitoCalendarDayBaseState,
-  type HitoCalendarDayResultState,
-  type HitoCalendarWorkoutIdentity,
-} from "@/components/ui/hito-calendar-day";
-import { workoutGlyphKind } from "@/lib/workout-glyph";
+  buildRestCalendarDayPresentation,
+  buildWorkoutCalendarDayPresentation,
+} from "@/components/calendar/calendar-day-presentation";
 import {
-  displayExecutableTargetEntries,
-  displayWorkoutStructureEntries,
+  displayWorkoutTargetReadbackEntries,
   feedbackMarkerMeta,
   formatDistanceKm,
   formatDurationMin,
   workoutDuration,
   workoutDistanceKm,
   workoutTypeMeta,
-  primaryWorkoutTarget,
   findWorkout,
   weekdayShort,
+  weekdayLong,
   formatDate,
-  type Status,
   type TrainingSnapshot,
   type Workout,
 } from "@/lib/training";
 import {
   ManualWorkoutAddMenu,
-  ManualWorkoutCopyMenu,
+  ManualWorkoutSourceActionMenu,
   type ManualCopiedWorkoutSource,
 } from "@/components/manual-workout/ManualWorkoutAuthoringControls";
 import {
@@ -49,17 +44,34 @@ type TooltipPosition = {
 };
 type ManualCalendarActionState = {
   copiedWorkoutSource: ManualCopiedWorkoutSource | null;
+  optimisticMove: ManualOptimisticMoveDisplay | null;
+  moveHoverDate: string | null;
   moveWorkoutSource: ManualCopiedWorkoutSource | null;
   onCancelMoveWorkout: () => void;
   onCopyWorkout: (source: ManualCopiedWorkoutSource) => void;
+  onMoveDragEnd: () => void;
+  onMoveTargetHover: (targetDate: string | null) => void;
   onManualPlanChanged: () => Promise<void>;
-  onMoveTargetSelected: (targetDate: string) => void;
+  onMoveTargetSelected: (targetDate: string, source?: ManualCopiedWorkoutSource | null) => void;
   onMoveWorkout: (source: ManualCopiedWorkoutSource) => void;
 };
 type ManualWorkoutCalendarActionContext = ManualCopiedWorkoutSource & {
-  canRequestCopyReview: boolean;
+  canDirectCopy: boolean;
+  canDirectMove: boolean;
+  canDragInitiate: boolean;
   canRequestClearReview: boolean;
-  canRequestMoveReview: boolean;
+};
+type ManualOptimisticMoveDisplay = {
+  requestId: string;
+  sourceWorkoutDate: string;
+  sourceWorkoutId: string;
+  targetDate: string;
+  workout: Workout;
+};
+type ManualMoveDateRender = {
+  isPendingMoveSource: boolean;
+  isPendingMoveTarget: boolean;
+  workout: Workout | undefined;
 };
 
 const TOOLTIP_VIEWPORT_MARGIN = 12;
@@ -73,12 +85,16 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
   const [manualCopySource, setManualCopySource] = useState<ManualCopiedWorkoutSource | null>(null);
   const [manualMoveSource, setManualMoveSource] = useState<ManualCopiedWorkoutSource | null>(null);
   const [manualMoveRequest, setManualMoveRequest] = useState<ManualWorkoutMoveRequest | null>(null);
+  const [manualMoveHoverDate, setManualMoveHoverDate] = useState<string | null>(null);
+  const [manualOptimisticMove, setManualOptimisticMove] =
+    useState<ManualOptimisticMoveDisplay | null>(null);
 
   const cells = useMemo(() => buildMonth(cursor), [cursor]);
   const mobileMonthDates = useMemo(() => buildMonthDays(cursor), [cursor]);
   const monthLabel = cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const tooltipWorkout = tooltipAnchor
-    ? (findWorkout(snapshot.workouts, tooltipAnchor.iso) ?? null)
+    ? (resolveManualMoveDateRender(snapshot.workouts, tooltipAnchor.iso, manualOptimisticMove)
+        .workout ?? null)
     : null;
 
   const weekCells = useMemo(() => {
@@ -105,34 +121,80 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
     setTooltipAnchor(null);
     setManualMoveSource(null);
     setManualMoveRequest(null);
+    setManualMoveHoverDate(null);
+    setManualOptimisticMove(null);
     await router.invalidate();
   }
 
-  function requestManualWorkoutMove(targetDate: string) {
-    if (!manualMoveSource) return;
+  async function refreshAfterManualMoveSuccess() {
+    setTooltipAnchor(null);
+    setManualMoveSource(null);
+    setManualMoveRequest(null);
+    setManualMoveHoverDate(null);
+    await router.invalidate();
+    setManualOptimisticMove(null);
+  }
+
+  function requestManualWorkoutMove(
+    targetDate: string,
+    sourceOverride?: ManualCopiedWorkoutSource | null,
+  ) {
+    const moveSource = sourceOverride ?? manualMoveSource;
+
+    if (!moveSource || manualMoveRequest) return;
+
+    const sourceWorkout = snapshot.workouts.find(
+      (workout) =>
+        workout.id === moveSource.sourceWorkoutId && workout.date === moveSource.sourceWorkoutDate,
+    );
+    if (!sourceWorkout) return;
+
+    const requestId = `${moveSource.sourceWorkoutId}:${targetDate}:${Date.now()}`;
 
     setManualMoveRequest({
-      ...manualMoveSource,
+      ...moveSource,
       targetDate,
-      requestId: `${manualMoveSource.sourceWorkoutId}:${targetDate}:${Date.now()}`,
+      requestId,
     });
+    setManualOptimisticMove({
+      requestId,
+      sourceWorkoutDate: moveSource.sourceWorkoutDate,
+      sourceWorkoutId: moveSource.sourceWorkoutId,
+      targetDate,
+      workout: sourceWorkout,
+    });
+    setManualMoveSource(null);
+    setManualMoveHoverDate(null);
   }
 
   const manualCalendarActionState: ManualCalendarActionState = {
     copiedWorkoutSource: manualCopySource,
+    optimisticMove: manualOptimisticMove,
+    moveHoverDate: manualMoveHoverDate,
     moveWorkoutSource: manualMoveSource,
-    onCancelMoveWorkout: () => setManualMoveSource(null),
+    onCancelMoveWorkout: () => {
+      setManualMoveSource(null);
+      setManualMoveHoverDate(null);
+    },
     onCopyWorkout: setManualCopySource,
+    onMoveDragEnd: () => setManualMoveHoverDate(null),
+    onMoveTargetHover: setManualMoveHoverDate,
     onManualPlanChanged: refreshAfterManualPlanChange,
     onMoveTargetSelected: requestManualWorkoutMove,
-    onMoveWorkout: setManualMoveSource,
+    onMoveWorkout: (source) => {
+      setManualMoveSource(source);
+      setManualMoveHoverDate(null);
+    },
   };
 
   return (
     <div>
       <ManualWorkoutMoveController
-        onMoved={refreshAfterManualPlanChange}
-        onRequestHandled={() => setManualMoveRequest(null)}
+        onMoved={refreshAfterManualMoveSuccess}
+        onRequestHandled={() => {
+          setManualMoveRequest(null);
+          setManualOptimisticMove(null);
+        }}
         request={manualMoveRequest}
       />
 
@@ -312,21 +374,60 @@ function MobileMonthList({
   return (
     <div className="hito-calendar-mobile-list lg:hidden">
       {visibleDates.map((iso) => {
-        const workout = findWorkout(snapshot.workouts, iso);
+        const moveRender = resolveManualMoveDateRender(
+          snapshot.workouts,
+          iso,
+          manualCalendarActionState.optimisticMove,
+        );
+        const workout = moveRender.workout;
         const isToday = iso === snapshot.currentDate;
-        const status = workout?.status ?? "rest";
         const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
         const hasWorkout = workout && workout.type !== "rest";
-        const identity = workout ? calendarWorkoutIdentity(workout) : null;
-        const baseState = calendarBaseState(workout);
-        const manualAddContext = getManualAddContext(snapshot, iso, workout);
+        const presentation = buildWorkoutCalendarDayPresentation(workout, {
+          includeRestTitle: true,
+          stripLocalizedPrefix: true,
+        });
+        const manualAddContext = getManualAddContext(
+          snapshot,
+          iso,
+          workout,
+          manualCalendarActionState.moveWorkoutSource,
+        );
+
+        if (moveRender.isPendingMoveTarget && workout) {
+          return (
+            <div key={iso} aria-live="polite">
+              <HitoWorkoutDayRow
+                {...presentation}
+                date={{ eyebrow: weekdayShort(iso), day: iso.slice(8) }}
+                pendingLabel="Saving"
+                selected
+                today={isToday}
+              />
+            </div>
+          );
+        }
+
+        if (moveRender.isPendingMoveSource) {
+          return (
+            <div key={iso} aria-live="polite">
+              <HitoWorkoutDayRow
+                {...buildRestCalendarDayPresentation({ stateLabel: "Rest" })}
+                date={{ eyebrow: weekdayShort(iso), day: iso.slice(8) }}
+                today={isToday}
+              />
+            </div>
+          );
+        }
 
         if (manualAddContext) {
-          const canMoveHere = canMoveToManualTarget(
-            manualCalendarActionState,
-            manualAddContext.activePlanId,
-            iso,
-          );
+          const canMoveHere =
+            manualAddContext.canAcceptMoveTarget &&
+            canMoveToManualTarget(manualCalendarActionState, manualAddContext.activePlanId, iso);
+          const isMoveTargetHovered = manualCalendarActionState.moveHoverDate === iso;
+          const addPresentation = buildRestCalendarDayPresentation({
+            stateLabel: canMoveHere ? "Move target" : undefined,
+          });
 
           return (
             <ManualWorkoutAddMenu
@@ -335,7 +436,8 @@ function MobileMonthList({
               activePlanSourceKind={manualAddContext.activePlanSourceKind}
               copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
               date={iso}
-              moveWorkoutSource={manualCalendarActionState.moveWorkoutSource}
+              moveOnly={manualAddContext.moveOnly}
+              moveWorkoutSource={canMoveHere ? manualCalendarActionState.moveWorkoutSource : null}
               onAdded={manualCalendarActionState.onManualPlanChanged}
               onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
               onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
@@ -344,18 +446,24 @@ function MobileMonthList({
                 type="button"
                 className="block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/25"
                 aria-label={`${weekdayShort(iso)} ${iso.slice(8)}. Add activity.`}
+                onDragEnter={(event) =>
+                  handleManualMoveDragEnter(event, canMoveHere, iso, manualCalendarActionState)
+                }
+                onDragLeave={(event) =>
+                  handleManualMoveDragLeave(event, iso, manualCalendarActionState)
+                }
                 onDragOver={(event) => handleManualMoveDragOver(event, canMoveHere)}
                 onDrop={(event) =>
                   handleManualMoveDrop(event, canMoveHere, iso, manualCalendarActionState)
                 }
               >
                 <HitoWorkoutDayRow
+                  {...addPresentation}
                   action={canMoveHere ? calendarMoveTargetAction() : calendarAddAction()}
                   date={{ eyebrow: weekdayShort(iso), day: iso.slice(8) }}
+                  focused={isMoveTargetHovered}
                   interactive
-                  state="empty"
-                  supportingText={canMoveHere ? "Move target" : "Editable active plan"}
-                  title="No workout planned"
+                  selected={isMoveTargetHovered}
                   today={isToday}
                 />
               </button>
@@ -364,32 +472,36 @@ function MobileMonthList({
         }
 
         const manualCopyContext = getManualCopyContext(snapshot, iso, workout);
-        const canDragMove = Boolean(manualCopyContext?.canRequestMoveReview);
+        const canDragMove = Boolean(manualCopyContext?.canDragInitiate);
+        const isMoveSource =
+          manualCalendarActionState.moveWorkoutSource?.sourceWorkoutId === workout?.id;
 
         return (
           <div
             key={iso}
-            className="group/manual-day relative"
+            className={cn(
+              "group/manual-day relative",
+              canDragMove && "cursor-grab active:cursor-grabbing",
+            )}
             draggable={canDragMove}
             onDragStart={(event) =>
               handleManualMoveDragStart(event, manualCopyContext, manualCalendarActionState)
             }
+            onDragEnd={() => handleManualMoveDragEnd(manualCalendarActionState)}
           >
             <Link
               to="/workout/$date"
               params={{ date: iso }}
               search={{} as never}
               className="group block"
+              draggable={false}
             >
               <HitoWorkoutDayRow
+                {...presentation}
                 date={{ eyebrow: weekdayShort(iso), day: iso.slice(8) }}
                 interactive
-                state={baseState}
-                result={calendarResultState(status, Boolean(hasWorkout))}
-                supportingText={hasWorkout ? compactWorkoutSummary(workout) : null}
-                title={workout?.title.replace(/^(Аэробный |Лёгкий )/, "") ?? "Rest day"}
+                selected={isMoveSource}
                 today={isToday}
-                workout={identity}
               />
             </Link>
 
@@ -398,6 +510,7 @@ function MobileMonthList({
                 to="/workout/$date"
                 params={{ date: iso }}
                 search={{ tab: "feedback" } as never}
+                draggable={false}
                 className="hito-calendar-mobile-feedback-marker focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/20"
                 aria-label={`${feedbackMeta.label}. Open workout feedback.`}
               >
@@ -406,7 +519,7 @@ function MobileMonthList({
             )}
 
             {manualCopyContext ? (
-              <ManualWorkoutCopyAction
+              <ManualWorkoutSourceAction
                 context={manualCopyContext}
                 layout="row"
                 onCleared={manualCalendarActionState.onManualPlanChanged}
@@ -494,22 +607,59 @@ function DayCell({
     return <CalendarSlotPlaceholder />;
   }
 
-  const workout = findWorkout(snapshot.workouts, iso);
+  const moveRender = resolveManualMoveDateRender(
+    snapshot.workouts,
+    iso,
+    manualCalendarActionState.optimisticMove,
+  );
+  const workout = moveRender.workout;
   const isToday = iso === snapshot.currentDate;
-  const status = workout?.status ?? "rest";
   const day = parseInt(iso.split("-")[2], 10);
   const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
   const hasWorkout = workout && workout.type !== "rest";
-  const identity = workout ? calendarWorkoutIdentity(workout) : null;
-  const baseState = calendarBaseState(workout);
-  const manualAddContext = inMonth ? getManualAddContext(snapshot, iso, workout) : null;
+  const presentation = buildWorkoutCalendarDayPresentation(workout, {
+    stripLocalizedPrefix: true,
+  });
+  const manualAddContext = inMonth
+    ? getManualAddContext(snapshot, iso, workout, manualCalendarActionState.moveWorkoutSource)
+    : null;
+
+  if (moveRender.isPendingMoveTarget && workout) {
+    return (
+      <div className="relative h-full min-w-0" aria-live="polite">
+        <HitoCalendarDayCell
+          {...presentation}
+          day={String(day).padStart(2, "0")}
+          className="h-full"
+          pendingLabel="Saving"
+          selected
+          today={isToday}
+        />
+      </div>
+    );
+  }
+
+  if (moveRender.isPendingMoveSource) {
+    return (
+      <div className="relative h-full min-w-0" aria-live="polite">
+        <HitoCalendarDayCell
+          {...buildRestCalendarDayPresentation({ stateLabel: "Rest" })}
+          day={String(day).padStart(2, "0")}
+          className="h-full"
+          today={isToday}
+        />
+      </div>
+    );
+  }
 
   if (manualAddContext) {
-    const canMoveHere = canMoveToManualTarget(
-      manualCalendarActionState,
-      manualAddContext.activePlanId,
-      iso,
-    );
+    const canMoveHere =
+      manualAddContext.canAcceptMoveTarget &&
+      canMoveToManualTarget(manualCalendarActionState, manualAddContext.activePlanId, iso);
+    const isMoveTargetHovered = manualCalendarActionState.moveHoverDate === iso;
+    const addPresentation = buildRestCalendarDayPresentation({
+      stateLabel: canMoveHere ? "Move target" : undefined,
+    });
 
     return (
       <div className="relative h-full min-w-0">
@@ -518,7 +668,8 @@ function DayCell({
           activePlanSourceKind={manualAddContext.activePlanSourceKind}
           copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
           date={iso}
-          moveWorkoutSource={manualCalendarActionState.moveWorkoutSource}
+          moveOnly={manualAddContext.moveOnly}
+          moveWorkoutSource={canMoveHere ? manualCalendarActionState.moveWorkoutSource : null}
           onAdded={manualCalendarActionState.onManualPlanChanged}
           onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
           onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
@@ -531,18 +682,25 @@ function DayCell({
               day: "numeric",
               weekday: "short",
             })}. Add activity.`}
+            onDragEnter={(event) =>
+              handleManualMoveDragEnter(event, canMoveHere, iso, manualCalendarActionState)
+            }
+            onDragLeave={(event) =>
+              handleManualMoveDragLeave(event, iso, manualCalendarActionState)
+            }
             onDragOver={(event) => handleManualMoveDragOver(event, canMoveHere)}
             onDrop={(event) =>
               handleManualMoveDrop(event, canMoveHere, iso, manualCalendarActionState)
             }
           >
             <HitoCalendarDayCell
+              {...addPresentation}
               action={canMoveHere ? calendarMoveTargetAction() : calendarAddAction()}
               day={String(day).padStart(2, "0")}
-              className={cn("h-full", canMoveHere && "ring-2 ring-signal/25")}
+              className="h-full"
+              focused={isMoveTargetHovered}
               interactive
-              state="empty"
-              supportingText={canMoveHere ? "Move target" : "Editable active plan"}
+              selected={isMoveTargetHovered}
               today={isToday}
             />
           </button>
@@ -552,20 +710,26 @@ function DayCell({
   }
 
   const manualCopyContext = inMonth ? getManualCopyContext(snapshot, iso, workout) : null;
-  const canDragMove = Boolean(manualCopyContext?.canRequestMoveReview);
+  const canDragMove = Boolean(manualCopyContext?.canDragInitiate);
+  const isMoveSource = manualCalendarActionState.moveWorkoutSource?.sourceWorkoutId === workout?.id;
 
   return (
     <div
-      className="group/manual-day relative h-full min-w-0"
+      className={cn(
+        "group/manual-day relative h-full min-w-0",
+        canDragMove && "cursor-grab active:cursor-grabbing",
+      )}
       draggable={canDragMove}
       onDragStart={(event) =>
         handleManualMoveDragStart(event, manualCopyContext, manualCalendarActionState)
       }
+      onDragEnd={() => handleManualMoveDragEnd(manualCalendarActionState)}
     >
       <Link
         to="/workout/$date"
         params={{ date: iso }}
         search={{} as never}
+        draggable={false}
         onMouseEnter={(event) => {
           if (hasWorkout) onTooltipChange(tooltipAnchorFromElement(iso, event.currentTarget));
         }}
@@ -577,15 +741,13 @@ function DayCell({
         className="group block h-full"
       >
         <HitoCalendarDayCell
+          {...presentation}
           day={String(day).padStart(2, "0")}
           className="h-full"
           interactive
           muted={!inMonth}
-          result={calendarResultState(status, Boolean(hasWorkout))}
-          state={baseState}
-          title={workout?.title.replace(/^(Аэробный |Лёгкий )/, "")}
+          selected={isMoveSource}
           today={isToday}
-          workout={identity}
         />
       </Link>
 
@@ -594,6 +756,7 @@ function DayCell({
           to="/workout/$date"
           params={{ date: iso }}
           search={{ tab: "feedback" } as never}
+          draggable={false}
           className="absolute bottom-2.5 right-2.5 z-20 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/20"
           aria-label={`${feedbackMeta.label}. Open workout feedback.`}
         >
@@ -602,7 +765,7 @@ function DayCell({
       )}
 
       {manualCopyContext ? (
-        <ManualWorkoutCopyAction
+        <ManualWorkoutSourceAction
           context={manualCopyContext}
           layout="cell"
           onCleared={manualCalendarActionState.onManualPlanChanged}
@@ -626,52 +789,46 @@ function CalendarSlotPlaceholder({ week = false }: { week?: boolean }) {
   );
 }
 
-function calendarBaseState(workout: Workout | undefined): HitoCalendarDayBaseState {
-  if (!workout) return "rest";
-  if (workout.type === "rest") return "rest";
-
-  return "workout";
-}
-
-function calendarResultState(status: Status, hasWorkout: boolean): HitoCalendarDayResultState {
-  if (!hasWorkout) return "none";
-  if (status === "completed" || status === "partial" || status === "skipped") return status;
-
-  return "planned";
-}
-
-function calendarWorkoutIdentity(workout: Workout): HitoCalendarWorkoutIdentity {
-  const meta = workoutTypeMeta(workout);
-  const label = meta.short;
-
-  if (workout.type === "rest") {
+function resolveManualMoveDateRender(
+  workouts: Workout[],
+  iso: string,
+  optimisticMove: ManualOptimisticMoveDisplay | null,
+): ManualMoveDateRender {
+  if (!optimisticMove) {
     return {
-      label: "Rest",
-      color: "var(--rest)",
-      glyph: "rest",
+      isPendingMoveSource: false,
+      isPendingMoveTarget: false,
+      workout: findWorkout(workouts, iso),
     };
   }
 
-  if (workout.type === "long_run") {
+  if (iso === optimisticMove.sourceWorkoutDate) {
+    const persistedSource = findWorkout(workouts, iso);
+
     return {
-      label: "Long",
-      color: meta.color,
-      glyph: workoutGlyphKind(workout),
+      isPendingMoveSource: persistedSource?.id === optimisticMove.sourceWorkoutId,
+      isPendingMoveTarget: false,
+      workout: persistedSource?.id === optimisticMove.sourceWorkoutId ? undefined : persistedSource,
     };
   }
 
-  if (workout.type === "quality") {
+  if (iso === optimisticMove.targetDate) {
     return {
-      label,
-      color: meta.color,
-      glyph: workoutGlyphKind(workout),
+      isPendingMoveSource: false,
+      isPendingMoveTarget: true,
+      workout: {
+        ...optimisticMove.workout,
+        date: optimisticMove.targetDate,
+        weekday: weekdayLong(optimisticMove.targetDate),
+        status: "upcoming",
+      },
     };
   }
 
   return {
-    label,
-    color: meta.color,
-    glyph: workoutGlyphKind(workout),
+    isPendingMoveSource: false,
+    isPendingMoveTarget: false,
+    workout: findWorkout(workouts, iso),
   };
 }
 
@@ -680,14 +837,10 @@ function Tooltip({ workout }: { workout: Workout }) {
   const duration = workoutDuration(workout);
   const meta = workoutTypeMeta(workout);
   const status = workout.status;
-  const target = primaryWorkoutTarget(workout);
-  const targetEntries = displayExecutableTargetEntries(target, workout.metricMode).slice(0, 2);
-  const showStructureOnly =
-    targetEntries.length === 0 && workout.metricMode.executableMode === "structure_only_executable";
-  const structureEntries = showStructureOnly
-    ? displayWorkoutStructureEntries(workout).slice(0, 2)
-    : [];
-  const readbackEntries = targetEntries.length > 0 ? targetEntries : structureEntries;
+  const readbackEntries = displayWorkoutTargetReadbackEntries(workout, {
+    limit: 2,
+    omitStructureLabels: ["distance", "duration"],
+  });
 
   return (
     <div className="hito-tooltip w-72 max-w-72">
@@ -744,21 +897,63 @@ function WeekStrip({
           return <CalendarSlotPlaceholder key={iso} week />;
         }
 
-        const workout = findWorkout(snapshot.workouts, iso);
+        const moveRender = resolveManualMoveDateRender(
+          snapshot.workouts,
+          iso,
+          manualCalendarActionState.optimisticMove,
+        );
+        const workout = moveRender.workout;
         const isToday = iso === snapshot.currentDate;
         const feedbackMeta = workout ? feedbackMarkerMeta(workout.feedbackMarker) : null;
-        const status = workout?.status ?? "rest";
         const hasWorkout = workout && workout.type !== "rest";
-        const identity = workout ? calendarWorkoutIdentity(workout) : null;
-        const baseState = calendarBaseState(workout);
-        const manualAddContext = getManualAddContext(snapshot, iso, workout);
+        const presentation = buildWorkoutCalendarDayPresentation(workout);
+        const manualAddContext = getManualAddContext(
+          snapshot,
+          iso,
+          workout,
+          manualCalendarActionState.moveWorkoutSource,
+        );
+
+        if (moveRender.isPendingMoveTarget && workout) {
+          return (
+            <div key={iso} aria-live="polite">
+              <HitoCalendarDayCell
+                {...presentation}
+                day={iso.slice(8)}
+                className="h-full"
+                layout="week"
+                pendingLabel="Saving"
+                selected
+                today={isToday}
+                weekday={weekdayShort(iso)}
+              />
+            </div>
+          );
+        }
+
+        if (moveRender.isPendingMoveSource) {
+          return (
+            <div key={iso} aria-live="polite">
+              <HitoCalendarDayCell
+                {...buildRestCalendarDayPresentation({ stateLabel: "Rest" })}
+                day={iso.slice(8)}
+                className="h-full"
+                layout="week"
+                today={isToday}
+                weekday={weekdayShort(iso)}
+              />
+            </div>
+          );
+        }
 
         if (manualAddContext) {
-          const canMoveHere = canMoveToManualTarget(
-            manualCalendarActionState,
-            manualAddContext.activePlanId,
-            iso,
-          );
+          const canMoveHere =
+            manualAddContext.canAcceptMoveTarget &&
+            canMoveToManualTarget(manualCalendarActionState, manualAddContext.activePlanId, iso);
+          const isMoveTargetHovered = manualCalendarActionState.moveHoverDate === iso;
+          const addPresentation = buildRestCalendarDayPresentation({
+            stateLabel: canMoveHere ? "Move target" : undefined,
+          });
 
           return (
             <ManualWorkoutAddMenu
@@ -767,7 +962,8 @@ function WeekStrip({
               activePlanSourceKind={manualAddContext.activePlanSourceKind}
               copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
               date={iso}
-              moveWorkoutSource={manualCalendarActionState.moveWorkoutSource}
+              moveOnly={manualAddContext.moveOnly}
+              moveWorkoutSource={canMoveHere ? manualCalendarActionState.moveWorkoutSource : null}
               onAdded={manualCalendarActionState.onManualPlanChanged}
               onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
               onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
@@ -780,19 +976,26 @@ function WeekStrip({
                   day: "numeric",
                   weekday: "short",
                 })}. Add activity.`}
+                onDragEnter={(event) =>
+                  handleManualMoveDragEnter(event, canMoveHere, iso, manualCalendarActionState)
+                }
+                onDragLeave={(event) =>
+                  handleManualMoveDragLeave(event, iso, manualCalendarActionState)
+                }
                 onDragOver={(event) => handleManualMoveDragOver(event, canMoveHere)}
                 onDrop={(event) =>
                   handleManualMoveDrop(event, canMoveHere, iso, manualCalendarActionState)
                 }
               >
                 <HitoCalendarDayCell
+                  {...addPresentation}
                   action={canMoveHere ? calendarMoveTargetAction() : calendarAddAction()}
                   day={iso.slice(8)}
-                  className={cn("h-full", canMoveHere && "ring-2 ring-signal/25")}
+                  className="h-full"
+                  focused={isMoveTargetHovered}
                   interactive
                   layout="week"
-                  state="empty"
-                  supportingText={canMoveHere ? "Move target" : "Editable active plan"}
+                  selected={isMoveTargetHovered}
                   today={isToday}
                   weekday={weekdayShort(iso)}
                 />
@@ -802,27 +1005,39 @@ function WeekStrip({
         }
 
         const manualCopyContext = getManualCopyContext(snapshot, iso, workout);
+        const canDragMove = Boolean(manualCopyContext?.canDragInitiate);
+        const isMoveSource =
+          manualCalendarActionState.moveWorkoutSource?.sourceWorkoutId === workout?.id;
 
         return (
-          <div key={iso} className="group/manual-day relative">
+          <div
+            key={iso}
+            className={cn(
+              "group/manual-day relative",
+              canDragMove && "cursor-grab active:cursor-grabbing",
+            )}
+            draggable={canDragMove}
+            onDragStart={(event) =>
+              handleManualMoveDragStart(event, manualCopyContext, manualCalendarActionState)
+            }
+            onDragEnd={() => handleManualMoveDragEnd(manualCalendarActionState)}
+          >
             <Link
               to="/workout/$date"
               params={{ date: iso }}
               search={{} as never}
               className="group block"
+              draggable={false}
             >
               <HitoCalendarDayCell
+                {...presentation}
                 day={iso.slice(8)}
                 className="h-full"
                 interactive
                 layout="week"
-                result={calendarResultState(status, Boolean(hasWorkout))}
-                state={baseState}
-                supportingText={hasWorkout ? compactWorkoutSummary(workout) : null}
-                title={workout?.title}
+                selected={isMoveSource}
                 today={isToday}
                 weekday={weekdayShort(iso)}
-                workout={identity}
               />
             </Link>
 
@@ -831,6 +1046,7 @@ function WeekStrip({
                 to="/workout/$date"
                 params={{ date: iso }}
                 search={{ tab: "feedback" } as never}
+                draggable={false}
                 className="absolute bottom-4 right-4 z-20 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/20"
                 aria-label={`${feedbackMeta.label}. Open workout feedback.`}
               >
@@ -839,7 +1055,7 @@ function WeekStrip({
             )}
 
             {manualCopyContext ? (
-              <ManualWorkoutCopyAction
+              <ManualWorkoutSourceAction
                 context={manualCopyContext}
                 layout="week"
                 onCleared={manualCalendarActionState.onManualPlanChanged}
@@ -858,22 +1074,45 @@ function getManualAddContext(
   snapshot: TrainingSnapshot,
   iso: string,
   workout: Workout | undefined,
-): { activePlanId: string; activePlanSourceKind: string } | null {
+  moveSource: ManualCopiedWorkoutSource | null,
+): {
+  activePlanId: string;
+  activePlanSourceKind: string;
+  canAcceptMoveTarget: boolean;
+  moveOnly: boolean;
+} | null {
   const planMeta = snapshot.planMeta;
 
   const addCapability = planMeta?.workoutEditing?.addWorkout;
+  const moveCapability = planMeta?.workoutEditing?.moveWorkout;
+  const hasBlockingWorkout = Boolean(workout && workout.type !== "rest");
+  const canAddWorkout =
+    Boolean(addCapability?.allowed) &&
+    !hasBlockingWorkout &&
+    iso > snapshot.currentDate &&
+    !isBeforePlanStart(iso, snapshot);
+  const canAcceptMoveTarget =
+    Boolean(moveCapability?.allowed) &&
+    !workout &&
+    !isBeforePlanStart(iso, snapshot) &&
+    (iso > snapshot.currentDate || canExposeTodayAsManualMoveTarget(snapshot, iso, moveSource));
 
-  if (!planMeta?.id || !addCapability?.allowed || workout || iso <= snapshot.currentDate) {
+  if (!planMeta?.id || (!canAddWorkout && !canAcceptMoveTarget)) {
     return null;
   }
 
-  if (isBeforePlanStart(iso, snapshot)) {
-    return null;
-  }
+  const activePlanSourceKind =
+    addCapability?.allowed === true
+      ? addCapability.sourceKind
+      : moveCapability?.allowed === true
+        ? moveCapability.sourceKind
+        : MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
 
   return {
     activePlanId: planMeta.id,
-    activePlanSourceKind: addCapability.sourceKind,
+    activePlanSourceKind,
+    canAcceptMoveTarget,
+    moveOnly: !canAddWorkout,
   };
 }
 
@@ -889,30 +1128,50 @@ function getManualCopyContext(
   }
 
   const editableFutureWorkout = iso > snapshot.currentDate && !isBeforePlanStart(iso, snapshot);
-  const canRequestCopyReview = planMeta.sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+  const sourceEditing = workout.sourceEditing;
+  const canDirectCopy = Boolean(sourceEditing?.canDirectCopy);
+  const canDirectMove = Boolean(sourceEditing?.canDirectMove);
+  const canDragInitiate = Boolean(sourceEditing?.canDragInitiate);
   const canRequestClearReview = Boolean(
     planMeta.workoutEditing?.clearWorkout.allowed && editableFutureWorkout,
   );
-  const canRequestMoveReview = Boolean(
-    planMeta.workoutEditing?.moveWorkout.allowed && editableFutureWorkout,
-  );
 
-  if (!canRequestCopyReview && !canRequestClearReview && !canRequestMoveReview) {
+  if (!canDirectCopy && !canRequestClearReview && !canDirectMove && !canDragInitiate) {
     return null;
   }
 
   return {
     activePlanId: planMeta.id,
-    canRequestCopyReview,
+    canDirectCopy,
+    canDirectMove,
+    canDragInitiate,
     canRequestClearReview,
-    canRequestMoveReview,
     sourceWorkoutDate: iso,
     sourceWorkoutId: workout.id,
     title: workout.title || workoutTypeMeta(workout).label,
   };
 }
 
-function ManualWorkoutCopyAction({
+function canExposeTodayAsManualMoveTarget(
+  snapshot: TrainingSnapshot,
+  targetDate: string,
+  moveSource: ManualCopiedWorkoutSource | null,
+) {
+  if (targetDate !== snapshot.currentDate || !moveSource) return false;
+
+  const sourceWorkout = snapshot.workouts.find(
+    (workout) =>
+      workout.id === moveSource.sourceWorkoutId && workout.date === moveSource.sourceWorkoutDate,
+  );
+
+  const sourceEditing = sourceWorkout?.sourceEditing;
+
+  return Boolean(
+    sourceEditing?.canDirectMove && sourceEditing.eligibility === "eligible_missed_unlogged_recent",
+  );
+}
+
+function ManualWorkoutSourceAction({
   context,
   layout,
   onCleared,
@@ -928,11 +1187,11 @@ function ManualWorkoutCopyAction({
   const mobile = layout === "row";
 
   return (
-    <ManualWorkoutCopyMenu
+    <ManualWorkoutSourceActionMenu
       activePlanId={context.activePlanId}
-      canCopy={context.canRequestCopyReview}
+      canCopy={context.canDirectCopy}
       canClear={context.canRequestClearReview}
-      canMove={context.canRequestMoveReview}
+      canMove={context.canDirectMove}
       onCleared={onCleared}
       onCopy={onCopyWorkout}
       onMove={onMoveWorkout}
@@ -957,7 +1216,7 @@ function ManualWorkoutCopyAction({
       >
         <Icon name="more-horizontal" size="xs" />
       </button>
-    </ManualWorkoutCopyMenu>
+    </ManualWorkoutSourceActionMenu>
   );
 }
 
@@ -965,7 +1224,9 @@ function calendarAddAction() {
   return {
     label: "Add",
     icon: "plus" as const,
+    trailingIcon: "chevron-down" as const,
     tone: "muted" as const,
+    visual: "button" as const,
     ariaLabel: "Add activity",
   };
 }
@@ -996,11 +1257,45 @@ function handleManualMoveDragStart(
   context: ManualWorkoutCalendarActionContext | null,
   manualCalendarActionState: ManualCalendarActionState,
 ) {
-  if (!context?.canRequestMoveReview) return;
+  if (!context?.canDragInitiate) return;
 
+  event.stopPropagation();
   manualCalendarActionState.onMoveWorkout(context);
   event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("application/x-hito-manual-workout-move", context.sourceWorkoutId);
   event.dataTransfer.setData("text/plain", context.sourceWorkoutId);
+  setManualMoveDragImage(event, context);
+}
+
+function handleManualMoveDragEnd(manualCalendarActionState: ManualCalendarActionState) {
+  manualCalendarActionState.onMoveDragEnd();
+}
+
+function handleManualMoveDragEnter(
+  event: DragEvent<HTMLElement>,
+  canMoveHere: boolean,
+  targetDate: string,
+  manualCalendarActionState: ManualCalendarActionState,
+) {
+  if (!canMoveHere) return;
+
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  manualCalendarActionState.onMoveTargetHover(targetDate);
+}
+
+function handleManualMoveDragLeave(
+  event: DragEvent<HTMLElement>,
+  targetDate: string,
+  manualCalendarActionState: ManualCalendarActionState,
+) {
+  if (manualCalendarActionState.moveHoverDate !== targetDate) return;
+
+  const currentTarget = event.currentTarget;
+  const nextTarget = event.relatedTarget;
+  if (nextTarget instanceof Node && currentTarget.contains(nextTarget)) return;
+
+  manualCalendarActionState.onMoveTargetHover(null);
 }
 
 function handleManualMoveDragOver(event: DragEvent<HTMLElement>, canMoveHere: boolean) {
@@ -1020,7 +1315,52 @@ function handleManualMoveDrop(
 
   event.preventDefault();
   event.stopPropagation();
-  manualCalendarActionState.onMoveTargetSelected(targetDate);
+  manualCalendarActionState.onMoveTargetHover(null);
+  manualCalendarActionState.onMoveTargetSelected(
+    targetDate,
+    manualCalendarActionState.moveWorkoutSource,
+  );
+}
+
+function setManualMoveDragImage(
+  event: DragEvent<HTMLElement>,
+  context: ManualWorkoutCalendarActionContext,
+) {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+
+  const dragImage = document.createElement("div");
+  dragImage.style.position = "fixed";
+  dragImage.style.top = "-1000px";
+  dragImage.style.left = "-1000px";
+  dragImage.style.zIndex = "2147483647";
+  dragImage.style.maxWidth = "240px";
+  dragImage.style.padding = "10px 12px";
+  dragImage.style.border = "1px solid var(--border)";
+  dragImage.style.borderRadius = "16px";
+  dragImage.style.background = "var(--card)";
+  dragImage.style.boxShadow = "0 18px 42px rgb(0 0 0 / 0.22)";
+  dragImage.style.color = "var(--foreground)";
+  dragImage.style.font = "inherit";
+  dragImage.style.pointerEvents = "none";
+  dragImage.style.opacity = "0.96";
+  const title = escapeHtml(context.title);
+  dragImage.innerHTML = `
+    <div style="font-weight: 700; font-size: 13px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</div>
+    <div style="margin-top: 4px; color: var(--muted-foreground); font-size: 11px;">Move workout</div>
+  `;
+
+  document.body.appendChild(dragImage);
+  event.dataTransfer.setDragImage(dragImage, 24, 18);
+  window.setTimeout(() => dragImage.remove(), 0);
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function CalendarFeedbackMarker({
@@ -1046,23 +1386,4 @@ function CalendarFeedbackMarker({
 function isBeforePlanStart(iso: string, snapshot: TrainingSnapshot) {
   const planStartDate = snapshot.planMeta?.startDate;
   return Boolean(planStartDate && iso < planStartDate);
-}
-
-function compactWorkoutSummary(workout: Workout) {
-  const km = workoutDistanceKm(workout);
-  const duration = workoutDuration(workout);
-
-  if (km != null && duration > 0) {
-    return `${formatDistanceKm(km)} km · ${formatDurationMin(duration)}`;
-  }
-
-  if (km != null) {
-    return `${formatDistanceKm(km)} km`;
-  }
-
-  if (duration > 0) {
-    return formatDurationMin(duration);
-  }
-
-  return workoutTypeMeta(workout).label;
 }

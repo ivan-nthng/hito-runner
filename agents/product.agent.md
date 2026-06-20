@@ -55,6 +55,30 @@ Product should use these skills when the task matches:
 These are Product's common skills, not the complete list. If another project skill matches the
 task, Product must load that skill too.
 
+## Subagent Expectations
+
+For Product routing, cleanup sequencing, source-of-truth checks, backlog triage, and prior-agent
+report review, follow the subagent delegation discipline in `AGENTS.md`: use read-only subagents
+when independent research can reduce user copy-paste, reuse open subagents for similar follow-ups,
+close completed subagents, and integrate findings into one product decision and one next-role
+prompt. Product should also write prompts that let execution roles use subagents for safe tests,
+audits, and research instead of sending every small subtask back to the user.
+
+For global simplification cleanup, Product should not turn every micro-seam into a separate
+user-mediated copy-paste loop. When the current owner can safely continue through adjacent
+same-owner cleanup seams, Product should route an autonomous cleanup batch with explicit stop
+conditions, validation, progress estimates, and subagent expectations.
+
+If the current Product environment does not expose real subagent/thread tools, Product must say so
+briefly instead of pretending it spawned agents. Product should still reduce user operator work by
+writing autonomous batch prompts for ARCHITECT/BACKEND/FRONTEND/DEVTOOLS/QA, requiring those roles to
+use subagents when available or continue safe local sequential audits when not available.
+
+When the user complains about being a copy-paste operator, treat that as process feedback, not as
+ordinary frustration. The next routing response should avoid another one-micro-gate prompt whenever
+safe, and should instead authorize a same-owner cleanup batch with clear stop conditions and a final
+report only at batch completion or real blocker.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

@@ -13,8 +13,48 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-18
+
+- Refined the shared calendar-day chrome so historical `Rest` and other calm non-active day states
+  no longer inherit signal-accent selection treatment, while true active states such as today,
+  workout selection, focus, and action targets keep the stronger shared calendar highlight grammar.
+
+## 2026-06-15
+
+- Shipped lifecycle-driven workout detail for runner-facing saved mode: future planned workouts now
+  show planned readback plus `Plan actions` instead of fake result/feedback tabs, today's planned
+  workout leads with completion action, past unlogged workouts stay actionable without pretending
+  completed state, completed manual-result and evidence-backed workouts expose real `Result` /
+  `Feedback` surfaces only when that truth exists, and rest days stay intentionally sparse. QA
+  proved all major lifecycle states plus safe invalid `?tab=feedback` fallback on disposable
+  persisted fixtures.
+
+## 2026-06-13
+- Simplified direct manual calendar editing for saved manual plans: manual Copy/Paste and direct
+  Move now mutate through one backend-owned manual edit seam instead of runner-facing `Review
+  paste` / `Review move` confirmation, while backend still re-resolves source/target truth, blocks
+  protected or occupied days, preserves original plan source metadata, and appends
+  `active_plan_user_edit_v1` audit history. QA proved persisted copy/paste and direct-move
+  behavior on disposable manual fixtures without shipping universal Copy/Paste, generated-plan
+  direct move, recurrence, workout-content editing, or Restore UI.
+
 ## 2026-06-12
 
+- Added the saved manual-plan workout constructor UI contract: eligible `Add activity` days now
+  expose `Start from scratch`, `Choose template`, and `Add rest day`; scratch opens as an empty
+  backend-reviewed constructor with disabled review until supportable, repeat/loop group editing is
+  visible, and template-picked workouts open the same editable constructor before reaching
+  `draft_ready`. Browser QA proved no silent client rows, segments, or persistence truth before
+  confirm, mobile `375px` no-overflow, and disposable cleanup; explicit persisted Rest day
+  review/confirm remains a separate gate.
+- Unified active-plan calendar editing for Add/Clear/Move in the proved scope: saved calendars now
+  use backend-shaped editability/capability metadata instead of separate manual-vs-generated
+  calendar products, so accepted active-plan sources can expose eligible future Add, Clear, and Move
+  actions while preserving the original plan source and recording `active_plan_user_edit_v1` audit
+  metadata. QA proved non-manual saved-plan mutation behavior plus the manual Clear rerun after the
+  reconstruction-normalization fix, including browser/DB readback and cleanup, without shipping
+  universal Copy/Paste, recurrence, workout-content editing, Restore UI, active-plan replacement
+  expansion, or broader generated-row mutation matrices.
 - Improved generated selected-plan quality in the rebuilt running-plan engine: backend-owned
   scenario, canonical review, confirm exactness, `training-plan-v2`, and imported/export-shaped
   artifacts now enforce the universal runner-facing richness bar and device-friendly prescription
@@ -426,7 +466,7 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 ## 2026-05-17
 
 - Reduced `/hitoDS` reference-card clutter: Overview now uses divider-led principles, Typography uses quiet ownership copy plus open role specimens, Icons uses a divided registry plus one shared usage surface, and nested specimen/card frames were removed without changing live product components.
-- Added the first Hito icon-system slice: product icon usage now flows through one `lucide-react`-backed Hito `Icon` primitive with stable names and four canonical sizes, `/hitoDS` documents the approved icon gallery and examples, and the raw `icons-line`, `icons-fill`, and `icons-multy` SVG folders were removed instead of becoming a second source of truth.
+- Added the first Hito icon-system slice: product icon usage now flows through one Tabler-backed Hito `Icon` primitive with stable names and four canonical sizes, `/hitoDS` documents the approved icon gallery and examples, and the raw `icons-line`, `icons-fill`, and `icons-multy` SVG folders were removed instead of becoming a second source of truth.
 - Fixed the shared dialog typography contract: `DialogTitle` and `DialogDescription` no longer force generic title/description utility defaults over canonical Hito role classes, so `Open plan`, JSON import, and body-note dialogs compute their title/body rhythm from `hito-modal-title` and `hito-body`.
 - Added the first canonical typography slice: shared Hito text roles now cover display, modal/panel titles, body/body-small, form labels, nav/menu, metric, status, error/success, and technical mono text; `/hitoDS` documents the full role inventory, and `Open plan`, JSON import, workout `Log result`/`Feedback`, and `User settings` now use those roles for their highest-drift text decisions.
 - Fixed working-toast dismissal at the DS layer: `hitoToast.working` now bypasses Sonner's loading/action button path and renders a custom Hito working-toast body with a normal in-content `Dismiss notification` button that hides the toast without cancelling the underlying action.

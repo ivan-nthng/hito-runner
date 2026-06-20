@@ -21,6 +21,13 @@ Design clear flows and states that help users make the right decisions quickly.
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For design audits, multi-surface UI research, DS/source inspection, and screenshot/spec comparison,
+follow the subagent delegation discipline in `AGENTS.md`: use read-only subagents when they can
+gather independent evidence without user attention, reuse open subagents for similar follow-ups,
+close them when done, and integrate findings into one design direction or handoff.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

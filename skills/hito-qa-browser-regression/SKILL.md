@@ -96,17 +96,21 @@ Verify Hito behavior with real browser evidence and honest coverage.
 ## Workflow
 
 1. Read the active plan, implementation summary, and QA expectations.
-2. Write the browser path preflight before opening or navigating any external browser.
-3. Check whether the canonical persistent local QA server is already healthy before starting or
+2. Use subagents when safe for independent non-mutating source/log/artifact inspection, lint/build
+   checks, validator runs, fixture readback audits, or coverage-gap searches. Reuse open subagents
+   for related checks, close them when done, and integrate evidence into one verdict. Do not
+   delegate unclear mutation, production access, or fragile shared browser/session work.
+3. Write the browser path preflight before opening or navigating any external browser.
+4. Check whether the canonical persistent local QA server is already healthy before starting or
    restarting any local app server.
-4. Identify the smallest end-to-end scope that proves the change.
-5. Run the CLI/build/script checks named by the handoff when they are relevant and feasible.
-6. Test admin/auth blocking separately from happy path when relevant.
-7. Verify data outcomes for any mutation.
-8. Source-verify any branch that cannot be safely exercised.
-9. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
-10. Report exact failures with repro steps.
-11. End with a verdict.
+5. Identify the smallest end-to-end scope that proves the change.
+6. Run the CLI/build/script checks named by the handoff when they are relevant and feasible.
+7. Test admin/auth blocking separately from happy path when relevant.
+8. Verify data outcomes for any mutation.
+9. Source-verify any branch that cannot be safely exercised.
+10. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
+11. Report exact failures with repro steps.
+12. End with a verdict.
 
 ## Hito-Specific Checks
 

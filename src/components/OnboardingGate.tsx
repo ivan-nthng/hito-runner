@@ -1,17 +1,22 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Icon } from "@/components/ui/icon";
+import { EditableValueChip } from "@/components/ui/editable-value-chip";
+import { type HitoIconName } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
-import { DictateToPlanPanel, type VoiceStatus } from "@/components/onboarding/DictateToPlanPanel";
-import { JsonImportPanel } from "@/components/onboarding/JsonImportPanel";
-import { ManualUserBuiltPlanPanel } from "@/components/onboarding/ManualUserBuiltPlanPanel";
 import { PlanPresetPanel, type PlanPresetUiStatus } from "@/components/onboarding/PlanPresetPanel";
-import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPlanConstructor";
+import {
+  OptionButton,
+  OptionGrid,
+  StructuredPlanConstructor,
+} from "@/components/onboarding/StructuredPlanConstructor";
 import {
   buildStructuredInput,
-  buildVoiceSupplementFromConstructorState,
+  isRecent5kPaceInAcceptedRange,
+  isRecent5kTimeInAcceptedRange,
   isPresetPrimarySetupReady,
   isStructuredConstructorReady,
+  normalizePresetPrimaryFitnessLevel,
+  PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS,
   resolveTerrainFocus,
   type GoalDistance,
   type GoalStyle,
@@ -19,54 +24,48 @@ import {
   type StructuredConstructorState,
   type TerrainFocus,
   type WeekdayName,
-  voiceResultMessage,
 } from "@/components/onboarding/onboarding-form-model";
-import { type ImportedPlan, validateImportedPlanJson } from "@/lib/imported-plan";
 import type { PlanPresetCardId, PlanPresetCardRequestInput } from "@/lib/plan-presets/schema";
+import { getPlanPresetCards, type PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
 import type { RunningPlanDistanceFamily, RunningPlanRunnerLevel } from "@/lib/plan-creation-engine";
-import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
-import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
+import type { UserSettingsSummary } from "@/lib/user-settings-actions";
+import type { StructuredFirstPlanDraftResult } from "@/lib/first-plan-actions";
+import type {
+  RunningPlanConfirmActionResult,
+  RunningPlanPreviewActionInput,
+  RunningPlanPreviewActionResult,
+} from "@/lib/running-plan-engine-actions";
 import {
-  completeOnboarding,
+  createEmptyManualActivePlan,
   confirmRunningPlanDraft,
   confirmStructuredFirstPlanDraft,
-  confirmVoiceToPlanDraft,
-  getPlanPresetCards,
   generateStructuredFirstPlanDraft,
-  generateVoiceToPlanDraft,
   previewRunningPlanDraft,
-  type PlanPresetCardsActionResult,
-  type RunningPlanConfirmActionResult,
-  type RunningPlanPreviewActionInput,
-  type RunningPlanPreviewActionResult,
-  type StructuredFirstPlanDraftResult,
-  type UserSettingsSummary,
 } from "@/lib/training-api";
+import type { ManualEmptyPlanSetupInput } from "@/lib/manual-workout-authoring/schema";
 
 type ConstructorStatus = "idle" | "reviewing" | "creating" | "finishing";
-type JsonStatus = "idle" | "parsing" | "saving" | "finishing";
-type SetupMode = "quick" | "talk";
+type ManualCreateStatus = "idle" | "creating";
+type SetupMode = "manual" | "quick";
+type ManualProfileEditableKey = "age" | "heightCm" | "weightKg";
 
-const VOICE_TO_PLAN_TOAST_ID = "onboarding-voice-to-plan";
 const STRUCTURED_REVIEW_TOAST_ID = "onboarding-structured-review";
 const STRUCTURED_REVIEW_TIMEOUT_MS = 300_000;
+const MANUAL_CREATE_TOAST_ID = "manual-empty-plan-create";
 
 export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSummary | null }) {
+  const createEmptyManualActivePlanFn = useServerFn(createEmptyManualActivePlan);
   const generateStructuredFirstPlanDraftFn = useServerFn(generateStructuredFirstPlanDraft);
   const confirmStructuredFirstPlanDraftFn = useServerFn(confirmStructuredFirstPlanDraft);
-  const completeOnboardingFn = useServerFn(completeOnboarding);
-  const generateVoiceToPlanDraftFn = useServerFn(generateVoiceToPlanDraft);
-  const confirmVoiceToPlanDraftFn = useServerFn(confirmVoiceToPlanDraft);
   const getPlanPresetCardsFn = useServerFn(getPlanPresetCards);
   const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
   const confirmRunningPlanDraftFn = useServerFn(confirmRunningPlanDraft);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
-  const voiceTranscriptRef = useRef<HTMLTextAreaElement | null>(null);
   const presetAutoLoadKeyRef = useRef<string | null>(null);
   const runningPlanPreviewInputKeyRef = useRef<string | null>(null);
   const runningPlanCreateInFlightRef = useRef(false);
+  const manualCreateInFlightRef = useRef(false);
 
   const [age, setAge] = useState(() => (defaults?.age != null ? String(defaults.age) : ""));
   const [weightKg, setWeightKg] = useState(() =>
@@ -102,6 +101,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [strengthPreference, setStrengthPreference] = useState<StrengthPreference>("none");
   const [comment, setComment] = useState("");
   const [constructorStatus, setConstructorStatus] = useState<ConstructorStatus>("idle");
+  const [manualCreateStatus, setManualCreateStatus] = useState<ManualCreateStatus>("idle");
+  const [manualCreateError, setManualCreateError] = useState<string | null>(null);
   const [structuredDraftResult, setStructuredDraftResult] =
     useState<StructuredFirstPlanDraftResult | null>(null);
   const [constructorError, setConstructorError] = useState<string | null>(null);
@@ -121,24 +122,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     "idle",
   );
   const [presetError, setPresetError] = useState<string | null>(null);
-  const [voiceTranscript, setVoiceTranscript] = useState("");
-  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
-  const [voiceResult, setVoiceResult] = useState<VoiceToPlanDraftResult | null>(null);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [setupMode, setSetupMode] = useState<SetupMode>("quick");
+  const [setupMode, setSetupMode] = useState<SetupMode>("manual");
+  const [activeManualEditableKey, setActiveManualEditableKey] =
+    useState<ManualProfileEditableKey | null>(null);
 
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [jsonDraft, setJsonDraft] = useState("");
-  const [importedPlan, setImportedPlan] = useState<ImportedPlan | null>(null);
-  const [jsonStatus, setJsonStatus] = useState<JsonStatus>("idle");
-  const [jsonError, setJsonError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<string[]>([]);
-
-  const isVoiceBusy = voiceStatus === "reviewing" || voiceStatus === "creating";
   const isPresetBusy = presetStatus !== "idle" || runningPlanCreateStatus !== "idle";
-  const isBusy =
-    constructorStatus !== "idle" || jsonStatus !== "idle" || isVoiceBusy || isPresetBusy;
+  const isManualCreateBusy = manualCreateStatus !== "idle";
+  const isBusy = constructorStatus !== "idle" || isPresetBusy || isManualCreateBusy;
   const constructorState: StructuredConstructorState = useMemo(
     () => ({
       age,
@@ -194,18 +184,18 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   );
   const isConstructorReady = isStructuredConstructorReady(constructorState);
   const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
+  const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(fitnessLevel);
+  const isManualSetupReady = isManualProfileReady(constructorState);
   const presetCardInput = buildPlanPresetCardInput(effectiveConstructorState);
   const presetDiscoveryKey = buildPlanPresetCardInputKey(presetCardInput);
 
-  const validateJsonDraft = validateJsonDraftFactory({
-    setJsonError,
-    setFieldErrors,
-    setImportedPlan,
-    setJsonStatus,
-  });
   const openSavedHome = () => {
     window.location.assign("/");
   };
+
+  useEffect(() => {
+    setManualCreateError(null);
+  }, [age, fitnessLevel, heightCm, weightKg]);
 
   useEffect(() => {
     presetAutoLoadKeyRef.current = null;
@@ -224,154 +214,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     setStructuredDraftResult(null);
     setConstructorError(null);
     hitoToast.dismiss(STRUCTURED_REVIEW_TOAST_ID);
-  };
-
-  const addMoreVoiceDetails = () => {
-    setVoiceError(null);
-    setVoiceStatus("idle");
-    window.requestAnimationFrame(() => voiceTranscriptRef.current?.focus());
-  };
-
-  const startVoiceOver = () => {
-    setVoiceTranscript("");
-    setVoiceResult(null);
-    setVoiceError(null);
-    setVoiceStatus("idle");
-    hitoToast.dismiss(VOICE_TO_PLAN_TOAST_ID);
-    window.requestAnimationFrame(() => voiceTranscriptRef.current?.focus());
-  };
-
-  const useStructuredSetup = () => {
-    setSetupMode("quick");
-    window.requestAnimationFrame(() =>
-      structuredFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    );
-  };
-
-  const submitVoiceReview = async () => {
-    const transcript = voiceTranscript.trim();
-
-    if (!transcript) {
-      setVoiceError("Paste or type what you would say out loud before asking Hito to review it.");
-      return;
-    }
-
-    setVoiceStatus("reviewing");
-    setVoiceError(null);
-    hitoToast.working({
-      id: VOICE_TO_PLAN_TOAST_ID,
-      title: "Reviewing draft",
-      description: "Hito is checking the transcript before anything is created.",
-    });
-
-    try {
-      const result = await generateVoiceToPlanDraftFn({
-        data: {
-          transcript,
-          context: {
-            fixedRestDays,
-            runningDaysPerWeek: null,
-          },
-          supplement: buildVoiceSupplementFromConstructorState(effectiveConstructorState),
-        },
-      });
-
-      setVoiceResult(result);
-      setVoiceStatus("idle");
-
-      if (!result.ok) {
-        const message = voiceResultMessage(result);
-        setVoiceError(message);
-        hitoToast.error({
-          id: VOICE_TO_PLAN_TOAST_ID,
-          title: result.reason === "capability_locked" ? "AI setup is locked" : "Review failed",
-          description: message,
-        });
-        return;
-      }
-
-      if (result.status === "draft_ready") {
-        hitoToast.success({
-          id: VOICE_TO_PLAN_TOAST_ID,
-          title: "Draft ready",
-          description: "Review what Hito understood before creating anything.",
-        });
-        return;
-      }
-
-      hitoToast.info({
-        id: VOICE_TO_PLAN_TOAST_ID,
-        title: "More details needed",
-        description: "No plan was created. Add the missing context, then review again.",
-      });
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error
-          ? submitError.message
-          : "Could not review the dictated plan yet.";
-      setVoiceStatus("idle");
-      setVoiceError(message);
-      hitoToast.error({
-        id: VOICE_TO_PLAN_TOAST_ID,
-        title: "Review failed",
-        description: message,
-      });
-    }
-  };
-
-  const confirmVoicePlan = async () => {
-    if (!voiceResult?.ok || voiceResult.status !== "draft_ready") {
-      setVoiceError("Generate a ready review before creating the plan.");
-      return;
-    }
-
-    setVoiceStatus("creating");
-    setVoiceError(null);
-    hitoToast.working({
-      id: VOICE_TO_PLAN_TOAST_ID,
-      title: "Creating plan",
-      description: "Hito is creating the active plan from the reviewed draft.",
-    });
-
-    try {
-      const result = await confirmVoiceToPlanDraftFn({
-        data: {
-          draft: voiceResult.draft,
-          supplement: voiceResult.supplement,
-        },
-      });
-
-      if (!result.ok) {
-        const message = voiceResultMessage(result);
-        setVoiceStatus("idle");
-        setVoiceError(message);
-        hitoToast.error({
-          id: VOICE_TO_PLAN_TOAST_ID,
-          title: "Plan not created",
-          description: message,
-        });
-        return;
-      }
-
-      setVoiceStatus("created");
-      hitoToast.success({
-        id: VOICE_TO_PLAN_TOAST_ID,
-        title: "Plan created",
-        description: "Opening your saved plan now.",
-        duration: 2600,
-      });
-      openSavedHome();
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : "Could not create the dictated plan.";
-      setVoiceStatus("idle");
-      setVoiceError(message);
-      hitoToast.error({
-        id: VOICE_TO_PLAN_TOAST_ID,
-        title: "Plan not created",
-        description: message,
-      });
-    }
   };
 
   const submitStructuredReview = async () => {
@@ -671,6 +513,67 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }
   };
 
+  const createManualPlan = async () => {
+    if (manualCreateInFlightRef.current) {
+      return;
+    }
+
+    const inputResult = buildManualEmptyPlanInput(constructorState);
+
+    if (!inputResult.ok) {
+      setManualCreateError(inputResult.error);
+      return;
+    }
+
+    manualCreateInFlightRef.current = true;
+    setManualCreateStatus("creating");
+    setManualCreateError(null);
+    hitoToast.working({
+      id: MANUAL_CREATE_TOAST_ID,
+      title: "Creating manual plan",
+      description: "Hito is opening a saved empty calendar for manual building.",
+    });
+
+    try {
+      const result = await createEmptyManualActivePlanFn({
+        data: inputResult.input,
+      });
+
+      if (!result.ok) {
+        manualCreateInFlightRef.current = false;
+        setManualCreateStatus("idle");
+        setManualCreateError(result.message);
+        hitoToast.error({
+          id: MANUAL_CREATE_TOAST_ID,
+          title: "Plan not created",
+          description: result.message,
+        });
+        return;
+      }
+
+      hitoToast.success({
+        id: MANUAL_CREATE_TOAST_ID,
+        title: "Manual plan created",
+        description: "Opening your manual calendar now.",
+        duration: 2600,
+      });
+      openSavedHome();
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error
+          ? submitError.message
+          : "The manual plan could not be created.";
+      manualCreateInFlightRef.current = false;
+      setManualCreateStatus("idle");
+      setManualCreateError(message);
+      hitoToast.error({
+        id: MANUAL_CREATE_TOAST_ID,
+        title: "Plan not created",
+        description: message,
+      });
+    }
+  };
+
   const confirmStructuredPlan = async () => {
     if (!structuredDraftResult?.ok || structuredDraftResult.status !== "draft_ready") {
       setConstructorError("Generate a ready review before creating the plan.");
@@ -724,39 +627,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }
   };
 
-  const submitImportedPlan = async (firstDayResolution: FirstDayResolution | null) => {
-    if (!importedPlan) {
-      setJsonError("Upload a valid JSON file before importing the plan.");
-      return;
-    }
-
-    setJsonStatus("saving");
-    setJsonError(null);
-
-    try {
-      const result = await completeOnboardingFn({
-        data: {
-          importedPlan,
-          firstDayResolution,
-        },
-      });
-
-      if (!result.ok) {
-        setJsonStatus("idle");
-        setJsonError("Could not apply that plan yet. Refresh and try again.");
-        return;
-      }
-
-      setJsonStatus("finishing");
-      openSavedHome();
-    } catch (submitError) {
-      setJsonStatus("idle");
-      setJsonError(
-        submitError instanceof Error ? submitError.message : "Could not import the JSON plan.",
-      );
-    }
-  };
-
   return (
     <section
       className="hito-surface hito-onboarding-surface mx-auto max-w-5xl px-6 pt-6 lg:px-10 lg:pt-10"
@@ -766,14 +636,25 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         <p className="hito-micro-label" data-tone="signal">
           Create a plan
         </p>
-        <h1 className="hito-page-title mt-3">Let&apos;s build your plan.</h1>
+        <h1 className="hito-page-title mt-3">Choose how to start your plan.</h1>
         <p className="hito-body mt-4 text-muted-foreground">
-          We&apos;ll ask a few simple questions and turn them into your first plan.
+          Start from an empty manual calendar, or choose a guided plan to review.
         </p>
       </div>
 
       <div className="mt-7">
         <div className="hito-tabs hito-tabs-simple" role="tablist" aria-label="Setup mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={setupMode === "manual"}
+            className="hito-tab"
+            data-active={setupMode === "manual"}
+            disabled={isBusy}
+            onClick={() => setSetupMode("manual")}
+          >
+            Manual setup
+          </button>
           <button
             type="button"
             role="tab"
@@ -785,47 +666,114 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           >
             Quick setup
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={setupMode === "talk"}
-            className="hito-tab"
-            data-active={setupMode === "talk"}
-            disabled={isBusy}
-            onClick={() => setSetupMode("talk")}
-          >
-            <span>Talk it through</span>
-            <span className="hito-tab-badge" data-variant="text">
-              Pro
-            </span>
-          </button>
         </div>
       </div>
 
-      {setupMode === "talk" ? (
-        <DictateToPlanPanel
-          voiceTranscriptRef={voiceTranscriptRef}
-          transcript={voiceTranscript}
-          setTranscript={(value) => {
-            setVoiceTranscript(value);
-            setVoiceError(null);
-          }}
-          result={voiceResult}
-          error={voiceError}
-          status={voiceStatus}
-          isBusy={isBusy}
-          submitReview={() => {
-            void submitVoiceReview();
-          }}
-          confirmDraft={() => {
-            void confirmVoicePlan();
-          }}
-          addMoreDetails={addMoreVoiceDetails}
-          startOver={startVoiceOver}
-          useStructuredSetup={useStructuredSetup}
-        />
-      ) : (
+      {setupMode === "manual" ? (
+        <div className="mt-6 grid gap-6">
+          <section className="grid gap-y-4 gap-x-0 md:grid-cols-[220px_minmax(0,1fr)] md:gap-x-12 lg:gap-x-16">
+            <div>
+              <p className="hito-micro-label">01</p>
+              <h2 className="hito-panel-title mt-2">Manual setup</h2>
+              <p className="hito-helper mt-2">
+                Add the basics, then open your saved empty calendar.
+              </p>
+            </div>
+            <div className="grid gap-4">
+              <div className="hito-editable-value-chip-group">
+                <EditableValueChip
+                  fieldKey="age"
+                  label="Age"
+                  value={age}
+                  setValue={setAge}
+                  activeEditableKey={activeManualEditableKey}
+                  setActiveEditableKey={setActiveManualEditableKey}
+                  placeholder="34"
+                  min={13}
+                  max={100}
+                  step={1}
+                  inputMode="numeric"
+                />
+                <EditableValueChip
+                  fieldKey="heightCm"
+                  label="Height"
+                  value={heightCm}
+                  setValue={setHeightCm}
+                  activeEditableKey={activeManualEditableKey}
+                  setActiveEditableKey={setActiveManualEditableKey}
+                  placeholder="178"
+                  min={120}
+                  max={230}
+                  step={1}
+                  inputMode="numeric"
+                />
+                <EditableValueChip
+                  fieldKey="weightKg"
+                  label="Weight"
+                  value={weightKg}
+                  setValue={setWeightKg}
+                  activeEditableKey={activeManualEditableKey}
+                  setActiveEditableKey={setActiveManualEditableKey}
+                  placeholder="72"
+                  min={30}
+                  max={250}
+                  step={0.5}
+                  inputMode="decimal"
+                  unit="kg"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <span className="hito-form-label">Running level</span>
+                <OptionGrid label="Running level">
+                  {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
+                    <OptionButton
+                      key={option.value}
+                      active={primaryFitnessLevel === option.value}
+                      icon={manualFitnessLevelIcon(option.value)}
+                      label={option.label}
+                      copy={option.copy}
+                      onClick={() => {
+                        setFitnessLevel(option.value);
+                        setRecent5kTime("");
+                        setRecent5kPace("");
+                      }}
+                    />
+                  ))}
+                </OptionGrid>
+                <span className="hito-field-helper">
+                  Hito creates the calendar now. You can add reviewed activities from the saved
+                  plan.
+                </span>
+              </div>
+
+              <div className="hito-section-divider flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  {manualCreateError ? (
+                    <p className="hito-field-error">{manualCreateError}</p>
+                  ) : (
+                    <p className="hito-field-helper">
+                      Creates an empty manual plan with no fake workouts or generated rows.
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="hito-button hito-button-primary hito-button-lg shrink-0"
+                  disabled={isBusy || !isManualSetupReady}
+                  onClick={() => void createManualPlan()}
+                >
+                  {manualCreateStatus === "creating" ? "Creating plan..." : "Create your plan"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {setupMode === "quick" ? (
         <StructuredPlanConstructor
+          mode="quick"
           formRef={structuredFormRef}
           state={constructorState}
           setState={{
@@ -863,76 +811,35 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           onBackToEdit={() => {
             clearStructuredReview();
           }}
-          planPresetPanel={({ openAdvancedCustom }) => (
-            <>
-              <PlanPresetPanel
-                cardsResult={presetCardsResult}
-                confirmResult={runningPlanConfirmResult}
-                previewResult={runningPlanPreviewResult}
-                createStatus={runningPlanCreateStatus}
-                error={presetError}
-                status={presetStatus}
-                isBusy={isBusy}
-                isPresetDiscoveryReady={isPresetDiscoveryReady}
-                selectedCardId={presetSelectedCardId}
-                previewOpen={runningPlanPreviewOpen}
-                onPreviewOpenChange={setRunningPlanPreviewOpen}
-                onLoadCards={() => {
-                  void loadPlanPresetCards();
-                }}
-                onSelectPlan={(cardId) => {
-                  selectPlanPresetPreview(cardId);
-                }}
-                onRefreshPreview={() => {
-                  void refreshSelectedRunningPlanPreview();
-                }}
-                onCreatePlan={() => {
-                  void confirmSelectedRunningPlan();
-                }}
-                onUseAdvancedCustom={openAdvancedCustom}
-              />
-              <ManualUserBuiltPlanPanel isGlobalBusy={isBusy} onPlanCreated={openSavedHome} />
-            </>
-          )}
+          planPresetPanel={
+            <PlanPresetPanel
+              cardsResult={presetCardsResult}
+              confirmResult={runningPlanConfirmResult}
+              previewResult={runningPlanPreviewResult}
+              createStatus={runningPlanCreateStatus}
+              error={presetError}
+              status={presetStatus}
+              isBusy={isBusy}
+              isPresetDiscoveryReady={isPresetDiscoveryReady}
+              selectedCardId={presetSelectedCardId}
+              previewOpen={runningPlanPreviewOpen}
+              onPreviewOpenChange={setRunningPlanPreviewOpen}
+              onLoadCards={() => {
+                void loadPlanPresetCards();
+              }}
+              onSelectPlan={(cardId) => {
+                selectPlanPresetPreview(cardId);
+              }}
+              onRefreshPreview={() => {
+                void refreshSelectedRunningPlanPreview();
+              }}
+              onCreatePlan={() => {
+                void confirmSelectedRunningPlan();
+              }}
+            />
+          }
         />
-      )}
-
-      <details
-        className="hito-disclosure hito-section-divider mt-8 pt-6"
-        open={showAdvanced}
-        onToggle={(event) => setShowAdvanced(event.currentTarget.open)}
-      >
-        <summary className="hito-disclosure-summary">
-          <span>
-            <span className="hito-body-small block text-foreground/90">Import existing plan</span>
-            <span className="mt-1 block hito-helper">
-              Quiet fallback for existing Hito plan JSON.
-            </span>
-          </span>
-          <Icon name="chevron-down" className="hito-disclosure-chevron" />
-        </summary>
-
-        <div className="hito-disclosure-body">
-          <JsonImportPanel
-            fileInputRef={fileInputRef}
-            selectedFileName={selectedFileName}
-            setSelectedFileName={setSelectedFileName}
-            jsonDraft={jsonDraft}
-            setJsonDraft={setJsonDraft}
-            fieldErrors={fieldErrors}
-            jsonError={jsonError}
-            jsonStatus={jsonStatus}
-            importedPlan={importedPlan}
-            isBusy={isBusy}
-            validateJsonDraft={validateJsonDraft}
-            submitImportedPlan={submitImportedPlan}
-            setImportedPlan={setImportedPlan}
-            setFieldErrors={setFieldErrors}
-            setJsonError={setJsonError}
-            setJsonStatus={setJsonStatus}
-          />
-        </div>
-      </details>
+      ) : null}
     </section>
   );
 }
@@ -989,6 +896,81 @@ function buildPlanPresetCardInput(state: StructuredConstructorState): PlanPreset
   };
 }
 
+function isManualProfileReady(state: StructuredConstructorState) {
+  return isPresetPrimarySetupReady(state);
+}
+
+function buildManualEmptyPlanInput(
+  state: StructuredConstructorState,
+): { ok: true; input: ManualEmptyPlanSetupInput } | { ok: false; error: string } {
+  const age = requiredManualNumber(state.age, "Age", {
+    min: 13,
+    max: 100,
+    integer: true,
+  });
+  const weightKg = requiredManualNumber(state.weightKg, "Weight", {
+    min: 30,
+    max: 250,
+    increment: 0.5,
+  });
+  const heightCm = requiredManualNumber(state.heightCm, "Height", {
+    min: 120,
+    max: 230,
+    integer: true,
+  });
+  const invalid = [age, weightKg, heightCm].find((value) => !value.ok);
+
+  if (invalid?.ok === false) {
+    return invalid;
+  }
+
+  if (!age.ok || !weightKg.ok || !heightCm.ok) {
+    return { ok: false, error: "Add age, height, and weight to create a manual plan." };
+  }
+
+  return {
+    ok: true,
+    input: {
+      age: age.value,
+      heightCm: heightCm.value,
+      weightKg: weightKg.value,
+      runningLevel: normalizePresetPrimaryFitnessLevel(state.fitnessLevel),
+    },
+  };
+}
+
+function requiredManualNumber(
+  value: string,
+  label: string,
+  options: { min: number; max: number; integer?: boolean; increment?: number },
+): { ok: true; value: number } | { ok: false; error: string } {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return { ok: false, error: `${label} is required.` };
+  }
+
+  const parsed = Number(trimmed);
+
+  if (!Number.isFinite(parsed)) {
+    return { ok: false, error: `${label} should be a number.` };
+  }
+
+  if (options.integer && !Number.isInteger(parsed)) {
+    return { ok: false, error: `${label} must be a whole number.` };
+  }
+
+  if (parsed < options.min || parsed > options.max) {
+    return { ok: false, error: `${label} must be between ${options.min} and ${options.max}.` };
+  }
+
+  if (options.increment && !Number.isInteger(parsed / options.increment)) {
+    return { ok: false, error: `${label} must use ${options.increment} increments.` };
+  }
+
+  return { ok: true, value: parsed };
+}
+
 function buildPlanPresetCardInputKey(input: PlanPresetCardRequestInput) {
   return JSON.stringify(input);
 }
@@ -1030,6 +1012,11 @@ function buildRunningPlanPreviewInput(
     max: 7,
     integer: true,
   });
+  const benchmark = buildRunningPlanBenchmarkInput(state);
+
+  if (!benchmark.ok) {
+    return { ok: false, error: benchmark.error };
+  }
 
   return {
     ok: true,
@@ -1043,6 +1030,54 @@ function buildRunningPlanPreviewInput(
       fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
       preferredLongRunDay: state.preferredLongRunDay || null,
       startDate: state.startDate.trim() || null,
+      benchmark: benchmark.input,
+    },
+  };
+}
+
+function buildRunningPlanBenchmarkInput(state: StructuredConstructorState):
+  | {
+      ok: true;
+      input: NonNullable<RunningPlanPreviewActionInput["benchmark"]>;
+    }
+  | { ok: false; error: string } {
+  const recent5kTime = state.recent5kTime.trim();
+  const recent5kPace = state.recent5kPace.trim();
+  const hasRecent5kTime = recent5kTime.length > 0;
+  const hasRecent5kPace = recent5kPace.length > 0;
+
+  if (hasRecent5kTime && !isRecent5kTimeInAcceptedRange(recent5kTime)) {
+    return { ok: false, error: "Use a recent 5K time between 18:00 and 55:00." };
+  }
+
+  if (hasRecent5kPace && !isRecent5kPaceInAcceptedRange(recent5kPace)) {
+    return { ok: false, error: "Use a recent 5K pace between 2:00/km and 15:00/km." };
+  }
+
+  if (hasRecent5kTime) {
+    return {
+      ok: true,
+      input: {
+        kind: "recent_5k_time",
+        recent5kTime,
+      },
+    };
+  }
+
+  if (hasRecent5kPace) {
+    return {
+      ok: true,
+      input: {
+        kind: "recent_5k_pace",
+        recent5kPace,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    input: {
+      kind: "unknown",
     },
   };
 }
@@ -1070,6 +1105,21 @@ function mapRunnerLevelToPlanEngine(level: RunnerFitnessLevel): RunningPlanRunne
       return "professional_competitive";
     case "custom":
       return "sometimes_runs";
+  }
+}
+
+function manualFitnessLevelIcon(value: RunnerFitnessLevel): HitoIconName {
+  switch (value) {
+    case "new_to_running":
+      return "sparkles";
+    case "beginner":
+      return "activity";
+    case "running_regularly":
+      return "check-circle";
+    case "performance_focused":
+      return "watch";
+    case "custom":
+      return "edit";
   }
 }
 
@@ -1174,50 +1224,4 @@ function structuredDraftResultMessage(result: StructuredFirstPlanDraftResult) {
   }
 
   return "Review the plan before creating it.";
-}
-
-function formatIssue(path: (string | number)[], message: string) {
-  if (!path.length) {
-    return message;
-  }
-
-  return `${path.join(".")}: ${message}`;
-}
-
-function validateJsonDraftFactory({
-  setJsonError,
-  setFieldErrors,
-  setImportedPlan,
-  setJsonStatus,
-}: {
-  setJsonError: (value: string | null) => void;
-  setFieldErrors: (value: string[]) => void;
-  setImportedPlan: (value: ImportedPlan | null) => void;
-  setJsonStatus: (value: JsonStatus) => void;
-}) {
-  return function validateJsonDraft(raw: string) {
-    setJsonStatus("parsing");
-    setJsonError(null);
-    setFieldErrors([]);
-    setImportedPlan(null);
-
-    const validation = validateImportedPlanJson(raw);
-
-    if (!validation) {
-      setJsonStatus("idle");
-      setJsonError("The JSON content could not be parsed.");
-      return;
-    }
-
-    if (!validation.success) {
-      setFieldErrors(
-        validation.error.issues.map((issue) => formatIssue(issue.path, issue.message)),
-      );
-      setJsonStatus("idle");
-      return;
-    }
-
-    setImportedPlan(validation.data);
-    setJsonStatus("idle");
-  };
 }

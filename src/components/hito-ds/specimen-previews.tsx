@@ -1,3 +1,20 @@
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
@@ -13,21 +30,26 @@ type SelectionBinarySize = "sm" | "md";
 type ModalBodyMode = "content-fit" | "scroll-fill";
 type ModalHeaderMode = "compact" | "large";
 type ModalFooterMode = "none" | "actions" | "note-actions";
+type DataTableSortDirection = "asc" | "desc";
 
 export function DataTableSpecimenPreview({
   sortable,
   activeSort,
+  sortDirection = "asc",
   filtered,
   staticMode,
   showUtilityRow,
 }: {
   sortable: boolean;
   activeSort: boolean;
+  sortDirection?: DataTableSortDirection;
   filtered: boolean;
   staticMode: boolean;
   showUtilityRow: boolean;
 }) {
   const previewIsStatic = staticMode || !sortable;
+  const activeSortDirection: DataTableSortDirection | null =
+    !previewIsStatic && activeSort ? sortDirection : null;
 
   return (
     <div className="grid gap-4">
@@ -68,7 +90,7 @@ export function DataTableSpecimenPreview({
             <tr>
               <th
                 scope="col"
-                aria-sort={!previewIsStatic && activeSort ? "descending" : undefined}
+                aria-sort={previewIsStatic ? undefined : sortDirectionToAria(activeSortDirection)}
                 className="whitespace-nowrap px-2 py-2 font-medium"
               >
                 {previewIsStatic ? (
@@ -76,22 +98,22 @@ export function DataTableSpecimenPreview({
                 ) : (
                   <DataTableHeaderButton
                     label="Preview column"
-                    active={activeSort}
+                    activeSortDirection={activeSortDirection}
                     filtered={filtered}
                   />
                 )}
               </th>
-              <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+              <th scope="col" aria-sort="none" className="whitespace-nowrap px-2 py-2 font-medium">
                 <DataTableHeaderButton label="Hover state" hover />
               </th>
               <th
                 scope="col"
-                aria-sort="descending"
+                aria-sort={sortDirectionToAria(sortDirection)}
                 className="whitespace-nowrap px-2 py-2 font-medium"
               >
-                <DataTableHeaderButton label="Active sort" active />
+                <DataTableHeaderButton label="Active sort" activeSortDirection={sortDirection} />
               </th>
-              <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
+              <th scope="col" aria-sort="none" className="whitespace-nowrap px-2 py-2 font-medium">
                 <DataTableHeaderButton label="Filtered" filtered />
               </th>
               <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
@@ -135,34 +157,89 @@ export function DataTableSpecimenPreview({
 
 function DataTableHeaderButton({
   label,
-  active = false,
+  activeSortDirection = null,
   filtered = false,
   hover = false,
 }: {
   label: string;
-  active?: boolean;
+  activeSortDirection?: DataTableSortDirection | null;
   filtered?: boolean;
   hover?: boolean;
 }) {
+  const isSorted = activeSortDirection != null;
+
   return (
-    <button
-      type="button"
-      className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
-      data-active={active || filtered ? "true" : undefined}
-      data-demo-state={hover ? "hover" : undefined}
-      aria-label={`Sort and filter ${label}`}
-    >
-      {label}
-      {filtered ? <span className="hito-data-table-filter-dot" /> : null}
-      <Icon
-        aria-hidden="true"
-        name="chevron-down"
-        size="xs"
-        className="hito-data-table-sort-indicator"
-        data-active={active ? "true" : undefined}
-      />
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
+          data-active={isSorted || filtered ? "true" : undefined}
+          data-demo-state={hover ? "hover" : undefined}
+          aria-label={`Sort and filter ${label}`}
+        >
+          <span>{label}</span>
+          {filtered ? <span className="hito-data-table-filter-dot" /> : null}
+          <Icon
+            aria-hidden="true"
+            name={activeSortDirection === "asc" ? "chevron-up" : "chevron-down"}
+            size="xs"
+            className="hito-data-table-sort-indicator"
+            data-active={isSorted ? "true" : undefined}
+          />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="hito-shell-menu hito-data-table-column-menu w-64"
+      >
+        <DropdownMenuLabel className="hito-micro-label">Sort</DropdownMenuLabel>
+        {DATA_TABLE_SORT_OPTIONS.map((option) => {
+          const optionActive = activeSortDirection === option.direction;
+
+          return (
+            <DropdownMenuItem
+              key={option.direction}
+              className="hito-shell-menu-item hito-data-table-menu-item"
+              aria-current={optionActive ? "true" : undefined}
+            >
+              <Icon
+                name={optionActive ? "check" : "chevron-right"}
+                size="xs"
+                className={optionActive ? "text-signal" : "text-muted-foreground"}
+              />
+              {option.label}
+            </DropdownMenuItem>
+          );
+        })}
+        {filtered ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="hito-micro-label">Filter</DropdownMenuLabel>
+            <DropdownMenuItem className="hito-shell-menu-item hito-data-table-menu-item">
+              <Icon name="check" size="xs" className="text-signal" />
+              Active filter
+            </DropdownMenuItem>
+            <DropdownMenuItem className="hito-shell-menu-item hito-data-table-menu-item">
+              <Icon name="x-circle" size="xs" />
+              Clear filter
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
+}
+
+const DATA_TABLE_SORT_OPTIONS = [
+  { direction: "asc", label: "Sort ascending" },
+  { direction: "desc", label: "Sort descending" },
+] satisfies Array<{ direction: DataTableSortDirection; label: string }>;
+
+function sortDirectionToAria(direction: DataTableSortDirection | null) {
+  if (direction === "asc") return "ascending";
+  if (direction === "desc") return "descending";
+  return "none";
 }
 
 function DataTableStaticHeader({ label }: { label: string }) {
@@ -213,27 +290,41 @@ export function ModalWindowPreview({
       ? "Use this when content can exceed the viewport but the footer must remain reachable."
       : "Use this when content can fit naturally without manufacturing empty height.";
 
-  return (
-    <article
-      className={cn(
-        "hito-window max-w-xl",
-        bodyMode === "scroll-fill"
-          ? "hito-window-scroll-fill h-[min(32rem,calc(100dvh-4rem))]"
-          : "hito-window-content-fit",
-      )}
-    >
-      <header
-        className={cn(
-          "hito-window-header",
-          headerMode === "large" ? "hito-window-header-large" : "hito-window-header-compact",
-        )}
-      >
+  const bodyClassName = cn(
+    bodyMode === "scroll-fill"
+      ? "hito-product-dialog-body-scroll-fill"
+      : "hito-product-dialog-body",
+    "grid gap-3",
+  );
+  const contentClassName = cn(
+    "hito-dialog-stable hito-product-dialog max-w-xl border-hairline bg-background/95 p-0 backdrop-blur-xl",
+    bodyMode === "scroll-fill" && "h-[min(32rem,calc(100dvh-2rem))]",
+  );
+
+  const renderModalContents = (live: boolean) => (
+    <>
+      <DialogHeader className="hito-product-dialog-header">
         <div>
           <p className="hito-label hito-label-signal">
             {headerMode === "large" ? "Large header + close" : "Compact header + close"}
           </p>
-          <h3 className="hito-modal-title mt-2">{title}</h3>
-          {headerMode === "large" && <p className="hito-body mt-2 max-w-lg">{description}</p>}
+          {live ? (
+            <>
+              <DialogTitle className="hito-modal-title mt-2">{title}</DialogTitle>
+              <DialogDescription
+                className={headerMode === "large" ? "hito-body mt-2 max-w-lg" : "sr-only"}
+              >
+                {description}
+              </DialogDescription>
+            </>
+          ) : (
+            <>
+              <h3 className="hito-modal-title mt-2">{title}</h3>
+              {headerMode === "large" ? (
+                <p className="hito-body mt-2 max-w-lg">{description}</p>
+              ) : null}
+            </>
+          )}
           {showStatusPill && (
             <span
               className="hito-status-pill mt-3"
@@ -243,60 +334,73 @@ export function ModalWindowPreview({
             </span>
           )}
         </div>
-        <button type="button" className="hito-window-close" aria-label="Close modal">
-          <Icon name="close" size="sm" />
-        </button>
-      </header>
-      <div
-        className={cn("hito-window-body", bodyMode === "scroll-fill" && "hito-window-body-scroll")}
-      >
-        <div className="grid gap-3">
-          {destructive && (
-            <div className="flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-3">
-              <Icon name="warning" size="sm" className="mt-1 text-destructive" />
-              <p className="hito-field-helper">
-                This action changes an active object. The final button carries destructive tone.
+      </DialogHeader>
+      <div className={bodyClassName}>
+        {destructive && (
+          <div className="flex items-start gap-3 rounded-xl border border-destructive/35 bg-destructive/10 p-3">
+            <Icon name="warning" size="sm" className="mt-1 text-destructive" />
+            <p className="hito-field-helper">
+              This action changes an active object. The final button carries destructive tone.
+            </p>
+          </div>
+        )}
+        {rows.map((label) => (
+          <div key={label} className="hito-list-row rounded-xl border border-hairline">
+            <div>
+              <p className="hito-list-row-title">{label}</p>
+              <p className="hito-list-row-copy">
+                This row belongs inside the modal body. Scroll-fill keeps this middle region bounded
+                when content grows.
               </p>
             </div>
-          )}
-          {rows.map((label) => (
-            <div key={label} className="hito-list-row rounded-xl border border-hairline">
-              <div>
-                <p className="hito-list-row-title">{label}</p>
-                <p className="hito-list-row-copy">
-                  This row belongs inside the modal body. Scroll-fill keeps this middle region
-                  bounded when content grows.
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
       {footerMode !== "none" && (
-        <footer className="hito-window-footer" data-variant={footerMode}>
+        <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           {footerMode === "note-actions" && (
-            <div className="hito-window-footer-note">
-              <p>Footer note stays short and tied to save/apply.</p>
-            </div>
+            <p className="hito-caption min-w-0 flex-1">
+              Footer note stays short and tied to save/apply.
+            </p>
           )}
-          <div className="hito-window-footer-actions">
-            <button type="button" className="hito-button hito-button-secondary hito-button-md">
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={cn(
-                "hito-button hito-button-md",
-                destructive ? "hito-button-outlined" : "hito-button-primary",
-              )}
-              data-tone={destructive ? "error" : undefined}
-            >
-              {destructive ? "Archive" : "Continue"}
-            </button>
-          </div>
-        </footer>
+          <button type="button" className="hito-button hito-button-secondary hito-button-md">
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "hito-button hito-button-md",
+              destructive ? "hito-button-outlined" : "hito-button-primary",
+            )}
+            data-tone={destructive ? "error" : undefined}
+          >
+            {destructive ? "Archive" : "Continue"}
+          </button>
+        </DialogFooter>
       )}
-    </article>
+    </>
+  );
+
+  return (
+    <div className="grid gap-4">
+      <article className={contentClassName}>{renderModalContents(false)}</article>
+      <div className="flex flex-wrap items-center gap-3">
+        <Dialog>
+          <DialogTrigger asChild>
+            <button type="button" className="hito-button hito-button-primary hito-button-md">
+              Open live modal
+            </button>
+          </DialogTrigger>
+          <DialogContent className={contentClassName} overlayClassName="hito-dialog-overlay-stable">
+            {renderModalContents(true)}
+          </DialogContent>
+        </Dialog>
+        <p className="hito-caption max-w-md">
+          Live modal uses the same overlay, focus trap, close behavior, and internal body-scroll
+          contract as product dialogs.
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -490,6 +594,7 @@ export function DemoInput({
   state = "default",
   feedback = "neutral",
   placeholder = "Search plans",
+  value,
 }: {
   variant: InputVariant;
   size: ButtonSize;
@@ -498,6 +603,7 @@ export function DemoInput({
   state?: InputState;
   feedback?: InputFeedback;
   placeholder?: string;
+  value?: string;
 }) {
   const simulatedState = state === "default" ? undefined : state;
   const iconSize = size === "xs" || size === "sm" ? "xs" : "sm";
@@ -547,7 +653,7 @@ export function DemoInput({
         aria-invalid={feedback === "error" ? true : undefined}
         aria-readonly={state === "readonly" ? true : undefined}
         placeholder={placeholder}
-        value={state === "readonly" ? "runner@example.com" : undefined}
+        value={state === "readonly" ? "runner@example.com" : value}
         onChange={() => undefined}
       />
       {rightIcon ? (
@@ -581,14 +687,14 @@ export function DemoButton({
   rightIcon?: boolean;
   disabled?: boolean;
   loading?: boolean;
-  demoState?: "hover" | "focus";
+  demoState?: "hover" | "focus" | "active";
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
       className={cn(
-        "hito-button whitespace-nowrap capitalize",
+        "hito-button w-fit max-w-full shrink-0 justify-self-start whitespace-nowrap capitalize",
         `hito-button-${variant}`,
         `hito-button-${size}`,
       )}

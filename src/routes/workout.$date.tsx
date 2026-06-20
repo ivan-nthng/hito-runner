@@ -1,12 +1,22 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { IntervalsViz } from "@/components/IntervalsViz";
 import { CompletionPanel, WorkoutFeedbackPanel } from "@/components/CompletionPanel";
+import { ManualWorkoutPersistedEditDialog } from "@/components/manual-workout/ManualWorkoutPersistedEditControls";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   displayExecutableTargetEntries,
-  displayStepStructureEntries,
+  displayStepTargetReadbackEntries,
   displayTargetSupportEntries,
   displayWorkoutStructureEntries,
   formatDistanceKm,
@@ -24,6 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
 import { getWorkoutRouteData } from "@/lib/training-api";
+import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 
 export const Route = createFileRoute("/workout/$date")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -56,6 +67,7 @@ function WorkoutPage() {
   const { workout, snapshot, viewer, prev, next, feedback } = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const router = useRouter();
   const tab = search.tab;
 
   if (!workout) {
@@ -127,6 +139,8 @@ function WorkoutPage() {
       ].filter((metric): metric is { label: string; value: string; unit?: string } =>
         Boolean(metric),
       );
+  const lifecycle = workoutDetailLifecycleFor(workout, snapshot, feedback);
+  const surfaceModel = workoutDetailSurfaceModelFor(lifecycle, tab);
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
@@ -184,57 +198,66 @@ function WorkoutPage() {
           </div>
         </section>
 
-        <div className="mt-10 flex gap-6 border-b border-hairline/80 pb-3">
-          <div className="hito-tab-list hito-tab-list-open">
-            {(
-              [
-                { v: "overview", l: "Overview" },
-                { v: "complete", l: "Log result" },
-                { v: "feedback", l: "Feedback" },
-                { v: "preview", l: "Preview state" },
-              ] as const
-            ).map((tabOption) => (
-              <button
-                key={tabOption.v}
-                onClick={() =>
-                  navigate({
-                    search: (current) => ({
-                      ...current,
-                      tab: tabOption.v,
-                    }),
-                    replace: true,
-                  })
-                }
-                data-active={tab === tabOption.v}
-                className="hito-tab"
-              >
-                {tabOption.l}
-                {tabOption.v === "preview" && (
-                  <span className="hito-tab-badge" data-variant="text">
-                    later
-                  </span>
-                )}
-              </button>
-            ))}
+        {lifecycle === "future_planned" && (
+          <FutureWorkoutActions
+            onPlanChanged={() => router.invalidate()}
+            snapshot={snapshot}
+            workout={workout}
+          />
+        )}
+
+        {surfaceModel.tabs.length > 1 && (
+          <div className="mt-10 flex gap-6 border-b border-hairline/80 pb-3">
+            <div className="hito-tab-list hito-tab-list-open">
+              {surfaceModel.tabs.map((tabOption) => (
+                <button
+                  key={tabOption.id}
+                  type="button"
+                  onClick={() =>
+                    navigate({
+                      search: (current) => ({
+                        ...current,
+                        tab: tabOption.id,
+                      }),
+                      replace: true,
+                    })
+                  }
+                  data-active={surfaceModel.activeSurface === tabOption.id}
+                  aria-current={surfaceModel.activeSurface === tabOption.id ? "page" : undefined}
+                  className="hito-tab"
+                >
+                  {tabOption.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="mt-8 grid lg:grid-cols-[1fr_320px] gap-10">
           <div
             className={cn(
               "relative",
-              (tab === "complete" || tab === "preview") && "hito-surface overflow-hidden p-6",
-              tab === "feedback" && "p-1",
+              surfaceModel.activeSurface === "complete" && "hito-surface overflow-hidden p-6",
+              surfaceModel.activeSurface === "feedback" && "p-1",
             )}
           >
-            {tab === "overview" && <Overview workout={workout} />}
-            {tab === "complete" && (
+            {surfaceModel.activeSurface === "overview" && (
+              <>
+                <Overview workout={workout} />
+                {lifecycle === "today_planned" && (
+                  <CompletionActionPanel workout={workout} variant="today" />
+                )}
+                {lifecycle === "past_unlogged" && (
+                  <CompletionActionPanel workout={workout} variant="past" />
+                )}
+              </>
+            )}
+            {surfaceModel.activeSurface === "complete" && (
               <CompletionPanel workout={workout} snapshot={snapshot} feedback={feedback} />
             )}
-            {tab === "feedback" && (
+            {surfaceModel.activeSurface === "feedback" && (
               <WorkoutFeedbackPanel workout={workout} snapshot={snapshot} feedback={feedback} />
             )}
-            {tab === "preview" && <PreviewPanel />}
           </div>
 
           <aside>
@@ -448,6 +471,223 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
   );
 }
 
+type WorkoutDetailLifecycleState =
+  | "future_planned"
+  | "today_planned"
+  | "completed_with_manual_result"
+  | "completed_with_evidence"
+  | "past_unlogged"
+  | "rest_day";
+
+type WorkoutDetailSurface = "overview" | "complete" | "feedback";
+
+type WorkoutDetailSearchTab = "overview" | "complete" | "feedback" | "preview";
+
+function workoutDetailLifecycleFor(
+  workout: Workout,
+  snapshot: TrainingSnapshot,
+  feedback: WorkoutResultFeedbackSummary | null,
+): WorkoutDetailLifecycleState {
+  if (workout.type === "rest") {
+    return "rest_day";
+  }
+
+  if (hasWorkoutEvidence(workout, feedback)) {
+    return "completed_with_evidence";
+  }
+
+  if (
+    workout.log ||
+    workout.status === "completed" ||
+    workout.status === "partial" ||
+    (workout.status === "skipped" && Boolean(workout.log))
+  ) {
+    return "completed_with_manual_result";
+  }
+
+  if (workout.status === "today" || workout.date === snapshot.currentDate) {
+    return "today_planned";
+  }
+
+  if (workout.status === "upcoming" || workout.date > snapshot.currentDate) {
+    return "future_planned";
+  }
+
+  return "past_unlogged";
+}
+
+function hasWorkoutEvidence(
+  workout: Workout,
+  feedback: WorkoutResultFeedbackSummary | null,
+): boolean {
+  const markerState = feedback?.marker?.state ?? workout.feedbackMarker?.state ?? null;
+
+  return Boolean(
+    markerState === "evidence_attached" ||
+    markerState === "feedback_ready" ||
+    feedback?.latestAsset ||
+    feedback?.latestActualMetrics ||
+    feedback?.latestComparison ||
+    feedback?.latestAiInsight,
+  );
+}
+
+function workoutDetailSurfaceModelFor(
+  lifecycle: WorkoutDetailLifecycleState,
+  requestedTab: WorkoutDetailSearchTab,
+): {
+  activeSurface: WorkoutDetailSurface;
+  tabs: Array<{ id: WorkoutDetailSurface; label: string }>;
+} {
+  if (lifecycle === "completed_with_evidence") {
+    const tabs = [
+      { id: "complete", label: "Result" },
+      { id: "feedback", label: "Feedback" },
+    ] satisfies Array<{ id: WorkoutDetailSurface; label: string }>;
+
+    return {
+      activeSurface: requestedTab === "feedback" ? "feedback" : "complete",
+      tabs,
+    };
+  }
+
+  if (lifecycle === "future_planned") {
+    return { activeSurface: "overview", tabs: [] };
+  }
+
+  if (lifecycle === "completed_with_manual_result") {
+    return { activeSurface: "complete", tabs: [] };
+  }
+
+  if (lifecycle === "today_planned" || lifecycle === "past_unlogged") {
+    return {
+      activeSurface: requestedTab === "complete" ? "complete" : "overview",
+      tabs: [],
+    };
+  }
+
+  return { activeSurface: "overview", tabs: [] };
+}
+
+function FutureWorkoutActions({
+  onPlanChanged,
+  snapshot,
+  workout,
+}: {
+  onPlanChanged: () => Promise<void>;
+  snapshot: TrainingSnapshot;
+  workout: Workout;
+}) {
+  const [editOpen, setEditOpen] = useState(false);
+  const canEdit = canEditWorkoutFromDetail(workout, snapshot);
+
+  if (!canEdit) {
+    return null;
+  }
+
+  return (
+    <section className="mt-6 border-y border-hairline py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="hito-label">Future actions</p>
+          <p className="hito-body-small mt-1 text-muted-foreground">
+            Edit training uses the backend-reviewed manual constructor. Move stays on the calendar.
+          </p>
+        </div>
+        <div className="hidden items-center gap-2 sm:flex">
+          <button
+            type="button"
+            className="hito-button hito-button-primary hito-button-md"
+            onClick={() => setEditOpen(true)}
+          >
+            <Icon name="edit" size="xs" />
+            Edit training
+          </button>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-md aspect-square p-0 sm:hidden"
+              aria-label="Open workout actions"
+            >
+              <Icon name="more-horizontal" size="sm" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Workout actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+              <Icon name="edit" size="xs" />
+              Edit training
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <ManualWorkoutPersistedEditDialog
+        activePlanId={snapshot.planMeta?.id}
+        onEdited={onPlanChanged}
+        onOpenChange={setEditOpen}
+        open={editOpen}
+        plannedWorkoutId={workout.id}
+        title={workout.title}
+        workoutDate={workout.date}
+      />
+    </section>
+  );
+}
+
+function canEditWorkoutFromDetail(workout: Workout, snapshot: TrainingSnapshot) {
+  return Boolean(
+    snapshot.source === "persisted" &&
+    snapshot.planMeta?.workoutEditing?.editWorkout.allowed &&
+    workout.sourceEditing?.eligibility === "eligible_future_unlogged" &&
+    workout.type !== "rest" &&
+    !workout.log,
+  );
+}
+
+function CompletionActionPanel({
+  workout,
+  variant,
+}: {
+  workout: Workout;
+  variant: "today" | "past";
+}) {
+  const isToday = variant === "today";
+
+  return (
+    <section className="hito-row-group mt-8">
+      <div className="hito-list-row items-start gap-4">
+        <Icon
+          name={isToday ? "check-circle" : "calendar-clock"}
+          size="sm"
+          className={cn("mt-0.5", isToday ? "text-success" : "text-warn")}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="hito-list-row-title">
+            {isToday ? "Ready when you finish" : "Not logged yet"}
+          </p>
+          <p className="hito-list-row-copy">
+            {isToday
+              ? "Log this workout after you run it. Feedback unlocks after a real result or Garmin evidence exists."
+              : "This past workout is treated as unlogged until you add a real result."}
+          </p>
+        </div>
+        <Link
+          to="/workout/$date"
+          params={{ date: workout.date }}
+          search={{ tab: "complete" } as never}
+          className="hito-button hito-button-primary hito-button-md shrink-0"
+        >
+          <Icon name={isToday ? "check" : "edit"} size="xs" />
+          {isToday ? "Mark as done" : "Add result"}
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 function Overview({ workout }: { workout: Workout }) {
   const restAssignment = restAssignmentFor(workout);
   const segmentReadbacks = segmentInstructionReadbacks(workout);
@@ -518,23 +758,6 @@ function Overview({ workout }: { workout: Workout }) {
             any targets shown above.
           </p>
         )}
-      </div>
-    </div>
-  );
-}
-
-function PreviewPanel() {
-  return (
-    <div className="hito-surface-flat border-dashed p-8 text-center">
-      <Icon name="plan-note" size="lg" className="mx-auto text-signal" strokeWidth={1.4} />
-      <h3 className="mt-4 font-display text-2xl">This tab is not in use yet</h3>
-      <p className="hito-support-copy mx-auto mt-3 max-w-md">
-        It stays here to hold the tab layout until extra analysis or plan tools are ready.
-      </p>
-      <div className="mt-6">
-        <span className="hito-status-pill" data-tone="signal">
-          Later
-        </span>
       </div>
     </div>
   );
@@ -790,11 +1013,9 @@ function buildSegmentInstructionReadback(
 ): SegmentInstructionReadback | null {
   const entries = dedupeReadbackEntries(
     [
-      ...displayStepStructureEntries(step).map((entry) => ({
-        label: entry.label,
-        value: entry.value,
-      })),
-      ...displayExecutableTargetEntries(step.target, metricMode).map((entry) => ({
+      ...displayStepTargetReadbackEntries(step, metricMode, {
+        includeStructureWithTargets: true,
+      }).map((entry) => ({
         label: entry.label,
         value: entry.value,
       })),

@@ -1,10 +1,15 @@
-import type { ManualWorkoutDraftInput, ManualWorkoutTargetTruthMode } from "@/lib/training-api";
 import { hitoDateFromIso } from "@/components/ui/hito-date-time-utils";
 import { formatDistanceMeters, formatDurationMin } from "@/lib/training";
 import {
   listManualWorkoutTemplates,
   type ManualWorkoutTemplate,
 } from "@/lib/manual-workout-authoring/templates";
+import type {
+  ManualWorkoutBlockInput,
+  ManualWorkoutConstructorEntryInput,
+  ManualWorkoutDraftInput,
+  ManualWorkoutTargetTruthMode,
+} from "@/lib/manual-workout-authoring/schema";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 
 const MANUAL_TEMPLATE_GROUPS: Array<{
@@ -59,11 +64,13 @@ export function buildManualDraftInput({
   targetTruthMode,
   template,
   title,
+  entries,
 }: {
   activePlanId?: string;
   activePlanSourceKind?: string;
   contextMode: "no_active_plan_draft" | "existing_active_plan";
   date: string;
+  entries?: ManualWorkoutConstructorEntryInput[];
   notes: string;
   targetTruthMode: ManualWorkoutTargetTruthMode;
   template: ManualWorkoutTemplate;
@@ -75,13 +82,46 @@ export function buildManualDraftInput({
     title: title.trim() || template.defaultTitle,
     notes: notes.trim() || null,
     targetTruthMode,
-    entries: template.defaultEntries,
+    entries: entries
+      ? cloneManualWorkoutEntries(entries)
+      : cloneManualWorkoutEntries(template.defaultEntries),
     context: {
       mode: contextMode,
       ...(activePlanId ? { activePlanId } : {}),
       ...(activePlanSourceKind ? { activePlanSourceKind } : {}),
       targetDateProtection: "none",
     },
+  };
+}
+
+export function cloneManualWorkoutEntries(
+  entries: ManualWorkoutConstructorEntryInput[],
+): ManualWorkoutConstructorEntryInput[] {
+  return entries.map((entryValue) => {
+    if (entryValue.kind === "repeat_group") {
+      return {
+        kind: "repeat_group",
+        group: {
+          ...entryValue.group,
+          workBlock: cloneManualWorkoutBlock(entryValue.group.workBlock),
+          ...(entryValue.group.recoveryBlock
+            ? { recoveryBlock: cloneManualWorkoutBlock(entryValue.group.recoveryBlock) }
+            : {}),
+        },
+      };
+    }
+
+    return {
+      kind: "block",
+      block: cloneManualWorkoutBlock(entryValue.block),
+    };
+  });
+}
+
+function cloneManualWorkoutBlock(block: ManualWorkoutBlockInput): ManualWorkoutBlockInput {
+  return {
+    ...block,
+    ...(block.target ? { target: { ...block.target } } : {}),
   };
 }
 
@@ -157,6 +197,14 @@ export function templateWorkoutIdentity(template: ManualWorkoutTemplate) {
     label: template.label,
     short: templateShortLabel(template),
   };
+}
+
+export function templateIconKind(template: ManualWorkoutTemplate | null | undefined) {
+  return (template?.calendarIconKey ?? "easy") as WorkoutGlyphKind;
+}
+
+export function templateIconTone(template: ManualWorkoutTemplate | null | undefined) {
+  return template ? workoutToneColor(template) : "var(--color-muted-foreground)";
 }
 
 export function targetTruthModeLabel(mode: ManualWorkoutTargetTruthMode | string) {

@@ -144,7 +144,7 @@ function collectCanonicalTargetIssues({
     });
   }
 
-  if (hasPaceTarget(target)) {
+  if (hasPaceTarget(target) && row.metric_mode?.pace_targets_allowed !== true) {
     issues.push({
       kind: "fake_pace_target",
       message: `${context} exposes a pace target without selected-plan pace truth.`,

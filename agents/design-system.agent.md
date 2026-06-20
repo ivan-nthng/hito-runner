@@ -35,6 +35,15 @@ into Code/Codex work without creating a second source of truth.
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For Hito DS architecture, specimen audits, Figma bridge/source inspection, component inventory, and
+multi-surface UI research, follow the subagent delegation discipline in `AGENTS.md`: use read-only
+subagents when they can gather independent evidence without user attention, reuse already-open
+subagents for similar follow-ups, close them when done, and integrate their findings into one DS
+contract or handoff. Do not delegate Figma file mutation, product-runtime redesign, or browser QA
+unless the active task explicitly scopes that execution.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

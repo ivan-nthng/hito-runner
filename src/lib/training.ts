@@ -1,4 +1,5 @@
 import planJson from "@/data/training-plan.json";
+import type { ActivePlanWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
 import type { BodyNote } from "@/lib/body-notes";
 import {
   normalizeCanonicalGoalContext,
@@ -108,6 +109,7 @@ export interface Workout {
   notes: string | null;
   steps: Step[];
   feedbackMarker: WorkoutFeedbackMarkerSummary | null;
+  sourceEditing: ActivePlanWorkoutSourceEditingCapabilities | null;
   status: Status;
   log: WorkoutLog | null;
 }
@@ -132,7 +134,11 @@ export interface PlanSchedulePreferencesSummary {
   preferredLongRunDay: string | null;
 }
 
-export type ActivePlanWorkoutEditingOperation = "add_workout" | "clear_workout" | "move_workout";
+export type ActivePlanWorkoutEditingOperation =
+  | "add_workout"
+  | "clear_workout"
+  | "move_workout"
+  | "edit_workout";
 
 export type ActivePlanWorkoutEditingCapability =
   | {
@@ -152,6 +158,7 @@ export interface ActivePlanWorkoutEditingCapabilities {
   addWorkout: ActivePlanWorkoutEditingCapability;
   clearWorkout: ActivePlanWorkoutEditingCapability;
   moveWorkout: ActivePlanWorkoutEditingCapability;
+  editWorkout: ActivePlanWorkoutEditingCapability;
 }
 
 export interface RunnerProfileSummary {
@@ -570,6 +577,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
       notes: workout.notes ?? null,
       steps,
       feedbackMarker: null,
+      sourceEditing: null,
       log: null,
       status: inferWorkoutStatus(workout.type, workout.date, currentDate, null),
     };
@@ -645,6 +653,7 @@ export function weekOf(workouts: Workout[], date: string): Workout[] {
       notes: null,
       steps: [],
       feedbackMarker: null,
+      sourceEditing: null,
       log: null,
       status: "rest",
     });
@@ -1008,6 +1017,88 @@ export function displayWorkoutStructureEntries(
   return duration > 0
     ? [{ key: "duration", label: "Duration", value: formatDurationMin(duration) }]
     : [];
+}
+
+type TargetReadbackOptions = {
+  includeStructureWithTargets?: boolean;
+  limit?: number;
+  omitStructureLabels?: string[];
+  supportFallbackLimit?: number;
+};
+
+export function displayStepTargetReadbackEntries(
+  step: Step,
+  metricMode?: Pick<CanonicalMetricMode, "paceTargetsAllowed" | "hrTargetsAllowed"> | null,
+  options: TargetReadbackOptions = {},
+): Array<{ key: string; label: string; value: string }> {
+  const executableEntries = displayExecutableTargetEntries(step.target, metricMode);
+  const structureEntries = filterAlreadyDisplayedStructureEntries(
+    displayStepStructureEntries(step),
+    options.omitStructureLabels,
+  );
+
+  if (options.includeStructureWithTargets) {
+    const combinedEntries = [...structureEntries, ...executableEntries];
+
+    if (combinedEntries.length > 0) {
+      return limitReadbackEntries(combinedEntries, options.limit);
+    }
+  }
+
+  if (executableEntries.length > 0) {
+    return limitReadbackEntries(executableEntries, options.limit);
+  }
+
+  if (structureEntries.length > 0) {
+    return limitReadbackEntries(structureEntries, options.limit);
+  }
+
+  const supportFallbackLimit = options.supportFallbackLimit ?? 0;
+
+  return supportFallbackLimit > 0
+    ? displayTargetSupportEntries(step.target).slice(0, supportFallbackLimit)
+    : [];
+}
+
+export function displayWorkoutTargetReadbackEntries(
+  workout: Pick<Workout, "steps" | "type" | "metricMode">,
+  options: TargetReadbackOptions = {},
+): Array<{ key: string; label: string; value: string }> {
+  const targetEntries = displayExecutableTargetEntries(
+    primaryWorkoutTarget(workout),
+    workout.metricMode,
+  );
+
+  if (targetEntries.length > 0) {
+    return limitReadbackEntries(targetEntries, options.limit);
+  }
+
+  return limitReadbackEntries(
+    filterAlreadyDisplayedStructureEntries(
+      displayWorkoutStructureEntries(workout),
+      options.omitStructureLabels,
+    ),
+    options.limit,
+  );
+}
+
+function limitReadbackEntries<T>(entries: T[], limit: number | undefined) {
+  return typeof limit === "number" ? entries.slice(0, limit) : entries;
+}
+
+function filterAlreadyDisplayedStructureEntries(
+  entries: Array<{ key: string; label: string; value: string }>,
+  omitStructureLabels: string[] | undefined,
+) {
+  if (!omitStructureLabels?.length) {
+    return entries;
+  }
+
+  const omitted = new Set(omitStructureLabels.map((label) => label.toLowerCase()));
+
+  return entries.filter(
+    (entry) => !omitted.has(entry.key.toLowerCase()) && !omitted.has(entry.label.toLowerCase()),
+  );
 }
 
 function describeStepUnitPrescription(

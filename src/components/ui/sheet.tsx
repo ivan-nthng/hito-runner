@@ -3,8 +3,8 @@
 import * as React from "react";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
-import { X } from "lucide-react";
 
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 const Sheet = SheetPrimitive.Root;
@@ -62,7 +62,7 @@ const SheetContent = React.forwardRef<
     <SheetOverlay />
     <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
       <SheetPrimitive.Close className="hito-ui-sheet-close absolute right-4 top-4 disabled:pointer-events-none">
-        <X className="h-4 w-4" />
+        <Icon name="close" size="sm" />
         <span className="sr-only">Close</span>
       </SheetPrimitive.Close>
       {children}

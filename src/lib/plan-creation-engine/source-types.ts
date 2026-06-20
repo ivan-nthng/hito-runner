@@ -104,6 +104,27 @@ export interface RunningPlanBuilderInput {
   fixedRestDays: WeekdayName[];
   preferredLongRunDay: WeekdayName | null;
   startDate: string;
+  benchmarkPaceTruth: RunningPlanBenchmarkPaceTruth | null;
+}
+
+export type RunningPlanBenchmarkInput =
+  | {
+      kind: "recent_5k_time";
+      recent5kTime: string;
+    }
+  | {
+      kind: "recent_5k_pace";
+      recent5kPace: string;
+    }
+  | {
+      kind: "unknown";
+    };
+
+export interface RunningPlanBenchmarkPaceTruth {
+  kind: "recent_5k";
+  source: "recent_5k_time" | "recent_5k_pace";
+  paceSecondsPerKm: number;
+  label: string;
 }
 
 export interface RunningPlanBuilderInputField {

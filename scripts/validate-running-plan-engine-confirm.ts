@@ -145,8 +145,9 @@ const supportedFixtures: readonly Array<{
 async function main() {
   const options = readCliOptions();
   const reviewedDrafts = await validateStableReviewContract();
+  const benchmarkProof = await validateBenchmarkBackedPaceTruthContract();
   await validateFailureBoundaries(reviewedDrafts[0]);
-  validatePlanPresetConfirmRemainsPreviewOnly();
+  validateLegacyPlanPresetCreateSeamIsRemoved();
 
   const persistencePreflight = resolvePersistencePreflight(options);
 
@@ -166,6 +167,7 @@ async function main() {
       nonRestRows: draft.canonicalNonRestRowCount,
       reviewContractVersion: draft.reviewContractVersion,
     })),
+    benchmarkPaceTruth: benchmarkProof,
     persistence: persistenceResults,
   });
 }
@@ -246,6 +248,116 @@ async function validateStableReviewContract() {
   }
 
   return reviewedDrafts;
+}
+
+async function validateBenchmarkBackedPaceTruthContract() {
+  const targetTimeOnlyResult = await buildReviewedRunningPlanPreview({
+    ...buildFixtureInput(supportedFixtures[0]),
+    targetTime: "45:00",
+  } as unknown as RunningPlanPreviewActionInput);
+  assert.equal(
+    targetTimeOnlyResult.ok,
+    true,
+    "Diagnostic target-time-only selected-plan fixture should still build without pace.",
+  );
+  if (!targetTimeOnlyResult.ok) {
+    throw new Error(targetTimeOnlyResult.unavailable.error.message);
+  }
+  validateNoFakePaceOrPersonalHr(
+    buildRunningPlanCanonicalPlan(targetTimeOnlyResult.draft).planned_workouts,
+  );
+
+  const benchmarkInput = {
+    ...buildFixtureInput(supportedFixtures[0]),
+    benchmark: {
+      kind: "recent_5k_time",
+      recent5kTime: "25:00",
+    },
+  } satisfies RunningPlanPreviewActionInput;
+  const result = await buildReviewedRunningPlanPreview(benchmarkInput);
+  assert.equal(result.ok, true, "Benchmark-backed selected-plan preview must build.");
+  if (!result.ok) throw new Error(result.unavailable.error.message);
+
+  const draft = result.draft;
+  const canonicalPlan = buildRunningPlanCanonicalPlan(draft);
+  const importedSeed = buildImportedPlanSeed(canonicalPlan);
+  const paceRows = canonicalPlan.planned_workouts.filter(rowHasPaceTargets);
+  const nonPaceRows = canonicalPlan.planned_workouts.filter(
+    (row) => row.workout_type !== "rest" && !rowHasPaceTargets(row),
+  );
+  const importedPaceWorkouts = importedSeed.workouts.filter((workout) =>
+    JSON.stringify(workout).includes("pace_min_per_km_range"),
+  );
+
+  assert.equal(draft.normalizedInputSummary.benchmarkPaceTruth?.kind, "recent_5k");
+  assert.equal(draft.normalizedInputSummary.benchmarkPaceTruth.source, "recent_5k_time");
+  assert.ok(
+    paceRows.length > 0,
+    "Benchmark-backed selected-plan canonical rows must include pace-capable rows.",
+  );
+  assert.ok(
+    importedPaceWorkouts.length > 0,
+    "Benchmark-backed pace targets must survive export-shaped readback.",
+  );
+
+  for (const row of paceRows) {
+    assert.equal(row.metric_mode?.executable_mode, "pace_executable");
+    assert.equal(row.metric_mode?.pace_targets_allowed, true);
+    assert.equal(row.metric_mode?.hr_targets_allowed, false);
+  }
+
+  for (const row of nonPaceRows) {
+    assert.equal(
+      row.metric_mode?.pace_targets_allowed,
+      false,
+      `${row.workout_id} without pace targets must not advertise pace capability.`,
+    );
+    assert.equal(row.metric_mode?.hr_targets_allowed, false);
+  }
+
+  validateNoPersonalHrTargets(canonicalPlan.planned_workouts);
+  validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts, {
+    expectedMode: "mixed",
+  });
+  assert.deepEqual(
+    summarizeRunningPlanCanonicalPrescriptionGrammar(canonicalPlan.planned_workouts).issues,
+    [],
+    "Benchmark-backed selected-plan rows must still satisfy executable prescription grammar.",
+  );
+
+  const exactness = await validateRunningPlanReviewExactness({
+    draft,
+    reviewToken: draft.reviewToken,
+    reviewChecksum: draft.reviewChecksum,
+  });
+  assert.equal(exactness.ok, true, "Benchmark-backed review token must validate.");
+
+  const changedBenchmark = await buildReviewedRunningPlanPreview({
+    ...benchmarkInput,
+    benchmark: {
+      kind: "recent_5k_time",
+      recent5kTime: "30:00",
+    },
+  });
+  assert.equal(changedBenchmark.ok, true, "Changed benchmark fixture should still build.");
+  if (!changedBenchmark.ok) throw new Error(changedBenchmark.unavailable.error.message);
+
+  const changedBenchmarkExactness = await validateRunningPlanReviewExactness({
+    draft: changedBenchmark.draft,
+    reviewToken: draft.reviewToken,
+    reviewChecksum: draft.reviewChecksum,
+  });
+  assert.equal(changedBenchmarkExactness.ok, false);
+  if (!changedBenchmarkExactness.ok) {
+    assert.equal(changedBenchmarkExactness.reason, "stale_review");
+  }
+
+  return {
+    sourceKind: draft.sourceKind,
+    paceRows: paceRows.length,
+    importedPaceWorkouts: importedPaceWorkouts.length,
+    hrTargetsAllowed: false,
+  };
 }
 
 async function validateFailureBoundaries(
@@ -379,13 +491,67 @@ async function validateFailureBoundaries(
   }
 }
 
-function validatePlanPresetConfirmRemainsPreviewOnly() {
-  const source = readFileSync("src/lib/plan-preset-actions.ts", "utf8");
+function validateLegacyPlanPresetCreateSeamIsRemoved() {
+  const presetActionsSource = readFileSync("src/lib/plan-preset-actions.ts", "utf8");
+  const trainingApiSource = readFileSync("src/lib/training-api.ts", "utf8");
+  const runningPlanActionsSource = readFileSync("src/lib/running-plan-engine-actions.ts", "utf8");
+  const legacyReviewActionName = ["review", "Plan", "Preset", "Draft"].join("");
+  const legacyConfirmActionName = ["confirm", "Plan", "Preset", "Draft"].join("");
+  const legacyReviewResultName = ["Plan", "Preset", "Review", "Draft", "Action", "Result"].join("");
+  const legacyConfirmResultName = ["Plan", "Preset", "Confirm", "Action", "Result"].join("");
+  const legacyBlockedReason = ["preview", "only"].join("_");
+  const cardDiscoveryActionName = ["get", "Plan", "Preset", "Cards"].join("");
+  const cardDiscoveryResultName = ["Plan", "Preset", "Cards", "Action", "Result"].join("");
 
   assert.match(
-    source,
-    /reason:\s*"preview_only"/,
-    "Legacy Plan Preset confirm path must remain preview-only while selected running-plan confirm is introduced.",
+    presetActionsSource,
+    new RegExp(`export const ${cardDiscoveryActionName}\\b`),
+    "Plan Preset card discovery must remain available from the canonical action owner.",
+  );
+  assert.match(
+    presetActionsSource,
+    new RegExp(`export type ${cardDiscoveryResultName}\\b`),
+    "Plan Preset card discovery result type must remain available from the canonical action owner.",
+  );
+  assert.doesNotMatch(
+    presetActionsSource,
+    new RegExp(`\\b${legacyReviewActionName}\\b`),
+    "Legacy Plan Preset review action must not remain in runtime source.",
+  );
+  assert.doesNotMatch(
+    presetActionsSource,
+    new RegExp(`\\b${legacyConfirmActionName}\\b`),
+    "Legacy Plan Preset confirm action must not remain in runtime source.",
+  );
+  assert.doesNotMatch(
+    presetActionsSource,
+    new RegExp(`\\b${legacyReviewResultName}\\b`),
+    "Legacy Plan Preset review result type must not remain in runtime source.",
+  );
+  assert.doesNotMatch(
+    presetActionsSource,
+    new RegExp(`\\b${legacyConfirmResultName}\\b`),
+    "Legacy Plan Preset confirm result type must not remain in runtime source.",
+  );
+  assert.doesNotMatch(
+    presetActionsSource,
+    new RegExp(`reason:\\s*"${legacyBlockedReason}"`),
+    "Runtime Plan Preset actions should not preserve a blocked create seam.",
+  );
+  assert.doesNotMatch(
+    trainingApiSource,
+    new RegExp(`\\b${cardDiscoveryActionName}\\b|\\b${cardDiscoveryResultName}\\b`),
+    "The route-facing facade must not re-export Plan Preset card discovery.",
+  );
+  assert.doesNotMatch(
+    trainingApiSource,
+    new RegExp(`\\b${legacyReviewActionName}\\b|\\b${legacyConfirmActionName}\\b`),
+    "The route-facing facade must not re-export legacy Plan Preset create actions.",
+  );
+  assert.match(
+    runningPlanActionsSource,
+    /export const confirmRunningPlanDraft/,
+    "Selected running-plan confirm remains the current plan creation seam.",
   );
 }
 
@@ -636,19 +802,48 @@ function buildInputFromDraft(draft: RunningPlanReviewedPreviewDraft<RunningPlanP
     fixedRestDays: [...draft.normalizedInputSummary.fixedRestDays],
     preferredLongRunDay: draft.normalizedInputSummary.preferredLongRunDay,
     startDate: draft.normalizedInputSummary.startDate,
+    ...(draft.normalizedInputSummary.benchmarkPaceTruth
+      ? {
+          benchmark:
+            draft.normalizedInputSummary.benchmarkPaceTruth.source === "recent_5k_time"
+              ? {
+                  kind: "recent_5k_time",
+                  recent5kTime: formatDurationSeconds(
+                    draft.normalizedInputSummary.benchmarkPaceTruth.paceSecondsPerKm * 5,
+                  ),
+                }
+              : {
+                  kind: "recent_5k_pace",
+                  recent5kPace: `${formatDurationSeconds(
+                    draft.normalizedInputSummary.benchmarkPaceTruth.paceSecondsPerKm,
+                  )}/km`,
+                },
+        }
+      : {}),
   } satisfies RunningPlanPreviewActionInput;
+}
+
+function formatDurationSeconds(seconds: number) {
+  const roundedSeconds = Math.round(seconds);
+  const minutes = Math.floor(roundedSeconds / 60);
+  const remainder = roundedSeconds % 60;
+
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
 function validateCanonicalRowsAreNumeric(
   rows: readonly ReturnType<typeof buildRunningPlanCanonicalPlan>["planned_workouts"][number][],
+  options: { expectedMode: "structure_only" | "mixed" } = { expectedMode: "structure_only" },
 ) {
   for (const row of rows) {
     if (row.workout_type === "rest") continue;
 
     assert.ok(row.segments.length > 0, `${row.workout_id} must have segments.`);
     assert.ok(row.metric_mode, `${row.workout_id} must have metric mode.`);
-    assert.equal(row.metric_mode?.executable_mode, "structure_only_executable");
-    assert.equal(row.metric_mode?.pace_targets_allowed, false);
+    if (options.expectedMode === "structure_only" || !rowHasPaceTargets(row)) {
+      assert.equal(row.metric_mode?.executable_mode, "structure_only_executable");
+      assert.equal(row.metric_mode?.pace_targets_allowed, false);
+    }
     assert.equal(row.metric_mode?.hr_targets_allowed, false);
 
     for (const segment of row.segments) {
@@ -667,10 +862,22 @@ function validateNoFakePaceOrPersonalHr(rows: readonly unknown[]) {
 
   assert.doesNotMatch(serialized, /"pace_min_per_km_range"|"pace_range_min_km"|"pace"/i);
   assert.doesNotMatch(serialized, /race_pace_session/i);
+  validateNoPersonalHrTargets(rows);
+}
+
+function validateNoPersonalHrTargets(rows: readonly unknown[]) {
+  const serialized = JSON.stringify(rows);
+
   assert.doesNotMatch(
     serialized,
     /personal_hr|personalized_hr|hr_zone_truth|"hr_targets_allowed":true/i,
   );
+}
+
+function rowHasPaceTargets(
+  row: ReturnType<typeof buildRunningPlanCanonicalPlan>["planned_workouts"][number],
+) {
+  return JSON.stringify(row.segments).includes("pace_min_per_km_range");
 }
 
 function validateNoClientRowsTrusted(rows: readonly PersistedWorkoutRow[]) {

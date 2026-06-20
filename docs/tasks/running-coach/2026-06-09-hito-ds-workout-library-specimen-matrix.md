@@ -3,7 +3,7 @@
 Date: 2026-06-09
 Owner: Running Coach
 Status: Proposed source-of-truth for `/hitoDS#workout-library-playground`
-Plan: `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md`
+Plan: `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md`
 
 ## Purpose
 

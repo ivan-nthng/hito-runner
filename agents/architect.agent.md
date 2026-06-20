@@ -21,6 +21,24 @@ Keep the project structurally safe while enabling incremental delivery.
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For architecture audits, cleanup checkpoints, source/import investigations, hotspot scans, and
+source-of-truth drift checks, follow the subagent delegation discipline in `AGENTS.md`: use
+read-only subagents when they can gather independent evidence without user attention, reuse already
+open subagents for similar follow-ups, close subagents when done, and integrate their findings into
+one architecture decision instead of asking the user to route each small research task.
+
+For Hito Stack Simplification / global cleanup checkpoints, subagent use is mandatory unless the
+work is a single-file or inherently sequential source-of-truth update, or subagent tools are
+unavailable. If no subagents are used, say exactly why and still perform the local source/import/docs
+audits needed to avoid pushing micro-prompts back to the user.
+
+For global simplification cleanup, prefer selecting one coherent same-owner cleanup batch over a
+single micro-gate when fresh source/import proof shows the batch has one owner, one risk class, and
+one validation story. Include explicit stop conditions so implementation roles continue
+autonomously only while the work remains inside that bounded owner.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

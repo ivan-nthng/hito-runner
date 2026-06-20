@@ -17,10 +17,12 @@ import {
   type RunningPlanHorizonSelection,
 } from "@/lib/plan-creation-engine/horizon-policy";
 import { findForbiddenRunnerFacingLanguageMatches } from "@/lib/plan-creation-engine/forbidden-runner-facing-language";
+import { normalizeRunningPlanBenchmarkPaceTruth } from "@/lib/plan-creation-engine/benchmark-pace-truth";
 import {
   RUNNING_PLAN_DAYS_PER_WEEK_VALUES,
   RUNNING_PLAN_DISTANCE_FAMILY_VALUES,
   RUNNING_PLAN_RUNNER_LEVEL_VALUES,
+  type RunningPlanBenchmarkInput,
   type RunningPlanBuilderInput,
   type RunningPlanDaysPerWeek,
   type RunningPlanDistanceFamily,
@@ -50,6 +52,7 @@ export interface BuildTenKPlanPreviewInput {
   fixedRestDays?: readonly WeekdayName[] | null;
   preferredLongRunDay?: WeekdayName | null;
   startDate?: string | null;
+  benchmark?: RunningPlanBenchmarkInput | null;
 }
 
 export type TenKPlanCalendarWorkoutDayKind = RunningPlanWorkoutDayKind | typeof REST_DAY_KIND;
@@ -299,6 +302,7 @@ function normalizeTenKPlanBuilderInput(input: BuildTenKPlanPreviewInput):
       fixedRestDays,
       preferredLongRunDay: longRunResolution.longRunDay,
       startDate,
+      benchmarkPaceTruth: normalizeRunningPlanBenchmarkPaceTruth(input.benchmark),
       normalizedBy: TEN_K_PLAN_BUILDER_SOURCE_KIND,
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
       longRunDaySource: longRunResolution.source,

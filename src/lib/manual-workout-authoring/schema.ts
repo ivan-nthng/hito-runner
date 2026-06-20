@@ -12,6 +12,16 @@ export const MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS = "manual_draft_reviewed" as
 export const MANUAL_USER_BUILT_PLAN_SOURCE_KIND = "manual_user_built_plan_v1" as const;
 export const MANUAL_USER_BUILT_PLAN_SOURCE_STATUS = "manual_user_built_plan_created" as const;
 export const MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION = "manual_workout_review_payload_v1" as const;
+export const MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION = "manual_empty_plan_setup_v1" as const;
+
+export const MANUAL_SETUP_RUNNING_LEVEL_VALUES = [
+  "new_to_running",
+  "beginner",
+  "running_regularly",
+  "performance_focused",
+] as const;
+
+export type ManualSetupRunningLevel = (typeof MANUAL_SETUP_RUNNING_LEVEL_VALUES)[number];
 
 export const MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES = [
   "structure_only",
@@ -79,6 +89,32 @@ export type ManualWorkoutRepeatSafetyKind =
   (typeof MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES)[number];
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+const requiredProfileNumber = (fieldLabel: string) =>
+  z.number({
+    required_error: `${fieldLabel} is required.`,
+    invalid_type_error: `${fieldLabel} is required.`,
+  });
+
+export const manualEmptyPlanSetupInputSchema = z
+  .object({
+    age: requiredProfileNumber("Age")
+      .int("Age must be a whole number.")
+      .min(13, "Age must be between 13 and 100.")
+      .max(100, "Age must be between 13 and 100."),
+    weightKg: requiredProfileNumber("Weight")
+      .min(30, "Weight must be between 30 kg and 250 kg.")
+      .max(250, "Weight must be between 30 kg and 250 kg.")
+      .refine((value) => Number.isInteger(value * 2), "Weight must use 0.5 kg increments."),
+    heightCm: requiredProfileNumber("Height")
+      .int("Height must be a whole number.")
+      .min(120, "Height must be between 120 cm and 230 cm.")
+      .max(230, "Height must be between 120 cm and 230 cm."),
+    runningLevel: z.enum(MANUAL_SETUP_RUNNING_LEVEL_VALUES),
+  })
+  .strict();
+
+export type ManualEmptyPlanSetupInput = z.output<typeof manualEmptyPlanSetupInputSchema>;
 
 const manualWorkoutTargetInputSchema = z
   .object({
@@ -326,6 +362,50 @@ export type ManualWorkoutAddToActivePlanFailureReason =
   | "occupied_day"
   | "persistence_failed";
 
+export type ManualEmptyPlanCreateFailureReason =
+  | "unauthenticated"
+  | "active_plan_exists"
+  | "invalid_input"
+  | "persistence_failed";
+
+export type ManualEmptyPlanCreateResult =
+  | {
+      ok: true;
+      status: "created";
+      persisted: true;
+      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
+      schemaVersion: "training-plan-v2";
+      activePlanId: string;
+      effectiveStartDate: string;
+      appliedStartDate: string;
+      workoutCount: 0;
+      calendarRowCount: 0;
+      nonRestWorkoutCount: 0;
+      setup: ManualEmptyPlanSetupInput;
+      sourceMetadata: {
+        creationMode: "empty_manual_setup";
+        setupPayloadVersion: typeof MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION;
+        rowCount: 0;
+        nonRestRowCount: 0;
+        runningLevel: ManualSetupRunningLevel;
+      };
+      safety: {
+        createsFakeWorkout: false;
+        trustedClientRows: false;
+        callsOpenAi: false;
+        readyForManualAdd: true;
+      };
+    }
+  | {
+      ok: false;
+      status: "blocked";
+      persisted: false;
+      reason: ManualEmptyPlanCreateFailureReason;
+      message: string;
+      sourceKind?: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+    };
+
 export type ManualWorkoutConfirmResult =
   | {
       ok: true;
@@ -392,6 +472,16 @@ export type ManualWorkoutAddToActivePlanResult =
       calendarRowCount: number;
       nonRestWorkoutCount: number;
       sourceMetadata: {
+        editSourceKind?: "active_plan_user_edit_v1";
+        mutationKind?: "user_added_workout" | "user_copied_workout";
+        originalPlanSourceKind?: string;
+        originalPlanSourceStatus?: string | null;
+        mutationMode?: "direct_manual_edit";
+        mutationPayloadVersion?: string;
+        mutationChecksum?: string;
+        sourceWorkoutId?: string;
+        sourceWorkoutDate?: string;
+        targetWorkoutId?: string;
         templateKey: ManualWorkoutTemplateKey;
         workoutDate: string;
         reviewChecksum: string;

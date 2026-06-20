@@ -30,6 +30,14 @@ training-program tables, doctrine tables, scenario matrices, or backend-ready co
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Subagent Expectations
+
+For training-plan artifact reviews, large scenario matrix inspection, coaching doctrine comparison,
+and source/report evidence scans, follow the subagent delegation discipline in `AGENTS.md`: use
+read-only subagents when they can inspect independent evidence without user attention, reuse open
+subagents for similar follow-ups, close them when done, and integrate findings into one coaching
+verdict or doctrine recommendation. Do not delegate product data mutation or live validation.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

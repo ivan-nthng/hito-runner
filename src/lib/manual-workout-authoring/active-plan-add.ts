@@ -1,5 +1,6 @@
 import {
   ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
+  type ActivePlanUserEditMutationKind,
   buildActivePlanUserEditMetadata,
   appendActivePlanUserEditMetadataToRecord,
   resolveActivePlanWorkoutEditability,
@@ -43,6 +44,7 @@ export interface ReviewedManualWorkoutForActivePlanAdd {
   reviewChecksum: string;
   targetTruthMode: ManualWorkoutTargetTruthMode;
   reviewWarnings: string[];
+  activePlanUserEdit?: ManualWorkoutActivePlanUserEditAuditInput;
 }
 
 export interface ManualWorkoutActivePlanAddDependencies {
@@ -63,6 +65,23 @@ interface ManualWorkoutAuthoringReviewMetadata {
   metric_truth_mode: ManualWorkoutTargetTruthMode;
   mapping_gaps: string[];
   warnings: string[];
+  user_edit_mutation_kind?: ActivePlanUserEditMutationKind;
+  user_edit_mutation_mode?: "direct_manual_edit";
+  user_edit_mutation_payload_version?: string;
+  user_edit_mutation_checksum?: string;
+  user_edit_source_workout_id?: string;
+  user_edit_source_workout_date?: string;
+  user_edit_trusted_client_rows?: boolean;
+}
+
+interface ManualWorkoutActivePlanUserEditAuditInput {
+  mutationKind?: ActivePlanUserEditMutationKind;
+  mutationMode?: "direct_manual_edit";
+  mutationPayloadVersion?: string;
+  mutationChecksum?: string;
+  sourceWorkoutId?: string;
+  sourceWorkoutDate?: string;
+  trustedClientRows?: boolean;
 }
 
 interface PersistManualWorkoutActivePlanAddInput {
@@ -210,9 +229,17 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
       nonRestWorkoutCount,
       sourceMetadata: {
         editSourceKind: "active_plan_user_edit_v1",
-        mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
+        mutationKind:
+          reviewMetadata.user_edit_mutation_kind ?? ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
         originalPlanSourceKind: editability.sourceKind,
         originalPlanSourceStatus: editability.sourceStatus,
+        mutationMode: reviewMetadata.user_edit_mutation_mode,
+        mutationPayloadVersion: reviewMetadata.user_edit_mutation_payload_version,
+        mutationChecksum:
+          reviewMetadata.user_edit_mutation_checksum ?? reviewMetadata.review_checksum,
+        sourceWorkoutId: reviewMetadata.user_edit_source_workout_id,
+        sourceWorkoutDate: reviewMetadata.user_edit_source_workout_date,
+        targetWorkoutId: persisted.plannedWorkout.id,
         templateKey: reviewed.draft.templateKey,
         workoutDate: reviewed.draft.workoutDate,
         reviewChecksum: reviewed.reviewChecksum,
@@ -402,6 +429,13 @@ function buildManualWorkoutAuthoringReviewMetadata(
     metric_truth_mode: reviewed.targetTruthMode,
     mapping_gaps: reviewed.draft.mappingGaps,
     warnings: reviewed.reviewWarnings,
+    user_edit_mutation_kind: reviewed.activePlanUserEdit?.mutationKind,
+    user_edit_mutation_mode: reviewed.activePlanUserEdit?.mutationMode,
+    user_edit_mutation_payload_version: reviewed.activePlanUserEdit?.mutationPayloadVersion,
+    user_edit_mutation_checksum: reviewed.activePlanUserEdit?.mutationChecksum,
+    user_edit_source_workout_id: reviewed.activePlanUserEdit?.sourceWorkoutId,
+    user_edit_source_workout_date: reviewed.activePlanUserEdit?.sourceWorkoutDate,
+    user_edit_trusted_client_rows: reviewed.activePlanUserEdit?.trustedClientRows,
   };
 }
 
@@ -422,13 +456,21 @@ function buildManualWorkoutAddGoalMetadata({
 }): Json {
   const editMetadata = buildActivePlanUserEditMetadata({
     activePlan,
-    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
+    mutationKind:
+      reviewMetadata.user_edit_mutation_kind ?? ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
+    mutationMode: reviewMetadata.user_edit_mutation_mode,
+    mutationPayloadVersion: reviewMetadata.user_edit_mutation_payload_version,
+    mutationChecksum: reviewMetadata.user_edit_mutation_checksum ?? reviewMetadata.review_checksum,
     plannedWorkoutId,
+    sourceWorkoutId: reviewMetadata.user_edit_source_workout_id,
+    sourceWorkoutDate: reviewMetadata.user_edit_source_workout_date,
+    targetWorkoutId: plannedWorkoutId,
     reviewChecksum: reviewMetadata.review_checksum,
     reviewPayloadVersion: reviewMetadata.review_payload_version,
     targetDate: reviewMetadata.workout_date,
     templateKey: reviewMetadata.template_key,
     title: null,
+    trustedClientRows: reviewMetadata.user_edit_trusted_client_rows,
     workoutAuthoringSourceKind: reviewMetadata.source_kind,
   });
   const root = appendActivePlanUserEditMetadataToRecord(
@@ -477,13 +519,21 @@ function buildManualWorkoutAddPlanPreferences({
 }): Json {
   const editMetadata = buildActivePlanUserEditMetadata({
     activePlan,
-    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
+    mutationKind:
+      reviewMetadata.user_edit_mutation_kind ?? ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
+    mutationMode: reviewMetadata.user_edit_mutation_mode,
+    mutationPayloadVersion: reviewMetadata.user_edit_mutation_payload_version,
+    mutationChecksum: reviewMetadata.user_edit_mutation_checksum ?? reviewMetadata.review_checksum,
     plannedWorkoutId,
+    sourceWorkoutId: reviewMetadata.user_edit_source_workout_id,
+    sourceWorkoutDate: reviewMetadata.user_edit_source_workout_date,
+    targetWorkoutId: plannedWorkoutId,
     reviewChecksum: reviewMetadata.review_checksum,
     reviewPayloadVersion: reviewMetadata.review_payload_version,
     targetDate: reviewMetadata.workout_date,
     templateKey: reviewMetadata.template_key,
     title: null,
+    trustedClientRows: reviewMetadata.user_edit_trusted_client_rows,
     workoutAuthoringSourceKind: reviewMetadata.source_kind,
   });
   const root = appendActivePlanUserEditMetadataToRecord(

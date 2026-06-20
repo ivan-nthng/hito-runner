@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+in_progress / G20 accepted; source-proof holding
 
 ## Type
 
@@ -14,4919 +14,3203 @@ high
 
 ## Next Recommended Role
 
-BACKEND
+architect
 
 ## Task
 
-Run Slice 13A: manual workout authoring validator lifecycle extraction.
+Resume Hito Stack Simplification only when a concrete cleanup candidate is source-proved.
 
 ## Stage
 
-BACKEND cleanup / manual MVP proof-infrastructure decomposition without behavior changes.
-
-## Running-Plan Quality Blocker Resolved — Cleanup Resumed
-
-Status update, 2026-06-12:
-
-- The running-plan quality blocker that paused code-freeze cleanup after Slice 12C is closed.
-- QA passed the universal runner-facing richness and executable prescription grammar repair.
-- Running Coach accepted the final quality rerun.
-- Proof covered `17` acceptance scenarios across `10K`, `Half Marathon`, `Marathon Base`, and
-  `Marathon Completion`, all preview-ready.
-- Accepted proof recorded `0` unresolved ranges, `0` unresolved executable segments, `0` richness
-  issues, `0` prescription grammar issues, `0` awkward standard durations,
-  `0` vague effort-only targets, `0` fake pace, `0` fake personal HR, and
-  `0` forbidden runner-facing language.
-- `Marathon Base` remains base-only.
-- `Marathon Completion` remains exact `42195m` and completion-focused, not performance-marathon.
-- This was a backend/canonical generation fix, not a frontend copy patch.
-- Proof boundary was backend-owned scenario, canonical review, confirm exactness,
-  `training-plan-v2`, and imported-plan/export-shaped artifact proof. Authenticated browser
-  selected-plan UI was not the proof surface for this gate.
-
-Architecture decision:
-
-- Resume code-freeze cleanup.
-- Do not resume with runtime frontend/backend refactors yet.
-- Select the next cleanup gate from proof infrastructure, where behavior can be preserved and
-  validated without touching accepted runner-facing UI or persistence.
-
-Current proof-infrastructure hotspot snapshot:
-
-| File | Current lines | Decision |
-| --- | ---: | --- |
-| [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts) | `3308` | Selected next cleanup gate. |
-| [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | `3382` | Keep stable after Slices 12A-12C; do not continue broad extraction until the manual MVP validator is split. |
-| [AI first-plan blueprint/envelope proof owner](../../../scripts/plan-authoring-doctrine/ai-first-plan-blueprint-envelope.ts) | `2546` | Keep; extracted owner from Slice 12C. |
-| [first-plan release gates](../../../scripts/plan-authoring-doctrine/first-plan-release-gates.ts) | `1366` | Keep; already focused release-gate owner. |
-
-Selected next gate:
-
-`BACKEND Slice 13A: manual workout authoring validator lifecycle extraction`.
-
-Why this is next:
-
-- The manual builder MVP is now QA-passed in the proved scope: first create, add activity, personal
-  saved templates, copy/paste, delete/clear, move workout, and JSON/Markdown export.
-- The validator is now a larger proof-infrastructure hotspot than the remaining main doctrine
-  validator.
-- It mixes multiple accepted manual lifecycle proof islands in one file, including review fixtures,
-  saved templates, first-create persistence, add-to-existing-plan, copy/paste, delete/clear,
-  move-workout, export, active-plan editability, date-only labels, and disposable persistence
-  preflight.
-- This is safer than touching [ManualWorkoutAuthoringControls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx),
-  [Calendar](../../../src/components/Calendar.tsx), [training-api](../../../src/lib/training-api.ts),
-  or accepted persistence/runtime seams during code-freeze cleanup.
-
-Expected implementation shape:
-
-- Keep `node --import tsx ./scripts/validate-manual-workout-authoring.ts` as the stable public
-  command.
-- Extract exactly one coherent lifecycle proof island into
-  `scripts/manual-workout-authoring/`.
-- Recommended first island: saved-template review/save/reconstruct proof, because it is cohesive,
-  already has a persistence-adjacent helper folder, and is lower-risk than copy/paste/delete/move
-  mutation assertions.
-- Preserve every assertion and fixture. Do not reduce coverage for line-count optics.
-- Keep disposable persistence harness behavior unchanged.
-- Update this plan with line-count impact, extracted owner, preserved command, and remaining manual
-  validator hotspots.
-
-Exact handoff prompt:
-
-```text
-ROLE: BACKEND
-
-Task:
-Run Slice 13A: manual workout authoring validator lifecycle extraction.
-
-Stage:
-BACKEND cleanup / manual MVP proof-infrastructure decomposition without behavior changes.
-
-Plan:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
-
-Context:
-Code-freeze cleanup may resume because the running-plan universal runner-facing richness and
-prescription-quality blocker is QA-passed and Running Coach accepted. Do not touch running-plan
-runtime behavior in this slice.
-
-The next selected cleanup gate is proof-infrastructure only:
-- scripts/validate-manual-workout-authoring.ts is now about 3308 lines.
-- The manual builder MVP is QA-passed in the proved scope: first create, add activity, personal
-  saved templates, copy/paste, delete/clear, move workout, and JSON/Markdown export.
-- The validator mixes accepted manual lifecycle proof islands in one file.
-
-Root cause:
-The visible symptom is code-size/reviewability growth in the manual authoring validator.
-The underlying cause is that multiple accepted lifecycle proofs accumulated in one public
-validation command.
-The canonical owner is scripts/proof infrastructure. Keep runtime source and UI untouched.
-
-Required reading:
-1. AGENTS.md
-2. agents/backend.agent.md
-3. skills/hito-backend-supabase-contract/SKILL.md
-4. skills/hito-plan-writing-and-closeout/SKILL.md
-5. docs/current-functional-map.md
-6. docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
-7. docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
-8. scripts/validate-manual-workout-authoring.ts
-9. scripts/manual-workout-authoring/persistence-proof.ts
-10. src/lib/manual-workout-authoring/*
-
-Scope:
-1. Keep `node --import tsx ./scripts/validate-manual-workout-authoring.ts` as the stable public
-   command.
-2. Extract exactly one coherent lifecycle assertion island into `scripts/manual-workout-authoring/`.
-3. Preferred first island: saved-template review/save/reconstruct proof, including user scoping,
-   display name/icon validation, backend review reconstruction, fake pace/HR rejection, and
-   unsupported payload rejection.
-4. Preserve every assertion, fixture, source-boundary check, and strict metric-truth check.
-5. Keep disposable persistence preflight and guarded remote override behavior unchanged.
-6. Update the active simplification strike plan with Slice 13A result, line-count impact, extracted
-   owner, preserved command, and remaining validator hotspots.
-
-What must not change:
-- No product runtime behavior.
-- No frontend UI.
-- No Supabase mutation except existing validator behavior when explicitly invoked with approved
-  guarded persistence flags.
-- No migrations.
-- No browser QA.
-- No deletion of validation coverage.
-- No copy/paste, delete/clear, move, export, recurrence, edit, Restore UI, QR/share/import, or
-  manual-builder product behavior changes.
-- No changes to running-plan engine runtime/source behavior.
-
-Validation:
-- `npm exec eslint -- scripts/validate-manual-workout-authoring.ts scripts/manual-workout-authoring/*.ts`
-- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
-- Scoped `git diff --check` for changed files.
-- New-file whitespace check if a new helper file is created.
-- No build is required unless runtime imports/config changed unexpectedly.
-```
-
-## Slice 12C Closeout — 2026-06-12
-
-Status: accepted / complete.
-
-Slice:
-
-`BACKEND Slice 12C: AI first-plan blueprint/envelope doctrine extraction`.
-
-What changed:
-
-- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) remains
-  the stable public entrypoint for the doctrine proof command.
-- [AI first-plan blueprint/envelope proof owner](../../../scripts/plan-authoring-doctrine/ai-first-plan-blueprint-envelope.ts)
-  is the new focused module for the AI first-plan blueprint/envelope doctrine assertion island.
-- The extracted island covers AI first-plan authoring input builders, blueprint fixtures,
-  blueprint workout-template helpers, goal-family cadence assertions, blueprint prompt/schema and
-  normalization/failure assertions, envelope decode/expand/trace assertions, and road-specificity
-  envelope assertions.
-- The main validator now calls the AI proof owner through dependency injection for shared fixed-rest,
-  metric, rich-workout, and long-run assertions.
-- Shared broader specificity/repair checks that still belong to surrounding cadence doctrine stayed
-  in the main validator for this slice.
-- The main validator went from `5677` lines to `3382` lines.
-- The new focused AI first-plan proof owner is `2546` lines.
-
-Acceptance evidence:
-
-- `npm exec eslint -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/*.ts`
-  passed.
-- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` passed with
-  `Plan authoring doctrine fixtures passed.`
-- Scoped `git diff --check` and new-file whitespace checks passed.
-- `npm run build` was not required unless imports/config/runtime compilation changed; this slice
-  only moved proof scripts/docs and executed the TSX validator directly.
-
-Cleanup progress:
-
-- Code-freeze proof-infrastructure cleanup has now extracted three coherent doctrine islands:
-  rich workout import/export, active-plan refresh, and AI first-plan blueprint/envelope.
-- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) has
-  been reduced from `6855` lines before Slice 12A to `3382` lines after Slice 12C.
-- The new focused proof owners total:
-  [rich workout import/export](../../../scripts/plan-authoring-doctrine/rich-workout-import-export.ts)
-  at `436` lines,
-  [active-plan refresh](../../../scripts/plan-authoring-doctrine/active-plan-refresh.ts) at `888`
-  lines, and
-  [AI first-plan blueprint/envelope](../../../scripts/plan-authoring-doctrine/ai-first-plan-blueprint-envelope.ts)
-  at `2546` lines.
-- This is a reviewability/source-ownership cleanup, not shipped runner-facing behavior and not a
-  product-size deletion claim.
-
-Architecture decision:
-
-- Accept Slice 12C as complete.
-- Treat Slice 12C as internal proof-infrastructure cleanup, not shipped user-facing behavior.
-- Do not add a [changelog](../../history/changelog.md) entry.
-- Pause further cleanup implementation gates behind the active running-plan quality blocker.
-- Do not select another cleanup slice until the confirmed Marathon Base export flatness incident is
-  either accepted by Running Coach as coach-credible or routed to Backend for a bounded
-  composition/diversity fix.
-- Runtime refactor, frontend cleanup, manual validator decomposition, and additional doctrine
-  extraction remain blocked while the plan engine may still produce coach-poor confirmed plans.
-
-Selected next gate:
-
-`RUNNING COACH: Marathon Base confirmed-export flatness quality blocker follow-up`.
-
-Why this is next:
-
-- The visible symptom is a confirmed Marathon Base export that QA classified as too flat.
-- The likely underlying cause is backend composition truth, not validator file shape.
-- The canonical first owner is Running Coach quality acceptance unless that incident has already
-  reported a precise Backend fix.
-- Continuing broad code-freeze cleanup would optimize proof infrastructure while a runner-facing
-  plan-quality blocker remains unresolved.
-
-## Slice 12B Closeout — 2026-06-12
-
-Status: accepted / complete.
-
-Slice:
-
-`BACKEND Slice 12B: active-plan refresh doctrine assertion extraction`.
-
-What changed:
-
-- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) remains
-  the stable public entrypoint for the doctrine proof command.
-- [active-plan refresh proof owner](../../../scripts/plan-authoring-doctrine/active-plan-refresh.ts)
-  is the new focused module for the active-plan refresh doctrine assertion island.
-- The extracted island covers rich draft normalization/fallback, apply-source non-generation proof,
-  proposal/rich-draft timeout fallback, review metadata checksum proof, stored authoring truth
-  preference, protected-history mutable guards, mountain refresh doctrine, and refresh fixture
-  builders.
-- The main validator now calls the new owner through dependency injection.
-- Shared helpers such as fixed-rest-day assertions, metric checks, trail doctrine, and rich workout
-  contract checks remain shared instead of duplicated.
-- The main validator went from `6458` lines to `5677` lines.
-- The new focused owner is `888` lines.
-
-Acceptance evidence:
-
-- `npm exec eslint -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/*.ts`
-  passed.
-- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` passed with
-  `Plan authoring doctrine fixtures passed.`
-- Scoped `git diff --check` passed.
-- New-file whitespace checks passed.
-- `npm run build` was skipped appropriately because only proof scripts/docs changed and the TSX
-  validator entrypoint was executed directly.
-
-Architecture decision:
-
-- Accept Slice 12B as complete.
-- Treat this as internal proof-infrastructure cleanup, not shipped user-facing behavior.
-- Do not add a [changelog](../../history/changelog.md) entry.
-- Continue one more backend/script proof-infrastructure cleanup slice before moving to runtime
-  frontend cleanup or manual validator decomposition.
-
-Selected next gate:
-
-`BACKEND Slice 12C: AI first-plan blueprint/envelope doctrine extraction`.
-
-Why this is next:
-
-- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) is still
-  `5677` lines and remains the largest proof-infrastructure hotspot.
-- AI first-plan blueprint/envelope prompt, schema, fixture, normalization, trace, and failure checks
-  form a coherent remaining assertion island in the main validator.
-- This remains lower-risk than decomposing the newer
-  [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts) or touching
-  accepted runtime UI such as
-  [manual authoring controls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
-  and [Calendar](../../../src/components/Calendar.tsx).
-- The next slice is still script-only and must preserve validation coverage.
-
-## Slice 12A Closeout — 2026-06-12
-
-Status: accepted / complete.
-
-Slice:
-
-`BACKEND Slice 12A: plan-authoring doctrine validator ownership extraction`.
-
-What changed:
-
-- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) remains
-  the stable public entrypoint for the doctrine proof command.
-- [rich workout import/export proof owner](../../../scripts/plan-authoring-doctrine/rich-workout-import-export.ts)
-  is the new focused module for one extracted assertion island.
-- The extracted island covers rich persistence readback, carry-forward, import/export roundtrip,
-  template validation, reference import identity preservation, saved-mode QA fixture checks, compact
-  fallback, and no fake pace/HR fixture proof.
-- The main validator went from `6855` lines to `6458` lines.
-- The new focused owner is `436` lines.
-- Backend intentionally chose this smaller island instead of active-plan refresh checks because
-  refresh has broader draft/proposal fixture coupling and should remain a separate cleanup slice.
-
-Acceptance evidence:
-
-- `npm exec eslint -- scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/*.ts`
-  passed.
-- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` passed with
-  `Plan authoring doctrine fixtures passed.`
-- New-file whitespace check passed.
-- Scoped `git diff --check` passed.
-- `npm run build` was skipped appropriately because only script/docs proof infrastructure changed
-  and the TSX entrypoint was validated directly.
-
-Architecture decision:
-
-- Accept Slice 12A as complete.
-- Treat this as internal proof-infrastructure cleanup, not shipped user-facing behavior.
-- Do not add a [changelog](../../history/changelog.md) entry.
-- Continue backend/script proof-infrastructure cleanup before moving to runtime frontend cleanup.
-
-Selected next gate:
-
-`BACKEND Slice 12B: active-plan refresh doctrine assertion extraction`.
-
-Why this is next:
-
-- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) is still
-  `6458` lines and remains the largest proof-infrastructure hotspot.
-- Active-plan refresh rich-draft/proposal assertions are still a coherent proof island inside the
-  same monolith.
-- This keeps the cleanup path low-risk: script-only, behavior-preserving, and no Supabase/browser
-  surface.
-- It is safer than decomposing [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts)
-  immediately after the manual MVP acceptance, and safer than touching
-  [manual authoring controls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
-  or [Calendar](../../../src/components/Calendar.tsx), which are accepted runtime UI surfaces.
-
-## Code-Freeze Cleanup Inventory — 2026-06-12
-
-Primary source of truth:
-
-- [current functional map](../../current-functional-map.md)
-
-Decision:
-
-The first code-freeze cleanup implementation gate is still
-`BACKEND Slice 12A: plan-authoring doctrine validator ownership extraction`, but the selection is
-now re-accepted against the updated functional map and current source size baseline.
-
-Root-cause framing:
-
-- Visible symptom: Hito grew quickly while selected-distance plan creation, manual user-built
-  plans, manual calendar editing, active-plan export, QA server tooling, AI first-plan authoring,
-  and running-plan engine validation shipped in parallel.
-- Underlying cause: accepted capability now spans several source-of-truth seams, so cleanup must
-  start from shipped business flows rather than line count alone.
-- Canonical owner for this pass: architecture inventory first, then one bounded backend cleanup
-  slice that preserves every accepted flow.
-
-Current measured baseline:
-
-| Area | Count | Notes |
-| --- | ---: | --- |
-| `src` TS/TSX/CSS files | `240` | Runtime, product UI, admin, Hito DS, and internal helpers. |
-| `src` TS/TSX/CSS lines | `103883` | Source size is now above the earlier simplification-strike baseline. |
-| `scripts` TS/TSX/MJS/JS files | `29` | Validators, proof harnesses, importers, and ops scripts. |
-| `scripts` TS/TSX/MJS/JS lines | `29292` | Proof infrastructure is a major growth area. |
-
-Largest audited hotspots:
-
-| File | Lines | Classification | Freeze decision |
-| --- | ---: | --- | --- |
-| [training API facade](../../../src/lib/training-api.ts) | `698` | required runtime / compatibility facade | Keep; audit later for export narrowing only after route imports are mapped. |
-| [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts) | `3052` | required validation/proof infrastructure | Keep; decompose later by first-create/add/templates/copy/delete/move/export after Slice 12A. |
-| [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | `6855` | required validation/proof infrastructure / decomposition hotspot | Selected first cleanup gate. |
-| [manual authoring controls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx) | `2032` | required frontend runtime / decomposition hotspot | Defer; requires frontend DS preflight and browser regression. |
-| [Calendar](../../../src/components/Calendar.tsx) | `1057` | required frontend runtime | Keep; avoid changing accepted manual calendar behavior during freeze inventory. |
-| [PlanManagementDialog](../../../src/components/PlanManagementDialog.tsx) | `1152` | required frontend runtime / plan lifecycle shell | Keep; decompose only through existing panel seams. |
-| [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | `1591` | required runtime according to current docs | Keep; audit later as schedule-edit owner, not manual Move replacement. |
-| [active-plan schedule edit validator](../../../scripts/validate-active-plan-schedule-edit-preview.ts) | `560` | required validation/proof infrastructure | Keep with schedule-edit preview until a dedicated audit says otherwise. |
-
-Cleanup inventory:
-
-### Backend Runtime
-
-Required runtime:
-
-- manual workout authoring modules under [manual-workout-authoring](../../../src/lib/manual-workout-authoring/)
-- [active-plan persistence](../../../src/lib/active-plan-persistence.ts)
-- [active-plan export actions](../../../src/lib/active-plan-export-actions.ts)
-- [plan export](../../../src/lib/plan-export.ts)
-- [running-plan engine actions](../../../src/lib/running-plan-engine-actions.ts)
-- [first-plan actions](../../../src/lib/first-plan-actions.ts)
-- [plan replacement actions](../../../src/lib/plan-replacement-actions.ts)
-- [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts)
-- [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts)
-
-Compatibility-only or audit-first:
-
-- [training API facade](../../../src/lib/training-api.ts): keep as route/server-function compatibility
-  facade; shrink only after import consumers are mapped.
-- AI strict/envelope/draft ops files: keep only as doctrine/proof/internal ops paths; do not treat
-  strict nested draft as normal product runtime.
-- old Plan Preset review/confirm behavior: keep only as bounded blocked/preview-only compatibility.
-
-Safe deletion/demotion candidates:
-
-- No backend runtime deletion is selected in this pass. The functional map does not yet prove a
-  runtime path is dead enough to delete safely.
-
-### Frontend Runtime
-
-Required runtime:
-
-- [OnboardingGate](../../../src/components/OnboardingGate.tsx)
-- [StructuredPlanConstructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx)
-- [ManualUserBuiltPlanPanel](../../../src/components/onboarding/ManualUserBuiltPlanPanel.tsx)
-- [selected-plan preview dialog](../../../src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx)
-- [Calendar](../../../src/components/Calendar.tsx)
-- [Hito calendar day primitive](../../../src/components/ui/hito-calendar-day.tsx)
-- [ManualWorkoutAuthoringControls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
-- [ManualWorkoutMoveControls](../../../src/components/manual-workout/ManualWorkoutMoveControls.tsx)
-- [PlanManagementDialog](../../../src/components/PlanManagementDialog.tsx)
-- [plan-management panel components](../../../src/components/plan-management/)
-
-Suspect/decompose:
-
-- [ManualWorkoutAuthoringControls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
-  should be the first manual UI decomposition candidate after the backend validator cleanup, but
-  not before freeze inventory because it is accepted runtime UI and needs browser QA.
-- [Calendar](../../../src/components/Calendar.tsx) can be audited for action-menu extraction later,
-  but must not become a local schedule-truth owner.
-- [PlanManagementDialog](../../../src/components/PlanManagementDialog.tsx) should continue splitting
-  only through already-established panel seams.
-
-Safe deletion/demotion candidates:
-
-- No frontend runtime deletion is selected in this pass. UI cleanup is intentionally deferred behind
-  proof-infrastructure cleanup.
-
-### Scripts, Validators, and Proof Infrastructure
-
-Required validation/proof infrastructure:
-
-- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
-- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
-- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts`
-- `node --import tsx ./scripts/validate-active-plan-schedule-edit-preview.ts`
-- `npm run validate-admin-capture-backlog`
-- `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000`
-
-Suspect/decompose:
-
-- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) is the
-  first selected cleanup gate. It should keep the public command stable while moving one assertion
-  island into [plan-authoring-doctrine modules](../../../scripts/plan-authoring-doctrine/).
-- [manual workout validator](../../../scripts/validate-manual-workout-authoring.ts) is the next
-  likely script decomposition candidate after Slice 12A. Do not split it before the manual MVP
-  acceptance remains stable in cleanup QA.
-- [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) remains internal ops
-  proof; audit later after blueprint/envelope ownership is settled.
-
-### Docs, Plans, and Backlog
-
-Required docs/source of truth:
-
-- [current functional map](../../current-functional-map.md)
-- [current product](../../current-product.md)
-- [current system](../../current-system.md)
-- [current state](../../current-state.md)
-- [changelog](../../history/changelog.md)
-- [manual workout authoring active plan](2026-06-09-manual-workout-authoring-and-user-built-plans.md)
-- [running-plan creation engine active plan](2026-06-08-running-plan-creation-engine-rebuild.md)
-- [this simplification strike](2026-06-07-hito-stack-simplification-strike.md)
-
-Audit-first docs:
-
-- [heart-rate zones active plan](2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md)
-- [voice-to-plan authoring active plan](2026-05-18-voice-to-plan-authoring-plan.md)
-- [Polar auto sync active plan](2026-05-21-polar-auto-sync-integration-plan.md)
-
-These older active plans are source-of-truth hygiene candidates, not the first code-freeze cleanup
-implementation gate. They should be classified separately as active, backlog, or archive before
-freeze.
-
-### Future-Only Artifacts
-
-Keep out of the first cleanup implementation gate:
-
-- QR/share/import
-- recurrence
-- edit workout
-- Restore/Put back/Redo UI
-- PDF/watch export
-- generated/preset/imported/running-engine manual mutation
-- active-plan replacement/refresh expansion
-- route/modal polish
-- new preset families
-
-Candidate table:
-
-| Candidate | Type | Impact | Risk | Decision |
-| --- | --- | --- | --- | --- |
-| Plan-authoring doctrine validator ownership extraction | Decompose proof infrastructure | High reviewability; isolates largest script hotspot | Low runtime risk if assertions stay unchanged | Selected |
-| Manual workout validator decomposition | Decompose proof infrastructure | Medium/high; aligns with completed manual MVP | Medium because manual MVP is newly accepted and validator protects many flows | Defer until after Slice 12A |
-| Manual authoring controls decomposition | Frontend runtime decomposition | High UI reviewability | Requires browser QA and risks accepted manual builder surface | Defer |
-| Training API facade narrowing | Runtime facade cleanup | Medium | Requires full import/route audit; can break server-function consumers | Defer |
-| Active-plan schedule edit preview audit | Runtime/source-of-truth audit | Medium | Current docs say it is implemented product behavior | Keep/audit later |
-| Older active-plan archive cleanup | Docs/source-of-truth hygiene | Low runtime impact | Requires canonical-plan comparison | Defer behind runtime/proof cleanup |
-
-Selected first cleanup gate:
-
-`BACKEND Slice 12A: plan-authoring doctrine validator ownership extraction`.
-
-Expected implementation shape:
-
-- Keep `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` as the stable command.
-- Extract exactly one assertion island into [scripts/plan-authoring-doctrine](../../../scripts/plan-authoring-doctrine/).
-- Prefer the rich workout/readback/refresh assertion island because it is cohesive and already
-  conceptually separate from first-plan release gates.
-- Preserve every assertion; do not reduce validation coverage just to lower line count.
-- Record line-count/reviewability impact and remaining validator hotspots in this plan.
-
-## Parallel Cleanup Audit After R8 Confirm/Persist Work
-
-Decision date: 2026-06-09.
-
-Purpose:
-
-Resume service-size reduction without blocking the ongoing running-plan R8/R8B confirm/persist
-track. This audit is deliberately parallel: it selects a cleanup target outside the R8 create-path
-files unless a direct safety conflict appears.
-
-Current measured size baseline:
-
-| Area | Current count | Notes |
-| --- | ---: | --- |
-| `src` TS/TSX/CSS files | `221` files | Runtime/product/admin/DS source; generated route tree is included if checked in. |
-| `src` TS/TSX/CSS lines | about `91,990` lines | Excludes docs, lockfiles, `node_modules`, and QA artifacts. |
-| `scripts` TS/TSX/MJS/JS files | `27` files | Validators, harnesses, importers, and ops scripts. |
-| `scripts` TS/TSX/MJS/JS lines | about `23,977` lines | Validation/tooling bloat remains significant. |
-| `docs/plans` + `docs/tasks` markdown/CSV | `143` files / about `72,102` lines | Planning/history/reference load; not service runtime. |
-| `qa-artifacts` | about `386M` | Gitignored/local generated proof artifacts; cleanup is disk hygiene, not runtime code reduction. |
-
-Largest current source hotspots:
-
-| File | Lines | Category | Audit note |
-| --- | ---: | --- | --- |
-| [global styles](../../../src/styles.css) | `5132` | runtime CSS / DS/product/admin styles | Slice 14A removed confirmed dead selectors; further cleanup needs QA/visual proof. |
-| [Hito DS route](../../../src/routes/hitoDS.tsx) | `4072` | internal DS route | Already decomposed once; further split should wait for DS/test-calendar tracks. |
-| [Admin analytics route](../../../src/routes/admin.analytics.tsx) | `2393` | admin UI runtime | Decompose later; current admin surface is live. |
-| [Admin capture route](../../../src/routes/admin.capture.tsx) | `2125` | admin UI runtime | Decompose later; current work-items surface is live. |
-| [voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts) | `1685` | product/runtime AI assist | Keep until rebuilt custom/advanced engine replacement is accepted. |
-| [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | `1591` | product/runtime schedule preview | Current reviewed mutation boundary; keep. |
-| [first-plan actions](../../../src/lib/first-plan-actions.ts) | `1551` | product/runtime first-plan actions | Broad but live; defer until create-engine replacement settles. |
-| [structured plan authoring workouts](../../../src/lib/structured-plan-authoring-workouts.ts) | `1398` | deterministic generator compatibility | Keep while legacy/readback/custom paths still depend on it. |
-| [imported plan contract](../../../src/lib/imported-plan.ts) | `1355` | canonical import/readback | Keep; schema/import compatibility owner. |
-| [CompletionPanel](../../../src/components/CompletionPanel.tsx) | `1342` | workout detail UI | Decompose later through frontend DS/workout-detail slice. |
-
-Largest current script hotspots:
-
-| File | Lines | Category | Audit note |
-| --- | ---: | --- | --- |
-| [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | `6788` | validation harness | Selected next cleanup gate; too broad for safe review. |
-| [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) | `2114` | ops/diagnostic | Keep until blueprint/envelope diagnostics are consolidated. |
-| [repo work-item importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts) | `1815` | admin tooling | Keep; bounded importer diagnostics are current. |
-| [first-plan release gates](../../../scripts/plan-authoring-doctrine/first-plan-release-gates.ts) | `1349` | validation harness | Keep; already extracted release-gate owner. |
-| [admin capture validator](../../../scripts/validate-admin-capture-backlog.ts) | `1078` | admin validation | Keep; admin work-items safety net. |
-| [running-plan scenario generator](../../../scripts/generate-running-plan-engine-scenarios.ts) | `974` | running-plan validation/artifacts | Keep while R8/Rich preview work is active. |
-
-Weak spots found:
-
-- Runtime product code:
-  - [training API facade](../../../src/lib/training-api.ts) is still broad, but it is touched by R8
-    exports and should not be narrowed in parallel with R8B/QA.
-  - first-plan, voice/text/custom, structured authoring, and active-plan refresh seams still overlap
-    conceptually, but several are live or needed for compatibility until the rebuilt engine fully
-    owns custom/advanced creation.
-- Validation/test harnesses:
-  - [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
-    remains the biggest weak seam. It mixes rich workout, import/export, refresh, structured,
-    blueprint, envelope, and first-plan release-gate assertions.
-  - validation scripts are not product runtime bloat, but a 6.7k-line harness becomes a weak
-    architecture seam when future agents cannot see which assertions belong to which product owner.
-- Docs/plans/specs:
-  - active docs remain large and numerous; this is admin/backlog visibility load, not runtime code.
-  - stale active-plan cleanup should continue separately through Admin Work Items/source-of-truth
-    hygiene, not as this implementation slice.
-- Generated/local artifacts:
-  - `qa-artifacts` is large at about `386M`, but it is gitignored proof output. Do not treat it as
-    service code. Add a disk-hygiene task later only if local storage becomes a problem.
-- Compatibility/legacy stubs:
-  - old Plan Preset review/confirm remains safely bounded as `preview_only`.
-  - `structured_authoring_v1` compatibility is still intentional and must not be deleted.
-  - old strict nested AI draft runtime was already deleted in Slice 10C.
-
-Cleanup candidates considered:
-
-| Candidate | Type | Expected impact | Risk | Decision |
-| --- | --- | ---: | --- | --- |
-| Doctrine validator ownership extraction | Decompose | High reviewability; can shrink main script by moving `1000+` lines into focused owners | Low runtime risk; script-only if behavior is preserved | Selected |
-| Training API facade narrowing | Consolidate/delete exports | Medium runtime simplification | Direct file conflict risk with R8/R8B and route/serverFn imports | Defer until R8 completes |
-| Voice/text/custom authoring consolidation | Audit then demote | Potentially high | Replacement advanced/custom engine is not accepted yet | Defer |
-| Admin analytics/capture route decomposition | Decompose | High route reviewability | Frontend/admin QA required; less direct source-of-truth cleanup | Defer |
-| Hito DS/global CSS second pass | Decompose/delete CSS | High visual/code cleanup | Slice 14A needs separate QA/design stability before deeper split | Defer |
-| QA artifact cleanup | Delete local artifacts | High disk impact, no runtime line impact | Could remove useful evidence if done blindly | Backlog/disk hygiene only |
-| Manual workout authoring cleanup | Audit | Medium/high future impact | Current manual workout track is in-flight and untracked | Do not touch |
-| Plan-creation engine cleanup | Decompose | High | Accepted preview/R8 create-path work is active | Do not touch in this parallel slice |
-
-Selected next cleanup gate:
-
-`BACKEND Slice 12A: plan-authoring doctrine validator ownership extraction`.
-
-Why this is the highest-impact/safest next slice:
-
-- It attacks the current largest script hotspot (`6788` lines) without touching product runtime,
-  Supabase, UI, R8 confirm/persist, or the accepted running-plan preview builders.
-- It reduces source-of-truth risk: validators should prove contracts, not become an unreadable
-  second implementation map.
-- It is safer than narrowing [Training API facade](../../../src/lib/training-api.ts) while R8B is
-  still active.
-- It is more root-cause-aligned than another small CSS deletion pass because the weak seam is
-  validation ownership, not one selector group.
-
-Slice 12A approved scope:
-
-- Keep the top-level command stable:
-  `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`.
-- Extract exactly one assertion island into `scripts/plan-authoring-doctrine/`.
-- Recommended first island:
-  rich workout draft normalization, rich compatibility mapping, rich persistence/readback,
-  import/export roundtrip, saved-mode QA fixture, and active-plan refresh rich draft/apply/timeout
-  assertions.
-- Keep assertion behavior unchanged.
-- Keep any shared helper extraction minimal and ownership-based.
-- Record main-file line-count reduction and remaining hotspots after extraction.
-
-Forbidden in Slice 12A:
-
-- Do not remove assertions to make the file smaller.
-- Do not touch R8/R8B running-plan confirm/persist source unless a direct conflict is proven.
-- Do not edit product runtime, DB/schema, Supabase data, frontend UI, Hito DS, Plan Preset card
-  discovery, manual workout authoring, active-plan persistence, or running-plan preview builders.
-- Do not delete `structured_authoring_v1` compatibility, blueprint/envelope gates, or current
-  first-plan release gates.
-
-Slice 12A implementation result:
-
-- Implemented on 2026-06-12 as a no-behavior-change proof-infrastructure extraction.
-- Extracted one coherent assertion island from
-  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) into
-  [rich workout import/export doctrine owner](../../../scripts/plan-authoring-doctrine/rich-workout-import-export.ts).
-- Extracted ownership covers rich workout persistence readback, persisted-row carry-forward,
-  import/export roundtrip, training-plan-v2 template rich-field validation, reference-style import
-  identity preservation, saved-mode QA fixture rich-field checks, compact fallback readback, and
-  no fake pace/HR fixture assertions.
-- Chose this smaller island instead of also moving active-plan refresh rich draft checks in the same
-  slice because refresh assertions depend on broader refresh proposal/draft fixtures and should be a
-  separate bounded extraction.
-- Line-count impact: main validator reduced from `6855` to `6458` lines; new rich import/export
-  doctrine owner is `436` lines.
-- Validation evidence: targeted ESLint, full plan-authoring doctrine validator, new-file whitespace
-  check, and scoped `git diff --check` passed.
-- Remaining validator hotspots: active-plan refresh rich draft/apply/timeout fallback checks,
-  structured/running-doctrine helper clusters, blueprint/envelope contract blocks, and the broad
-  metric/rich workout helper area in the top half of the validator.
-- Stable entrypoint preserved:
-  `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`.
-
-Slice 12B implementation result:
-
-- Implemented on 2026-06-12 as a second no-behavior-change proof-infrastructure extraction.
-- Extracted the active-plan refresh doctrine island from
-  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) into
-  [active-plan refresh doctrine owner](../../../scripts/plan-authoring-doctrine/active-plan-refresh.ts).
-- Extracted ownership covers refresh rich draft normalization/fallback, apply-source non-generation
-  proof, proposal/rich-draft timeout fallback, review metadata checksum proof, stored structured
-  authoring truth preference, protected-history mutable guard behavior, mountain refresh doctrine,
-  and refresh fixture row/context builders.
-- Kept shared non-refresh helpers in the main validator and passed them into the refresh owner as
-  dependencies so fixed-rest, metric-target, rich-workout, trail doctrine, and plan-shaping helpers
-  remain single-source within the top-level doctrine harness.
-- Line-count impact after Slice 12B: main validator reduced from `6458` to `5677` lines; new
-  active-plan refresh doctrine owner is `888` lines.
-- Validation evidence: targeted ESLint, full plan-authoring doctrine validator, new-file whitespace
-  check, and scoped `git diff --check` passed.
-- Remaining validator hotspots: structured/running-doctrine helper clusters, blueprint/envelope
-  contract blocks, rich workout draft normalizer checks, text/voice compatibility checks, and the
-  broad metric/rich workout helper area in the top half of the validator.
-- Stable entrypoint preserved:
-  `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`.
-
-## Slice 14A Global CSS Cleanup Result
-
-Implemented on 2026-06-09.
-
-Ownership map:
-
-- Hito DS tokens/primitives:
-  [global styles](../../../src/styles.css) lines around `:root`, `@theme`, typography roles,
-  fields, buttons, tabs, choice controls, checkbox/radio controls, status pills, status markers,
-  feedback markers, product dialogs, toast chrome, date fields, menu/select wrappers, and shared
-  calendar-day anatomy.
-- Hito DS route/specimen styles:
-  workbench shell/sidebar, DS nested navigation, reference rows, specimen shells, playground
-  anatomy, data-table specimen controls, modal/window specimen, and calendar/workout playground
-  display classes.
-- Product calendar/workout styles:
-  shared calendar grid/mobile-row classes, calendar type glyphs, feedback markers, state surfaces,
-  nav cards, workout-result/readback support surfaces, and active-plan schedule edit narrow-layout
-  safety overrides.
-- Onboarding/preset styles:
-  onboarding surfaces, preset card/grid/stage treatment, selected-plan preview calendar,
-  selected-plan segment rows, editable value chip, date/time controls, and first-plan dialog chrome.
-- Admin/work-items styles:
-  admin shell/profile/menu, backlog divider-list/detail/metadata tags, analytics cards, data-table
-  utility row/search/header/menu classes, chart/comparison/scale/severity primitives.
-- Legacy/dead/duplicate candidates:
-  old product-dialog mode/row/note helpers, unused `hito-ui-sidebar-shell`, unused standalone
-  error/success text aliases, and old radio visual-helper aliases.
-
-Deleted with source proof:
-
-- Deleted unused product-dialog helpers:
-  `hito-product-dialog-content-fit`, `hito-product-dialog-scroll-fill`,
-  `hito-product-dialog-header-row`, `hito-product-dialog-body-content-fit`,
-  `hito-product-dialog-footer-row`, and `hito-product-dialog-footer-note`.
-  `rg --fixed-strings` found no runtime/source consumers outside
-  [global styles](../../../src/styles.css), excluding this result record.
-  Live dialog classes such as `hito-product-dialog`, `hito-product-dialog-header`,
-  `hito-product-dialog-body-scroll-fill`, and `hito-product-dialog-footer` remain in use.
-- Deleted unused `hito-ui-sidebar-shell`; `rg --fixed-strings` found no runtime/source consumers
-  outside [global styles](../../../src/styles.css), excluding this result record. Live sidebar specimen classes
-  `hito-ui-sidebar-panel` and `hito-ui-sidebar-row` remain in use.
-- Deleted unused `hito-error-text` and `hito-success-text`; `rg --fixed-strings` found no
-  runtime/source consumers outside [global styles](../../../src/styles.css), excluding this result
-  record. Current form feedback uses
-  `hito-field-error`, `hito-field-success`, helper copy, and status primitives.
-- Deleted unused `hito-radio-checked` and `hito-radio-indicator-dot`; `rg --fixed-strings` found no
-  runtime/source consumers outside [global styles](../../../src/styles.css), excluding this result
-  record. Native/input radio checked styling and `data-state="checked"` styling remain.
-
-Kept intentionally:
-
-- Kept the remaining no-fixed-reference size-ladder selectors:
-  `hito-button-xl`, `hito-field-xs`, `hito-field-xl`, `hito-checkbox-md`, `hito-radio-md`,
-  `hito-control-label-md`, `hito-choice-toggle-md`, `hito-choice-toggle-lg`,
-  `hito-choice-toggle-xl`, and `hito-textarea-lg`.
-- These are Hito DS primitive/size variants or specimen-controlled variants. Several are used
-  through dynamic class construction in [Hito DS route](../../../src/routes/hitoDS.tsx) and
-  [specimen previews](../../../src/components/hito-ds/specimen-previews.tsx), so they are not
-  safe deletion targets in this pass.
-
-Line impact:
-
-- [global styles](../../../src/styles.css) went from `5206` lines to `5132` lines.
-- This pass deleted `74` CSS lines without changing TS/TSX, product behavior, backend truth, or
-  global visual design.
-
-Validation evidence:
-
-- Source proof used `rg --fixed-strings` for every deleted selector and confirmed zero runtime/source
-  consumers outside [global styles](../../../src/styles.css), excluding this result record.
-- Post-cleanup dead-selector scan reports only intentionally kept DS size-ladder/specimen variants.
-- Targeted `git diff --check` passed for [global styles](../../../src/styles.css), route/component
-  files, and this active plan.
-- `npm run build` passed.
-- Built-in browser smoke passed for `/hitoDS`, `/hitoDS#workout-library-playground`, and
-  `/hitoDS#calendar-workout-playground`; direct deep-link load produced no fresh hydration mismatch,
-  workout-library still rendered `32` calendar cells and `32` mobile rows, and `375px` viewport had
-  no horizontal overflow.
-
-Follow-up cleanup candidates:
-
-- Split [global styles](../../../src/styles.css) by ownership only after another source-proof pass:
-  DS primitives, admin/workbench, onboarding/presets, calendar/workout, and DS specimens.
-- Audit the remaining DS size-ladder classes with a component-level decision before deleting any
-  primitive variants.
-- Later cleanup can migrate used-but-route-specific admin/backlog styles toward shared DS/admin
-  modules, but that is intentionally out of scope for Slice 14A.
-
-Next recommended role:
-
-QA should run focused source/browser validation for `/hitoDS`, touched DS control/specimen surfaces,
-and mobile no-overflow.
-
-## Previous Cleanup Result
-
-Implemented on 2026-06-09.
-
-- [Training API facade](../../../src/lib/training-api.ts) no longer re-exports
-  `reviewPlanPresetDraft(...)`, `confirmPlanPresetDraft(...)`, or their action-result types.
-- [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) still expose
-  `getPlanPresetCards(...)` for backend-shaped availability cards.
-- Stale direct calls to `reviewPlanPresetDraft(...)` or `confirmPlanPresetDraft(...)` now return a
-  bounded `preview_only` blocked result and do not rebuild drafts, sign review tokens, validate
-  review checksums, call active-plan persistence, or persist a `plan_preset_v1` plan.
-- [Running plan engine actions](../../../src/lib/running-plan-engine-actions.ts) still own the
-  accepted selected-plan preview path through `previewRunningPlanDraft(...)`.
-- Superseded by Slice 10B: low-level Plan Preset recipe/review contract harnesses and old
-  algorithmic expansion source were removed after selected-plan preview became the accepted owner.
-
-Validation evidence:
-
-- Source audit shows `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)` remain only in
-  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) as bounded `preview_only`
-  blocked actions, not in [Training API facade](../../../src/lib/training-api.ts), frontend, scripts,
-  or package scripts.
-- Source audit shows [Onboarding gate](../../../src/components/OnboardingGate.tsx) still imports
-  `getPlanPresetCards(...)` and `previewRunningPlanDraft(...)`.
-- Targeted ESLint passed for Training API, Plan Preset actions, running-plan engine actions,
-  Onboarding gate, and Plan Preset panel.
-- Running-plan engine source, 10K builder, and R6 builder validators passed.
-- Plan Preset eligibility fixtures passed.
-- Admin capture backlog validation passed.
-- Targeted `git diff --check` passed.
-- `npm run build` passed.
-
-## Backend Slice 10C Result
-
-Implemented on 2026-06-09.
-
-- Deleted `src/lib/ai-first-plan-draft-authoring.ts`, the remaining historical strict nested
-  `ai-first-plan-draft-v1` prompt/schema/OpenAI schema/normalizer module.
-- Removed the obsolete strict nested assertion island from
-  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts):
-  `buildAiFirstPlanDraftFixture(...)`, strict draft fixture helpers,
-  `assertAiFirstPlanDraftContract(...)`, and the top-level assertion call.
-- Kept [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts) as the
-  product-owned metadata/trace seam for blueprint/envelope/service code.
-- Kept [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts)
-  `strict-draft` selection as a bounded `unsupported_contract` negative proof.
-- Preserved blueprint, envelope, structured-authoring/readback, rich workout draft, active refresh,
-  import/export, Plan Preset card discovery, running-plan preview, and admin backlog validations.
-
-Source audit evidence:
-
-- `rg -n "ai-first-plan-draft-authoring|ai-first-plan-draft-v1|strict_draft|strict-draft|aiFirstPlanDraftSchema|aiFirstPlanDraftOpenAiSchema" src scripts docs/plans/active docs/tasks package.json`
-  found no live `src`/`scripts` import of the deleted strict authoring file. Remaining source hit is
-  only the intentional `strict-draft` unsupported guard in
-  [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts).
-- `rg -n "ai_first_plan_blueprint_v1|ai_first_plan_envelope_v1|structured_authoring_v1|unsupported_contract" src scripts`
-  still shows blueprint/envelope release-gate assertions, `structured_authoring_v1` compatibility
-  readback, and the `unsupported_contract` guard.
-- `rg -n "AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION|buildAiFirstPlanDraftPrompt|normalizeAiFirstPlanDraftToTrainingPlan|AiFirstPlanDraft\\b|assertAiFirstPlanDraftContract|buildAiRunningDraftWorkout|emptyAiDraftTarget|aiFirstPlanDraftSchema|aiFirstPlanDraftOpenAiSchema" src scripts`
-  no longer finds strict nested schema/prompt/normalizer symbols outside current service naming.
-
-Validation evidence:
-
-- `npm exec eslint -- src/lib/ai-first-plan-*.ts src/lib/first-plan-actions.ts scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/first-plan-release-gates.ts scripts/author-ai-first-plan-draft.ts` passed.
-- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts` passed.
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
-  passed with `sourceKind: ai_first_plan_blueprint_v1`, `persisted: false`, and no deterministic
-  fallback success.
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope` passed with
-  `sourceKind: ai_first_plan_envelope_v1`, `sourceStatus: expanded_from_envelope`, and
-  `persisted: false`.
-- `npm run author-ai-first-plan-draft -- --contract strict-draft` returned the expected bounded
-  failure: `ok: false`, `reason: unsupported_contract`.
-- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts` passed.
-- `node --import tsx ./scripts/validate-running-plan-engine-source.ts` passed.
-- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts` passed.
-- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts` passed.
-- `npm run validate-admin-capture-backlog` passed.
-- `npm run build` passed.
-
-Cleanup impact:
-
-- Removed the tracked `1602`-line strict nested authoring module from `src`.
-- Reduced [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
-  from about `7263` lines to `6788` lines by deleting obsolete strict nested assertions rather than
-  moving them.
-
-## Frontend Hito DS Route Decomposition Result
-
-Implemented on 2026-06-09.
-
-- Kept [Hito DS route](../../../src/routes/hitoDS.tsx) as the route shell, nav/hash orchestration,
-  section registry, and inline section composition owner.
-- Added [Hito DS reference anatomy](../../../src/components/hito-ds/reference.tsx) for shared DS
-  documentation rows, section intros, specimen shells, and product links.
-- Added [Hito DS specimen previews](../../../src/components/hito-ds/specimen-previews.tsx) for the
-  data-table preview, modal-window preview, choice selector, selection-control preview, toggle row,
-  demo input, demo button, and menu row helpers.
-- Preserved `/hitoDS`, `/hitoDS#calendar-workout-playground`, and
-  `/hitoDS#workout-library-playground` behavior, including the SSR-safe initial section state and
-  the current workout-library provider-control no-overflow fix.
-- Did not touch product calendar, onboarding, workout routes, Supabase, backend, provider sync,
-  persistence, admin routes, or global style cleanup.
-
-Line impact:
-
-- [Hito DS route](../../../src/routes/hitoDS.tsx) went from `4770` lines to `4072` lines.
-- The extracted responsibilities now live in focused Hito DS modules:
-  [reference anatomy](../../../src/components/hito-ds/reference.tsx) at `132` lines and
-  [specimen previews](../../../src/components/hito-ds/specimen-previews.tsx) at `627` lines.
-
-QA closeout:
-
-Passed on 2026-06-09.
-
-- Built-in Codex Browser was used first.
-- Dev server `127.0.0.1:8082` had an in-app Browser runtime issue around
-  `@id/virtual:tanstack-start-client-entry`, while `curl` returned `200 OK`.
-- Final browser proof passed against a safe local production server on `127.0.0.1:8099`.
-- `/hitoDS`, `/hitoDS#calendar-workout-playground`, and `/hitoDS#workout-library-playground`
-  loaded successfully.
-- Fresh console checks on `8099` showed `0` errors and `0` warnings.
-- Deep links resolved to target sections.
-- Patterns nav expanded and active child state moved correctly.
-- Workout-library showed `32` identities, `32` mobile rows, `32` mobile date entries, and `7`
-  grid headings.
-- Provider/mobile overflow path passed with no horizontal overflow.
-- Source boundary proof passed: no Supabase/server actions, product Calendar imports, workout route
-  imports, provider sync, AI, persistence, mutation behavior, or new route-local styling system.
-- Targeted ESLint passed for [Hito DS route](../../../src/routes/hitoDS.tsx),
-  [Hito DS components](../../../src/components/hito-ds/), and
-  [shared calendar day UI](../../../src/components/ui/hito-calendar-day.tsx).
-- `npm run build` passed.
-- `git diff --check -- src/routes/hitoDS.tsx src/components/hito-ds src/styles.css docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
-  passed.
-
-Acceptance decision:
-
-Slice 13 is implemented and QA-passed. The Hito DS route decomposition is accepted as a
-behavior-preserving responsibility split. It should not be reopened unless a concrete regression is
-found.
-
-Next cleanup slice:
-
-`FRONTEND Slice 14A: global CSS semantic cleanup preflight and first safe deletion pass`.
-
-Why this is next:
-
-- [Global styles](../../../src/styles.css) is now the largest source hotspot at about `5206` lines.
-- The Hito DS route/specimen split is QA-stable, so CSS ownership can be audited against a stable DS
-  proof surface.
-- This is higher-impact than admin route cleanup if the first pass deletes dead global rules and
-  records ownership boundaries.
-- This is safer than voice/text/custom authoring consolidation because the running-plan custom path
-  is still being rebuilt.
-- The slice is intentionally bounded: ownership map plus confirmed-unused CSS deletion only, not
-  light/dark mode, visual redesign, or a new token system.
-
-## Major Cleanup Gate Selection
-
-Decision date: 2026-06-09.
-
-Current audit evidence:
-
-- `git status --short --branch` shows the branch is clean relative to `origin/main` only for git
-  history, but the worktree still has unrelated dirty/in-flight files:
-  [simplification strike plan](2026-06-07-hito-stack-simplification-strike.md),
-  [DS workout-library plan](2026-06-09-hito-ds-workout-library-calendar-detail-playground.md),
-  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts),
-  [Training API facade](../../../src/lib/training-api.ts), [Hito DS route](../../../src/routes/hitoDS.tsx),
-  and untracked DS workout-library playground files under
-  [Hito DS components](../../../src/components/hito-ds/). Treat those as external in-flight work
-  and do not overwrite them in this cleanup slice.
-- `find src -type f | wc -l` reports `230` source files.
-- TS/TSX/CSS line scan reports about `92408` total lines under `src`.
-- Script line scan reports about `23340` total lines under `scripts`.
-- Largest current source hotspots include [styles](../../../src/styles.css) at about `5206` lines,
-  [Hito DS route](../../../src/routes/hitoDS.tsx) at about `4773` lines,
-  [admin analytics route](../../../src/routes/admin.analytics.tsx) at about `2393` lines,
-  [admin capture route](../../../src/routes/admin.capture.tsx) at about `2125` lines,
-  [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) at
-  about `1795` lines, [voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts) at
-  about `1685` lines, [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts)
-  at about `1602` lines, and [first plan actions](../../../src/lib/first-plan-actions.ts) at
-  about `1551` lines.
-- Largest script hotspots include
-  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) at
-  about `7263` lines, [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts)
-  at about `2114` lines, and
-  [repo work item importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts) at about
-  `1815` lines.
-- Source reference proof shows [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts)
-  is still imported by product runtime modules mostly for shared metadata/trace types:
-  [AI draft service](../../../src/lib/ai-first-plan-draft-service.ts),
-  [AI blueprint schema](../../../src/lib/ai-first-plan-blueprint-schema.ts),
-  [AI blueprint trace](../../../src/lib/ai-first-plan-blueprint-trace.ts),
-  [AI blueprint horizon](../../../src/lib/ai-first-plan-blueprint-horizon.ts), and
-  [AI blueprint validation](../../../src/lib/ai-first-plan-blueprint-validation.ts).
-- The historical strict nested prompt/schema/normalizer also remains imported by
-  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts), which
-  means it still has QA value but should not remain a product-runtime owner.
-- `package.json` still exposes broad ops tooling, but there is no package-level `strict_draft`
-  entrypoint; [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) keeps
-  `strict-draft` bounded as an unsupported contract.
-
-Candidate ranking:
-
-| Candidate | Impact | Risk | Decision |
-| --- | --- | --- | --- |
-| Demote strict nested `ai-first-plan-draft-v1` runtime coupling | High: removes a historical 1600-line authoring module from product-runtime ownership while preserving metadata and doctrine value | Moderate: shared metadata types must be extracted before prompt/schema isolation | Selected immediate gate |
-| Delete old Plan Preset algorithmic builder or fixtures | High line-count impact | High: Plan Preset/running-plan transition remains in flight and old harnesses still protect behavior | Defer |
-| Decompose doctrine validator | High reviewability impact | Low behavior risk, but mostly shifts harness ownership rather than deleting runtime complexity | Later slice after first runtime demotion |
-| Split `/hitoDS` route and global CSS | High file-size impact | Medium/high because DS workout-library playground is currently dirty/in flight | Defer until DS track stabilizes |
-| Narrow all `training-api.ts` facade exports | Medium | Medium because it can break server action import contracts broadly | Do only one export group per later slice |
-| Delete `structured_authoring_v1` compatibility | Potentially high | Too risky: still deterministic generator/readback compatibility and not the same as strict nested AI draft | Forbidden |
-
-Selected gate:
-
-`BACKEND Slice 10A: strict nested AI first-plan draft runtime demotion`.
-
-Approved scope:
-
-- Extract `AiFirstPlanDraftMetadata`, `AiFirstPlanBlueprintTraceMetadata`, and any shared trace/result
-  metadata needed by product runtime into a small product-owned metadata module.
-- Update blueprint/service/action/ops-script type imports to use that metadata module instead of
-  importing [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts).
-- Move or isolate the strict nested `ai-first-plan-draft-v1` prompt/schema/normalizer into
-  doctrine-only ownership so [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
-  can keep historical coverage without making the strict nested authoring module product runtime.
-- Preserve `ai_first_plan_blueprint_v1` as the advanced/custom production default.
-- Preserve `ai_first_plan_envelope_v1` as internal/non-default.
-- Preserve bounded `strict-draft` CLI behavior as `unsupported_contract`.
-- Preserve `structured_authoring_v1` readback/deterministic compatibility while keeping it blocked
-  as a successful first-plan fallback.
-
-Forbidden in Slice 10A:
-
-- No Plan Preset runtime/builder/frontend/confirm/persistence changes.
-- No running-plan engine preview builder changes.
-- No DS workout-library playground changes.
-- No Supabase mutation, DB/schema migration, or persistence changes.
-- No OpenAI prompt rewrite except moving historical strict nested prompt/schema ownership if required
-  for demotion.
-- No deletion of doctrine coverage before replacement coverage is proven.
-
-## Backend Slice 10A Result
-
-Implemented on 2026-06-09.
-
-- Added [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts) as the
-  small product-owned home for `AiFirstPlanDraftMetadata`,
-  `AiFirstPlanBlueprintTraceMetadata`, normalization issue shape, and
-  `AiFirstPlanDraftNormalizationResult`.
-- Updated blueprint/service/runtime imports to consume the metadata module instead of importing
-  [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts).
-- Updated [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) to import trace
-  metadata from the new metadata module.
-- Left strict nested `ai-first-plan-draft-v1` prompt/schema/OpenAI schema/normalizer in
-  [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) with an
-  ownership comment marking it historical/doctrine-only for product runtime.
-- Preserved [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
-  strict nested coverage, and fixed two drift-prone request-level target dates so the fixture does
-  not expire against real `today`.
-
-Validation evidence:
-
-- Source audit shows product runtime no longer imports `ai-first-plan-draft-authoring.ts`; remaining
-  strict authoring references are the doctrine validator, strict schema/prompt constants inside the
-  strict file itself, and bounded `strict-draft` argument handling in the ops script.
-- Source audit shows shared metadata now resolves through
-  [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts).
-- Targeted ESLint passed.
-- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts` passed.
-- Blueprint mock with trace passed and remained `ai_first_plan_blueprint_v1`.
-- Envelope mock passed and remained `ai_first_plan_envelope_v1`.
-- `--contract strict-draft` remained bounded with `unsupported_contract` and did not produce a
-  runtime draft.
-- Plan Preset eligibility fixtures passed.
-- Admin capture backlog validation passed.
-- `git diff --check` passed.
-- `npm run build` failed once on the known intermittent Nitro SSR generated hashed chunk issue, then
-  passed on immediate rerun without source changes. Treat this as a build-lifecycle follow-up if QA
-  requires cold-build determinism beyond this source slice.
-
-## Backend Slice 10B Result
-
-Implemented and QA-passed on 2026-06-09.
-
-- Deleted the old product-failed Plan Preset algorithmic review expansion owners:
-  - `src/lib/plan-presets/algorithmic-builder.ts`
-  - `src/lib/plan-presets/expand.ts`
-  - `src/lib/plan-presets/composition.ts`
-  - `src/lib/plan-presets/persistence-metadata.ts`
-  - `src/lib/plan-presets/review-token.ts`
-  - `src/lib/plan-presets/recipe-expanders/shared.ts`
-- Deleted old builder-only Plan Preset CSV/source files from runtime source:
-  - `preset-workout-identity-library.csv`
-  - `preset-phase-template-table.csv`
-  - `preset-weekly-archetype-table.csv`
-  - `preset-identity-placement-rules.csv`
-  - `preset-segment-anatomy-table.csv`
-  - `preset-progression-math-rules.csv`
-  - `preset-quality-gates.csv`
-  - `preset-builder-io-contract.csv`
-  - `preset-program-source-of-truth.md`
-- Deleted old per-recipe review/confirm harness files under `scripts/plan-presets/`.
-- Kept the current Plan Preset card-discovery seam:
-  - [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) still expose
-    `getPlanPresetCards(...)`.
-  - [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts), progressive card modules,
-    recipes, schema, and card-summary modules remain.
-  - [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts) now owns only active
-    card-discovery data: scenario matrix, load adjustments, and goal contract matrix.
-- Kept the accepted selected-plan preview seam:
-  - [Running plan engine actions](../../../src/lib/running-plan-engine-actions.ts) still expose
-    `previewRunningPlanDraft(...)`.
-  - [Plan creation engine](../../../src/lib/plan-creation-engine/) remains the accepted
-    10K/Half/Marathon Base preview builder owner.
-- Rewrote [Plan Preset eligibility validator](../../../scripts/validate-plan-preset-eligibility.ts)
-  into a card-discovery/source-model harness instead of an old review/confirm draft harness.
-- Updated [build finalizer](../../../scripts/finalize-build-output.mjs) to package only the three
-  active Plan Preset card-discovery CSVs.
-
-Source audit evidence:
-
-- `rg` found no `src` or `scripts` imports of `buildPlanPresetReviewDraftContract`,
-  `buildPlanPresetAlgorithmicDraft`, `PlanPresetReviewDraftContract`, review-token helpers,
-  persistence metadata helpers, old composition helpers, or old algorithmic quality gates.
-- Remaining old-builder strings are limited to historical plan text and explicit absence assertions
-  in the rewritten Plan Preset validator.
-- `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)` remain only as bounded
-  `preview_only` blocked actions in [Plan Preset actions](../../../src/lib/plan-preset-actions.ts);
-  they are not exported by [Training API facade](../../../src/lib/training-api.ts).
-
-Validation evidence:
-
-- Targeted ESLint passed for Plan Preset modules, Plan Preset actions, Training API facade,
-  running-plan engine actions, onboarding preset UI surfaces, the rewritten Plan Preset validator,
-  and the build finalizer.
-- `node --import tsx ./scripts/validate-running-plan-engine-source.ts` passed.
-- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts` passed.
-- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts` passed.
-- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts` passed.
-- `npm run validate-admin-capture-backlog` passed.
-- `git diff --check` passed after plan closeout update.
-- `npm run build` passed.
-
-Ownership reduction:
-
-- Removed 20 tracked legacy Plan Preset builder/review files.
-- Removed the old 1795-line algorithmic builder, old 152-line expansion facade, old review token
-  and persistence helpers, old composition/shared helpers, old per-recipe harnesses, and builder-only
-  CSV source files.
-- Current active Plan Preset runtime source under `src/lib/plan-presets/*.ts` is about 1971 lines,
-  focused on card discovery, progressive card policy, recipes, and active program data.
-- The validator is now a current-flow card/source harness instead of an old review/confirm
-  acceptance harness.
-
-QA closeout evidence:
-
-- Old product-failed Plan Preset algorithmic builder/review harness files are deleted.
-- No runtime import remains for old review draft builder, algorithmic draft builder, review-token
-  helpers, persistence metadata helpers, composition helpers, or algorithmic quality gates.
-- `getPlanPresetCards(...)` remains preserved for card discovery.
-- `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)` remain only as bounded
-  `preview_only` blocked actions.
-- [Training API facade](../../../src/lib/training-api.ts) exports `getPlanPresetCards(...)` and
-  `previewRunningPlanDraft(...)`, not legacy review/confirm.
-- Running-plan preview builders remain validated.
-- Cleanup impact from Slice 10B was about `5955` deletions / `1003` insertions, around `5k` net
-  line reduction.
-
-## Next Cleanup Gate After Slice 10B QA
-
-Decision date: 2026-06-09.
-
-Current cleanup state:
-
-- Slice 10A removed strict nested AI draft authoring from product runtime imports by extracting
-  shared metadata into [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts).
-- Slice 10B removed the old product-failed Plan Preset algorithmic review expansion and harness
-  ownership.
-- Current active Plan Preset source is now about `2104` lines and focused on card discovery,
-  progressive card policy, recipes, schema, and active card data.
-- Current script total is about `21816` lines after old Plan Preset harness deletion.
-- [Plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) remains
-  about `7263` lines and still imports the strict nested doctrine-only module.
-- [Strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) is now about
-  `1499` lines and contains only the historical `ai-first-plan-draft-v1` prompt/schema/OpenAI
-  schema/normalizer for doctrine coverage.
-
-Candidate re-evaluation:
-
-| Candidate | Cleanup value | Risk | Decision |
-| --- | --- | --- | --- |
-| Delete doctrine-only strict nested `ai-first-plan-draft-v1` module and obsolete doctrine assertions | High: removes the last unsupported strict draft authoring module and reduces validator scope | Moderate: must preserve blueprint/envelope and `strict-draft` unsupported proof | Selected next gate |
-| Narrow [Training API facade](../../../src/lib/training-api.ts) | Medium: reduces hidden export surface | Lower line-count impact and less urgent after Plan Preset review/confirm exports are already gone | Defer one slice |
-| Decompose [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) generally | High reviewability, low deletion | Moves code more than it removes; better after obsolete strict draft assertions are deleted | Defer until after 10C |
-| Split [Onboarding gate](../../../src/components/OnboardingGate.tsx) | Medium reviewability | Frontend flow still tied to running-plan preview and DS tracks; not source-of-truth deletion | Defer |
-| Split [Hito DS route](../../../src/routes/hitoDS.tsx) or [styles](../../../src/styles.css) | High line-count potential | DS workout-library QA-fix track is separate and in flight | Defer |
-| Voice/text/custom overlap audit | Potentially high | Replacement advanced/custom engine not accepted yet | Defer |
-| Admin route/tooling cleanup | Medium | Less direct duplication after recent Admin simplification | Defer |
-
-Selected gate:
-
-`BACKEND Slice 10C: strict nested AI draft doctrine-only deletion`.
-
-Approved scope:
-
-- Delete [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) if
-  source scans confirm only doctrine-only consumers remain.
-- Remove the obsolete strict nested `ai-first-plan-draft-v1` assertion block from
-  [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts), including
-  prompt/schema/normalizer fixture assertions around:
-  `AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION`, `buildAiFirstPlanDraftPrompt`,
-  `normalizeAiFirstPlanDraftToTrainingPlan`, and `AiFirstPlanDraft`.
-- Keep [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts) because
-  blueprint/envelope/service traces still need shared metadata.
-- Keep `strict-draft` command-line selection in
-  [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) as a bounded
-  `unsupported_contract` negative proof, without importing the deleted strict module.
-- Preserve active doctrine gates for blueprint, envelope, first-plan review/confirm, rich workout
-  draft, structured authoring, active-plan refresh, import/export, and no
-  `structured_authoring_v1` first-plan fallback success.
-
-Expected impact:
-
-- Remove the last unsupported `ai-first-plan-draft-v1` authoring module from `src`.
-- Reduce [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
-  by deleting obsolete strict nested assertions instead of merely moving them.
-- Make `author-ai-first-plan-draft` and the doctrine validator prove only supported/current
-  first-plan contracts plus negative unsupported strict-draft behavior.
-
-Forbidden in Slice 10C:
-
-- Do not delete [AI first-plan draft metadata](../../../src/lib/ai-first-plan-draft-metadata.ts).
-- Do not weaken `ai_first_plan_blueprint_v1` default behavior.
-- Do not promote `ai_first_plan_envelope_v1`.
-- Do not delete `structured_authoring_v1` deterministic/readback compatibility.
-- Do not touch Plan Preset card discovery, running-plan preview builders, DS workout-library,
-  Supabase/DB/schema, provider sync, frontend UI, or persistence.
+ARCHITECT source-proof holding / no safe next implementation gate selected.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: BACKEND
+ROLE: ARCHITECT
 
 Task:
-Delete doctrine-only strict nested ai-first-plan-draft-v1 module and obsolete assertions.
+Resume Hito Stack Simplification only when a concrete cleanup candidate is source-proved.
 
 Stage:
-BACKEND implementation / strict nested doctrine-only deletion.
-
-PLAN:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
+ARCHITECT source-proof holding / no safe next implementation gate selected.
 
 Context:
-- Slice 10A demoted strict nested `ai-first-plan-draft-v1` out of product runtime ownership by
-  moving shared metadata/trace types to `src/lib/ai-first-plan-draft-metadata.ts`.
-- Slice 10B deleted the old product-failed Plan Preset algorithmic builder/review harness path and
-  passed QA.
-- The remaining strict nested draft module is now doctrine-only:
-  `src/lib/ai-first-plan-draft-authoring.ts`.
-- `scripts/validate-plan-authoring-doctrine.ts` is the remaining real consumer of that strict
-  prompt/schema/normalizer coverage.
-- `strict-draft` CLI selection should remain as a bounded unsupported contract, but the unsupported
-  path no longer needs a full strict draft prompt/schema/normalizer module.
+G20 is accepted. The untracked duplicate-space manual-workout backlog markdown copy was removed
+after source/admin-root proof confirmed it was not tracked, differed from the canonical backlog
+item, and should not become parallel repo-derived Admin Backlog truth.
 
-Implement:
-- Source-audit all remaining `ai-first-plan-draft-authoring`, `ai-first-plan-draft-v1`,
-  `AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION`, `buildAiFirstPlanDraftPrompt`,
-  `normalizeAiFirstPlanDraftToTrainingPlan`, and `AiFirstPlanDraft` references.
-- Delete `src/lib/ai-first-plan-draft-authoring.ts` if the audit confirms it is doctrine-only.
-- Remove the obsolete strict nested draft assertion block from
-  `scripts/validate-plan-authoring-doctrine.ts` instead of moving it to another fixture.
-- Keep `src/lib/ai-first-plan-draft-metadata.ts` and all blueprint/envelope/service metadata imports.
-- Keep `npm run author-ai-first-plan-draft -- --contract strict-draft` bounded as
-  `unsupported_contract`.
-- Preserve blueprint, envelope, structured authoring, rich draft, active refresh, import/export, and
-  Plan Preset/running-plan preview validations.
+Current burndown:
+- `cleanup-burndown-v1`: `37/40` complete, `3` remaining, `92.5%`.
+- Expected delta is `0` until a new source-proved cleanup candidate appears.
 
-Do not touch:
-- Plan Preset card discovery or `plan_preset_v1` active card metadata.
-- Running-plan preview builders.
-- `structured_authoring_v1` deterministic/readback compatibility.
-- Supabase, DB/schema, migrations, provider sync, frontend UI, Hito DS workout-library, or
-  persistence.
+Root cause and architecture fit:
+- Visible symptom: after G20, no current source-proved cleanup batch is selected.
+- Underlying cause: remaining candidates mix live runtime facades, browser-sensitive UI, required
+  validators, local tooling, and protected evidence; routing by momentum could break accepted
+  behavior.
+- Canonical owner: Architecture source-proof holding before any next BACKEND, FRONTEND, DEVTOOLS,
+  QA, or docs implementation gate.
 
-Run:
-- `rg -n "ai-first-plan-draft-authoring|ai-first-plan-draft-v1|AI_FIRST_PLAN_DRAFT_SCHEMA_VERSION|buildAiFirstPlanDraftPrompt|normalizeAiFirstPlanDraftToTrainingPlan|AiFirstPlanDraft|strict_draft|strict-draft" src scripts package.json`
-- `rg -n "AiFirstPlanDraftMetadata|AiFirstPlanBlueprintTraceMetadata|ai-first-plan-draft-metadata" src scripts`
-- `npm exec eslint -- src/lib/ai-first-plan-*.ts src/lib/first-plan-actions.ts scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/first-plan-release-gates.ts scripts/author-ai-first-plan-draft.ts`
-- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope`
-- `npm run author-ai-first-plan-draft -- --contract strict-draft`
-- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
-- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`
-- `npm run validate-admin-capture-backlog`
-- `git diff --check`
-- `npm run build`
+Scope:
+1. Do not route cleanup implementation by momentum, file size, or suspicion.
+2. Watch for a new implementation report, QA report, source/import-map change, docs drift, product
+   decision, or newly discovered duplicate owner that creates a concrete cleanup candidate.
+3. Before selecting any future gate, use read-only subagents for backend/import-map,
+   frontend/browser-risk, and docs/devtools drift when the candidate is non-trivial.
+4. Select exactly one next gate only when it has one owner, one risk class, one validation story,
+   and clear stop conditions.
+5. If no such candidate exists, keep the simplification strike in source-proof holding.
 
-Report:
-1. Task
-2. Stage
-3. Files changed
-4. Strict nested deletion summary
-5. Source audit proof
-6. Preserved metadata proof
-7. Preserved blueprint/envelope proof
-8. Preserved structured-authoring/readback proof
-9. Unsupported strict-draft proof
-10. Validation results
-11. Blockers
+What must not be touched:
+- Do not change product runtime, frontend UI, backend code, Supabase, migrations, OpenAI behavior,
+  browser QA, logs, `qa-artifacts`, validation coverage, manual calendar behavior, selected-plan
+  creation, Plan Preset card discovery, Admin expansion, Hito DS implementation, or
+  `/test-calendar` work.
+
+Validation:
+- Before any future implementation gate is selected, run source/import/docs proof for the candidate.
+- If docs are updated, run scoped `git diff --check`.
+- If admin-mirrored markdown moves or is deleted from repo-derived roots, run the admin importer
+  dry-run and backlog validator.
+
+Stop conditions:
+- Stop if a proposed cleanup candidate crosses owner boundaries, becomes browser-visible, touches
+  mutation safety, requires Supabase/OpenAI/production access, weakens validation coverage, or needs
+  a product decision.
 ```
 
-## Owner
-
-ARCHITECT / BACKEND / FRONTEND / QA
-
-## Last Updated
-
-2026-06-09
-
-## Reference Links
-
-- [Project operating rules](../../../AGENTS.md)
-- [Project context](../../context.md)
-- [Glossary](../../glossary.md)
-- [Current system](../../current-system.md)
-- [Current product](../../current-product.md)
-- [Current state](../../current-state.md)
-- [Optimization strike plan](2026-05-29-hito-optimization-strike-plan.md)
-- [Archived Plan Preset plan](../archive/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md)
-- [Training API facade](../../../src/lib/training-api.ts)
-- [Active plan persistence](../../../src/lib/active-plan-persistence.ts)
-- [Plan Preset actions](../../../src/lib/plan-preset-actions.ts)
-- [First plan actions](../../../src/lib/first-plan-actions.ts)
-- [Plan replacement actions](../../../src/lib/plan-replacement-actions.ts)
-
-## Cleanup Master Plan
-
-Date: 2026-06-09.
-
-Purpose:
-
-Turn the simplification strike from a sequence of local cleanup tasks into one aggressive,
-evidence-based deletion and reuse strategy.
-
-This is not a promise to cut the repo by `50%`. The current evidence does not justify that claim.
-Treat `50%` as the user aspiration, then reduce toward it by deleting/demoting wrong ownership
-first and decomposing only where reviewability is the actual bottleneck.
-
-Current measured baseline:
-
-| Area | Current count | Notes |
-| --- | ---: | --- |
-| `src` TS/TSX/CSS files | `217` files | Counts tracked source files matching `*.ts`, `*.tsx`, `*.css`; generated route tree included because it is checked in. |
-| `src` TS/TSX/CSS lines | about `92,418` lines | Does not include docs, node_modules, QA artifacts, or lockfile. |
-| `scripts` TS/TSX/MJS/JS lines | about `23,340` lines | Includes validators, ops scripts, importer tooling, and harnesses. |
-| `supabase/migrations` SQL lines | about `1,199` lines | Schema history; not a cleanup target without migration policy. |
-| Service code estimate | about `116,957` lines | `src + scripts + supabase/migrations`; package lock, docs, node_modules, and QA artifacts excluded. |
-
-Top hotspots by responsibility:
-
-| Hotspot | Approx lines | Responsibility | Cleanup classification |
-| --- | ---: | --- | --- |
-| [Plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | `7263` | multi-domain QA harness | decompose later; do not delete safety net |
-| [Global styles](../../../src/styles.css) | `5206` | DS tokens, route styles, legacy utilities, product chrome | audit/delete unused classes after DS playground stabilizes |
-| [Hito DS route](../../../src/routes/hitoDS.tsx) | `4773` | design-system route plus many specimen sections | split/specimen ownership after DS workout-library QA |
-| [Admin analytics route](../../../src/routes/admin.analytics.tsx) | `2393` | admin workspace UI | decompose only after source-owner map; not first deletion target |
-| [Admin capture route](../../../src/routes/admin.capture.tsx) | `2125` | admin work-item UI | keep; route is current product/admin surface |
-| [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) | `1795` | old product-failed Plan Preset expansion | selected post-10A deletion/demotion candidate |
-| [Voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts) | `1685` | Pro voice/text-ish plan authoring seam | audit after new engine custom path is stable |
-| [Active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | `1591` | future schedule edit preview | keep until schedule-edit roadmap is audited |
-| [First plan actions](../../../src/lib/first-plan-actions.ts) | `1551` | structured/voice/AI first-plan action layer | decompose only after new engine ownership settles |
-| [Strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) | `1499` | historical strict nested prompt/schema/normalizer | Slice 10A demotes runtime ownership; QA pending |
-
-### Source-Of-Truth Map
-
-| Domain | Current product truth owner | Notes |
-| --- | --- | --- |
-| First-plan creation / advanced custom | [First plan actions](../../../src/lib/first-plan-actions.ts), [AI draft service](../../../src/lib/ai-first-plan-draft-service.ts), and blueprint modules | `ai_first_plan_blueprint_v1` remains production custom/advanced default; no strict nested runtime ownership after Slice 10A. |
-| Selected-plan previews | [Running plan engine actions](../../../src/lib/running-plan-engine-actions.ts) plus [plan creation engine](../../../src/lib/plan-creation-engine/) | Preview-only, no persistence/create contract yet. |
-| Running-plan engine previews | [plan creation engine](../../../src/lib/plan-creation-engine/) | Accepted preview owners for 10K, Half, and Marathon Base; do not delete. |
-| Plan Preset cards | [Plan Preset actions](../../../src/lib/plan-preset-actions.ts), [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts), progressive card modules | Still used for backend-shaped card availability; old review/confirm mutation seam is demoted. |
-| Old Plan Preset expansion/review | [Plan Preset expand](../../../src/lib/plan-presets/expand.ts), [algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts), Plan Preset CSV artifacts, Plan Preset harnesses | Product-failed old expansion path; next deletion/demotion target after Slice 10A QA. |
-| Structured authoring | [structured plan authoring](../../../src/lib/structured-plan-authoring.ts) and split policy/workout/metric modules | Deterministic generator and compatibility/readback owner; must not become first-plan fallback success. |
-| Voice/text authoring | [voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts), [OpenAI text authoring](../../../src/lib/openai-plan-authoring.ts), [rich workout draft authoring](../../../src/lib/rich-workout-draft-authoring.ts) | Keep until rebuilt engine advanced/custom path defines replacement or consolidation. |
-| Active-plan refresh/apply | [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts), [refresh draft](../../../src/lib/active-plan-refresh-draft.ts), [active plan persistence](../../../src/lib/active-plan-persistence.ts) | Explicit reviewed mutation path; not deletion target. |
-| Workout result import/comparison | [workout-result import modules](../../../src/lib/workout-result-import/) and workout detail UI | Current Garmin feedback truth; do not touch in plan-creation cleanup. |
-| Provider evidence/feedback | [workout log actions](../../../src/lib/workout-log-actions.ts), [Completion panel](../../../src/components/CompletionPanel.tsx), comparison/AI insight modules | Current saved-mode behavior; keep separate from DS fake playground. |
-| Admin backlog/capture | [admin capture server](../../../src/lib/admin-capture.server.ts), [admin work items](../../../src/lib/admin-work-items.ts), [repo importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts), [admin capture route](../../../src/routes/admin.capture.tsx) | Current admin work-item surface; cleanup only through admin-specific slices. |
-| Hito DS playground/specimens | [Hito DS route](../../../src/routes/hitoDS.tsx), [Hito DS playground components](../../../src/components/hito-ds/) | Internal specimen truth only; fake data must not leak into product routes. |
-
-### Duplicate And Stale Path Map
-
-| Stale / duplicate path | Current owner | Old owner / duplicate owner | Runtime status | Mutation risk | Decision |
-| --- | --- | --- | --- | --- | --- |
-| Strict nested `ai-first-plan-draft-v1` | doctrine-only after Slice 10A | former full AI first-plan draft authoring module | product runtime demotion implemented, QA pending | low after metadata extraction | keep doctrine coverage; no runtime ownership |
-| Old Plan Preset review/confirm | [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) | old `plan_preset_v1` review/confirm before rebuilt selected-plan engine | returns bounded `preview_only` after prior cleanup | formerly high; now bounded | delete/demote old expansion dependencies next |
-| Old Plan Preset algorithmic expansion | [algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts), [expand facade](../../../src/lib/plan-presets/expand.ts), CSV artifacts | product-failed preset expansion path | used by Plan Preset harnesses and old review contract; not accepted product truth | indirect if stale callers return | selected post-10A candidate |
-| `training-api.ts` broad facade | [Training API facade](../../../src/lib/training-api.ts) | multiple extracted action owners | current compatibility import map | medium if stale exports expose old seams | narrow one group per slice later |
-| `structured_authoring_v1` deterministic generator | [structured authoring](../../../src/lib/structured-plan-authoring.ts) | old first-plan fallback semantics | current deterministic generator/readback compatibility | high if reintroduced as first-plan success fallback | keep; forbid deletion until replacement/readback audit |
-| Voice/text/custom AI seams | voice/text/rich-draft modules | overlap with advanced custom first-plan direction | current non-default product paths | medium | audit after rebuilt engine defines advanced custom replacement |
-| `/hitoDS` route-local specimens | [Hito DS route](../../../src/routes/hitoDS.tsx) plus specimen components | route-local demo data and many section owners | internal only | low product mutation risk, high bloat risk | split/delete after DS workout-library QA |
-| Admin work-item importer and route UI | importer/admin routes | earlier backlog/capture split | current admin tool truth | low product mutation risk, medium admin drift risk | keep; cleanup only with admin QA |
-| Active/archive duplicate docs | docs/plans active/archive | stale active copies | docs/importer visibility only | no runtime mutation | cleanup as docs/admin hygiene, not code-size priority |
-
-### Cleanup Roadmap
-
-Tier 1: delete/demote now or immediately after QA.
-
-- Finish QA for Slice 10A strict nested draft demotion.
-- After Slice 10A QA, run `BACKEND Slice 10B: old Plan Preset algorithmic builder and review harness demotion`.
-- Narrow stale Plan Preset exports and scripts only after source scans prove the rebuilt selected-plan preview does not use them.
-- Keep `getPlanPresetCards(...)` and `previewRunningPlanDraft(...)`; delete/demote only old review/confirm expansion ownership.
-
-Tier 2: consolidate after proof.
-
-- Narrow [Training API facade](../../../src/lib/training-api.ts) one import group at a time.
-- Decompose [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
-  into assertion owners after strict/Plan Preset stale paths are settled.
-- Split [Hito DS route](../../../src/routes/hitoDS.tsx) and move specimen data/components behind
-  route-neutral Hito DS modules after DS workout-library QA.
-- Classify [global styles](../../../src/styles.css) into semantic tokens, shared primitives, route
-  styles, admin styles, and dead rules before deletion.
-- Audit voice/text/custom authoring once the rebuilt running-plan engine has accepted custom/advanced
-  ownership.
-
-Tier 3: defer or keep.
-
-- Keep [plan creation engine](../../../src/lib/plan-creation-engine/) because it is the accepted
-  preview owner.
-- Keep [active plan persistence](../../../src/lib/active-plan-persistence.ts) as canonical mutation
-  owner.
-- Keep workout result import/comparison/provider evidence until a provider cleanup plan exists.
-- Keep Supabase migrations as history; do not delete schema files to chase line count.
-- Keep current admin work-items/capture until a dedicated admin route decomposition slice is chosen.
-
-### Big Cleanup Slices
-
-| Slice | Owner | Target files | Deletion / demotion target | Expected impact | Replacement coverage | Validation | Risks / do not touch |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Slice 10A: strict nested runtime demotion | BACKEND -> QA | [AI first-plan draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts), [metadata](../../../src/lib/ai-first-plan-draft-metadata.ts), blueprint/service imports, doctrine validator | remove strict nested module from product runtime ownership | removes stale runtime dependency on historical strict draft module; does not delete doctrine value | blueprint/envelope mocks, strict-draft unsupported proof, doctrine validator | already scoped in current QA prompt | do not weaken blueprint/envelope or `structured_authoring_v1` readback |
-| Slice 10B: old Plan Preset expansion deletion/demotion | BACKEND | [algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts), [expand facade](../../../src/lib/plan-presets/expand.ts), [program data](../../../src/lib/plan-presets/program-data.ts), Plan Preset CSV artifacts, Plan Preset harness scripts | delete or move old product-failed `plan_preset_v1` review expansion out of runtime after proof | potential `2k-4k+` runtime/code ownership reduction, plus fewer false product seams | running-plan preview builders, `getPlanPresetCards(...)`, bounded `preview_only` old actions | `rg buildPlanPresetReviewDraftContract/buildPlanPresetAlgorithmicDraft`, running engine validators, Plan Preset card smoke, build | do not delete card resolver/progressive cards if onboarding still uses them |
-| Slice 11: `training-api.ts` facade narrowing | BACKEND | [Training API facade](../../../src/lib/training-api.ts) and direct import call sites | remove one obsolete export group per slice | lower hidden API surface; modest line reduction | direct action-owner imports and serverFn wrappers | import map, targeted ESLint, build | do not break TanStack serverFn route contracts |
-| Slice 12: doctrine validator decomposition | BACKEND / QA tooling | [doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts), [doctrine folder](../../../scripts/plan-authoring-doctrine/) | split assertion ownership without weakening checks | reviewability gain, not net deletion | stable top-level validator entrypoint | doctrine validator, targeted ESLint | do not delete assertions to make file smaller |
-| Slice 13: Hito DS route/specimen split | FRONTEND | [Hito DS route](../../../src/routes/hitoDS.tsx), [Hito DS components](../../../src/components/hito-ds/) | move specimen data/components out of route; delete dead route-local specimens | route file responsibility reduction and safer DS reuse | existing Hito DS playground anatomy, DS workout-library QA | targeted ESLint, build, browser `/hitoDS`, 375px | do not mix with product calendar or provider sync |
-| Slice 14: global CSS semantic cleanup | FRONTEND / DESIGNER | [styles](../../../src/styles.css), selected route/component class usages | delete dead classes and route-local one-offs after source/visual proof | potential large CSS complexity reduction, exact lines unknown | Hito DS tokens/classes and current route screenshots | class usage map, targeted browser QA, build | do not invent light mode or new visual system in cleanup slice |
-| Slice 15: admin route/tooling responsibility cleanup | FRONTEND / BACKEND | [admin analytics](../../../src/routes/admin.analytics.tsx), [admin capture](../../../src/routes/admin.capture.tsx), importer | split admin UI/tooling ownership where it reduces duplication | reviewability and admin consistency | Admin Work Items/source-group model | admin browser QA, importer dry-run, validator | do not run live import or `--archive-stale` without approval |
-| Slice 16: voice/text/custom authoring consolidation audit | ARCHITECT -> BACKEND | [voice authoring](../../../src/lib/voice-to-plan-authoring.ts), [OpenAI text authoring](../../../src/lib/openai-plan-authoring.ts), [rich draft authoring](../../../src/lib/rich-workout-draft-authoring.ts) | decide whether advanced custom path can reuse one backend contract | potentially high, but blocked until new engine custom path is accepted | running-plan engine custom/advanced architecture | source audit only first | do not delete live Pro/advanced paths without replacement |
-
-### Immediate Post-10A Slice
-
-Selected next implementation slice after Slice 10A QA passes:
-
-`BACKEND Slice 10B: old Plan Preset algorithmic builder and review harness demotion`.
-
-Why this is the next bold slice:
-
-- It targets a known product-failed plan-generation path, not a random large file.
-- The old review/confirm mutation seam is already bounded as `preview_only`.
-- The accepted selected-plan path now lives in [running plan engine actions](../../../src/lib/running-plan-engine-actions.ts)
-  and [plan creation engine](../../../src/lib/plan-creation-engine/).
-- It can remove or isolate several thousand lines of stale runtime/harness ownership if source scans
-  prove the old builder is no longer needed for product behavior.
-
-Slice 10B required proof before deletion:
-
-- Source scan for `buildPlanPresetReviewDraftContract`, `buildPlanPresetAlgorithmicDraft`,
-  `preset-builder-io-contract`, `preset-segment-anatomy-table`, `preset-quality-gates`,
-  and `validate-plan-preset-eligibility`.
-- Prove no frontend or runtime product path can call old review/confirm expansion.
-- Prove `getPlanPresetCards(...)` still works if it remains required for the onboarding card view.
-- Prove `previewRunningPlanDraft(...)` still works for accepted 10K/Half/Marathon preview families.
-- Prove no plan confirm/persistence path is added.
-
-Slice 10B validation expectations:
-
-- `rg -n "buildPlanPresetReviewDraftContract|buildPlanPresetAlgorithmicDraft|preset-builder-io-contract|preset-segment-anatomy-table|preset-quality-gates|validate-plan-preset-eligibility" src scripts package.json`.
-- `rg -n "getPlanPresetCards|previewRunningPlanDraft|reviewPlanPresetDraft|confirmPlanPresetDraft" src scripts package.json`.
-- `npm exec eslint -- src/lib/plan-preset-actions.ts src/lib/training-api.ts src/lib/plan-presets/*.ts src/lib/plan-presets/recipe-expanders/*.ts src/lib/plan-creation-engine/*.ts scripts/validate-running-plan-engine-source.ts scripts/validate-running-plan-engine-10k-builder.ts scripts/validate-running-plan-engine-r6-builders.ts`.
-- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`.
-- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`.
-- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`.
-- `npm run validate-admin-capture-backlog`.
-- `git diff --check`.
-- `npm run build`.
-
-### No-New-System Rules
-
-- No new plan-creation path without deleting, demoting, or explicitly isolating the old path it replaces.
-- No new route-local UI system when a Hito DS primitive, token, or shared component already exists.
-- No new AI path without a bounded backend contract, explicit review/confirm boundary, and removal plan
-  for any replaced path.
-- No new facade export unless it is the canonical public seam and its owner is named.
-- No compatibility branch without a removal condition, compatibility owner, and validation proof.
-- No `1000+` line file receives new responsibility without an extraction plan in the same slice or a
-  recorded architecture exception.
-- No frontend-owned schedule, metric, eligibility, persistence, provider, or billing truth.
-- No QA harness deletion unless replacement validation proves the same safety boundary.
-
-## Context
-
-Hito has accumulated a lot of successful work quickly:
-
-- saved-mode Supabase truth
-- structured onboarding
-- AI blueprint first-plan generation
-- internal envelope proof
-- Plan Presets
-- voice/text authoring
-- active-plan refresh/apply
-- schedule edit
-- Garmin feedback
-- admin analytics/capture/backlog
-- Hito DS rollout
-- many dedicated QA harnesses
-
-The product is safer than before, but the system is now at risk of becoming hard to reason about
-because multiple seams can appear to own the same product truth.
-
-The simplification strike is not a rewrite. It is a sequence of deletion and narrowing slices that
-make the existing architecture smaller and more legible.
-
-## Root Cause
-
-The complexity is not mainly caused by one dependency or one large component.
-
-The root cause is overlapping ownership:
-
-- several plan creation paths can lead to canonical `training-plan-v2`
-- several server action wrappers expose plan creation or mutation seams
-- `training-api.ts` still acts as a broad compatibility facade after many modules were extracted
-- old active plan files can remain visible even after archive copies exist
-- validation scripts have grown into multi-domain safety nets that are expensive to review
-- tooling signals are mixed, especially if multiple lockfiles imply multiple package managers
-
-If we only patch visible symptoms, the project will keep adding helpers, wrappers, plans, and QA
-scripts. The correct fix is to reduce sources of truth.
-
-## Non-Goals
-
-- Do not rewrite the app.
-- Do not replace TanStack Start, Supabase, Hito DS, Nitro, Vercel, or OpenAI in this strike.
-- Do not delete working product features.
-- Do not weaken review/confirm mutation boundaries.
-- Do not make frontend own backend truth.
-- Do not make Plan Presets a frontend template system.
-- Do not promote envelope to production default.
-- Do not remove local/admin compatibility before a separate auth lifecycle audit approves it.
-- Do not bundle risky code cleanup with docs cleanup.
-- Do not touch the active Plan Preset implementation while it is still in flight.
-
-## Core Architecture Rule
-
-Every simplification must move Hito closer to one canonical pipeline:
-
-`runner/provider input -> backend validation -> normalization -> canonical persisted entities -> deterministic product truth -> optional AI/enrichment -> explicit review/confirm when mutation is risky -> UI rendering`
-
-Simplification means fewer owners for the same truth, not new abstractions with nicer names.
-
-## Start Gate
-
-Plan Presets are complete and archived, so the simplification strike may begin.
-
-Code cleanup is still gated by worktree safety. The shipped Plan Preset implementation has been
-preserved in git, so Plan Preset source files are no longer a dirty-worktree blocker. Do not start
-product-code cleanup until the remaining unrelated instruction/tooling changes are either committed,
-discarded by explicit user request, or intentionally separated.
-
-Treat these shipped Plan Preset files as product behavior, not simplification targets:
-
-- [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx)
-- [Onboarding gate](../../../src/components/OnboardingGate.tsx)
-- [Structured plan constructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx)
-- [Plan Preset actions](../../../src/lib/plan-preset-actions.ts)
-- [Plan Presets library](../../../src/lib/plan-presets/)
-- [Training API facade](../../../src/lib/training-api.ts)
-- [Active plan persistence](../../../src/lib/active-plan-persistence.ts)
-- [Plan Preset backlog item](../../tasks/backlog/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md)
-
-Docs/source-of-truth cleanup may start now because it does not touch product source behavior.
-
-## Post-Plan-Presets Audit Findings
-
-Date: 2026-06-07.
-
-Shipped Plan Preset scope now intentionally includes:
-
-- [Plan Preset library](../../../src/lib/plan-presets/) for recipe/schema/resolver/expansion,
-  review-token, persistence metadata, and composition ownership.
-- [Plan Preset server actions](../../../src/lib/plan-preset-actions.ts) for backend-owned card,
-  review, token/checksum, no-active-plan guard, and confirm/persistence boundaries.
-- [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx) and
-  [Onboarding gate](../../../src/components/OnboardingGate.tsx) for frontend card/review/confirm
-  rendering and server-action orchestration.
-- [Plan Preset validation harness](../../../scripts/validate-plan-preset-eligibility.ts) plus
-  [Plan Preset script fixtures](../../../scripts/plan-presets/) for card, draft, metric, and confirm
-  contract preservation.
-- Current docs and changelog entries describing shipped no-active-plan Plan Presets.
-
-Current dirty/untracked state:
-
-- The Plan Preset shipped implementation was committed and pushed as
-  `9ad43db Ship Plan Presets no-active-plan creation`.
-- Remaining modified files are unrelated to Plan Presets:
-  [architect agent instructions](../../../agents/architect.agent.md),
-  [admin Backlog importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts),
-  [plan-writing skill](../../../skills/hito-plan-writing-and-closeout/SKILL.md), and
-  [prompt-handoff skill](../../../skills/hito-prompt-handoff/SKILL.md).
-- Remaining untracked docs include this simplification plan and older active plan files that appear
-  to predate this closeout.
-
-Hotspots worth simplifying now:
-
-- Active/archive plan duplicates are the safest immediate target because they create false active
-  work and confuse the Backlog importer.
-- [training-api](../../../src/lib/training-api.ts) still has broad compatibility imports/re-exports;
-  it is a good later narrowing target after docs/source-of-truth cleanup.
-- [OnboardingGate](../../../src/components/OnboardingGate.tsx) is now about `916` lines and mixes
-  structured setup, voice setup, advanced JSON, and Plan Presets orchestration. It is a later
-  frontend decomposition candidate, not Slice 1.
-- [StructuredPlanConstructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx) is
-  about `806` lines and should not receive more responsibilities before a focused frontend slice.
-- [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts) is about `453` lines and
-  [recipe shared helpers](../../../src/lib/plan-presets/recipe-expanders/shared.ts) are about `368`
-  lines; both are acceptable now after Slice 2F extraction, but should be watched before adding new
-  families.
-- [admin Backlog importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts) is a tooling
-  hotspot and currently hangs in dry-run during closeout validation. Treat the hang as a separate
-  tooling follow-up unless Slice 1 needs importer responsiveness to complete mirror cleanup.
-
-Safe no-behavior-change cleanup candidates:
-
-- reconcile or remove duplicate active/archive plan files after comparing evidence
-- update current-state active inventory if it lists completed work as active
-- narrow `training-api.ts` imports one action group at a time after source-of-truth docs are clean
-- decompose one large onboarding owner only after Plan Preset source files are intentionally
-  preserved
-- isolate or fix backlog importer hang as a tooling slice, not as product behavior
-
-Risky or deferred cleanup:
-
-- deleting Plan Preset runtime files, recipe helpers, or validation harnesses
-- changing Plan Preset composition behavior or adding preset families
-- changing confirm/persistence, DB schema, Supabase, or active-plan lifecycle
-- deleting AI blueprint/envelope/text/voice authoring paths without a separate classification gate
-- redesigning onboarding or Hito DS surfaces during simplification
-
-## Workstream 0: In-Flight Worktree Safety
-
-Purpose:
-
-Protect current Plan Preset creation/confirm work from accidental cleanup edits.
-
-Steps:
-
-1. Run `git status --short`.
-2. List modified/untracked files.
-3. Classify each changed file as:
-   - shipped Plan Preset work, do not touch in simplification cleanup
-   - unrelated user change
-   - safe simplification target
-   - unknown, do not touch
-4. If unrelated dirty/untracked files remain, block product-code cleanup until their commit or
-   exclusion scope is explicit.
-5. Proceed to Workstream 1 for docs/source-of-truth cleanup only.
-
-Validation:
-
-- No file changes required unless the plan start gate needs updating.
-- If this plan changes, run targeted `git diff --check`.
-
-Exit criteria:
-
-- The strike has a clear yes/no start gate.
-- No shipped Plan Preset implementation work is accidentally touched.
-- Product-code cleanup remains blocked until unrelated dirty/untracked files are handled or
-  explicitly excluded from the cleanup slice.
-
-## Workstream 1: Active/Archive Source-Of-Truth Cleanup
-
-Purpose:
-
-Remove false active work before touching code.
-
-Observed issue:
-
-Some plan files exist in both `docs/plans/active/` and `docs/plans/archive/`. That makes agents,
-Backlog importer output, and humans see completed work as active.
-
-Known duplicate candidates to verify:
-
-- [Admin analytics active plan](2026-05-17-admin-analytics-page-plan.md) and
-  [Admin analytics archive plan](../archive/2026-05-17-admin-analytics-page-plan.md)
-- [Active plan schedule edit active plan](2026-05-25-active-plan-schedule-edit-plan.md) and
-  [Active plan schedule edit archive plan](../archive/2026-05-25-active-plan-schedule-edit-plan.md)
-- [AI-authored first plan active plan](2026-05-26-ai-authored-first-plan-pipeline.md) and
-  [AI-authored first plan archive plan](../archive/2026-05-26-ai-authored-first-plan-pipeline.md)
-- [Plan authoring decomposition active plan](2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md) and
-  [Plan authoring decomposition archive plan](../archive/2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md)
-- [Envelope adoption active plan](2026-06-01-ai-first-plan-envelope-production-adoption-and-prompt-simplification.md) and
-  [Envelope adoption archive plan](../archive/2026-06-01-ai-first-plan-envelope-production-adoption-and-prompt-simplification.md)
-- [Calendar pre-start active plan](2026-06-01-first-plan-calendar-pre-start-rendering-polish.md) and
-  [Calendar pre-start archive plan](../archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md)
-
-Steps:
-
-1. Compare each active/archive duplicate.
-2. If the archive copy is canonical and complete, remove the active duplicate.
-3. If the active copy has newer evidence that archive lacks, merge only final closeout evidence into
-   archive first.
-4. Do not archive or remove genuinely active work.
-5. Update [current state](../../current-state.md) only if it lists a duplicate as active.
-6. Do not update [current product](../../current-product.md) or [current system](../../current-system.md)
-   for planned cleanup unless implemented behavior changes.
-
-Validation:
-
-- `git diff --check -- docs/plans/active docs/plans/archive docs/current-state.md`
-- `npm run import-admin-backlog-work-items -- --dry-run`
-- If dry-run shows required mirror updates, run the live importer only after confirming it is safe.
-- `npm run validate-admin-capture-backlog`
-
-Exit criteria:
-
-- `docs/plans/active/` contains only work that truly guides active execution.
-- Duplicate active/archive plan files are gone or explicitly justified.
-- Backlog mirror no longer treats completed duplicate plans as active work.
-
-### Slice 1 Result
-
-Status: complete on 2026-06-07.
-
-Duplicate candidates inspected:
-
-- `2026-05-17-admin-analytics-page-plan.md`
-- `2026-05-25-active-plan-schedule-edit-plan.md`
-- `2026-05-26-ai-authored-first-plan-pipeline.md`
-- `2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md`
-- `2026-06-01-ai-first-plan-envelope-production-adoption-and-prompt-simplification.md`
-- `2026-06-01-first-plan-calendar-pre-start-rendering-polish.md`
-
-Canonical decisions:
-
-- [Admin analytics archive plan](../archive/2026-05-17-admin-analytics-page-plan.md) is canonical:
-  it is readable, marked `Complete / Closed / archived`, and includes final Phase 1 / Phase 1A
-  exit criteria plus no-next-step guidance. The active duplicate was stale and was removed.
-- [Active-plan schedule edit archive plan](../archive/2026-05-25-active-plan-schedule-edit-plan.md)
-  is canonical: it is marked `closed`, includes final QA closeout, moved residual follow-ups to
-  backlog, and says no active next step remains. The active duplicate was stale and was removed.
-- [AI-authored first-plan archive plan](../archive/2026-05-26-ai-authored-first-plan-pipeline.md)
-  is canonical: it is marked `Complete / Closed / archived after production blueprint wave`, and
-  points future work to split tracks. The active duplicate was stale and was removed.
-- [Plan authoring decomposition archive plan](../archive/2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md)
-  is canonical: it is marked complete/archived and explicitly redirects follow-through cleanup to
-  the active optimization strike plan. The active duplicate was stale and was removed.
-- [Envelope adoption archive plan](../archive/2026-06-01-ai-first-plan-envelope-production-adoption-and-prompt-simplification.md)
-  is canonical: it is marked completed, records internal non-default envelope exactness, and says
-  future rollout/default-switch work needs a separate plan. The active duplicate was stale and was
-  removed.
-- [Calendar pre-start archive plan](../archive/2026-06-01-first-plan-calendar-pre-start-rendering-polish.md)
-  is canonical: it is archived, QA-passed, and keeps generic Hito DS calendar/workout playground
-  work separate. The active duplicate was stale and was removed.
-
-Evidence merged:
-
-- None. The archive files were newer/canonical and already contained closeout evidence; no active
-  duplicate had evidence that needed to be merged.
-
-Ambiguous candidates:
-
-- None among the six inspected duplicate filenames.
-
-Validation note:
-
-- Markdown whitespace validation passed.
-- Admin Backlog deterministic validator passed.
-- Initial importer dry-run hung before Slice 2. After Slice 2 and the stale PDF active-file cleanup,
-  `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000` completes cleanly.
-- Live mirror refresh was not run because the clean dry-run reported `created: 0` and `updated: 0`.
-
-Next recommended slice:
-
-BACKEND / FRONTEND unified Admin Backlog repo work-item model.
-
-Reason:
-
-The source-of-truth duplicate cleanup is complete and the repo-derived admin Backlog importer now
-has bounded diagnostics plus a clean dry-run. The next root-cause simplification is to make Admin
-Backlog treat backlog markdown and active plans as one explicit work-item domain instead of relying
-on duplicate wrapper files or raw `source_type` labels.
-
-## Workstream 2: Unified Admin Backlog Repo Work-Item Model
-
-Purpose:
-
-Make Admin Backlog show both future work and current work without duplicate wrapper markdown files.
-
-Root-cause diagnosis:
-
-- Hito currently stores repo-authored work in several valid folders:
-  [backlog tasks](../../tasks/backlog/), [active plans](./), [archived plans](../archive/),
-  [frontend specs](../../tasks/frontend-specs/), and [product briefs](../../tasks/product-briefs/).
-- The importer already scans those folders, but the domain model still reads like an admin capture
-  backlog mirror instead of a unified repo work-item model.
-- Current importer identity is `metadata.source_type + metadata.source_path`, which is good for
-  idempotent row refresh but does not tell the UI whether a repo row is a backlog idea, active plan,
-  archived plan, frontend spec, or product brief in a user-friendly way.
-- Active plans can become invisible or confusing in Admin because the route is named `Backlog`, the
-  default tabs are only `Active / Done / Archived`, source labels are raw values such as
-  `active_plan`, and wrapper backlog files can be created to make active/future work discoverable.
-- Duplicate wrappers are the symptom. Examples currently exist where the same concept appears in
-  both backlog and active-plan roots, such as HR-zone and voice-to-plan docs. That creates two
-  Supabase mirror rows for one real product idea instead of one clear source of truth.
-
-Architecture decision:
-
-Choose Option A.
-
-Keep the current folders and expand the importer/Admin model so all approved repo markdown sources
-are mirrored into one Admin work-item surface with explicit kind/lifecycle metadata. Do not introduce
-a new `docs/work-items/` root yet. A new root would be a larger migration, would force broad path
-updates across docs/history/importer/backlog mirrors, and would not solve the immediate visibility
-problem faster than a model correction.
-
-Canonical work-item domain:
-
-- A repo work item is any approved markdown document that represents future, current, review, or
-  completed work and can be mirrored into Admin for discovery and prompt copy.
-- Markdown remains canonical for repo-authored work.
-- Supabase `admin_capture_items` remains the read-only mirror for repo-derived rows and the
-  canonical storage only for admin-created quick notes/captured UI rows.
-- Source identity remains `metadata.source_path + metadata.source_type` for compatibility and
-  idempotency.
-- Add explicit display metadata rather than changing identity:
-  `work_item_kind`, `work_item_lifecycle`, `source_group`, and a display label for source type.
-
-Source hierarchy:
-
-- `docs/tasks/backlog/`
-  future backlog ideas, paused work, and follow-ups that are not active execution plans.
-- `docs/plans/active/`
-  currently active execution plans, cleanup strikes, architecture tracks, implementation tracks, and
-  current QA/review gates.
-- `docs/plans/archive/`
-  completed, closed, superseded, or historical plans that should remain searchable but not appear as
-  active work.
-- `docs/tasks/frontend-specs/` and `docs/tasks/product-briefs/`
-  specialized repo work items that should stay discoverable without becoming active plans.
-
-Metadata and status mapping:
-
-| Source type | Work item kind | Lifecycle | Admin status default | Admin label |
-| --- | --- | --- | --- | --- |
-| `backlog_doc` | `backlog_item` | `backlog` | `new` | `Backlog item` |
-| `active_plan` | `plan` | `active` | `ready_for_codex` unless markdown says `backlog`/`blocked` | `Active plan` |
-| `archived_plan` | `plan` | `archived` | `done` or `archived` | `Archived plan` |
-| `frontend_spec` | `frontend_spec` | `backlog` / `in_progress` from metadata | existing status mapping | `Frontend spec` |
-| `product_brief` | `product_brief` | `backlog` / `in_progress` from metadata | existing status mapping | `Product brief` |
-
-Required canonical metadata sections for new/updated repo work items should remain:
-
-- `Status`
-- `Type`
-- `Priority`
-- `Next Recommended Role`
-- `Task`
-- `Stage`
-- `Exact Handoff Prompt`
-
-For active plans, `Status` should use importer-normalizable values such as `in_progress`,
-`backlog`, `completed`, `closed`, or `archived`, not free-form prose. Richer status wording belongs
-inside the body.
-
-Importer implications:
-
-- Keep scanning the existing approved roots.
-- Keep upsert identity stable by `source_type + source_path`.
-- Add explicit `metadata.work_item_kind`, `metadata.work_item_lifecycle`,
-  `metadata.source_group`, `metadata.source_group_label`, and `metadata.source_label`.
-- Add dry-run diagnostics for duplicate concepts across approved roots. The first version can report
-  likely duplicates by same date+slug or same normalized task title. It should not silently suppress,
-  merge, or archive rows.
-- Preserve stale mirror detection: if an approved source path disappears, report it and archive only
-  behind explicit `--archive-stale`.
-- Preserve read-only repo-derived rows in Admin mutation actions.
-
-Admin UI implications:
-
-- The `/admin/capture` route may keep its URL for now, but visible copy should treat the surface as
-  `Work items` or `Backlog & plans`, not only `Backlog`.
-- Add a source-kind filter or group display:
-  `All work`, `Backlog`, `Active plans`, `Specs`, `Briefs`, `Archive`.
-- Row metadata should show human labels such as `Active plan` instead of raw `active_plan`.
-- Detail readback should show:
-  source path, source type label, work item kind, lifecycle/status, markdown metadata health, and
-  read-only source-of-truth note.
-- Active plans should appear in the default active view when their lifecycle is active/in-progress.
-- Archived/completed plans should remain searchable through `Done`/`Archived` or source filters but
-  not clutter active execution.
-
-Migration strategy:
-
-- No folder migration in v1.
-- Do not create duplicate backlog wrapper items for active plans.
-- Existing duplicate wrapper pairs should be resolved as a later docs cleanup after importer reports
-  likely duplicates with evidence.
-- Keep existing `docs/tasks/backlog` and `docs/plans/active` paths stable so current markdown links,
-  archive history, and handoff prompts do not break.
-- Only consider a future `docs/work-items/` root if the current-folder model still causes repeated
-  confusion after importer/UI labels are fixed.
-
-First implementation slice:
-
-BACKEND / FRONTEND Slice 3:
-
-1. Add the explicit repo work-item metadata fields in
-   [admin Backlog importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts).
-2. Add dry-run duplicate-concept diagnostics without changing import behavior.
-3. Update `/admin/capture` readback/filter labels to show repo source kind clearly.
-4. Preserve all existing read-only mirror behavior and stale cleanup behavior.
-5. Do not run live import until dry-run proves whether mirror updates are required.
-
-Validation gates:
-
-- targeted ESLint for changed importer/Admin files
-- `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000`
-- `npm run import-admin-backlog-work-items -- --dry-run --archive-stale --timeout-ms 30000` if
-  stale/duplicate diagnostics are touched
-- `npm run validate-admin-capture-backlog`
-- browser QA for `/admin/capture` only if UI labels/filters change
-- `git diff --check`
-
-Expected user-visible behavior:
-
-- Admin sees backlog tasks and active plans in one work-item surface.
-- Active plans are discoverable without duplicate backlog wrapper files.
-- Rows clearly say whether they are backlog items, active plans, specs, briefs, or archived plans.
-- Repo-derived rows remain read-only in Admin, with markdown as source of truth.
-
-What not to touch:
-
-- Do not move markdown folders in this slice.
-- Do not mutate Supabase in architecture/planning mode.
-- Do not create backlog wrappers for active plans.
-- Do not make Admin UI editable for repo-derived rows.
-- Do not change product Plan Presets, plan generation, persistence, or manual workout work.
-
-## Workstream 3: Package-Manager And Tooling Signal Simplification
-
-Purpose:
-
-Avoid agents and local tooling choosing different install/build assumptions.
-
-Observed issue:
-
-Both [package-lock.json](../../../package-lock.json) and [bun.lockb](../../../bun.lockb) are tracked,
-while [package.json](../../../package.json) does not declare `packageManager`.
-
-Recommended default:
-
-Use npm as the canonical package manager unless source audit proves Bun is intentionally required.
-
-Steps:
-
-1. Inspect [package.json](../../../package.json), [README](../../../README.md), CI/deploy docs, and
-   scripts for Bun usage.
-2. If npm is canonical:
-   - add `packageManager` to [package.json](../../../package.json)
-   - keep [package-lock.json](../../../package-lock.json)
-   - remove [bun.lockb](../../../bun.lockb)
-3. If Bun is canonical:
-   - document why
-   - remove npm lock only if CI/deploy agrees
-4. Do not change dependency versions in this slice unless lockfile normalization requires it.
-
-Validation:
-
-- `npm install --package-lock-only` only if package metadata changes require lockfile sync.
-- `git diff --check -- package.json package-lock.json bun.lockb README.md`
-- `npm run build` only if package metadata or lockfiles changed.
-
-Exit criteria:
-
-- One package-manager signal is canonical.
-- The repo no longer sends mixed npm/Bun instructions by default.
-
-## Workstream 4: `training-api.ts` Facade Narrowing
-
-Purpose:
-
-Stop [training-api.ts](../../../src/lib/training-api.ts) from being a hidden second API for the
-whole product.
-
-Current state:
-
-`training-api.ts` still imports/re-exports many extracted action owners. This was useful during
-decomposition, but it should not remain the default path forever.
-
-Keep in `training-api.ts` for now:
-
-- route-data wrappers that need request snapshot/viewer injection
-- persisted snapshot loading
-- preview/persisted snapshot compatibility
-- public wrappers that cannot move safely without changing route contracts
-
-Move direct imports away from `training-api.ts` when safe:
-
-- [auth actions](../../../src/lib/auth-actions.ts)
-- [first-plan actions](../../../src/lib/first-plan-actions.ts)
-- [Plan Preset actions](../../../src/lib/plan-preset-actions.ts)
-- [plan replacement actions](../../../src/lib/plan-replacement-actions.ts)
-- [active-plan export actions](../../../src/lib/active-plan-export-actions.ts)
-- [user settings actions](../../../src/lib/user-settings-actions.ts)
-- [workout log actions](../../../src/lib/workout-log-actions.ts)
-
-Steps:
-
-1. Generate a usage map of imports from `@/lib/training-api`.
-2. Classify each import:
-   - route-data/snapshot wrapper, keep
-   - action owner exists, candidate for direct import
-   - type-only import, candidate for moving type export
-   - compatibility required, keep with reason
-3. Change one narrow group per slice.
-4. Remove dead re-exports only after no imports use them.
-5. Do not change behavior or action names in the same slice.
-
-Validation:
-
-- targeted ESLint for changed files
-- `git diff --check`
-- `npm run build`
-
-Exit criteria:
-
-- `training-api.ts` has fewer responsibilities.
-- Each remaining export has an explicit reason.
-- No route loses request-auth/snapshot behavior.
-
-## Workstream 5: Plan-Creation Path Classification And Deletion Gates
-
-Purpose:
-
-Make plan creation understandable before deleting or adding more paths.
-
-Paths to classify:
-
-- [AI first-plan blueprint modules](../../../src/lib/ai-first-plan-blueprint-authoring.ts)
-- [AI first-plan envelope modules](../../../src/lib/ai-first-plan-envelope-expand.ts)
-- [AI draft service](../../../src/lib/ai-first-plan-draft-service.ts)
-- [structured plan authoring](../../../src/lib/structured-plan-authoring.ts)
-- [first plan actions](../../../src/lib/first-plan-actions.ts)
-- [Plan Preset actions](../../../src/lib/plan-preset-actions.ts)
-- [Plan Presets library](../../../src/lib/plan-presets/)
-- [voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts)
-- [OpenAI text plan authoring](../../../src/lib/openai-plan-authoring.ts)
-- [rich workout draft authoring](../../../src/lib/rich-workout-draft-authoring.ts)
-- [plan replacement actions](../../../src/lib/plan-replacement-actions.ts)
-- [imported plan parser](../../../src/lib/imported-plan.ts)
-- [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts)
-- [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts)
-
-Classification buckets:
-
-- production default
-- production non-default explicit path
-- internal/non-default supported path
-- ops/diagnostic path
-- QA/doctrine-only fixture path
-- legacy compatibility/readback path
-- delete/demote candidate
-- keep for now with explicit reason
+## G20 Closeout — 2026-06-20
+
+Status: complete / G20 accepted; source-proof holding.
+
+Root-cause decision:
+
+- Visible symptom: a duplicate-space backlog markdown copy remained under a repo-derived
+  admin-imported docs root.
+- Underlying cause: local/docs residue can create duplicate admin mirror truth or confuse cleanup
+  agents if it remains beside the canonical backlog item.
+- Canonical owner applied: Architecture docs/source-of-truth cleanup with admin importer proof.
 
-Required decisions:
+G20 acceptance:
 
-1. Which paths can create a new active plan?
-2. Which paths can replace or refresh an active plan?
-3. Which paths are non-mutating review only?
-4. Which paths call OpenAI?
-5. Which paths must never call OpenAI?
-6. Which paths persist through [active-plan persistence](../../../src/lib/active-plan-persistence.ts)?
-7. Which path is the first safe deletion/demotion candidate?
-8. What validation must pass before deletion?
+- Accepted as docs/source-of-truth cleanup.
+- Deleted only
+  `docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence 2.md`.
+- Preserved the canonical tracked backlog item:
+  `docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md`.
+- Source proof showed the duplicate-space file was untracked while the canonical file is tracked.
+- Diff proof showed the duplicate was an older backlog-stage artifact that differed materially from
+  the canonical item and should not become a parallel admin Backlog source.
+- Admin importer dry-run and backlog validation passed after deletion.
 
-Validation:
+Burndown:
+
+- `cleanup-burndown-v1`: `37/40` complete, `3` remaining, `92.5%`.
+- G20 delta: `+1` gate.
+- Expected future delta: `0` until a new source-proved cleanup candidate appears.
+
+Next state:
 
-- source inspection only
-- no product code changes in the classification pass
-- `git diff --check` only if this plan or a related architecture note changes
+Source-proof holding. Do not select backend/runtime, frontend/browser-sensitive, docs/devtools, or
+artifact cleanup by momentum alone.
+
+## G19 Closeout And Post-G19 Reassessment — 2026-06-20
+
+Status: complete / G19 accepted; ARCHITECT G20 selected.
+
+Root-cause decision:
+
+- Visible symptom: the cleanup track needed a post-G19 next gate after deleting a source-proved
+  onboarding voice UI orphan.
+- Underlying cause: remaining candidates mix live runtime facades, browser-sensitive UI, required
+  validators, source-of-truth drift, and protected artifacts; selecting by size or momentum would
+  risk accepted behavior.
+- Canonical owner applied: Architecture source/import/docs reassessment with read-only subagents.
 
-Exit criteria:
+G19 acceptance:
+
+- Accepted as QA-passed deletion-only frontend cleanup.
+- `src/components/onboarding/DictateToPlanPanel.tsx` is deleted.
+- `rg -n "DictateToPlanPanel" src package.json scripts` returns no refs.
+- Backend voice-to-plan truth remains present in `src/lib/first-plan-actions.ts`,
+  `src/lib/voice-to-plan-authoring.ts`, entitlement files, onboarding form-model types,
+  plan-authoring snapshot mapping, and doctrine validation.
+- Targeted ESLint, `npm run build`, and scoped `git diff --check` passed in the implementation/QA
+  report.
+- Browser smoke was not required because this was deletion-only source hygiene and the source graph,
+  lint, and full build proved no live dependency.
+
+Subagent findings integrated:
+
+- Backend/import-map audit found no safe deletion/facade cleanup after G19. `training-api.ts`,
+  schedule-edit preview, validators, and live ops entrypoints remain required runtime or validation
+  owners. A future ops mutation-safety hardening batch exists but is not deletion/demotion-ready.
+- Frontend/browser-sensitive audit found no additional no-browser-safe frontend deletion candidate.
+  Manual calendar, selected-plan preview, Hito DS, and admin UI cleanup remain browser-sensitive or
+  separately owned.
+- Docs/devtools audit confirmed G19 source-of-truth drift and identified the untracked duplicate
+  manual-workout backlog markdown copy as the next clean deletion/demotion-ready docs/admin-mirror
+  candidate.
+- All three subagents were closed after their reports were integrated.
+
+Selected next batch:
 
-- No future agent has to guess whether a path is production, internal, ops-only, or legacy.
-- First deletion/demotion candidate is selected with an explicit gate.
+`ARCHITECT Slice G20: remove duplicate manual-workout backlog markdown copy after admin-mirror proof`.
 
-## Workstream 6: Plan Persistence Owner Consolidation
+Source proof:
 
-Purpose:
+- The canonical tracked backlog item is
+  `docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md`.
+- The duplicate-space file
+  `docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence 2.md` is untracked.
+- The duplicate differs materially from the canonical file and should not become a parallel
+  repo-derived admin Backlog source of truth.
+- The gate is docs/source-of-truth cleanup only; it must preserve runtime/source files, QA
+  artifacts, and the canonical backlog item.
 
-Ensure there is one canonical persistence owner for plan creation/replacement.
+Rejected alternatives:
+
+- Backend ops mutation-safety hardening: useful future candidate, but not deletion/demotion-ready and
+  touches command safety semantics, so it is deferred behind the cleaner docs/admin-mirror hygiene
+  gate.
+- Broad `training-api.ts` cleanup: blocked by live route/component imports and runtime wrappers.
+- Manual calendar/Admin/Hito DS runtime cleanup: browser-sensitive or separately owned.
+- Further validator extraction: rejected by momentum; validators remain required proof owners.
+- Artifact/log deletion: blocked by retention policy; `qa-artifacts/` remains protected evidence.
+
+Burndown:
+
+- `cleanup-burndown-v1`: `36/40` complete, `4` remaining, `90%`.
+- G19 delta: `+1` gate.
+- If G20 is accepted, `cleanup-burndown-v1` moves to `37/40` complete, `3` remaining, `92.5%`.
 
-Current canonical owner:
+## G18 Closeout And Post-G18 Reassessment — 2026-06-20
 
-- [active-plan persistence](../../../src/lib/active-plan-persistence.ts)
+Status: complete / G18 accepted; FRONTEND G19 selected.
 
-Known lower-level entrypoints:
+Root-cause decision:
 
-- `applyImportedPlanForUser(...)`
-- `createFirstPlanFromReviewedCanonicalPlanForUser(...)`
+- Visible symptom: the cleanup track needed a post-G18 next gate after deleting a source-proved
+  onboarding import orphan.
+- Underlying cause: remaining candidates mix live backend/runtime facades, browser-sensitive
+  surfaces, protected evidence, docs/admin mirror hygiene, and future-adjacent UI residue.
+- Canonical owner applied: Architecture source/import/docs reassessment with read-only subagents.
 
-Steps:
+G18 acceptance:
 
-1. Map all callers into this seam.
-2. Verify each caller performs only path-specific validation/review/token logic before persistence.
-3. Identify duplicate active-plan checks or rollback logic outside the persistence owner.
-4. Keep path-specific server actions, but prevent them from owning row insertion rules.
-5. Do not add a second persistence system for Plan Presets, voice, text, import, or refresh.
+- Accepted as complete.
+- `src/components/onboarding/JsonImportPanel.tsx` is deleted.
+- `rg -n "JsonImportPanel" src package.json scripts` returns no refs.
+- Current JSON import ownership remains with `PlanImportPanel`, `PlanManagementDialog`, and
+  `UploadJsonDialog`.
+- Targeted ESLint, `npm run build`, and scoped `git diff --check` passed in the implementation/QA
+  report.
+- Browser smoke was not required because this was deletion-only source hygiene and the source graph,
+  lint, and full build proved no live dependency.
 
-Validation:
+Subagent findings integrated:
 
-- targeted source inspection
-- behavior-preservation harnesses for any touched path
-- no DB/schema change unless a concrete missing field is proven
+- Backend/import-map audit found no safe backend/ops gate after G18. `training-api.ts`, Plan Preset
+  card discovery, selected-plan creation, active-plan import/export/lifecycle/manual seams, and ops
+  validators remain required runtime or validation owners.
+- Frontend/browser-sensitive audit confirmed G18 source state and identified tracked
+  `DictateToPlanPanel.tsx` as the strongest next source-proved frontend orphan candidate with no
+  live import.
+- Docs/devtools audit confirmed post-G18 source-of-truth/dashboard drift and classified the
+  duplicate manual-workout backlog copy as real but lower-priority docs/admin-mirror hygiene because
+  it differs from the canonical file.
 
-Exit criteria:
+Selected next batch:
 
-- Persistence ownership is clear.
-- No plan creation path can silently bypass lifecycle guards or rollback policy.
+`FRONTEND Slice G19: delete orphan DictateToPlanPanel UI residue while preserving backend voice-to-plan truth`.
 
-## Workstream 7: Script And Validator Decomposition
+Source proof:
 
-Purpose:
+- `git ls-files --error-unmatch src/components/onboarding/DictateToPlanPanel.tsx` confirms the file
+  is tracked.
+- `rg -n "DictateToPlanPanel" src package.json scripts --glob '!src/components/onboarding/DictateToPlanPanel.tsx'`
+  returns no live source/package/script caller.
+- Current docs classify Dictate-to-Plan / voice transcript assist as not visible in onboarding until
+  a future frontend and QA gate accepts it.
+- Backend voice-to-plan remains a non-default backend seam and is not selected for deletion.
 
-Keep safety harnesses strong but reviewable.
+Rejected alternatives:
 
-Current hotspots:
+- Backend/ops cleanup: no source-proved safe gate after G18.
+- Broad `training-api.ts` cleanup: blocked by live route/component imports and runtime wrappers.
+- Docs/admin-mirror duplicate backlog cleanup: real candidate, but needs a separate docs/admin-mirror
+  hygiene gate because the duplicate file differs from the canonical backlog item.
+- Manual calendar/Admin/Hito DS runtime cleanup: browser-sensitive or separately owned.
+- Artifact/log deletion: blocked by retention policy; `qa-artifacts/` remains protected evidence.
 
-- [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
-- [AI first plan draft script](../../../scripts/author-ai-first-plan-draft.ts)
-- [admin backlog importer](../../../scripts/import-repo-work-items-to-admin-backlog.ts)
-- [admin capture validator](../../../scripts/validate-admin-capture-backlog.ts)
-- [first-plan release gates](../../../scripts/plan-authoring-doctrine/first-plan-release-gates.ts)
+Burndown:
 
-Rules:
+- `cleanup-burndown-v1`: `35/40` complete, `5` remaining, `87.5%`.
+- G18 delta: `+1` gate.
+- If G19 is accepted, `cleanup-burndown-v1` moves to `36/40` complete, `4` remaining, `90%`.
 
-- Keep top-level commands stable.
-- Extract by ownership, not arbitrary line count.
-- Do not weaken assertions.
-- Do not combine behavior change with broad extraction.
-- Prefer deleting duplicate helpers over adding helper layers.
+## Post-G17 Reassessment And G18 Selection — 2026-06-20
 
-Steps:
+Status: complete / G17 accepted; FRONTEND G18 selected.
 
-1. Pick one script hotspot.
-2. Identify assertion/fixture/CLI parsing boundaries.
-3. Extract one stable responsibility.
-4. Preserve command output shape where QA depends on it.
-5. Add exact preservation assertions if behavior might drift.
+Root-cause decision:
 
-Validation:
+- Visible symptom after G17: the Plan Preset source hygiene gate is complete, but the cleanup track
+  needs one next bounded gate from fresh source proof.
+- Underlying cause: remaining candidates mix live runtime facades, browser-sensitive UI, docs
+  hygiene, local residue, and protected evidence. The next gate must be selected from a concrete
+  source mismatch, not from file size.
+- Canonical owner applied: Architecture source/import/docs reassessment with read-only subagents.
 
-- existing command for the extracted script
-- `git diff --check`
-- `npm run build` only if runtime source changed
+G17 acceptance:
 
-Exit criteria:
+- Accepted as complete.
+- Source proof shows no remaining untracked legacy Plan Preset builder/review residue under
+  `src/lib/plan-presets/` or `scripts/plan-presets/`.
+- `git ls-files -- src/lib/plan-presets scripts/plan-presets` shows only tracked current Plan
+  Preset card-discovery owners.
+- Old builder/review names now appear only in docs/history and the validator absence list.
+- The canonical direct validator command was used because `npm run validate-plan-preset-eligibility`
+  is not defined in `package.json`; package command semantics were intentionally preserved.
 
-- Validators remain trustworthy.
-- Future deletion gates are easier to prove.
+Subagent findings integrated:
 
-## Workstream 8: Hito DS Wrapper And Dependency Usage Audit
+- Backend/import-map audit kept broad `training-api.ts` cleanup blocked and found no stronger
+  backend/ops deletion gate after G17.
+- Frontend/UI audit identified tracked `JsonImportPanel.tsx` as a source-proved orphan because docs
+  already mark it removed, current import UI is owned elsewhere, and no live import remains.
+- Docs/devtools audit found the remaining duplicate backlog markdown copy and generated/local
+  artifacts as real but lower-priority docs/devtools hygiene. Logs and `qa-artifacts/` remain
+  protected from deletion.
 
-Purpose:
+Selected next batch:
 
-Delete truly unused UI wrappers/dependencies without dismantling Hito DS reuse.
+`FRONTEND Slice G18: delete resurrected orphan onboarding JsonImportPanel residue`.
 
-Important boundary:
+Source proof:
 
-Hito DS wrappers are not automatically bad. Many Radix/shadcn wrappers are the intended shared UI
-contract. Removing them blindly would increase route-local UI.
+- `git ls-files --error-unmatch src/components/onboarding/JsonImportPanel.tsx` confirms the orphan
+  file is tracked.
+- `rg -n "JsonImportPanel" src package.json scripts --glob '!src/components/onboarding/JsonImportPanel.tsx'`
+  returns no live source/package/script caller.
+- Current import UI references point to `PlanImportPanel`, `PlanManagementDialog`, and
+  `UploadJsonDialog`, not the old onboarding panel.
 
-Steps:
+Rejected alternatives:
 
-1. Audit [components.json](../../../components.json), [UI primitives](../../../src/components/ui/),
-   and dependency imports.
-2. Classify wrappers:
-   - used Hito DS primitive, keep
-   - unused but likely future DS primitive, consider backlog only
-   - unused imported shadcn artifact, delete candidate
-   - product visualization dependency, keep if used
-3. Remove only unused wrappers/dependencies with source proof.
-4. Do not redesign UI in this slice.
+- Broad `training-api.ts` cleanup: blocked by live route/component imports and runtime wrappers.
+- Docs/backlog duplicate markdown cleanup: valid docs hygiene, but lower leverage than deleting a
+  tracked source orphan that current docs already say is gone.
+- Manual calendar/Admin/Hito DS runtime cleanup: browser-sensitive or separately owned.
+- Artifact/log deletion: blocked by retention policy; `qa-artifacts/` remains protected evidence.
 
-Validation:
+Expected next burndown:
 
-- targeted ESLint
-- `git diff --check`
-- `npm run build`
+- Current stable burndown is `34/40` complete, `6` remaining, `85%`.
+- If G18 is accepted, `cleanup-burndown-v1` moves to `35/40` complete, `5` remaining, `87.5%`.
+
+## G17 Closeout — 2026-06-20
 
-Exit criteria:
+Status: complete / untracked legacy Plan Preset builder/review residue deleted.
 
-- UI dependency surface is smaller where safely possible.
-- Hito DS remains the canonical UI reuse layer.
+Root-cause decision:
 
-## Workstream 9: Auth/Admin Compatibility Follow-Up
+- Visible symptom: untracked legacy Plan Preset builder/review files under `src/lib/plan-presets/`
+  and dependent `scripts/plan-presets/*` helpers could make old Plan Preset creation look live.
+- Underlying cause: local residue from the removed Plan Preset review/confirm creation seam survived
+  after product truth moved to card discovery plus selected running-plan preview/create.
+- Canonical owner applied: BACKEND/OPS source hygiene and Plan Preset card-discovery boundary.
+
+Deleted residue:
 
-Purpose:
+- `src/lib/plan-presets/algorithmic-builder.ts`
+- `src/lib/plan-presets/composition.ts`
+- `src/lib/plan-presets/expand.ts`
+- `src/lib/plan-presets/persistence-metadata.ts`
+- `src/lib/plan-presets/review-token.ts`
+- Legacy Plan Preset builder CSV/source artifacts:
+  `preset-builder-io-contract.csv`, `preset-identity-placement-rules.csv`,
+  `preset-phase-template-table.csv`, `preset-program-source-of-truth.md`,
+  `preset-progression-math-rules.csv`, `preset-quality-gates.csv`,
+  `preset-segment-anatomy-table.csv`, `preset-weekly-archetype-table.csv`, and
+  `preset-workout-identity-library.csv`.
+- Dependent untracked proof helpers under `scripts/plan-presets/`.
 
-Avoid re-opening admin auth unless simplification work uncovers active duplication risk.
+Preserved:
 
-Known compatibility paths:
+- Current Plan Preset card discovery through `src/lib/plan-preset-actions.ts`.
+- Tracked current Plan Preset resolver/recipe/progressive/schema modules and current program CSVs.
+- Selected running-plan preview/create ownership.
+- `training-api.ts`, package command semantics, validators, Supabase/OpenAI boundaries, and
+  browser-visible UI.
 
-- signed admin session cookie
-- local auth bypass cookie
-- Supabase app metadata admin compatibility
-- local tester accounts
-- admin route/serverFn allowlist
+Validation evidence:
 
-Rule:
+- Final source proof showed the deleted files were untracked and had no package/current owner.
+- `scripts/validate-plan-preset-eligibility.ts` already asserts the legacy builder/review artifacts
+  must not exist.
+- Post-delete validation kept Plan Preset card discovery behavior covered by the existing eligibility
+  harness.
 
-Do not simplify auth opportunistically. Only start this work after a dedicated root-cause audit or
-recurring failure signal.
+Burndown:
 
-Exit criteria:
+- `cleanup-burndown-v1`: `34/40` complete, `6` remaining, `85%`.
+- G17 delta: `+1` gate.
 
-- Auth/admin remains out of the simplification strike unless selected as a concrete follow-up.
+## Post-G16 Reassessment And G17 Selection — 2026-06-20
 
-## Workstream 10: Changelog And Backlog Policy Cleanup
+Status: complete / G16 accepted; BACKEND/OPS G17 selected.
 
-Purpose:
+Root-cause decision:
 
-Keep shipped history, repo backlog, and admin backlog mirror from becoming three conflicting truths.
+- Visible symptom after G16: the local duplicate-space residue gate is complete, and the cleanup
+  track needs one next bounded gate from fresh source proof.
+- Underlying cause: remaining candidates mix current runtime facades, browser-sensitive UI,
+  docs/devtools drift, and local untracked source residue. Selecting by line count or momentum would
+  risk reopening accepted behavior.
+- Canonical owner applied: Architecture source/import/docs reassessment with read-only subagents.
 
-Rules:
+G16 acceptance:
 
-- [changelog](../../history/changelog.md) is shipped history.
-- [backlog docs](../../tasks/backlog/) are future or active task intake.
-- admin Backlog mirror is an operational mirror, not canonical shipped history.
-- Completed implementation closeout must either add changelog entry or explicitly say why not.
+- Accepted as complete.
+- Confirmed deleted targets are absent:
+  `src/lib/plan-creation-engine/source-model 2.ts`,
+  `src/components/onboarding/PlanPresetPanel 2.tsx`, and
+  `src/components/ui/calendar 2.tsx`.
+- `git ls-files` has no tracked entries for those duplicate-space paths.
+- Source refs for those names appear only in docs closeout/history.
+- Canonical `source-model.ts` imports remain intact.
 
-Steps:
+Subagent findings integrated:
 
-1. During active/archive cleanup, identify completed implementation plans missing changelog entries.
-2. Do not add changelog for unimplemented plans or pure future backlog.
-3. Keep repo-derived admin Backlog read-only.
-4. Run importer dry-run after markdown task status changes.
+- Backend/import-map audit kept broad `training-api.ts` cleanup blocked and identified untracked
+  legacy Plan Preset builder/review residue as the strongest backend/ops candidate. Current Plan
+  Preset truth is card discovery only, and `scripts/validate-plan-preset-eligibility.ts` already
+  asserts many legacy builder artifacts must be absent.
+- Frontend/UI audit found a tracked orphan `JsonImportPanel.tsx` candidate, but that is frontend
+  source cleanup with build/browser-risk boundaries and is lower priority than residue that can
+  break current validator doctrine.
+- Docs/devtools audit found stale `docs/work-dashboard.md` wording and one untracked duplicate
+  backlog markdown copy. Dashboard refresh is part of this closeout; backlog duplicate cleanup is
+  deferred behind a docs/admin-mirror hygiene gate.
 
-Validation:
+Selected next batch:
 
-- targeted `git diff --check`
-- admin backlog importer dry-run when markdown source state changes
-- `npm run validate-admin-capture-backlog`
+`BACKEND/OPS Slice G17: remove untracked legacy Plan Preset builder/review residue`.
 
-Exit criteria:
+Source proof:
 
-- No completed shipped work relies on Backlog mirror as its changelog substitute.
+- `git status --short -- src/lib/plan-presets scripts/plan-presets` shows the legacy
+  builder/review module cluster and dependent `scripts/plan-presets/*` helpers are untracked.
+- `git ls-files -- src/lib/plan-presets scripts/plan-presets` shows only the current tracked card
+  discovery owners and active program CSVs; the legacy builder/review files are not tracked current
+  source.
+- `scripts/validate-plan-preset-eligibility.ts` lists the legacy builder/review files in
+  `removedLegacyBuilderFiles` and asserts they must not exist.
+- Current `plan-preset-actions.ts` and resolver/recipe/progressive modules remain the current
+  tracked Plan Preset card-discovery owner.
 
-## Suggested Slice Order
+Rejected alternatives:
 
-### Slice 0: Start Gate And Dirty Worktree Safety
+- Frontend `JsonImportPanel.tsx` deletion: real candidate, but frontend/build-sensitive and already
+  historical G5B cleanup; defer until the stronger validator-breaking residue is removed.
+- Duplicate backlog markdown `...recurrence 2.md`: docs-only hygiene, lower risk and lower leverage;
+  defer behind a docs/admin-mirror cleanup gate.
+- Broad `training-api.ts` cleanup: blocked by live route/component imports and runtime wrappers.
+- Manual calendar/Admin/Hito DS runtime cleanup: browser-sensitive or separately owned.
+- Artifact/log deletion: blocked by retention policy; `qa-artifacts/` remains protected evidence.
 
-Owner:
+Expected next burndown:
 
-ARCHITECT
+- Current stable burndown remains `33/40` complete, `7` remaining, `82.5%`.
+- If G17 is accepted, `cleanup-burndown-v1` moves to `34/40` complete, `6` remaining, `85%`.
 
-Scope:
+## G16 Closeout — 2026-06-20
 
-- inspect dirty worktree
-- confirm Plan Preset track is archived
-- classify shipped Plan Preset dirty/untracked files as do-not-touch for cleanup
-- approve docs/source-of-truth cleanup only
+Status: complete / local duplicate-space residue deleted.
 
-No product code changes.
+Root-cause decision:
 
-Status:
+- Visible symptom: duplicate-space files remained in the working tree after backend/ops cleanup.
+- Underlying cause: local filesystem residue can look like live backend/frontend business truth even
+  when canonical owners already exist.
+- Canonical owner applied: BACKEND/OPS local source hygiene; canonical runtime owners remain
+  untouched.
 
-Complete for planning. The strike can start with docs/source-of-truth cleanup. Product-code cleanup
-waits until shipped Plan Preset source files are intentionally preserved.
+G16 result:
 
-### Slice 1: Active/Archive Cleanup
+- Deleted `src/lib/plan-creation-engine/source-model 2.ts`.
+- Deleted `src/components/onboarding/PlanPresetPanel 2.tsx`.
+- Deleted `src/components/ui/calendar 2.tsx`.
+- Preserved canonical owners:
+  `src/lib/plan-creation-engine/source-model.ts`,
+  `src/components/onboarding/PlanPresetPanel.tsx`, and `src/components/ui/calendar.tsx`.
+- Confirmed source imports still target canonical `source-model.ts`.
 
-Owner:
+Cleanup burndown:
 
-ARCHITECT
+- `cleanup-burndown-v1`: `33/40` gates complete, `7` remaining, `82.5%`.
+- Delta from G16: `+1` completed gate.
 
-Scope:
+## G15 Closeout — 2026-06-20
 
-- remove or reconcile active/archive duplicate plans
-- update current state only if needed
-- run Backlog importer dry-run and admin backlog validator
+Status: complete / orphan legacy MJS ops helper residue deleted.
 
-Exact first slice:
+Root-cause decision:
 
-- compare the six known active/archive duplicate plan filenames:
-  `2026-05-17-admin-analytics-page-plan.md`,
-  `2026-05-25-active-plan-schedule-edit-plan.md`,
-  `2026-05-26-ai-authored-first-plan-pipeline.md`,
-  `2026-05-28-plan-authoring-engine-decomposition-and-legacy-cleanup.md`,
-  `2026-06-01-ai-first-plan-envelope-production-adoption-and-prompt-simplification.md`, and
-  `2026-06-01-first-plan-calendar-pre-start-rendering-polish.md`
-- if the archive copy is canonical and complete, remove the false active duplicate
-- if the active copy has newer closeout evidence, merge that evidence into archive first
-- do not touch genuinely active work, product source, runtime code, lockfiles, Supabase, or Plan
-  Preset shipped files
-- treat the backlog importer hang as a tooling gap; use bounded timeout and do not run live import if
-  dry-run does not complete
+- Visible symptom: tracked legacy MJS helper files still made old ops/source ownership look live.
+- Underlying cause: stale local ops helpers survived prior text-authoring and ops cleanup while
+  canonical TS and ops-local owners became active.
+- Canonical owner applied: backend/ops cleanup; current command ownership remains in
+  `scripts/author-plan-from-text.ts`, `src/lib/openai-plan-authoring.ts`,
+  `src/lib/structured-plan-authoring.ts`, `src/lib/imported-plan.ts`, and
+  `scripts/lib/ops-plan-apply.ts`.
 
-Status:
+G15 result:
 
-Complete on 2026-06-07. Six false active/archive duplicate plan files were removed. Admin Backlog
-mirror refresh was later unblocked by Slice 2 plus stale PDF active-file cleanup; live import was not
-run because the clean dry-run reported no required mirror changes.
+- Deleted `scripts/lib/openai-plan-authoring.mjs`.
+- Deleted `scripts/lib/structured-plan-authoring.mjs`.
+- Deleted `scripts/lib/imported-plan-seed.mjs`.
+- Preserved public command names and command behavior for `author-plan-from-text`,
+  `author-structured-plan`, and `import:current-plan`.
+- Preserved G4F local mutation safety: default/help and dry-run paths remain non-mutating, and
+  `--apply` remains local-loopback guarded.
+- Confirmed `scripts/author-plan-from-text.mjs` remains intentionally deleted and was not revived.
 
-### Slice 2: Admin Backlog Importer Dry-Run Responsiveness
+Cleanup burndown:
 
-Owner:
+- `cleanup-burndown-v1`: `32/40` gates complete, `8` remaining, `80%`.
+- Delta from G15: `+1` completed gate.
 
-BACKEND / QA
+## Post-G15 Reassessment And G16 Selection — 2026-06-20
 
-Scope:
+Status: complete / G15 accepted; DEVTOOLS/OPS G16 selected.
 
-- reproduce the `npm run import-admin-backlog-work-items -- --dry-run` hang with a bounded timeout
-- identify whether the hang is markdown scanning, filesystem/iCloud access, stale mirror lookup,
-  Supabase/env setup despite dry-run, or output/reporting
-- fix the root cause without changing product behavior
-- keep dry-run safe and keep `--archive-stale` explicit
-- do not run live import until dry-run completes and reports whether mirror updates are required
+Root-cause decision:
 
-Status:
+- Visible symptom after G15: the selected backend/ops residue deletion is complete, but the cleanup
+  track needs the next gate from fresh source proof rather than cleanup momentum.
+- Underlying cause: remaining candidates mix live runtime facades, browser-sensitive UI,
+  validation/proof infrastructure, generated/local artifacts, and local filesystem residue.
+- Canonical owner applied: Architecture source/import/docs reassessment with read-only subagents.
 
-Implemented on 2026-06-07. The importer now has bounded timeout, phase diagnostics, and debug
-logging. Plain dry-run does not reach Supabase; the observed hang is during markdown scanning at
-`read_markdown_file` for `docs/plans/active/2026-05-15-plan-export-pdf.md`. The command now exits
-with a bounded diagnostic instead of hanging indefinitely.
+G15 acceptance:
 
-Follow-up cleanup on 2026-06-07 resolved the remaining file-access blocker. The active PDF export
-file was untracked, unreadable through bounded reads, and stale relative to the canonical backlog
-item [Active Plan PDF Export Plan](../../tasks/backlog/2026-05-15-plan-export-pdf.md) plus the
-archived [Plan Export From Open Plan](../archive/2026-05-15-plan-export-from-open-plan.md) history.
-Only the false active copy was removed. PDF export remains preserved as a useful future backlog
-slice, not an active implementation plan.
+- Accepted as complete.
+- The deleted MJS helper residue no longer exists on disk:
+  - `scripts/lib/openai-plan-authoring.mjs`
+  - `scripts/lib/structured-plan-authoring.mjs`
+  - `scripts/lib/imported-plan-seed.mjs`
+- Source/import proof found no live refs in `package.json`, `scripts`, or `src`.
+- Current command owners and package command behavior remain preserved.
 
-After removal, `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000` completed
-successfully with `ok: true`, `created: 0`, `updated: 0`, `duplicateCount: 0`,
-`repoDerivedInReviewCount: 0`, and `staleActiveRepoMirrorCount: 0`. Live import was not run because
-the dry-run reported no required mirror changes.
+Subagent findings integrated:
 
-### Slice 3: Unified Admin Backlog Repo Work-Item Model
+- Backend/import-map and ops audit kept broad `training-api.ts` cleanup blocked, preserved package
+  scripts and validators, and classified remaining duplicate-space files as DEVTOOLS/local hygiene
+  rather than backend runtime cleanup.
+- Frontend/browser-sensitive audit found no safe browser-visible frontend cleanup batch. Manual
+  calendar, selected-plan preview, Admin, Hito DS, and `/test-calendar` remain deferred or separately
+  owned.
+- Docs/devtools/artifact audit found the generated dashboard needed refresh after G15 and confirmed
+  artifact/log deletion remains blocked behind explicit retention policy.
 
-Owner:
+Selected next batch:
+
+`DEVTOOLS/OPS Slice G16: local duplicate-space residue cleanup`.
 
-BACKEND / FRONTEND
+Source proof:
 
-Scope:
+- `git status --short -- "src/lib/plan-creation-engine/source-model 2.ts" "src/components/onboarding/PlanPresetPanel 2.tsx" "src/components/ui/calendar 2.tsx"`
+  shows all three files are untracked.
+- `git ls-files -- <target files>` returns no tracked paths.
+- Source search found no imports or live references to the duplicate-space filenames.
+- Current imports reference the canonical `source-model.ts`, not `source-model 2.ts`.
 
-- keep existing markdown folders
-- add explicit repo work-item kind/lifecycle/source-group metadata in the importer
-- add duplicate-concept dry-run diagnostics for wrapper duplicates
-- update Admin row/detail labels and filters so backlog items and active plans are both visible
-- preserve repo-derived read-only behavior and stale cleanup
-- do not run live import before dry-run proves the source scan and metadata shape
+G16 scope:
 
-Status:
+- Delete only:
+  - `src/lib/plan-creation-engine/source-model 2.ts`
+  - `src/components/onboarding/PlanPresetPanel 2.tsx`
+  - `src/components/ui/calendar 2.tsx`
+- Do not delete tracked source, logs, `qa-artifacts`, generated test artifacts, validation coverage,
+  or canonical runtime owners.
 
-Implemented and QA-passed on 2026-06-07.
+Rejected alternatives:
 
-Implemented behavior:
+- Broad `training-api.ts` cleanup: blocked by live route/component imports.
+- Backend ops helper deletion beyond G15: blocked; surviving helpers are required by current scripts.
+- Frontend/manual calendar/admin/Hito DS cleanup: browser-sensitive or separately owned.
+- Docs/dashboard refresh alone: required as source-of-truth sync, but not a cleanup gate by itself.
+- Artifact/log deletion: blocked; `artifact:hygiene` remains dry-run and `qa-artifacts` remains
+  protected proof evidence.
 
-- The importer emits explicit repo work-item kind/lifecycle/source-group metadata, human source
-  labels, source-group counts, and duplicate-concept diagnostics without changing
-  `metadata.source_type + metadata.source_path` identity.
-- Admin readback exposes typed repo work-item metadata.
-- `/admin/capture` shows a `Work items` surface with source filters for `All work`, `Backlog`,
-  `Active plans`, `Specs`, `Briefs`, and `Archive`.
-- Repo-derived rows remain read-only and markdown remains canonical.
+Expected next burndown:
 
-QA evidence:
+- If G16 is accepted, `cleanup-burndown-v1` moves to `33/40` complete, `7` remaining, `82.5%`.
 
-- Built-in Codex browser was used first.
-- Actual dev server was discovered on `localhost:8082`.
-- `/admin/capture` loaded without `ERR_BLOCKED_BY_CLIENT`.
-- Targeted ESLint passed.
-- Importer dry-run passed without writes.
-- `npm run validate-admin-capture-backlog` passed.
-- Read-only Supabase source-group proof passed.
-- `git diff --check` passed.
-- `npm run build` passed.
-- Dry-run source groups were:
-  `backlog: 19`, `active_plans: 7`, `specs: 16`, `briefs: 8`, `archive: 70`.
-- Read-only Supabase current source groups included:
-  `backlog: 19`, `active_plans: 7`, `specs: 16`, `briefs: 8`, `archive: 67`.
-- Duplicate concept diagnostics were present with count `2`.
-- `All work` includes active plans and backlog items.
-- `Active plans` shows Hito Stack Simplification Strike and excludes backlog labels.
-- `Backlog` shows backlog rows and excludes active-plan labels.
-- Specs, briefs, and archive labels work.
-- Active-plan detail is read-only and shows source path, source group, kind, and lifecycle.
-- Screenshots/artifacts were saved under
-  `qa-artifacts/screenshots/2026-06-07/admin-work-items-metadata-filters-qa/`.
-- PNG screenshots were partially blocked by `Page.captureScreenshot` timeout, but JSON/text fallback
-  artifacts were saved.
-- QA did not run live import, `--archive-stale`, migrations, or data mutation.
+## UI-C1 Closeout And Post-UI-C1 Gate Selection — 2026-06-20
 
-### Slice 3A: Unified Admin Shell And Navigation Contract
+Status: complete / UI-C1 QA-passed and accepted; BACKEND/OPS G15 selected.
 
-Owner:
+Root-cause decision:
 
-DESIGNER / FRONTEND
+- Visible symptom before UI-C1: the selected running-plan preview calendar still carried a
+  route-local calendar cell owner after the shared Hito calendar-day primitive had become the
+  accepted product/DS seam.
+- Underlying cause: DS/specimen rollout and runtime selected-plan preview consumer migration were
+  separate tracks, so selected-plan preview kept duplicate presentation ownership.
+- Canonical owner applied: `HitoCalendarDayCell` in the selected-plan preview consumer, while
+  backend selected-plan generation, endpoint proof, metric truth, and persistence remained
+  unchanged.
 
-Status:
+UI-C1 acceptance evidence:
 
-Implemented and QA-passed on 2026-06-08.
+- Source proof: `rg -n "PreviewCalendarCell|hito-selected-plan-calendar-cell" src` returns no refs.
+- `SelectedTenKPlanPreviewDialog.tsx` renders `HitoCalendarDayCell`.
+- Browser QA with a disposable no-active-plan user and known-good Quick setup rendered the selected
+  running-plan preview calendar.
+- No-benchmark 10K preview rendered `84` shared calendar rows and `12` week groups.
+- Workout, rest, and final endpoint states rendered.
+- Final endpoint row showed `Final 10K Day` and `10000m endpoint`.
+- Benchmark retry with Recent 5K time `25:00` rendered and showed
+  `Recent 5K benchmark pace 5:00/km · personal HR targets blocked`.
+- Desktop and `375px` mobile had no horizontal overflow.
+- Disposable auth/local user cleanup returned scoped data to zero/absent.
 
-QA evidence:
+Subagent preflight for post-UI-C1 selection:
 
-- Built-in Codex browser was used first against `localhost:8082`.
-- Safari fallback was not used.
-- Targeted ESLint passed.
-- `npm run validate-admin-capture-backlog` passed.
-- `git diff --check` passed.
-- `npm run build` passed.
-- Overview, Users, Test accounts, and Work items all render the shared Admin nav.
-- Desktop sidebar labels are identical across sections.
-- Shared helper copy appears:
-  `One internal workspace for product truth, users, test accounts, and work items.`
-- Route-local `Manual handoff` and `Admin surface` helper identities are gone.
-- Exactly one visible desktop sidebar item is active per section.
-- Users and Test accounts map to the correct headings/content and active nav items.
-- Analytics deep links preserve active sidebar state.
-- Work Items list/status/source filter/search/source labels still work.
-- `q=screenshot` updates the list count to `Showing 6 of 6 items`.
-- Desktop and mobile have no horizontal overflow.
-- Artifacts were saved under `qa-artifacts/screenshots/2026-06-08/admin-shell-unification-qa/`.
-- PNG capture mostly timed out, but DOM/JSON fallback artifacts cover state.
+- Backend/import-map subagent found one source-proved same-owner cleanup candidate: tracked orphan
+  legacy MJS ops helper residue under `scripts/lib/`.
+- Frontend/browser-risk subagent found no new safe frontend implementation batch with one owner,
+  risk class, and validation story. Manual calendar, Admin, Hito DS, and `/test-calendar` remain
+  browser-sensitive or separately owned.
+- Docs/devtools subagent found the expected stale UI-C1 plan/map/dashboard wording and no stronger
+  devtools script fix.
 
-Diagnosis:
+Post-UI-C1 decision:
 
-The unified repo work-item model is implemented, but the visible Admin shell still communicates two
-different mental models:
+- Accept UI-C1 as behavior-preserving frontend cleanup.
+- Update `cleanup-burndown-v1` to `31/40` complete, `9` remaining, `77.5%`.
+- Select `BACKEND/OPS Slice G15: orphan legacy MJS ops helper residue deletion`.
 
-- `/admin/analytics` presents a stable Admin surface with a bottom helper titled `Admin surface`.
-- `/admin/capture` presents Work items with a bottom helper titled `Manual handoff`.
-- Both routes render similar sidebars, but each route owns its own nav list, active state, helper
-  copy, and mobile rail.
-- This makes Work items feel like a separate mini-app even though it is now part of the same Admin
-  workspace as Overview, Users, and Test accounts.
+G15 source proof:
 
-Selected Admin shell model:
+- `git ls-files --error-unmatch scripts/lib/openai-plan-authoring.mjs scripts/lib/structured-plan-authoring.mjs scripts/lib/imported-plan-seed.mjs`
+  shows all three files are tracked.
+- Source search found no live callers/imports for those MJS helper modules outside their own stale
+  helper pair.
+- `package.json` points current commands to canonical owners:
+  `author-plan-from-text`, `author-structured-plan`, and `import:current-plan`.
+- `node --check` passes for the three stale MJS files, so the issue is duplicate ownership/residue,
+  not a syntax break.
+- Broad `training-api.ts` cleanup remains blocked because route/component/server-function callers
+  are still live.
 
-- Admin is one workspace.
-- There is one persistent Admin sidebar on desktop.
-- There is one selected sidebar item at a time.
-- The right-side content changes based on the selected item.
-- No Admin section should override the shell identity unless it intentionally becomes a separate
-  admin app, which Work items is not.
-- The existing routes may remain:
-  - `/admin/analytics` for analytics/users/test-account sections
-  - `/admin/capture` for Work items
-- Route boundaries are implementation details. The visible shell should feel shared.
+Rejected alternatives:
 
-Canonical Admin nav items:
+- Broad `training-api.ts` cleanup: blocked by live route/component imports.
+- Frontend/manual calendar cleanup: browser-sensitive live mutation surface.
+- Admin table/capture cleanup: authenticated browser-sensitive runtime with route/search/filter and
+  mutation controls.
+- Hito DS and `/test-calendar`: separate owners; not the next global simplification gate.
+- Untracked duplicate-space UI residue such as `PlanPresetPanel 2.tsx`: not a backend/ops gate and
+  should not be bundled with G15.
 
-| Item | Visible label | Route / state | Notes |
-| --- | --- | --- | --- |
-| Overview | `Overview` | `/admin/analytics` + overview state | Default analytics overview. |
-| Funnel & Usage | `Funnel & Usage` | `/admin/analytics` + funnel state | Keep current section state. |
-| Feedback | `Feedback` | `/admin/analytics` + feedback state | Keep current section state. |
-| AI & Entitlements | `AI & Entitlements` | `/admin/analytics` + ai state | Keep current section state. |
-| Users | `Users` | `/admin/analytics` + users state | Real users only. |
-| Test accounts | `Test accounts` | `/admin/analytics` + test-account state | QA/local/test users. |
-| Work items | `Work items` | `/admin/capture` | Replaces visible `Backlog` shell label. |
+Expected next burndown:
 
-Naming decision:
+- If G15 is accepted, `cleanup-burndown-v1` moves to `32/40` complete, `8` remaining, `80%`.
 
-- Use `Work items` as the visible admin nav label.
-- Do not use `Backlog` as the primary shell label now that the surface includes backlog tasks,
-  active plans, specs, briefs, archived plans, and quick admin notes.
-- `Backlog` can remain a content filter inside Work items, not a shell identity.
+## Designer Audit Checkpoint — 2026-06-18
 
-Sidebar helper/card decision:
+Status: complete / UI-C1 accepted unchanged after Designer audit.
 
-Use one consistent helper pattern across all Admin sections.
+Root-cause decision:
 
-Recommended v1:
+- Visible symptom: `/hitoDS` is accepted, but some runtime consumers still own local UI grammar.
+- Underlying cause: DS/specimen rollout and product-consumer migration happened as separate tracks,
+  leaving a few product surfaces outside shared primitives.
+- Canonical owner applied: Architecture sequencing over the Designer audit findings. Select one
+  bounded runtime DS-adoption batch instead of reopening broad visual audit or routing a vague
+  frontend cleanup pass.
 
-- Title: `Admin workspace`
-- Body: `Internal tools for analytics, test accounts, and repo-synced work.`
+Designer audit findings accepted:
 
-Rules:
+- No broad redesign is justified.
+- `/hitoDS` remains the accepted DS/specimen owner.
+- Runtime drift is concentrated in consumer seams, not everywhere.
+- The selected running-plan preview calendar still owns a mini calendar system instead of consuming
+  the shared calendar-day primitive.
+- Admin table/capture drift, repeated dialog shells, manual workout readbacks, and feedback
+  micro-surfaces remain real future candidates, but they are broader or more browser-sensitive than
+  the selected preview-calendar seam.
 
-- The helper title must not change per section.
-- Section-specific operational details belong in the right-side page header or content area.
-- Do not use `Manual handoff` as the sidebar identity.
-- Do not use `Admin surface` only on analytics sections.
-- If the helper continues to feel redundant after implementation, it may be removed entirely from
-  all Admin sections, but it must not vary by selected item.
+Subagent preflight:
 
-Desktop behavior:
-
-- Sidebar width, logo/admin header, nav row spacing, icon size, active marker, hover backdrop, and
-  bottom helper spacing stay identical across Admin sections.
-- Selected item uses the existing Hito shell nav active row:
-  muted surface wash, foreground label, icon in foreground, and one signal dot/marker.
-- Hover uses the same low-chrome row backdrop for all items.
-- Focus-visible uses the existing Hito focus ring and must not be visually confused with selected.
-- Disabled nav items are not expected in v1. If needed later, they should stay visible, muted, and
-  non-interactive with a reason in content, not in the shell helper.
-- Only one nav row may carry active styling at a time.
-- Work-item status/source filters stay inside the Work items content area.
-
-Route and deep-link behavior:
-
-- `/admin/capture` deep-links directly to Work items with Work items selected.
-- `/admin/analytics` defaults to Overview selected.
-- Analytics sub-sections may remain internal state, query state, or hash state, but deep links should
-  restore the matching selected nav item when the implementation supports them.
-- If Frontend keeps analytics section state internal for this slice, the visible requirement is that
-  clicking a sidebar item updates one selected row and right-side content without duplicate active
-  markers.
-- `Back to Hito` and `Sign out` behavior remain unchanged.
-
-Mobile behavior:
-
-- Use one mobile Admin nav pattern across analytics and Work items.
-- The mobile topbar should read `Admin / <selected item>`.
-- The quick-link rail or drawer must include the same canonical items as desktop.
-- Work items should not get a separate mobile nav model.
-- If horizontal quick links overflow, switch to a Hito DS drawer/jump menu rather than wrapping into
-  multiple noisy rows.
-- Work-item filters remain in the Work items content, below the page header.
-
-Accessibility notes:
-
-- Sidebar nav uses `nav` with `aria-label="Admin workspace"`.
-- Current route/section link uses `aria-current="page"` for route-level links or
-  `aria-current="location"` for internal section links.
-- Nav rows are links when they change URL and buttons only when they change internal section state.
-- Keyboard focus order should be stable: logo/home, nav items, helper if interactive, content.
-- Icons are decorative when labels are visible.
-- Active state cannot rely on color only; keep the marker/backdrop/text-weight combination.
-
-Frontend implementation notes:
-
-- Prefer a shared admin nav model over separate route-local nav arrays.
-- Candidate shared owner can be a small component or helper near existing admin routes; do not
-  introduce a broad admin framework.
-- `src/routes/admin.analytics.tsx` and `src/routes/admin.capture.tsx` should consume the same nav
-  item definitions and helper copy.
-- If analytics sections remain internal tabs, the nav model can expose an item action/href shape
-  that supports both route links and section setters.
-- Keep Hito DS classes:
-  `hito-workbench-shell`, `hito-workbench-sidebar`, `hito-shell-nav`, `hito-shell-nav-row`,
-  `hito-shell-nav-icon`, `hito-shell-nav-dot`, `hito-row-group`, `hito-list-row`, and existing
-  mobile rail classes.
-- Do not add a new Admin-specific visual kit.
-- Do not change backend loaders, admin auth, user classification, Work items importer, or Supabase
-  mirror behavior.
-
-What not to touch:
-
-- Do not redesign every admin page.
-- Do not change admin analytics data, user/test-account classification, or Work items data model.
-- Do not move markdown work-item files.
-- Do not decide new importer metadata.
-- Do not turn Work items source/status filters into shell navigation.
-- Do not create duplicate Admin shell components if a small shared helper can cover both routes.
-
-Acceptance criteria:
-
-- Overview, Funnel & Usage, Feedback, AI & Entitlements, Users, Test accounts, and Work items appear
-  as one stable Admin nav list.
-- Selecting Work items does not change the shell identity to `Manual handoff`.
-- Selecting Overview/Test accounts does not show a different helper identity than Work items.
-- There is only one active-looking nav item at a time.
-- The bottom helper/card is either identical across sections or removed across all sections.
-- Work items remains visibly part of Admin, not a separate capture mini-app.
-- Work-item filters remain inside the Work items content.
-- Desktop and mobile share the same nav item taxonomy.
-- Existing routes, auth, data loading, and admin actions continue to work.
-
-### Slice 3B: Worktree Commit Hygiene And Dirty-Work Triage
-
-Owner:
-
-ARCHITECT
-
-Status:
-
-Complete on 2026-06-08.
-
-Reason:
-
-Admin Work Items metadata/filters and Admin shell/navigation unification are implemented and
-QA-passed, but the worktree now contains mixed remaining work. Starting package-manager cleanup,
-`training-api.ts` narrowing, or any other product-code simplification before classifying and
-committing this work would increase risk and make rollback/review harder.
-
-Scope:
-
-- classify all modified/untracked files by source task
-- split ready work into clean commit groups
-- preserve unrelated instruction/skill updates as their own scope
-- keep older untracked active plans separate until the user confirms whether they should remain
-  active, move to backlog, or be removed as stale duplicates
-- keep QA artifacts untracked unless explicitly promoted
-- do not push until the branch/remote/commit scope is explicitly approved
-
-Recommended commit groups:
-
-1. Admin Work Items metadata/importer/Admin UI implementation.
-2. Admin shell/navigation unification implementation.
-3. Hito Stack Simplification Strike plan/docs.
-4. Agent/skill instruction updates, if still intentional.
-5. Older active-plan docs only after separate source-of-truth confirmation.
-
-Validation:
-
-- `git status --short --branch`
-- `git diff --stat`
-- `git diff --name-status`
-- `git diff --cached --name-status` if anything is staged
-- `git ls-files --others --exclude-standard`
-- targeted `git diff --check` for the files in each proposed commit group
-
-Exit criteria:
-
-- no mixed staged index
-- each ready commit group has an exact file list and message
-- unrelated/unconfirmed files remain unstaged
-- next simplification slice can start from a known worktree state
-
-Closeout result:
-
-- Admin Work Items metadata/importer/Admin UI implementation, Admin shell/navigation
-  implementation, and this simplification strike plan were committed together as
-  `5c79d23 Unify admin work items and admin shell`.
-- The scoped Admin simplification commit was pushed to `origin/main`.
-- Remaining dirty work is intentionally outside that commit:
-  agent/skill instruction updates plus older untracked active-plan docs that need separate
-  source-of-truth confirmation.
-
-### Slice 3C: Admin Shell Chrome, Account Menu, And Contextual Actions
-
-Owner:
-
-DESIGNER / FRONTEND
-
-Status:
-
-Implemented and QA-passed on 2026-06-08.
-
-Diagnosis:
-
-The unified Admin navigation is implemented and QA-passed, but the chrome still feels heavier than
-the Admin workspace needs:
-
-- The left brand stack currently separates logo, `Admin`, and `Admin workspace` in a way that makes
-  the sidebar header feel taller and more important than the navigation.
-- The right-side page header still uses a large workspace/banner slab with an `Admin workspace`
-  kicker, duplicating the sidebar identity.
-- Top-right actions currently include global shell utilities such as `Back to Hito` and `Sign out`,
-  which competes with section-specific actions.
-- Admin account actions have no dedicated account/menu home, unlike the runner app profile pattern.
-- Work items needs `Add quick note`, but that should be a contextual page action, not a global
-  debugger/capture entry.
-
-Selected Admin chrome model:
-
-- Sidebar owns Admin identity.
-- Content owns current section title, description, and contextual actions.
-- Account/profile actions live at the bottom of the sidebar.
-- The oversized right-side workspace banner is removed.
-- No route should create a separate shell identity after the unified navigation work.
-
-Sidebar brand treatment:
-
-- Logo and `Admin` should sit on the same baseline.
-- Use the Hito logo at a compact shell height, aligned visually with the `Admin` wordmark/title.
-- `Admin` uses the existing display/title treatment, but should not overpower nav items.
-- Optional subtitle below:
-  - `Admin workspace`
-  - micro-label / muted
-  - tighter tracking than the current screenshot if uppercase feels too loud
-  - no extra card/surface
-- Spacing:
-  - header block should be compact enough that the nav begins quickly
-  - brand row gap should feel intentional, not like logo + separate page title
-  - subtitle should sit close under the brand row and read as support copy
-
-Content header treatment:
-
-- Remove the oversized gray/right-side workspace slab.
-- Page header should be an open content header:
-  - section title
-  - one concise subtitle/description
-  - optional contextual action slot aligned to the right on desktop
-- Do not repeat `Admin workspace` as a kicker if the sidebar already owns that identity.
-- Use existing Hito page/section typography roles.
-- Keep enough breathing room, but no heavy banner, large background block, or duplicate shell label.
-- On mobile, the header can stack title, description, and action, but should stay compact.
-
-Contextual action slot rules:
-
-The top-right header slot is for current-section actions only.
-
-| Section | Header action |
-| --- | --- |
-| Work items | `Add quick note` |
-| Users | `Add user` as disabled/future-safe placeholder only if product wants the seam visible |
-| Test accounts | No primary action unless a real local tester action already exists |
-| Overview | Empty |
-| Funnel & Usage | Empty |
-| Feedback | Empty |
-| AI & Entitlements | Empty unless a real entitlement/admin action exists |
-
-Rules:
-
-- Use Hito DS button primitives.
-- Empty action slot should collapse; do not reserve visual chrome for absent actions.
-- Placeholder actions must be visibly disabled or labelled as future-safe; no fake active `Add user`.
-- `Back to Hito` is not a contextual section action.
-- `Sign out` is not a contextual section action.
-
-Admin account/menu rules:
-
-- Add a bottom-left sidebar account/profile control, similar to the runner app profile trigger.
-- It should show compact admin identity:
-  - avatar/fallback initials or admin icon
-  - display name or `Admin`
-  - email/role/supporting line if available
-- Use existing Hito dropdown/menu primitives and runner shell account-menu anatomy where possible:
-  `hito-shell-profile-trigger`, `hito-shell-menu`, `hito-shell-menu-item`,
-  `hito-shell-menu-separator`, `hito-menu-text`, and `hito-menu-meta`.
-- Menu actions:
-  - `Sign out`
-  - `Account settings` disabled/future-safe unless implemented
-  - `Invite admin` disabled/future-safe if shown
-  - `Manage admin profile` disabled/future-safe if shown
-- Do not create a new menu system.
-- If admin identity data is not available, use stable fallback copy:
-  - primary: `Admin`
-  - secondary: `Local operations`
-
-Future online debugger / capture-overlay compatibility:
-
-- `Add quick note` remains a lightweight Work items action.
-- It must not imply live product-page element capture, debugger mode, or automatic dispatch.
-- Leave room for a future global capture/debugger entry in the Admin account/sidebar utility zone.
-- Future debugger entry should be visually distinct from `Add quick note`, for example:
-  - sidebar account/menu item: `Open capture mode`
-  - or quiet sidebar utility below nav, not a Work items content action
-- Do not implement debugger/capture overlay in this slice.
-- Do not consume the future debugger conceptual slot with a route-local Work items button.
-
-Frontend implementation notes:
-
-- Reuse the shared Admin navigation introduced in Slice 3A.
-- Update both `/admin/analytics` and `/admin/capture`; do not refine only one route.
-- Prefer extracting a small shared Admin shell/header/account component if it prevents duplicated
-  chrome, but do not introduce a broad framework.
-- Reuse `HitoLogo`, existing shell/profile/menu CSS classes, and dropdown primitives.
-- Move sign-out out of the page-header action cluster and into the admin account menu.
-- Decide whether `Back to Hito` belongs in the admin account menu or as a quiet utility; it must not
-  compete with contextual actions.
-- Preserve Work items filters/search/status tabs inside Work items content.
-- Preserve admin auth, loaders, user/test account data, Work items importer/readback, and Supabase
-  behavior.
-
-What not to touch:
-
-- Do not redesign every admin content section.
-- Do not change Work Items importer/model.
-- Do not mutate Supabase.
-- Do not implement fake `Add user`.
-- Do not implement online debugger/capture overlay.
-- Do not add manual workout CRUD.
-- Do not create a new visual system outside Hito DS.
-- Do not remove useful section titles/descriptions; only remove the oversized workspace banner and
-  duplicate shell identity.
-
-Acceptance criteria:
-
-- Sidebar brand shows Hito logo and `Admin` on one baseline.
-- Sidebar subtitle is quiet and reads `Admin workspace` or equivalent concise copy.
-- Right-side oversized workspace/banner slab is gone.
-- Content headers show only section title, concise subtitle/description, and optional contextual
-  action slot.
-- Top-right contextual action slot shows `Add quick note` on Work items.
-- Users either shows no action or a disabled/future-safe `Add user` placeholder.
-- Sections without meaningful actions have no empty action chrome.
-- Sign out/account actions live in the bottom-left sidebar account menu.
-- Account menu uses Hito DS dropdown/menu/profile primitives.
-- `Add quick note` remains distinct from any future online debugger/capture overlay.
-- Desktop and mobile remain one Admin workspace with no horizontal overflow.
-- Existing routes, auth, data loading, Work items filters, and admin actions continue to work.
-
-Implementation and QA closeout:
-
-- Browser Path Preflight: built-in Codex browser was used first against `http://localhost:8082/`.
-- Safari fallback was not used.
-- Targeted ESLint passed.
-- `npm run validate-admin-capture-backlog` passed.
-- `git diff --check` passed.
-- `npm run build` passed with existing Vite, Radix, and TanStack warnings only.
-- Shared sidebar nav was verified across Work items, Overview, Users, Test accounts, and Funnel.
-- Desktop proof showed one active sidebar item per section.
-- Sidebar brand visually uses the Hito logo plus `Admin`, with quiet `Admin workspace` subtitle.
-- Bottom-left account menu uses Hito avatar/dropdown styling and exposes disabled
-  `Account settings`, `Back to Hito`, and `Sign out` href.
-- Page-header chrome no longer contains topbar `Back to Hito` or `Sign out`.
-- Work items header shows title/subtitle plus `Add quick note`.
-- Users shows disabled `Add user`.
-- Overview, Test accounts, and Funnel show no fake contextual action.
-- Route-local `Manual handoff`, `Admin surface`, and oversized right-side `Admin workspace` slab are
-  absent.
-- Work Items list/search/status/source filters still render.
-- `q=Plan` smoke worked.
-- Mobile `375px` proof showed no horizontal overflow.
-- QA artifacts were saved under `qa-artifacts/screenshots/2026-06-08/admin-chrome-refinement-qa/`.
-
-Closeout decision:
-
-Slice 3C is complete. Admin chrome now has the accepted shell identity separation: sidebar owns Admin
-identity, content owns section title/subtitle/contextual actions, and account actions live in the
-bottom-left sidebar menu. This does not start `/hitoDS`, preset-card polish, onboarding hierarchy, or
-manual workout work.
-
-### Slice 3D: Hito DS Playground Consistency Contract
-
-Owner:
-
-DESIGNER / FRONTEND
-
-Status:
-
-Implemented, QA-passed, and design-approved on 2026-06-08.
-
-Diagnosis:
-
-`/hitoDS` is still the correct reference surface, but the visual grammar has drifted:
-
-- The page has a stable section topology through `NAV_GROUPS`, but section bodies vary too much.
-- Some playgrounds use a shared specimen shell, while the calendar/workout playground and several
-  component examples use route-local structures.
-- The current modal/dialog playground screenshot shows the main failure clearly: a large framed
-  preview, framed content inside the preview, a separate framed controls panel, and more framed
-  rows below. The result reads as card soup rather than a calm Hito workbench.
-- Controls, preview, captions, and supporting contracts do not always occupy the same relative
-  positions across sections.
-- Explanatory paragraphs compete with the actual visual specimens. The page often explains instead
-  of demonstrating.
-- Footer/caption patterns are inconsistent: some sections use contracts, some use captions, some use
-  paragraphs, and some use nested helper rows.
-- Foundations, Components, Patterns, playgrounds, and any Live View/equivalent section can feel like
-  separate pages because the side layout, section rhythm, and specimen anatomy jump.
-
-Selected playground model:
-
-Use one consistent `/hitoDS` playground anatomy:
-
-1. Section header:
-   - section label
-   - title
-   - one concise purpose sentence
-   - optional small status pill only when it adds operational meaning, such as `Specimen only`
-2. Playground shell:
-   - one low-chrome workbench row/grid
-   - no nested dashboard cards
-   - no framed panel stack unless the component being demonstrated is itself a panel
-3. Preview/stage:
-   - desktop: left side
-   - owns the visual specimen
-   - should look like the real product/component context, not a decorative fake card
-4. Controls:
-   - desktop: right side
-   - always reachable
-   - use Hito DS fields, choice toggles, buttons, icon buttons, menus, disclosures, and status pills
-   - no route-local dropdown/input/button styling
-5. Footer/caption:
-   - one shared row below the playground shell
-   - explains what the specimen proves and what it does not imply
-   - replaces long prose and repeated local contract cards
-
-Controls and preview placement:
-
-- Desktop default: preview/stage left, controls right.
-- Reason: `/hitoDS` should first show the visual result, then expose controls as a workbench rail.
-- Controls may be sticky inside the section only if the current shell already supports it without
-  layout jump. Sticky behavior is optional, not a v1 requirement.
-- Intermediate widths may stack controls above preview only when a two-column layout would compress
-  the preview below useful fidelity.
-- Mobile/narrow default:
-  - section header
-  - compact controls
-  - preview
-  - caption/footer
-- Mobile controls can use a disclosure if there are many controls, but they must not be hover-only
-  or hidden behind unclear icons.
-- The preview must never force a cramped desktop 7-column grid when the content cannot fit. Calendar
-  specimens should switch to their mobile/list anatomy instead.
-
-Surface and border rules:
-
-- Bordered cards are rare.
-- Nested bordered cards are exceptional.
-- A playground may use at most one outer boundary when a boundary is needed for grouping.
-- Preview/stage surfaces should usually be open:
-  - light neutral stage
-  - dark neutral stage when demonstrating dark/overlay behavior
-  - subtle wash only when contrast is required
-  - divider-only separation when enough
-- A border is allowed when:
-  - the demonstrated component owns a border
-  - the stage needs a minimum boundary to separate from the page background
-  - a table/dialog/shell specimen requires an actual bounded context
-- A border is not allowed just to make every row or helper note feel like a card.
-- Cards are allowed only when demonstrating card/surface behavior or when a real product component
-  is card-shaped.
-- Component galleries should prefer open grids, rows, dividers, and spacing over boxed tiles.
-- Dense examples should use row grouping and section dividers instead of wrapping each option in its
-  own framed card.
-
-Typography and text reduction rules:
-
-- Each section gets one concise intro. Avoid repeating the same product philosophy in every section.
-- Playground explanatory copy should be reduced to visual proof plus small captions.
-- `Use for` / `Do not use for` should become compact caption/footer content, paired rows, or small
-  disclosure content, not large bordered blocks.
-- Status copy should stay small and operational:
-  - `Specimen only`
-  - `Static display`
-  - `Reference`
-- Do not overuse uppercase labels. Use existing Hito type roles and quiet support text.
-- If a state is visible in the preview, do not repeat it in a paragraph unless the boundary is
-  important, such as "visual only, not shipped CRUD."
-
-Footer/caption rules:
-
-- Every playground should use one shared footer/caption location below the preview/control shell.
-- Recommended content shape:
-  - `Proves:` one short phrase
-  - `Does not imply:` one short phrase
-  - optional `Used in:` only when source ownership matters
-- The caption/footer should use existing Hito caption/list-row copy roles.
-- Do not create a second footer inside the preview unless the previewed component itself has a
-  footer, such as a dialog.
-- Do not place the caption in a large card. Use divider, spacing, or a quiet row group.
-
-Navigation and sidebar stability rules:
-
-- Keep `NAV_GROUPS` as the source of section topology.
-- Do not invent a new `/hitoDS` nav framework or taxonomy in this slice.
-- Preserve the current parent/child nested model:
-  `Overview`, `Foundations`, `Components`, `Patterns`, and `Backlog` or future `Specs` only if a
-  later naming slice explicitly approves it.
-- Sidebar width, content left edge, active parent/child state, and jump-menu behavior should remain
-  stable when moving between Foundations, Components, Patterns, playgrounds, and Live View/equivalent
-  sections.
-- Active child state must be visible without creating a second separate subsection rail.
-- Deep links such as `/hitoDS#calendar-workout-playground` must continue to scroll to the section
-  and activate the correct group/child.
-- The section layout must not jump because one group uses a different header/sidebar/footer pattern.
-
-Implementation priorities:
-
-1. Normalize shared `/hitoDS` playground/specimen anatomy and class names first.
-2. Apply it to the highest-drift playgrounds:
-   - calendar/workout playground
-   - modal/dialog playground
-   - one dense component playground such as inputs/buttons or async toasts
-3. Reduce explanatory text and convert repeated contract cards into the shared caption/footer.
-4. Replace nested framed wrappers with open preview stages, dividers, or row groups.
-5. Verify the nested sidebar and mobile jump behavior remains stable across groups.
-6. After the first slice proves the grammar, continue section-by-section through Foundations,
-   Components, Patterns, and any Live View/equivalent section.
-
-First frontend slice:
-
-FRONTEND should implement the smallest useful proof slice:
-
-- Create or normalize shared `/hitoDS`-only playground anatomy using existing Hito DS primitives.
-- Keep the implementation small: a helper component and/or CSS classes are acceptable if they delete
-  repeated local structure, but do not create a new UI kit.
-- Migrate:
-  - calendar/workout playground
-  - modal/dialog playground
-  - one dense component playground
-- Preserve anchors, state controls, accessibility states, and existing component examples.
-- Do not touch product surfaces outside `/hitoDS`.
-
-Acceptance criteria:
-
-- `/hitoDS` playgrounds read as one workbench, not separate demo apps.
-- Preview/stage and controls use the same relative placement across playground sections.
-- The calendar/workout playground no longer reads as nested specimen cards.
-- The modal/dialog playground no longer presents a large fake card stack as the normal modal
-  reference.
-- Captions/footers use one shared pattern.
-- Explanatory text is shorter and visual examples are more prominent.
-- Borders are purposeful and minimal.
-- Section/sidebar layout does not jump between Foundations, Components, Patterns, playgrounds, and
-  Live View/equivalent sections.
-- Desktop, intermediate width, and 375px mobile render without horizontal overflow.
-- Deep links and active nested navigation continue to work.
-- Product components outside `/hitoDS` are unchanged.
-
-What not to touch:
-
-- Do not redesign product pages.
-- Do not change product component behavior outside `/hitoDS`.
-- Do not change backend/product data.
-- Do not remove accessibility/focus/disabled/error examples.
-- Do not add custom local controls where Hito DS controls already exist.
-- Do not introduce a separate playground framework.
-- Do not imply visual-only manual-workout or future authoring states are shipped behavior.
-
-Implementation closeout:
-
-- Added shared `HitoDsPlayground` anatomy.
-- Applied it to calendar/workout, modal/dialog, and async toast playgrounds.
-- Shared anatomy owns section header, neutral preview/stage, controls area, and footer/caption rows.
-- Desktop uses preview/stage left and controls right.
-- Mobile uses controls before preview where appropriate.
-- Caption rows use `Proves`, `Does not imply`, and `Used in`.
-- Borders were reduced to purposeful component chrome only.
-- `NAV_GROUPS`, section IDs, deep links, and active parent/child state were preserved.
-
-QA evidence:
-
-- Browser Path Preflight: built-in Codex browser was used first against
-  `http://localhost:8082/hitoDS`.
-- Safari fallback was not used.
-- Targeted ESLint passed.
-- `git diff --check` passed.
-- `npm run build` passed.
-- Calendar/workout, modals, and async-actions all use shared `HitoDsPlayground` anatomy.
-- DOM proof confirmed shared labels `Proves`, `Does not imply`, and `Used in`.
-- Modal controls and async toast interactions worked.
-- `#calendar-workout-playground` expands `Patterns` and marks `Calendar` active with
-  `aria-current="location"`.
-- Mobile `375px` proof showed no horizontal overflow.
-- QA artifacts were saved under
-  `qa-artifacts/screenshots/2026-06-08/hito-ds-playground-anatomy-qa/`.
-
-Design evidence:
-
-- Touched playgrounds now feel like one Hito DS workbench rather than unrelated demo-card surfaces.
-- Low-chrome stage removes card-inside-card feeling.
-- Captions replace long explanatory blocks.
-- Calendar, Modals, and Async toasts share anatomy while preserving context.
-- No design blockers remain.
-
-Technical hygiene note:
-
-- QA/design notes mentioned hydration mismatch console errors around `/hitoDS` active nav/SSR state.
-  This is a non-blocking technical hygiene issue for a later focused frontend cleanup or QA
-  regression slice. It did not block Slice 3D design acceptance or QA pass.
-
-Closeout decision:
-
-Slice 3D is complete for the shared playground anatomy proof slice. Further `/hitoDS` section-by-
-section normalization can continue later if new drift appears, but it is not the next active gate.
-
-### Slice 4: Watch-Required Onboarding Contract And Preset Hierarchy
-
-Owner:
-
-BACKEND first, then FRONTEND after backend contract QA.
-
-Status:
-
-Implemented and QA-passed on 2026-06-08.
-
-Designer closeout:
-
-The Plan Preset onboarding redesign direction is accepted:
-
-- Presets are the primary fast path.
-- Advanced custom is secondary.
-- Option B is selected: basic setup at the top, Plan Preset cards immediately below, and Advanced
-  custom as a secondary disclosure/button below cards.
-- Primary setup fields are age, height, weight, running level, and available running days per week.
-- Distance is selected through cards, not through the primary setup form.
-- Guidance style, target date/time, detailed comments, injury/caution, and unusual constraints move
-  to Advanced custom.
-- Preset cards should be bold hero cards with strong distance identity and backend-shaped
-  summary/date/workout-mix/metric/fit data.
-
-Product/system decision:
-
-Hito no longer supports "without watch/app" as a normal new-plan product option.
-
-This is a product/system contract change, not merely a hidden UI default:
-
-- remove user-facing watch ownership choice from primary Plan Preset onboarding
-- remove "no watch/app" as a selectable new-plan option
-- assume every supported new-plan creation flow has a watch/app execution surface
-- keep watch/app execution server-owned for Plan Presets and Advanced custom creation
-- keep metric truth separate from execution-surface truth
-
-Pre-implementation source audit findings:
-
-- [Plan Preset schema](../../../src/lib/plan-presets/schema.ts) previously included
-  `missing_watch_app_support` as a preset reason code.
-- [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts) previously computed
-  `missingWatchSupport` from `execution.watchAccess !== "watch_or_app"` and disables cards when
-  watch/app support is absent.
-- [First-plan authoring utils](../../../src/lib/first-plan-authoring-utils.ts) keep
-  `FIRST_PLAN_WATCH_ACCESS_VALUES = ["none", "watch_or_app", "unknown"]` for legacy/readback
-  compatibility, and previously used `watchAccess: "unknown"` as the new-plan default.
-- [Structured first-plan onboarding](../../../src/lib/structured-first-plan-onboarding.ts) previously
-  accepts optional `execution.watchAccess` and formats review copy for watch/app, no watch/app, or
-  unknown access.
-- [Onboarding form model](../../../src/components/onboarding/onboarding-form-model.ts) previously
-  exposes `WATCH_ACCESS_OPTIONS`, including `Not sure yet`, `Watch or app`, and `No watch/app`.
-- [Structured plan constructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx)
-  previously rendered a `Target tools` section and a `Guidance style` section in primary setup.
-- [Archived watch-executable contract](../archive/2026-06-04-watch-executable-workout-targets-and-metric-truth-contract.md)
-  already established that `none`, `unknown`, and `effort_only` should not be normal primary
-  structured output, while legacy rows remain readable.
-
-Watch-required contract:
-
-- Primary Plan Preset onboarding must not ask whether the runner has a watch or app.
-- Supported new-plan creation must assume `watch_or_app` before preset eligibility and metric-mode
-  resolution.
-- Plan Preset eligibility must not return `missing_watch_app_support` or require
-  `execution.watchAccess` as a missing field in the normal redesigned primary setup.
-- Advanced custom may expose guidance/style, target date/time, comments, and caution context, but it
-  must not expose a "without watch/app" option.
-- Backend-owned metric truth remains strict:
-  watch/app support does not create pace truth without backend-approved benchmark/provider truth.
-  watch/app support does not create executable HR truth without personal HR-zone truth.
-  target time alone is not pace truth.
-  age-estimated HR remains advisory/readback-only.
-  `structure_only_executable` remains valid when pace/HR truth is unavailable.
-
-Legacy compatibility decision:
-
-- Keep old `none`, `unknown`, and `effort_only` values readable for imported plans, persisted old
-  authoring snapshots, diagnostics, and historical QA fixtures.
-- Do not present `none` or `unknown` as selectable new-plan options.
-- Do not delete legacy readback compatibility in this slice.
-- If a stale caller submits explicit `none` or `unknown` into a current supported new-plan creation
-  action, backend must handle it boundedly without restoring a no-watch product path. The preferred
-  implementation is to normalize the supported new-plan boundary to server-owned `watch_or_app` and
-  record review/metric-policy copy that Hito assumes watch/app execution; if source audit proves
-  explicit rejection is safer for one legacy seam, document that exception and keep it out of
-  primary onboarding.
-
-Backend scope:
-
-- update execution-mode normalization/defaults for supported new-plan creation
-- update Plan Preset eligibility/card resolver so watch/app support is assumed and not a card
-  blocker
-- remove or demote `missing_watch_app_support` from new Plan Preset card behavior
-- preserve preset review/confirm/persistence exactness and `plan_preset_v1` metadata
-- preserve Advanced custom blueprint boundary and `ai_first_plan_blueprint_v1` behavior
-- keep legacy/import/readback parsers compatible enough for old saved rows and diagnostics
-- add fixtures proving the new contract
-
-Frontend follow-up scope after backend QA:
-
-- remove the primary `Target tools` section from setup
-- move `Guidance style`, target date/time, comments, injury/caution, and unusual constraints into
-  Advanced custom
-- make distance selection card-driven for Plan Presets
-- render backend-shaped card state, summary/date/mix/metric/fit truth only
-- do not compute eligibility, duration, metric truth, or workout mix locally
-- do not add 5K as a shipped preset card unless backend support exists first
-
-What not to touch:
-
-- do not weaken pace or HR gates
-- do not infer pace from watch/app presence alone
-- do not infer personal HR from age/height/weight/watch presence
-- do not remove legacy readback compatibility
-- do not touch Plan Preset confirm/persistence behavior
-- do not touch manual workout CRUD
-- do not add new preset families
-- do not add DB/schema changes
-- do not create a new visual system outside Hito DS
-
-Validation expectations:
-
-- targeted ESLint for changed backend/frontend files
-- Plan Preset harness proving 10K, Half Marathon, and Marathon cards remain available when primary
-  setup omits execution support
-- Plan Preset review draft harness proving no-benchmark presets remain `structure_only_executable`
-  with no fake pace/HR
-- metric fixture proving recent 5K truth can still unlock backend-gated pace where appropriate
-- structured custom/blueprint smoke proving Advanced custom remains separate and
-  `ai_first_plan_blueprint_v1` remains the custom production default
-- source proof that no frontend primary setup option still says `No watch/app`, `Not sure yet`, or
-  equivalent no-watch selection
-- `git diff --check`
-- `npm run build`
-
-Implementation note, 2026-06-08:
-
-- Added a supported-new-plan execution normalizer that keeps legacy `none`/`unknown` readable while
-  normalizing Plan Preset and structured first-plan creation to server-owned `watch_or_app`.
-- Removed `missing_watch_app_support` from the Plan Preset runtime reason-code contract and
-  eligibility blocker.
-- Updated Plan Preset and first-plan release-gate fixtures so stale omitted/`unknown`/`none`
-  execution input proves watch/app normalization instead of correction.
-- Removed the primary onboarding `Target tools` selectable options as the direct UI contract cleanup;
-  broader preset-first hierarchy redesign remains frontend follow-up.
-- Validation evidence is recorded in the Slice 4 backend closeout report for this run.
-
-QA closeout evidence:
-
-- Browser Path Preflight: built-in Codex browser was used first against `localhost:8082`.
-- Safari fallback was not used.
-- Targeted ESLint passed.
-- Plan Preset harness passed.
-- Doctrine validator passed.
-- Blueprint smoke passed.
-- `npm run validate-admin-capture-backlog` passed.
-- `git diff --check` passed.
-- `npm run build` passed.
-- Backend normalization forces `watch_or_app` for supported new-plan creation.
-- Omitted, stale `unknown`, and stale `none` watch inputs do not block eligible Plan Preset cards.
-- `missing_watch_app_support` is absent from the Plan Preset runtime contract.
-- Pace truth still requires benchmark truth.
-- HR executable targets remain unavailable without personal HR-zone truth.
-- Age-estimated HR remains advisory.
-- Target time without benchmark routes to Advanced custom instead of unlocking pace.
-- Legacy values remain readable but not selectable.
-- Primary onboarding UI no longer shows `Target tools`, `No watch/app`, `Not sure yet`, watch
-  ownership, or HR monitor ownership.
-- Preset cards render.
-- Review scaffold opens.
-- `Create preset plan` appears but was not clicked by scope.
-- `375px` mobile proof showed no horizontal overflow.
-- QA artifacts were saved under
-  `qa-artifacts/screenshots/2026-06-08/watch-required-onboarding-contract-qa/`.
-
-Closeout decision:
-
-Slice 4 is complete for the accepted watch-required contract. The remaining onboarding work is visual
-hierarchy and interaction architecture, not backend watch eligibility. Keep metric-truth gates,
-legacy readback compatibility, and Plan Preset confirm/persistence boundaries unchanged.
-
-### Slice 5: Progressive Plan Preset Cards And Post-Selection Preference Refinement
-
-Owner:
-
-BACKEND first, then FRONTEND after backend contract QA.
-
-Status:
-
-Backend Slice 5A is implemented and QA-passed on 2026-06-08. Frontend Slice 5B is implemented and
-QA-passed on 2026-06-08. Backend Slice 5C is selected as the next bounded cleanup slice for
-no-behavior-change progressive Plan Preset policy decomposition.
-
-Reason:
-
-The watch-required backend contract is ready, but the next product issue is not only visual
-hierarchy. The user clarified that Plan Preset cards should appear early, before every scheduling
-preference is known, so the runner first sees clear plan choices rather than a form filter.
-
-Current runtime still treats card loading as dependent on a fully structured setup-shaped input.
-That makes incomplete setup feel like a hard gate even when the correct product state is "show the
-cards, then refine preferences after selection."
-
-Source inspection findings:
-
-- [Plan Preset schema](../../../src/lib/plan-presets/schema.ts) currently aliases
-  `planPresetEligibilityInputSchema` to the full structured first-plan onboarding schema.
-- [Plan Preset schema](../../../src/lib/plan-presets/schema.ts) already includes
-  `needs_more_info`, but [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts)
-  mostly returns `recommended`, `available`, `custom_fit`, or `unavailable`.
-- [Onboarding gate](../../../src/components/OnboardingGate.tsx) gates card loading through
-  `isPresetPrimarySetupReady`.
-- [Onboarding form model](../../../src/components/onboarding/onboarding-form-model.ts) currently
-  makes preset basics require age, height, weight, and running days/week.
-- [Onboarding gate](../../../src/components/OnboardingGate.tsx) uses
-  `buildPlanPresetStructuredInput`, which still builds a full structured input and resets advanced
-  preferences for the preset path.
-- [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx) allows review only for
-  `recommended` and `available`, so `needs_more_info` requires an explicit post-selection
-  refinement decision.
-
-Progressive card model decision:
-
-- The minimum input to show cards is basic profile plus running level. Weekly running days may be
-  unknown initially if backend can return safe defaults.
-- Shipped preset families stay visible by default:
-  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
-- `unavailable` is reserved for true hard blockers, not incomplete setup.
-- Incomplete setup maps to `needs_more_info` or an equivalent backend-shaped soft state.
-- Running level influences recommendation strength and activation. It should not hide shipped cards
-  unless the runner's data clearly makes a card unsafe or inappropriate.
-- Weekly running days support three levels of truth:
-  backend default suggestion before user input, user-selected available days, and backend-selected
-  optimal rhythm when still unknown.
-- Long-run day and fixed-rest preferences move to post-selection refinement when needed.
-- Review draft becomes the boundary where missing preferences must be resolved before confirm.
-- Confirm/persistence remains unchanged.
-- Metric truth remains unchanged:
-  no fake pace from watch/app presence, no executable HR without personal HR-zone truth, and
-  `structure_only_executable` remains valid when pace/HR truth is missing.
-
-Backend ownership:
-
-- partial eligibility/card input contract
-- card state and recommendation truth
-- hard blocker vs soft signal decisions
-- default weekly rhythm suggestion
-- post-selection preference questions/options
-- start/end date and duration summaries
-- metric honesty and level-fit copy
-- review draft exactness
-- confirm metadata for selected card, resolved rhythm, rest/long-run preferences, summary fields,
-  and metric policy
-
-Frontend ownership:
-
-- render all backend-returned cards early
-- show recommendation, needs-preferences, and inactive states from backend view models
-- collect post-selection preferences
-- request backend recomputation/review when preferences change
-- render backend-shaped review and confirm states
-- never own schedule generation, eligibility computation, date math, metric truth, workout
-  templates, recipe rows, or persistence rules
-
-Post-selection preference refinement decision:
-
-- Selecting a card before all preferences are known should not immediately fail.
-- If the selected card needs more preference truth, the backend should return required refinement
-  prompts/options for weekly running days, long-run day, fixed rest days, or safe rhythm defaults.
-- Frontend should render those backend-shaped questions and resubmit for review.
-- A review draft token/checksum should only be issued after the selected preset has enough resolved
-  preference truth to expand exact canonical `training-plan-v2` rows.
-- Confirm remains the same explicit mutation boundary and must not accept unresolved preference state.
-
-Running Coach matrix normalization:
-
-The Running Coach scenario matrix is accepted as coaching foundation, but BACKEND must implement the
-normalized product contract below instead of copying coaching synonyms directly. The outdated
-"no watch/app truth -> correction required" row is explicitly rejected for new-plan creation because
-Slice 4 made watch/app execution a supported product assumption. Legacy no-watch/unknown values
-remain readable only; they are not selectable new-plan card inputs.
-
-Canonical card-state enum proposal:
-
-| State | Backend meaning | Allowed next action |
-| --- | --- | --- |
-| `recommended` | Best current fit from known inputs and shipped recipe support. | Open review if preference truth is resolved; otherwise open refinement first. |
-| `available` | Safe shipped option, not the strongest recommendation. | Open review if resolved; otherwise open refinement first. |
-| `needs_more_info` | Visible card that needs backend-declared preference/refinement answers before review. | Open refinement, not review token issuance. |
-| `not_ideal` | Selectable but de-emphasized because known inputs make it less suitable without making it unsafe. | Open refinement/review with warning copy from backend. |
-| `custom_fit` | Visible card state indicating Advanced custom is the better route for this setup. | Route to Advanced custom; no preset review token. |
-| `unavailable` | True hard blocker for the preset family. | No preset review; show backend reason. |
-
-Canonical reason-code proposal:
-
-| Reason code | Category | Meaning |
-| --- | --- | --- |
-| `missing_minimum_profile` | soft | Age/weight and/or height are missing or invalid before reliable card summaries can be shaped. |
-| `missing_running_level` | soft | Running level is missing; cards stay visible but cannot be recommended. |
-| `missing_weekly_days` | soft | Weekly running days are unknown; backend may show default rhythm suggestions and require refinement before review. |
-| `needs_rest_day_preferences` | soft | Fixed rest days are optional but useful before exact review expansion. |
-| `needs_long_run_preference` | soft | Long-run day is optional but useful before exact review expansion. |
-| `level_too_low_for_family` | hard or not-ideal | Known level makes the family unsafe/inappropriate or less ideal. |
-| `insufficient_availability` | hard | Explicit weekly days are below the family minimum. |
-| `excess_availability_for_recipe` | soft | Explicit weekly days exceed v1 recipe range; backend can cap or ask refinement if safe. |
-| `fixed_rest_conflict` | hard | Explicit rest days leave too few available run days or conflict with selected rhythm. |
-| `long_run_conflict` | hard | Preferred long-run day is explicitly blocked or impossible for selected rhythm. |
-| `target_date_present` | custom | Target-date plans use Advanced custom in preset v1. |
-| `target_time_present` | custom | Target-time plans use Advanced custom in preset v1. |
-| `material_comment_present` | custom | Detailed comments/unusual constraints route to Advanced custom. |
-| `injury_or_pain_signal` | custom | Injury, pain, rehab, or caution signals route to Advanced custom. |
-| `workout_type_removal_request` | custom | Requests to remove/ban key workout types route to Advanced custom or later manual editing. |
-| `metric_truth_insufficient_for_target` | custom | Target specificity requires benchmark/provider truth; target-time preset is not unlocked. |
-| `recipe_not_available` | hard | Shipped v1 recipe cannot safely support the known combination. |
-
-Backend-ready scenario matrix:
-
-| Input stage / scenario | 10K Foundation | Half Marathon Balanced | Marathon Base | Reason codes | Follow-up requirements | Default rhythm suggestion | Next allowed action |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| No minimum profile | `needs_more_info` | `needs_more_info` | `needs_more_info` | `missing_minimum_profile` | age, weight, height, running level | none until profile valid | collect basics |
-| Age + weight only | `needs_more_info` | `needs_more_info` | `needs_more_info` | `missing_minimum_profile`, `missing_running_level` | height and running level | none until profile valid | collect basics |
-| Age + weight + height, level missing | `needs_more_info` | `needs_more_info` | `needs_more_info` | `missing_running_level` | running level | neutral preview only | collect level |
-| New to running | `recommended` or `needs_more_info` if weekly rhythm unknown | `not_ideal` | `unavailable` | `missing_weekly_days`, `level_too_low_for_family` | weekly days before review; rest/long-run optional | 3 days/week, conservative run/walk rhythm | 10K refinement; Half de-emphasized; Marathon blocked |
-| Beginner | `recommended` or `needs_more_info` if weekly rhythm unknown | `not_ideal` until enough days/base truth | `unavailable` | `missing_weekly_days`, `level_too_low_for_family` | weekly days before review; rest/long-run optional | 3-4 days/week, foundation rhythm | 10K refinement; Half refinement if days/base support; Marathon blocked |
-| Running/recreational | `available` | `recommended` or `needs_more_info` if weekly rhythm unknown | `not_ideal` unless 5 days/week or benchmark/base support | `missing_weekly_days`, `level_too_low_for_family` when applicable | weekly days before review; long-run preference optional | 4 days/week; long run weekend fallback | 10K/Half refinement; Marathon refinement only if support exists |
-| Experienced/performance | `available` | `recommended` | `available` or `recommended` when availability supports it | `missing_weekly_days` if unknown | weekly days before review; long-run preference optional | 4-5 days/week depending family | refinement/review for all supported families |
-| Weekly days unknown after minimum profile | `needs_more_info` | `needs_more_info` | `needs_more_info` | `missing_weekly_days` | choose days/week or accept backend suggested rhythm | 10K 3, Half 4, Marathon 5 if level supports | open refinement, not review token |
-| 1 day/week explicit | `unavailable` | `unavailable` | `unavailable` | `insufficient_availability` | none for preset v1 | none | route to Advanced custom or future restart path |
-| 2 days/week explicit | `not_ideal` or `unavailable` by level | `unavailable` | `unavailable` | `insufficient_availability` | none if hard blocked; otherwise warning review only if recipe supports | 2-day foundation only if backend approves; otherwise none | 10K only if safe; otherwise Advanced custom |
-| 3 days/week explicit | `recommended` for beginner/foundation | `not_ideal` or `unavailable` by level/base support | `unavailable` | `level_too_low_for_family`, `insufficient_availability` | optional rest/long-run preference | 3-day foundation | 10K review/refinement; Half only if safe; Marathon blocked |
-| 4 days/week explicit | `available` | `recommended` | `not_ideal` by level/base support | `level_too_low_for_family` when applicable | optional rest/long-run preference | 4-day balanced rhythm | 10K/Half review/refinement; Marathon warning/refinement if safe |
-| 5 days/week explicit | `available` | `available` | `recommended` for experienced/performance or supported recreational | none or `level_too_low_for_family` | optional rest/long-run preference | 5-day marathon/base rhythm | review/refinement for supported families |
-| Fixed rest days leave too few open days | `unavailable` | `unavailable` | `unavailable` | `fixed_rest_conflict` | change rest days or weekly days | none | refinement only, no review token |
-| Preferred long-run day is blocked | `needs_more_info` | `needs_more_info` | `needs_more_info` | `long_run_conflict` | choose another long-run day or remove fixed-rest conflict | nearest safe weekend/latest-available fallback | refinement only, no review token |
-| No fixed rest day preference | `available` or current family state | current family state | current family state | none | optional rest-day preference | backend chooses rest days from safe rhythm | review can proceed if weekly days resolved |
-| No long-run day preference | current family state | current family state | current family state | none | optional long-run preference | Sunday, then Saturday, then latest safe available weekday | review can proceed if weekly days resolved |
-| Target date present | `custom_fit` | `custom_fit` | `custom_fit` | `target_date_present` | none for preset v1 | none | Advanced custom |
-| Target time present | `custom_fit` | `custom_fit` | `custom_fit` | `target_time_present`, optional `metric_truth_insufficient_for_target` | none for preset v1 | none | Advanced custom |
-| Material comment/unusual constraint | `custom_fit` | `custom_fit` | `custom_fit` | `material_comment_present` | none for preset v1 | none | Advanced custom |
-| Injury/pain/caution signal | `custom_fit` | `custom_fit` | `custom_fit` | `injury_or_pain_signal` | none for preset v1 | none | Advanced custom |
-| Benchmark missing | current family state | current family state | current family state | none | none unless target-time/custom route requested | structure-only executable metric mode | review can proceed without pace/HR targets |
-| Recent 5K benchmark present | current family state | current family state | current family state | none | none | pace-capable only when backend metric gates allow | review can include broad pace targets where allowed |
-| Workout-type removal request | `custom_fit` | `custom_fit` | `custom_fit` | `workout_type_removal_request` | none for preset v1 | none | Advanced custom or future manual editing |
-| No watch/app truth | current family state | current family state | current family state | none | none | watch/app assumed for supported new-plan creation | do not block; keep metric gates strict |
-
-Post-selection preference contract:
-
-| Selected family | Required before review token | Optional before review | Backend default/floating behavior | Review readiness |
-| --- | --- | --- | --- | --- |
-| `10K Foundation` | valid profile, running level, weekly days that satisfy recipe minimum, no hard blockers | fixed rest days, long-run day | suggest 3 days/week when unknown; choose safe rest days; long-run fallback Sunday/Saturday/latest available | issue review token only after weekly days are resolved |
-| `Half Marathon Balanced` | valid profile, running level/base support, weekly days that satisfy recipe minimum, no hard blockers | fixed rest days, long-run day, benchmark | suggest 4 days/week when unknown; long run weekend fallback; structure-only if no benchmark | issue review token only after weekly days/base support are resolved |
-| `Marathon Base` | valid profile, level/base support, explicit or backend-accepted 4-5 day rhythm, no hard blockers | fixed rest days, long-run day, benchmark | suggest 5 days/week for supported runners; conservative long-run fallback; no target-time specificity | issue review token only after marathon support and rhythm are resolved |
-
-Review/confirm metadata preservation:
-
-- selected `cardId`, recipe id, recipe version, source kind `plan_preset_v1`, and
-  `preset_recipe_expanded`
-- normalized input stage and resolved follow-up answers
-- resolved running days/week, fixed rest days, preferred or backend-selected long-run day, and
-  default rhythm source
-- duration weeks, start date, estimated end date, program family, workout mix, key workout types,
-  why-this-fits copy, level-fit copy, and metric mode summary
-- reason codes shown before review and whether they were resolved, accepted as warning, or routed to
-  Advanced custom
-- metric truth summary: benchmark source, pace permission, HR permission, advisory/default HR state,
-  and `structure_only_executable` vs pace-capable mode
-- row counts and canonical draft checksum/token metadata
-
-Backend Slice 5A scope:
-
-- Add or refactor a backend-owned partial Plan Preset card input contract.
-- Return visible cards for the three shipped preset families before all preferences are complete.
-- Use `needs_more_info` or equivalent soft state for incomplete preference requirements.
-- Preserve current review/confirm behavior for fully resolved inputs.
-- Add backend-shaped post-selection preference requirements for weekly running days, long-run day,
-  and rest-day preferences.
-- Preserve exact draft expansion and persistence when preferences are resolved.
-- Keep `getPlanPresetCards`, `reviewPlanPresetDraft`, and `confirmPlanPresetDraft` behavior stable
-  where possible; if additive contract changes are required, document them precisely.
-- Do not add frontend implementation in this slice.
-
-Implementation note, 2026-06-08:
-
-- Added `planPresetCardInputSchema` as the partial/discovery contract for Plan Preset cards while
-  keeping `planPresetEligibilityInputSchema` as the full resolved review/confirm contract.
-- `getPlanPresetCards` now accepts partial card input and routes partial/discovery requests through
-  `plan-presets/progressive-cards.ts`, returning visible shipped cards with `needs_more_info`,
-  `not_ideal`, `custom_fit`, or `unavailable` states plus backend-shaped post-selection refinement
-  requirements.
-- Shared card summary fields moved to `plan-presets/card-summary.ts` so resolved and progressive
-  cards do not duplicate duration/date/program-summary truth.
-- `reviewPlanPresetDraft` and `confirmPlanPresetDraft` still require fully resolved input and still
-  own review-token/checksum and exact row expansion boundaries.
-- Harness coverage was added for partial profile, missing weekly rhythm, 2/3/4/5-day state ladder,
-  fixed-rest conflict, long-run conflict, custom routing, and metric-truth preservation.
-
-QA closeout evidence, 2026-06-08:
-
-- Browser was not used because this was backend/source/harness validation only.
-- Source inspection covered Plan Preset schema/resolver/progressive-card/action/review seams, active
-  plan notes, onboarding panel readback label, and preset validation scripts.
-- Targeted ESLint passed.
-- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts` passed.
-- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts` passed.
-- Blueprint mock smoke passed and remained `ai_first_plan_blueprint_v1`.
-- `npm run validate-admin-capture-backlog` passed.
-- `git diff --check` passed.
-- `npm run build` passed.
-- Read-only progressive-state probe passed.
-- Partial card discovery works through `planPresetCardInputSchema`.
-- Empty/missing setup returns `needs_more_info`.
-- One-day availability returns `unavailable`.
-- 2/3/4/5-day scenarios produce bounded `not_ideal`, `available`, or `recommended`.
-- Progressive cards remain non-mutating with `sourceKind: plan_preset_v1`, `persisted: false`, and
-  safety flags.
-- Progressive recommended/available cards do not become review-ready until post-selection
-  preferences are provided.
-- Required refinement fields include goal distance/style/terrain and preferred long-run day, with
-  additional benchmark/fitness refinement where needed.
-- Partial card input cannot reach review draft expansion.
-- `reviewPlanPresetDraft` and `confirmPlanPresetDraft` still require full schemas,
-  token/checksum path, and server-owned canonical rebuild.
-- No-benchmark and stale no-watch inputs remain `structure_only_executable`.
-- Benchmark plus recent 5K can still become `pace_executable`.
-- Target time alone does not unlock pace.
-- HR remains non-executable/advisory without personal HR zones.
-- No frontend route, DB/schema, persistence, OpenAI, confirm behavior, manual workout behavior, or
-  new preset family was introduced.
-- No stale first-plan-preset runtime references were found.
-
-Maintainability follow-up:
-
-- [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts) is now about
-  `707` lines. This is not a Slice 5A blocker, but it crosses the 700-line hotspot threshold and
-  should be decomposed before adding more progressive states or new preset families.
-
-Closeout decision:
-
-Backend Slice 5A is complete for the progressive Plan Preset card contract. Frontend implementation
-is now unblocked for rendering backend-shaped progressive states and post-selection refinement, but
-it must not compute eligibility, schedule/rhythm, date, metric, recipe, review-readiness, or
-persistence truth locally.
-
-Frontend Slice 5B scope:
-
-- implement the preset-first hierarchy and bold hero card redesign using the new backend contract
-- call the progressive card endpoint with partial setup input
-- render all backend-returned shipped cards early
-- support states:
-  `recommended`, `available`, `needs_more_info`, `not_ideal`, `custom_fit`, and `unavailable`
-- show backend reason/refinement copy
-- allow selecting cards that need refinement only into a refinement step, not directly into review
-- collect backend-required post-selection preferences
-- request backend recomputation/review after preferences are resolved
-- only show review/create when backend returns review-ready/full review state
-- keep Advanced custom secondary and separate
-- keep review scaffold and `Create preset plan` behavior intact
-- preserve unavailable CTA polish:
-  no visible `Unavailable` badge, disabled CTA with tooltip reason
-- preserve no hidden selected default
-- preserve no `Recommended` badge if the current design decision remains to hide it
-- preserve mobile `375px` no-overflow
-- do not compute backend truth locally
-
-5K decision:
-
-- Do not show 5K as a shipped preset card because backend Plan Preset v1 supports only `10K
-  Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
-- If Frontend needs a visual placeholder for design balance, it must be clearly unavailable or
-  coming soon and must not route to review/confirm.
-- Prefer keeping unimplemented cards out of the primary shipped set unless the active plan is
-  explicitly widened.
-
-What not to touch:
-
-- do not add new preset families
-- do not claim 5K shipped unless backend exists
-- do not change Plan Preset persistence/confirm behavior
-- do not touch manual workout CRUD
-- do not add active-plan replacement/refresh
-- do not weaken metric-truth gates
-- do not run `--archive-stale`
-- do not start broad admin cleanup in this slice
-- do not convert progressive availability into a frontend-only card visibility patch
-
-Validation expectations:
-
-- targeted ESLint for changed frontend files in Frontend Slice 5B
-- `git diff --check`
-- `npm run build`
-- built-in Codex browser first against local onboarding
-- verify cards render from partial setup
-- verify all backend states and backend reason/refinement copy render
-- verify selecting `needs_more_info` or `not_ideal` cards opens refinement instead of direct review
-- verify review/create appears only after backend review-ready/full review state
-- verify unavailable CTA polish, no hidden selected default, no unwanted `Recommended` badge, and
-  mobile `375px` no-overflow
-- source proof that frontend consumes backend-shaped progressive Plan Preset data and does not
-  compute eligibility/rhythm/date/metric/review truth locally
-
-Frontend Slice 5B closeout evidence, 2026-06-08:
-
-- Built-in Codex Browser was used first against `http://localhost:8082/`; Safari was not used.
-- Targeted ESLint passed.
-- `npm run validate-admin-capture-backlog` passed.
-- `git diff --check` passed.
-- `npm run build` passed with existing Vite/Radix/TanStack warnings.
-- With only age, height, and weight entered and no weekly running days selected, all three shipped
-  cards appeared:
-  `10k`, `half_marathon`, and `marathon`.
-- Initial state had no selected card, no hidden selected default, no review scaffold, and no
-  `Create preset plan`.
-- Browser exercised `needs_more_info`, `available`, and `unavailable`; source coverage accounts for
-  all six backend states:
-  `recommended`, `available`, `needs_more_info`, `not_ideal`, `custom_fit`, and `unavailable`.
-- No visible `Recommended` badge appeared.
-- Selecting unresolved `10K` opened a distinct preferences panel, not review.
-- Refinement showed backend-provided reason/defaults, including `Use suggested defaults`.
-- Review/create stayed hidden until required preferences were resolved.
-- After resolving preferences, backend review returned a non-mutating scaffold with
-  `plan_preset_v1 · persisted false`, row counts, metric policy, assumptions, and enabled
-  `Create preset plan`.
-- QA did not click `Create preset plan`.
-- Source confirmed confirm payload includes only `cardId`, structured setup input, `reviewToken`,
-  and `reviewChecksum`; no client rows/workouts are sent.
-- With `1 day`, all cards became unavailable. No unavailable pill/badge appeared; CTA stayed as
-  `Review preset`, had `aria-disabled="true"`, was inert, and tooltip/focus copy used
-  backend-shaped reason text.
-- Advanced custom remains secondary and collapsed by default.
-- Frontend does not compute eligibility, recommendation, rhythm conflicts, metric policy, workout
-  mix, dates, rows, persistence, OpenAI behavior, active-plan replacement, or manual workout CRUD
-  locally.
-- No 5K preset card shipped.
-- Mobile `375px` had no horizontal overflow.
-- Artifacts:
-  `qa-artifacts/screenshots/2026-06-08/progressive-plan-preset-ui-qa/`.
-
-Frontend Slice 5B closeout decision:
-
-Frontend Slice 5B is complete for progressive Plan Preset card UI and post-selection refinement.
-It proves the frontend consumes backend-shaped progressive card/review contracts and preserves the
-review/confirm mutation boundary. The implementation track should not expand to new families,
-manual workout CRUD, active-plan replacement, or metric-truth changes.
-
-Legacy/stale audit findings, 2026-06-08:
-
-- No safe delete-now candidates were found.
-- No stale runtime/source hits were found for:
-  `first-plan-preset`, `first_plan_preset`, `FirstPlanPreset`, `firstPlanPreset`, or
-  `validate-first-plan-preset`.
-- `missing_watch_app_support` appears only in docs/history/active-plan context, not runtime.
-- Remaining compatibility seams are intentional and should stay:
-  full structured review/confirm path for exactness, readable legacy watch/no-watch compatibility,
-  and [Training API facade](../../../src/lib/training-api.ts) exports until a separate import-map
-  cleanup slice.
-- The main complexity is not stale code; it is concentrated progressive policy ownership.
-- [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts) is about
-  `707` lines and owns context building, metric truth, hard blocks, missing info,
-  fit/recommendation policy, refinement questions, and copy/reason messages.
-- Later frontend decomposition candidates:
-  [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx),
-  [Onboarding gate](../../../src/components/OnboardingGate.tsx), and
-  [Structured plan constructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx).
-
-Delete-now decision:
-
-There are no approved delete-now candidates after the legacy/stale audit. Cleanup should proceed by
-no-behavior-change decomposition of the progressive backend policy seam, not by deleting
-compatibility or review/confirm paths.
-
-Backend Slice 5C scope:
-
-- Slice name:
-  `Backend Slice 5C: no-behavior-change progressive Plan Preset policy decomposition`.
-- Immediate owner:
-  BACKEND.
-- Extract policy/metric/refinement ownership from
-  [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts).
-- Preserve exact card states:
-  `recommended`, `available`, `needs_more_info`, `not_ideal`, `custom_fit`, and `unavailable`.
-- Preserve exact reason codes, result codes, review readiness, required/optional refinement fields,
-  default summaries, metric truth, recommendation behavior, row counts, source metadata, and
-  harness behavior.
-- Keep `resolvePlanPresetCards(...)`, `reviewPlanPresetDraft`, and `confirmPlanPresetDraft`
-  behavior stable.
-- Keep the full structured review/confirm path intact for exactness.
-- Keep legacy watch/no-watch readback/input compatibility where it is intentionally normalized to
-  supported watch/app behavior.
-- Keep [Training API facade](../../../src/lib/training-api.ts) cleanup for Slice 8.
-- Add or adjust harness assertions proving output preservation.
-- Document what remains recipe-specific versus shared progressive card policy.
-
-Backend Slice 5C out of scope:
-
-- frontend decomposition
-- UX behavior changes
-- new preset families
-- 5K
-- confirm/persistence changes
-- DB/schema changes
-- OpenAI behavior
-- manual workout CRUD
-- active-plan replacement/refresh
-- metric-truth weakening
-
-Backend Slice 5C implementation note, 2026-06-08:
-
-- Decomposed progressive Plan Preset policy ownership without behavior changes.
-- [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts) remains the
-  card orchestration/view-model facade.
-- [Progressive Plan Preset context](../../../src/lib/plan-presets/progressive-context.ts) owns
-  partial setup normalization for progressive card resolution.
-- [Progressive Plan Preset metric truth](../../../src/lib/plan-presets/progressive-metric-truth.ts)
-  owns `pace_executable` versus `structure_only_executable` gating for progressive cards.
-- [Progressive Plan Preset policy](../../../src/lib/plan-presets/progressive-policy.ts) owns custom
-  routing, blockers, missing-info reasons, fit/recommendation policy, and refinement requirements.
-- Recipe-specific rows, review/confirm persistence, source metadata, and metric truth semantics were
-  preserved.
-
-### Slice 6: Rich Adaptive Plan Preset Training-Quality Reset
-
-Owner:
-
-ARCHITECT / RUNNING COACH / BACKEND.
-
-Status:
-
-Plan Preset program source-of-truth artifacts are QA-passed on 2026-06-08, and local Backend Slice 6
-work now consumes those artifacts in backend card/review expansion. Architect audit found this is not
-yet sufficient as the final deterministic algorithmic builder: the current source-of-truth still
-lacks phase, weekly-slot, identity-placement, segment-parameter, progression-math, and target-time
-doctrine contracts. Slice 6A is selected for source-of-truth gap closure before treating Backend
-Slice 6 implementation as final.
-
-Scope correction:
-
-- The Plan Preset quality issue applies to all shipped Plan Preset families unless proven otherwise:
-  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
-- Do not frame the quality failure as a 10K-only fix.
-- The exported `10K Foundation` rejection is evidence of the broader risk: plans can be safe while
-  still being too empty, support-heavy, template-like, and missing event-specific progression.
-- Existing fixed-duration fixtures for 10/12/16 weeks can remain regression references only until
-  the rich adaptive rebuild replaces them.
-- Existing 10/12/16 week fixture preservation must not remain the product target.
-- All shipped Plan Preset families require rich adaptive rebuild before more preset families are
-  added or current preset quality is treated as acceptable.
-
-Dynamic duration decision:
-
-Plan Preset duration must become backend-owned, dynamic, and explainable from:
-
-- distance/family
-- runner level
-- weekly running days
-- age
-- height
-- weight
-- body-size/load context
-- recent consistency or benchmark if available
-- optional fixed rest-day and long-run constraints
-- workout-type removal or unusual constraints, which may route to Advanced custom rather than preset
-  v1
-
-Rules:
-
-- Low weekly availability should extend duration where safe rather than forcing thin fixed-week
-  plans.
-- Higher load-risk context should slow progression, lower intensity density, add cutback/recovery,
-  or extend duration.
-- Lower load-risk context may allow normal progression, but must not create unsafe aggressive jumps.
-- Fixed 10/12/16 weeks are no longer sufficient as the product model.
-- Duration must be returned in backend-owned card and review summaries with a concise explanation of
-  why that duration fits.
-- Frontend must render the returned duration/start/end/fit summary and must not calculate duration
-  locally.
-
-Program source-of-truth artifacts:
-
-- [Plan Preset program source of truth](../../../src/lib/plan-presets/preset-program-source-of-truth.md)
-- [Plan Preset scenario matrix](../../../src/lib/plan-presets/preset-program-scenario-matrix.csv)
-- [Plan Preset load adjustments](../../../src/lib/plan-presets/preset-program-load-adjustments.csv)
-- [Plan Preset workout identity library](../../../src/lib/plan-presets/preset-workout-identity-library.csv)
-- [Plan Preset goal contract matrix](../../../src/lib/plan-presets/preset-goal-contract-matrix.csv)
-- [Plan Preset phase template table](../../../src/lib/plan-presets/preset-phase-template-table.csv)
-- [Plan Preset weekly archetype table](../../../src/lib/plan-presets/preset-weekly-archetype-table.csv)
-- [Plan Preset identity placement rules](../../../src/lib/plan-presets/preset-identity-placement-rules.csv)
-- [Plan Preset segment anatomy table](../../../src/lib/plan-presets/preset-segment-anatomy-table.csv)
-- [Plan Preset progression math rules](../../../src/lib/plan-presets/preset-progression-math-rules.csv)
-- [Plan Preset quality gates](../../../src/lib/plan-presets/preset-quality-gates.csv)
-- [Plan Preset builder I/O contract](../../../src/lib/plan-presets/preset-builder-io-contract.csv)
-
-Artifact QA closeout evidence, 2026-06-08:
-
-- Browser was not used because this was source/document/artifact validation only.
-- Source-of-truth markdown covers `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
-- Coverage includes eligibility, adaptive duration, recovery/cutback, long-run/rest-day rules,
-  metric truth, routing, and final outcome expectations.
-- Scenario matrix parsed cleanly with `60` data rows, no ragged rows, and no empty headers.
-- Scenario matrix covers all three families, runner levels, and `1`, `2`, `3`, `4`, `5` days/week.
-- Each family has `20` scenario rows.
-- Card states include `available`, `recommended`, `not_ideal`, and `unavailable`.
-- 2-day cards are not all unavailable: `4 available`, `3 not_ideal`, and `5 unavailable`.
-- Marathon remains stricter at low availability.
-- Load adjustments parsed cleanly with `20` data rows.
-- Load adjustment artifact uses neutral terms such as `load_context` and
-  `progression_conservatism`.
-- No body-shaming labels, medical claims, or injury inference from height/weight.
-- Workout identity library parsed cleanly with `19` data rows.
-- Workout identity library includes rich recovery, easy, strides, steady, cutback, progression,
-  tempo, interval, threshold, marathon-specific, long-run, steady-finish, and taper identities.
-- All workout identity rows include structured segment anatomy.
-- Builder-level artifacts now include `50` goal-contract rows, `76` phase-template rows, `20`
-  weekly-archetype rows, `23` identity-placement rows, `57` segment-anatomy rows, `14`
-  progression-math rows, `17` quality-gate rows, and `30` builder I/O contract rows.
-- Metric-truth rules are preserved.
-- No shipped 5K family appears.
-- No OpenAI happy-path generation, frontend-owned plan generation, DB/schema, or persistence
-  behavior is implied.
-- `git diff --check` passed for the four artifacts.
-- CSV parse/read checks passed.
-- `npm run validate-admin-capture-backlog` passed.
-
-Minor clarity issue decision:
-
-- QA noted that the source-of-truth already says presets must not rely on one fixed duration, but
-  did not explicitly name current fixed `10/12/16` week fixtures as no longer the product target.
-- This was fixed in the source-of-truth artifact before Backend Slice 6 so implementation does not
-  preserve fixed-duration fixtures as the target behavior.
-
-Algorithmic builder audit, 2026-06-08:
-
-Files inspected:
-
-- [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts)
-- [Plan Preset composition helpers](../../../src/lib/plan-presets/composition.ts)
-- [Plan Preset draft expansion facade](../../../src/lib/plan-presets/expand.ts)
-- [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts)
-- [Plan Preset progressive policy](../../../src/lib/plan-presets/progressive-policy.ts)
-- [Plan Preset progressive cards](../../../src/lib/plan-presets/progressive-cards.ts)
-- [Plan Preset eligibility validator](../../../scripts/validate-plan-preset-eligibility.ts)
-- [Plan Preset program source of truth](../../../src/lib/plan-presets/preset-program-source-of-truth.md)
-- [Plan Preset scenario matrix](../../../src/lib/plan-presets/preset-program-scenario-matrix.csv)
-- [Plan Preset load adjustments](../../../src/lib/plan-presets/preset-program-load-adjustments.csv)
-- [Plan Preset workout identity library](../../../src/lib/plan-presets/preset-workout-identity-library.csv)
-
-Backend Slice 6B implementation verdict:
-
-- Current artifacts are sufficient for the shipped non-target-time Plan Preset builder scope:
-  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
-- Runtime reads all source-of-truth CSV artifacts through
-  [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts).
-- [Plan Preset draft expansion facade](../../../src/lib/plan-presets/expand.ts) now calls one
-  canonical deterministic builder instead of recipe-specific row expanders.
-- [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) owns phase
-  allocation, weekly archetype inheritance, slot-to-weekday mapping, identity resolution, final
-  outcome materialization, recurring cutback protection, quality gates, and canonical row assembly.
-- The previous active recipe-specific expanders for `10K Foundation`, `Half Marathon Balanced`, and
-  `Marathon Base` were deleted so there is no second active row-generation truth.
-- `recipe-expanders/shared.ts` remains as shared workout safety/counting helpers only; it no longer
-  owns per-family program composition.
-- Target-time preset doctrine remains future-gated and continues to route to Advanced custom.
-
-Canonical builder pipeline:
-
-| Layer | Owner | Input | Output | Source of truth needed | Validation requirement | Frontend must not guess |
-| --- | --- | --- | --- | --- | --- | --- |
-| Runner inputs | Frontend collects, backend validates | profile, level, availability, rest days, long-run preference, benchmark, goal intent | normalized setup truth | existing schema plus preset card contract | schema and card-state harness | eligibility, defaults, or metric truth |
-| Capability/load context | Backend | normalized setup truth | age/load/conservatism context | load-adjustment table plus thresholds | neutral labels, no medical/body-shaming copy | load risk, duration extension, progression safety |
-| Goal contract | Backend | distance, goal style, target time/date, benchmark truth | completion/base/performance/custom routing | `preset-goal-contract-matrix.csv` | target-time routes custom unless doctrine exists | target-time eligibility or ambition realism |
-| Duration model | Backend | goal contract, level, days/week, load context, benchmark/consistency | duration band and selected duration | scenario matrix plus progression bounds | adaptive duration assertions | duration or end date |
-| Phase architecture | Backend | selected duration, family, goal contract, conservatism | ordered phases with week ranges | `preset-phase-template-table.csv` | phase sequence, min/max phase length, cutback cadence | phase count or phase labels |
-| Weekly composition | Backend | phases, days/week, rest/long-run constraints | weekly archetypes and day slots | `preset-weekly-archetype-table.csv` | long-run placement, rest conflicts, specific-touch caps | weekly rhythm or slot ownership |
-| Workout identity placement | Backend | weekly slots, phase, family rules | identity assigned to each workout slot | `preset-identity-placement-rules.csv` | identity diversity, min/max frequency, forbidden context checks | identity mix or substitutions |
-| Segment anatomy | Backend | identity, level, phase, conservatism, metric mode | warmup/main/repeats/recovery/cooldown sectors | `preset-segment-anatomy-table.csv` | every non-rest row rich and executable | workout sectors or target structure |
-| Target-mode resolution | Backend | segment anatomy plus metric truth | structure-only, pace, or HR-capable targets | metric-truth contract plus future target-time doctrine | no fake pace/HR, no target-time pace without benchmark truth | pace/HR permission |
-| Canonical rows | Backend | resolved slots and segments | canonical `training-plan-v2` draft rows | runtime builder | row/metadata/review checksum exactness | row generation |
-| Review/confirm | Backend owns mutation, frontend renders | reviewed draft token/checksum | persisted active plan only on confirm | existing persistence seam | exact persistence, idempotency, rollback | persistence or duplicate guards |
-
-Source-of-truth artifacts now active:
-
-- [Plan Preset goal contract matrix](../../../src/lib/plan-presets/preset-goal-contract-matrix.csv)
-  covers completion/base/performance/custom routing, final outcomes, and target-time future gates.
-- [Plan Preset phase template table](../../../src/lib/plan-presets/preset-phase-template-table.csv)
-  covers ordered phases, phase ratios, minimum weeks, cutback cadence, and final phases.
-- [Plan Preset weekly archetype table](../../../src/lib/plan-presets/preset-weekly-archetype-table.csv)
-  covers days/week rhythms, long-run slots, support slots, and low-frequency patterns.
-- [Plan Preset identity placement rules](../../../src/lib/plan-presets/preset-identity-placement-rules.csv)
-  cover phase/family/level identity availability and substitutions.
-- [Plan Preset segment anatomy table](../../../src/lib/plan-presets/preset-segment-anatomy-table.csv)
-  covers workout anatomy ownership for supported identities and execution modes.
-- [Plan Preset progression math rules](../../../src/lib/plan-presets/preset-progression-math-rules.csv)
-  covers ramp, cutback, low-frequency milestone, and duration/progression constraints.
-- [Plan Preset quality gates](../../../src/lib/plan-presets/preset-quality-gates.csv) covers final
-  outcome, support-only rejection, identity diversity, and family-specific acceptance gates.
-
-Target-time policy decision:
-
-- Target-time Plan Presets remain out of scope now.
-- Existing resolver behavior that routes `goalStyle: target_time` / `targetTime` to Advanced custom
-  remains correct.
-- A future target-time preset path requires separate doctrine and backend gates before it can be
-  deterministic:
-  recent benchmark truth, realistic improvement bounds, target-distance projection, intensity
-  multiplier, duration extension, refusal/custom routing, and no pace target unless benchmark truth
-  supports it.
-- Target time alone must never create pace truth.
-
-AI usage policy:
-
-- Acceptable AI use:
-  offline doctrine drafting, workout library enrichment, coach review suggestions, copy
-  alternatives, and future Advanced custom generation behind review.
-- Not acceptable for the current preset happy path:
-  runtime unreviewed preset row generation, silent mutation, replacing deterministic safety gates,
-  inventing pace/HR truth, or bypassing source-of-truth validation.
-
-Slice 6A decision:
-
-`Slice 6A: Plan Preset algorithmic builder architecture and missing source-of-truth gap closure`.
+- Preview-calendar parity subagent confirmed `SelectedTenKPlanPreviewDialog` still renders local
+  `hito-selected-plan-calendar-*` wrappers and `PreviewCalendarCell`, while product calendar and
+  `/test-calendar` already consume `HitoCalendarDayCell` / `HitoWorkoutDayRow`.
+- Admin-risk subagent confirmed admin table/capture cleanup is wider and higher risk because it
+  touches authenticated admin analytics, test accounts, Work Items, filters/search, popovers, and
+  admin shell behavior.
+- Source/reference subagent confirmed current docs agree that G14 is complete, UI-C1 is the
+  immediate gate, and the candidate has one owner, one risk class, and one validation story.
 
 Decision:
 
-- Completed before Backend Slice 6B.
-- Source-of-truth artifacts now exist as markdown plus CSV inputs under
-  [Plan Preset source of truth](../../../src/lib/plan-presets/preset-program-source-of-truth.md).
-- Backend Slice 6B consumes these artifacts through
-  [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts) and the deterministic
-  [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts).
-- Remaining target-time preset doctrine is intentionally future-gated and routes to Advanced custom.
-
-Slice 6A artifact output:
-
-- phase template contract
-- weekly archetype / slot contract
-- identity placement frequency contract
-- segment anatomy parameter contract
-- progression math / low-frequency milestone contract
-- quality-gate contract
-- target-time doctrine marked future-gated, not shipped behavior
-
-Body-size/load factor decision:
-
-Introduce a backend-owned anthropometric load context for Plan Presets.
-
-Purpose:
-
-- Use age, height, and weight to moderate progression, weekly load, long-run ramp, impact exposure,
-  and intensity density.
-- Influence duration and progression conservatism.
-- Stay conservative and auditable.
-- Avoid medical claims, injury inference, or exact pace/HR truth.
-
-Neutral internal terms:
-
-- `bodyLoadFactor`
-- `impactLoadAdjustment`
-- `progressionConservatism`
-- `anthropometricLoadContext`
-
-Forbidden language:
-
-- Do not use insulting, moralizing, or body-shaming labels in code, UI, docs, or product copy.
-- Do not label runners as "bad", "heavy risk", "overweight", "obese", "fragile", or similar
-  product-facing judgments in this preset context.
-- Do not present the load context as diagnosis, injury prediction, or medical advice.
-
-Allowed runner-facing copy:
-
-- "We'll build this with a more gradual progression."
-- "This plan uses a conservative ramp to protect consistency."
-- "Your plan duration adapts to your current profile and weekly rhythm."
-- "Hito is using a steadier progression because this setup benefits from more recovery space."
-
-Architecture:
-
-- Backend owns formula, thresholds, caps, and explanation strings.
-- Frontend only renders backend-shaped explanation.
-- The policy must not infer injury from height/weight.
-- The policy must not create exact pace from body size.
-- The policy must not create personal HR targets from age/body size.
-- The policy must be testable through deterministic fixtures.
-
-Rich program doctrine across shipped families:
-
-Every shipped Plan Preset family must include:
-
-- family-specific workout identity mix
-- rich structured segments
-- meaningful progression
-- cutback/recovery cycles
-- final outcome logic
-- dynamic duration
-- level-specific variants
-- days/week variants
-- rest-day and long-run preference adaptation
-- metric-truth-preserving execution
-
-Avoid support-only plans dominated by easy/recovery/rest. Easy and recovery work are still required,
-but they must support a meaningful family-specific progression instead of replacing it.
-
-Required workout library for the rebuild:
-
-- recovery jog / recovery run-walk
-- easy aerobic run
-- easy run with strides
-- progression run
-- aerobic intervals
-- short intervals
-- tempo / threshold
-- cruise intervals
-- hills / hill strides / hill endurance
-- long aerobic run
-- long run with steady finish
-- cutback aerobic run
-- cutback long run
-- benchmark/test
-- race simulation / completion day
-- rest/recovery day
-- optional strength/cross-training notes if supported
-
-Family final outcome requirements:
-
-- `10K Foundation` must end with an explicit 10K completion/test/race-style simulation or a clear
-  coach-approved equivalent.
-- `Half Marathon Balanced` must end with a credible half-readiness marker or race-specific readiness
-  block.
-- `Marathon Base` must end with a clear durability/base endpoint and must not falsely claim full
-  race readiness unless the selected duration/progression supports it.
-
-Backend Slice 6B implementation decision:
-
-`Backend Slice 6B: Implement deterministic Plan Preset program builder pipeline`.
-
-Scope:
-
-- Rebuild all three shipped families, not just 10K:
-  `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
-- Add dynamic duration model.
-- Add backend-owned body-size/load adjustment.
-- Add richer workout library usage.
-- Add days/week variants, including safe longer 2-day 10K support and narrow/conservative Half
-  support only where Running Coach approves it.
-- Keep Marathon stricter for low availability and higher load-risk contexts.
-- Add final outcome logic.
-- Preserve metric truth:
-  target time alone does not unlock pace, age/body size does not unlock HR, and
-  `structure_only_executable` remains valid without benchmark/provider truth.
-- Preserve review/confirm/persistence safety.
-- Update harness expectations away from fixed 10/12/16 row counts toward adaptive duration and
-  quality assertions.
-- Keep preset happy-path deterministic and backend-owned; do not use OpenAI to improvise preset
-  programs at runtime.
-- Implementation is complete locally and ready for QA validation; Slice 6A source-of-truth artifacts
-  are parsed by the runtime and harness.
-
-Backend Slice 6 QA expectations:
-
-- fixtures for short/light, average, and tall/heavier runners
-- fixtures for low, normal, and higher weekly availability
-- fixtures for beginner/recreational/performance levels
-- no-benchmark and recent-5K metric truth fixtures
-- fixed-rest and long-run preference fixtures
-- adaptive duration assertions rather than fixed 10/12/16 week assertions
-- family-specific identity mix assertions
-- non-rest rows have rich structured segments
-- support-only/easy-dominated plans are rejected
-- final outcome marker is present for every family
-- no fake pace/HR
-- no OpenAI call
-- no DB/schema change unless separately approved
-- review/confirm/source metadata behavior preserved
-
-Backend Slice 6 implementation note, 2026-06-08:
-
-- [Plan Preset program data](../../../src/lib/plan-presets/program-data.ts) now owns parsing and
-  resolving the scenario matrix, load adjustments, and workout identity library into deterministic
-  program duration/load metadata.
-- [Plan Preset resolver](../../../src/lib/plan-presets/resolver.ts) and
-  [Plan Preset review expansion](../../../src/lib/plan-presets/expand.ts) now use adaptive
-  duration, estimated end date, scenario metadata, neutral impact-load context, progression
-  conservatism, cutback policy, and final-outcome metadata.
-- [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) now owns
-  generated workout rows for all shipped preset families through one CSV-backed builder pipeline.
-- The old recipe-specific row expanders for `10K Foundation`, `Half Marathon Balanced`, and
-  `Marathon Base` were deleted.
-- [Plan Preset composition](../../../src/lib/plan-presets/composition.ts) now owns safe
-  specific-touch placement so long-run steady-finish and midweek specificity do not collide in the
-  same week.
-- Plan Preset harness expectations were updated away from fixed `10/12/16` week and `70/84/112`
-  row-count truth toward adaptive duration formulas, source-matrix coverage, family outcome markers,
-  rich identities, metric truth, and review/confirm exactness.
-- [Build output finalization](../../../scripts/finalize-build-output.mjs) now copies and verifies
-  the Plan Preset program CSV artifacts into server output so runtime preset resolution does not
-  depend on an accidental source checkout in production.
-- Local validation passed:
-  targeted Plan Preset ESLint, Plan Preset harness, plan-authoring doctrine validator, blueprint
-  mock smoke, admin capture backlog validator, build-finalizer syntax/lint, `git diff --check`, and
-  `npm run build`.
-
-Backend Slice 6B final outcome identity fix, 2026-06-08:
-
-- QA found that final outcome rows were still emitting legacy identities:
-  `10k_rhythm_intervals`, `half_marathon_threshold_durability`, and
-  `long_run_with_steady_finish`.
-- [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) now
-  preserves the canonical builder I/O output identities in final generated rows:
-  `tenk_completion_or_checkpoint`, `half_readiness_marker`, and `base_endpoint_marker`.
-- [Plan Preset eligibility validator](../../../scripts/validate-plan-preset-eligibility.ts) and
-  per-recipe Plan Preset assertions now require exact final-week canonical identities instead of
-  accepting legacy identity/text substitutes.
-
-Backend Slice 6B QA closeout, 2026-06-08:
-
-Status:
-
-implemented and QA-passed.
-
-Evidence recorded:
-
-- Runtime now emits canonical final outcome markers:
-  `tenk_completion_or_checkpoint`, `half_readiness_marker`, and `base_endpoint_marker`.
-- Final marker rows have structured segment anatomy rather than text-only or legacy filler rows.
-- Harnesses require exact canonical final identities instead of accepting legacy substitutes.
-- Quality-gate proof passed for final outcome markers and family-specific builder expectations.
-- Metric truth remains strict:
-  no fake pace without benchmark truth and no executable HR without personal HR-zone truth.
-- Review/confirm boundary remains intact:
-  Plan Presets stay deterministic, reviewed before mutation, and persisted only through the existing
-  confirm path.
-- Blueprint/custom authoring smoke remains unaffected.
-- No frontend, DB/schema, persistence, OpenAI runtime generation, manual workout CRUD, target-time
-  preset support, new preset family, or active-plan replacement/refresh behavior changed.
-- Validation passed in QA:
-  targeted Plan Preset ESLint, Plan Preset harness, plan-authoring doctrine validator,
-  blueprint/custom authoring smoke, admin capture backlog validator, build-finalizer syntax check,
-  `git diff --check`, and `npm run build`.
-
-Minor source-text drift:
-
-- [Plan Preset quality gates CSV](../../../src/lib/plan-presets/preset-quality-gates.csv) still has
-  Half marker prose saying it may be threshold durability or a long-run specificity endpoint.
-- Runtime and harness truth now require exact canonical `half_readiness_marker`, so this is a
-  source-text/copy drift, not a runtime correctness blocker.
-- Decision:
-  non-blocking cleanup note. It should be fixed by a tiny BACKEND/COPY source-text cleanup when the
-  Plan Preset source artifacts are next touched, but it does not block Slice 6B closeout or the next
-  service-size cleanup gate.
-
-### Plan Preset Product Contract Reset
-
-Date:
-
-2026-06-08.
-
-Status:
-
-controlled reset required before service-size cleanup resumes.
-
-Trigger:
-
-Real Plan Preset output failed product acceptance. The Half Marathon export is the concrete proof
-case, but the decision applies to all shipped Plan Preset programs.
-
-Evidence:
-
-- Exported file:
-  `/Users/ivan/Downloads/half-marathon-balanced-plan-preset-2026-06-08.json`.
-- The selected card was Half Marathon.
-- The exported plan is `plan_preset_v1`, named `Half Marathon Balanced Plan Preset`.
-- The exported plan has `119` rows across `17` weeks.
-- The final row is `half_readiness_marker`.
-- The final row title is `Half marathon readiness marker`.
-- The final row summary is `68 min half readiness marker`.
-- The final row has structured time-based segments, but no explicit `21.1K` endpoint distance field.
-- User acceptance expectation:
-  choosing a Half Marathon card should produce a plan that culminates in a real Half
-  Marathon-distance outcome or an explicitly named Half Marathon completion/checkpoint, not a
-  hidden internal readiness marker.
-- Additional readback evidence:
-  workout detail/export surfaces can show effort labels such as `Effort: easy`,
-  `Effort: threshold steady`, `Mode: Executable structure`, and `Effort threshold steady` as
-  primary-feeling execution copy.
-
-Decision:
-
-This is not only frontend copy drift. It is a product-contract failure across Running Coach
-doctrine, backend source-of-truth, builder segment anatomy, metric truth, export/review/readback, and
-frontend workout-detail rendering.
-
-Reset decision:
-
-- The current Plan Preset algorithmic builder is product-failed / not accepted as the canonical
-  creation model.
-- Do not keep patching the current algorithm blindly.
-- Treat current generated outputs as regression evidence for what failed, not as accepted coaching
-  targets.
-- The rebuild must start from human coach benchmark plans and watch-executable workout examples
-  before Backend writes a new builder.
-- Keep the product deterministic and backend-owned; do not replace the failed algorithm with
-  frontend templates or OpenAI runtime improvisation.
-
-Service-size cleanup sequencing:
-
-- `BACKEND Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime ownership`
-  is paused.
-- Do not clean old plan-authoring paths while the current primary no-active-plan creation product is
-  failing real acceptance.
-- Resume service-size cleanup only after the corrected Plan Preset product contract is implemented
-  and QA-passed.
-
-What remains salvageable:
-
-- Visual card direction can be preserved if it supports the corrected interaction.
-- Existing review/confirm/persistence safety can be preserved:
-  review must remain non-mutating, confirm must persist exact reviewed canonical rows, and duplicate
-  active-plan guards remain mandatory.
-- Backend-owned truth remains mandatory:
-  eligibility, schedule, calendar rows, workout placement, metric truth, load/progression, and
-  persistence must not move to frontend.
-- Existing `plan_preset_v1` source kind can remain if the rebuilt contract preserves auditability,
-  but source metadata must clearly distinguish corrected builder versions.
-- Hito DS visual primitives and card styling can be reused.
-
-What is deleted, demoted, or frozen:
-
-- Current algorithmic builder output is frozen as failed product behavior until rebuilt.
-- Current source-of-truth CSVs are frozen for audit:
-  keep them as evidence only until Running Coach/Backend replaces or corrects the wrong doctrine.
-- Old recipe expanders that are already removed should stay removed unless Backend proves one
-  specific deleted piece is safer as a temporary fixture than the failed algorithm.
-- Quality gates that allow readiness-only final outcomes for selected distance cards must be
-  replaced.
-- Any segment model that lets effort wording be the primary execution target must be rejected.
-- Do not run a blind `git reset`, broad revert, or mass deletion:
-  every deletion/demotion must name the file/symbol, prove replacement coverage, and pass harnesses.
-
-Controlled deletion strategy:
-
-1. Freeze failed builder behavior behind the current plan as product-failed, not accepted.
-2. Ask Running Coach for backend-ready reference doctrine and example plans.
-3. Let Backend compare current builder/source files against the corrected doctrine.
-4. Delete or demote only the specific builder/source/gate pieces that encode the wrong doctrine.
-5. Preserve review/confirm/persistence seams unless a concrete contract bug is proven.
-6. Keep old failed outputs only as test fixtures that prove the new builder no longer emits them.
-
-New canonical Plan Preset creation pipeline:
-
-`runner basics -> load/progression context -> selected distance goal -> days/week capacity -> coach-authored reference doctrine -> phase plan -> weekly calendar preview -> workout placement -> watch-executable segment construction -> review modal -> confirm/persist`
-
-Pipeline ownership:
-
-- Runner basics:
-  age, height, weight, running level, and days/week are collected by frontend but interpreted by
-  backend.
-- Load/progression context:
-  backend applies safe, non-shaming, non-medical multipliers for preparation duration, volume, and
-  progression conservatism.
-- Selected distance goal:
-  backend owns the real endpoint contract for 10K, Half Marathon, and Marathon/Base.
-- Days/week capacity:
-  backend turns selected or default days/week into viable phase/weekly rhythm.
-- Coach-authored reference doctrine:
-  Running Coach provides human benchmark plans and workout examples before code.
-- Phase plan:
-  backend maps doctrine into phase durations, cutback rhythm, quality density, long-run growth, and
-  endpoint/taper behavior.
-- Weekly calendar preview:
-  backend returns calendar rows before confirm; frontend renders only backend-shaped truth.
-- Workout placement:
-  backend places rest days, long runs, quality days, cutbacks, and recovery spacing, with flexible
-  defaults if runner omits preferences.
-- Watch-executable segment construction:
-  backend emits duration/distance/repeats/work/recovery segment prescriptions and only adds pace/HR
-  when real truth exists.
-- Review modal:
-  frontend shows selected-plan details, mini calendar, colored workout types, preferences, endpoint,
-  and review copy.
-- Confirm/persist:
-  existing explicit confirm path persists exact reviewed canonical rows.
-
-Corrected selected-distance endpoint contract:
-
-- `10K Foundation` must culminate in a real 10K completion/checkpoint endpoint.
-- `Half Marathon Balanced` must culminate in a real Half Marathon-distance endpoint or explicitly
-  named Half Marathon completion/checkpoint endpoint.
-- A hidden `readiness marker only` cannot satisfy a selected distance card unless the card copy
-  clearly says it is not a completion-distance plan.
-- `Marathon Base` must be re-decided explicitly:
-  either rename/reposition it as honest base-building and not a `run a marathon` plan,
-  or define safe constraints for a future Marathon-distance endpoint.
-- Endpoint behavior must be represented in backend source-of-truth, builder output, review/export,
-  and QA harnesses.
-- Endpoint behavior must not be inferred from internal identity names alone; exported canonical rows
-  need runner-auditable endpoint fields/copy.
-
-Corrected watch-executable metric contract:
-
-- Hito assumes watch/app execution for supported new-plan creation.
-- Pace targets require benchmark truth.
-- HR targets require personal HR-zone truth.
-- Lack of pace/HR truth must not collapse a workout into vague `Effort: threshold steady` as the
-  primary target.
-- Every generated non-rest workout segment must have watch-executable structure:
-  duration and/or distance, interval/repeat counts where relevant, work/recovery units where
-  relevant, and explicit target-mode classification.
-- Primary prescription examples:
-  `10 min`, `8 km easy`, `3 x 10 min`, `3 min recovery`, `6 x 2 min`, `1 km recovery`,
-  or a similarly watch-programmable structure.
-- Secondary cue examples:
-  conversational, controlled, steady, threshold-like, relaxed, smooth, durable.
-- Effort/RPE/coaching cue may exist as secondary instruction, but must not be the primary metric
-  target shown as if it is enough for a watch-based plan.
-- Do not show raw internal effort labels such as `threshold steady` as primary runner-facing metric
+- Accept the Designer recommendation.
+- Keep `FRONTEND UI-C1: adopt the shared Hito calendar-day primitive in selected running-plan
+  preview calendar` as the first product-wide DS-adoption cleanup batch.
+- Do not change the cleanup burndown for this checkpoint. The ledger remains `30/40` complete,
+  `10` remaining, `75%`; if UI-C1 is implemented and QA-accepted, expected next delta is `+1` to
+  `31/40`, `9` remaining, `77.5%`.
+
+Why UI-C1 beats alternatives:
+
+- It has one runtime consumer: selected-plan preview calendar.
+- It has one canonical shared owner: `HitoCalendarDayCell` / `HitoWorkoutDayRow`.
+- It removes a duplicate presentation system without changing backend selected-plan truth.
+- Admin table/capture cleanup is broader, authenticated, and needs a larger browser-proof matrix.
+- Dialog-shell, manual workout, and feedback micro-surface cleanup candidates are real but less
+  isolated than the preview-calendar candidate.
+
+Stop conditions for UI-C1:
+
+- Stop if the selected-plan preview state cannot be represented without a broad shared primitive
+  redesign.
+- Stop if implementation needs changes to running-plan engine preview/review/confirm, persistence,
+  metric truth, fake pace/HR guardrails, or Marathon Base/Completion semantics.
+- Stop if the slice starts touching manual calendar mutation behavior, Admin tables, `/hitoDS`
+  rollout implementation, `/test-calendar`, Supabase, migrations, OpenAI, logs, or `qa-artifacts`.
+- Stop if desktop or `375px` browser proof cannot preserve week grouping, workout/rest/final states,
+  tooltip/detail readback, confirm/create flow, and no horizontal overflow.
+
+## Slice G14 Business-Flow Legacy Teardown Matrix — 2026-06-18
+
+Status: complete / global business-flow teardown map accepted; first execution batch selected.
+
+Root-cause decision:
+
+- Visible symptom: the cleanup track entered source-proof holding even though the codebase is still
+  large and contains historical compatibility, route-local UI, validation, and devtools residue.
+- Underlying cause: opportunistic cleanup removed many known seams, but the remaining work had not
+  been rebuilt from a full business-flow ownership map, so agents could not safely distinguish live
+  execution paths from legacy duplicates.
+- Canonical owner applied: Architecture source-of-truth cleanup. The matrix below maps business
+  flows to one canonical owner before selecting implementation.
+
+Subagent preflight:
+
+- Backend/import-map subagent checked `src/lib/*`, route/server-function owners, `training-api.ts`,
+  plan creation, import/export/lifecycle/manual seams, ops scripts, and validators. It found no new
+  no-caller `training-api.ts` export and kept broad runtime facade cleanup blocked.
+- Frontend/UI subagent checked onboarding, selected-plan preview, calendar/manual actions, plan
+  management, admin, Hito DS, and `/test-calendar`. It confirmed the strongest duplicate runtime UI
+  path is the selected-plan preview calendar, which has a route-local cell system next to the shared
+  Hito calendar-day primitive.
+- Docs/devtools/artifacts subagent checked active/current docs, package scripts, generated
+  dashboard, logs, `test-results`, and `qa-artifacts` policy. It found no stronger docs/devtools
+  implementation batch; local residue remains a future DEVTOOLS retention-policy candidate.
+
+Business-flow teardown matrix:
+
+| Business flow | Canonical supported path | Duplicate / legacy / suspect path | Classification | Decision |
+| --- | --- | --- | --- | --- |
+| Auth and login/session | `src/lib/auth-actions.ts`, live auth route wrappers in `training-api.ts`, login/admin auth surfaces | G4C already removed the auth callback exchange facade re-export | required runtime | Keep. Do not change Magic Link, redirect sanitization, Supabase env handling, local auth, or admin auth in cleanup. |
+| Onboarding and first active-plan creation | `OnboardingGate`, `first-plan-actions`, structured first-plan review/confirm, selected/manual creation seams | Voice/Dictate-to-Plan UI is non-visible/future-adjacent; first-plan voice backend remains non-default | required runtime plus future/non-default | Keep. Do not delete voice or first-plan helpers without Product/Architect decision and fresh proof. |
+| Selected/structured plan preview and confirm | Running-plan engine preview/review/confirm plus `SelectedTenKPlanPreviewDialog` | Local selected-plan preview calendar cell/CSS duplicates shared calendar-day presentation | deletion/demotion-ready frontend presentation duplicate | Select UI-C1 as first execution batch. Backend plan truth remains unchanged. |
+| Manual user-built plan creation and authoring | Manual workout authoring actions, persistence, review exactness, saved templates, constructor controls | Large live controls/calendar files | required runtime / decompose-only | Keep. Any cleanup needs browser-visible manual-plan QA scope. |
+| Active-plan lifecycle and refresh | `active-plan-lifecycle-actions`, `active-plan-refresh-actions`, schedule edit preview/apply owners | Broad lifecycle helper/facade cleanup already narrowed; schedule edit remains live | required runtime | Keep. No broad lifecycle or refresh cleanup by line count. |
+| Plan import, replacement, export, share/QR | `PlanManagementDialog`, `PlanImportPanel`, `UploadJsonDialog`, `active-plan-export-actions`, `plan-export` | QR/share/import-from-share are future-only; old Plan Preset create/import paths removed | required runtime plus future-only | Keep current import/export. Do not select QR/share/import future work in cleanup. |
+| AI/text/voice plan authoring and ops | TS-backed `author-plan-from-text`, `openai-plan-authoring`, first-plan AI owners | MJS fallback and duplicate ops residue already removed; voice remains non-default | required ops/runtime | Keep. No live OpenAI calls or voice deletion in cleanup. |
+| Plan presets/card discovery | `plan-preset-actions` card discovery and selected-plan create handoff | Legacy Plan Preset review/confirm create seam removed | current runtime | Keep card discovery only; do not revive old create/confirm. |
+| Workout logs/provider evidence/actual metrics | Workout log actions, provider/evidence readback, workout detail/completion surfaces | Protected-state rules can make calendar actions blocked | required runtime | Keep. Do not weaken evidence/protected-history truth for cleanup. |
+| Admin/backlog/capture/analytics | Admin capture, analytics, backlog importer, account/auth surfaces | Admin route files are large; G9 removed future placeholders | required runtime / decompose-only | Defer. Admin cleanup needs dedicated browser/auth proof. |
+| Hito DS, Figma export, `/test-calendar` sandbox | Hito DS IA/Figma bridge active plan; dedicated `/hitoDS/export/figma`; archived static `/test-calendar` plan | Parent `/hitoDS` fallback removed; `/test-calendar` code remains fake/static | required internal tooling plus archived sandbox | Keep. Do not move sandbox ownership back into `/hitoDS`; no DS feature work in simplification. |
+| Local devtools/scripts/artifacts/dashboard | `work:dashboard`, `artifact:hygiene`, import/admin scripts, validators | `.DS_Store`, `logs/qa-local-server-state 2.json`, `test-results/.last-run.json` residue candidates | generated/local hygiene | Defer to DEVTOOLS retention-policy batch. Do not delete logs or `qa-artifacts` in G14. |
+
+Top deletion-ready candidates:
+
+- No product-runtime deletion candidate is source-proved by G14.
+- Local generated residue is possible DEVTOOLS work, but not selected because it is not the first
+  business-flow duplicate and must obey the log/artifact retention policy.
+
+Top decomposition-only candidates:
+
+- Admin table/header utility primitive cleanup across live admin routes.
+- Manual authoring controls/calendar decomposition.
+- Plan management/schedule edit presentation cleanup.
+- Voice-to-plan and active-plan schedule edit backend decomposition only with owner-specific proof.
+
+Blocked / browser-sensitive candidates:
+
+- Broad `training-api.ts` cleanup remains blocked unless a new tiny no-caller compatibility seam is
+  source-proved.
+- Manual calendar mutation UI, admin runtime UI, Hito DS route work, and plan-management UI require
+  dedicated browser validation and must not be bundled with backend/devtools cleanup.
+- Logs, `qa-artifacts`, validation coverage, Supabase mutation, migrations, and live OpenAI calls
+  remain out of scope.
+
+G14 burndown:
+
+- `cleanup-burndown-v1`: `30/40` gates complete, `10` remaining, `75%`.
+- Delta from G14: `+1` completed architecture/source-of-truth gate.
+- Expected next delta if UI-C1 is implemented and QA-accepted: `+1` to `31/40`, `9` remaining,
+  `77.5%`.
+
+Selected first execution batch after G14:
+
+`FRONTEND UI-C1: adopt the shared Hito calendar-day primitive in selected running-plan preview calendar`.
+
+This is selected because it has one canonical owner, one duplicate path, one risk class, and one
+validation story. It should run autonomously through implementation and QA handoff only within the
+selected preview-calendar scope.
+
+## Slice G13 Closeout — 2026-06-18
+
+Status: complete / accepted.
+
+Root-cause decision:
+
+- Visible symptom: the side-pane work dashboard could keep showing a completed cleanup gate as the
+  next active task if it was not regenerated after plan closeout.
+- Underlying cause: dashboard refresh still lived as a direct `node` helper workflow instead of a
+  first-class package-script/devtools workflow with obvious safe/default commands.
+- Canonical owner applied: local devtools / docs source-of-truth hygiene through the existing
+  `scripts/hito-work-dashboard.mjs` owner.
+
+G13 result:
+
+- Added first-class package scripts:
+  - `npm run work:dashboard`
+  - `npm run work:dashboard:no-admin`
+  - `npm run work:dashboard:apply`
+- Updated dashboard help and generated command block to recommend package scripts first.
+- Kept direct `node scripts/hito-work-dashboard.mjs` as fallback.
+- Regenerated `docs/work-dashboard.md` from current active-plan truth.
+- Did not run the live Admin apply path.
+
+Burndown update:
+
+- `cleanup-burndown-v1`: `29/40` gates complete, `11` remaining, `72.5%`.
+- Delta from G13: `+1` completed gate.
+
+## Post-G13 Reassessment — 2026-06-18
+
+Status: complete / G13 accepted; no safe next implementation batch selected.
+
+Root-cause decision:
+
+- Visible symptom after G13: the work-dashboard devtools cleanup is complete and the cleanup track
+  wants another autonomous batch.
+- Underlying cause: remaining candidates currently mix live route/component facades,
+  browser-sensitive UI, validation infrastructure, protected QA evidence, and separate-owner product
+  tracks.
+- Canonical owner applied: Architecture source-proof holding rather than forced implementation.
+
+G13 acceptance:
+
+- Accepted as complete.
+- `package.json` exposes:
+  - `npm run work:dashboard`
+  - `npm run work:dashboard:no-admin`
+  - `npm run work:dashboard:apply`
+- `scripts/hito-work-dashboard.mjs` remains the dashboard helper owner and preserves non-mutating
+  defaults unless the explicitly live `--apply` path is selected.
+- `docs/work-dashboard.md` now shows package-script commands first and reflects current active-plan
   truth.
-- If a workout cannot be expressed in watch-executable structure without fake pace/HR, it should fail
-  quality gates or route to custom/review instead of silently shipping vague effort-only text.
-
-Backend/source-of-truth contract:
-
-- Backend must use age, height, weight, level, and days/week as real inputs into duration, load, and
-  progression, not decorative fields.
-- Backend must ask or accept rest-day and long-run preferences after plan selection.
-- Backend must support flexible/default rest-day and long-run behavior when the runner omits those
-  preferences.
-- Backend should avoid rigid same-pattern weekly placement when the source-of-truth allows safe
-  variation.
-- Backend source-of-truth, segment anatomy, quality gates, and harnesses must prevent Half Marathon
-  from passing without selected-distance endpoint behavior.
-- Backend source-of-truth, segment anatomy, quality gates, and harnesses must prevent generated
-  non-rest segments from passing when their primary execution target is only vague effort wording.
-- Export/review/readback must preserve the primary structured prescription and keep cue/effort copy
-  secondary.
-
-Frontend interaction/readback contract:
-
-- Cards can appear after age, height, weight, and level are known.
-- Days/week may have a backend-owned default if not selected, but it must remain editable before
-  review/confirm.
-- Primary card CTA is `Select Plan`.
-- Remove the separate `Learn more` CTA.
-- `Select Plan` opens a selected-plan modal.
-- The selected-plan modal shows simple plan details plus preference controls:
-  running days/week if missing or editable, rest-day count/selection based on days/week, preferred
-  long-run day, and a flexible/default option when omitted.
-- Card click may reveal extra details below, but it must not be the primary creation/review path.
-- Remove `Ready to create`.
-- Replace `Create preset plan` with runner-facing copy such as `Create my plan`, only inside the
-  selected-plan modal after backend review is ready.
-- Frontend must never send rows/workouts or calculate schedule/metric truth locally.
-- Workout detail/readback must show primary structured prescription before effort/cue.
-
-Plan ownership transition:
-
-- This simplification strike no longer owns Plan Preset or plan-creation rebuild execution.
-- The rebuild is now owned by
-  [Running Plan Creation Engine Rebuild](2026-06-08-running-plan-creation-engine-rebuild.md).
-- Keep this section only as evidence for why service-size cleanup was paused and why plan-creation
-  work moved to a dedicated product plan.
-- Do not add more plan-creation implementation slices to this simplification strike.
-- Resume this strike only after the dedicated rebuild plan passes product acceptance.
-
-What remains forbidden:
-
-- no 5K shipped card
-- no target-time preset support
-- no fake pace or HR
-- no frontend-owned schedule logic
-- no DB/schema changes unless separately approved
-- no persistence semantic changes
-- no manual workout CRUD
-- no active-plan replacement/refresh
-- no OpenAI runtime generation for preset happy path
-- no service-size cleanup until this correction passes QA
-
-Slice 6 out of scope:
-
-- adding 5K as shipped
-- adding new preset families
-- using OpenAI for preset happy-path generation
-- weakening metric truth
-- body-shaming/internal insulting labels
-- medical claims
-- injury inference from weight/height
-- DB/schema changes unless separately proven necessary
-- confirm/persistence semantic changes
-- frontend changes
-- manual workout CRUD
-- active-plan replacement/refresh
-
-### Service Size Root-Cause Audit
-
-Date:
-
-2026-06-08.
-
-Snapshot:
-
-- Tracked repo markdown/code/data total is about `186,945` lines across counted `ts`, `tsx`, `mjs`,
-  `md`, `css`, `csv`, and `json` files.
-- Tracked plus currently untracked worktree files total is about `193,159` counted lines.
-- Runtime `src` code is about `84,677` lines.
-- Runtime `src` TypeScript/TSX is about `79,707` lines.
-- Scripts and validation harness code are about `21,662` lines.
-- Docs markdown/CSV are about `66,528` lines.
-- `package-lock.json` is about `11,693` lines and should not be counted as service complexity.
-
-Runtime/source hotspots:
-
-| Cluster | Approx lines | Diagnosis |
-| --- | ---: | --- |
-| plan authoring / AI blueprint / envelope / doctrine | `31,974` | biggest real ownership sprawl; many first-plan, AI, structured-authoring, and doctrine seams coexist |
-| Admin routes/importer/work items | `12,655` | admin surface and importer grew as operational tooling, not runner runtime |
-| Plan Presets | `7,422` | actively changing and currently in dirty worktree; not safe as first deletion target |
-| import/export/workout-result ingest | `6,069` | separate ingestion/export domain; requires source-of-truth audit before deletion |
-| active-plan refresh/replacement/schedule | `5,572` | legitimate but overlaps plan mutation/review ownership |
-| Hito DS route/playground | `5,664` | [Hito DS route](../../../src/routes/hitoDS.tsx) is a single large route-local demo owner |
-| global CSS | `4,970` | [styles](../../../src/styles.css) is a monolithic styling owner |
 
-Root cause:
-
-The line count is not primarily caused by one bad dependency or one accidental file. It grew because
-Hito added many correct-but-parallel seams before deleting older ones:
-
-- multiple plan creation paths remained after Plan Presets, blueprint, envelope, text, voice,
-  import/apply, and refresh/apply were added
-- validation scripts grew into multi-domain safety nets
-- Admin became both product surface and operations/backlog mirror
-- `/hitoDS` accumulated design-system demos inside one route owner
-- global CSS absorbed route/component concerns instead of being steadily tokenized/extracted
-- active/archive/backlog docs accumulated as useful history, but they inflate repo line count and
-  should be separated from runtime service complexity
-
-What is not the first fix:
-
-- Do not delete docs/archive just to lower the number.
-- Do not delete QA harnesses before replacing their safety coverage.
-- Do not delete Plan Preset builder work while it is dirty/in-flight.
-- Do not split files purely by line count if ownership would become less clear.
-- Do not treat `package-lock.json`, generated route tree, or historical docs as product bloat.
-
-Size-reduction strategy:
-
-1. Separate runtime source, scripts/harnesses, docs/history, generated/lockfiles, and active dirty
-   work in every future size report.
-2. Prefer deletion/demotion of stale plan-creation paths over abstraction.
-3. Pick one ownership seam per slice and require behavior-preservation validation.
-4. Add line-count budgets to hotspot files before adding responsibility:
-   around `700` lines needs justification or extraction, around `1000` lines needs architecture
-   reason, and around `1500` lines becomes an active decomposition candidate.
-5. Reduce code paths before shrinking UI polish files; plan generation owns the largest real
-   complexity cluster.
-
-First safe reduction slice:
-
-`ARCHITECT Slice: Plan-creation source map and deletion-gate selection`.
-
-Scope:
-
-- classify every plan creation/mutation/review path by production default, production non-default,
-  internal supported, ops/diagnostic, QA/doctrine fixture, legacy readback, or deletion/demotion
-  candidate
-- select exactly one stale/legacy seam for Backend deletion or demotion
-- define required validation before deletion
-- do not touch Plan Preset in-flight builder files
-- do not weaken blueprint default, review/confirm, persistence, or metric-truth behavior
-
-Second reduction slice:
-
-`BACKEND Slice: plan-authoring doctrine validator decomposition`.
-
-Scope:
-
-- decompose [plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts)
-  by stable assertion ownership
-- keep the command entrypoint stable
-- preserve all assertions
-- do not use decomposition as a substitute for deleting stale plan-authoring paths
-
-Third reduction slice:
-
-`FRONTEND Slice: Hito DS route and CSS ownership audit`.
-
-Scope:
-
-- split route-local `/hitoDS` demo ownership only if it reduces route responsibility
-- classify [styles](../../../src/styles.css) into DS tokens, shared primitives, product route
-  styles, admin styles, and dead rules
-- delete only rules/components with source proof and visual QA
-
-### Slice 9: Plan-Creation Source Map And First Deletion Gate
-
-Status:
-
-architecture decision complete on 2026-06-08.
-
-Owner:
-
-ARCHITECT.
-
-Audit evidence:
-
-- Source/reference scans covered [first-plan actions](../../../src/lib/first-plan-actions.ts),
-  [AI first-plan draft service](../../../src/lib/ai-first-plan-draft-service.ts),
-  [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts),
-  [AI blueprint modules](../../../src/lib/ai-first-plan-blueprint-authoring.ts),
-  [AI envelope modules](../../../src/lib/ai-first-plan-envelope-expand.ts),
-  [structured authoring](../../../src/lib/structured-plan-authoring.ts),
-  [Plan Presets](../../../src/lib/plan-presets/),
-  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts),
-  [imported plan contract](../../../src/lib/imported-plan.ts),
-  [active plan persistence](../../../src/lib/active-plan-persistence.ts),
-  [text authoring](../../../src/lib/openai-plan-authoring.ts),
-  [voice authoring](../../../src/lib/voice-to-plan-authoring.ts),
-  [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts),
-  [plan replacement actions](../../../src/lib/plan-replacement-actions.ts),
-  [plan-authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts),
-  [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts), and
-  [Plan Preset harnesses](../../../scripts/plan-presets/).
-- `package.json` still exposes the stable ops commands:
-  `author-ai-first-plan-draft`, `seed-ai-first-plan-blueprint-proof`,
-  `author-plan-from-text`, `validate-admin-capture-backlog`, and
-  `import-admin-backlog-work-items`.
-- Reference proof showed the old strict nested `ai-first-plan-draft-v1` prompt/schema/normalizer
-  functions are used by [plan-authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts),
-  while product runtime imports from [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts)
-  are type/metadata dependencies for blueprint trace/result metadata.
-- `npm run author-ai-first-plan-draft -- --contract strict-draft` is already bounded as an
-  unsupported ops contract by the script parser; routine service/action/script paths expose only
-  blueprint or envelope draft contracts.
-
-Source map:
-
-| Path / seam | Current role | Evidence | Classification | Decision |
-| --- | --- | --- | --- | --- |
-| Plan Presets (`plan_preset_v1`) | canonical no-active-plan happy path | [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) review/confirm through [active plan persistence](../../../src/lib/active-plan-persistence.ts); [Onboarding gate](../../../src/components/OnboardingGate.tsx) calls preset server actions | product runtime | Keep; out of deletion scope while builder QA is in flight |
-| AI first-plan blueprint (`ai_first_plan_blueprint_v1`) | production advanced/custom first-plan draft path | [first-plan actions](../../../src/lib/first-plan-actions.ts) defaults to blueprint through [AI draft service](../../../src/lib/ai-first-plan-draft-service.ts) | production default for custom AI path | Keep; must not weaken default |
-| AI first-plan envelope (`ai_first_plan_envelope_v1`) | explicit internal non-default structured draft option | [first-plan actions](../../../src/lib/first-plan-actions.ts) accepts internal envelope contract; no public selector | internal supported path | Keep; no production promotion |
-| Strict nested AI draft (`ai-first-plan-draft-v1`) | historical full draft prompt/schema/normalizer | [doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) imports prompt/normalizer; runtime imports only shared type/metadata from the same file | QA/doctrine historical path plus stale runtime coupling | Selected first demotion gate |
-| Deterministic structured authoring (`structured_authoring_v1`) | deterministic canonical generator and legacy/readback source | [structured authoring](../../../src/lib/structured-plan-authoring.ts) feeds blueprint fallback scaffolds, envelope expansion, active refresh, voice/text paths, and doctrine fixtures | production support / legacy compatibility | Keep; do not reintroduce as successful first-plan fallback |
-| Text rich authoring | saved-mode text replacement path | [plan replacement actions](../../../src/lib/plan-replacement-actions.ts) calls [OpenAI text authoring](../../../src/lib/openai-plan-authoring.ts), then canonical persistence | production non-default path | Keep; audit later only after source map narrows |
-| Voice-to-plan | Pro transcript first-plan assist | [first-plan actions](../../../src/lib/first-plan-actions.ts) dynamically imports [voice authoring](../../../src/lib/voice-to-plan-authoring.ts) and preserves review/confirm | production non-default path | Keep |
-| Active-plan refresh/apply | explicit reviewed mutation for existing active plans | [training API facade](../../../src/lib/training-api.ts) binds server actions to [active-plan refresh actions](../../../src/lib/active-plan-refresh-actions.ts) | product runtime mutation path | Keep; not plan-creation deletion scope |
-| JSON import/apply and text replacement | advanced import/replacement fallback | [plan replacement actions](../../../src/lib/plan-replacement-actions.ts) and [imported plan contract](../../../src/lib/imported-plan.ts) feed [active plan persistence](../../../src/lib/active-plan-persistence.ts) | product runtime / migration support | Keep |
-| Active plan persistence | canonical create/apply owner | [active plan persistence](../../../src/lib/active-plan-persistence.ts) owns `applyImportedPlanForUser(...)` and `createFirstPlanFromReviewedCanonicalPlanForUser(...)` | canonical persistence | Never deletion target in this strike |
-| `author-ai-first-plan-draft` ops script | blueprint/envelope diagnostics and live/mock smoke | [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts) calls the service and rejects strict-draft selection | ops/diagnostic path | Keep; later narrow only if diagnostics duplicate another command |
-| Doctrine validator | broad safety harness for authoring, refresh, rich drafts, blueprint/envelope, and legacy coverage | [plan-authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) is large but protects multiple contracts | QA harness | Decompose later; do not delete |
-| `training-api.ts` facade | compatibility server-action import map | [training API facade](../../../src/lib/training-api.ts) re-exports extracted owners for routes/components | legacy compatibility facade | Narrow later only after import-map proof |
-
-Candidate table:
-
-| Candidate | Why considered | Why not / risk | Gate decision |
-| --- | --- | --- | --- |
-| Demote strict nested `ai-first-plan-draft-v1` | It is the clearest historical first-plan authoring path: strict-draft is no longer selectable, and the prompt/normalizer are only doctrine-harness behavior | Shared metadata/trace types still live in the same runtime file, so raw deletion would break blueprint/envelope/runtime type imports | Approved as first demotion gate with type/metadata extraction first |
-| Delete/demote `structured_authoring_v1` references | Old source kind remains visible in several places | It remains deterministic generator/readback compatibility and must not become a first-plan success fallback | Forbidden for first gate |
-| Decompose `validate-plan-authoring-doctrine.ts` | 7k+ line hotspot | It is a safety harness, not runtime bloat; deletion would weaken QA | Later decomposition slice only |
-| Narrow `training-api.ts` re-exports | It is a broad compatibility facade | Route/serverFn import eligibility can break if narrowed too early | Later import-map slice |
-| Delete Plan Preset recipe/builder files | Current family code is large | Current Plan Preset builder is in-flight and user-visible creation depends on it | Forbidden for this gate |
-| Delete ops scripts | They are not product runtime | Blueprint/envelope live/mock diagnostics still provide release-gate proof | Keep for now |
-
-Selected deletion/demotion gate:
-
-`BACKEND Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime ownership`.
-
-Status:
-
-paused after real Plan Preset acceptance failure. Keep this as the first service-size cleanup gate,
-but do not start it until the corrected Plan Preset endpoint/watch-executable contract is
-implemented and QA-passed.
-
-Next owner:
-
-BACKEND after Plan Preset contract correction QA passes.
-
-Scope approved for Slice 10A:
-
-- Extract shared AI first-plan metadata and blueprint trace types out of
-  [strict nested AI draft authoring](../../../src/lib/ai-first-plan-draft-authoring.ts) into a
-  small product-owned metadata/trace module.
-- Update blueprint, envelope/service, first-plan action, and ops-script type imports to depend on
-  that shared metadata module instead of the strict nested draft module.
-- Move or isolate the strict nested `ai-first-plan-draft-v1` prompt/schema/normalizer into
-  doctrine-only ownership so its validation value remains available to
-  [plan-authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) without
-  presenting it as a routine runtime authoring seam.
-- Preserve the stable doctrine validator entrypoint.
-- Preserve bounded `strict-draft` CLI rejection in
-  [AI first-plan ops script](../../../scripts/author-ai-first-plan-draft.ts).
-- Remove any now-dead product-runtime source-kind branch only after source scans prove no runtime
-  path can emit it.
-
-Explicitly out of scope for Slice 10A:
-
-- Plan Preset runtime, builder CSV artifacts, resolver, review, confirm, persistence, or frontend.
-- Blueprint default behavior, prompt, validation, repair, horizon extension, or smoke contract.
-- Envelope internal/non-default behavior or exact review/confirm proof.
-- `structured_authoring_v1` legacy readback, deterministic generator, or compatibility metadata.
-- Text authoring, voice-to-plan, active-plan refresh/apply, JSON import/apply, and canonical
-  persistence.
-- Browser QA, DB/schema changes, migrations, Supabase mutation, or frontend changes.
-
-Validation expected for Slice 10A:
-
-- Source proof:
-  `rg "ai-first-plan-draft-authoring|ai-first-plan-draft-v1|strict_draft|strict-draft" src scripts package.json`.
-- Import proof:
-  product runtime no longer imports strict nested prompt/schema/normalizer ownership, while doctrine
-  harness still can validate historical strict nested fixtures.
-- `npm exec eslint -- src/lib/ai-first-plan-*.ts src/lib/first-plan-actions.ts scripts/validate-plan-authoring-doctrine.ts scripts/plan-authoring-doctrine/first-plan-release-gates.ts scripts/author-ai-first-plan-draft.ts`.
-- `node ./node_modules/.bin/tsx scripts/validate-plan-authoring-doctrine.ts`.
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract blueprint --trace-blueprint`.
-- `npm run author-ai-first-plan-draft -- --mock-openai --contract envelope`.
-- `npm run author-ai-first-plan-draft -- --contract strict-draft` must remain bounded
-  `unsupported_contract`.
-- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`.
-- `git diff --check`.
-- `npm run build`.
-
-### 2026-06-09 Cleanup Resume Audit
-
-Status:
-
-architecture decision complete; next backend gate selected.
-
-Scope decision:
-
-Service-size cleanup can resume in parallel with the DS workout-library playground only as narrow
-source/runtime cleanup.
-
-What changed since the previous pause:
-
-- The DS workout-library playground is now a separate active plan routed to RUNNING COACH first:
-  [Hito DS Workout Library Calendar And Detail Playground](2026-06-09-hito-ds-workout-library-calendar-detail-playground.md).
-- The Running Plan Creation Engine Rebuild remains the plan-creation owner:
-  [Running Plan Creation Engine Rebuild](2026-06-08-running-plan-creation-engine-rebuild.md).
-- The rebuilt selected-plan preview path is stable enough for audit:
-  - accepted 10K selected-plan preview
-  - backend-validated Half Marathon and Marathon Base preview builders
-  - frontend-selected preview wiring for 10K, Half Marathon, and Marathon Base
-  - Marathon Base visible-copy fix passed QA re-validation per latest handoff context
-- The rebuild is still preview-focused:
-  no create/confirm/persistence path has been accepted for the new running-plan engine.
-
-Current service-size/hotspot evidence:
-
-| Area | Approx lines / evidence | Classification | Decision |
-| --- | ---: | --- | --- |
-| [Plan authoring doctrine validator](../../../scripts/validate-plan-authoring-doctrine.ts) | about `7263` lines | oversized QA harness | keep; decompose later, do not delete |
-| [Hito styles](../../../src/styles.css) | about `5206` lines | broad styling owner | defer; not the safest plan-creation cleanup gate |
-| [Hito DS route](../../../src/routes/hitoDS.tsx) | about `4770` lines | broad DS route owner | defer; DS workout-library track is separate |
-| [Plan Preset algorithmic builder](../../../src/lib/plan-presets/algorithmic-builder.ts) | about `1795` lines | old product-failed builder still used by old review/confirm helpers and harnesses | audit before deleting; do not touch builder in this gate |
-| [Onboarding gate](../../../src/components/OnboardingGate.tsx) | about `1107` lines | broad frontend orchestrator | defer; frontend decomposition can happen after plan-creation ownership stabilizes |
-| [Structured plan constructor](../../../src/components/onboarding/StructuredPlanConstructor.tsx) | about `964` lines | broad setup component | defer; no behavior cleanup selected |
-| [Running plan 10K builder](../../../src/lib/plan-creation-engine/ten-k-builder.ts) | about `974` lines | accepted preview engine code | keep; do not touch in cleanup gate |
-| [Running plan preview shared builder](../../../src/lib/plan-creation-engine/preview-builder-shared.ts) | about `801` lines | accepted preview engine shared logic | keep; do not touch in cleanup gate |
-| [Training API facade](../../../src/lib/training-api.ts) | about `656` lines | compatibility facade with stale exports | audit target; select one stale export group only |
-
-Runtime/source proof before backend demotion:
-
-- [Onboarding gate](../../../src/components/OnboardingGate.tsx) imports and uses
-  `getPlanPresetCards(...)` and `previewRunningPlanDraft(...)`.
-- [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx) renders card selection
-  and opens [Selected running plan preview dialog](../../../src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx).
-- Source scan found no frontend imports of `reviewPlanPresetDraft(...)` or
-  `confirmPlanPresetDraft(...)`.
-- Before this backend slice, [Training API facade](../../../src/lib/training-api.ts) still re-exported
-  `reviewPlanPresetDraft(...)`, `confirmPlanPresetDraft(...)`, and their result types from
-  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts).
-- Before this backend slice, [Plan Preset actions](../../../src/lib/plan-preset-actions.ts)
-  implemented the old
-  mutation-capable `plan_preset_v1` review/confirm path through
-  [active plan persistence](../../../src/lib/active-plan-persistence.ts).
-- The accepted selected-plan preview path now lives in
-  [running plan engine actions](../../../src/lib/running-plan-engine-actions.ts), dispatching to the
-  accepted preview builders in [plan creation engine](../../../src/lib/plan-creation-engine/).
-
-Candidate classification:
-
-| Candidate | Bucket | Reason | Decision |
-| --- | --- | --- | --- |
-| Demote old Plan Preset `reviewPlanPresetDraft` / `confirmPlanPresetDraft` runtime-facing exports | delete/demote now | no current frontend caller; still mutation-capable; old Plan Preset create path is product-failed while new engine has no confirm contract | selected next gate |
-| Delete old Plan Preset builder files | audit first | builder is product-failed but still connected to old review/confirm/harnesses; deletion before demoting mutation seam is too broad | defer |
-| Demote strict nested `ai-first-plan-draft-v1` | audit first | still valid from prior source map, but less urgent than removing stale product-failed preset mutation exposure | keep as later Slice 10A candidate |
-| Narrow broad `training-api.ts` facade generally | audit first | facade contains many live compatibility exports; broad narrowing could break route imports | narrow only the stale Plan Preset review/confirm group |
-| Decompose doctrine validator | keep | large but protects many contracts; not runtime bloat | later decomposition |
-| Decompose `/hitoDS` route or CSS | defer | useful cleanup, but parallel DS workout-library track is already active and isolated | do not mix |
-| Active/archive stale plan duplicates | audit first | still visible duplicates exist for heart-rate and voice-to-plan plans | handle as docs cleanup later, not the next runtime cleanup gate |
+Post-G13 audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Remaining `training-api.ts` exports | required runtime facade / current compatibility | Keep blocked. Fresh proof found no no-caller export strong enough for another bounded facade cleanup. |
+| Backend ops/scripts and validators | required local ops, required validation, or future/non-default diagnostics | Keep. Do not delete or thin validation coverage by line count. |
+| Manual calendar / source actions | browser-sensitive required runtime | Defer until a dedicated frontend cleanup gate defines exact desktop/mobile browser QA coverage. |
+| Hito DS / admin UI / `/test-calendar` | separate active owner, current runtime, or paused static sandbox | Defer. No deletion-ready same-owner frontend batch was found. |
+| Docs/devtools/artifacts | G13 resolved current dashboard drift; artifacts are generated/protected | Keep holding. Do not delete logs or `qa-artifacts`; `artifact:hygiene` remains dry-run unless a future retention policy selects otherwise. |
+
+Decision:
+
+- Do not select another implementation batch now.
+- Place the simplification strike in source-proof holding.
+- Expected burndown delta from this holding decision: `0`; ledger remains `29/40` complete, `11`
+  remaining, `72.5%`.
+- Resume implementation cleanup only when fresh source/import/docs evidence identifies one concrete
+  owner, one risk class, one validation story, and clear stop conditions.
+
+Subagent preflight:
+
+- Backend/import-map subagent accepted G13 and found no next backend cleanup candidate.
+- Frontend/browser-risk subagent found no safe next frontend batch without browser-specific scope.
+- Docs/devtools/artifact subagent accepted G13, found current burndown aligned, and found no stronger
+  docs/devtools batch.
+
+## Service-Wide UI Consistency Audit — 2026-06-18
+
+Status: complete / first DS adoption cleanup batch selected.
+
+Root-cause decision:
+
+- Visible symptom: `/hitoDS` is largely accepted, but runtime product consumers can still drift
+  through route-local typography, spacing, wrappers, calendar cells, table headers, and modal/menu
+  anatomy.
+- Underlying cause: DS/specimen rollout and runtime consumer adoption were separate tracks.
+- Canonical owner: Architecture audit first, then one bounded FRONTEND/DS cleanup batch where the
+  source proof shows one owner, one risk class, and one validation story.
+
+Read-only audit streams:
+
+- DS primitive inventory confirmed canonical owners for text roles, surfaces, wrappers, metadata
+  tags, workbench shell, Figma export, and shared calendar-day presentation.
+- Runtime route-consumer scan found multiple drift candidates:
+  selected running-plan preview calendar, admin data-table headers/utility rows, admin page header
+  typography, structured-onboarding duplicate labels, and manual constructor local card/surface
+  wrappers.
+- Spacing/typography scan found broad route-local Tailwind recipes, but those are too wide for the
+  first cleanup batch.
+- Browser-risk shortlist found a tiny manual-calendar move-target label issue, but that is an
+  accessibility/view-model cleanup, not the best first DS-adoption root-cause batch.
+
+Selected first DS adoption batch:
+
+`FRONTEND UI-C1: adopt the shared Hito calendar-day primitive in selected running-plan preview calendar`.
+
+Why this is the safest first move:
+
+- It directly addresses DS adoption, not only copy/accessibility polish.
+- It has one runtime consumer: `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`.
+- It has one existing shared owner: `src/components/ui/hito-calendar-day.tsx`.
+- It has one route-local drift family: `hito-selected-plan-calendar-*` CSS plus local
+  `PreviewCalendarCell`.
+- It has one validation story: selected-plan preview browser proof at desktop and `375px`, plus
+  targeted ESLint/build/diff checks.
+- It avoids higher-risk mixed-owner batches such as admin data-table primitive extraction,
+  typography-wide migration, manual workout constructor polish, and route-wide spacing cleanup.
+
+Deferred candidates:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Admin data-table header / utility row primitive | strong DS adoption candidate, but touches Admin runtime plus DS specimen | Defer until UI-C1 passes; next likely DS adoption batch if browser/admin proof is scoped. |
+| Route-wide typography migration | too broad / high visual regression risk | Defer; should be broken into route-family batches. |
+| Manual calendar move-target accessible label | small frontend accessibility cleanup | Keep as separate targeted cleanup; not selected as first service-wide DS adoption batch. |
+| Manual workout constructor local surfaces | browser-sensitive manual authoring runtime | Defer to a dedicated manual-authoring DS cleanup gate. |
+| Schedule edit local CSS wrapper | plan-management route consumer drift | Defer; needs Open plan browser proof. |
+
+Burndown:
+
+- Current ledger remains `29/40` complete, `11` remaining, `72.5%`.
+- UI-C1 is the selected next gate. If accepted after implementation and QA, it should move the
+  ledger to `30/40`.
+
+## Slice G12 Closeout — 2026-06-18
+
+Status: complete / accepted.
+
+Root-cause decision:
+
+- Visible symptom: `training-api.ts` still suggested ownership of first-plan/voice compatibility
+  names that current runtime did not import.
+- Underlying cause: old compatibility re-exports survived after visible onboarding moved to
+  structured review plus selected/manual creation paths.
+- Canonical owner applied: backend import-map / route-facing facade cleanup while preserving
+  `src/lib/first-plan-actions.ts` as the action owner.
+
+G12 result:
+
+- Removed no-caller compatibility re-exports from `src/lib/training-api.ts`:
+  - `completeStructuredFirstPlanOnboarding`
+  - `completeStructuredFirstPlanOnboardingForUser`
+  - `generateVoiceToPlanDraft`
+  - `confirmVoiceToPlanDraft`
+- Preserved canonical first-plan/voice actions in `src/lib/first-plan-actions.ts`.
+- Preserved live `training-api.ts` route/component exports.
+
+Burndown update:
+
+- `cleanup-burndown-v1`: `28/40` gates complete, `12` remaining, `70%`.
+- Delta from G12: `+1` completed gate.
+
+## Post-G12 Reassessment And G13 Selection — 2026-06-18
+
+Status: complete / G12 accepted; next BACKEND/OPS devtools hygiene batch selected.
+
+Root-cause decision:
+
+- Visible symptom after G12: the selected facade-pruning gate was complete, but the cleanup track
+  needed a next safe autonomous batch without drifting into line-count cleanup.
+- Underlying cause: remaining candidates mix live route/component facades, browser-sensitive UI,
+  validation infrastructure, generated artifact hygiene, and docs/source-of-truth drift.
+- Canonical owner applied: Architecture source/import/docs reassessment with read-only subagents,
+  then local devtools/dashboard hygiene for the selected next batch.
+
+G12 acceptance:
+
+- Accepted as complete.
+- `src/lib/training-api.ts` no longer re-exports:
+  - `completeStructuredFirstPlanOnboarding`
+  - `completeStructuredFirstPlanOnboardingForUser`
+  - `generateVoiceToPlanDraft`
+  - `confirmVoiceToPlanDraft`
+- Canonical ownership remains in `src/lib/first-plan-actions.ts`.
+- Live route/component `training-api.ts` wrappers remain intact.
+
+Post-G12 audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Remaining `training-api.ts` exports | required runtime facade / current compatibility | Keep blocked. Source proof and backend subagent found no remaining no-caller compatibility re-export strong enough for another bounded facade cleanup. |
+| Backend ops/scripts | required local ops, required validation, or dirty/in-flight local work | Do not select by file size or historical cleanup momentum. |
+| Manual calendar / source actions | browser-sensitive required runtime | Defer until a dedicated frontend cleanup gate defines exact browser QA coverage. |
+| Hito DS / admin UI / `/test-calendar` | separate active owner, current runtime, or paused static sandbox | Defer; no deletion-ready same-owner frontend batch found. |
+| Logs / generated artifacts / `qa-artifacts/` | generated/local or protected proof output | Keep dry-run only; no deletion without a separate retention policy. |
+| `docs/work-dashboard.md` / dashboard refresh path | docs/devtools source-of-truth drift | Select BACKEND/OPS Slice G13. The dashboard can lag after plan closeout, and `package.json` lacks first-class refresh aliases for the existing dashboard helper. |
+
+Selected next gate:
+
+- BACKEND/OPS Slice G13: make the work dashboard refresh path first-class and stale-resistant.
+- Expected burndown if accepted: `cleanup-burndown-v1` moves from `28/40` to `29/40`, `11`
+  remaining, `72.5%`.
+- This is not product work and not Admin live sync by default; it is local devtools/source-of-truth
+  hygiene around `scripts/hito-work-dashboard.mjs`, `package.json`, and `docs/work-dashboard.md`.
+
+Subagent preflight:
+
+- Backend/import-map subagent accepted G12 and found no stronger backend/import-map deletion gate.
+- Frontend/browser-risk subagent found no safe immediate frontend batch; remaining candidates need
+  browser-specific gates or separate Hito DS/Admin ownership.
+- Docs/devtools/artifact subagent found the real post-G12 drift: `docs/work-dashboard.md` still
+  showed G12 as selected until regenerated, while artifact/log policy stayed aligned.
+
+## Post-G11 Reassessment And G12 Selection — 2026-06-18
+
+Status: complete / G11 accepted; next BACKEND facade-narrowing batch selected.
+
+Root-cause decision:
+
+- Visible symptom after G11: the duplicate-space local ops residue cleanup is complete, and the
+  active cleanup track needs a fresh next gate without returning to line-count or cleanup momentum.
+- Underlying cause: remaining candidates mix live runtime facade exports, browser-sensitive UI,
+  validation infrastructure, generated artifact hygiene, and docs/source-of-truth drift.
+- Canonical owner applied: Architecture read-only source/import/docs audit with subagent preflight,
+  then backend import-map facade cleanup for the selected next batch.
+
+G11 acceptance:
+
+- Accepted as complete.
+- `scripts/import-current-plan 2.mjs` and `scripts/validate-plan-preset-eligibility 2.ts` are gone.
+- Canonical owners remain:
+  - `scripts/import-current-plan.mjs`
+  - `scripts/validate-plan-preset-eligibility.ts`
+  - `scripts/author-plan-from-text.ts`
+  - `src/lib/openai-plan-authoring.ts`
+- Changelog remains unchanged because G11 was internal local ops cleanup, not shipped
+  runner-facing behavior.
+
+Post-G11 audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Duplicate-space ops residue | completed deletion | Keep gone; no further action. |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep blocked. Live route/component callers still use route data, auth, settings, workout logging, plan management, selected-plan, manual runtime wrappers, and active-plan lifecycle/refresh wrappers. |
+| First-plan/voice compatibility re-exports in `training-api.ts` | completed compatibility-only sub-seam | Complete in G12. Removed only `completeStructuredFirstPlanOnboarding`, `completeStructuredFirstPlanOnboardingForUser`, `generateVoiceToPlanDraft`, and `confirmVoiceToPlanDraft` re-exports after source proof remained clean. |
+| Frontend/manual calendar/admin/Hito DS cleanup | browser-sensitive or separate owner | Defer. No frontend cleanup batch is safer without dedicated browser QA scope. |
+| Artifact/log deletion | generated/local hygiene | Defer. `artifact:hygiene` remains non-mutating and `qa-artifacts/` stays protected evidence. |
+| `docs/current-state.md` date / broad cleanup pointer | weak docs drift | Defer. Not stronger than the source-proved backend facade seam. |
+
+Subagent findings integrated:
+
+- Backend/import-map subagent confirmed G11 files are absent and found exactly four no-caller
+  first-plan/voice compatibility exports in `training-api.ts`.
+- Frontend/UI subagent confirmed manual calendar, Hito DS, admin, and `/test-calendar` cleanup
+  candidates remain browser-sensitive or separate product/design tracks.
+- Docs/devtools subagent confirmed active plan, functional map, and work dashboard were aligned to
+  G11 / `27/40` at selection time; G12 closeout now updates the active cleanup ledger to `28/40`.
+- All three subagents were closed after their reports were integrated.
+
+Burndown:
+
+- Current ledger after G12 closeout is `cleanup-burndown-v1`: `28/40` gates complete,
+  `12` remaining, `70%`.
+- G12 delta: `+1` gate.
+
+## Slice G11 Closeout — 2026-06-18
+
+Status: complete / accepted pending next ARCHITECT cleanup reassessment.
+
+Root-cause decision:
+
+- Visible symptom: duplicate-space local ops residue files remained in the working tree and could
+  confuse future cleanup/source audits.
+- Underlying cause: local copied scripts outlived their canonical package/current-doc owners.
+- Canonical owner applied: backend/devtools ops script hygiene.
+
+G11 result:
+
+- Deleted untracked duplicate-space local residue:
+  - `scripts/import-current-plan 2.mjs`
+  - `scripts/validate-plan-preset-eligibility 2.ts`
+- Preserved canonical owners:
+  - `scripts/import-current-plan.mjs`
+  - `scripts/validate-plan-preset-eligibility.ts`
+  - `scripts/author-plan-from-text.ts`
+- Validation passed: duplicate-space source proof, `npm run import:current-plan`, Plan Preset
+  eligibility validator, and scoped `git diff --check`.
+
+Burndown update:
+
+- `cleanup-burndown-v1`: `27/40` gates complete, `13` remaining, `67.5%`.
+- Delta from G11: `+1` completed gate.
+
+## Slice G10 Closeout And Post-G10 Reassessment — 2026-06-18
+
+Status: complete / accepted; next BACKEND/OPS cleanup batch selected.
+
+Root-cause decision:
+
+- Visible symptom after G10: the selected text-authoring legacy entrypoint cleanup was complete, but
+  the active plan and functional map still needed the next source-proofed gate.
+- Underlying cause: local/legacy ops residue can survive after canonical package scripts and current
+  docs move to safer owners.
+- Canonical owner applied: Architecture acceptance closeout and read-only source/import audit, then
+  BACKEND/OPS local script hygiene for the next batch.
+
+G10 acceptance:
+
+- Accepted as behavior-preserving cleanup.
+- The stale tracked `scripts/author-plan-from-text.mjs` entrypoint was deleted.
+- The supported text-authoring path remains `npm run author-plan-from-text` ->
+  `scripts/author-plan-from-text.ts` -> `src/lib/openai-plan-authoring.ts`.
+- Validation passed: source/reference proof, `npm run author-plan-from-text -- --help`, targeted
+  ESLint for `scripts/author-plan-from-text.ts` and `src/lib/openai-plan-authoring.ts`, and scoped
+  `git diff --check`.
+- Changelog remains unchanged because G10 was internal ops/source cleanup, not a shipped
+  runner-facing capability.
+
+Post-G10 read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| `scripts/author-plan-from-text.mjs` | completed deletion | Keep deleted. TS-backed text authoring remains canonical. |
+| `scripts/import-current-plan.mjs` | required local ops helper / hardened | Keep. Package command and current docs define it as non-mutating by default and loopback-guarded for apply. |
+| `scripts/import-current-plan 2.mjs` | deletion-ready local residue | Select in Slice G11. It is untracked, has no current owner, imports deleted MJS helpers, defaults to a hardcoded Downloads path, and lacks current dry-run / loopback apply guards. |
+| `scripts/validate-plan-preset-eligibility.ts` | required validation | Keep. It validates current Plan Preset card discovery and absence of old legacy builder artifacts. |
+| `scripts/validate-plan-preset-eligibility 2.ts` | deletion-ready local residue | Select in Slice G11 after repeated source proof. It is an untracked duplicate-space validator copy and should not compete with the canonical validator. |
+| Frontend/admin/Hito DS/manual calendar cleanup | browser-sensitive or required runtime | Defer. No frontend-visible cleanup batch is source-proved safe without dedicated browser QA. |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep blocked until fresh import proof identifies another tiny compatibility-only seam. |
+
+Subagent findings integrated:
+
+- Backend/import-map subagent confirmed G10 is complete, the TS text-authoring path remains
+  required, and duplicate-space local ops residue is the only source-proved next implementation
+  batch.
+- Frontend/UI subagent confirmed no frontend/admin/Hito DS/manual-calendar cleanup is safe without
+  browser-visible scope.
+- Docs/devtools subagent confirmed burndown/dashboard drift and artifact/log policy stability.
+- All three subagents were closed after their reports were integrated.
+
+## Slice G9 Closeout And Stable Burndown Adoption — 2026-06-17
+
+Status: complete / QA-passed; stable cleanup burndown adopted; next BACKEND/OPS cleanup batch
+selected.
+
+Root-cause decision:
+
+- Visible symptom after G9: docs and the side dashboard still presented G9 as selected rather than
+  accepted.
+- Underlying cause: G9 crossed from implementation/QA into accepted cleanup, but the active
+  simplification plan, functional map, and generated work dashboard had not yet been synced.
+- Canonical owner applied: Architecture acceptance closeout and source-of-truth cleanup, not another
+  frontend/admin runtime change.
+
+G9 acceptance:
+
+- Accepted as QA-passed behavior-preserving cleanup.
+- `src/routes/admin.analytics.tsx` no longer exposes the future-only disabled `Add user` affordance
+  in the Users header.
+- `src/components/admin/AdminWorkspaceNav.tsx` no longer exposes the future-only disabled
+  `Account settings / Soon` account-menu row.
+- QA proved the managed server was current/healthy, source refs were gone, targeted ESLint passed,
+  authenticated `/admin/analytics?section=users` and `/admin/capture` loaded, the admin account menu
+  showed only current actions, desktop and `375px` mobile overflow checks passed, and artifacts were
+  captured under `qa-artifacts/screenshots/2026-06-17/admin-placeholder-demotion-qa-rerun`.
+- Changelog remains unchanged because G9 was internal cleanup/demotion of future-only admin
+  placeholders, not a new shipped user-facing capability.
+
+Post-G9 read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Admin UI placeholders (`Add user`, `Account settings / Soon`) | completed FRONTEND/ADMIN cleanup | Keep closed. Source proof found no removed placeholder refs in admin runtime files; the remaining `Account settings` match is an intentional Hito DS specimen. |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep blocked. Live callers still use route data, auth/login, settings, workout logging, plan management, selected-plan, and manual runtime wrappers. |
+| Manual calendar / Hito DS / admin runtime cleanup | required runtime or browser-sensitive | Defer until a dedicated browser-safe cleanup gate selects one owner and validation story. |
+| Artifact/log deletion | generated/local hygiene | Defer. `artifact:hygiene` remains non-mutating; `qa-artifacts/` stays protected proof evidence. |
+| Legacy `scripts/author-plan-from-text.mjs` entrypoint | stale ops/source-of-truth mismatch | Select as Slice G10. Current docs and package ownership point to the TS-backed path, but the tracked MJS entrypoint still exists and imports stale helper paths. |
+
+Subagent findings integrated:
+
+- Backend/import-map subagent confirmed G9 does not affect backend runtime and identified the stale
+  `scripts/author-plan-from-text.mjs` entrypoint as the safest next source-proved cleanup candidate.
+- Frontend/UI subagent confirmed G9 source is clean and found no stronger frontend cleanup candidate
+  that is safe without browser-visible scope.
+- Docs/devtools subagent confirmed G9 wording and dashboard state were stale, and recommended
+  source-of-truth closeout plus dashboard regeneration rather than runtime changes.
+- All three subagents were closed after their reports were integrated.
+
+Stable cleanup burndown ledger:
+
+| Field | Value |
+| --- | --- |
+| Ledger version | `cleanup-burndown-v1` |
+| Adopted | 2026-06-17, after G9 QA acceptance |
+| Fixed denominator | 40 bounded cleanup gates |
+| Completed through G20 | 37 gates |
+| Remaining after G20 | 3 gates |
+| Current gate-burndown completion | 92.5% |
+| Current delta | `+1` completed gate from G20 |
+
+Ledger rule:
+
+- Use this fixed denominator for future cleanup reports instead of recalculating rough percentages
+  from line-count impressions.
+- Future closeouts should update completed/remaining gate counts by delta.
+- Reset the denominator only through an explicit ARCHITECT source-of-truth decision.
+- The burndown percentage is a sequencing/progress metric, not a product-code line-reduction claim.
+
+## Slice G8 Closeout And Post-G8 Reassessment — 2026-06-17
+
+Status: complete / QA-passed; next autonomous same-owner cleanup batch selected.
+
+Root-cause decision:
+
+- Visible symptom after G8: source-of-truth docs still pointed at a now-completed Hito DS cleanup
+  slice.
+- Underlying cause: G8 crossed from selected implementation gate to QA-passed cleanup, but the active
+  simplification plan and functional map still needed closeout sync.
+- Canonical owner applied: Architecture acceptance closeout, followed by read-only source/import
+  reassessment before selecting one next cleanup batch.
+
+G8 acceptance:
+
+- Accepted as QA-passed behavior-preserving cleanup.
+- `src/routes/hitoDS.tsx` no longer owns the duplicate inline `/hitoDS/export/figma` fallback.
+- `src/routes/hitoDS_.export.figma.tsx` and `src/components/hito-ds/figma-export-board.tsx` remain
+  the canonical route/component owners for the Figma export surface.
+- QA proved `/hitoDS`, `/hitoDS#figma-bridge`, and `/hitoDS/export/figma` on desktop and `375px`
+  mobile with zero console warn/error count.
+- Changelog remains unchanged because G8 was internal cleanup, not a new shipped user-facing
+  capability.
+
+Post-G8 read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep. Remaining imports still include route data, auth/login, settings, workout logging, plan management, selected-plan, and manual runtime wrappers. |
+| Hito DS Figma export fallback | completed cleanup | Keep closed. Source proof shows the export board is owned by the dedicated route/component, not the parent `/hitoDS` route. |
+| Admin UI placeholders (`Add user`, `Account settings / Soon`) | browser-visible internal admin cleanup with one owner | Select as Slice G9. These are future-only affordances in frontend/admin rendering, with no backend mutation requirement. |
+| Manual calendar source actions | required product runtime / browser-sensitive | Defer. Copy/Move/Clear/Edit behavior is accepted product runtime and needs a dedicated product-browser cleanup gate if touched. |
+| Devtools/log retention | generated/local hygiene | Defer. `artifact:hygiene` remains non-mutating; no apply/delete mode is authorized and `qa-artifacts/` stays protected. |
+| Docs/source-of-truth drift | docs-only | Fold into this closeout by replacing stale G8 next-gate wording with G9. |
+
+Subagent findings integrated:
+
+- Backend/import-map subagent confirmed no safe BACKEND runtime batch after G8 and classified broad
+  `training-api.ts` cleanup as unsafe.
+- Frontend/UI subagent identified the disabled admin placeholders as the strongest bounded
+  browser-visible cleanup candidate with one owner and one validation story.
+- Docs/devtools subagent confirmed G8 was still stale in current docs and found no stronger
+  devtools/artifact cleanup gate.
+
+Next selected gate:
+
+FRONTEND/ADMIN Slice G9: demote future-only admin UI placeholders.
+
+## Post-G7C Source-Proof Reassessment — 2026-06-17
+
+Status: complete / one autonomous same-owner cleanup batch selected.
+
+Root-cause decision:
+
+- Visible symptom after G7C: cleanup routing could either drift into broad `training-api.ts`
+  narrowing or stay stuck in tiny docs-only micro-gates.
+- Underlying cause: the remaining candidates mix live route/component facades, browser-sensitive UI,
+  proof infrastructure, docs drift, and generated/local hygiene; only source proof can separate them.
+- Canonical owner applied: Architecture source-proof selection with read-only subagents, then one
+  bounded owner handoff.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep. Current imports still use route data, login/auth, workout logging, plan management lifecycle/refresh/schedule wrappers, selected/first-plan actions, and manual runtime actions. |
+| G7C manual review/confirm facade names | removed compatibility seam | Keep closed. The removed names no longer appear in `training-api.ts`; remaining matches are canonical manual authoring modules, proof scripts, or historical docs. |
+| `ViewerSummary` in `training-api.ts` | type-only but no selected destination | Defer. Do not create a new type owner solely to reduce facade surface. |
+| Manual calendar / manual-workout UI cleanup | required product runtime / browser-sensitive | Defer. Accepted manual Add/Copy/Move/Clear/Edit surfaces need their own product-browser cleanup gate if touched. |
+| Docs/devtools drift | docs-only / very small | Fold into this closeout. `docs/current-functional-map.md` had one stale "post-G7A" hotspot label; artifact hygiene remains dry-run only and needs no implementation. |
+| `/hitoDS/export/figma` duplicate route ownership | browser-sensitive internal DS cleanup with one owner | Select as Slice G8. The dedicated file route owns `/hitoDS/export/figma`; `src/routes/hitoDS.tsx` still has an old inline fallback that can be removed with targeted DS browser proof. |
+
+Subagent findings integrated:
+
+- Backend/import-map subagent confirmed no safe BACKEND implementation batch after G7C and classified
+  broad `training-api.ts` cleanup as unsafe.
+- Frontend/UI subagent confirmed the Hito DS Figma export fallback is the strongest bounded
+  same-owner cleanup candidate, with medium but contained browser risk.
+- Docs/devtools subagent confirmed source-proof holding was otherwise current, found one stale
+  `post-G7A` label in the functional map, and confirmed `artifact:hygiene` remains non-mutating.
+- All three subagents were closed after their reports were integrated.
+
+Decision:
+
+- Select `FRONTEND/DS Slice G8: remove duplicate /hitoDS/export/figma route ownership`.
+- Keep broad `training-api.ts`, manual runtime UI, admin, validation thinning, local ops deletion,
+  logs deletion, and `qa-artifacts/` cleanup deferred.
+- Do not update changelog because this is internal DS/source cleanup, not a new shipped runner-facing
+  product capability.
+
+Cleanup progress estimate:
+
+- Global simplification is still roughly `35-40%` complete, with about `60-65%` remaining.
+- Rough remaining bounded gate count is now about `12-20`, depending on safe same-owner batching.
+
+## Slice G7C Closeout — 2026-06-17
+
+Status: complete / targeted manual-authoring review-confirm facade export narrowing accepted by
+source validation.
+
+Root-cause decision:
+
+- Visible symptom before G7C: `training-api.ts` still looked like the owner for manual Copy/Paste
+  and Move review/confirm server functions.
+- Underlying cause: old compatibility re-exports survived after product behavior moved to direct
+  manual mutation wrappers and canonical manual authoring owner modules.
+- Canonical owner applied: `src/lib/manual-workout-authoring` and its `copy-paste.ts` /
+  `move-workout.ts` submodules for review/confirm functions and `ForUser` proof helpers.
+
+What changed:
+
+- Removed `reviewManualWorkoutCopyPasteDraft(...)` and
+  `confirmManualWorkoutCopyPasteDraft(...)` compatibility re-exports from `training-api.ts`.
+- Removed `reviewManualWorkoutMove(...)` and `confirmManualWorkoutMove(...)` compatibility
+  re-exports from `training-api.ts`.
+- Preserved direct manual runtime wrappers in `training-api.ts`:
+  `copyManualWorkoutWithinActivePlan`, `moveManualWorkoutWithinActivePlan`,
+  `confirmManualWorkoutDeleteClear`, `reviewManualWorkoutDeleteClear`, Add/Create/Templates, and
+  persisted-edit actions.
+- Preserved canonical manual authoring exports and proof modules.
+
+Validation evidence:
+
+- `rg -n "reviewManualWorkoutCopyPasteDraft|confirmManualWorkoutCopyPasteDraft|reviewManualWorkoutMove|confirmManualWorkoutMove" src scripts package.json docs/current-functional-map.md docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
+- `rg -n "from \"@/lib/training-api\"|from '@/lib/training-api'" src/components src/routes src/lib scripts --glob '!src/routeTree.gen.ts'`
+- targeted ESLint for `src/lib/training-api.ts`
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- `npm run build`
+- scoped `git diff --check`
+
+Next:
+
+- Run an ARCHITECT reassessment before selecting any further cleanup. Do not continue narrowing
+  `training-api.ts` by momentum; select only a source-proved bounded owner.
+
+## Slice G7B Closeout — 2026-06-17
+
+Status: complete / targeted runtime facade helper export narrowing accepted by source validation.
+
+Root-cause decision:
+
+- Visible symptom before G7B: `training-api.ts` still exposed user-scoped helper names that made the
+  facade look like the owner for lifecycle/refresh helper behavior.
+- Underlying cause: helper compatibility names survived after canonical lifecycle/refresh owner
+  modules became stable and current UI callers used only top-level server-function wrappers.
+- Canonical owners applied: `src/lib/active-plan-lifecycle-actions.ts` for active-plan lifecycle
+  helpers and `src/lib/active-plan-refresh-actions.ts` for user-scoped refresh apply.
+
+What changed:
+
+- Removed `archiveActivePlanForUser(...)` and `clearUpcomingScheduleForUser(...)` compatibility
+  exports from `training-api.ts`.
+- Removed `applyActivePlanRefreshProposalForUser(...)` compatibility export from `training-api.ts`.
+- Removed the now-dead local `applyActivePlanRefreshProposalForUserServer` bridge from
+  `training-api.ts`.
+- Preserved live top-level wrappers: `deleteActivePlan`, `clearUpcomingSchedule`,
+  `proposeActivePlanRefresh`, and `applyActivePlanRefreshProposal`.
+- Updated current docs where they previously described those no-caller helper names as public
+  `training-api.ts` compatibility exports.
+
+Validation evidence:
+
+- `rg -n "archiveActivePlanForUser|clearUpcomingScheduleForUser|applyActivePlanRefreshProposalForUser" src scripts package.json docs/current-system.md docs/current-state.md docs/current-functional-map.md docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
+- `rg -n "from \"@/lib/training-api\"|from '@/lib/training-api'" src/components src/routes src/lib scripts --glob '!src/routeTree.gen.ts'`
+- targeted ESLint for touched source files
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
+- `npm run build`
+- scoped `git diff --check`
+
+Next:
+
+- Run an ARCHITECT reassessment before selecting any further cleanup. Do not continue narrowing
+  `training-api.ts` by momentum; select only a source-proved bounded owner.
+
+## Post-G7B Cleanup Reassessment — 2026-06-17
+
+Status: complete / no BACKEND implementation batch selected after read-only audits.
+
+Root-cause decision:
+
+- Visible symptom after G7B: cleanup could drift either back into broad `training-api.ts` narrowing
+  or sideways into browser-sensitive Hito DS cleanup.
+- Underlying cause: the remaining candidates mix live runtime wrappers, type-only ownership without
+  a selected destination, browser-sensitive internal routes, validation-only proof seams, local ops
+  safety tooling, and docs/devtools hygiene.
+- Canonical owner applied: architecture cleanup selection from fresh source/import/reference
+  evidence. The next owner remains ARCHITECT source-proof reassessment; no BACKEND implementation
+  starts until a new source-proved seam appears.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep. Current source imports still use route data, login, workout-log, plan-management, selected/first-plan, and manual runtime wrappers. G7B removed only no-caller helper compatibility names. |
+| `ViewerSummary` in `training-api.ts` | type-only but no selected canonical destination | Defer. Do not create a new type owner solely to shrink the facade. |
+| Manual Copy/Paste and Move review/confirm compatibility re-exports in `training-api.ts` | candidate backend facade seam but no selected safe implementation batch after latest audits | Historical hold after post-G7B reassessment. Superseded by Slice G7C after fresh source proof selected and completed this bounded backend facade seam. |
+| Manual calendar and manual authoring hotspots | required runtime / browser-sensitive product UI | Defer. `Calendar.tsx`, manual authoring controls, source-action menu, and move controls own accepted Add/Copy/Move/Clear behavior and need a dedicated product-browser cleanup slice if touched. |
+| Plan/manual/running validators and local ops scripts | live proof/safety tooling | Defer. Do not thin validation coverage or delete ops helpers for cleanup optics; select only with a dedicated proof-preserving owner. |
+| Admin analytics/capture hotspots | current admin runtime | Defer. Admin cleanup needs its own admin route/source proof and validation boundary. |
+| Generated logs, `test-results`, and `qa-artifacts` | generated/proof hygiene | Defer. `npm run artifact:hygiene` is dry-run only; `qa-artifacts/` remains protected until a separate QA evidence policy exists. |
+| `/test-calendar` sandbox | paused static fake-only product-design sandbox | Keep paused. TC1/TC2 are accepted, no TC3 is selected, and reopening requires a concrete Product/Design question plus Architecture checkpoint. |
+| `/hitoDS` Figma export double wiring | possible DS route ownership cleanup, but browser-sensitive | Defer. It needs a dedicated FRONTEND/DS gate with `/hitoDS`, `#figma-bridge`, `/hitoDS/export/figma`, and mobile proof; do not select it as a backend cleanup substitute. |
+
+Decision:
+
+- Accept the post-G7B reassessment correction.
+- Select no immediate BACKEND implementation gate from the latest read-only audits.
+- Put the simplification strike in ARCHITECT source-proof holding mode: reassess current
+  source/import/reference evidence and select an autonomous batch only when one safe same-owner seam
+  is proved.
+- This post-G7B hold is historical after Slice G7C: G7C later removed the no-caller manual
+  Copy/Paste and Move review/confirm compatibility re-exports after fresh source proof.
+- Do not update changelog because this is internal facade/source cleanup, not a new runner-facing
+  shipped capability.
+
+Cleanup progress estimate:
+
+- Global simplification remains roughly `35-40%` complete, with about `60-65%` remaining.
+- Rough remaining bounded gate count remains about `13-21`; no implementation batch was selected,
+  so the overall estimate remains unchanged.
+
+## Slice G7A Reassessment Closeout — 2026-06-17
+
+Status: complete / post-G7A architecture cleanup reassessment accepted.
+
+Root-cause decision:
+
+- Visible symptom after G7A: the cleanup track still needed a next gate, while current docs and
+  source evidence could pull agents back toward broad `training-api.ts` cleanup.
+- Underlying cause: `training-api.ts` remains a mixed route-facing facade with many live wrappers,
+  but a few helper compatibility names and docs/source-truth lines lag behind current ownership.
+- Canonical owner applied: architecture source/import reassessment. The next gate is selected only
+  from fresh source proof, not file size or cleanup momentum.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep. Route data, auth/login, active-plan lifecycle/refresh/schedule-edit, selected/first-plan, workout-log, plan-replacement, and manual authoring wrappers remain live. |
+| G7A seams: `persistImportedPlanForCurrentRequest`, `saveUserSettings` | complete compatibility cleanup | Accepted. Fresh source proof shows these names are gone from `training-api.ts`; canonical owners remain `plan-replacement-actions.ts` and `user-settings-actions.ts`. |
+| `archiveActivePlanForUser`, `clearUpcomingScheduleForUser`, `applyActivePlanRefreshProposalForUser` in `training-api.ts` | no-caller helper compatibility names with canonical owners | Select as G7B. Fresh source proof found no current source caller importing these names from `training-api.ts`; canonical functions already exist in lifecycle/refresh owner modules. |
+| `ViewerSummary` in `training-api.ts` | type-only but no selected canonical destination | Defer. Do not create a new type owner solely to reduce facade surface. |
+| Manual calendar/source-action frontend | required runtime / browser-sensitive | Defer. Accepted Copy/Move/Clear/Add behavior needs a dedicated browser-safe frontend cleanup gate if touched. |
+| Hito DS Figma export double wiring | possible frontend/DS cleanup | Defer. It requires a dedicated DS/browser proof gate and is lower priority than the source-proved backend helper batch. |
+| Docs/devtools drift | docs-only source-of-truth sync | Partially fixed in this closeout for G7A truth. Local artifact cleanup remains dry-run only; do not delete logs or `qa-artifacts`. |
+
+Subagent findings integrated:
+
+- Backend/import-map explorer confirmed broad `training-api.ts` cleanup is unsafe, G7A is
+  source-confirmed complete, and the three user-scoped helper exports are the only plausible later
+  backend facade seam.
+- Frontend/UI explorer confirmed manual calendar/source-action cleanup is browser-sensitive and
+  should not be selected casually; Hito DS export double wiring is a later bounded DS candidate.
+- Docs/devtools explorer confirmed `/test-calendar` ownership is consistent after G6, artifact
+  hygiene remains non-mutating, and current source-of-truth docs needed G7A alignment.
+
+Decision:
+
+- Accept the post-G7A reassessment.
+- Historical decision at that checkpoint: select Slice G7B for the no-caller user-scoped
+  `training-api.ts` helper compatibility exports. Slice G7B is now complete and is not current next
+  work.
+- Do not update changelog because this is internal cleanup/source-of-truth alignment, not a shipped
+  runner-facing capability.
+
+Cleanup progress estimate:
+
+- Global simplification remains roughly `35-40%` complete, with about `60-65%` remaining.
+- Rough remaining bounded gate count remains about `13-21`; G7B is intentionally small and does not
+  materially change the overall estimate.
+
+## Slice G7A Closeout — 2026-06-17
+
+Status: complete / targeted runtime facade import-map narrowing accepted by source validation.
+
+Root-cause decision:
+
+- Visible symptom before G7A: `training-api.ts` still looked like the owner for imported-plan
+  persistence and user-settings save contracts.
+- Underlying cause: compatibility re-exports survived after canonical owner modules became stable.
+- Canonical owners applied: `src/lib/plan-replacement-actions.ts` for
+  `persistImportedPlanForCurrentRequest`, and `src/lib/user-settings-actions.ts` for
+  `saveUserSettings`.
+
+What changed:
+
+- Removed the unused `persistImportedPlanForCurrentRequest` re-export from `training-api.ts`.
+- Moved `src/routes/settings.tsx` to import `saveUserSettings` directly from
+  `src/lib/user-settings-actions.ts`.
+- Removed the `saveUserSettings` re-export from `training-api.ts`.
+- Preserved `getSettingsRouteData` and all other live route/component server-function wrappers in
+  `training-api.ts`.
+
+Validation evidence:
+
+- `rg -n "persistImportedPlanForCurrentRequest|saveUserSettings" src scripts package.json`
+- `rg -n "@/lib/training-api" src/components src/routes src/lib scripts`
+- `npm exec eslint -- src/lib/training-api.ts src/routes/settings.tsx src/lib/user-settings-actions.ts`
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
+- `npm run build`
+- scoped `git diff --check`
+
+Next:
+
+- Run an ARCHITECT reassessment before selecting any further cleanup. Do not continue narrowing
+  `training-api.ts` without a fresh source/import proof and a selected bounded gate.
+
+## Slice G7 Closeout — 2026-06-17
+
+Status: complete / post-G6 cleanup reassessment accepted.
+
+Root-cause decision:
+
+- Visible symptom before G7: after G6, the active-plan root was cleaner, but cleanup could still
+  drift back toward line-count or momentum-based implementation slices.
+- Underlying cause: remaining candidates mix live runtime facades, browser-sensitive UI, validation
+  coverage, source-of-truth drift, and generated/local artifact hygiene.
+- Canonical owner applied: Architecture cleanup selection from current source/import/reference
+  evidence before choosing the next BACKEND, FRONTEND, DEVTOOLS, QA, or docs gate.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep. Current route/component imports still use route data wrappers, auth/login wrappers, settings loader, active-plan lifecycle/refresh/schedule-edit wrappers, selected/first-plan actions, workout logging, and manual runtime actions. |
+| `persistImportedPlanForCurrentRequest` re-export | compatibility-only / deletion-ready facade sub-seam | Select as part of G7A. Fresh `rg` showed no external source caller imports this through `training-api.ts`; canonical ownership is `src/lib/plan-replacement-actions.ts`. |
+| `saveUserSettings` re-export | small runtime action facade sub-seam with direct canonical owner | Select conditionally as part of G7A. Fresh `rg` showed one facade caller in `src/routes/settings.tsx`, while the server function is already defined by `src/lib/user-settings-actions.ts`. |
+| Manual calendar/source-action UI | required runtime / browser-sensitive | Defer. `Calendar.tsx`, `ManualWorkoutSourceActionMenu.tsx`, move controls, and authoring controls own accepted manual calendar behavior and require a dedicated browser-safe frontend cleanup gate. |
+| Hito DS route/export fallback branch | compatibility-only candidate but browser-visible DS route | Defer. Source proof suggests the dedicated `/hitoDS/export/figma` route owns export, but this is a separate FRONTEND/DS gate with browser proof, lower priority than the safer backend import-map batch. |
+| Admin UI placeholders | future-only / demotion candidate | Defer. Potentially safe, but admin UI cleanup needs its own admin/browser validation boundary. |
+| `docs/current-state.md` archived baseline reference | docs-only drift | Fixed in this checkpoint by pointing the canonical reference to the archived baseline plan. |
+| Artifact/log cleanup | generated/local hygiene | Defer. `npm run artifact:hygiene` remains dry-run only; do not delete logs or `qa-artifacts` in this track. |
+
+Subagent findings integrated:
+
+- Backend/import-map explorer confirmed broad `training-api.ts` cleanup is still unsafe but identified
+  the two G7A sub-seams above as source-proved candidates.
+- Frontend/UI explorer confirmed manual calendar/source-action surfaces are live and browser-risky,
+  and identified the Hito DS export fallback branch as a later bounded frontend/DS candidate.
+- Docs/devtools explorer confirmed no safe artifact deletion gate and found the stale
+  `docs/current-state.md` active-path reference repaired by this G7 checkpoint.
+
+Decision:
+
+- Accept Slice G7 as complete.
+- Select one immediate next cleanup gate:
+  `BACKEND Slice G7A: targeted training-api import-map cleanup batch`.
+- Do not update changelog because G7 is architecture/source-of-truth cleanup and G7A is internal
+  import-map cleanup, not shipped runner-facing behavior.
+
+Cleanup progress estimate:
+
+- After G7 acceptance, global simplification remains roughly `35-40%` complete, with about `60-65%`
+  remaining.
+- Rough remaining bounded gate count is about `13-21`, depending on how many future same-owner
+  cleanup seams can be batched safely after read-only proof.
+
+## Slice G6 Closeout — 2026-06-16
+
+Status: complete / docs-source-of-truth demotion accepted.
+
+Root-cause decision:
+
+- Visible symptom before G6: `docs/plans/active/` still contained a paused `/test-calendar` sandbox
+  plan even though no TC3 or immediate sandbox execution owner was selected.
+- Underlying cause: historical sandbox execution docs remained in the active-plan root after Hito DS
+  IA/specimen/Figma bridge work became the active DS owner.
+- Canonical owner fixed: documentation/source-of-truth. The paused sandbox plan now lives in
+  `docs/plans/archive/` as historical evidence, while the Hito DS IA plan remains active.
+
+What changed:
+
+- Moved `docs/plans/active/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md` to
+  `docs/plans/archive/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md`.
+- Preserved import-ready metadata and changed status to `archived`.
+- Updated source-of-truth references so the active-plan root no longer treats paused
+  `/test-calendar` work as current execution.
+- Kept `/test-calendar` runtime/source, Hito DS implementation, and QA artifacts untouched.
+
+Validation:
+
+- Source/reference proof checked `test-calendar`, `/test-calendar`, `Hito DS`, `specimen`, and
+  `Figma bridge` references across plans, current docs, tasks, and changelog.
+- Scoped `git diff --check` passed for touched markdown.
+- The requested `npm run ...` wrappers could not run in this desktop shell because `npm` was not on
+  `PATH`; the equivalent scripts passed through the bundled Codex Node runtime:
+  `node --env-file=.env.local --import tsx ./scripts/import-repo-work-items-to-admin-backlog.ts --dry-run --timeout-ms 30000`
+  and `node --import tsx ./scripts/validate-admin-capture-backlog.ts`.
+
+Decision:
+
+- Accept Slice G6 as complete.
+- Do not update changelog because this is docs/source-of-truth hygiene, not a shipped
+  runner-facing behavior change.
+- Next recommended role: Architect should run Slice G7 as a post-G6 cleanup reassessment from the
+  compact active-plan root.
+
+## Slice G5F Closeout — 2026-06-16
+
+Status: complete / behavior-preserving backend ops persistence cleanup.
+
+Root-cause decision:
+
+- Visible symptom before G5F: after G5E, local ops scripts no longer duplicated plan builders but
+  still duplicated profile / plan cycle / planned workout apply and readback orchestration.
+- Underlying cause: historical local ops scripts predated the current runtime active-plan persistence
+  seams and evolved as separate apply paths.
+- Direct runtime persistence reuse was not selected because the runtime seam creates its own admin
+  Supabase client from environment configuration. That would be the wrong owner for local ops
+  mutation safety, where entrypoints must retain explicit dry-run and local-loopback guards.
+- Canonical owner fixed: a narrow ops-local helper now owns only shared local apply/readback logic
+  and receives the already-created, caller-guarded Supabase client.
+
+What changed:
+
+- Added `scripts/lib/ops-plan-apply.ts` for shared local ops profile upsert, active-plan archive,
+  plan cycle insertion, planned workout insertion, and readback.
+- `scripts/import-current-plan.mjs`, `scripts/author-structured-plan.mjs`, and
+  `scripts/test-user.mjs` now call that helper for plan apply/readback instead of carrying local
+  duplicate blocks.
+- The helper reuses canonical `buildPersistedWorkoutInsertRows(...)` from runtime persistence
+  support, but does not create a Supabase client or own mutation-safety decisions.
+
+Validation:
+
+- Source/import proof showed the duplicated plan-apply row creation/readback code now lives in one
+  ops helper.
+- `node --check` passed for touched `.mjs` entrypoints.
+- Targeted ESLint passed for touched ops scripts and helper.
+- `npm run import:current-plan` printed non-mutating help.
+- `node --env-file=.env.local ./scripts/import-current-plan.mjs --dry-run --plan-file scripts/fixtures/rich-workout-saved-mode-fixture.json` stayed non-mutating.
+- `node --env-file=.env.local ./scripts/import-current-plan.mjs --apply --plan-file scripts/fixtures/rich-workout-saved-mode-fixture.json` remained blocked without the local-loopback mutation flag.
+- `author-structured-plan` and `test-user` no-argument checks failed before mutation with usage/missing-input errors.
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
+- `npm run build`
+- scoped `git diff --check`
+
+Decision:
+
+- Accept Slice G5F as complete.
+- Do not update changelog because G5F is internal ops/import cleanup, not a runner-facing shipped
+  capability.
+- Next recommended role: Architect should run Slice G6 as docs/source-of-truth demotion for the
+  paused `/test-calendar` sandbox plan.
+
+## Post-G5F Cleanup Batch Selection — 2026-06-16
+
+Status: complete / next owner selected.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Backend ops/import-map after G5F | docs/devtools + live runtime + proof-infrastructure | Defer implementation. G5F source evidence matches the report, and remaining backend candidates are live, required proof entrypoints, or docs/devtools helpers. |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Defer. Current route/component imports still rely on it; do not narrow by line count or momentum. |
+| Frontend manual calendar / source-action cleanup | live browser-sensitive runtime | Defer. A small `ManualWorkoutSourceActionMenu` import cleanup may exist, but it touches accepted menu behavior and requires browser QA, so it is not the safest immediate post-G5F gate. |
+| Hito DS / `/test-calendar` implementation cleanup | browser-reachable DS/devtools surfaces | Defer implementation. Keep runtime routes and sandbox code intact. |
+| Local artifact/log retention apply mode | generated/local hygiene | Defer. `npm run artifact:hygiene` remains dry-run only, and `qa-artifacts/` remain protected evidence until a separate QA evidence policy exists. |
+| Paused `/test-calendar` active plan | docs/source-of-truth drift | Select. The sandbox is paused with no TC3 selected, while the Hito DS IA/specimen contract plan owns the active DS/specimen/Figma bridge rollout. |
 
 Selected next cleanup gate:
 
-`BACKEND Slice: stale Plan Preset review/confirm mutation seam demotion`.
+`ARCHITECT Slice G6: demote/archive the paused /test-calendar sandbox plan from active execution`.
 
-Implementation boundary:
+Batching decision:
 
-- Remove or demote runtime-facing `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)`.
-- Preserve `getPlanPresetCards(...)`.
-- Preserve `previewRunningPlanDraft(...)`.
-- Preserve the new preview-only [plan creation engine](../../../src/lib/plan-creation-engine/).
-- Preserve canonical [active plan persistence](../../../src/lib/active-plan-persistence.ts).
-- Preserve low-level old Plan Preset fixture/harness coverage only if needed as regression evidence,
-  but do not leave the stale create action as a product-facing runtime seam.
-- If a stale caller attempts old Plan Preset review/confirm, return a bounded unsupported/preview-only
-  result instead of persisting a product-failed plan.
+- This is a docs/source-of-truth batch, not runtime cleanup.
+- Batching is intentionally narrow: classify and demote/archive the paused `/test-calendar` active
+  plan only if source evidence confirms it no longer owns active execution.
+- Keep `/test-calendar` route/source and QA artifacts untouched.
+- Keep the Hito DS IA/specimen contract plan as the active owner for DS/specimen/Figma bridge
+  rollout.
 
-Why this is the safest first gate:
+Cleanup progress estimate:
 
-- It does not touch new preview builders, DS playground work, provider ingest, DB/schema, or
-  canonical persistence.
-- It removes a stale mutation-capable path before any new create path is implemented.
-- It matches the current product state: selected-plan preview is allowed, but create/confirm is not.
-- It is smaller and safer than deleting the old Plan Preset builder or narrowing the whole
-  `training-api.ts` facade.
+- After G5F acceptance, global simplification is roughly `35-40%` complete, with about `60-65%`
+  remaining.
+- Rough remaining bounded gate count is about `14-22`, depending on how many future same-owner
+  cleanup seams can be batched safely.
 
-Validation expected:
+## Slice G5E Closeout — 2026-06-16
 
-- `rg "reviewPlanPresetDraft|confirmPlanPresetDraft" src scripts package.json`.
-- `rg "getPlanPresetCards|previewRunningPlanDraft" src/components src/lib`.
-- Targeted ESLint for changed backend/source files.
-- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`.
-- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`.
-- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`.
-- `npm run validate-admin-capture-backlog`.
-- `git diff --check`.
+Status: complete / behavior-preserving backend ops import cleanup.
+
+Root-cause decision:
+
+- Visible symptom before G5E: local ops scripts still carried historical `.mjs` plan-seed /
+  structured-authoring helper ownership beside current TypeScript owners.
+- Underlying cause: the ops scripts predated the canonical `src/lib/imported-plan.ts` and
+  `src/lib/structured-plan-authoring.ts` seams.
+- Canonical owner fixed: local ops entrypoints now call the TypeScript imported-plan and structured
+  authoring owners directly through `tsx/esm/api` scoped imports, without introducing a third bridge
+  layer.
+
+What changed:
+
+- `scripts/import-current-plan.mjs`, `scripts/author-structured-plan.mjs`, and
+  `scripts/test-user.mjs` now load canonical TypeScript owners instead of local duplicate helper
+  files.
+- Deleted duplicate local helper modules:
+  `scripts/lib/imported-plan-seed.mjs` and `scripts/lib/structured-plan-authoring.mjs`.
+- Preserved public package command names and the G4F `import:current-plan` safety contract:
+  default/help remains non-mutating, dry-run remains non-mutating, and apply remains blocked without
+  the explicit local-loopback mutation flag.
+
+Validation:
+
+- Source/import proof showed no remaining imports of `scripts/lib/imported-plan-seed.mjs` or
+  `scripts/lib/structured-plan-authoring.mjs`.
+- `node --check` passed for touched `.mjs` entrypoints.
+- Targeted ESLint passed for touched ops scripts.
+- `npm run import:current-plan` printed non-mutating help.
+- `node --env-file=.env.local ./scripts/import-current-plan.mjs --dry-run --plan-file scripts/fixtures/rich-workout-saved-mode-fixture.json` stayed non-mutating.
+- `node --env-file=.env.local ./scripts/import-current-plan.mjs --apply --plan-file scripts/fixtures/rich-workout-saved-mode-fixture.json` remained blocked without the local-loopback mutation flag.
+- `author-structured-plan` and `test-user` no-argument checks failed before mutation with usage/missing-input errors.
+- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
+- `npm run build`
+- scoped `git diff --check`
+
+Decision:
+
+- Accept Slice G5E as complete.
+- Do not update changelog because G5E is internal ops/import cleanup, not a runner-facing shipped
+  capability.
+- Next recommended role: Backend should run Slice G5F as the next same-owner ops cleanup batch.
+
+## Post-G5E Cleanup Batch Selection — 2026-06-16
+
+Status: complete / next owner selected.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Defer. Remaining imports are still route/component server-function wrappers or live contract consumers; do not continue facade cleanup by file size. |
+| Product frontend/manual calendar cleanup | live browser-sensitive runtime | Defer. Manual calendar controls still own accepted Copy/Move/Clear, drag/drop, dialogs, mobile behavior, and backend-shaped capability rendering. |
+| Hito DS Figma export defensive route branch | small frontend/DS cleanup candidate | Defer. There is source evidence for a narrow cleanup, but it requires browser proof and is lower leverage than the ops seam directly exposed by G5E. |
+| Docs/devtools source-of-truth compression | docs-only candidate | Defer. G5E is already recorded as complete; historical sections are noisy but not currently blocking the next implementation gate. |
+| Local artifact/log retention apply mode | generated/local hygiene | Defer. L1 is dry-run only, and `qa-artifacts/` remain protected evidence until a separate QA evidence retention policy exists. |
+| Ops plan-apply persistence blocks | backend ops/script cleanup candidate | Select. `import-current-plan`, `author-structured-plan`, and `test-user --plan` now use canonical TS plan builders, but still duplicate similar Supabase profile/plan/workout apply/readback logic. |
+
+Selected next cleanup gate:
+
+`BACKEND Slice G5F: ops plan-apply persistence consolidation audit and cleanup`.
+
+Batching decision:
+
+- This remains a same-owner backend ops/script batch, directly following the root cause exposed by
+  G5E.
+- Batching is safe only within the three local ops entrypoints and any narrow helper they can share.
+- The slice must first prove whether existing canonical active-plan/imported-plan persistence seams
+  can be reused without weakening local-loopback mutation guards.
+- If canonical runtime persistence cannot be reused safely, Backend may extract only a narrow
+  ops-local helper for duplicated row-apply/readback code, or stop and report the blocker.
+
+Cleanup progress estimate:
+
+- After G5E acceptance, global simplification is roughly `33-38%` complete, with about `62-67%`
+  remaining.
+- Rough remaining bounded gate count is about `15-23`, depending on how many future same-owner
+  cleanup seams can be batched safely.
+
+## Slice G5D Closeout — 2026-06-16
+
+Status: complete / behavior-preserving backend import-contract cleanup.
+
+Root-cause decision:
+
+- Visible symptom before G5D: `training-api.ts` still looked like the owner for many manual-authoring
+  contracts.
+- Underlying cause: manual-authoring runtime server actions and pure type contracts still shared the
+  same compatibility facade.
+- Canonical owner fixed: backend import/export contract ownership for pure manual-authoring types.
+
+What changed:
+
+- Pure `ManualWorkout*` and `ManualEmpty*` type imports in manual/onboarding components now import
+  from `src/lib/manual-workout-authoring` or `src/lib/manual-workout-authoring/schema`.
+- Runtime manual server-function/action imports remain in `training-api.ts`.
+- Proved-unused manual type re-exports were removed from `training-api.ts`.
+
+Validation:
+
+- Source/import proof before and after with
+  `rg -n "@/lib/training-api" src/components src/routes src/lib scripts`.
+- `npm exec eslint -- src/lib/training-api.ts src/components/OnboardingGate.tsx src/components/onboarding/ManualUserBuiltPlanPanel.tsx src/components/manual-workout/ManualWorkoutAuthoringControls.tsx src/components/manual-workout/ManualWorkoutConstructorEditor.tsx src/components/manual-workout/ManualWorkoutMoveControls.tsx src/components/manual-workout/ManualWorkoutPersistedEditControls.tsx src/components/manual-workout/ManualWorkoutSourceActionMenu.tsx src/components/manual-workout/manual-workout-authoring-utils.ts`
+- `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
+- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
+- `npm run build`
+- scoped `git diff --check`
+
+Decision:
+
+- Accept Slice G5D as complete.
+- Keep runtime manual server-function/action imports in `training-api.ts`; broad facade cleanup is
+  still unsafe without a newly proved non-runtime seam.
+- Do not update changelog because G5D is internal import-contract cleanup, not a new runner-facing
+  shipped capability.
+
+## Post-G5D Cleanup Batch Selection — 2026-06-16
+
+Status: complete / next owner selected.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Broad `training-api.ts` cleanup | unsafe current-runtime facade | Keep. Route data, auth, settings, lifecycle, selected-plan, workout-log, and manual action wrappers remain live. |
+| `ViewerSummary` type in `training-api.ts` | suspect type-only seam without selected canonical owner | Defer. Do not create a new type owner just to reduce facade surface. |
+| Product frontend/manual calendar cleanup | live browser-sensitive runtime | Pause. `Calendar.tsx`, manual authoring controls, source action menu, and move controls own accepted desktop/mobile menu, drag/drop, toast, dialog, and refresh behavior. |
+| Docs/devtools source-of-truth drift | docs-only | Resolve in this closeout by replacing stale G5D-next text with the new selected G5E gate. |
+| Local artifact/log retention after L1 | generated/local hygiene | Defer. L1 is dry-run only; deletion/apply mode still needs explicit retention approval and must not touch `qa-artifacts/`. |
+| Ops plan-seed `.mjs` helper seam | backend ops/script cleanup candidate | Select. `import-current-plan`, `author-structured-plan`, and `test-user` still use `.mjs` seed/structured helper modules while canonical TS owners exist. |
+
+Selected next cleanup gate:
+
+`BACKEND Slice G5E: ops plan-seed canonicalization audit and cleanup`.
+
+Batching decision:
+
+- This is a same-owner backend ops/import cleanup batch.
+- Batching is safe only because the selected files are local ops scripts and helper modules, not
+  product runtime or browser UI.
+- The batch is still safety-sensitive because some scripts can mutate Supabase; validation must keep
+  default/dry-run behavior non-mutating and preserve local-loopback-only apply guards.
+
+Cleanup progress estimate:
+
+- After G5D acceptance, global simplification is roughly `31-36%` complete, with about `64-69%`
+  remaining.
+- Rough remaining bounded gate count is about `16-24`, depending on how many future gates can batch
+  same-owner proof-backed seams.
+
+## Slice G5C Closeout — 2026-06-16
+
+Status: complete / QA-passed behavior-preserving frontend cleanup.
+
+Root-cause decision:
+
+- Visible symptom before G5C: manual calendar source-action source still looked copy-only after the
+  accepted menu became Copy / Move / Clear.
+- Underlying cause: the stale `ManualWorkoutCopyMenu` compatibility alias remained after the
+  `ManualWorkoutSourceActionMenu` extraction.
+- Canonical owner fixed: frontend source-action naming/import ownership. Backend mutation truth,
+  persistence, date truth, metadata, and metric truth were preserved.
+
+QA acceptance evidence:
+
+- `rg -n "ManualWorkoutCopyMenu" src` returned zero refs.
+- `Calendar.tsx` imports/renders `ManualWorkoutSourceActionMenu` directly.
+- Saved manual calendar source-action menu still exposes Copy, Move, and Clear.
+- Copy/Paste persisted through the accepted backend seam.
+- Move preserved the same planned workout row id while moving dates.
+- Clear rendered the backend-shaped review dialog with Restore / Put back / Redo copy.
+- Mobile `375px` had no horizontal overflow.
+- Disposable auth/local/DB fixture cleanup returned to zero.
+- No fake pace or fake personal HR was found.
+
+Decision:
+
+- Accept Slice G5C as QA-passed.
+- Record it as cleanup validation, not a new shipped feature. Changelog is not updated because the
+  runner-facing Copy/Move/Clear capability already existed; this slice removed stale naming and
+  compatibility surface without adding behavior.
+- Pause further product frontend/manual-calendar cleanup until a fresh browser-safe seam is selected.
+
+## Post-G5C Cleanup Batch Selection — 2026-06-16
+
+Status: complete / next owner selected.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| Product frontend/manual calendar cleanup | live browser-sensitive runtime | Pause. G5C is accepted, but `Calendar.tsx` and manual authoring controls own live desktop/mobile/drag/drop/menu/dialog behavior. Do not continue by file size. |
+| Hito DS/admin UI cleanup | separate runtime/IA tracks | Defer. Hito DS belongs to the DS IA rollout; Admin needs a dedicated source/import proof gate. |
+| Docs/devtools source-of-truth drift | docs-only | Resolved in this closeout by marking G5C QA-passed and selecting the next immediate gate. L1 retention policy still forbids deletion/apply mode. |
+| `training-api.ts` broad cleanup | unsafe current-runtime facade | Keep. Route-facing wrappers and runtime manual actions remain live. |
+| Manual-authoring type-only facade narrowing | bounded backend import-contract cleanup | Select. Pure `ManualWorkout*` / `ManualEmpty*` type imports can move to canonical manual-authoring owners if source proof shows they do not require the facade. |
+
+Historical selected next cleanup gate at the G5C checkpoint:
+
+`BACKEND Slice G5D: manual-authoring type-only facade narrowing`.
+
+Batching decision:
+
+- This is a same-owner backend/import-contract cleanup batch.
+- Batching is safe only for pure type imports and proved-unused type re-exports.
+- It is not safe to include runtime manual server-function exports/actions, browser behavior,
+  Supabase, migrations, OpenAI, artifact hygiene, Hito DS, Admin, or broad `training-api.ts`
+  narrowing.
+
+Cleanup progress estimate:
+
+- After G5C acceptance, global simplification remains roughly `30-35%` complete, with about
+  `65-70%` remaining. G5C was valuable but intentionally small.
+- Rough remaining bounded gate count is now about `17-25`, depending on how many future gates can
+  safely batch same-owner seams after read-only proof.
+
+## Slice L1 Closeout — 2026-06-16
+
+Status: complete / local artifact hygiene dry-run tooling implemented.
+
+What changed:
+
+- Added `npm run artifact:hygiene` as a non-mutating local artifact inventory command.
+- Added `scripts/report-local-artifact-hygiene.mjs` as the dry-run reporter for `logs/`,
+  build-output residues, and `test-results/`.
+- Added `test-results/` to `.gitignore` after source proof showed `test-results/.last-run.json` was
+  generated, untracked, and not intentionally ignored.
+- Kept `qa-artifacts/` protected: excluded by default, counted only with
+  `--include-qa-artifacts`, and always reported as non-disposable.
+- Updated current docs to keep generated/proof artifact boundaries explicit.
+
+Validation:
+
+- `node --check scripts/report-local-artifact-hygiene.mjs`
+- `npm run artifact:hygiene`
+- `node ./scripts/report-local-artifact-hygiene.mjs --root <temporary-fixture>`
+- `node ./scripts/report-local-artifact-hygiene.mjs --include-qa-artifacts`
+- `npm exec eslint -- scripts/report-local-artifact-hygiene.mjs`
+- scoped `git diff --check`
+
+Observed current repo inventory:
+
+- `logs/`: recent raw local diagnostic/build output, about `19.9 MB`.
+- `test-results/`: generated test-runner residue, `45 B`.
+- `qa-artifacts/`: protected QA evidence, about `696.2 MB`, counted only with explicit opt-in.
+
+## Post-L1 Cleanup Batch Selection — 2026-06-16
+
+Status: complete / next owner selected.
+
+Root-cause finding:
+
+- Visible symptom: cleanup routing is still too granular when every small compatibility seam becomes
+  a separate prompt.
+- Underlying cause: remaining candidates mix live runtime ownership, protected local artifacts, and
+  browser-sensitive frontend compatibility naming. L1 closed the artifact dry-run gap, so the next
+  safe implementation batch should be selected from current import/source proof rather than cleanup
+  momentum.
+- Canonical owner selected: FRONTEND, because the strongest proved seam is a stale manual
+  source-action alias in rendering/import naming, not backend mutation truth.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| `training-api.ts` remaining exports | current-runtime facade / unsafe broad cleanup | Keep. Current route/component wrappers and manual authoring imports are still live; do not narrow by line count. |
+| Manual authoring type cluster import map | broad current-runtime audit candidate | Defer. It needs a dedicated backend import-map audit before implementation. |
+| `ManualWorkoutCopyMenu` alias | live frontend compatibility alias / safe bounded cleanup with QA | Select. It is stale naming around the accepted `ManualWorkoutSourceActionMenu` owner and can be cleaned as one frontend batch. |
+| Devtools/log hygiene after L1 | generated/local hygiene | Defer. L1 added dry-run reporting; deletion/apply mode needs a separate retention policy and must not touch QA evidence. |
+| Docs/source-of-truth drift | docs-only | Sync in this checkpoint by pointing the active plan and functional map at G5C and aligning retention wording to the L1 reporter. |
+
+Selected next cleanup gate:
+
+`FRONTEND Slice G5C: manual source-action naming and alias cleanup`.
+
+Batching decision:
+
+- This was a bundled same-owner frontend cleanup batch, not a cross-track implementation.
+- Batching was safe because all included edits were one source-action rendering/import seam:
+  `Calendar.tsx`, `ManualWorkoutSourceActionMenu.tsx`, and
+  `ManualWorkoutAuthoringControls.tsx`.
+- It is not safe to include backend manual authoring type cleanup, `training-api.ts` runtime wrapper
+  narrowing, devtools deletion/apply mode, Hito DS cleanup, or QA artifact policy in the same gate.
+- Frontend implementation preserved accepted source-action behavior by only renaming the import/local
+  helper and removing the stale alias. QA later accepted the slice; see `Slice G5C Closeout`.
+
+Cleanup progress estimate:
+
+- After G4F, G5A, G5B, G4D/G4E, and L1, global simplification is now roughly `30-35%` complete,
+  with about `65-70%` remaining.
+- Rough remaining bounded gate count is about `18-26`, depending on how many future cleanup batches
+  can safely combine same-owner seams after read-only proof.
+
+## Slice G4F Closeout — 2026-06-16
+
+Status: complete / `import:current-plan` hardened as local-only ops helper with non-mutating
+defaults.
+
+Decision:
+
+- Path A, harden, was selected. The script remains available as a local ops helper, but the easy
+  package path no longer performs a mutation.
+
+What changed:
+
+- `package.json` no longer passes a hardcoded `/Users/ivan/Downloads/...` plan file to
+  `scripts/import-current-plan.mjs`.
+- No-argument `npm run import:current-plan` now prints usage/help and exits without mutation.
+- `--dry-run --plan-file <path>` parses the provided `training-plan-v2` JSON, builds the imported
+  plan seed, reads the local-bypass account, and reports the configured Supabase target without
+  creating a Supabase client.
+- `--apply` requires both `--allow-local-supabase-mutation` and a loopback
+  `NEXT_PUBLIC_SUPABASE_URL`; remote Supabase targets are blocked.
+- The current `.env.local` remote Supabase project `dltfjwexyctmihclcjqj` was observed only through
+  non-mutating dry-run/preflight output and was not mutated.
+
+Validation:
+
+- `node --check scripts/import-current-plan.mjs`
+- `npm run import:current-plan`
+- `node --env-file=.env.local ./scripts/import-current-plan.mjs --dry-run --plan-file scripts/fixtures/rich-workout-saved-mode-fixture.json`
+- `node --env-file=.env.local ./scripts/import-current-plan.mjs --apply --plan-file scripts/fixtures/rich-workout-saved-mode-fixture.json`
+- `node --env-file=.env.local ./scripts/import-current-plan.mjs --apply --plan-file scripts/fixtures/rich-workout-saved-mode-fixture.json --allow-local-supabase-mutation`
+
+Next cleanup candidates:
+
+1. Frontend `ManualWorkoutCopyMenu` compatibility alias removal with browser/source proof.
+2. Backend manual-authoring type cluster import-map audit before any runtime narrowing.
+3. Devtools local log/artifact retention hygiene with explicit QA evidence retention boundaries.
+
+## Post-G4F Cleanup Batch Selection — 2026-06-16
+
+Status: complete / next owner selected.
+
+Root-cause finding:
+
+- Visible symptom: cleanup is slowing down when every small seam becomes a separate prompt, while
+  generated/local roots continue to make the repo look noisy.
+- Underlying cause: post-G4F runtime cleanup candidates are either still live (`training-api.ts`
+  wrappers and manual authoring type imports) or browser-sensitive (`ManualWorkoutCopyMenu` alias),
+  while local artifact hygiene is already policy-defined but lacks a safe dry-run tool.
+- Canonical owner: tooling/devtools cleanup executed by BACKEND, because this repo has no separate
+  `DEVTOOLS` role file and the slice touches scripts/config/docs rather than product runtime.
+
+Read-only audit findings:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| `training-api.ts` remaining exports | current-runtime facade / unsafe broad cleanup | Keep. Route/component server-function wrappers and manual authoring imports are still live. Do not narrow by line count. |
+| `ManualWorkoutCopyMenu` alias | completed later in Slice G5C | Historical at this checkpoint. Slice G5C later removed the alias and QA proved Copy/Move/Clear behavior was preserved. |
+| Manual authoring type cluster import map | broad current-runtime audit candidate | Defer. It needs a dedicated import-map audit before any implementation. |
+| `logs/` / build-server logs / `test-results/` | generated local hygiene | Select. Existing policy already separates these from product source and forbids QA evidence deletion. |
+| `qa-artifacts/` | protected QA evidence | Keep protected. Count/report only if explicitly scoped; no deletion in this batch. |
+
+Selected next cleanup gate:
+
+`BACKEND / DEVTOOLS Slice L1: local artifact hygiene dry-run tooling batch`.
+
+Batching decision:
+
+- This is a bundled same-owner cleanup batch, not a cross-product refactor.
+- Batching is safe because all included work is local generated-artifact inventory/reporting and
+  optional ignore/dry-run guidance. It does not touch product runtime, frontend interaction, backend
+  persistence, Supabase, OpenAI, or QA evidence deletion.
+- Do not bundle `ManualWorkoutCopyMenu`, manual authoring type imports, or additional
+  `training-api.ts` narrowing into L1.
+
+Cleanup progress estimate:
+
+- Keep global simplification at about `25-30%` complete, with about `70-75%` remaining.
+- Rough remaining gate count after G4F remains about `20-29` bounded gates. L1 is expected to
+  reduce local audit noise but should not be counted as product/runtime simplification.
+
+## Slice G4E Bundled Type-Only Facade Closeout — 2026-06-16
+
+Status: G4E complete / same-class type-only facade cleanup bundled and closed.
+
+What changed:
+
+- Settings, structured first-plan, and selected running-plan UI surfaces now import the selected G4E
+  types directly from their canonical owner modules:
+  `src/lib/user-settings-actions.ts`, `src/lib/first-plan-actions.ts`, and
+  `src/lib/running-plan-engine-actions.ts`.
+- `training-api.ts` no longer re-exports:
+  `UserSettingsSummary`, `StructuredFirstPlanDraftResult`,
+  `RunningPlanConfirmActionResult`, `RunningPlanPreviewActionInput`, or
+  `RunningPlanPreviewActionResult`.
+- Read-only audit also proved five same-class type-only compatibility re-exports had no current
+  callers through `training-api.ts`, so the bundle removed:
+  `ConfirmStructuredFirstPlanDraftResult`, `ConfirmVoiceToPlanDraftResult`,
+  `RunningPlanConfirmActionInput`, `ClearUpcomingScheduleResult`, and
+  `DeleteActivePlanResult`.
+
+Preserved:
+
+- Runtime TanStack server-function wrappers remain in `training-api.ts`.
+- `ViewerSummary` remains in `training-api.ts` because no canonical destination is selected.
+- Manual authoring exports remain untouched because that cluster is broad and needs a dedicated
+  manual-authoring import cleanup gate.
+- Selected-plan, first-plan, settings, active-plan lifecycle, Plan Preset, Supabase, OpenAI, admin,
+  Hito DS, and manual runtime behavior were not intentionally changed.
+
+Audit result:
+
+- Two read-only subagent audits completed and were used for type/export classification and docs
+  drift.
+- Two planned read-only subagent audits failed on model capacity, so their scope was covered by
+  local `rg` audits instead of being counted as subagent proof.
+
+Historical next cleanup gate at the time:
+
+`BACKEND Slice G4F: audit and harden or demote import:current-plan mutating ops script`.
+
+Resolved by:
+
+- Slice G4F completed this gate and hardened `import:current-plan` with non-mutating defaults,
+  dry-run/preflight, and local-loopback-only apply mode.
+
+Why this was next:
+
+- No remaining `training-api.ts` type-only candidate meets the same low-risk bundled criteria.
+- At that time, `import:current-plan` was still a current hardcoded mutating package script and
+  needed to be made explicitly safe, demoted, or removed through a dedicated backend ops-safety
+  slice.
+
+## Slice G4D Closeout And Post-G4D Audit — 2026-06-16
+
+Status: G4D complete / next type-only facade cleanup gate selected.
+
+G4D acceptance decision:
+
+- Accept Slice G4D as cleanup-complete.
+- `PlanManagementDialog`, `PlanRefreshPanel`, and `PlanScheduleEditPanel` now import Open plan
+  refresh/schedule-edit contract types from canonical owner modules.
+- `training-api.ts` no longer re-exports the Open plan refresh/schedule-edit type-only
+  compatibility names.
+- Runtime Open plan server-function wrappers remain in `training-api.ts`.
+
+Fresh source/import proof after G4D:
+
+- Open plan runtime imports from `training-api.ts` still exist and should stay because they are
+  TanStack server-function wrappers.
+- G4D selected contract types are no longer imported from `training-api.ts`.
+- Read-only training-api audit found a few next small type-only candidates:
+  `UserSettingsSummary`, `StructuredFirstPlanDraftResult`, `RunningPlanConfirmActionResult`,
+  `RunningPlanPreviewActionInput`, and `RunningPlanPreviewActionResult`.
+- Read-only ops audits found no delete-ready package script references to deleted G5A/G5B files.
+- At the time of G4D, `import:current-plan` / `scripts/import-current-plan.mjs` still looked like a
+  current unsafe mutating ops seam and needed a separate hardening/demotion gate rather than blind
+  deletion.
+
+Candidate classification after G4D:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| G4E settings/first-plan/running-plan type re-exports | compatibility-only type sub-seam | Select next. It is bounded to component type imports and public type re-export removal; runtime wrappers stay in `training-api.ts`. |
+| `ManualWorkoutCopyMenu` alias | completed later in Slice G5C | Historical at this checkpoint. Slice G5C later removed the alias and QA proved Copy/Move/Clear behavior was preserved. |
+| `import:current-plan` / `scripts/import-current-plan.mjs` | hardened in G4F | Complete. Default/help and dry-run are non-mutating; apply mode is local-loopback guarded. |
+| Further broad `training-api.ts` cleanup | unsafe by line-count alone | Do not select. Most remaining exports are live route/component server-function wrappers or sensitive compatibility imports. |
+
+Selected next cleanup gate:
+
+`BACKEND Slice G4E: remove the next small type-only compatibility re-exports from training-api.ts`.
+
+Boundary for Slice G4E:
+
+- Move only selected type imports for settings, structured first-plan, and selected running-plan
+  action result/input contracts from `training-api.ts` to their canonical owner modules.
+- Preserve runtime server-function wrappers, Supabase/auth semantics, JSON import, active-plan
+  export, manual authoring, selected-plan creation, admin, and Hito DS.
+- Do not broaden into other `training-api.ts` exports.
+
+## Slice G5B Closeout — 2026-06-16
+
+Status: complete / orphaned onboarding JSON import panel deleted.
+
+What changed:
+
+- Final source/import proof found no live source import for `JsonImportPanel`.
+- Deleted `src/components/onboarding/JsonImportPanel.tsx`.
+- Preserved the current advanced JSON import owner:
+  `src/components/plan-management/PlanImportPanel.tsx` inside
+  `src/components/PlanManagementDialog.tsx`.
+- Preserved `src/lib/imported-plan.ts` and `src/lib/plan-replacement-actions.ts`.
+- No JSON import behavior, plan-management UI behavior, backend action, Supabase mutation, OpenAI
+  call, migration, validator, admin surface, manual authoring surface, selected-plan surface, Hito
+  DS surface, or QA artifact changed in this slice.
+
+Validation evidence:
+
+- `rg -n "JsonImportPanel" src docs package.json scripts` now returns only docs/history/spec
+  references, not live source.
+- Targeted ESLint, production build, and scoped `git diff --check` passed in the implementation run.
+
+Next cleanup direction:
+
+- Post-G5B architecture reassessment selected G4D from fresh import proof.
+- The next implementation gate is the small type-only Open plan refresh/schedule-edit contract
+  facade cleanup. It must not broaden into runtime server-function or behavior changes.
+
+## Slice G5A Closeout — 2026-06-16
+
+Status: complete / stale MJS text-authoring ops fallback removed.
+
+What changed:
+
+- Fresh source audit found no live command/runtime/current-doc dependency on the legacy MJS pair.
+- Deleted `scripts/author-plan-from-text.mjs`.
+- Deleted `scripts/lib/openai-plan-authoring.mjs`.
+- Preserved `npm run author-plan-from-text` as the TS-backed command through
+  `scripts/author-plan-from-text.ts`.
+- Preserved `src/lib/openai-plan-authoring.ts` as the canonical OpenAI text-authoring source owner.
+- No live OpenAI call, Supabase mutation, migration, product runtime change, or validator coverage
+  removal was part of this slice.
+
+Next cleanup direction:
+
+- Post-G5A reassessment selected `FRONTEND Slice G5B: delete orphaned onboarding JsonImportPanel`.
+- G4D was a small type-only facade narrowing candidate and was later completed.
+- `ManualWorkoutCopyMenu` alias removal and ops/import hardening were later selected and closed as
+  G5C and G4F respectively; this checkpoint is historical.
+
+## Post-G5A Cleanup Reassessment — 2026-06-16
+
+Status: architecture checkpoint complete / next deletion-first cleanup gate selected.
+
+G5A acceptance decision:
+
+- Accept Slice G5A as cleanup-complete.
+- The legacy MJS text-authoring ops fallback is removed and must stay removed unless a future
+  explicit recovery plan proves a live owner.
+- The current text-authoring command remains `npm run author-plan-from-text` through
+  `scripts/author-plan-from-text.ts` and `src/lib/openai-plan-authoring.ts`.
+
+Candidate classification after G5A:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| G4D Open plan refresh/schedule-edit contract type re-exports | compatibility-only type sub-seam | Keep queued. Safe, but lower leverage than a deletion-only orphan cleanup and should not drive cleanup by `training-api.ts` momentum. |
+| Orphaned onboarding `JsonImportPanel` | removed in Slice G5B | Final source/import proof found no live source import; current JSON import UI remains `PlanImportPanel` inside `PlanManagementDialog`. |
+| `ManualWorkoutCopyMenu` alias | completed later in Slice G5C | Historical at this checkpoint. Slice G5C later removed the alias and QA proved Copy/Move/Clear behavior was preserved. |
+| `import:current-plan` / `scripts/import-current-plan.mjs` | hardened in G4F | Complete. Default/help and dry-run are non-mutating; apply mode is local-loopback guarded. |
+
+Root-cause finding:
+
+- The next best simplification is deleting a dead source owner, not continuing runtime facade
+  narrowing by inertia.
+- `JsonImportPanel` is an old onboarding import panel that no longer owns the shipped JSON import
+  flow.
+- The current advanced JSON import flow is still required and must remain under
+  `PlanImportPanel` / `PlanManagementDialog`.
+
+Selected next cleanup gate:
+
+`FRONTEND Slice G5B: delete orphaned onboarding JsonImportPanel`.
+
+Boundary for Slice G5B:
+
+- Delete only `src/components/onboarding/JsonImportPanel.tsx` if final `rg` proof still shows no
+  live source imports.
+- Do not alter `PlanImportPanel`, `PlanManagementDialog`, `imported-plan`, or plan replacement
+  behavior.
+- Do not turn this into JSON import redesign, onboarding IA work, manual authoring cleanup, Hito DS
+  cleanup, or `training-api.ts` narrowing.
+
+Expected validation:
+
+- `rg -n "JsonImportPanel" src docs package.json scripts` proves no live source owner remains after
+  deletion, with only historical docs allowed.
+- Targeted ESLint for plan-management and onboarding surfaces.
 - `npm run build`.
+- Scoped `git diff --check`.
 
-Still gated / forbidden:
+## Slice G5 Global Teardown Matrix — 2026-06-16
 
-- no new running-plan confirm/persistence implementation
-- no Supabase mutation
-- no DB/schema/migration changes
-- no provider ingest/sync changes
-- no DS workout-library implementation changes
-- no manual workout CRUD
-- no new preset families
-- no deletion of accepted preview engine builders
-- no broad Plan Preset builder deletion until mutation demotion and replacement coverage are proven
+Status: architecture checkpoint complete / global cleanup control board created.
 
-### Slice 7: Package Manager Signal Cleanup
+Root-cause finding:
 
-Owner:
+- Visible symptom: cleanup feels endless because each slice selects a local seam and then asks what
+  to do next.
+- Underlying cause: cleanup lacked one compact matrix that ranks duplicate flows, source-of-truth
+  conflicts, stale compatibility seams, generated artifacts, validation gaps, and QA blockers
+  together.
+- Canonical owner: architecture/source-of-truth first. BACKEND, FRONTEND, QA, and DEVTOOLS slices
+  should now execute from this teardown matrix instead of redoing broad discovery every time.
 
-BACKEND
+Read-only fan-out used:
 
-Scope:
+- Backend/import-map explorer confirmed G4D is safe and type-only, but broad `training-api.ts`
+  cleanup remains unsafe.
+- Frontend/UI/DS explorer confirmed `ManualWorkoutCopyMenu` and `JsonImportPanel` are the clearest
+  frontend cleanup candidates, while Calendar and manual orchestration decomposition need broader
+  QA-safe scopes.
+- Docs/scripts/artifacts explorer confirmed the legacy MJS text-authoring pair is the strongest
+  stale duplicate script candidate, while `qa-artifacts` deletion remains blocked by evidence
+  policy.
 
-- decide npm vs Bun
-- remove mixed lockfile signal if safe
-- validate build if package metadata changes
+Current teardown matrix:
 
-### Slice 8: `training-api.ts` Import Map And First Narrowing
+| Candidate | Classification | Visible symptom / likely cause | Canonical owner | Evidence path | Recommended action | Validation needed | Sub-agent fit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| G4D Open plan refresh/schedule-edit contract type re-exports from [training API facade](../../../src/lib/training-api.ts) | needs proof / safe tiny cleanup | `training-api.ts` still looks like a type owner for Open plan contracts, but canonical type owners already exist. | BACKEND / import contract ownership | [active-plan refresh contract](../../../src/lib/active-plan-refresh-contract.ts), [schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts), [PlanManagementDialog](../../../src/components/PlanManagementDialog.tsx) | Keep queued as near-term low-risk cleanup, but demote behind higher-leverage G5A. | targeted ESLint, build, import-source audit, scoped diff check | yes, read-only import-map proof |
+| Legacy MJS text-authoring pair | removed in G5A | Old MJS path duplicated the canonical TS-backed text-authoring ops path and could still call OpenAI/Supabase through stale script shape. | BACKEND / text-authoring ops seam | [package script](../../../package.json), [TS author script](../../../scripts/author-plan-from-text.ts), [TS OpenAI owner](../../../src/lib/openai-plan-authoring.ts), [current state](../../current-state.md) | Complete. Keep deleted unless a future explicit recovery plan proves a real need. | `rg` proof, dry-run mock text-authoring command, doctrine validator, build, scoped diff check | no further implementation |
+| `ManualWorkoutCopyMenu` alias in [ManualWorkoutSourceActionMenu](../../../src/components/manual-workout/ManualWorkoutSourceActionMenu.tsx) | merge/consolidate | Live calendar still imports a Copy-named alias even though the component now owns Copy/Move/Clear. | FRONTEND / shared manual source-action rendering | [Calendar](../../../src/components/Calendar.tsx), [ManualWorkoutSourceActionMenu](../../../src/components/manual-workout/ManualWorkoutSourceActionMenu.tsx), current functional map | Next frontend cleanup candidate after higher-priority script/runtime gates. Rename call sites and remove alias only with browser proof. | `rg`, targeted ESLint, build, Copy/Move/Clear browser proof | yes, read-only import map; implementation single-owner |
+| Repeated Calendar Add/Move/Copy/Clear rendering in [Calendar](../../../src/components/Calendar.tsx) | extract/decompose | Month, week, and mobile render branches repeat action/menu wiring. | FRONTEND / Calendar rendering view model | [Calendar](../../../src/components/Calendar.tsx), backend capability map | Defer. Needs a focused frontend extraction plan and browser QA matrix; not deletion-ready. | desktop/month/week/mobile browser proof for Add, Paste, Move, Clear | yes for QA matrix only |
+| Duplicated manual first-create vs saved-calendar Add orchestration | extract/decompose | First-create and Add share constructor/template/review UI ideas but confirm through different backend mutations. | FRONTEND orchestration; BACKEND mutations remain separate | [ManualUserBuiltPlanPanel](../../../src/components/onboarding/ManualUserBuiltPlanPanel.tsx), [ManualWorkoutAuthoringControls](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx) | Defer. Do not collapse confirm paths without a dedicated architecture spec. | full manual first-create/Add/template browser + DB proof | yes for read-only duplication map |
+| Orphaned onboarding `JsonImportPanel` | removed in G5B | Component was source-orphaned; current import UI moved to plan-management import surfaces. | FRONTEND / onboarding dead-code cleanup | `rg JsonImportPanel src`, current import flow map | Complete. Keep current import UI under `PlanImportPanel` / `PlanManagementDialog`. | post-delete `rg`, targeted ESLint/build, scoped diff check | no |
+| `/hitoDS` Figma export double wiring | needs proof | Export board is reachable through a dedicated file route and defensive branch in main DS route. | FRONTEND / Hito DS IA route ownership | [hitoDS route](../../../src/routes/hitoDS.tsx), [Figma export route](../../../src/routes/hitoDS_.export.figma.tsx), [Figma export board](../../../src/components/hito-ds/figma-export-board.tsx) | Defer until DS Slice 6 QA is accepted; then remove only proved duplicate route wiring. | `/hitoDS`, `#figma-bridge`, `/hitoDS/export/figma`, build, mobile proof | yes, route proof only |
+| Paused `/test-calendar` plan | archived in G6 | Product-design sandbox is accepted through TC2, no TC3 is selected, and the historical plan no longer belongs in the active root. | ARCHITECT / docs source-of-truth | [archived workout-library/test-calendar plan](../archive/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md), [Hito DS IA plan](2026-06-15-hito-ds-information-architecture-and-specimen-contract.md) | Complete. Keep runtime/source and QA artifacts untouched; reopen only from a concrete Product/Design question and a new Architecture checkpoint. | docs diff check; admin importer dry-run and backlog validator passed after move | no |
+| `import:current-plan` / [import-current-plan.mjs](../../../scripts/import-current-plan.mjs) | complete / hardened in G4F | Historical command was hardcoded and mutating; G4F removed the hardcoded file path, made default/help and dry-run non-mutating, and blocked apply mode unless the target is local loopback Supabase. | BACKEND / ops import safety | [package script](../../../package.json), [current system](../../current-system.md), [import script](../../../scripts/import-current-plan.mjs) | Complete. Keep as local-only ops helper; do not use as remote or production import path. | help, dry-run, remote apply-block proof; no live mutation | no |
+| `logs/` retention | generated/local hygiene | Local logs are large enough to distract cleanup but are not product code. | DEVTOOLS / local artifact hygiene | `logs/` inventory, generated artifact policy | Later DEVTOOLS dry-run retention tooling only; no deletion in G5. | dry-run against fixture temp dir; preserve QA server state | yes |
+| [test-results/.last-run.json](../../../test-results/.last-run.json) | local hygiene / delete-ready only after ignore proof | Tiny untracked Playwright residue can keep showing up as cleanup noise. | DEVTOOLS / generated artifact hygiene | `rg last-run.json`, `git status` | Later local hygiene: ignore/remove residue after confirming no active QA report depends on it. | `rg`, status proof | yes |
+| `qa-artifacts/` | blocked by QA policy | Huge proof root is local/generated, but it contains acceptance evidence. | QA / evidence retention policy | QA artifact policy, screenshot/report references | Do not delete. Create a QA evidence retention/index policy before any archive/compression. | cross-reference QA reports before action | yes, QA/ARCHITECT inventory only |
 
-Owner:
+How much is left:
 
-BACKEND
+- Global simplification remains about `25-30%` complete.
+- About `70-75%` remains.
+- Rough remaining gate count:
+  - Backend/runtime facade and ops cleanup: `5-8` gates.
+  - Frontend/manual calendar decomposition and orphan cleanup: `5-7` gates.
+  - Hito DS route/IA/export cleanup: `3-5` gates, separate from product runtime.
+  - Docs/source-of-truth demotion/archive: `3-4` gates.
+  - Devtools/generated artifact hygiene: `3-4` gates.
+  - QA retention/browser-proof policy work: `2-3` gates.
+- Safe parallelism:
+  - Read-only import/source audits can run in parallel.
+  - Docs/archive/source-of-truth work can run beside backend/frontend implementation if it does not
+    move active owners.
+  - DEVTOOLS dry-run retention work can run separately from product cleanup.
+- Not parallel-safe:
+  - Multiple edits to [Calendar](../../../src/components/Calendar.tsx) or manual authoring controls.
+  - Broad `training-api.ts` narrowing.
+  - Any cleanup that touches auth, Supabase mutation, QA artifacts, or active-plan lifecycle
+    behavior.
 
-Scope:
+Selected next gate after G5A:
 
-- classify all `@/lib/training-api` imports
-- move one safe action group to direct owner imports
-- remove dead re-export only when no imports remain
+`FRONTEND Slice G5B: delete orphaned onboarding JsonImportPanel`.
 
-### Slice 9: Plan-Creation Path Classification
+G4D was later completed as a safe type-only cleanup, but G5B was the immediate deletion-first slice
+because current import proof shows `JsonImportPanel` has no live source owner while the current JSON
+import UI is owned by `PlanImportPanel` inside `PlanManagementDialog`.
 
-Owner:
+## Slice G4C Closeout — 2026-06-16
 
-ARCHITECT / BACKEND
+Status: complete / auth callback compatibility facade narrowed.
 
-Scope:
+What changed:
 
-- classification completed in `Slice 9: Plan-Creation Source Map And First Deletion Gate`
-- selected first gate is strict nested `ai-first-plan-draft-v1` demotion from product runtime
-  ownership
-- paused because real Plan Preset acceptance failed; resume only after corrected selected-distance
-  endpoint and watch-executable metric contract is implemented and QA-passed
+- Updated [auth confirm route](../../../src/routes/api.auth.confirm.tsx) to import
+  `exchangeCodeForSession(...)` directly from [auth actions](../../../src/lib/auth-actions.ts).
+- Removed the `exchangeCodeForSession(...)` re-export from
+  [training API facade](../../../src/lib/training-api.ts).
+- Preserved `getLoginRouteData(...)` and `requestMagicLink(...)` in
+  [training API facade](../../../src/lib/training-api.ts) because they remain route-facing TanStack
+  server-function wrappers for current callers.
+- Updated current docs so auth callback exchange is described as direct route-to-auth-owner wiring,
+  not a `training-api.ts` compatibility export.
 
-### Slice 10: First Code Deletion/Demotion
+Validation evidence:
 
-Owner:
+- `npm exec eslint -- src/routes/api.auth.confirm.tsx src/lib/training-api.ts src/lib/auth-actions.ts`
+  passed.
+- `rg -n "exchangeCodeForSession" src/lib/training-api.ts src/routes/api.auth.confirm.tsx src/lib/auth-actions.ts`
+  shows `exchangeCodeForSession(...)` only in [auth actions](../../../src/lib/auth-actions.ts) and
+  [auth confirm route](../../../src/routes/api.auth.confirm.tsx), not in
+  [training API facade](../../../src/lib/training-api.ts).
+- `npm run build`
+  passed.
+- scoped `git diff --check`
+  passed.
 
-BACKEND
+Next cleanup gate:
 
-Scope:
+Historical at G4C closeout: BACKEND Slice G4D was selected for type-only Open plan contract facade
+narrowing, then superseded for immediate execution by the Slice G5 matrix, and later completed.
 
-- execute `BACKEND Slice 10A: demote strict nested ai-first-plan-draft-v1 out of product runtime
-  ownership` only after Plan Preset contract correction QA passes
-- preserve blueprint, Plan Preset, review/confirm, persistence, and metric-truth behavior
+## Post-G4C Cleanup Reassessment — 2026-06-16
 
-### Slice 11: Script/Validator Decomposition
+Status: architecture checkpoint complete / next smallest safe cleanup gate selected.
 
-Owner:
+G4C acceptance decision:
 
-BACKEND / QA
+- Accept Slice G4C as cleanup-complete.
+- Source evidence matches the backend report:
+  [auth confirm route](../../../src/routes/api.auth.confirm.tsx) imports
+  `exchangeCodeForSession(...)` directly from [auth actions](../../../src/lib/auth-actions.ts).
+- [training API facade](../../../src/lib/training-api.ts) no longer re-exports
+  `exchangeCodeForSession(...)`.
+- `getLoginRouteData(...)` and `requestMagicLink(...)` remain in
+  [training API facade](../../../src/lib/training-api.ts) because they are live route-facing
+  TanStack server-function wrappers.
 
-Scope:
+Candidate classification after G4C:
 
-- extract one script hotspot responsibility
-- keep command stable
-- preserve assertions
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| [training API facade](../../../src/lib/training-api.ts) | current-runtime compatibility facade after G4A/G4B/G4C narrowing | Do not broadly narrow. Most exports are still live route/component server-function wrappers or current compatibility. |
+| Route data wrappers in [training API facade](../../../src/lib/training-api.ts) | required runtime | Keep. Home, shell, login, workout, progress, and settings still import these wrappers. |
+| `requestMagicLink(...)` in [training API facade](../../../src/lib/training-api.ts) | required runtime wrapper | Keep. [Auth entry screen](../../../src/components/AuthEntryScreen.tsx) still calls it through `useServerFn`. |
+| Active-plan lifecycle, refresh, and schedule-edit runtime wrappers in [training API facade](../../../src/lib/training-api.ts) | required runtime wrappers | Keep. [Plan management dialog](../../../src/components/PlanManagementDialog.tsx) still uses these server functions. |
+| Active-plan refresh/schedule-edit contract type re-exports in [training API facade](../../../src/lib/training-api.ts) | removed compatibility-only type sub-seam | Completed in Slice G4D. Component type imports now use [active-plan refresh contract](../../../src/lib/active-plan-refresh-contract.ts) and [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts). |
+| G4E selected settings/first-plan/running-plan type re-exports in [training API facade](../../../src/lib/training-api.ts) | removed compatibility-only type sub-seam | Complete in Slice G4E. UI type imports now use canonical owners in `user-settings-actions.ts`, `first-plan-actions.ts`, and `running-plan-engine-actions.ts`. |
+| Extra same-class type-only re-exports in [training API facade](../../../src/lib/training-api.ts) | removed compatibility-only type sub-seam | Complete in bundled G4E closeout. No current caller imports those confirm/input/lifecycle result types through `training-api.ts`. |
+| `ViewerSummary` in [training API facade](../../../src/lib/training-api.ts) | suspect type owner, but canonical destination is not selected yet | Defer. Do not create a new type owner just to reduce facade surface. |
+| Manual authoring exports in [training API facade](../../../src/lib/training-api.ts) | current runtime and current component imports | Keep. Too broad for this slice. |
+| Selected running-plan and first-plan runtime exports in [training API facade](../../../src/lib/training-api.ts) | current runtime and product-sensitive creation paths | Keep. Runtime wrappers/actions stay unless a dedicated import/QA story proves a safe seam. |
+| `archiveActivePlanForUser(...)`, `clearUpcomingScheduleForUser(...)`, and `applyActivePlanRefreshProposalForUser(...)` compatibility names | removed no-caller helper compatibility names | Complete in Slice G7B. Canonical helper ownership remains in lifecycle/refresh action modules, while `training-api.ts` keeps only live top-level wrappers. |
+| Admin, Hito DS, manual authoring runtime UI hotspots, and proof-infrastructure files | separate active owners or required validation | Do not mix into this facade cleanup slice. |
 
-### Slice 12: Hito DS Wrapper Usage Audit
+Root-cause finding:
 
-Owner:
+- The next safe simplification is not another behavior deletion; it is narrowing type ownership.
+- Open plan components should read refresh/schedule-edit contract types from their canonical
+  contract modules, while `training-api.ts` continues to expose the runtime server functions that
+  current callers still need.
+- This reduces facade authority without touching mutations, auth, Supabase, OpenAI, plan creation,
+  manual authoring, or user-visible UI behavior.
 
-FRONTEND
+Historical selected cleanup gate:
 
-Scope:
+`BACKEND Slice G4D: remove Open plan refresh/schedule-edit contract type re-exports from training-api.ts`.
 
-- classify UI wrappers/dependencies
-- delete unused wrappers only with source proof
-- no UI redesign
+Status: later completed.
 
-Result, 2026-06-08:
+Boundary for Slice G4D:
 
-- Deleted unused stock shadcn UI wrappers from [UI primitives](../../../src/components/ui/) after
-  import proof showed no live product, admin, Hito DS, script, or package imports.
-- Deleted two confirmed-unused helper files:
-  [browser Supabase client](../../../src/lib/supabase/browser.ts) and
-  [workout result import archive helper](../../../src/lib/workout-result-import/archive.ts).
-- Removed only dependencies whose remaining source hits were package metadata or the deleted stock
-  wrappers, including unused form, command, carousel, OTP, resizable, chart, drawer, and unused
-  Radix primitive packages.
-- Preserved live Hito DS/product primitives such as dialog, dropdown menu, popover, select,
-  tooltip, sheet, skeleton, calendar, button, avatar, progress, metadata tag, and Hito-specific
-  date/time/toast/calendar-day components.
-- `package.json` and `package-lock.json` were updated through npm package-lock metadata sync.
-  `bun.lockb` was not regenerated in this environment because the Bun CLI was unavailable; the
-  separate package-manager-signal slice remains the right owner for deciding whether to remove or
-  canonicalize the Bun lockfile.
-- Validation for this slice: targeted ESLint for `src/components`, `src/lib`, and `package.json`,
-  Admin Backlog deterministic validator, import/dead-code proof scans, `git diff --check`, and
-  production build.
+- Move only type-only imports for `ProposeActivePlanRefreshResult`,
+  `ActivePlanScheduleEditInput`, and `ActivePlanScheduleEditPreview` from `training-api.ts` to
+  canonical owner modules.
+- Remove only the selected public type re-export blocks from `training-api.ts`.
+- Preserve runtime server-function wrappers and current behavior.
 
-### Slice 13: Closeout
+Cleanup progress estimate:
 
-Owner:
+- Global simplification remains about `25-30%` complete.
+- G4D is intentionally tiny; do not inflate the global estimate until a larger runtime owner is
+  deleted, demoted, or decomposed.
 
-ARCHITECT / QA
+## Slice G4B Closeout — 2026-06-16
 
-Scope:
+Status: complete / Plan Preset card compatibility facade narrowed.
 
-- record reductions
-- update changelog only for shipped/product-visible or meaningful internal reliability changes
-- archive the plan if no active simplification slices remain
+What changed:
+
+- Updated [onboarding gate](../../../src/components/OnboardingGate.tsx) to import
+  `getPlanPresetCards(...)` and `PlanPresetCardsActionResult` directly from
+  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts).
+- Updated [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx) to import its
+  card result type directly from [Plan Preset actions](../../../src/lib/plan-preset-actions.ts).
+- Removed Plan Preset card discovery re-exports from
+  [training API facade](../../../src/lib/training-api.ts).
+- Updated [selected running-plan confirm validator](../../../scripts/validate-running-plan-engine-confirm.ts)
+  so the negative proof now asserts:
+  `plan-preset-actions.ts` still exports card discovery, old Plan Preset review/confirm actions stay
+  absent, `training-api.ts` does not re-export Plan Preset card discovery, and selected running-plan
+  confirm remains the creation seam.
+- Updated current docs so Plan Preset card discovery is described as a direct canonical action owner,
+  not a `training-api.ts` compatibility export.
+
+Validation evidence:
+
+- `npm exec eslint -- src/lib/training-api.ts src/lib/plan-preset-actions.ts src/components/OnboardingGate.tsx src/components/onboarding/PlanPresetPanel.tsx scripts/validate-running-plan-engine-confirm.ts scripts/validate-plan-preset-eligibility.ts`
+  passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
+  passed in non-mutating mode.
+- `node --import tsx ./scripts/validate-plan-preset-eligibility.ts`
+  passed.
+- `npm run build`
+  passed.
+- scoped `git diff --check`
+  passed.
+
+Next cleanup gate:
+
+Run an ARCHITECT reassessment before selecting any further `training-api.ts` cleanup.
+
+## Post-G4B Cleanup Reassessment — 2026-06-16
+
+Status: architecture checkpoint complete / next bounded runtime facade gate selected.
+
+Superseded by Slice G4C closeout above; retained as decision history.
+
+G4B acceptance decision:
+
+- Accept Slice G4B as cleanup-complete.
+- Source evidence matches the backend report:
+  [Onboarding Gate](../../../src/components/OnboardingGate.tsx) imports `getPlanPresetCards(...)`
+  and `PlanPresetCardsActionResult` directly from
+  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts).
+- [Plan Preset panel](../../../src/components/onboarding/PlanPresetPanel.tsx) imports its card result
+  type directly from [Plan Preset actions](../../../src/lib/plan-preset-actions.ts).
+- [training API facade](../../../src/lib/training-api.ts) no longer re-exports Plan Preset card
+  discovery.
+- No old `reviewPlanPresetDraft(...)` / `confirmPlanPresetDraft(...)` runtime seam remains in
+  `src`, `scripts`, or `package.json`.
+
+Candidate classification after G4B:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| [training API facade](../../../src/lib/training-api.ts) | current-runtime compatibility facade with one more proved sub-seam | Do not broadly narrow. Select only auth callback exchange re-export removal. |
+| `exchangeCodeForSession(...)` re-export in [training API facade](../../../src/lib/training-api.ts) | compatibility-only facade sub-seam | Select Backend Slice G4C. Canonical owner already exists in [auth actions](../../../src/lib/auth-actions.ts), and the only runtime caller is [auth confirm route](../../../src/routes/api.auth.confirm.tsx). |
+| [auth actions](../../../src/lib/auth-actions.ts) | required auth owner for login route data, Magic Link request, and callback exchange | Keep. Only route import ownership changes in G4C. |
+| `getLoginRouteData(...)` and `requestMagicLink(...)` in [training API facade](../../../src/lib/training-api.ts) | required route-facing TanStack server-function wrappers | Keep. They are not the selected seam. |
+| Route-data wrappers in [training API facade](../../../src/lib/training-api.ts) | current runtime | Keep. Home, shell, workout detail, progress, login, and settings still import route data wrappers. |
+| Active-plan lifecycle, refresh, schedule edit, workout log, selected running-plan, structured/voice, manual authoring, and plan-replacement exports | current runtime or current compatibility imports | Keep. These require separate import-map audits and validation stories. |
+| [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) | required direct card discovery owner after G4B | Keep. No second deletion target remains here. |
+| [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) and validator | current runtime + required validation | Keep. Less deletion-first than G4C. |
+| Admin, Hito DS, manual authoring runtime UI hotspots, and proof-infrastructure files | separate active owners or required validation | Do not mix into this runtime facade cleanup slice. |
+
+Root-cause finding:
+
+- The next clean runtime deletion is another compatibility import edge, not a behavior removal.
+- The auth callback exchange behavior already belongs to `src/lib/auth-actions.ts`; keeping a
+  `training-api.ts` re-export only makes the facade look more authoritative than it should.
+- The route can import the canonical auth action directly, while `training-api.ts` continues to own
+  only the route-facing TanStack server-function wrappers that still have live callers.
+
+Selected next cleanup gate:
+
+`BACKEND Slice G4C: remove auth callback exchange compatibility re-export from training-api.ts`.
+
+Boundary for Slice G4C:
+
+- Move `/api/auth/confirm` to import `exchangeCodeForSession(...)` directly from
+  `src/lib/auth-actions.ts`.
+- Remove only the `exchangeCodeForSession(...)` re-export from `training-api.ts`.
+- Preserve `getLoginRouteData(...)`, `requestMagicLink(...)`, Supabase code/token-hash exchange,
+  redirect handling, local-auth behavior, admin auth separation, and all unrelated server actions.
+
+Cleanup progress estimate:
+
+- Global simplification remains about `25-30%` complete.
+- G4C is intentionally small; do not inflate the global estimate until larger runtime ownership seams
+  are removed or demoted.
+
+## Slice G4A Closeout — 2026-06-16
+
+Status: complete / runtime compatibility facade narrowed.
+
+What changed:
+
+- Updated [plan export API route](../../../src/routes/api.plan.export.tsx) to import
+  `exportActivePlanForUser(...)` directly from
+  [active-plan export actions](../../../src/lib/active-plan-export-actions.ts).
+- Removed `exportActivePlan(...)`, `exportActivePlanForUser(...)`, and
+  `ExportActivePlanResult` re-exports from [training API facade](../../../src/lib/training-api.ts).
+- Preserved [active-plan export actions](../../../src/lib/active-plan-export-actions.ts) and
+  [plan export shaping](../../../src/lib/plan-export.ts) as the canonical export owners.
+- Updated current docs so active-plan export no longer appears as a `training-api.ts`
+  compatibility export.
+
+Validation evidence:
+
+- `rg -n "exportActivePlan|exportActivePlanForUser" src scripts docs/current-*.md docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
+  now shows runtime usage only in [active-plan export actions](../../../src/lib/active-plan-export-actions.ts)
+  and [plan export API route](../../../src/routes/api.plan.export.tsx); remaining docs references are
+  historical or this closeout.
+- Targeted ESLint passed for the touched route/action/facade files.
+- Manual workout authoring validator passed, preserving the manual export proof island.
+- Plan authoring doctrine validator passed, preserving import/export proof.
+- `npm run build` passed.
+- Scoped `git diff --check` passed.
+
+## Post-G4A Cleanup Reassessment — 2026-06-16
+
+Status: architecture checkpoint complete / next bounded runtime facade gate selected.
+
+Superseded by Slice G4B closeout above; retained as decision history.
+
+G4A acceptance decision:
+
+- Accept Slice G4A as cleanup-complete.
+- Source evidence matches the backend report:
+  [plan export API route](../../../src/routes/api.plan.export.tsx) imports
+  `exportActivePlanForUser(...)` directly from
+  [active-plan export actions](../../../src/lib/active-plan-export-actions.ts).
+- [training API facade](../../../src/lib/training-api.ts) no longer re-exports active-plan export
+  actions or `ExportActivePlanResult`.
+- Active-plan export behavior remains owned by
+  [active-plan export actions](../../../src/lib/active-plan-export-actions.ts) and
+  [plan export shaping](../../../src/lib/plan-export.ts).
+
+Candidate classification after G4A:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| [training API facade](../../../src/lib/training-api.ts) | current-runtime compatibility facade with another proved sub-seam | Do not broadly narrow. Select only Plan Preset card discovery re-export removal. |
+| Plan Preset card discovery re-export in [training API facade](../../../src/lib/training-api.ts) | compatibility-only facade sub-seam | Select Backend Slice G4B. Canonical owner already exists in [Plan Preset actions](../../../src/lib/plan-preset-actions.ts). |
+| [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) | required runtime owner for card discovery | Keep `getPlanPresetCards(...)`, `PlanPresetCardsActionResult`, and active-plan-exists blocking. |
+| [selected running-plan confirm validator](../../../scripts/validate-running-plan-engine-confirm.ts) | required validation with stale compatibility assertion | Update the negative proof so it asserts `training-api.ts` no longer re-exports Plan Preset card discovery. |
+| [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | current runtime + required validation | Keep. A future extraction would need a new action owner; it is less deletion-first than G4B. |
+| [schedule edit preview validator](../../../scripts/validate-active-plan-schedule-edit-preview.ts) | required validation | Keep with the schedule-edit seam. |
+| AI structured/text/voice authoring seams | required runtime/proof or Product-deletion-only | Keep; do not select by line count or cleanup momentum. |
+| Manual authoring runtime/UI hotspots | current runtime | Keep until a dedicated browser-safe cleanup slice is selected. |
+| Admin and Hito DS hotspots | separate active-plan owners | Do not mix into runtime facade cleanup. |
+
+Root-cause finding:
+
+- The next clean runtime deletion is not another Plan Preset behavior removal.
+- The remaining issue is a compatibility import path: Plan Preset card discovery is live, but it does
+  not need to be re-exported by `training-api.ts` when its canonical server-action owner is already
+  `plan-preset-actions.ts`.
+- This is safer than decomposing schedule edit preview because it removes an existing facade edge
+  without creating a new module.
+
+Selected next cleanup gate:
+
+`BACKEND Slice G4B: remove Plan Preset card discovery compatibility re-export from training-api.ts`.
+
+Boundary for Slice G4B:
+
+- Move onboarding Plan Preset UI imports to `src/lib/plan-preset-actions.ts`.
+- Remove only the Plan Preset card discovery re-export from `training-api.ts`.
+- Update validator source proof so the absence of the `training-api.ts` Plan Preset re-export is
+  intentional.
+- Preserve Plan Preset card discovery, selected running-plan create, and all unrelated server
+  functions.
+
+Cleanup progress estimate:
+
+- Keep global simplification at about `25-30%` complete, with about `70-75%` remaining.
+- G4B is intentionally small; it should not inflate the global teardown estimate.
+
+## Slice G2A Closeout — 2026-06-15
+
+Status: complete / runtime compatibility seam deleted.
+
+What changed:
+
+- Removed stale Plan Preset review/confirm blocked actions from
+  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts).
+- Removed related stale result types and the `preview_only` helper.
+- Preserved `getPlanPresetCards(...)`, `PlanPresetCardsActionResult`, active-plan conflict blocking,
+  and Plan Preset card discovery.
+- Updated [selected running-plan confirm validator](../../../scripts/validate-running-plan-engine-confirm.ts)
+  so the negative proof now asserts the old Plan Preset create seam is absent instead of requiring a
+  blocked runtime action to remain.
+- Updated current source-of-truth docs to state that Plan Presets are discovery cards and selected
+  running-plan preview/confirm owns creation.
+
+Validation:
+
+- `npm exec eslint -- src/lib/plan-preset-actions.ts scripts/validate-running-plan-engine-confirm.ts`
+  passed.
+- `rg -n "reviewPlanPresetDraft|confirmPlanPresetDraft|PlanPresetReviewDraftActionResult|PlanPresetConfirmActionResult|preview_only" src scripts package.json`
+  returned no matches.
+- `rg -n "getPlanPresetCards|previewRunningPlanDraft|confirmRunningPlanDraft" src/components src/lib`
+  confirmed card discovery plus selected running-plan preview/confirm remain wired.
+- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts` passed in non-mutating mode.
+- `node --import tsx ./scripts/validate-running-plan-engine-source.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts` passed.
+- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts` passed.
+- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts` passed.
+- `npm run build` passed.
+- Scoped `git diff --check` passed.
+
+Next cleanup gate:
+
+`ARCHITECT Slice G3: simplification strike source-of-truth compression and historical section demotion`.
+
+## Post-G2A Cleanup Reassessment — 2026-06-15
+
+Status: architecture checkpoint complete / next gate selected.
+
+G2A acceptance decision:
+
+- Accept Slice G2A as cleanup-complete.
+- Source evidence matches the backend report:
+  [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) now owns only
+  `getPlanPresetCards(...)` plus active-plan-exists blocking, while selected running-plan
+  preview/confirm remains the current create/persist seam.
+- `plan_preset_v1` remains valid only as Plan Preset card/source metadata, active-plan source-kind
+  readback, and manual editability proof fixture data.
+- The old Plan Preset review/confirm blocked actions, result types, and `preview_only` runtime helper
+  are absent from runtime source and scripts.
+
+Candidate classification after G2A:
+
+| Candidate | Classification | Decision |
+| --- | --- | --- |
+| [training API facade](../../../src/lib/training-api.ts) | current-runtime compatibility facade | Keep; many route/component imports still rely on it. Do not select broad facade cleanup without a fresh import map. |
+| [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | current-runtime + validation owner | Keep; current product/system docs and `Open plan` UI use it for reviewed schedule reflow. |
+| [schedule edit preview validator](../../../scripts/validate-active-plan-schedule-edit-preview.ts) | required validation | Keep with the schedule-edit seam. |
+| [Plan Preset eligibility validator](../../../scripts/validate-plan-preset-eligibility.ts) | required validation for card discovery | Keep; it now validates card discovery, program summaries, metric truth, and absence of removed legacy builder artifacts. |
+| Plan Preset legacy algorithmic/review source files | already absent from runtime | No implementation deletion gate remains; remaining references are historical docs/source-of-truth noise. |
+| AI blueprint/envelope/ops proof files | required validation/proof infrastructure | Keep; do not continue extraction by inertia. |
+| Manual authoring/runtime UI hotspots | current runtime | Keep until a dedicated QA-safe frontend/runtime cleanup slice is selected. |
+| This active simplification strike plan | docs/source-of-truth hotspot | Select Slice G3. |
+
+Root-cause finding:
+
+- The next cleanup risk is no longer another obvious runtime compatibility seam.
+- The active simplification strike itself has become a source-of-truth hotspot: it still contains
+  long historical slices, superseded Plan Preset prompts, and old guidance that can look live in
+  search results.
+- That is a real cleanup blocker because future agents use this file to choose gates.
+
+Selected next cleanup gate:
+
+`ARCHITECT Slice G3: simplification strike source-of-truth compression and historical section demotion`.
+
+Boundary for Slice G3:
+
+- Compress or demote stale historical sections from this active plan.
+- Preserve current G1/G2/G2A closeouts, the global teardown baseline, current candidate
+  classifications, selected next gate, risks, and exit criteria.
+- Keep useful history in archive/history form where needed.
+- Do not touch product runtime, frontend UI, backend runtime, validators, Supabase, migrations, or
+  QA artifacts.
+
+Cleanup progress estimate:
+
+- Keep global simplification at about `25-30%` complete, with about `70-75%` remaining.
+- G2A was intentionally small; it removed one stale runtime seam but does not materially change the
+  global teardown estimate.
+
+## Generated Artifact And Log Retention Policy — 2026-06-16
+
+Status: policy recorded / no deletion approved.
+
+Root-cause finding:
+
+- Visible symptom: `logs/`, `qa-artifacts/`, `test-results/`, and build/server output make the repo
+  look much larger and can distract cleanup agents into scanning generated proof output.
+- Underlying cause: prior cleanup baselines quarantined generated roots from service-size claims but
+  did not define a retention/deletion boundary.
+- Canonical owner: documentation/source-of-truth now, then a later DEVTOOLS local hygiene slice if
+  deletion or rotation is approved.
+
+Classification:
+
+| Root / surface | Classification | Current cleanup treatment |
+| --- | --- | --- |
+| `logs/` | generated local/dev/build/server logs | Excluded from product-code counts; future DEVTOOLS cleanup may rotate/compress/delete by age. |
+| Build/server logs outside `logs/` | generated operational output | Excluded from source-size claims; should be moved under the log-retention rule before deletion. |
+| `qa-artifacts/` | local QA proof output / acceptance evidence | Excluded from product-code counts; do not delete until a separate QA evidence retention policy exists. |
+| `test-results/` | generated test-runner residue | Excluded from product-code counts; disposable in a later local hygiene task if unreferenced. |
+| `node_modules/` and build/cache roots | vendor/generated build output | Excluded from cleanup hotspot rankings and service-size claims. |
+
+Retention rule proposal:
+
+- Keep recent raw logs for `7` days.
+- Classify logs older than `30` days as old retention candidates for a future DEVTOOLS policy pass.
+- Do not delete old logs unless a later explicit retention/apply-mode slice approves deletion and
+  proves they are not referenced by an active bug, QA blocker, incident, or
+  release proof.
+- Preserve active QA-server status, PID, and current-run evidence until the managed QA server is
+  intentionally restarted or stopped.
+- Do not delete `qa-artifacts/` in generic cleanup. Permanent QA evidence should be promoted through
+  a dedicated tracked evidence task; otherwise it remains local/gitignored proof output.
+
+Agent audit guidance:
+
+- Source/cleanup audits should exclude `logs/**`, `qa-artifacts/**`, `test-results/**`,
+  `node_modules/**`, `.next/**`, `.turbo/**`, `dist/**`, `build/**`, and coverage roots unless
+  explicitly scoped.
+- Service-size reports must separate product/runtime/docs/scripts from generated/proof/vendor roots.
+- Local artifact cleanup is disk hygiene, not product-code simplification.
+
+Gate decision:
+
+- This policy originally did not replace the G3 source-of-truth cleanup gate.
+- After G4F, Architecture selected
+  `BACKEND / DEVTOOLS Slice L1: local artifact hygiene dry-run tooling batch`.
+- L1 is non-mutating inventory/reporting only. Any actual deletion, archive, compression, or
+  `qa-artifacts/` evidence-retention policy remains a separate future gate.
+
+## Slice G1 Closeout — 2026-06-15
+
+Status: complete / docs-source-of-truth demotion accepted.
+
+What changed:
+
+- Removed duplicate active-plan copies for
+  [heart-rate zones](../../tasks/backlog/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md)
+  and
+  [voice-to-plan authoring](../../tasks/backlog/2026-05-18-voice-to-plan-authoring-plan.md)
+  because current backlog copies already own those future work items.
+- Demoted
+  [Polar auto-sync integration](../../tasks/backlog/2026-05-21-polar-auto-sync-integration-plan.md)
+  to backlog because provider sync expansion is future/integration work, not an active execution
+  owner.
+- Demoted
+  [advanced performance cadence doctrine](../../tasks/backlog/2026-06-01-advanced-performance-cadence-doctrine-and-implementation.md)
+  to backlog because it is future coaching/performance doctrine, not current runtime execution.
+- Archived
+  [Hito optimization strike history](../archive/2026-05-29-hito-optimization-strike-plan.md)
+  because its cleanup work is completed and superseded by this simplification strike.
+- Kept the current active execution root focused on Admin Work Items, this simplification strike,
+  running-plan creation engine, Hito DS workout playground history, manual workout authoring, and
+  the Hito DS IA/specimen contract.
+- Confirmed that `logs`, `qa-artifacts`, `test-results`, and `node_modules` are generated,
+  proof-output, or vendor surfaces and must stay outside product-code size claims.
+
+Line-count impact:
+
+- `docs/plans/active`: `11` files / `18510` lines before G1.
+- `docs/plans/active`: `6` files / `15320` lines after G1.
+- Main counted text surface after G1: about `585` files / `259409` lines, excluding generated,
+  cache, vendor, build, log, and QA artifact roots.
+
+Validation:
+
+- `git diff --check` passed for the touched docs.
+- `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000` passed.
+- `npm run validate-admin-capture-backlog` passed.
+
+Next cleanup gate:
+
+`ARCHITECT Slice G2: runtime capability ownership audit for compatibility/facade narrowing after
+stale active-plan demotion`.
+
+## Slice G2 Closeout — 2026-06-15
+
+Status: complete / runtime capability ownership audit accepted.
+
+Root-cause framing:
+
+- Visible symptom: runtime/source files still look bloated after stale active-plan demotion.
+- Underlying cause: some old compatibility seams still live beside real product owners, but broad
+  runtime deletion would be unsafe without import/reference proof.
+- Canonical owner: architecture audit first, then one backend cleanup implementation gate.
+
+Runtime ownership findings:
+
+| Seam | Evidence | Classification | Decision |
+| --- | --- | --- | --- |
+| [training API facade](../../../src/lib/training-api.ts) | Route/component imports still rely on its server-function wrappers and compatibility exports. | required runtime compatibility facade | Keep; no broad facade narrowing in G2. |
+| [active-plan schedule edit preview](../../../src/lib/active-plan-schedule-edit-preview.ts) | Imported by product UI and validated by [schedule edit preview validator](../../../scripts/validate-active-plan-schedule-edit-preview.ts). | required runtime + validation | Keep; do not delete as a manual Move duplicate. |
+| [schedule edit preview validator](../../../scripts/validate-active-plan-schedule-edit-preview.ts) | Directly validates the active-plan schedule edit preview contract. | required validation | Keep. |
+| [voice-to-plan authoring](../../../src/lib/voice-to-plan-authoring.ts) | Dynamically imported by first-plan actions and typed by onboarding form code, but not called by current `OnboardingGate` UI. | required non-default backend runtime | Keep; future Product deletion/replacement or frontend/QA wiring only. |
+| [imported plan contract](../../../src/lib/imported-plan.ts) | Used by import, replacement, persistence, running-plan review, manual authoring, and validators. | canonical runtime contract | Keep. |
+| [AI strict draft authoring module](../../../src/lib/ai-first-plan-draft-authoring.ts) | File no longer exists; current docs were stale. | deleted historical seam | Current docs corrected; no runtime gate needed. |
+| [Plan Preset actions](../../../src/lib/plan-preset-actions.ts) | `getPlanPresetCards(...)` is live; old `reviewPlanPresetDraft(...)` / `confirmPlanPresetDraft(...)` blocked actions have no current caller outside a validator source-regex proof. | mixed required discovery + compatibility-only blocked actions | Select Backend Slice G2A. |
+
+Plan Preset current-state decision:
+
+- Plan Preset cards remain backend-owned discovery for `10K Foundation`, `Half Marathon Balanced`,
+  and `Marathon Base`.
+- Selected running-plan preview/create owns current review/confirm/persist behavior.
+- The old Plan Preset review/confirm blocked actions are not current product owners and can be
+  removed with validator proof updated to assert absence of the stale seam.
+
+Docs/source-of-truth sync:
+
+- [current product](../../current-product.md), [current system](../../current-system.md),
+  [current state](../../current-state.md), and [current functional map](../../current-functional-map.md)
+  now describe Plan Presets as discovery/card ownership rather than the current create seam.
+- Current docs now state that `src/lib/ai-first-plan-draft-authoring.ts` has been removed and that
+  strict-draft references are bounded unsupported/negative-proof handling only.
+
+Selected next cleanup gate:
+
+`BACKEND Slice G2A: remove stale Plan Preset review/confirm blocked actions and update selected-plan
+confirm negative proof`.
+
+Validation expected from Backend Slice G2A:
+
+- Preserve `getPlanPresetCards(...)`.
+- Remove old `reviewPlanPresetDraft(...)`, `confirmPlanPresetDraft(...)`, related result types, and
+  `preview_only` runtime helper if source proof remains clean.
+- Update [selected running-plan confirm validator](../../../scripts/validate-running-plan-engine-confirm.ts)
+  so it no longer requires the stale `preview_only` blocked action to exist.
+- Run targeted ESLint, selected running-plan validators, `npm run build`, and scoped diff checks.
+
+Cleanup progress estimate:
+
+- Global simplification remains about `25-30%` complete, with about `70-75%` remaining.
+- G2 was an ownership-selection gate, not a large line-count deletion.
+
+## Slice G3 Closeout — 2026-06-16
+
+Status: complete / active-plan source-of-truth compressed.
+
+Root-cause finding:
+
+- Visible symptom: the active simplification strike had grown into a multi-thousand-line mixed
+  history of current decisions, old handoff prompts, old Plan Preset cleanup paths, proof-script
+  extraction closeouts, Admin/Hito DS slices, and stale service-size audits.
+- Underlying cause: completed cleanup history remained in the active execution path instead of being
+  summarized behind current source-of-truth decisions.
+- Canonical owner: documentation/source-of-truth. Runtime cleanup should start from the current
+  functional map and live import/capability evidence, not from old historical prompts.
+
+What changed:
+
+- Preserved the import-ready metadata block at the top of this active plan.
+- Preserved current closeouts and policy sections that still guide execution:
+  Slice G1, Slice G2, Slice G2A, post-G2A reassessment, generated artifact/log retention policy, and
+  this Slice G3 closeout.
+- Compressed stale historical sections into the historical summary below.
+- Removed stale-looking live guidance around old Plan Preset review/confirm actions, old Plan Preset
+  algorithmic expansion, prior proof-infrastructure sequencing, old Admin/Hito DS cleanup prompts,
+  and superseded service-size audits from the current execution path.
+- Kept the current source hierarchy pointed at [current functional map](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-functional-map.md),
+  [current product](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-product.md),
+  [current system](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-system.md), and
+  [current state](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-state.md).
+
+What was not changed:
+
+- No product runtime behavior.
+- No frontend UI.
+- No backend source.
+- No validators or proof coverage.
+- No Supabase, migrations, OpenAI calls, browser QA, logs, or QA artifacts.
+- No future/backlog work moved back into active execution.
+
+Line-count impact:
+
+- Before Slice G3, this active plan was `6449` lines.
+- After Slice G3, this active plan is `550` lines and intentionally compressed to the current
+  execution path plus a compact history summary.
+- The repo-wide baseline in the functional map is not recomputed by this docs-only pass; future
+  size reports should use the generated-root exclusions recorded there.
+
+Validation:
+
+- `git diff --check -- docs/plans/active/2026-06-07-hito-stack-simplification-strike.md docs/current-functional-map.md` passed.
+- Admin backlog importer dry-run was not required because no markdown files moved between
+  repo-derived admin roots.
+- Admin backlog validator was not required because no backlog/admin mirror metadata changed.
+
+## Slice G4 Closeout — 2026-06-16
+
+Status: complete / runtime import-map reassessment accepted.
+
+Root-cause finding:
+
+- Visible symptom: codebase/service-size pressure remains after many accepted product and proof
+  slices, and `training-api.ts` still looks like the obvious large runtime facade.
+- Underlying cause: the facade is still a real route/component boundary for many server functions,
+  but a few focused owners now exist behind old compatibility exports.
+- Canonical owner: architecture import-map audit first, then one bounded backend facade-narrowing
+  implementation gate.
+
+Import-map findings:
+
+| Candidate | Evidence | Classification | Decision |
+| --- | --- | --- | --- |
+| [training API facade](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts) | Route/component imports still use it for home/shell/workout/progress/settings/login, active-plan lifecycle, refresh, schedule edit, selected plans, manual authoring, and route-facing types. | required runtime compatibility facade | Do not broadly narrow. Select only the proved export sub-seam below. |
+| Active-plan export re-export in [training API facade](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts) | Export truth already lives in [active-plan export actions](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-export-actions.ts) and [plan export](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-export.ts); current runtime caller is [plan export API route](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/routes/api.plan.export.tsx). | compatibility-only facade sub-seam | Select Backend Slice G4A. |
+| [active-plan schedule edit preview](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-schedule-edit-preview.ts) | Product docs and [schedule edit preview validator](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/scripts/validate-active-plan-schedule-edit-preview.ts) still map it to Open plan schedule reflow. | current runtime + required validation | Keep. Do not confuse with manual Move. |
+| [Plan Preset actions](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-preset-actions.ts) | After G2A it only owns `getPlanPresetCards(...)` plus active-plan-exists blocking. | required card discovery | Keep; no second deletion target remains here. |
+| [Plan Preset eligibility validator](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/scripts/validate-plan-preset-eligibility.ts) | Validates card discovery, program summaries, metric truth, and absence of removed legacy builder artifacts. | required validation | Keep. |
+| AI structured/text/voice authoring seams | Current docs and imports still map blueprint/envelope/text/voice paths to shipped or non-default authoring/proof flows. | required runtime/proof or Product-deletion-only | Keep until Product selects a replacement/deletion gate. |
+| Manual authoring runtime hotspots | Large files remain live UI/runtime owners with many accepted browser-proved flows. | current runtime / future frontend cleanup | Keep unless a dedicated browser-safe frontend cleanup slice is selected. |
+| Admin and Hito DS hotspots | Current admin runtime and separate Hito DS IA rollout remain active tracks. | separate active-plan owners | Do not mix into G4 runtime facade cleanup. |
+
+Selected next cleanup gate:
+
+`BACKEND Slice G4A: active-plan export facade narrowing from training-api.ts`.
+
+Boundary for Slice G4A:
+
+- Move the plan export API route to the canonical export action owner if the import map remains clean.
+- Remove only the now-unused active-plan export compatibility re-export from `training-api.ts`.
+- Preserve active-plan export behavior, payloads, filenames, content types, and download orchestration.
+- Preserve all unrelated dirty/in-flight source changes in `training-api.ts`.
+- Do not broaden into general facade cleanup.
+
+Cleanup progress estimate:
+
+- Keep global simplification at about `25-30%` complete, with about `70-75%` remaining.
+- G4 is an ownership-selection gate. G4A should be small; do not inflate the global estimate after it
+  unless it removes a broader compatibility class.
+
+## Current Source Hierarchy For Cleanup
+
+1. [Current functional map](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-functional-map.md)
+   is the primary cleanup source of truth for shipped/accepted flows, protected runtime seams,
+   proof infrastructure, future-only boundaries, generated-root exclusions, and immediate cleanup
+   sequencing.
+2. This active simplification strike owns cleanup execution history, current closeouts, current risk
+   boundaries, and exact next-gate handoffs.
+3. [Current product](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-product.md),
+   [current system](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-system.md), and
+   [current state](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-state.md)
+   describe implemented behavior only and win over historical plan text.
+4. Archived plans and changelog entries are history, not active execution instructions.
+5. `logs/`, `qa-artifacts/`, `test-results/`, `node_modules/`, and build/cache roots are excluded
+   from product-code size claims unless a task explicitly scopes local artifact hygiene.
+
+## Current Global Cleanup Baseline
+
+Status: global simplification remains active / implementation cleanup is conservative.
+
+Stable cleanup burndown:
+
+- Ledger: `cleanup-burndown-v1`.
+- Fixed denominator: `40` bounded cleanup gates.
+- Completed through G20: `37` gates.
+- Remaining after G20: `3` gates.
+- Current gate-burndown completion: `92.5%`.
+- Earlier rough estimates, including `35-40%` and the old proof-infrastructure-only `48%`, are
+  retired for progress reporting. The burndown is a sequencing metric, not a source-line reduction
+  claim.
+
+Current protected runtime families:
+
+| Capability family | Current decision |
+| --- | --- |
+| Selected running plans | Keep running-plan engine preview/review/confirm/persist owners; Marathon Base must stay base-only, and Marathon Completion exposure remains separate unless accepted by product/UI gates. |
+| Plan Presets | Keep card discovery through `getPlanPresetCards(...)`; old Plan Preset review/confirm runtime actions are removed by G2A and must not be revived. |
+| Manual user-built plans and active-plan edits | Keep shipped manual create/Add/templates/Copy/Paste/Clear/Move/export seams and backend-owned editability policy. Do not refactor runtime UI without browser-safe scope. |
+| Active-plan export/import/refresh/schedule edit | Keep current backend seams and proof owners; schedule edit preview is current runtime, not a stale duplicate. |
+| AI / structured / voice first-plan authoring | Keep current structured blueprint/envelope/text seams, and keep the backend voice seam as non-visible/non-default until Product selects deletion or replacement; strict nested draft runtime is historical and absent. |
+| Hito DS | Keep under the separate Hito DS IA/specimen rollout plan; do not mix DS rollout with runtime cleanup. |
+| Admin / Backlog | Keep admin capture, analytics, repo importer, and admin shell seams until a dedicated admin cleanup gate selects one owner. |
+| Generated/proof artifacts | Exclude from source-size claims. Do not delete QA artifacts; log rotation is later DEVTOOLS hygiene only. |
+
+## Current Cleanup Candidate Classification
+
+| Candidate | Classification | Current decision |
+| --- | --- | --- |
+| [training API facade](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts) | current-runtime compatibility facade after G4A/G4B/G4C narrowing | Keep for now; do not broadly delete exports without a fresh route/component import map and a new selected gate. |
+| `exchangeCodeForSession(...)` re-export in [training API facade](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts) | removed compatibility-only facade sub-seam | Complete in Slice G4C; [auth confirm route](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/routes/api.auth.confirm.tsx) imports [auth actions](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/auth-actions.ts) directly. |
+| Open plan refresh/schedule-edit contract type re-exports in [training API facade](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts) | removed compatibility-only type sub-seam | Complete in Slice G4D. Runtime wrappers stay in `training-api.ts`; component type imports now use [active-plan refresh contract](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-refresh-contract.ts) and [active-plan schedule edit preview](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-schedule-edit-preview.ts). |
+| Legacy MJS text-authoring pair | stale ops/source-of-truth mismatch after G5A | Complete in Slice G10. Current command and docs use the TS-backed [author-plan-from-text.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/scripts/author-plan-from-text.ts) and [openai-plan-authoring.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/openai-plan-authoring.ts), and the remaining tracked `scripts/author-plan-from-text.mjs` entrypoint was deleted. |
+| Duplicate-space local ops residue | untracked local ops copies after canonical owners were preserved | Complete in Slice G11. `scripts/import-current-plan 2.mjs` and `scripts/validate-plan-preset-eligibility 2.ts` were deleted after source proof confirmed no package/current-doc owner. |
+| First-plan/voice compatibility re-exports in [training API facade](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts) | removed no-caller compatibility sub-seam | Complete in Slice G12. Removed only `completeStructuredFirstPlanOnboarding`, `completeStructuredFirstPlanOnboardingForUser`, `generateVoiceToPlanDraft`, and `confirmVoiceToPlanDraft` re-exports after source proof stayed clean. |
+| [auth actions](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/auth-actions.ts) | required auth owner | Keep login route data, Magic Link request, callback exchange, and local-vs-public auth helpers here. |
+| [active-plan export actions](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-export-actions.ts) and [plan export](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-export.ts) | required runtime export owner | Keep as canonical owner; route callers already import here instead of through `training-api.ts` where proved safe. |
+| [active-plan schedule edit preview](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-schedule-edit-preview.ts) | current runtime + validation owner | Keep; used by Open plan Edit schedule and validator. |
+| [schedule edit preview validator](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/scripts/validate-active-plan-schedule-edit-preview.ts) | required validation | Keep with the schedule-edit seam. |
+| [Plan Preset actions](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-preset-actions.ts) | required direct card discovery owner after G4B | Keep `getPlanPresetCards(...)`; old review/confirm actions are already removed. |
+| [Plan Preset eligibility validator](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/scripts/validate-plan-preset-eligibility.ts) | required validation | Keep; validates card discovery and absence of old legacy builder artifacts. |
+| Legacy Plan Preset builder/review residue under `src/lib/plan-presets/` and `scripts/plan-presets/` | completed BACKEND/OPS source hygiene | Complete in Slice G17. Untracked old builder/review modules, legacy CSV/source artifacts, and dependent proof helpers were deleted while tracked card-discovery owners remain intact. |
+| Manual Copy/Paste and Move review/confirm compatibility re-exports in [training API facade](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts) | removed no-caller manual-authoring facade sub-seam | Complete in Slice G7C. Canonical review/confirm ownership remains in [manual workout authoring](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/manual-workout-authoring/index.ts), while direct Copy/Paste and Move runtime wrappers remain in `training-api.ts`. |
+| `/hitoDS` Figma export double wiring | completed FRONTEND/DS route cleanup | Complete in Slice G8. The accepted dedicated `/hitoDS/export/figma` file route and export-board component own the export surface; the parent `/hitoDS` route no longer owns the old inline fallback. |
+| Admin UI placeholders (`Add user`, `Account settings / Soon`) | completed FRONTEND/ADMIN browser-visible cleanup | Complete in Slice G9. QA passed after the build/server lifecycle fix; admin Users and account menu now expose only current actions, with desktop and `375px` browser proof. |
+| Manual authoring runtime UI hotspots | current runtime | Keep until a dedicated frontend cleanup slice has exact browser QA coverage. |
+| Admin routes and importer | current admin runtime/tooling | Audit later; not selected by G3. |
+| Hito DS route/styles | current internal DS runtime | Route through Hito DS IA rollout, not this simplification strike. |
+| Logs/test results | generated local output | Later DEVTOOLS hygiene only. |
+| `qa-artifacts/` | QA proof output | No deletion until separate QA evidence retention policy exists. |
+| Work dashboard refresh path | completed local devtools/source-of-truth hygiene | Complete in Slice G13. First-class safe package-script aliases now wrap the existing dashboard helper, the generated dashboard command block recommends those aliases first, and non-mutating defaults are preserved. |
+| Selected running-plan preview calendar DS adoption | selected FRONTEND/DS cleanup batch after G14 | Select UI-C1. Replace route-local selected-plan preview calendar cell ownership with the shared Hito calendar-day primitive while preserving preview semantics. |
+
+## Historical Sections Demoted By Slice G3
+
+These topics remain useful history, but they no longer guide active execution from this plan:
+
+| Historical topic | Current summary |
+| --- | --- |
+| Slices 12A-12H plan-authoring proof extraction | Completed internal proof-infrastructure cleanup. Stable public command remains `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`; focused proof owners live under `scripts/plan-authoring-doctrine/`. Do not continue extraction by momentum alone. |
+| Slices 13A-13I manual authoring proof extraction | Completed internal proof-infrastructure cleanup. Stable public command remains `node --import tsx ./scripts/validate-manual-workout-authoring.ts`; focused proof owners live under `scripts/manual-workout-authoring/`. Manual validator is no longer the obvious hotspot. |
+| Slice 17A manual source-action menu extraction | QA-passed behavior-preserving frontend cleanup. `ManualWorkoutSourceActionMenu` is rendering/interaction only; backend remains owner of schedule mutation, persistence, metadata, date truth, and metric truth. |
+| Old Plan Preset review/confirm cleanup | Superseded by G2A. Old `reviewPlanPresetDraft(...)` and `confirmPlanPresetDraft(...)` runtime actions are removed; only card discovery remains live. |
+| Old Plan Preset algorithmic expansion prompts | Historical. Do not use old Slice 10-era prompts as current guidance; selected running-plan engine owns creation. |
+| Prior code-freeze inventory and parallel R8 audits | Historical evidence. Current decisions are summarized in the functional map and G1/G2/G2A closeouts. |
+| Admin shell / Backlog / capture cleanup slices | Historical or separate admin-track evidence. Select new admin cleanup only through fresh source/import proof. |
+| Hito DS historical playground normalization slices | Historical or owned by the active Hito DS IA/specimen rollout plan. Do not mix with runtime cleanup. |
+| Old service-size/root-cause audit sections | Superseded by the current global cleanup baseline and generated artifact policy. |
+
+Detailed prior wording remains recoverable through git history and archived/current task documents.
+Future agents should not treat deleted historical prompts from this plan as live instructions.
+
+## Current Cleanup Sequence
+
+1. BACKEND Slice G4E is complete: the selected settings, structured first-plan, and selected
+   running-plan type imports now use canonical owner modules, and `training-api.ts` no longer
+   re-exports those compatibility types.
+2. The bundled G4E cleanup also removed same-class unused confirm/input/lifecycle result type
+   re-exports from `training-api.ts` after source proof found no current facade callers.
+3. Keep runtime server-function wrappers in `training-api.ts`; G4A-G4E were bounded facade
+   narrowing slices and must not become broad runtime cleanup by momentum.
+4. G4F is complete: `import:current-plan` no longer exposes a hardcoded mutating easy path and now
+   requires explicit local-loopback apply mode for mutation.
+5. L1 is complete: `npm run artifact:hygiene` reports local generated roots without deletion, and
+   `test-results/` is ignored as generated test-runner residue.
+6. G5C is QA-passed: the stale `ManualWorkoutCopyMenu` alias is removed, manual source-action
+   call-site naming is aligned around `ManualWorkoutSourceActionMenu`, and browser QA proved
+   Copy/Move/Clear still work through accepted backend seams.
+7. G5D is complete: pure manual-authoring type imports were narrowed away from `training-api.ts`,
+   while runtime manual server-function exports/actions stay in the facade.
+8. G5E is complete: local ops plan-seed / structured-authoring `.mjs` helper ownership was removed
+   in favor of the TypeScript owners in `src/lib/imported-plan.ts` and
+   `src/lib/structured-plan-authoring.ts`.
+9. G5F is complete: duplicated local ops plan-apply persistence blocks were consolidated into a
+   narrow ops-local helper while entrypoints retained their own mutation-safety gates.
+10. G6 is complete: the paused `/test-calendar` sandbox plan moved to archive as historical
+    evidence; active DS/specimen/Figma bridge work remains owned by the Hito DS IA plan.
+11. G7 is complete: the compact active-plan root was reassessed from current source/import evidence,
+    the stale `current-state` archived-baseline reference was repaired, and G7A was selected as a
+    narrow backend import-map batch rather than broad runtime or browser-sensitive cleanup.
+12. G7A is complete: `training-api.ts` no longer re-exports
+    `persistImportedPlanForCurrentRequest` or `saveUserSettings`; current docs now describe those
+    canonical owners directly.
+13. G7A reassessment is complete: broad `training-api.ts` cleanup remains unsafe, and G7B was
+    selected for only the three no-caller user-scoped helper compatibility exports.
+14. G7B is complete: no-caller user-scoped lifecycle/refresh helper compatibility exports were
+    removed from `training-api.ts`; live top-level lifecycle/refresh server-function wrappers remain
+    in the facade.
+15. G7C is complete: no-caller manual Copy/Paste and Move review/confirm compatibility re-exports
+    were removed from `training-api.ts`; direct manual Copy/Paste and Move runtime wrappers plus
+    Delete/Clear, Add/Create/Templates, and persisted-edit actions remain in the facade.
+16. Post-G7C source-proof reassessment is complete: broad `training-api.ts` cleanup remains unsafe,
+    validators/local ops remain live proof/safety tooling, `qa-artifacts/` deletion remains blocked,
+    and Slice G8 was selected as a bounded FRONTEND/DS route-ownership cleanup.
+17. G8 is QA-passed: the duplicate inline `/hitoDS/export/figma` fallback was removed from the
+    parent `/hitoDS` route, while the dedicated file route and export-board component remain the
+    canonical export surface.
+18. Post-G8 reassessment selected G9 as a same-owner FRONTEND/ADMIN cleanup batch for future-only
+    disabled admin placeholders.
+19. G9 is QA-passed: future-only admin placeholders were removed from admin Users/account menu
+    surfaces while shipped admin analytics, capture, auth/logout, desktop layout, and `375px` mobile
+    layout stayed intact.
+20. Stable cleanup burndown v1 is adopted and updated after G20: `40` total gates, `37` complete,
+    `3` remaining, `92.5%` gate-burndown complete.
+21. G10 is complete: the remaining stale `scripts/author-plan-from-text.mjs` entrypoint was deleted
+    after source proof confirmed no live owner and preserved the TS-backed text-authoring command.
+22. Post-G10 source proof selected BACKEND/OPS Slice G11 for duplicate-space local ops residue:
+    `scripts/import-current-plan 2.mjs` and `scripts/validate-plan-preset-eligibility 2.ts`.
+23. G11 is complete: both duplicate-space local ops residue files were deleted after source proof
+    confirmed they were untracked and ownerless.
+24. Post-G11 source proof selected BACKEND Slice G12 for the no-caller first-plan/voice
+    compatibility re-exports in `training-api.ts`; this is not broad facade cleanup.
+25. G12 is complete: those four no-caller first-plan/voice compatibility re-exports were removed
+    from `training-api.ts`.
+26. Post-G12 reassessment accepted G12, found no safe next backend/runtime or frontend deletion
+    batch, and selected BACKEND/OPS Slice G13 for local work-dashboard devtools hygiene.
+27. G13 is complete: dashboard refresh now has first-class safe package scripts over the existing
+    `scripts/hito-work-dashboard.mjs` helper, and `docs/work-dashboard.md` is regenerated from active
+    plan truth.
+28. Post-G13 reassessment is complete: the cleanup track entered source-proof holding until the
+    service-wide UI consistency audit found a concrete shared-owner DS adoption candidate.
+29. Service-wide UI consistency audit identified FRONTEND UI-C1 as a concrete shared-owner DS
+    adoption candidate.
+30. G14 is complete: the global business-flow teardown matrix is accepted, no product-runtime
+    deletion candidate is source-proved, and FRONTEND UI-C1 was selected as the first execution
+    batch after the matrix because it removed a duplicate selected-plan preview calendar
+    presentation path.
+31. UI-C1 is QA-passed and accepted: selected-plan preview now uses the shared Hito calendar-day
+    primitive with desktop and `375px` proof, no-benchmark and benchmark preview proof, final
+    endpoint readback, no fake personal HR, and disposable cleanup.
+32. Post-UI-C1 source/import audit selected BACKEND/OPS G15 for deletion-only orphan legacy MJS ops
+    helper residue under `scripts/lib/`.
+33. G15 is complete: `scripts/lib/openai-plan-authoring.mjs`,
+    `scripts/lib/structured-plan-authoring.mjs`, and `scripts/lib/imported-plan-seed.mjs` were
+    deleted after source proof confirmed current command ownership is TS-backed or ops-local.
+34. Post-G15 source/import/docs reassessment selected DEVTOOLS/OPS G16 for local duplicate-space
+    residue cleanup. The selected files are untracked and unimported, and the slice must not touch
+    canonical runtime owners.
+35. G16 is complete: `src/lib/plan-creation-engine/source-model 2.ts`,
+    `src/components/onboarding/PlanPresetPanel 2.tsx`, and `src/components/ui/calendar 2.tsx` were
+    deleted while canonical owners remain untouched.
+36. Post-G16 reassessment selected BACKEND/OPS G17 for untracked legacy Plan Preset builder/review
+    residue. The selected batch preserved current Plan Preset card discovery and selected-plan
+    preview/create, and stopped short of tracked/current owners.
+37. G17 is complete: the untracked legacy Plan Preset builder/review module cluster, legacy CSV/source
+    artifacts, and dependent `scripts/plan-presets/*` helpers were deleted while tracked current
+    card-discovery owners remain untouched.
+38. Post-G17 reassessment selected FRONTEND G18 for the tracked orphan onboarding
+    `JsonImportPanel.tsx`. This is deletion-only source repair; current JSON import behavior remains
+    owned by `PlanImportPanel`, `PlanManagementDialog`, and `UploadJsonDialog`.
+39. G18 is complete: the tracked orphan onboarding `JsonImportPanel.tsx` residue was deleted while
+    current JSON import behavior remains owned by `PlanImportPanel`, `PlanManagementDialog`, and
+    `UploadJsonDialog`.
+40. Post-G18 reassessment selected FRONTEND G19 for tracked orphan `DictateToPlanPanel.tsx` UI
+    residue. This is deletion-only source cleanup; backend `voice-to-plan` truth remains a
+    non-default backend seam and must not be deleted or changed.
+41. G19 is complete: tracked orphan `DictateToPlanPanel.tsx` residue was deleted while backend
+    voice-to-plan truth remains owned by `first-plan-actions`, `voice-to-plan-authoring`,
+    entitlements, onboarding form-model types, plan-authoring snapshot mapping, and doctrine proof.
+42. Post-G19 reassessment selected ARCHITECT G20 for the untracked duplicate-space manual-workout
+    backlog markdown copy. This is docs/admin-mirror source-of-truth hygiene only.
+43. G20 is complete: the untracked duplicate-space manual-workout backlog markdown copy was deleted
+    after admin-root proof, preserving the canonical tracked backlog item and importer contract.
+44. The simplification strike is back in source-proof holding. Select a next gate only after fresh
+    source/import/docs evidence proves one owner, one risk class, and one validation story.
+45. Keep runtime/frontend cleanup conservative. Shipped manual builder, active-plan calendar,
+   selected-plan create, export/import, admin, and Hito DS behavior must not be refactored by vibe or
+   line count.
+46. Do not delete `qa-artifacts/` before a separate QA evidence retention policy exists.
+47. Keep QR/share/import, recurrence, Restore UI, universal Copy/Paste, generated-plan mutation
+   expansion, persisted `Edit training` UI, and modal polish out of this cleanup track unless Product
+   explicitly opens a dedicated gate.
+
+## Immediate Next Gate
+
+None selected / source-proof holding.
+
+G20 is complete and accepted. The cleanup burndown is now `37/40` complete, `3` remaining, and
+`92.5%` complete. No next implementation batch is selected in this closeout. Broader runtime,
+backend ops hardening, docs/devtools cleanup, or browser-sensitive cleanup remains deferred unless
+fresh import/reference/docs proof selects another bounded seam with one owner, one risk class, and
+one validation story.
 
 ## QA Expectations
 
-Docs-only slices:
+For docs/source-of-truth cleanup:
 
-- targeted `git diff --check`
-- admin backlog importer dry-run if markdown source state changes
-- admin backlog validator if mirror-relevant docs changed
+- Run scoped `git diff --check` on changed markdown files.
+- If markdown files move between repo-derived admin roots, run
+  `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000`.
+- If backlog/admin mirror metadata changes, run `npm run validate-admin-capture-backlog`.
+- No build, browser QA, Supabase mutation, OpenAI call, or migration is required unless runtime or
+  backlog-imported files are unexpectedly changed.
 
-Code behavior-preservation slices:
+For future implementation cleanup selected after G5:
 
-- targeted ESLint for touched files
-- relevant harness command
-- `git diff --check`
-- `npm run build`
-
-Browser QA:
-
-- only required if UI behavior changes
-- use built-in Codex browser first
-- Safari fallback only when needed by QA policy
-- for Slice 3A, check both `/admin/analytics` and `/admin/capture` so the shared shell does not
-  regress on either side
-- for Slice 3C, check both `/admin/analytics` and `/admin/capture` for sidebar brand baseline,
-  compact page headers, contextual actions, bottom-left admin account menu, mobile layout, and no
-  horizontal overflow
-- for Slice 3D, check `/hitoDS` across Overview, Foundations, Components, Patterns, modal/dialog
-  playground, calendar/workout playground, and any Live View/equivalent section; verify shared
-  playground anatomy, stable sidebar/nav behavior, reduced nested borders/cards, shared
-  captions/footers, reachable controls, preserved deep links, and 375px mobile no-overflow
+- Backend/runtime cleanup must include import/reference proof, targeted ESLint, relevant validators,
+  and `npm run build` when public exports/imports change.
+- Frontend cleanup must include Hito DS preflight, targeted ESLint, build, and browser proof for any
+  behavior-visible route or responsive surface.
+- Validation coverage must be preserved; do not delete checks just to reduce line count.
 
 ## Risks
 
-- Touching in-flight Plan Preset files could break current plan creation work.
-- Removing compatibility exports too early could break TanStack serverFn eligibility or route imports.
-- Deleting diagnostic authoring paths without doctrine coverage could weaken safety.
-- Removing Hito DS wrappers blindly could increase route-local UI rather than reduce complexity.
-- Lockfile cleanup without checking CI/deploy assumptions could create install drift.
-- Active/archive cleanup could accidentally discard newer closeout evidence if duplicates are not
-  compared first.
-- Treating active plans as backlog wrapper tasks would keep duplicating markdown truth instead of
-  fixing Admin Backlog visibility.
-- Leaving Admin shell/helper copy route-local would keep Work items feeling like a separate app even
-  after the unified work-item model is implemented.
-- Keeping global utilities in the page header would make contextual Admin actions unclear and could
-  conflict with future debugger/capture-overlay entry points.
-- Treating `/hitoDS` state coverage as visual approval would keep shipping heavy, nested specimen
-  layouts that contradict the product's low-card direction.
-- Creating a new playground framework instead of normalizing the existing Hito DS specimen/sidebar
-  seams would add another UI system to maintain.
-- Treating fixed 10/12/16 week Plan Preset fixtures as the product target would preserve
-  template-like, support-heavy plans and hide training-quality risk across all shipped preset
-  families.
-- Encoding body-size/load adjustment without Running Coach doctrine could create unsafe,
-  body-shaming, or medically suggestive product behavior.
+- Reintroducing old Plan Preset review/confirm language would recreate a removed creation seam.
+- Broadly narrowing `training-api.ts` beyond fresh import-map evidence could break route-facing
+  server functions.
+- Auth callback behavior is login-critical; future cleanup must preserve code and token-hash
+  exchange, redirects, Supabase session cookies, local-auth availability, and admin-auth separation.
+- Treating schedule edit preview as stale would remove a current Open plan capability.
+- Reintroducing the removed G4B validator assertion would again require the stale `training-api.ts`
+  Plan Preset card re-export.
+- Touching manual calendar/runtime UI without browser-safe scope could regress shipped manual editing.
+- Treating `qa-artifacts/` as disposable logs could destroy acceptance evidence.
+- Selecting runtime cleanup by file size alone could move business truth into the wrong layer.
+- Removing admin placeholders without browser proof could accidentally disturb shipped admin
+  analytics, capture/backlog, auth/logout, or responsive shell behavior.
+- Merging Hito DS rollout, admin cleanup, manual authoring, running-plan engine, and global cleanup
+  into one slice would recreate the drift this plan is trying to prevent.
 
 ## Exit Criteria
 
-- The Plan Preset track is either complete or explicitly paused before code cleanup begins.
+This simplification strike can close only when:
+
+- Active cleanup source-of-truth stays compact and current.
 - `docs/plans/active/` contains only real active execution plans.
-- Admin Backlog has one repo work-item model where backlog items, active plans, specs, briefs, and
-  archived plans are distinguishable without duplicate wrapper markdown.
-- Admin analytics, users/test accounts, and Work items share one stable Admin shell/navigation
-  contract with one selected item and one consistent helper pattern.
-- Admin chrome separates sidebar identity, page title/subtitle, contextual section actions, and
-  account/profile actions without oversized workspace banners or route-specific shell cards.
-- `/hitoDS` playgrounds share one workbench anatomy for section header, preview/stage, controls, and
-  caption/footer; they avoid nested card soup and preserve stable nested navigation.
-- No-watch/unknown execution support is no longer a normal new-plan onboarding option, while legacy
-  `none`, `unknown`, and `effort_only` readback remains bounded compatibility.
-- Plan Preset shipped-family quality is either rebuilt through the rich adaptive program model or
-  explicitly paused with current fixed-duration presets classified as insufficient quality.
-- Package-manager signal is singular and documented.
-- `training-api.ts` has fewer compatibility responsibilities or an explicit remaining-export map.
-- Plan creation paths are classified by production/internal/ops/QA/legacy/delete status.
-- At least one stale or duplicate seam is deleted or demoted after validation.
-- Script/validator ownership is clearer without weakening checks.
-- No product behavior changes accidentally.
-- No fake metric truth, AI fallback leak, or frontend-owned plan truth is introduced.
+- Generated/cache/vendor/build/log/artifact roots stay outside product-code size claims.
+- At least one stale runtime or source-of-truth seam has been deleted or demoted with validation.
+- The next runtime/frontend cleanup gate is selected from current import/capability proof, not old
+  historical prompts.
+- Accepted manual builder, selected-plan creation, active-plan editability, export/import, admin,
+  and Hito DS behavior remain intact.
+- No fake metric truth, AI fallback leak, frontend-owned plan truth, or revived Plan Preset
+  create/confirm path is introduced.
 
 ## Blockers
 
-- No blocker for Slice 1 docs/source-of-truth cleanup.
-- Product-code cleanup is no longer blocked by Admin simplification dirty work; Slice 3B committed
-  and pushed the scoped Admin simplification work.
-- Remaining dirty instruction/skill updates and older untracked active-plan docs must stay outside
-  watch-required implementation unless the user separately approves committing or resolving them.
-- Admin Backlog importer dry-run now completes cleanly after the stale PDF active file was removed.
-  Live import was not run because the dry-run reported no required mirror changes.
-- Admin shell/navigation unification is implemented and QA-passed.
-- Slice 3C Admin chrome refinement is implemented and QA-passed.
-- Slice 3D `/hitoDS` playground consistency normalization is implemented, QA-passed, and
-  design-approved.
-- Backend Slice 6 card-to-review QA follow-up is implemented locally:
-  - fixed the resolver/review-builder contract gap where `reviewReady: true` cards could fail
-    `buildPlanPresetReviewDraftContract(...)`
-  - kept 2-day 10K supported with conservative recovery-first composition instead of unsafe forced
-    midweek specificity
-  - kept 2-day Half review-ready cases supported by using long-run steady-finish specificity rather
-    than placing controlled tempo on the protected post-long-run slot
-  - expanded structured preparation horizon validation to support the 25-week marathon beginner
-    preset scenario instead of silently truncating it
-  - added full source-matrix review-ready harness coverage: 36 review-ready scenarios, 0 draft-build
-    failures
-  - Plan Preset CSV artifacts are now resolved through source and packaged output candidates, with
-    build finalizer copy/validation retained for local and Vercel output
+- No blocker from G13 closeout.
+- No blocker for the selected UI-C1 handoff.
+- Broader UI/DS adoption candidates remain deferred until UI-C1 proves the runtime-consumer cleanup
+  validation path.
+- QA artifact deletion is blocked until a separate QA evidence retention policy exists.

@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { TrainingPreferenceFields } from "./TrainingPreferenceFields";
+import { RecentFiveKBenchmarkFields, TrainingPreferenceFields } from "./TrainingPreferenceFields";
 import {
   GUIDANCE_PREFERENCE_OPTIONS,
   GOAL_DISTANCE_OPTIONS,
@@ -41,7 +41,7 @@ import {
   type TerrainFocus,
   type WeekdayName,
 } from "./onboarding-form-model";
-import type { StructuredFirstPlanDraftResult } from "@/lib/training-api";
+import type { StructuredFirstPlanDraftResult } from "@/lib/first-plan-actions";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 
 type ConstructorStatus = "idle" | "reviewing" | "creating" | "finishing";
@@ -57,6 +57,7 @@ type StructuredCorrectionRequired = Extract<
 
 interface StructuredPlanConstructorProps {
   formRef: RefObject<HTMLFormElement | null>;
+  mode?: "quick" | "advanced";
   state: StructuredConstructorState;
   setState: {
     setAge: (value: string) => void;
@@ -88,10 +89,13 @@ interface StructuredPlanConstructorProps {
   onConfirmDraft: () => void;
   onBackToEdit: () => void;
   planPresetPanel?: ReactNode | ((actions: { openAdvancedCustom: () => void }) => ReactNode);
+  onUseAdvancedSetup?: () => void;
+  onUseQuickSetup?: () => void;
 }
 
 export function StructuredPlanConstructor({
   formRef,
+  mode = "quick",
   state,
   setState,
   constructorStatus,
@@ -103,25 +107,21 @@ export function StructuredPlanConstructor({
   onConfirmDraft,
   onBackToEdit,
   planPresetPanel,
+  onUseAdvancedSetup,
+  onUseQuickSetup,
 }: StructuredPlanConstructorProps) {
+  const isAdvancedMode = mode === "advanced";
   const showsTargetFields = state.goalStyle === "target_time";
   const showsTerrainSelector =
     state.goalDistance === "marathon" || state.goalDistance === "ultra_marathon";
   const impliedMountainTerrain = state.goalDistance === "mountain_running";
   const [activeEditableKey, setActiveEditableKey] = useState<ProfileBasicEditableKey | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(state.fitnessLevel);
   const isDraftReady = draftResult?.ok === true && draftResult.status === "draft_ready";
   const isCorrectionRequired =
     draftResult?.ok === true && draftResult.status === "correction_required";
   const openAdvancedCustom = () => {
-    setAdvancedOpen(true);
-    window.requestAnimationFrame(() =>
-      formRef.current?.querySelector("[data-advanced-custom]")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      }),
-    );
+    onUseAdvancedSetup?.();
   };
 
   return (
@@ -142,7 +142,11 @@ export function StructuredPlanConstructor({
         <ConstructorSection
           eyebrow="01"
           title="Basic setup"
-          body="Profile basics unlock backend-owned Plan Preset cards; rhythm can be refined after selection."
+          body={
+            isAdvancedMode
+              ? "Start with the basics, then add the details you need below."
+              : "Start with the basics, then choose a guided plan to review."
+          }
           divider={false}
         >
           <div className="hito-editable-value-chip-group">
@@ -190,7 +194,7 @@ export function StructuredPlanConstructor({
 
           <Field
             label="Running level"
-            helper="Use Advanced custom below if you want to add a recent 5K benchmark."
+            helper="Choose the closest current level. You can refine details after the plan exists."
           >
             <OptionGrid label="Running level">
               {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
@@ -210,9 +214,23 @@ export function StructuredPlanConstructor({
             </OptionGrid>
           </Field>
 
+          {!isAdvancedMode ? (
+            <Field
+              label="Fitness benchmark"
+              helper="Optional. A recent 5K lets Hito show backend-backed pace targets in selected-plan previews when supported."
+            >
+              <RecentFiveKBenchmarkFields
+                recent5kTime={state.recent5kTime}
+                onRecent5kTimeChange={setState.setRecent5kTime}
+                recent5kPace={state.recent5kPace}
+                onRecent5kPaceChange={setState.setRecent5kPace}
+              />
+            </Field>
+          ) : null}
+
           <Field
             label="Available running days per week"
-            helper="Optional before choosing. If you leave this open, the selected 10K preview uses the backend default."
+            helper="Optional. Add this now if you want a more tailored starting point."
           >
             <OptionGrid label="Available running days per week">
               {PRESET_RUNNING_DAY_OPTIONS.map((option) => (
@@ -231,7 +249,7 @@ export function StructuredPlanConstructor({
             label="Plan Start Date"
             value={state.startDate}
             onChange={setState.setStartDate}
-            helper="Optional. Leave unset to let the 10K preview use the backend default start date."
+            helper="Optional. Leave this open to use Hito's default start date."
           />
           <input type="hidden" name="schedule.startDate" value={state.startDate} />
 
@@ -241,8 +259,7 @@ export function StructuredPlanConstructor({
                 <div>
                   <p className="hito-label">Schedule rhythm</p>
                   <p className="hito-list-row-copy">
-                    Optional before selecting. These values are sent to the backend preview, not
-                    used to compute rows in the browser.
+                    Optional. Add schedule preferences now, or choose a plan first and refine later.
                   </p>
                 </div>
                 <TrainingPreferenceFields
@@ -256,72 +273,47 @@ export function StructuredPlanConstructor({
                   onPreferredLongRunDayChange={setState.setPreferredLongRunDay}
                   preferredLongRunMode="default-sunday"
                   showRunningDays={false}
-                  fixedRestDaysHelper="Optional. Protect days that should stay off the run schedule."
-                  preferredLongRunHelper="Optional. Leave unselected to keep the backend default."
+                  fixedRestDaysHelper="Optional. Protect days you want to keep free."
+                  preferredLongRunHelper="Optional. Leave this open if you do not have a preferred day."
                 />
               </div>
             </div>
           </div>
         </ConstructorSection>
 
-        {typeof planPresetPanel === "function"
-          ? planPresetPanel({ openAdvancedCustom })
-          : planPresetPanel}
+        {!isAdvancedMode
+          ? typeof planPresetPanel === "function"
+            ? planPresetPanel({ openAdvancedCustom })
+            : planPresetPanel
+          : null}
 
-        <details
-          className="hito-disclosure hito-section-divider pt-6"
-          data-advanced-custom
-          open={advancedOpen}
-          onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-        >
-          <summary className="hito-disclosure-summary">
-            <span>
-              <span className="hito-body-small block text-foreground/90">
-                Need a custom program?
-              </span>
-              <span className="mt-1 block hito-helper">
-                Use Advanced for target dates, target times, injury or caution signals, unusual
-                goals, detailed constraints, or guidance preferences.
-              </span>
-            </span>
-            <span className="inline-flex shrink-0 items-center gap-2">
-              <span className="hito-button hito-button-secondary hito-button-sm pointer-events-none">
-                {advancedOpen ? "Close Advanced custom" : "Open Advanced custom"}
-              </span>
-              <Icon name="chevron-down" className="hito-disclosure-chevron" />
-            </span>
-          </summary>
-
-          <div className="hito-disclosure-body gap-8">
+        {isAdvancedMode ? (
+          <section className="hito-section-divider grid gap-8 pt-6" data-advanced-custom>
             <div className="hito-surface-wash" data-tone="signal">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="hito-list-row-title">Advanced custom is secondary</p>
+                  <p className="hito-list-row-title">Advanced setup</p>
                   <p className="hito-list-row-copy">
-                    This path keeps the full review-before-create flow for target dates, target
-                    times, fixed rest constraints, terrain nuance, guidance preferences, and
-                    detailed comments.
+                    Use this path when you want more control over the setup.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="hito-button hito-button-secondary hito-button-sm shrink-0"
-                  onClick={() => {
-                    setAdvancedOpen(false);
-                    window.requestAnimationFrame(() =>
-                      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-                    );
-                  }}
-                >
-                  Back to presets
-                </button>
+                {onUseQuickSetup ? (
+                  <button
+                    type="button"
+                    className="hito-button hito-button-secondary hito-button-sm shrink-0"
+                    disabled={isBusy}
+                    onClick={onUseQuickSetup}
+                  >
+                    Back to Quick setup
+                  </button>
+                ) : null}
               </div>
             </div>
 
             <ConstructorSection
               eyebrow="A1"
               title="Schedule constraints"
-              body="Use this only when preset availability is not enough."
+              body="Add schedule details when Quick setup is not the right fit."
             >
               <TrainingPreferenceFields
                 fixedRestDays={state.fixedRestDays}
@@ -344,13 +336,15 @@ export function StructuredPlanConstructor({
                 }}
                 recent5kTime={state.recent5kTime}
                 onRecent5kTimeChange={setState.setRecent5kTime}
+                recent5kPace={state.recent5kPace}
+                onRecent5kPaceChange={setState.setRecent5kPace}
               />
             </ConstructorSection>
 
             <ConstructorSection
               eyebrow="A2"
               title="Workout guidance"
-              body="Tune wording only when you need the custom path."
+              body="Choose how you want workouts to be described."
             >
               <Field label="Guidance style">
                 <OptionGrid label="Guidance style">
@@ -370,7 +364,7 @@ export function StructuredPlanConstructor({
             <ConstructorSection
               eyebrow="A3"
               title="Goal and timing"
-              body="Use Advanced when the plan needs a specific goal shape."
+              body="Set a specific goal, timeline, or target if you need one."
             >
               <Field label="Goal distance">
                 <OptionGrid label="Goal distance">
@@ -458,7 +452,7 @@ export function StructuredPlanConstructor({
             <ConstructorSection
               eyebrow="A4"
               title="Extras"
-              body="Add light mobility or strength support for a custom plan."
+              body="Add light strength or mobility support if you want it included."
             >
               <div className="grid gap-2">
                 {STRENGTH_OPTIONS.map((option) => (
@@ -476,7 +470,7 @@ export function StructuredPlanConstructor({
             <ConstructorSection
               eyebrow="A5"
               title="Detailed comment"
-              body="Add caution signals or constraints that should route through custom review."
+              body="Add any important context or constraints for review."
             >
               <label className="grid gap-2">
                 <span className="hito-form-label">Comment</span>
@@ -502,7 +496,7 @@ export function StructuredPlanConstructor({
                   ) : null}
                   {!constructorError && constructorStatus !== "finishing" ? (
                     <p className="hito-field-helper max-w-xl">
-                      Advanced custom reviews the setup before anything is created.
+                      Advanced setup reviews everything before anything is created.
                     </p>
                   ) : null}
                 </div>
@@ -512,15 +506,15 @@ export function StructuredPlanConstructor({
                   className="hito-button hito-button-secondary hito-button-lg shrink-0"
                 >
                   {constructorStatus === "reviewing"
-                    ? "Reviewing custom..."
+                    ? "Reviewing setup..."
                     : constructorStatus === "finishing"
                       ? "Opening your plan..."
-                      : "Review advanced custom"}
+                      : "Review advanced setup"}
                 </button>
               </div>
             </div>
-          </div>
-        </details>
+          </section>
+        ) : null}
         {isDraftReady ? (
           <StructuredDraftReadyReviewModal
             result={draftResult}
@@ -611,8 +605,8 @@ function StructuredDraftReadyReviewModal({
       }}
     >
       <DialogContent
-        className="hito-product-dialog max-h-[88vh] max-w-3xl overflow-y-auto"
-        overlayClassName="hito-product-dialog-overlay"
+        className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Review your plan</DialogTitle>
@@ -621,89 +615,97 @@ function StructuredDraftReadyReviewModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="hito-row-group">
-          <div className="hito-list-row items-start">
-            <div className="min-w-0">
-              <p className="hito-list-row-title">Plan ready</p>
-              <p className="hito-list-row-copy">{longHorizonReviewCopy}</p>
+        <div className="hito-product-dialog-body-scroll-fill">
+          <div className="hito-row-group">
+            <div className="hito-list-row items-start">
+              <div className="min-w-0">
+                <p className="hito-list-row-title">Plan ready</p>
+                <p className="hito-list-row-copy">{longHorizonReviewCopy}</p>
+              </div>
+              <span className="hito-status-pill" data-tone="success">
+                Review
+              </span>
             </div>
-            <span className="hito-status-pill" data-tone="success">
-              Review
-            </span>
-          </div>
 
-          <div className="hito-list-row items-start">
-            <div className="grid gap-3">
-              <p className="hito-form-label">What Hito understood</p>
-              <StructuredReviewLine label="Runner" value={review.runnerUnderstanding.profile} />
-              <StructuredReviewLine
-                label="Benchmark"
-                value={review.runnerUnderstanding.benchmark}
-              />
-              <StructuredReviewLine label="Goal" value={review.runnerUnderstanding.goal} />
-              <StructuredReviewLine
-                label="Availability"
-                value={review.runnerUnderstanding.availability}
-              />
-              <StructuredReviewLine
-                label="Workout guidance"
-                value={review.runnerUnderstanding.execution}
-              />
+            <div className="hito-list-row items-start">
+              <div className="grid gap-3">
+                <p className="hito-form-label">What Hito understood</p>
+                <StructuredReviewLine label="Runner" value={review.runnerUnderstanding.profile} />
+                <StructuredReviewLine
+                  label="Benchmark"
+                  value={review.runnerUnderstanding.benchmark}
+                />
+                <StructuredReviewLine label="Goal" value={review.runnerUnderstanding.goal} />
+                <StructuredReviewLine
+                  label="Availability"
+                  value={review.runnerUnderstanding.availability}
+                />
+                <StructuredReviewLine
+                  label="Workout guidance"
+                  value={review.runnerUnderstanding.execution}
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="hito-list-row items-start">
-            <div className="grid gap-3">
-              <p className="hito-form-label">Plan setup summary</p>
-              <StructuredReviewLine label="Plan" value={review.displayTitle} />
-              <StructuredReviewLine label={durationLabel} value={review.planShape.durationLabel} />
-              <StructuredReviewLine
-                label="Days per week"
-                value={`${review.planShape.runningDaysPerWeek}`}
-              />
-              <StructuredReviewLine
-                label="Rest days"
-                value={
-                  review.planShape.fixedRestDays.length
-                    ? review.planShape.fixedRestDays.join(", ")
-                    : "No fixed rest days"
-                }
-              />
-              <StructuredReviewLine
-                label="Workouts"
-                value={`${review.planShape.workoutCount} planned workouts`}
-              />
-              <StructuredReviewLine
-                label="Long run"
-                value={review.planShape.longRunDay ?? "No fixed long-run day"}
-              />
-              <StructuredReviewLine label="Quality rhythm" value={review.planShape.qualityRhythm} />
-              <StructuredReviewLine label="Metric policy" value={review.planShape.metricPolicy} />
-              <StructuredReviewLine
-                label="Terrain"
-                value={formatTerrainFocus(review.planShape.terrainFocus)}
-              />
-              {review.planShape.activityMix.length > 0 ? (
-                <div>
-                  <p className="hito-label">Workout mix</p>
-                  <p className="hito-body-small text-muted-foreground">
-                    {review.planShape.activityMix.join(", ")}
-                  </p>
-                </div>
-              ) : null}
+            <div className="hito-list-row items-start">
+              <div className="grid gap-3">
+                <p className="hito-form-label">Plan setup summary</p>
+                <StructuredReviewLine label="Plan" value={review.displayTitle} />
+                <StructuredReviewLine
+                  label={durationLabel}
+                  value={review.planShape.durationLabel}
+                />
+                <StructuredReviewLine
+                  label="Days per week"
+                  value={`${review.planShape.runningDaysPerWeek}`}
+                />
+                <StructuredReviewLine
+                  label="Rest days"
+                  value={
+                    review.planShape.fixedRestDays.length
+                      ? review.planShape.fixedRestDays.join(", ")
+                      : "No fixed rest days"
+                  }
+                />
+                <StructuredReviewLine
+                  label="Workouts"
+                  value={`${review.planShape.workoutCount} planned workouts`}
+                />
+                <StructuredReviewLine
+                  label="Long run"
+                  value={review.planShape.longRunDay ?? "No fixed long-run day"}
+                />
+                <StructuredReviewLine
+                  label="Quality rhythm"
+                  value={review.planShape.qualityRhythm}
+                />
+                <StructuredReviewLine label="Metric policy" value={review.planShape.metricPolicy} />
+                <StructuredReviewLine
+                  label="Terrain"
+                  value={formatTerrainFocus(review.planShape.terrainFocus)}
+                />
+                {review.planShape.activityMix.length > 0 ? (
+                  <div>
+                    <p className="hito-label">Workout mix</p>
+                    <p className="hito-body-small text-muted-foreground">
+                      {review.planShape.activityMix.join(", ")}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          <div className="hito-list-row items-start">
-            <div>
-              <p className="hito-form-label">Assumptions and safety</p>
-              <ul className="mt-2 grid gap-1">
-                {[...review.assumptions, ...review.safetyNotes].map((note) => (
-                  <li key={note} className="hito-body-small text-muted-foreground">
-                    {note}
-                  </li>
-                ))}
-              </ul>
+            <div className="hito-list-row items-start">
+              <div>
+                <p className="hito-form-label">Assumptions and safety</p>
+                <ul className="mt-2 grid gap-1">
+                  {[...review.assumptions, ...review.safetyNotes].map((note) => (
+                    <li key={note} className="hito-body-small text-muted-foreground">
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -802,7 +804,7 @@ const PRESET_RUNNING_DAY_OPTIONS: { value: string; label: string; copy: string }
   { value: "5", label: "5 days", copy: "More durable base" },
 ];
 
-function OptionGrid({ children, label }: { children: ReactNode; label: string }) {
+export function OptionGrid({ children, label }: { children: ReactNode; label: string }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label={label}>
       {children}
@@ -810,7 +812,7 @@ function OptionGrid({ children, label }: { children: ReactNode; label: string })
   );
 }
 
-function OptionButton({
+export function OptionButton({
   active,
   icon,
   label,

@@ -89,7 +89,7 @@ Architect / Backend / Frontend / QA
 
 ## Last Updated
 
-2026-06-03
+2026-06-13
 
 ## Context
 
@@ -1393,6 +1393,21 @@ Stale mirror cleanup QA closeout, 2026-06-03:
 - Validation passed: targeted ESLint for the importer and validator, importer dry-run, importer
   dry-run with `--archive-stale`, local validator, live validator, `git diff --check`, and
   `npm run build`.
+
+Repo work-item target-role contract repair, 2026-06-13:
+
+- Root cause: the importer/admin backlog role contract had drifted from the linked Supabase
+  `admin_capture_items.target_role` constraint, so current markdown mirror refresh could fail on
+  valid repo-derived rows instead of refreshing by `metadata.source_path`.
+- The linked Supabase project was updated with the existing product/running-coach target-role
+  migration; live probes now accept both `product` and `running_coach`.
+- Importer role parsing/normalization now reuses the shared admin capture target-role contract,
+  including explicit `ROLE: product` and `ROLE: running_coach` parsing.
+- The previously failing archive mirror
+  `docs/plans/archive/2026-05-18-workout-type-glyph-semantics.md` refreshes successfully as an
+  archived plan with `target_role: product`.
+- Validation passed: targeted ESLint for the importer/admin role files, importer dry-run, live
+  importer refresh, local admin backlog validator, scoped `git diff --check`, and `npm run build`.
 
 Frontend follow-up after Backend Slice 7:
 

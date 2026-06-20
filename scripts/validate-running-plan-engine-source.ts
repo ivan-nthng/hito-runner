@@ -77,11 +77,15 @@ function validateBuilderInputBoundary() {
     activeFieldNames.includes("preferredLongRunDay"),
     "Preferred long-run day must be represented.",
   );
+  assert.ok(
+    activeFieldNames.includes("benchmarkPaceTruth"),
+    "Optional benchmark-backed pace truth must be represented without being required.",
+  );
 
   assert.ok(!activeFieldNames.includes("watchAccess"), "Watch access must not be a normal input.");
   assert.ok(
     !activeFieldNames.includes("recent5kBenchmark"),
-    "Recent 5K benchmark must not be a normal input.",
+    "Legacy raw recent5kBenchmark must not be the normal input owner.",
   );
   assert.ok(!activeFieldNames.includes("targetTime"), "Target time must not be a normal input.");
   assert.ok(
@@ -92,10 +96,6 @@ function validateBuilderInputBoundary() {
   assert.ok(
     deliberatelyAbsentFields.includes("watchAccess"),
     "Watch access absence must be explicit.",
-  );
-  assert.ok(
-    deliberatelyAbsentFields.includes("recent5kBenchmark"),
-    "5K benchmark absence must be explicit.",
   );
   assert.ok(
     deliberatelyAbsentFields.includes("targetTime"),

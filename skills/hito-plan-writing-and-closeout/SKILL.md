@@ -32,6 +32,34 @@ Every active plan should include:
 - Next Recommended Role
 - Suggested Next Step
 
+## Repo-Derived Admin Backlog Mirror Compatibility
+
+Plans under `docs/plans/active/` and `docs/plans/archive/` are mirrored into the admin Backlog.
+Every new or materially updated plan should keep one canonical import-ready metadata block in the
+markdown itself so the importer and copied handoff prompt stay deterministic.
+
+Required canonical sections:
+
+- `Status`
+- `Type`
+- `Priority`
+- `Next Recommended Role`
+- `Task`
+- `Stage`
+- `Exact Handoff Prompt`
+
+Allowed canonical values:
+
+- `Status`: `backlog`, `in_progress`, `completed`, `closed`, `archived`
+- `Type`: `bug`, `change_request`, `context_capture`, `plan`, `frontend_spec`, `product_brief`
+- `Priority`: `low`, `medium`, `high`, `urgent`
+- `Next Recommended Role`: `architect`, `backend`, `frontend`, `designer`, `copy`, `qa`,
+  `product`, `running_coach`
+
+Plan-specific sections such as `Context`, `Problem Definition`, `Responsibilities`, `QA
+Expectations`, `Risks`, `Exit Criteria`, or `Suggested Next Step` remain valid and often required,
+but they do not replace the canonical import-ready block.
+
 ## Closeout Rules
 
 When a track is complete:

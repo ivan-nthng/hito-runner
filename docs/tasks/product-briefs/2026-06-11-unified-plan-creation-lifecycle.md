@@ -1,10 +1,82 @@
 # Unified Plan Creation Lifecycle
 
-Status: Product direction / backend universal editability foundation implemented; frontend wiring and browser QA pending
+## Status
+
+in_progress
+
+## Type
+
+product_brief
+
+## Priority
+
+high
+
+## Next Recommended Role
+
+backend
+
+## Task
+
+Implement persisted future workout editing for eligible manual planned rows before `Edit training`
+is exposed on workout detail.
+
+## Stage
+
+BACKEND implementation / persisted workout-content editing boundary.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: BACKEND
+
+Task:
+Implement persisted future workout editing for eligible manual planned rows before `Edit training`
+is exposed on workout detail.
+
+Stage:
+BACKEND implementation / persisted workout-content editing boundary.
+
+Context:
+The unified active-plan lifecycle now has an accepted future workout-detail action contract:
+desktop top actions, narrow-screen `...` overflow, `Copy training`, `Delete training`, and
+`Edit training`, with no `Move training` on the workout-detail surface. `Edit training` must remain
+blocked until backend owns persisted workout-content editing for already-planned rows.
+
+Root cause and architecture fit:
+The visible symptom is missing `Edit training` on future workout detail. The underlying cause is not
+a frontend button gap; persisted workout-content editing lacks a backend-owned review/confirm seam.
+Reuse active-plan editability policy, protected-history checks, persisted workout reconstruction,
+manual workout draft review, and active-plan user-edit metadata before adding anything new.
+
+Scope:
+- Eligible future planned manual workout rows only.
+- Reconstruct the persisted row into the existing manual workout draft/constructor shape.
+- Review edited draft input server-side and issue token/checksum.
+- Confirm by rebuilding server-side and updating exactly the same `planned_workouts` row.
+- Persist `active_plan_user_edit_v1` metadata with `user_edited_workout` and
+  `trusted_client_rows: false`.
+- Keep frontend action-bar wiring, generated/selected/preset/imported edit expansion, recurrence,
+  Restore UI, active-plan replacement, fake pace, fake personal HR, and OpenAI mutation out of
+  scope.
+
+Validation:
+- Targeted ESLint for changed backend files.
+- Manual authoring validator with edit coverage.
+- Scoped `git diff --check`.
+- `npm run build` if runtime source changed.
+```
+
+## Product Direction Status
+
+Product direction / universal Add-Clear-Move editability accepted in proved scope; direct manual
+Copy/Paste and Move implemented and QA-passed in the manual scope; missed-unlogged manual
+move contract accepted for target today or valid future empty days; future workout-detail
+action/editing contract accepted
 
 Date: 2026-06-11
 
-Last Updated: 2026-06-12
+Last Updated: 2026-06-15
 
 Owner: PRODUCT
 
@@ -26,10 +98,20 @@ Current user-visible gap:
 
 - manual user-built plans have QA-passed Add activity, personal saved templates, Copy/Paste,
   Delete/Clear, Move Workout, and JSON/Markdown export
-- AI/generated, selected-distance, preset, and imported active plans can show workouts in the
-  calendar but do not expose the same basic future-workout controls
-- this was a valid safety guardrail while the manual builder was being proven, but it is not the
-  final product model
+- AI/generated, selected-distance, preset, and imported active plans now have proved
+  backend-shaped Add/Clear/Move editability in the accepted scope, but Copy/Paste, content editing,
+  recurrence, Restore UI, active-plan replacement semantics expansion, and broader source/row
+  matrices remain future-only
+- manual active-plan Copy/Paste and drag/drop Move are now QA-passed as direct backend mutations
+  with no separate runner-facing review/confirm step in the manual scope
+- the missed-unlogged manual move contract now explicitly allows an eligible missed workout from a
+  bounded recent past window, including yesterday, to move to today when it has no logged result,
+  provider evidence, comparison-backed state, or other protected history
+- the remaining risk is not a separate manual-vs-generated calendar product, but keeping the
+  accepted capability-driven lifecycle narrow and backend-owned while future operations are added
+- workout detail future actions now have a product contract: top action bar on desktop, `...`
+  overflow on narrow screens, no `Move training` on this surface, and no live `Edit training` until
+  backend persisted workout-content editing exists
 
 ## Product Principle
 
@@ -91,17 +173,170 @@ That should be a backend-shaped reason, not a frontend source-kind guess.
 | --- | --- | --- |
 | Add workout to empty future day | Runner authors or picks a reviewed workout/template, backend reviews, then inserts one row into the current active plan. | Universal target. Reuse manual authoring review for the new workout, but persist it as a user override inside the original active plan source. |
 | Delete/Clear future planned workout | Backend reviews the target persisted row, proves it is editable, then removes exactly that row and updates metadata. | Universal target. Preserve last-workout protection only if Product still wants to prevent empty active plans; otherwise require a separate empty-plan decision. |
-| Move workout to empty future day | Backend reviews source and target date-only truth, then updates the same planned workout row date/weekday/week metadata. | Universal target. Never implement as copy+delete or drag-only local state. |
-| Copy/Paste | Backend reconstructs a reviewed draft from a persisted source workout, then inserts reviewed copy to an eligible target day. | Universal after Add/Delete/Move. It is appropriate when source workout can be safely reconstructed into canonical workout authoring truth. |
-| Edit workout content | Runner changes workout structure/duration/segments/targets through a reviewed constructor. | Future-only. Needs a dedicated editor contract so frontend does not mutate rows/segments locally. |
+| Move workout to empty day | Backend validates source and target date-only truth, then updates the same planned workout row date/weekday/week metadata. | Implemented and QA-passed as a direct mutation for manual active plans. Future empty-day move remains allowed; bounded missed-unlogged manual sources may target today or a valid future empty day. Universal direct/generated behavior remains future-only. Never implement as copy+delete or drag-only local state. |
+| Copy/Paste | Backend reconstructs from a persisted source workout, validates supportability server-side, then inserts one copied row to an eligible target day. | Implemented and QA-passed as a direct mutation for manual active plans. Universal Copy/Paste remains future-only. |
+| Edit workout content | Runner changes workout structure/duration/segments/targets through a reviewed constructor. | Product contract accepted for future workout detail, backend seam not implemented yet. First backend scope should be eligible future manual rows only, using persisted-row reconstruction plus manual constructor review/confirm. |
 | Recurrence/batch expansion | Runner repeats a workout pattern across multiple dates. | Future-only. Requires batch conflict/protection review and must not be bundled into universal v1. |
+
+## Direct Manual Copy/Paste And Drag-Move Decision
+
+Date: 2026-06-13
+
+Status:
+
+Implemented / QA-passed / accepted in the manual scope.
+
+Decision:
+
+- For manual active-plan editing, Copy/Paste and drag/drop Move should become direct backend
+  mutations with no separate runner-facing review dialog or confirm step.
+- This is not a frontend shortcut. Backend still owns mutation safety, source/target validation,
+  protected-state checks, persisted reconstruction, metadata, and audit history.
+- This decision is manual-only first. Universal Copy/Paste and direct Move for generated, selected,
+  preset, imported, or AI-authored active plans require a separate accepted contract and proof.
+
+Direct copy contract:
+
+- Frontend stores only a transient copied source pointer.
+- Paste calls one backend direct copy mutation with `activePlanId`, `sourceWorkoutId`,
+  `sourceWorkoutDate`, and `targetDate`.
+- Backend re-resolves the active manual plan, verifies the source row is still on the source date,
+  reconstructs from persisted workout truth, reruns supported manual draft validation internally,
+  inserts one new row on the target date, updates metadata, and returns the refreshed mutation
+  result.
+- No client rows, segments, weekday labels, week numbers, metric targets, source metadata, or plan
+  metadata are trusted.
+
+Direct move contract:
+
+- Drag/drop and menu fallback call one backend direct move mutation with `activePlanId`,
+  `sourceWorkoutId`, `sourceWorkoutDate`, and `targetDate`.
+- Backend re-resolves the active manual plan, verifies the source row/date, verifies the target is
+  eligible and empty, updates exactly the existing `planned_workouts` row, preserves workout title,
+  identity, structure, and metric truth, updates metadata, and returns the refreshed mutation
+  result.
+- Future empty target dates stay valid. Target today is valid only for the missed-unlogged manual
+  contract below.
+- Move must never be implemented as copy+delete, optimistic-only local schedule state, or
+  frontend-provided row mutation.
+
+Missed-unlogged manual move contract:
+
+- Manual direct move may move a missed unlogged source workout to today or to a valid future empty
+  day.
+- Source date may be any date from seven calendar days before today through yesterday. This includes
+  the primary yesterday-to-today use case while keeping the window bounded.
+- Target date may be today or a future empty date inside the active plan. A target before today
+  remains blocked.
+- Target today and future empty targets are allowed only when the source workout is fully unlogged.
+- Fully unlogged means no workout log, provider evidence, comparison-backed state,
+  AI-insight/recommendation-backed state, protected history, unsafe metric truth, unreadable legacy
+  metadata, or unsupported source shape.
+- Target occupancy stays strict. Explicit Rest rows and any planned workout row are occupied; no
+  replace, swap, or rest-row overwrite is accepted in this slice.
+- Drag/drop and menu move must call the same backend rule and return the same bounded result shape.
+
+Direct mutation blocked states:
+
+- unauthenticated user
+- missing, inactive, archived, foreign-user, or active-plan-id-mismatched plan
+- non-`manual_user_built_plan_v1` active plan in this first direct slice
+- source row not found, no longer on `sourceWorkoutDate`, not in the active plan, or unsupported
+  for manual reconstruction
+- source row with logged results, provider evidence, comparison-backed state, protected history,
+  unsafe metric truth, unreadable legacy metadata, or unsupported rest/manual-template shape unless
+  a dedicated proof accepts it
+- target date is before today, before plan start, outside editable range, occupied, protected, or the
+  same as the source date
+- target date is today when the source is not a bounded missed-unlogged manual workout
+- source date is older than the bounded missed window when trying to move to today or to a future
+  empty day from the missed window
+- request carries client rows, segments, weekday labels, week numbers, metric targets, source
+  metadata, plan metadata, or other trusted payloads
+
+Audit metadata:
+
+- Preserve original active-plan `source_kind` and `source_status`.
+- Continue appending `active_plan_user_edit_v1` metadata.
+- Add `user_copied_workout` for direct copy and keep `user_moved_workout` for direct move.
+- Record `mutation_mode: direct_manual_edit`, direct mutation payload version, server-computed
+  mutation checksum, source workout id/date, target workout id or moved workout id, target date,
+  target weekday, template/workout source type, title, original plan source kind/status, and
+  `trusted_client_rows: false`.
+
+Frontend behavior:
+
+- No `Review paste`, `Review move`, review token, review checksum, or confirm modal in the direct
+  manual path.
+- Show working/success/blocked states from backend results.
+- Refresh the calendar from persisted truth after success or failure.
+- Do not add, duplicate, remove, or move rows locally as source of truth.
+
+Source-row affordance contract:
+
+- Direct copy, direct move, and drag initiation must be gated by row-level source capability truth,
+  not by plan-level editability alone.
+- `status === "skipped"` is not enough to decide eligibility because it can mean either an
+  auto-inferred missed unlogged workout or a persisted skipped result.
+- Persisted skipped/completed/partial results, provider evidence, comparison-backed state,
+  AI-insight/recommendation-backed protected state, unsafe metric truth, unreadable source metadata,
+  unsupported source shape, rest rows, inactive/archived/foreign-user plans, and protected history
+  must not expose active copy/move/drag affordances.
+- Recent missed-unlogged manual rows may expose move/drag for accepted target-today and
+  future-empty-day move targets. They do not become generally copyable/protected-history-free rows.
+- Ineligible source rows must not be draggable or set a drag payload. Copy/Move actions should be
+  hidden by default, or shown disabled with a clear explanation if the menu remains visible for other
+  actions.
+- Backend mutation checks remain the final safety net even after pre-interaction affordance gating
+  is improved.
+
+## Future Workout Detail Actions And Edit Contract
+
+Date: 2026-06-15
+
+Status:
+
+Accepted as product/architecture contract; not implemented.
+
+Decision:
+
+- Future planned workout detail actions move to the top of the detail page.
+- Desktop uses an inline Hito action bar.
+- Narrow/mobile uses a single `...` overflow menu.
+- `Move training` is intentionally absent from workout detail. Calendar remains the move surface.
+- The workout-detail action set is `Copy training`, `Delete training`, and `Edit training`.
+- `Edit training` must remain blocked or disabled until backend owns persisted workout-content
+  editing.
+
+Canonical edit seam:
+
+- First supported scope is eligible future planned manual workout rows that can reconstruct into the
+  existing manual workout constructor draft shape.
+- The edit surface should reuse the manual workout constructor/editor controls inside a
+  workout-detail-like page rhythm. Do not create a second persisted workout editor.
+- Backend must review and confirm edited workout content before persistence.
+- Confirm must update exactly the same `planned_workouts` row, preserve date-only truth, preserve
+  original active-plan source kind/status, and write `active_plan_user_edit_v1` metadata with
+  `user_edited_workout`.
+- Frontend must not send persisted rows, segments, weekday labels, metric targets, or source
+  metadata as mutation truth.
+
+Blocked in this contract:
+
+- today, past, logged, completed, partial, skipped-with-log, provider-evidence-backed,
+  comparison-backed, protected-history, rest, unsafe-metric, unreadable, or unsupported rows
+- generated/selected/preset/imported workout-content editing until a separate backend proof accepts
+  their reconstruction and semantics
+- moving from workout detail
+- recurrence, restore UI, active-plan replacement, fake pace, fake personal HR, and OpenAI-authored
+  mutation
 
 ### Protected States
 
 Universal editing must protect:
 
 - past days
-- today, unless Product explicitly accepts same-day editing for unlogged future execution
+- today, except for the accepted missed-unlogged manual move contract
 - logged workouts
 - provider-evidence-backed workouts
 - comparison-backed workouts
@@ -189,12 +424,14 @@ This should reuse existing canonical seams before adding anything new:
 
 ### Review / Confirm Boundary
 
-- Add, Delete/Clear, Move, Copy/Paste, and future Edit must use backend review/confirm when they
-  mutate persisted active-plan truth.
-- Review must rebuild or verify the current active plan server-side.
-- Confirm must rebuild/verify the review server-side and reject changed source, changed target,
-  stale checksum, invalid token, client row payloads, occupied target, protected rows, and active
-  plan changes.
+- Add, Delete/Clear, authored workout content changes, future Edit, recurrence, replacement, and
+  other risky/batch/destructive mutations still need backend review/confirm unless Product accepts a
+  narrower direct contract.
+- Manual Copy/Paste and manual drag/drop Move are the explicit direct-mutation exception selected on
+  2026-06-13.
+- Direct mutation must still rebuild or verify the current active plan server-side at mutation time.
+- Direct mutation must reject changed source, changed target, client row payloads, occupied target,
+  protected rows, and active-plan changes.
 - No local schedule truth and no optimistic-only persistence.
 
 ## Unified Flow
@@ -367,6 +604,20 @@ Backend implementation result — 2026-06-12:
   source metadata remains blocked, manual saved-plan behavior remains valid, and representative
   `plan_preset_v1` Add/Delete/Move review-confirm paths pass without rewriting the plan source.
 
+Frontend / QA acceptance result — 2026-06-12:
+
+- Saved calendar Add/Clear/Move controls are accepted as backend-shaped capability-driven behavior in
+  the proved scope.
+- Non-manual saved-plan mutation proof passed for the proved path, while preserving original
+  `source_kind` and writing `active_plan_user_edit_v1` audit metadata for user edits.
+- The manual Clear rerun passed after the persisted-workout reconstruction normalization fix:
+  `Review clear workout` rendered, Restore affordance data was present, confirm cleared the
+  persisted workout, fresh DB/browser readback proved the workout stayed removed, and disposable
+  cleanup returned manual and non-manual rows/users to zero or absent.
+- This acceptance does not ship universal Copy/Paste, recurrence, workout-content editing, Restore
+  UI, active-plan replacement semantics expansion, or a broad generated-row mutation matrix beyond
+  the already proved Add/Clear/Move slices.
+
 Scope for that gate:
 
 - define backend editability/capability metadata for the current active plan, dates, and workouts
@@ -384,9 +635,10 @@ Scope for that gate:
 
 ## What Must Not Be Claimed Yet
 
-- Do not claim the unified lifecycle is shipped.
-- Do not claim AI/generated, selected-distance, preset, refreshed, or imported active plans are
-  editable until backend and browser QA prove those paths.
+- Do not claim the whole unified lifecycle is complete; only Add/Clear/Move are accepted in the
+  proved scope.
+- Do not claim every AI/generated, selected-distance, preset, refreshed, or imported row/source
+  combination is editable; backend capability/protection reasons can still block specific cases.
 - Do not claim AI continuation is implemented.
 - Do not merge manual builder and AI authoring into one backend shortcut.
 - Do not let AI overwrite manual/protected calendar truth.

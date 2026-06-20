@@ -185,7 +185,6 @@ function AdminAnalyticsPage() {
             activeSection={activeTab}
             title={activeSection.label}
             description={ADMIN_SECTION_DESCRIPTIONS[activeTab]}
-            action={activeTab === "users" ? <DisabledAddUserAction /> : undefined}
           />
 
           <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
@@ -203,20 +202,6 @@ function AdminAnalyticsPage() {
         </section>
       </div>
     </main>
-  );
-}
-
-function DisabledAddUserAction() {
-  return (
-    <button
-      type="button"
-      className="hito-button hito-button-secondary hito-button-md"
-      disabled
-      title="Future-safe placeholder. User creation is not implemented in this admin slice."
-    >
-      <Icon name="plus" size="xs" />
-      Add user
-    </button>
   );
 }
 

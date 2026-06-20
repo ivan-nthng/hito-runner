@@ -229,7 +229,7 @@ export const DENSE_GRID_DAYS: Array<Partial<CalendarPlaygroundState> & { day: nu
   { day: 30, baseState: "workout", identity: "easy", result: "completed" },
   { day: 31, baseState: "rest" },
   { day: 1, baseState: "workout", identity: "long", feedback: "evidence_attached" },
-  { day: 2, baseState: "empty", action: "add-activity" },
+  { day: 2, baseState: "rest", action: "add-activity" },
   { day: 3, baseState: "workout", identity: "recovery", result: "partial" },
   { day: 4, baseState: "workout", identity: "steady" },
   { day: 5, baseState: "workout", identity: "tempo", action: "more-menu" },

@@ -38,6 +38,16 @@ detail, or route surfaces, using `skills/hito-frontend-design-system/SKILL.md` i
 Skipping the matching skill, skipping nearby-code inspection, or adding UI without checking Hito DS
 first makes the frontend pass invalid and it must be redone.
 
+## Subagent Expectations
+
+For frontend implementation, UI debugging, Hito DS preflight, route/component ownership scans,
+browser-adjacent source research, and non-mutating validation checks, follow the subagent delegation
+discipline in `AGENTS.md`: use read-only subagents for independent evidence and bounded workers only
+for disjoint write scopes, reuse open subagents for related follow-ups, close completed subagents,
+and integrate results yourself before final validation. Do not delegate fragile browser sessions,
+product mutation, or UI changes with overlapping write scopes unless the active plan explicitly
+allows that split.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

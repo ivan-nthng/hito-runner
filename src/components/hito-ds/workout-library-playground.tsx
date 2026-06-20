@@ -64,11 +64,11 @@ export function WorkoutLibraryPlayground() {
   return (
     <HitoDsPlayground
       id="workout-library-playground"
-      label="Workout library"
-      title="Workout library calendar and detail specimens."
-      body="Static Running Coach specimens for every canonical workout identity, rendered through shared calendar-day anatomy without real plans, provider rows, AI insight, or persistence."
+      label="Workout taxonomy appendix"
+      title="Canonical workout identities on shared primitives."
+      body="Static Running Coach matrix for every canonical workout identity. Calendar ownership stays with the shared calendar primitive specimen above."
       status={`${WORKOUT_LIBRARY_IDENTITY_COUNT} identities`}
-      statusTone="rollout"
+      statusTone="neutral"
       controls={<ControlsBody state={state} setField={setField} />}
       preview={
         <WorkoutLibraryPreview
@@ -82,7 +82,7 @@ export function WorkoutLibraryPlayground() {
       caption={[
         {
           label: "Proves",
-          body: "Calendar label, glyph, result marker, provider overlay, and detail readback for every canonical workout identity.",
+          body: "Workout identity labels, glyphs, result markers, provider overlays, and detail readback across the taxonomy.",
         },
         {
           label: "Does not imply",
@@ -90,7 +90,7 @@ export function WorkoutLibraryPlayground() {
         },
         {
           label: "Used in",
-          body: "Static /hitoDS review of workout-library visuals before product calendar/detail changes need real fixtures.",
+          body: "Static taxonomy review after the primary HitoCalendarDayCell / HitoWorkoutDayRow specimen.",
         },
       ]}
     />
@@ -161,13 +161,13 @@ function WorkoutLibraryPreview({
         <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
           <div className="min-w-0">
             <p className="hito-label">
-              {state.viewMode === "desktop" ? "Fake dense calendar" : "Fake mobile workout rows"}
+              {state.viewMode === "desktop" ? "Static identity grid" : "Static identity rows"}
             </p>
             <h3 className="hito-list-row-title mt-1">
               {specimens.length} of {WORKOUT_LIBRARY_IDENTITY_COUNT} identities visible
             </h3>
           </div>
-          <span className="hito-status-pill" data-tone="neutral" data-icon="false">
+          <span className="hito-status-pill" data-tone="neutral">
             Specimen only
           </span>
         </div>
@@ -377,7 +377,6 @@ function WorkoutDetailSpecimen({
         <span
           className="hito-status-pill"
           data-tone={provider.future ? "rollout" : providerAllowed ? "signal" : "muted"}
-          data-icon={provider.future ? "true" : "false"}
         >
           {provider.future ? <Icon name="sparkles" size="xs" decorative /> : null}
           {provider.future ? "Future specimen" : provider.label}
@@ -419,7 +418,7 @@ function WorkoutDetailSpecimen({
       <div className="border-b border-hairline py-4">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
           <p className="hito-label">Segments</p>
-          <span className="hito-status-pill" data-tone="muted" data-icon="false">
+          <span className="hito-status-pill" data-tone="muted">
             {state.detailDensity === "compact" ? "Compact" : "Full"}
           </span>
         </div>
@@ -430,7 +429,7 @@ function WorkoutDetailSpecimen({
                 key={`${specimen.identity}-${segment.code}-${segment.prescription}`}
                 className="hito-list-row items-start rounded-lg border-0 bg-foreground/[0.025] py-3"
               >
-                <span className="hito-status-pill shrink-0" data-tone="neutral" data-icon="false">
+                <span className="hito-status-pill shrink-0" data-tone="neutral">
                   {segment.code}
                 </span>
                 <div className="min-w-0 flex-1">

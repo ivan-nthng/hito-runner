@@ -122,7 +122,7 @@ Status:
 
 Relevant current dependency:
 
-- [docs/plans/active/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md)
+- [docs/tasks/backlog/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md)
 
 Status:
 - partial

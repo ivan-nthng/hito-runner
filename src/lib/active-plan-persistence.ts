@@ -31,6 +31,40 @@ export type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"
 
 type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
 
+export interface EmptyActivePlanCreationInput {
+  profile: RunnerProfileSummary;
+  profilePatch: StructuredFirstPlanProfilePatch | null;
+  title: string;
+  goalSummary: string;
+  sourceTemplate: string;
+  schemaVersion: string;
+  sourceKind: string;
+  startDate: string;
+  endDate: string;
+  targetDate: string | null;
+  goalMetadata: Json | null;
+  planPreferences: Json | null;
+  planMetadata?: AdditionalPlanPersistenceMetadata | null;
+}
+
+export type EmptyActivePlanCreationResult = PlanApplySuccessResult & {
+  planCycle: PersistedPlanCycleRow;
+  workouts: [];
+};
+
+type AssignedPlanCycleSeed = {
+  title: string;
+  goalSummary: string;
+  sourceTemplate: string;
+  schemaVersion: string;
+  sourceKind: string;
+  startDate: string;
+  endDate: string;
+  targetDate: string | null;
+  goalMetadata: Json | null;
+  planPreferences: Json | null;
+};
+
 export type ExistingPlanContext = {
   activePlan: PersistedPlanCycleRow | null;
   existingWorkouts: {
@@ -115,6 +149,37 @@ export async function createFirstPlanFromReviewedCanonicalPlanForUser(
   };
 }
 
+export async function createEmptyActivePlanForUser(
+  userId: string,
+  input: EmptyActivePlanCreationInput,
+): Promise<EmptyActivePlanCreationResult> {
+  const planContext = await getExistingPlanContext(userId);
+
+  if (planContext.activePlan) {
+    throw new Error("An empty active plan cannot be created while another active plan exists.");
+  }
+
+  await upsertRunnerProfile(userId, input.profile, input.profilePatch);
+  const planCycle = await createAssignedPlanCycle(
+    userId,
+    input,
+    "active",
+    input.planMetadata ?? null,
+  );
+
+  return {
+    ok: true,
+    status: "applied",
+    effectiveStartDate: input.startDate,
+    appliedStartDate: input.startDate,
+    normalizedFromStartDate: null,
+    firstDayResolution: null,
+    workoutCount: 0,
+    planCycle,
+    workouts: [],
+  };
+}
+
 export async function getActivePlan(userId: string) {
   const supabase = createAdminSupabaseClient();
   const existing = await supabase
@@ -140,25 +205,52 @@ export async function createAssignedPlanFromImportedSeed(
   planMetadata: AdditionalPlanPersistenceMetadata | null = null,
 ) {
   const supabase = createAdminSupabaseClient();
+  const planCycle = await createAssignedPlanCycle(userId, importedSeed, status, planMetadata);
+
+  const workoutInsert = await supabase
+    .from("planned_workouts")
+    .insert(buildPersistedWorkoutInsertRows(planCycle.id, userId, importedSeed.workouts))
+    .select("*");
+
+  if (workoutInsert.error) {
+    await rollbackInsertedPlan(planCycle.id);
+    throw new Error(workoutInsert.error.message);
+  }
+
+  if (!workoutInsert.data || workoutInsert.data.length !== importedSeed.workouts.length) {
+    await rollbackInsertedPlan(planCycle.id);
+    throw new Error("Planned workout persistence did not match the reviewed plan row count.");
+  }
+
+  return {
+    planCycle,
+    workouts: workoutInsert.data,
+  };
+}
+
+async function createAssignedPlanCycle(
+  userId: string,
+  seed: AssignedPlanCycleSeed,
+  status: PersistedPlanCycleRow["status"] = "active",
+  planMetadata: AdditionalPlanPersistenceMetadata | null = null,
+) {
+  const supabase = createAdminSupabaseClient();
   const planInsert = await supabase
     .from("plan_cycles")
     .insert({
       user_id: userId,
       status,
-      title: importedSeed.title,
-      goal_summary: importedSeed.goalSummary,
-      source_template: importedSeed.sourceTemplate,
-      schema_version: importedSeed.schemaVersion,
-      source_kind: importedSeed.sourceKind,
-      start_date: importedSeed.startDate,
-      end_date: importedSeed.endDate,
-      target_date: importedSeed.targetDate,
-      goal_metadata: mergePlanPersistenceMetadata(
-        importedSeed.goalMetadata,
-        planMetadata?.goalMetadata,
-      ),
+      title: seed.title,
+      goal_summary: seed.goalSummary,
+      source_template: seed.sourceTemplate,
+      schema_version: seed.schemaVersion,
+      source_kind: seed.sourceKind,
+      start_date: seed.startDate,
+      end_date: seed.endDate,
+      target_date: seed.targetDate,
+      goal_metadata: mergePlanPersistenceMetadata(seed.goalMetadata, planMetadata?.goalMetadata),
       plan_preferences: mergePlanPersistenceMetadata(
-        importedSeed.planPreferences,
+        seed.planPreferences,
         planMetadata?.planPreferences,
       ),
     })
@@ -169,25 +261,7 @@ export async function createAssignedPlanFromImportedSeed(
     throw new Error(planInsert.error.message);
   }
 
-  const workoutInsert = await supabase
-    .from("planned_workouts")
-    .insert(buildPersistedWorkoutInsertRows(planInsert.data.id, userId, importedSeed.workouts))
-    .select("*");
-
-  if (workoutInsert.error) {
-    await rollbackInsertedPlan(planInsert.data.id);
-    throw new Error(workoutInsert.error.message);
-  }
-
-  if (!workoutInsert.data || workoutInsert.data.length !== importedSeed.workouts.length) {
-    await rollbackInsertedPlan(planInsert.data.id);
-    throw new Error("Planned workout persistence did not match the reviewed plan row count.");
-  }
-
-  return {
-    planCycle: planInsert.data,
-    workouts: workoutInsert.data,
-  };
+  return planInsert.data;
 }
 
 async function replaceActivePlanWithImportedInput(

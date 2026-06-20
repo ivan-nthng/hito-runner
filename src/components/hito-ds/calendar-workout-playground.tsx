@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
-import { Icon } from "@/components/ui/icon";
 import { HitoCalendarDayCell, HitoWorkoutDayRow } from "@/components/ui/hito-calendar-day";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import {
@@ -14,13 +13,11 @@ import {
   ACTION_OPTIONS,
   BASE_STATE_OPTIONS,
   DEFAULT_PLAYGROUND_STATE,
-  DENSE_GRID_DAYS,
   DENSITY_OPTIONS,
   FEEDBACK_OPTIONS,
   OVERLAY_OPTIONS,
   RESULT_OPTIONS,
   TITLE_STRESS_OPTIONS,
-  VIEW_MODE_OPTIONS,
   WORKOUT_IDENTITIES,
   WORKOUT_IDENTITY_OPTIONS,
   getNonWorkoutTitle,
@@ -48,17 +45,18 @@ export function CalendarWorkoutPlayground() {
   return (
     <HitoDsPlayground
       id="calendar-workout-playground"
-      label="Calendar playground"
-      title="Calendar and workout-day states."
-      body="Static DS specimens for day cells, mobile rows, result markers, evidence markers, density, and visual-only authoring affordances."
-      status="Specimen only"
-      statusTone="rollout"
+      label="Calendar primitive"
+      title="Shared calendar-day cells and workout rows."
+      body="The primary calendar specimen renders the same HitoCalendarDayCell and HitoWorkoutDayRow primitives consumed by the product calendar."
+      status="Shared primitive"
+      statusTone="signal"
       controls={<ControlsBody state={state} setField={setField} />}
-      preview={<CalendarPreviewStage state={state} title={previewTitle} workout={workout} />}
+      demo={<CalendarDemoStage state={state} title={previewTitle} workout={workout} />}
+      variants={<CalendarVariantsStage state={state} title={previewTitle} workout={workout} />}
       caption={[
         {
           label: "Proves",
-          body: "Shared day-cell and mobile-row anatomy, marker hierarchy, density stress, and add/more affordance placement.",
+          body: "Shared product day-cell and mobile-row anatomy, marker hierarchy, density stress, and add/more affordance placement.",
         },
         {
           label: "Does not imply",
@@ -66,7 +64,7 @@ export function CalendarWorkoutPlayground() {
         },
         {
           label: "Used in",
-          body: "Static /hitoDS reference plus the shared visual seam consumed by the product calendar.",
+          body: "Static /hitoDS reference and the product calendar rendering seam.",
         },
       ]}
     />
@@ -83,66 +81,97 @@ function ControlsBody({
   ) => (value: CalendarPlaygroundState[Key]) => void;
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <ChoiceControl
-        label="Preview mode"
-        options={VIEW_MODE_OPTIONS}
-        value={state.viewMode}
-        onChange={setField("viewMode")}
-      />
-      <ChoiceControl
-        label="Base date state"
-        options={BASE_STATE_OPTIONS}
-        value={state.baseState}
-        onChange={setField("baseState")}
-      />
-      <ChoiceControl
-        label="Interaction overlay"
-        options={OVERLAY_OPTIONS}
-        value={state.overlay}
-        onChange={setField("overlay")}
-      />
-      <ChoiceControl
-        label="Result marker"
-        options={RESULT_OPTIONS}
-        value={state.result}
-        onChange={setField("result")}
-      />
-      <ChoiceControl
-        label="Feedback marker"
-        options={FEEDBACK_OPTIONS}
-        value={state.feedback}
-        onChange={setField("feedback")}
-      />
-      <SelectControl
-        label="Workout identity"
-        options={WORKOUT_IDENTITY_OPTIONS}
-        value={state.identity}
-        onChange={setField("identity")}
-      />
-      <ChoiceControl
-        label="Title stress"
-        options={TITLE_STRESS_OPTIONS}
-        value={state.titleStress}
-        onChange={setField("titleStress")}
-      />
-      <ChoiceControl
-        label="Density"
-        options={DENSITY_OPTIONS}
-        value={state.density}
-        onChange={setField("density")}
-      />
-      <SelectControl
-        label="Future action affordance"
-        options={ACTION_OPTIONS}
-        value={state.action}
-        onChange={setField("action")}
-      />
+    <div className="grid gap-5">
+      <ControlGroup
+        body="Pick the day state and overlay that both desktop and row specimens should mirror."
+        title="Specimen state"
+      >
+        <ChoiceControl
+          label="Base date state"
+          options={BASE_STATE_OPTIONS}
+          value={state.baseState}
+          onChange={setField("baseState")}
+        />
+        <ChoiceControl
+          label="Interaction overlay"
+          options={OVERLAY_OPTIONS}
+          value={state.overlay}
+          onChange={setField("overlay")}
+        />
+      </ControlGroup>
+
+      <ControlGroup body="Show only the markers that the shared primitive owns." title="Markers">
+        <ChoiceControl
+          label="Result marker"
+          options={RESULT_OPTIONS}
+          value={state.result}
+          onChange={setField("result")}
+        />
+        <ChoiceControl
+          label="Feedback marker"
+          options={FEEDBACK_OPTIONS}
+          value={state.feedback}
+          onChange={setField("feedback")}
+        />
+      </ControlGroup>
+
+      <ControlGroup body="Stress content without inventing calendar behavior." title="Content">
+        <SelectControl
+          label="Workout identity"
+          options={WORKOUT_IDENTITY_OPTIONS}
+          value={state.identity}
+          onChange={setField("identity")}
+        />
+        <ChoiceControl
+          label="Title stress"
+          options={TITLE_STRESS_OPTIONS}
+          value={state.titleStress}
+          onChange={setField("titleStress")}
+        />
+      </ControlGroup>
+
+      <ControlGroup
+        body="Action and density mirror the shared day-cell contract, not product mutation truth."
+        title="Behavior"
+      >
+        <ChoiceControl
+          label="Density"
+          options={DENSITY_OPTIONS}
+          value={state.density}
+          onChange={setField("density")}
+        />
+        <SelectControl
+          label="Future action"
+          options={ACTION_OPTIONS}
+          value={state.action}
+          onChange={setField("action")}
+        />
+      </ControlGroup>
     </div>
   );
 }
 
-function CalendarPreviewStage({
+function ControlGroup({
+  body,
+  children,
+  title,
+}: {
+  body: string;
+  children: ReactNode;
+  title: string;
+}) {
+  return (
+    <div className="grid gap-3">
+      <div>
+        <p className="hito-form-label">{title}</p>
+        <p className="hito-caption mt-1">{body}</p>
+      </div>
+      <div className="grid gap-3">{children}</div>
+    </div>
+  );
+}
+
+function CalendarDemoStage({
   state,
   title,
   workout,
@@ -151,294 +180,255 @@ function CalendarPreviewStage({
   title: string;
   workout: WorkoutIdentity;
 }) {
+  const titleForState = getNonWorkoutAwareTitle(state, workout, title);
+  const supportCopy = getSpecimenSupportCopy(state);
+  const action = getActionVisual(state);
+
   return (
-    <div className="min-w-0">
+    <div className="grid min-w-0 gap-5">
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
         <div className="min-w-0">
-          <p className="hito-label">
-            {state.viewMode === "desktop" ? "Desktop preview" : "Mobile preview"}
+          <p className="hito-label">Demo</p>
+          <h3 className="hito-list-row-title mt-1">Product day and row primitives together</h3>
+          <p className="hito-caption mt-1 max-w-2xl">
+            One desktop day cell and one mobile row reflect the same controlled state. This keeps
+            the specimen close to product rhythm without pretending to be a full calendar route.
           </p>
-          <h3 className="hito-list-row-title mt-1">
-            {state.density === "dense" ? "Density stress" : "Controlled day state"}
-          </h3>
         </div>
-        <span className="hito-status-pill" data-tone="neutral" data-icon="false">
+        <span className="hito-status-pill" data-tone="neutral">
           Static display only
         </span>
       </div>
 
-      <div className="mt-4 min-w-0">
-        {state.viewMode === "desktop" ? (
-          <DesktopCalendarPreview state={state} title={title} workout={workout} />
-        ) : (
-          <MobileCalendarPreview state={state} title={title} workout={workout} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DesktopCalendarPreview({
-  state,
-  title,
-  workout,
-}: {
-  state: CalendarPlaygroundState;
-  title: string;
-  workout: WorkoutIdentity;
-}) {
-  const days = state.density === "dense" ? DENSE_GRID_DAYS : buildDesktopPreviewDays();
-
-  return (
-    <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
-      <div className="hito-calendar-grid-seven">
-        <div
-          className={
-            state.density === "dense"
-              ? "hito-calendar-grid hito-calendar-grid-month hito-calendar-grid-month-dense"
-              : "hito-calendar-grid hito-calendar-grid-month"
-          }
-        >
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((weekday) => (
-            <span key={weekday} className="hito-calendar-grid-heading hito-micro-label">
-              {weekday}
-            </span>
-          ))}
-          {days.map((dayState, index) => {
-            const mergedState =
-              state.density === "dense"
-                ? buildDenseGridState(dayState, index, state)
-                : buildDesktopGridState(dayState, state);
-            const mergedWorkout =
-              index === 3 && state.density !== "dense"
-                ? workout
-                : WORKOUT_IDENTITIES[mergedState.identity];
-
-            return (
-              <HitoCalendarDayCell
-                key={`${dayState.day}-${index}`}
-                ariaLabel={`Calendar specimen day ${dayState.day}`}
-                action={getActionVisual(mergedState)}
-                day={String(dayState.day)}
-                dense={state.density === "dense"}
-                feedback={mergedState.feedback}
-                muted={mergedState.baseState === "outside-month"}
-                interactive={mergedState.baseState !== "outside-month"}
-                focused={mergedState.overlay === "focused"}
-                selected={mergedState.overlay === "selected"}
-                state={mergedState.baseState}
-                today={mergedState.overlay === "today"}
-                result={mergedState.result}
-                title={
-                  index === 3 && state.density !== "dense"
-                    ? title
-                    : getWorkoutTitle(mergedWorkout, "short")
-                }
-                workout={mergedWorkout}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="hito-calendar-grid-list p-3">
-        {days.map((dayState, index) => {
-          const mergedState =
-            state.density === "dense"
-              ? buildDenseGridState(dayState, index, state)
-              : buildDesktopGridState(dayState, state);
-          const mergedWorkout =
-            index === 3 && state.density !== "dense"
-              ? workout
-              : WORKOUT_IDENTITIES[mergedState.identity];
-
-          return (
-            <HitoWorkoutDayRow
-              key={`${dayState.day}-${index}`}
-              action={getActionVisual(mergedState)}
-              date={{ day: String(dayState.day).padStart(2, "0") }}
-              feedback={mergedState.feedback}
-              focused={mergedState.overlay === "focused"}
-              muted={mergedState.baseState === "outside-month"}
-              selected={mergedState.overlay === "selected"}
-              state={mergedState.baseState}
-              today={mergedState.overlay === "today"}
-              result={mergedState.result}
-              title={getNonWorkoutAwareTitle(mergedState, mergedWorkout)}
-              workout={mergedWorkout}
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)]">
+        <div className="grid min-w-0 content-start gap-2">
+          <p className="hito-label text-muted-foreground">Desktop day cell</p>
+          <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
+            <HitoCalendarDayCell
+              action={action}
+              ariaLabel="Calendar specimen desktop day"
+              className="border-0"
+              day="18"
+              dense={state.density === "dense"}
+              feedback={state.feedback}
+              focused={state.overlay === "focused"}
+              interactive={state.baseState !== "outside-month"}
+              muted={state.baseState === "outside-month"}
+              result={state.result}
+              selected={state.overlay === "selected"}
+              state={state.baseState}
+              stateLabel={state.baseState === "empty" ? "Empty day" : undefined}
+              supportingText={supportCopy}
+              title={titleForState}
+              today={state.overlay === "today"}
+              weekday="Thu"
+              workout={workout}
             />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function MobileCalendarPreview({
-  state,
-  title,
-  workout,
-}: {
-  state: CalendarPlaygroundState;
-  title: string;
-  workout: WorkoutIdentity;
-}) {
-  const rows =
-    state.density === "dense"
-      ? DENSE_GRID_DAYS
-      : [
-          { day: 17, baseState: "rest" as const },
-          { day: 18 },
-          { day: 19, baseState: "empty" as const, action: "add-activity" as const },
-        ];
-
-  return (
-    <div className="grid min-w-0 gap-2">
-      {state.density === "dense" ? (
-        <div className="hito-calendar-mobile-row">
-          <span className="hito-calendar-mobile-date">
-            <span>Jun</span>
-            <strong>1-7</strong>
-            <span>Week</span>
-          </span>
-          <div className="min-w-0">
-            <p className="hito-label text-muted-foreground">Mobile density stress</p>
-            <p className="hito-list-row-copy">Rows stay stacked instead of forcing a tiny grid.</p>
           </div>
         </div>
-      ) : null}
-      {rows.map((dayState, index) => {
-        const mergedState =
-          state.density === "dense"
-            ? buildDenseGridState(dayState, index, state)
-            : buildMobilePreviewState(dayState, index, state);
-        const mergedWorkout =
-          index === 1 && state.density !== "dense"
-            ? workout
-            : WORKOUT_IDENTITIES[mergedState.identity];
 
-        return (
+        <div className="grid min-w-0 content-start gap-2">
+          <p className="hito-label text-muted-foreground">Workout day row</p>
           <HitoWorkoutDayRow
-            key={`${dayState.day}-${index}`}
-            ariaLabel={`Mobile calendar specimen row for Jun ${dayState.day}`}
-            action={getActionVisual(mergedState)}
-            date={{
-              eyebrow: "Jun",
-              day: String(dayState.day),
-              meta: index === 1 && state.density !== "dense" ? "Thu" : undefined,
-            }}
-            feedback={mergedState.feedback}
-            interactive={mergedState.baseState !== "outside-month"}
-            focused={mergedState.overlay === "focused"}
-            muted={mergedState.baseState === "outside-month"}
-            selected={mergedState.overlay === "selected"}
-            state={mergedState.baseState}
-            today={mergedState.overlay === "today"}
-            result={mergedState.result}
-            title={
-              index === 1 && state.density !== "dense"
-                ? title
-                : getWorkoutTitle(mergedWorkout, "short")
-            }
-            workout={mergedWorkout}
+            action={action}
+            ariaLabel="Calendar specimen mobile row"
+            date={{ eyebrow: "Jun", day: "18", meta: "Thu" }}
+            feedback={state.feedback}
+            focused={state.overlay === "focused"}
+            interactive={state.baseState !== "outside-month"}
+            muted={state.baseState === "outside-month"}
+            result={state.result}
+            selected={state.overlay === "selected"}
+            state={state.baseState}
+            stateLabel={state.baseState === "empty" ? "Empty day" : undefined}
+            supportingText={supportCopy}
+            title={titleForState}
+            today={state.overlay === "today"}
+            workout={workout}
           />
-        );
-      })}
+        </div>
+      </div>
+
+      <div className="hito-row-group border-0">
+        <AnatomyRow label="Desktop" body="HitoCalendarDayCell" />
+        <AnatomyRow label="Mobile" body="HitoWorkoutDayRow" />
+        <AnatomyRow label="Source" body="Product calendar rendering seam" />
+      </div>
     </div>
   );
 }
 
-function buildDesktopPreviewDays() {
+function CalendarVariantsStage({
+  state,
+  title,
+  workout,
+}: {
+  state: CalendarPlaygroundState;
+  title: string;
+  workout: WorkoutIdentity;
+}) {
+  const variants = buildCalendarVariants(state, workout, title);
+
+  return (
+    <div className="grid min-w-0 gap-5">
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
+        <div className="min-w-0">
+          <p className="hito-label">Variants</p>
+          <h3 className="hito-list-row-title mt-1">Calendar primitive state coverage</h3>
+          <p className="hito-caption mt-1 max-w-2xl">
+            A compact state matrix for the shared day and row primitives. These are specimens, not a
+            replacement for the product calendar route.
+          </p>
+        </div>
+        <span className="hito-status-pill" data-tone="neutral">
+          State coverage
+        </span>
+      </div>
+
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {variants.map((variant) => (
+          <div key={variant.label} className="grid min-w-0 content-start gap-2">
+            <p className="hito-label text-muted-foreground">{variant.label}</p>
+            <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
+              <HitoCalendarDayCell
+                action={getActionVisual(variant.state)}
+                ariaLabel={`Calendar variant ${variant.label}`}
+                className="border-0"
+                day={variant.day}
+                dense={variant.state.density === "dense"}
+                feedback={variant.state.feedback}
+                focused={variant.state.overlay === "focused"}
+                interactive={variant.state.baseState !== "outside-month"}
+                muted={variant.state.baseState === "outside-month"}
+                result={variant.state.result}
+                selected={variant.state.overlay === "selected"}
+                state={variant.state.baseState}
+                stateLabel={variant.state.baseState === "empty" ? "Empty day" : undefined}
+                supportingText={getSpecimenSupportCopy(variant.state)}
+                title={getNonWorkoutAwareTitle(variant.state, variant.workout, variant.title)}
+                today={variant.state.overlay === "today"}
+                workout={variant.workout}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid min-w-0 gap-2">
+        {variants.slice(0, 3).map((variant) => (
+          <HitoWorkoutDayRow
+            key={`${variant.label}-row`}
+            action={getActionVisual(variant.state)}
+            ariaLabel={`Calendar row variant ${variant.label}`}
+            date={{ eyebrow: "Jun", day: variant.day, meta: variant.weekday }}
+            feedback={variant.state.feedback}
+            focused={variant.state.overlay === "focused"}
+            interactive={variant.state.baseState !== "outside-month"}
+            muted={variant.state.baseState === "outside-month"}
+            result={variant.state.result}
+            selected={variant.state.overlay === "selected"}
+            state={variant.state.baseState}
+            stateLabel={variant.state.baseState === "empty" ? "Empty day" : undefined}
+            supportingText={getSpecimenSupportCopy(variant.state)}
+            title={getNonWorkoutAwareTitle(variant.state, variant.workout, variant.title)}
+            today={variant.state.overlay === "today"}
+            workout={variant.workout}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type CalendarVariant = {
+  day: string;
+  label: string;
+  state: CalendarPlaygroundState;
+  title: string;
+  weekday: string;
+  workout: WorkoutIdentity;
+};
+
+function buildCalendarVariants(
+  state: CalendarPlaygroundState,
+  workout: WorkoutIdentity,
+  title: string,
+): CalendarVariant[] {
+  const base: CalendarPlaygroundState = {
+    ...DEFAULT_PLAYGROUND_STATE,
+    viewMode: "desktop",
+    titleStress: "short",
+    density: state.density,
+    result: "none",
+    feedback: "none",
+    overlay: "none",
+    action: "none",
+  };
+
   return [
-    { day: 15, baseState: "outside-month" as const },
-    { day: 16, baseState: "workout" as const, identity: "recovery" as const },
-    { day: 17, baseState: "rest" as const },
-    { day: 18 },
-    { day: 19, baseState: "empty" as const, action: "add-activity" as const },
-    { day: 20, baseState: "workout" as const, identity: "long" as const },
-    { day: 21, baseState: "outside-month" as const },
+    {
+      day: "18",
+      label: "Selected workout",
+      state: { ...state, action: resolveSpecimenAction(state.baseState, state.action) },
+      title,
+      weekday: "Thu",
+      workout,
+    },
+    {
+      day: "19",
+      label: "Rest with Add",
+      state: { ...base, baseState: "rest", action: "add-activity" },
+      title: "Rest day",
+      weekday: "Fri",
+      workout: WORKOUT_IDENTITIES.recovery,
+    },
+    {
+      day: "20",
+      label: "Completed long",
+      state: {
+        ...base,
+        baseState: "workout",
+        feedback: "evidence_attached",
+        identity: "long",
+        result: "completed",
+      },
+      title: getWorkoutTitle(WORKOUT_IDENTITIES.long, "short"),
+      weekday: "Sat",
+      workout: WORKOUT_IDENTITIES.long,
+    },
+    {
+      day: "21",
+      label: "More actions",
+      state: { ...base, baseState: "workout", action: "more-menu", identity: "tempo" },
+      title: getWorkoutTitle(WORKOUT_IDENTITIES.tempo, "short"),
+      weekday: "Sun",
+      workout: WORKOUT_IDENTITIES.tempo,
+    },
   ];
 }
 
-function buildDesktopGridState(
-  dayState: Partial<CalendarPlaygroundState> & { day: number },
-  state: CalendarPlaygroundState,
-): CalendarPlaygroundState {
-  if (dayState.day === 18) {
-    return state;
+function getSpecimenSupportCopy(state: CalendarPlaygroundState) {
+  if (state.baseState === "workout") {
+    if (state.feedback === "feedback_ready") return "Feedback ready";
+    if (state.feedback === "evidence_attached") return "Evidence attached";
+    if (state.result === "completed") return "Completed from persisted truth";
+    if (state.result === "partial") return "Partially completed";
+    if (state.result === "skipped") return "Skipped";
+    return "Planned workout";
   }
 
-  const mergedState: CalendarPlaygroundState = {
-    ...DEFAULT_PLAYGROUND_STATE,
-    viewMode: state.viewMode,
-    overlay: "none",
-    result: "none",
-    feedback: "none",
-    action: "none",
-    titleStress: "short",
-    density: "normal",
-    ...dayState,
-  };
-
-  return {
-    ...mergedState,
-    action: resolveSpecimenAction(mergedState.baseState, state.action, dayState.action),
-  };
+  if (state.baseState === "rest") return "Calm editable rest state";
+  if (state.baseState === "empty") return "Empty authorable day";
+  return "Outside the current month";
 }
 
-function buildMobilePreviewState(
-  dayState: Partial<CalendarPlaygroundState> & { day: number },
-  index: number,
-  state: CalendarPlaygroundState,
-): CalendarPlaygroundState {
-  if (index === 1) return state;
-
-  const mergedState: CalendarPlaygroundState = {
-    ...DEFAULT_PLAYGROUND_STATE,
-    viewMode: state.viewMode,
-    overlay: "none",
-    result: "none",
-    feedback: "none",
-    action: "none",
-    titleStress: "short",
-    density: "normal",
-    ...dayState,
-  };
-
-  return {
-    ...mergedState,
-    action: resolveSpecimenAction(mergedState.baseState, state.action, dayState.action),
-  };
-}
-
-function buildDenseGridState(
-  dayState: Partial<CalendarPlaygroundState>,
-  index: number,
-  state: CalendarPlaygroundState,
-): CalendarPlaygroundState {
-  if (index === 9) {
-    return {
-      ...state,
-      density: "dense",
-    };
-  }
-
-  const mergedState: CalendarPlaygroundState = {
-    ...DEFAULT_PLAYGROUND_STATE,
-    viewMode: state.viewMode,
-    overlay: "none",
-    result: "none",
-    feedback: "none",
-    action: "none",
-    titleStress: "short",
-    density: "dense",
-    ...dayState,
-  };
-
-  return {
-    ...mergedState,
-    action: resolveSpecimenAction(mergedState.baseState, state.action, dayState.action),
-  };
+function AnatomyRow({ body, label }: { body: string; label: string }) {
+  return (
+    <div className="hito-list-row py-3">
+      <span className="hito-list-row-title">{label}</span>
+      <code className="hito-technical-mono text-xs text-muted-foreground">{body}</code>
+    </div>
+  );
 }
 
 function resolveSpecimenAction(
@@ -452,16 +442,20 @@ function resolveSpecimenAction(
     return "more-menu";
   }
 
-  if (requestedAction === "add-activity" && baseState === "empty") {
+  if (requestedAction === "add-activity" && (baseState === "empty" || baseState === "rest")) {
     return "add-activity";
   }
 
   return "none";
 }
 
-function getNonWorkoutAwareTitle(state: CalendarPlaygroundState, workout: WorkoutIdentity) {
+function getNonWorkoutAwareTitle(
+  state: CalendarPlaygroundState,
+  workout: WorkoutIdentity,
+  workoutTitle = getWorkoutTitle(workout, "short"),
+) {
   if (state.baseState === "workout") {
-    return getWorkoutTitle(workout, "short");
+    return workoutTitle;
   }
 
   return getNonWorkoutTitle(state.baseState);
@@ -474,8 +468,9 @@ function getActionVisual(state: CalendarPlaygroundState) {
     return {
       label: "Add",
       icon: "plus",
+      trailingIcon: "chevron-down",
       button: "secondary",
-      disabled: state.baseState !== "empty",
+      disabled: state.baseState !== "empty" && state.baseState !== "rest",
       ariaLabel: "Add activity placeholder",
     };
   }

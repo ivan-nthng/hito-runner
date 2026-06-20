@@ -7,9 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Icon } from "@/components/ui/icon";
+import {
+  HitoCalendarDayCell,
+  type HitoCalendarWorkoutIdentity,
+} from "@/components/ui/hito-calendar-day";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import type {
   RunningPlanRange,
@@ -19,7 +21,7 @@ import type {
 import type {
   RunningPlanConfirmActionResult,
   RunningPlanPreviewActionResult,
-} from "@/lib/training-api";
+} from "@/lib/running-plan-engine-actions";
 
 type SelectedRunningPlanPreviewResult = RunningPlanPreviewActionResult;
 type SelectedRunningPlanPreviewDraft = Extract<
@@ -76,7 +78,7 @@ export function SelectedRunningPlanPreviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="hito-dialog-stable hito-product-dialog h-[min(48rem,calc(100dvh-2rem))] max-w-5xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
-        overlayClassName="hito-product-dialog-overlay"
+        overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
           <div className="min-w-0">
@@ -296,6 +298,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
               label="Rhythm"
               value={`${draft.normalizedInputSummary.daysPerWeek} runs/week`}
             />
+            <PreviewFact label="Metric truth" value={metricTruthReadback(draft)} />
             <PreviewFact label="Start date" value={draft.normalizedInputSummary.startDate} />
             <PreviewFact
               label="Fixed rest"
@@ -364,13 +367,57 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
                 <div key={weekNumber} className="hito-selected-plan-calendar-week">
                   <p className="hito-label">Week {weekNumber}</p>
                   <div className="hito-selected-plan-calendar-week-grid">
-                    {rows.map((row) => (
-                      <PreviewCalendarCell
-                        key={row.rowId}
-                        row={row}
-                        onPreview={setActiveCalendarRowId}
-                      />
-                    ))}
+                    {rows.map((row) => {
+                      const meta = workoutKindMeta(row.workoutDayKind);
+                      const tone = calendarTone(row);
+                      const endpoint = calendarEndpointReadback(row);
+                      const day = formatCalendarDayNumber(row.date);
+                      const selected = row.rowId === activeCalendarRowId;
+                      const ariaLabel = [
+                        `${row.date} ${row.weekday}`,
+                        meta.label,
+                        row.title,
+                        endpoint,
+                      ]
+                        .filter(Boolean)
+                        .join(". ");
+                      const presentation = buildPreviewCalendarDayPresentation(row);
+
+                      return (
+                        <Tooltip key={row.rowId}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="block aspect-square min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal/30"
+                              data-preview-tone={tone}
+                              aria-label={ariaLabel}
+                              aria-pressed={selected}
+                              onClick={() => setActiveCalendarRowId(row.rowId)}
+                              onFocus={() => setActiveCalendarRowId(row.rowId)}
+                              onMouseEnter={() => setActiveCalendarRowId(row.rowId)}
+                            >
+                              <HitoCalendarDayCell
+                                {...presentation}
+                                className="h-full rounded-md border border-hairline p-1"
+                                day={day}
+                                dense
+                                interactive
+                                selected={selected}
+                              />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="hito-tooltip max-w-80" sideOffset={8}>
+                            <span className="hito-tooltip-meta block">
+                              {row.date} · {row.weekday} · {meta.label}
+                            </span>
+                            <span className="hito-tooltip-title mt-1 block">{row.title}</span>
+                            {endpoint ? (
+                              <span className="hito-tooltip-meta mt-1 block">{endpoint}</span>
+                            ) : null}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -634,6 +681,14 @@ function PreviewFact({ label, value }: { label: string; value: string }) {
   );
 }
 
+function metricTruthReadback(draft: SelectedRunningPlanPreviewDraft) {
+  const benchmarkPaceTruth = draft.normalizedInputSummary.benchmarkPaceTruth;
+
+  return benchmarkPaceTruth
+    ? `${benchmarkPaceTruth.label} · personal HR targets blocked`
+    : "No benchmark pace supplied · structure-only targets";
+}
+
 function groupRowsByWeek(rows: readonly SelectedRunningPlanCalendarRow[]) {
   const grouped = new Map<number, SelectedRunningPlanCalendarRow[]>();
 
@@ -729,56 +784,53 @@ function PreviewCalendarDetail({ row }: { row: SelectedRunningPlanCalendarRow })
   );
 }
 
-function PreviewCalendarCell({
-  onPreview,
-  row,
-}: {
-  onPreview: (rowId: string) => void;
-  row: SelectedRunningPlanCalendarRow;
-}) {
+function buildPreviewCalendarDayPresentation(row: SelectedRunningPlanCalendarRow): {
+  result: "none" | "planned";
+  state: "workout" | "rest";
+  supportingText?: string | null;
+  title?: string;
+  workout: HitoCalendarWorkoutIdentity;
+} {
+  return {
+    result: row.isRestDay ? "none" : "planned",
+    state: row.isRestDay ? "rest" : "workout",
+    supportingText: calendarEndpointReadback(row),
+    title: row.isRestDay ? undefined : row.title,
+    workout: previewCalendarWorkoutIdentity(row),
+  };
+}
+
+function previewCalendarWorkoutIdentity(
+  row: SelectedRunningPlanCalendarRow,
+): HitoCalendarWorkoutIdentity {
   const meta = workoutKindMeta(row.workoutDayKind);
   const tone = calendarTone(row);
-  const endpoint = calendarEndpointReadback(row);
-  const finalSelectedDistance = isFinalSelectedDistanceRow(row);
-  const day = String(new Date(`${row.date}T00:00:00`).getDate());
-  const ariaLabel = [`${row.date} ${row.weekday}`, meta.label, row.title, endpoint]
-    .filter(Boolean)
-    .join(". ");
 
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="hito-selected-plan-calendar-cell"
-          data-preview-tone={tone}
-          aria-label={ariaLabel}
-          onClick={() => onPreview(row.rowId)}
-          onFocus={() => onPreview(row.rowId)}
-          onMouseEnter={() => onPreview(row.rowId)}
-        >
-          <span className="hito-selected-plan-calendar-cell-day">{day}</span>
-          {tone === "final" && finalSelectedDistance ? (
-            <Icon name="trophy" size="xs" className="hito-selected-plan-calendar-cell-trophy" />
-          ) : (
-            <WorkoutGlyph kind={meta.glyph} className="hito-selected-plan-calendar-cell-glyph" />
-          )}
-          {tone === "final" ? (
-            <span className="hito-selected-plan-calendar-cell-endpoint">
-              {calendarEndpointShortLabel(row)}
-            </span>
-          ) : null}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent className="hito-tooltip max-w-80" sideOffset={8}>
-        <span className="hito-tooltip-meta block">
-          {row.date} · {row.weekday} · {meta.label}
-        </span>
-        <span className="hito-tooltip-title mt-1 block">{row.title}</span>
-        {endpoint ? <span className="hito-tooltip-meta mt-1 block">{endpoint}</span> : null}
-      </TooltipContent>
-    </Tooltip>
-  );
+  return {
+    color: previewCalendarToneColor(tone),
+    glyph: meta.glyph,
+    label: meta.label,
+    short: tone === "final" ? calendarEndpointShortLabel(row) : meta.short,
+  };
+}
+
+function previewCalendarToneColor(tone: PreviewCalendarTone) {
+  const colors: Record<PreviewCalendarTone, string> = {
+    easy: "var(--easy)",
+    final: "var(--orange-500)",
+    hills: "color-mix(in oklch, var(--success) 68%, var(--easy))",
+    intervals: "var(--warn)",
+    long: "var(--long)",
+    rest: "var(--rest)",
+    strides: "var(--success)",
+    tempo: "var(--quality)",
+  };
+
+  return colors[tone];
+}
+
+function formatCalendarDayNumber(date: string) {
+  return date.slice(8).replace(/^0/, "");
 }
 
 function calendarTone(row: SelectedRunningPlanCalendarRow): PreviewCalendarTone {
@@ -819,12 +871,6 @@ function calendarTone(row: SelectedRunningPlanCalendarRow): PreviewCalendarTone 
   }
 
   return "tempo";
-}
-
-function isFinalSelectedDistanceRow(row: SelectedRunningPlanCalendarRow) {
-  return (
-    Boolean(row.endpointDistanceMeters) || row.workoutDayKind === "final_selected_distance_day"
-  );
 }
 
 function calendarEndpointShortLabel(row: SelectedRunningPlanCalendarRow) {

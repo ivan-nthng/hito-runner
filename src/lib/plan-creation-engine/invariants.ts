@@ -128,13 +128,7 @@ function validateBuilderInputContract(model: RunningPlanEngineSourceModel, issue
   const deliberatelyAbsentFields = model.builderInputContract.deliberatelyAbsentFields.map(
     (field) => field.field,
   );
-  const requiredAbsentFields = [
-    "watchAccess",
-    "noWatchOrNoApp",
-    "recent5kBenchmark",
-    "targetTime",
-    "personalHrZones",
-  ];
+  const requiredAbsentFields = ["watchAccess", "noWatchOrNoApp", "targetTime", "personalHrZones"];
 
   for (const absentField of requiredAbsentFields) {
     if (!deliberatelyAbsentFields.includes(absentField)) {

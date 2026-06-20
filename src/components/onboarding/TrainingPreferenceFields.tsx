@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   FITNESS_LEVEL_OPTIONS,
   WEEKDAY_OPTIONS,
+  isRecent5kPaceInAcceptedRange,
   isRecent5kTimeInAcceptedRange,
   type WeekdayName,
 } from "./onboarding-form-model";
@@ -24,6 +25,8 @@ interface TrainingPreferenceFieldsProps {
   onFitnessLevelChange?: (value: RunnerFitnessLevel) => void;
   recent5kTime?: string;
   onRecent5kTimeChange?: (value: string) => void;
+  recent5kPace?: string;
+  onRecent5kPaceChange?: (value: string) => void;
   showFitnessBenchmark?: boolean;
   fixedRestDaysHelper?: string;
   maxRunningDaysHelper?: string;
@@ -45,6 +48,8 @@ export function TrainingPreferenceFields({
   onFitnessLevelChange,
   recent5kTime = "",
   onRecent5kTimeChange,
+  recent5kPace = "",
+  onRecent5kPaceChange,
   showFitnessBenchmark = false,
   fixedRestDaysHelper,
   maxRunningDaysHelper,
@@ -213,7 +218,11 @@ export function TrainingPreferenceFields({
         </TrainingPreferenceField>
       ) : null}
 
-      {canShowFitnessBenchmark && fitnessLevel && onFitnessLevelChange && onRecent5kTimeChange ? (
+      {canShowFitnessBenchmark &&
+      fitnessLevel &&
+      onFitnessLevelChange &&
+      onRecent5kTimeChange &&
+      onRecent5kPaceChange ? (
         <TrainingPreferenceField label="Fitness benchmark">
           <div className="grid gap-2" role="radiogroup" aria-label="Fitness benchmark">
             {FITNESS_LEVEL_OPTIONS.map((option) => {
@@ -243,31 +252,82 @@ export function TrainingPreferenceFields({
           </div>
 
           {fitnessLevel === "custom" ? (
-            <label className="mt-2 grid gap-2">
-              <span className="hito-form-label">Recent 5K time</span>
-              <input
-                value={recent5kTime}
-                onChange={(event) => onRecent5kTimeChange(event.target.value)}
-                placeholder="25:00"
-                className="hito-field hito-field-primary hito-field-md"
-                aria-invalid={
-                  recent5kTime.trim() ? !isRecent5kTimeInAcceptedRange(recent5kTime.trim()) : true
-                }
-              />
-              <span
-                className={
-                  recent5kTime.trim() && !isRecent5kTimeInAcceptedRange(recent5kTime.trim())
-                    ? "hito-field-error"
-                    : "hito-field-helper"
-                }
-              >
-                Use a recent 5K time between 18:00 and 55:00.
-              </span>
-            </label>
+            <RecentFiveKBenchmarkFields
+              className="mt-2"
+              required
+              recent5kTime={recent5kTime}
+              onRecent5kTimeChange={onRecent5kTimeChange}
+              recent5kPace={recent5kPace}
+              onRecent5kPaceChange={onRecent5kPaceChange}
+            />
           ) : null}
         </TrainingPreferenceField>
       ) : null}
     </>
+  );
+}
+
+export function RecentFiveKBenchmarkFields({
+  className,
+  required = false,
+  recent5kTime = "",
+  onRecent5kTimeChange,
+  recent5kPace = "",
+  onRecent5kPaceChange,
+}: {
+  className?: string;
+  required?: boolean;
+  recent5kTime?: string;
+  onRecent5kTimeChange: (value: string) => void;
+  recent5kPace?: string;
+  onRecent5kPaceChange: (value: string) => void;
+}) {
+  const trimmedTime = recent5kTime.trim();
+  const trimmedPace = recent5kPace.trim();
+  const hasTime = trimmedTime.length > 0;
+  const hasPace = trimmedPace.length > 0;
+  const timeInvalid = hasTime && !isRecent5kTimeInAcceptedRange(trimmedTime);
+  const paceInvalid = hasPace && !isRecent5kPaceInAcceptedRange(trimmedPace);
+  const missingRequiredBenchmark = required && !hasTime && !hasPace;
+  const helperTone =
+    timeInvalid || paceInvalid || missingRequiredBenchmark
+      ? "hito-field-error"
+      : "hito-field-helper";
+  const helperText = timeInvalid
+    ? "Use a recent 5K time between 18:00 and 55:00."
+    : paceInvalid
+      ? "Use a recent 5K pace between 2:00/km and 15:00/km."
+      : missingRequiredBenchmark
+        ? "Use a recent 5K time or pace."
+        : "Optional. Add either value; Hito uses it only when backend benchmark truth supports pace targets.";
+
+  return (
+    <div className={cn("grid gap-2", className)}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-2">
+          <span className="hito-form-label">Recent 5K time</span>
+          <input
+            value={recent5kTime}
+            onChange={(event) => onRecent5kTimeChange(event.target.value)}
+            placeholder="25:00"
+            className="hito-field hito-field-primary hito-field-md"
+            aria-invalid={timeInvalid || (required && !hasTime && !hasPace)}
+          />
+        </label>
+
+        <label className="grid gap-2">
+          <span className="hito-form-label">Recent 5K pace</span>
+          <input
+            value={recent5kPace}
+            onChange={(event) => onRecent5kPaceChange(event.target.value)}
+            placeholder="5:00/km"
+            className="hito-field hito-field-primary hito-field-md"
+            aria-invalid={paceInvalid || (required && !hasTime && !hasPace)}
+          />
+        </label>
+      </div>
+      <span className={helperTone}>{helperText}</span>
+    </div>
   );
 }
 

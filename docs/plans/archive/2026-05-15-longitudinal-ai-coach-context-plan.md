@@ -1,739 +1,85 @@
-Archive Note
-
-Archived during the 2026-05-25 active-plan inventory cleanup.
-
-Classification: Complete / archive now.
-
-Reason: The implemented behavior is now reflected in current docs or in newer archived closeout plans. This artifact is historical and should not drive new work by inertia.
-
-Future agents should not continue this artifact by default. If the product need returns, create a fresh active plan from current `docs/current-*` truth.
-
----
-
-# Longitudinal AI Coach Context Plan
-
 ## Status
 
-In progress - first backend context slice implemented
+archived
 
-## Owner
+## Type
 
-Backend
+plan
 
-## Last Updated
+## Priority
 
-2026-05-15
-
-## Implementation Update
-
-2026-05-15 backend slice:
-
-- added [src/lib/runner-coach-context.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/runner-coach-context.ts) as the first canonical `RunnerCoachContext` builder
-- the builder reads only persisted Supabase truth and compacts active plan, remaining schedule, recent workout history, recent adherence/load, Garmin comparison signals, and workout-scoped body-note cautions
-- added [src/lib/plan-refresh-proposal.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-refresh-proposal.ts) as the first task-specific consumer for explicit active-plan refresh proposals
-- no runner-facing longitudinal surface, final apply flow, broad coach chat, or automatic plan mutation exists yet
-
-2026-05-15 proposal-output hygiene slice:
-
-- the active-plan refresh consumer now produces a review-safe output object for runner-facing surfaces
-- backend hygiene removes raw ids, implementation field names, dangling fragments, unsupported characters, and ambiguous scope counts before the review layer reads the proposal
-- the review-safe output now guarantees a dedicated fixed-truth section for past workouts, logged history, and remaining-schedule-only scope
-- targeted count is derived from model refs or, when refs are absent, from the sanitized proposed-change list that the review actually shows
-- proposal generation remains proposal-only, and the separate explicit apply foundation now requires a fresh matching fingerprint before any archive/replace mutation can occur
-
-## Context
-
-The current Hito product already uses OpenAI in two bounded places only:
-
-1. text-first plan creation:
-   free text -> OpenAI -> validated structured authoring input -> canonical `training-plan-v2` plan truth
-2. workout-detail `Feedback` interpretation:
-   deterministic Garmin comparison -> bounded AI explanation and next-workout recommendation
-
-That means AI is not currently acting like a longitudinal coach with access to the full runner history.
-
-At the same time, the saved-mode product now already preserves most of the history that a future coaching layer would need:
-
-- `runner_profiles`
-- active and archived `plan_cycles`
-- `planned_workouts`
-- `workout_logs`
-- `workout_result_assets`
-- `workout_actual_metrics`
-- `workout_comparisons`
-- `workout_ai_insights`
-- workout-scoped `body_notes`
-
-So the core question is no longer "can Hito save the history?"
-
-The real question is:
-- how to expose that history to AI through one safe canonical context seam
-- without turning the system into an opaque AI memory product
-- and without letting AI replace deterministic product truth
-
-## Is This Realistic?
-
-Yes.
-
-It is realistic if Hito does **not** give AI unconstrained raw authority over the whole database and instead introduces one backend-owned longitudinal runner context layer.
-
-Recommended model:
-
-- canonical persisted user truth stays in Supabase
-- backend builds one bounded `RunnerCoachContext`
-- AI receives only that task-scoped context
-- deterministic summaries and metrics remain primary wherever math or product truth matters
-
-This is a normal next step from the current architecture.
-
-It does **not** require a second product database, a vector-memory platform, or a general-purpose agent runtime in v1.
-
-## Existing Work Audit
-
-### What already exists
-
-#### 1. Free-text plan creation through OpenAI
-
-Current and still valid:
-
-- [src/lib/openai-plan-authoring.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/openai-plan-authoring.ts)
-- [docs/plans/archive/2026-05-07-openai-text-to-plan-authoring-plan.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-05-07-openai-text-to-plan-authoring-plan.md)
-- [docs/plans/archive/2026-05-12-text-first-plan-creation-and-start-date-policy-plan.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-05-12-text-first-plan-creation-and-start-date-policy-plan.md)
-
-Status:
-- current
-- implemented
-- bounded correctly
-
-#### 2. Bounded workout AI interpretation
-
-Current and still valid:
-
-- [src/lib/workout-result-import/generate-workout-ai-insight.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/workout-result-import/generate-workout-ai-insight.ts)
-- [docs/plans/active/2026-05-15-workout-body-note-modal-and-ai-context.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-05-15-workout-body-note-modal-and-ai-context.md)
-- [docs/plans/active/2026-05-06-workout-screenshot-openai-verdict-plan.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-05-06-workout-screenshot-openai-verdict-plan.md)
-
-Status:
-- current
-- implemented in the Garmin path
-- deliberately narrow
-
-#### 3. Runner-level profile expansion
-
-Relevant current dependency:
-
-- [docs/tasks/backlog/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-05-14-heart-rate-zones-profile-and-aet-estimation-plan.md)
-
-Status:
-- partial
-- still planning, not fully implemented
-- relevant because longitudinal coaching should eventually read canonical runner physiology/profile truth from one place
-
-### What does not exist yet
-
-No prior canonical plan was found for:
-
-- one longitudinal per-runner AI coaching context
-- one AI-readable full-history runner profile
-- one backend-owned coaching summary seam spanning archived plans, logged workouts, Garmin evidence, comparisons, and prior AI outputs
-
-Conclusion:
-
-- reuse the current bounded OpenAI seams
-- reuse the existing Supabase history tables
-- add one new canonical **context-building layer**
-- do not invent a parallel AI architecture
-
-## What We Reuse From Earlier Work
-
-- text-first authoring already proved the correct AI boundary:
-  OpenAI proposes; deterministic validation owns persistence
-- workout-feedback AI already proved the correct evidence boundary:
-  deterministic comparison stays primary; AI interpretation stays secondary
-- saved-mode plan lifecycle already preserves history through archived plans rather than destructive deletion
-- workout-scoped body notes already exist as bounded caution context
-
-These are the right building blocks for a longitudinal coach layer.
-
-## Problem Definition
-
-Today Hito can answer only narrow AI questions:
-
-- "turn this request into a plan"
-- "explain this one uploaded run against this one planned workout"
-
-It cannot yet answer broader coaching questions such as:
-
-- how is this runner trending over the last 6 to 12 weeks?
-- how often are they completing quality sessions?
-- are they undertraining, drifting, or showing stable consistency?
-- what does this specific workout mean in the context of recent weeks?
-- what recurring discomfort or caution patterns are showing up?
-
-Current limitation:
-
-- AI prompt inputs are workout-local or authoring-local
-- there is no reusable longitudinal runner context builder
-- `runner_profiles` still hold only bounded setup/settings truth, not a coaching-ready history summary
-- the current AI seams do not load archived-plan history or multi-workout patterns
-
-## Product Decision
-
-Hito should introduce one canonical internal capability:
-
-- `RunnerCoachContext`
-
-Definition:
-
-- a backend-owned, task-scoped, AI-readable context object for one authenticated runner
-- built only from canonical persisted truth
-- assembled on demand for specific coaching tasks
-- never treated as the source of record itself
-
-This should become the single internal context seam for future AI coaching tasks such as:
-
-1. workout-specific historical summary
-2. weekly or monthly training dynamics summary
-3. next-workout recommendation with recent-history awareness
-4. explicit active-plan refresh or rebuild based on real runner history
-5. future runner-facing "coach summary" surfaces or chat
-
-This is a **backend context layer**, not a new user-facing product by itself.
-
-## Current AI Usage Audit
-
-### AI is currently used here
-
-1. `src/lib/openai-plan-authoring.ts`
-   for free-text plan authoring only
-2. `src/lib/workout-result-import/generate-workout-ai-insight.ts`
-   for bounded workout interpretation only
-
-### AI is not currently used here
-
-- not for longitudinal training summaries
-- not for cross-workout pattern analysis
-- not for full runner history review
-- not for archived-plan history synthesis
-- not for cross-workout body-note patterns
-- not for dynamic program management
-
-### Current practical answer to the user question
-
-No, AI is **not** currently "everywhere" in Hito.
-
-Right now it is present only in:
-
-- plan generation
-- bounded workout feedback wording and recommendation
-
-It is **not yet** acting like a real coach with full per-user historical context.
-
-## Canonical Runner Coach Context
-
-### Core rule
-
-The AI layer should never query arbitrary raw tables directly from UI flows.
-
-Instead:
-
-`Supabase canonical truth -> deterministic context builder -> RunnerCoachContext -> task-specific AI prompt`
-
-### Recommended `RunnerCoachContext` sections
-
-#### 1. Runner identity and profile
-
-- runner id
-- display name
-- goal label
-- profile basics already stored canonically:
-  age
-  weight
-  height
-- future physiological truth when implemented:
-  heart-rate zones
-  AeT-derived zone metadata
-
-#### 2. Active plan context
-
-- active plan id
-- title
-- source kind
-- effective start date
-- target date
-- plan preferences
-- current week number
-- active-plan upcoming workout summary
-
-#### 3. Plan history summary
-
-- all active + archived plan cycles for that user
-- each plan summarized, not dumped in full by default
-- start/end window
-- plan goal
-- plan source kind
-- whether the runner completed it partially, fully, or abandoned it
-
-#### 4. Workout history summary
-
-- date-ordered logged workouts across active and archived plans
-- completion state
-- manual actuals
-- body-note presence
-- workout type and title
-- planned duration/distance
-- recent windows:
-  last 7 days
-  last 28 days
-  last 84 days
-
-#### 5. Evidence history summary
-
-- Garmin evidence attached count
-- workouts with normalized actual metrics
-- workouts with deterministic comparison
-- workouts with AI feedback
-- screenshot evidence later when that path exists
-
-#### 6. Deterministic longitudinal aggregates
-
-These should be backend-computed before AI sees them:
-
-- workouts completed / partial / skipped
-- completion rate by recent window
-- planned vs actual volume by recent window where trustworthy
-- number of consecutive missed workouts
-- quality-session completion rate
-- long-run consistency
-- body-note incidence count and recent severity summary
-
-AI should interpret these aggregates, not compute them from scratch.
-
-#### 7. Recent notable events
-
-One bounded event list for the recent horizon:
-
-- plan replaced
-- schedule cleared
-- workout skipped
-- Garmin evidence attached
-- recommendation escalated to `review`
-- body note with elevated severity
-
-This is useful for runner summaries without forcing the model to reconstruct narrative from every row.
-
-## Canonical Pipeline
-
-Recommended canonical pipeline:
-
-1. canonical user truth persists in Supabase
-2. deterministic backend loaders fetch only this runner’s history
-3. deterministic backend aggregation builds `RunnerCoachContext`
-4. task-specific prompt builder narrows that context again
-5. OpenAI returns bounded interpretation text or structured summary output
-6. deterministic quality gate validates output shape and basic language quality
-7. result is stored only if the product needs persistence
-
-This keeps AI downstream of trusted history rather than upstream of it.
-
-## Truth Boundaries To Preserve
-
-### Deterministic truth remains primary for
-
-- stored runner identity
-- plan ownership
-- active vs archived plan state
-- workout logs
-- Garmin parsed actual metrics
-- deterministic planned-vs-actual comparison
-- body-note storage
-- completion counts and recent-history aggregates
-
-### AI may interpret
-
-- what recent adherence patterns suggest
-- how one workout fits into recent weeks
-- whether recent load looks steady or inconsistent
-- how to phrase a conservative next-step suggestion
-- a human-readable training summary
-
-### AI must not become truth for
-
-- completion status
-- date arithmetic
-- training volume math
-- plan lifecycle state
-- injury diagnosis
-- silent plan changes
-- unsupported physiological conclusions
-
-## What AI May Use
-
-OpenAI may receive:
-
-- bounded runner profile truth
-- active-plan summary
-- archived-plan summary
-- recent workout history summary
-- deterministic longitudinal aggregates
-- current workout deterministic comparison
-- prior bounded AI outputs only as reference, not as source truth
-- workout-scoped body notes as caution context
-
-## What AI Must Not Pretend To Know
-
-- hidden cause of pain or injury
-- exact physiology from incomplete evidence
-- training-zone truth that has not been derived canonically
-- future performance guarantees
-- that the plan has already been adapted unless the backend explicitly changed it
-
-## Storage And Query Direction
-
-### Recommended v1 approach
-
-Do **not** start with a new persistent AI-memory subsystem.
-
-Start with:
-
-- one backend `RunnerCoachContext` builder
-- one deterministic longitudinal aggregate helper
-- one task-specific prompt-input builder per AI use case
-
-### Why this is the right first step
-
-- the canonical raw history already exists in Supabase
-- current AI usage is still bounded
-- token budgets require summarization anyway
-- on-demand deterministic shaping is simpler than inventing a second persistent truth layer
-
-### What may be added later if proven necessary
-
-Only if performance or token cost becomes a real issue:
-
-- one cached `runner_history_summary` style table or materialized summary payload
-- one regeneration job for stale summaries
-
-That should be a later optimization, not the starting architecture.
-
-## First Recommended AI Use Cases
-
-The first longitudinal uses should stay small and product-relevant:
-
-### 1. Training dynamics summary
-
-Examples:
-
-- "How has the last month gone?"
-- "What patterns stand out in my recent training?"
-
-Why first:
-
-- high runner value
-- no need for live chat product yet
-- directly benefits from preserved history
-
-### 2. Workout-specific historical context
-
-Examples:
-
-- "How does this workout compare with my recent similar work?"
-- "Was this missed session part of a pattern?"
-
-Why second:
-
-- fits existing workout-detail `Feedback`
-- builds on the current Garmin + deterministic comparison foundation
-
-### 3. Future bounded coach summary surface or chat
-
-This should wait until the context layer is trustworthy.
-
-### 4. Active-plan refresh from history
-
-Examples:
-
-- "Update my plan. The recent load has been too hard."
-- "I missed the last few days. Rebuild the rest of my plan."
-- "Keep the same goal, but revise the next weeks based on what I actually did."
-
-Why this should be an early downstream use of `RunnerCoachContext`:
-
-- it is high runner value
-- it reuses the already-live text-first plan creation seam
-- it depends on real saved history rather than abstract AI chat
-- it gives the product a real coaching behavior without silent automation
-
-Important boundary:
-
-- this must be an explicit runner-triggered action
-- not an automatic hidden plan mutation
-
-## Recommended Delivery Sequence
-
-### Phase 0: Context contract
-
-Goal:
-
-- define one canonical `RunnerCoachContext` TypeScript/domain contract
-
-Deliver:
-
-- field list
-- recent-window rules
-- aggregate rules
-- task-scoped input variants
-
-Risk:
-
-- overbuilding a generic memory schema
-
-Rollback posture:
-
-- keep it as a non-persisted contract layer only
-
-Next likely role:
-
-- BACKEND
-
-### Phase 1: Deterministic runner-history aggregation
-
-Goal:
-
-- add one backend seam that collects and summarizes a runner’s longitudinal history
-
-Deliver:
-
-- runner profile summary
-- plan history summary
-- recent workout history summary
-- deterministic aggregates
-- notable-events summary
-
-Risk:
-
-- mixing raw row truth and interpreted summary truth
-
-Rollback posture:
-
-- keep raw tables as sole source of record
-- treat aggregates as derived and replaceable
-
-Next likely role:
-
-- BACKEND / QA for deeper edge-case coverage
-
-Status:
-
-- first compact implementation exists through `RunnerCoachContext`
-- remaining later expansion can add archived-plan rollups and richer trend windows without changing the source-of-record model
-
-### Phase 2: First longitudinal AI input builder
-
-Goal:
-
-- build one task-specific prompt input using `RunnerCoachContext`
-
-Recommended first task:
-
-- training dynamics summary
-
-Risk:
-
-- prompt bloat or token overflow
-
-Rollback posture:
-
-- reduce horizon and event depth
-- keep only recent-window summary plus notable events
-
-Next likely role:
-
-- BACKEND
-
-### Phase 3: First runner-facing summary surface
-
-Goal:
-
-- expose one bounded longitudinal AI summary to the runner
-
-Recommended first surface:
-
-- summary block or modal, not a full coach chat
-
-Risk:
-
-- overclaiming coaching authority too early
-
-Rollback posture:
-
-- keep it as explicit summary / reflection wording
-- not "adaptive coach"
-
-Next likely role:
-
-- FRONTEND
-
-### Phase 4: Active-plan refresh proposal seam
-
-Goal:
-
-- use `RunnerCoachContext` to support one explicit "Update plan" workflow that rebuilds the remaining active schedule from current runner reality
-
-Deliver:
-
-- task-scoped AI prompt input for plan refresh
-- preserved current goal and core runner inputs
-- recent adherence, actual load, body-note caution, and evidence summary in context
-- deterministic validation back into canonical structured authoring input or canonical plan truth
-- explicit apply/replacement confirmation step
-
-Risk:
-
-- AI can overreact to short noisy history
-- the system can blur "recommendation" and "silent plan mutation"
-
-Rollback posture:
-
-- keep it suggestion-only until explicit confirm/apply
-- keep current active plan unchanged on any malformed or weak result
-
-Next likely role:
-
-- BACKEND
-
-Status:
-
-- first proposal-only seam exists and clamps output scope back to `remaining_active_schedule_only`
-- final deterministic plan conversion, review UI, and apply/confirmation flow remain later work
-
-### Phase 5: Expand workout-detail historical awareness
-
-Goal:
-
-- let workout `Feedback` or later summary surfaces use recent-history context when appropriate
-
-Risk:
-
-- recommendation becoming too broad or opaque
-
-Rollback posture:
-
-- deterministic workout comparison remains primary
-- historical context stays secondary explanation
-
-Next likely role:
-
-- BACKEND
-
-## Backend Responsibilities
-
-- own the `RunnerCoachContext` builder
-- own longitudinal aggregates
-- own task-scoped prompt inputs
-- own output validation and storage decisions
-- enforce per-user isolation
-- keep AI downstream of deterministic truth
-
-## Frontend Responsibilities
-
-- expose runner-facing summary surfaces only after backend context exists
-- never assemble the coaching context on the client
-- never let the browser invent history math or coaching conclusions
-
-## QA Expectations
-
-- AI context never mixes data across users
-- AI summaries reflect archived + active saved history correctly
-- deterministic aggregates match stored workout truth
-- body-note context softens interpretation without producing diagnosis
-- if Garmin/screenshot evidence is missing, the summary stays honest
-- if history is sparse, AI says so plainly
-- no silent plan changes occur from longitudinal AI output
-
-## What We Must Not Build
-
-- a freeform “AI has raw database access” system
-- a second profile database outside Supabase
-- an unbounded chat-memory platform before task-specific context exists
-- AI-computed source-of-truth metrics
-- diagnosis, treatment, or medical-risk scoring
-- automatic plan adaptation in the same first slice
-
-## Open Questions
-
-1. What should be the first runner-facing longitudinal surface:
-   a summary card, a modal, or a dedicated route?
-2. Should prior `workout_ai_insights` be included in context by default, or only when the user asks about a specific past workout?
-3. When screenshot OCR arrives later, should screenshot-derived normalized metrics merge into the same evidence-history summary with Garmin, or remain source-labeled but shared?
-4. How much archived-plan detail is useful before prompt size becomes wasteful?
-5. Should future heart-rate-zone truth be required before richer physiological coaching, or only additive when available?
-6. For explicit plan refresh, should v1 rebuild only today-and-future workouts, or should it support a chosen restart date using the same current plan-apply seam?
-7. Should the first runner-facing refresh entry live inside `Open plan`, or inside a future coach summary surface after the context layer is proven?
-
-## Risks
-
-- the model can sound more authoritative than the product actually is
-- raw-history prompt size can grow too large without deterministic summarization
-- confusing prior AI outputs with canonical fact could create AI-on-AI drift
-- trying to solve chat, adaptation, summary, and workout feedback at once would overbuild the system
-
-## Exit Criteria
-
-- one canonical longitudinal AI context direction is defined
-- current AI usage and current non-usage are explicit
-- deterministic vs AI truth boundaries are explicit
-- one recommended storage/query approach exists without inventing a second memory subsystem
-- one practical phase order exists
-- one next recommended role is chosen
+low
 
 ## Next Recommended Role
 
-BACKEND
+architect
 
-## Suggested Next Step
+## Task
 
-Implement the first backend-only `RunnerCoachContext` contract and deterministic history-aggregate builder, then wire one bounded longitudinal AI summary task on top of that context before designing a broader runner-facing coach surface.
+Preserve archived Longitudinal AI Coach Context Plan as historical context.
 
-## 🔁 HANDOFF BLOCK (MANDATORY)
+## Stage
 
-```md
-## Handoff Context
+ARCHITECT archived-plan reference / compressed historical summary.
 
-### Summary
+## Exact Handoff Prompt
 
-Defined the first canonical architecture for giving AI bounded access to a runner’s longitudinal Hito history without turning AI into the source of truth.
+```text
+ROLE: ARCHITECT
 
-### Key Decisions
+Task:
+Preserve archived Longitudinal AI Coach Context Plan as historical context.
 
-- Keep Supabase canonical user history as the only source of record.
-- Introduce one backend-owned `RunnerCoachContext` builder instead of direct raw AI access to the database.
-- Reuse the existing bounded AI pattern: deterministic truth first, AI interpretation second.
-- Start with longitudinal summaries and historical workout context before any broad coach-chat or adaptive-plan behavior.
+Stage:
+ARCHITECT archived-plan reference / compressed historical summary.
 
-### Current State
-
-- OpenAI is live only for text-to-plan authoring and bounded workout feedback.
-- Hito already stores most of the per-user history needed for longitudinal coaching across profiles, plans, workouts, Garmin evidence, deterministic comparisons, AI insights, and workout-scoped body notes.
-- No canonical longitudinal AI context layer exists yet.
-
-### Constraints
-
-- Do not create a second AI-memory subsystem in v1.
-- Do not let AI replace deterministic metrics, status, or plan lifecycle truth.
-- Do not broaden into diagnosis, automatic plan mutation, or a generic coach chat platform in the first slice.
-
-### Risks / Open Questions
-
-- Prompt size can grow quickly without deterministic summarization.
-- Historical AI outputs must not become mistaken for canonical fact.
-- The first runner-facing longitudinal surface is still undecided and should wait until the backend context seam is trustworthy.
-
-### Next Recommended Role
-
-BACKEND
-
-### Suggested Next Step
-
-Add one backend `RunnerCoachContext` contract plus deterministic longitudinal aggregate builder from existing Supabase history, then use that seam for a first bounded training-dynamics summary task.
+Context:
+This artifact is archived history. Do not continue it by default. If longitudinal AI coaching returns, start from current docs/current-* truth, current AI seams, and current backend context builders.
 ```
+
+## Archive Note
+
+Archived during the 2026-05-25 active-plan inventory cleanup. Compressed during D12 of the docs/artifact compression track.
+
+Current truth now lives in:
+
+- [Current system](../../current-system.md)
+- [Current product](../../current-product.md)
+- [Product history digest](../../history/product-history-digest.md)
+
+## Final Outcome
+
+This plan defined the first safe architecture for giving AI bounded access to a runner's longitudinal Hito history without turning AI into product truth.
+
+The accepted seam was `RunnerCoachContext`: a backend-owned, task-scoped, AI-readable context object built only from canonical persisted Supabase truth and deterministic aggregates. AI may interpret bounded context, but it must not query raw tables from UI flows, compute source-of-truth metrics, diagnose injury, or silently mutate plans.
+
+## Key Decisions Preserved
+
+- Supabase remains the source of record for runner profile, plans, workouts, logs, evidence, comparisons, AI insights, and body notes.
+- Backend builds deterministic context and recent-history aggregates before AI sees anything.
+- OpenAI receives task-scoped context only and remains downstream of deterministic truth.
+- A future coaching layer should start with summary/reflection and explicit proposal workflows, not broad chat or automatic adaptation.
+- Active-plan refresh from history must be runner-triggered, proposal-only first, and gated by explicit review/apply.
+- No persistent AI-memory subsystem was needed for v1; cached summaries were deferred until performance or token cost proved the need.
+
+## Implementation History
+
+The archived plan recorded two backend slices:
+
+- `src/lib/runner-coach-context.ts` introduced the first compact `RunnerCoachContext` builder from persisted history.
+- `src/lib/plan-refresh-proposal.ts` introduced a task-specific proposal consumer for active-plan refresh.
+- Proposal output hygiene sanitized raw ids, implementation field names, dangling fragments, unsupported characters, ambiguous scope counts, and unsafe history references before review.
+- Apply remained separate and required a fresh matching fingerprint before any archive/replace mutation.
+
+## Boundary Notes
+
+- AI may interpret adherence trends, workout context, load consistency, and conservative next-step suggestions.
+- AI must not own completion state, date math, training volume math, lifecycle state, injury diagnosis, silent plan changes, or unsupported physiology.
+- Body notes are caution context, not diagnosis.
+- Prior AI outputs can be referenced but must not become canonical fact.
+
+## Validation And QA Expectations
+
+The original plan required proof that context stays user-isolated, deterministic aggregates match stored truth, sparse history remains honestly described, body-note caution softens language without diagnosis, and no silent plan changes occur from AI output.
+
+Detailed old phase prompts and open-question inventories were removed because the current implementation/source hierarchy must be rechecked before any future AI-coach work resumes.

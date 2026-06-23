@@ -15,10 +15,10 @@ import { hitoToast } from "@/components/ui/hito-toast";
 import {
   confirmManualWorkoutDraft,
   listManualWorkoutSavedTemplates,
-  reviewManualWorkoutDraftAction,
   reviewManualWorkoutSavedTemplate,
   saveManualWorkoutSavedTemplate,
-} from "@/lib/training-api";
+} from "@/lib/manual-workout-authoring";
+import { reviewManualWorkoutDraftAction } from "@/lib/training-api";
 import type {
   ManualWorkoutSavedTemplateReviewResult,
   ManualWorkoutSavedTemplateSaveResult,
@@ -532,7 +532,7 @@ export function ManualUserBuiltPlanPanel({
                         />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-56">
+                    <DropdownMenuContent align="start" className="hito-menu-width-standard">
                       <DropdownMenuLabel>{formatReadableDate(date)}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={() => openScratchConstructor(date)}>

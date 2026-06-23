@@ -160,6 +160,11 @@ Blockers:
   subagent expectations when useful: the next agent should use or reuse subagents for safe
   independent read-only audits, tests, source scans, and non-mutating validation; close completed
   subagents; integrate findings themselves; and avoid routing every small subtask back to the user.
+- If a prompt routes from one execution role to another role for validation or read-only proof inside
+  the same active lane, tell the parent role to start a role-prefixed subagent/session itself when
+  tools are available. The delegated prompt must begin with `ROLE: <ROLE>` so the subagent loads the
+  correct role instructions. Do not make the user copy-paste routine QA, source audit, or validation
+  prompts when the parent role can safely delegate and integrate the result.
 - For Hito Stack Simplification prompts to ARCHITECT or BACKEND, include subagent expectations by
   default. If you intentionally omit them, state why the task is single-file, inherently sequential,
   or blocked by unavailable subagent tooling.
@@ -172,10 +177,28 @@ Blockers:
   Instead, write the next prompt so the execution role uses subagents where available or performs
   safe sequential audits locally, completes the bounded batch, and returns only on validation
   failure, owner-boundary crossing, mutation/browser-risk escalation, or product decision need.
+- When a role has already selected a same-owner/same-risk follow-up, prefer asking that role to
+  execute/delegate the follow-up autonomously over issuing a new user-facing prompt. The user should
+  receive integrated outcomes, blockers, or Product decisions, not a chain of role-to-role copy-paste
+  messages.
 - For Hito Stack Simplification routing, an ARCHITECT prompt should usually select an autonomous
   execution batch, not merely one tiny next gate, unless fresh evidence shows only one safe seam
   exists. If it must select only one seam, the prompt must explain the stop condition and why batching
   would be unsafe.
+
+## Minimal Documentation For Cleanup Handoffs
+
+For cleanup, docs compression, artifact retention, or apply/tooling prompts:
+
+- Tell the execution role to keep source-of-truth docs compact. Active plans should receive ledger
+  entries, not copied terminal logs, per-file manifests, repeated handoff prompts, or full subagent
+  transcripts.
+- Tell the role to put machine-detail evidence in machine artifacts, dry-run outputs, apply-result
+  files, QA reports, or manifests, then link/summarize those artifacts from docs.
+- If the slice removes files/bytes but adds a long Markdown report, require the role to compact the
+  closeout before returning.
+- For retention/apply work, the plan entry should usually include only date, slice/command, counts,
+  bytes, affected roots, manifest/apply-result paths, validation commands, and next gate/hold.
 
 ## Required Handoff Shell
 

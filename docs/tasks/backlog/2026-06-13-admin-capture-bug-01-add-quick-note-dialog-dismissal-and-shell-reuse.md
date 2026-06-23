@@ -2,7 +2,7 @@
 
 ## Status
 
-new
+backlog
 
 ## Type
 
@@ -136,4 +136,3 @@ Use the existing Hito modal naming and avoid creating a second visual system.
 - clicking outside the dialog closes it unless the accepted contract explicitly forbids outside dismissal
 - the reused shell keeps the same header/footer grammar
 - body/content can vary without rebuilding the full dialog structure each time
-

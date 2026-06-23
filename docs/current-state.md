@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-06-17
+2026-06-20
 
 ## Where We Are Now
 
@@ -214,10 +214,12 @@ Active
 - The bundled type-only `training-api.ts` facade narrowing slice is now implemented:
   settings, structured first-plan, selected running-plan, first-plan confirm, selected-plan confirm
   input, and active-plan lifecycle result types now import from canonical owner modules or no longer
-  need `training-api.ts` compatibility re-exports. Later G7C source proof also removed no-caller
-  manual Copy/Paste and Move review/confirm compatibility re-exports from `training-api.ts`, while
-  direct manual Copy/Paste and Move runtime wrappers plus Delete/Clear, Add/Create/Templates, and
-  persisted-edit actions remain in the facade.
+  need `training-api.ts` compatibility re-exports. Later source proof removed the remaining manual
+  authoring runtime compatibility re-exports from `training-api.ts`: direct manual
+  Add/Create/Templates, Copy/Paste, Move, Delete/Clear, and persisted-edit server functions now
+  import from `src/lib/manual-workout-authoring/*`; `training-api.ts` keeps only
+  `reviewManualWorkoutDraftAction` as the TanStack server-function wrapper around the pure draft
+  review seam.
 - The first `PlanManagementDialog` decomposition slice is now implemented:
   the saved-mode `Open plan` export dropdown UI now lives in `src/components/plan-management/PlanExportMenu.tsx`, while the parent dialog still owns export status, error handling, the authenticated iframe download path, and all existing plan-management actions.
 - The second `PlanManagementDialog` decomposition slice is now implemented:
@@ -291,8 +293,13 @@ Active
   `applyActivePlanRefreshProposal` server-action wrappers. The no-caller
   `applyActivePlanRefreshProposalForUser` compatibility export was removed from `training-api.ts`;
   canonical user-scoped refresh apply ownership remains in `active-plan-refresh-actions.ts`.
-- The plan-replacement action extraction and G7A import-map narrowing slices are now implemented:
-  `src/lib/plan-replacement-actions.ts` owns advanced JSON/imported-plan replacement, saved-mode text replacement action behavior, and the internal `persistImportedPlanForCurrentRequest` helper, while `training-api.ts` keeps only the current public `completeOnboarding` and `completeTextOnboarding` compatibility names for route/component callers.
+- The plan-replacement action extraction and saved-mode import-map narrowing slices are now
+  implemented:
+  `src/lib/plan-replacement-actions.ts` owns advanced JSON/imported-plan replacement, saved-mode
+  text replacement action behavior, and the internal `persistImportedPlanForCurrentRequest` helper.
+  `PlanManagementDialog` and `UploadJsonDialog` import `completeOnboarding` /
+  `completeTextOnboarding` from that canonical owner directly, and `training-api.ts` no longer keeps
+  those plan-replacement compatibility names.
 - The backend voice-to-plan review assumption clarity follow-up is implemented:
   when an obvious dictated goal-style cue differs from the reviewed draft style, such as balanced becoming relaxed, the backend adds an explicit runner-facing assumption rather than forcing the requested style or silently hiding the change; the real frontend-shaped request path now compares transcript style cues before constructor supplement defaults, so the dictated cue cannot be masked by structured state.
 - The first immediate Garmin UX cleanup slice is now implemented:
@@ -452,8 +459,8 @@ Active
 - The first OpenAI-backed text-to-plan backend slice is now implemented:
   the service accepts one bounded free-text request, asks OpenAI for structured authoring input, validates that model output deterministically, then the saved-mode text replacement action explicitly opts into a rich workout draft that is accepted only after backend normalization into canonical `training-plan-v2`; the same Supabase seam used by JSON import and structured authoring remains the only persistence path.
   Saved-mode text replacement can use this path; no-plan onboarding currently uses Manual setup, structured draft/confirm, and selected-plan preview/confirm rather than a visible free-text or voice setup panel.
-- The original direct structured plan-authoring backend contract slice is superseded for visible onboarding:
-  `completeStructuredFirstPlanOnboarding` still exists in first-plan actions, but current no-plan callers use `generateStructuredFirstPlanDraft` followed by `confirmStructuredFirstPlanDraft`; the backend still requires bounded age/weight/height profile basics, validates benchmark/target-time/terrain/rest-day combinations, accepts ultra marathon and mountain running goal options, normalizes omitted or hidden terrain to the canonical generation context, translates `runningDaysPerWeek + fixedRestDays` into deterministic preferred running days, preserves fixed rest days through the existing weekday invariant plan preferences, persists only age/weight/height to `runner_profiles`, and keeps terrain focus as generation context rather than profile truth.
+- The original direct structured plan-authoring backend action surface is superseded for visible onboarding:
+  current no-plan callers use `generateStructuredFirstPlanDraft` followed by `confirmStructuredFirstPlanDraft`, while the old no-caller direct-complete action has been removed; the backend still requires bounded age/weight/height profile basics, validates benchmark/target-time/terrain/rest-day combinations, accepts ultra marathon and mountain running goal options, normalizes omitted or hidden terrain to the canonical generation context, translates `runningDaysPerWeek + fixedRestDays` into deterministic preferred running days, preserves fixed rest days through the existing weekday invariant plan preferences, persists only age/weight/height to `runner_profiles`, and keeps terrain focus as generation context rather than profile truth.
 - The Phase 4 frontend cleanup slice has been superseded by the structured first-plan constructor:
   visible no-plan and shell surfaces present structured plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
 - The first Hito design-system implementation slices are now implemented:
@@ -472,22 +479,61 @@ Active
 
 ## Current Active Stream
 
-Code-freeze simplification is the current broad stream:
-the product has backend-owned Plan Preset discovery cards for `10K Foundation`,
-`Half Marathon Balanced`, and `Marathon Base`, selected running-plan preview/create for supported
-families, manual user-built plan creation/editing/export in the proved scope, and the existing
-Advanced custom program escape hatch for target-date/time and unusual cases. Cleanup now focuses on
-source-of-truth hygiene and carefully reassessed compatibility narrowing before adding more families
-or mutation models.
+The Hito Stack Simplification core cleanup track is complete. The current cleanup stream is now the
+separate Hito Docs and Artifact Compression track: reduce documentation/history noise, preserve
+product evolution in a compact digest, and define safe local artifact retention before any evidence
+or logs are deleted.
+
+The current cleanup checkpoint is after accepted G23 business-process short-path cleanup:
+
+- `cleanup-burndown-v1` is the active sequencing ledger: `40/40` gates are complete, `0` remain, and
+  the cleanup track is `100%` complete after G23.
+- G20 removed the untracked duplicate-space manual-workout backlog markdown copy while preserving
+  the canonical tracked backlog item and admin importer contract.
+- G21 completed the final codebase size and dead-code teardown sweep, measured the current text
+  baseline, rechecked business-flow uniqueness, and found no safe backend/runtime or
+  frontend/browser-sensitive deletion batch to select by momentum.
+- G22 folded in current-state/dashboard sync, reran the business-process short-path audit, and
+  selected the final bounded backend ownership cleanup instead of broad runtime/frontend deletion.
+- G23 shortened no-active-plan onboarding ownership: first-plan and selected-plan runtime actions now
+  import directly from their canonical action modules instead of through `training-api.ts`, while
+  manual empty-plan creation and unrelated route-facing wrappers remain on the facade.
+- The Hito Stack Simplification Strike is archived as completed cleanup history after G23; future
+  docs compression, artifact retention, or roadmap review work should use separately named tracks.
+- The active docs/artifact compression plan owns that follow-up track. Slices D1-D4 and D12-D19
+  are accepted net-negative docs-size-reduction batches, while D5-D10 are accepted Admin importer
+  metadata-quality hygiene and D11 rebaselined the track so metadata-only work is not counted as
+  compression progress. D20 stopped before edits because the selected archive tail was already
+  compressed enough. D21 compressed the first post-archive admin-imported frontend spec pilot from
+  `4542` lines to `693` lines, net `-3849`; D22 compressed the DS/workbench frontend spec pilot
+  from `2255` lines to `407` lines, net `-1848`; D23 is the next completed/closed frontend spec
+  tail compression pilot.
+- The G21 counted text baseline is `624` files / `261277` lines overall, with `src` at `299` files /
+  `119629` lines, `scripts` at `51` files / `34066` lines, and `docs` at `196` files /
+  `88955` lines.
+- The docs-only baseline has dropped from the initial `89204` markdown lines under `docs/` to about
+  `49300` after D22, with archived plans reduced from `42188` lines to about `6174`. The active
+  compression plan and product-history digest remain the sources for detailed D-track line deltas.
+- Generated/protected roots remain outside product-code size claims: `logs` is about `22MB`,
+  `qa-artifacts` is about `746MB`, and `test-results` is about `4KB`. These roots must not be
+  deleted through cleanup momentum; `qa-artifacts/` remains protected evidence until a separate QA
+  retention policy exists.
+- G22/G23 source-of-truth sync regenerated the work dashboard through the safe no-admin dashboard
+  command. Runtime behavior changes, frontend rewrites, Supabase, OpenAI, Admin apply, artifact
+  deletion, and browser QA were out of scope for the docs/devtools sync portion.
 
 ## Next Recommended Steps
 
-1. Continue the Hito stack simplification strike from the current global teardown map before
-   expanding product scope.
-2. Use backlog-only follow-ups for additional Plan Preset families, preset-based active-plan
+1. Run ARCHITECT Slice D23 from the Hito Docs and Artifact Compression plan: continue the
+   admin-imported frontend spec compression lane on completed/closed DS/admin tail candidates while
+   preserving Admin importer metadata, current-contract truth, validation evidence,
+   current-owner links, and changelog/current-doc semantics.
+2. Keep the archived Hito Stack Simplification Strike as completed cleanup evidence; do not reopen it
+   unless source proof shows a missed closeout issue.
+3. Use backlog-only follow-ups for additional Plan Preset families, preset-based active-plan
    replacement/refresh, recurrence, Restore UI, universal Copy/Paste, QR/share/import, and broader
    persisted workout editing beyond the proved manual scope.
-3. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use
+4. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use
    `/hitoDS` as the inspection surface before shipping new visual patterns.
 
 ## Canonical References

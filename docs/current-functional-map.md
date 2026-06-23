@@ -31,11 +31,12 @@ Active execution plans remain the source for in-progress gates:
 - [admin UI capture and backlog plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md)
 - [manual workout authoring plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md)
 - [running plan creation engine rebuild](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md)
-- [Hito stack simplification strike](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md)
 - [Hito DS IA and specimen contract](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-15-hito-ds-information-architecture-and-specimen-contract.md)
+- [Hito docs and artifact compression](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-20-hito-docs-and-artifact-compression.md)
 
 Product-contract references:
 
+- [archived Hito stack simplification strike](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-06-07-hito-stack-simplification-strike.md)
 - [archived Hito DS workout-library calendar/detail playground history](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md)
 - [unified plan creation lifecycle](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/product-briefs/2026-06-11-unified-plan-creation-lifecycle.md)
 - [universal selected-distance no-dead-end taxonomy](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/product-briefs/2026-06-11-universal-selected-distance-no-dead-end-ux-taxonomy.md)
@@ -71,8 +72,9 @@ no-caller first-plan/voice compatibility re-exports from `training-api.ts`, G16 
 duplicate-space local residue, G17 removed untracked legacy Plan Preset builder/review residue, G18
 deleted tracked orphan `JsonImportPanel` residue, G19 deleted tracked orphan
 `DictateToPlanPanel` residue while preserving backend voice-to-plan truth, G20 removed the
-untracked duplicate-space manual-workout backlog markdown copy, and the simplification strike is now
-back in source-proof holding.
+untracked duplicate-space manual-workout backlog markdown copy, G21 accepted the final codebase size
+and dead-code teardown sweep, and G22 accepted the business-process short-path audit after folding in
+current-state/dashboard source-of-truth sync.
 
 Reason:
 
@@ -273,8 +275,15 @@ Reason:
   markdown cleanup after admin-mirror proof.
 - G20 is complete: the untracked duplicate-space manual-workout backlog markdown copy was deleted,
   while the canonical tracked backlog item and admin importer contract were preserved.
-- The simplification strike is now in source-proof holding. Select a future cleanup gate only from
-  fresh source/import/docs proof.
+- G21 is complete: the final codebase size and dead-code teardown sweep measured the current text
+  baseline, confirmed no safe backend/runtime or frontend/browser-sensitive deletion batch, and
+  selected G22 for a final business-process short-path audit after current-state/dashboard sync.
+- G22 is complete: the business-process short-path audit confirmed broad runtime/frontend deletion
+  remains unsafe, folded in the current-state/dashboard source-of-truth sync, and selected BACKEND
+  G23 for first-plan/selected-plan `training-api.ts` passthrough narrowing.
+- G23 is complete: `OnboardingGate` imports first-plan and selected-plan runtime actions directly
+  from canonical action modules, and `training-api.ts` no longer re-exports those four passthrough
+  actions.
 - The no-active-plan onboarding IA/runtime blocker around `isManualProfileReady` is not marked as
   accepted by this map because the inspected docs did not provide an explicit latest QA closeout for
   that blocker.
@@ -287,21 +296,29 @@ Reason:
 - QR/share/import remains future-only and must not be selected as immediate implementation during
   this freeze-readiness pass.
 - Stable cleanup burndown `cleanup-burndown-v1` is now the progress source: fixed denominator `40`
-  bounded cleanup gates, `37` completed through G20, `3` remaining, and `92.5%` gate-burndown
+  bounded cleanup gates, `40` completed through G23, `0` remaining, and `100%` gate-burndown
   complete. The burndown is a sequencing metric, not a source-line reduction claim.
 - Generated/cache/vendor/build/log/artifact roots must stay out of product-code size claims:
   `logs`, `qa-artifacts`, `test-results`, `node_modules`, and build/cache directories are counted
   separately.
 
-Immediate cleanup gate:
+Immediate docs/artifact compression gate:
 
-None selected / source-proof holding.
+ARCHITECT Slice D23 for the separate Hito Docs and Artifact Compression track.
 
-G20 is complete and accepted. No next implementation batch is selected in this closeout. Broad
-`training-api.ts`, backend ops mutation-safety hardening, manual calendar runtime UI, admin table
-primitives, Hito DS feature work, validation thinning, live OpenAI calls, Supabase mutation,
-artifact deletion, and `qa-artifacts/` cleanup remain deferred until fresh proof selects a bounded
-owner/risk/validation story.
+G23 is accepted and the simplification strike is archived. The cleanup ledger is `40/40` complete,
+`0` remaining, `100%`. Product has opened a separate docs/artifact compression track. D1-D4 and
+D12-D19 are accepted net-negative docs-size-reduction batches, D5-D10 are accepted Admin importer
+metadata-quality hygiene, and D11 rebaselined the track so metadata-only work is not counted as
+compression progress. D20 stopped before edits because the selected archive tail was already
+compressed enough. D21 compressed the first post-archive admin-imported frontend spec pilot from
+`4542` lines to `693` lines, net `-3849`; D22 compressed the DS/workbench frontend spec pilot from
+`2255` lines to `407` lines, net `-1848`. D23 should continue with completed/closed frontend spec
+tail candidates before artifact-retention apply work. Broad
+`training-api.ts`, manual calendar runtime UI, admin
+table primitives, Hito DS feature work, validation thinning, live OpenAI calls, Supabase mutation,
+artifact deletion, and `qa-artifacts/` cleanup remain deferred unless Product opens a separately
+named future track.
 
 ## Shared Calendar And Mutation Ownership
 
@@ -331,6 +348,10 @@ owner/risk/validation story.
 - Manual user-built plans create `manual_user_built_plan_v1` active plans from reviewed manual
   workouts; later Add/Clear/Move edits use the same active-plan edit metadata model as other accepted
   active-plan sources without rewriting the original plan source.
+- Starting a selected generated/preset plan from an existing active manual plan now has a
+  backend-owned reviewed transition seam: review is non-mutating, confirm revalidates selected-plan
+  exactness plus active-plan revision, archives/supersedes the old manual active plan, and activates
+  the new selected plan without merging upcoming manual workouts.
 - Advanced JSON import/replacement remains an advanced fallback and migration path.
 
 ## Flow Map
@@ -340,7 +361,8 @@ owner/risk/validation story.
 | No-active-plan entry | Signed-in runners without an active plan see creation choices instead of silent preview assignment. | Shipped for the accepted creation choices; latest no-active-plan IA blocker is not marked accepted here without explicit QA closeout | `src/lib/route-data-actions.ts`, `src/lib/first-plan-actions.ts`, `src/lib/training-api.ts` wrappers | `src/components/OnboardingGate.tsx`, onboarding components | `runner_profiles`, `plan_cycles`, `planned_workouts` only after confirm | Changelog-backed saved-mode and onboarding history; no explicit inspected QA closeout for the `isManualProfileReady` blocker | No silent plan creation; no active-plan replacement without explicit action; do not treat unresolved IA/runtime blockers as cleanup-safe |
 | Structured first plan / AI-authored blueprint draft | Runner enters profile/goal/training context in Quick setup, reviews a backend-shaped draft, then confirms. AI may draft under backend constraints. | Shipped for the current visible structured Quick setup path; Dictate-to-Plan / voice transcript assist is not a visible onboarding UI flow | `src/lib/first-plan-actions.ts`, `src/lib/structured-first-plan-onboarding.ts`, `src/lib/ai-first-plan-blueprint-*`, `src/lib/active-plan-persistence.ts` | `src/components/OnboardingGate.tsx`, `src/components/onboarding/StructuredPlanConstructor.tsx` | `runner_profiles`, `plan_cycles`, `planned_workouts` | Validators under `scripts/validate-plan-authoring-doctrine.ts`; changelog entries through 2026-06-10 | No AI direct persistence; no fake pace from target time; no fake personal HR; strict draft/envelope ops seams are not normal UI; no visible voice-to-plan / AI setup caller until a frontend and QA gate accepts it |
 | Selected-distance plan creation | Runner can create accepted selected-distance plans after preview/review/create. | 10K, Half Marathon, and Marathon Base create accepted; Marathon Completion backend preview/review/confirm artifacts accepted, with runner-facing selected-option exposure still separate | `src/lib/running-plan-engine-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/plan-creation-engine/*`, `src/lib/active-plan-persistence.ts` | `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`, onboarding selected-plan UI | `runner_profiles`, `plan_cycles`, `planned_workouts` after confirm | `scripts/validate-running-plan-engine-*`, `scripts/generate-running-plan-engine-scenarios.ts`, R8 browser/DB proof, universal richness/prescription QA + Running Coach acceptance | Do not treat Marathon Completion selected-option UI exposure as shipped unless a product/UI gate accepts it; do not turn Marathon Base into completion |
-| Plan Presets | Runner can use 10K Foundation, Half Marathon Balanced, or Marathon Base cards as no-active-plan discovery into selected running-plan preview/create. | Shipped as discovery; creation is owned by the running-plan engine | `src/lib/plan-preset-actions.ts` keeps `getPlanPresetCards(...)`; selected create/review/confirm lives in running-plan engine actions/review | Preset cards in onboarding plus selected-plan preview dialog | Card discovery does not persist; selected running-plan confirm persists `runner_profiles`, `plan_cycles`, and `planned_workouts` | Changelog 2026-06-07 history plus later selected-plan create proof; Slice G2A removed old Plan Preset review/confirm blocked actions | No new preset families; no Plan Preset active-plan replacement; no legacy Plan Preset review/confirm creation seam |
+| Plan Presets | Runner can use 10K Foundation, Half Marathon Balanced, or Marathon Base cards as non-mutating discovery into selected running-plan preview/create, including saved-mode active-manual transition discovery. | Shipped as discovery; creation is owned by the running-plan engine or active-plan transition seam | `src/lib/plan-preset-actions.ts` keeps `getPlanPresetCards(...)`; selected create/review/confirm lives in running-plan engine actions/review; active-manual replacement uses `src/lib/active-plan-transition-actions.ts` | Preset cards in onboarding plus selected-plan preview dialog and future saved-mode `Create a plan` transition UI | Card discovery does not persist; selected running-plan confirm persists `runner_profiles`, `plan_cycles`, and `planned_workouts` only when no active plan exists; active manual transition archives/supersedes through reviewed confirm | Changelog 2026-06-07 history plus later selected-plan create proof; Slice G2A removed old Plan Preset review/confirm blocked actions; saved-mode card discovery no longer has an active-plan read gate | No new preset families; no Plan Preset active-plan replacement; no legacy Plan Preset review/confirm creation seam; no direct selected-plan confirm while an active plan exists |
+| Active manual plan -> selected generated plan transition | Runner can be shown a backend-shaped impact review for replacing an active manual plan with a reviewed selected generated/preset plan; frontend wiring/QA remains separate. | Backend seam implemented / QA pending / not runner-facing shipped | `src/lib/active-plan-transition-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/active-plan-persistence.ts` | Future saved-mode `Create a plan` transition UI | Old `plan_cycles` row archived/superseded; new selected plan persisted as active; manual templates remain user-library rows | `scripts/validate-running-plan-engine-confirm.ts` transition proof | No silent replacement; no clear-then-create shortcut; no merge of upcoming manual workouts; no deletion of logs/evidence/comparisons/protected history |
 | Manual first create | Runner chooses `Build my plan myself`, reviews one workout, and creates a manual active plan. | Shipped | `src/lib/manual-workout-authoring/actions.ts`, `persistence.ts`, `review-exactness.ts`, `active-plan-persistence.ts` | `src/components/onboarding/ManualUserBuiltPlanPanel.tsx`, shared manual controls | `runner_profiles`, `plan_cycles`, `planned_workouts` | `scripts/validate-manual-workout-authoring.ts`; browser/DB proof; changelog 2026-06-10 | Do not persist empty active manual plans silently |
 | Active-plan Add activity | Runner adds a reviewed user-authored workout to an eligible future empty day in an accepted active plan. | Shipped in proved manual and non-manual Add scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/manual-workout-authoring/active-plan-add.ts`, `actions.ts`, `review-exactness.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`, `manual-workout-authoring-utils.ts` | Existing `plan_cycles`; new `planned_workouts` rows with `active_plan_user_edit_v1` metadata | Manual browser/DB proof plus universal editability QA; changelog 2026-06-11 and 2026-06-12 | No frontend row append; no unproved source/row mutation; no universal Copy/Paste |
 | Personal saved templates | Runner saves a reviewed manual workout as a personal template and reuses it from Add activity. | Shipped in scoped first-create and existing-plan Add paths | `src/lib/manual-workout-authoring/saved-templates.ts`, `saved-template-repository.ts`, review reconstruction through manual authoring | Manual save modal and template picker in shared controls | `runner_manual_workout_templates`, `planned_workouts` when later confirmed | Browser/DB proof; changelog 2026-06-11 | No organization/coach templates; no frontend-owned template rows |
@@ -369,10 +391,11 @@ folders.
 
 | Area | Files | Lines / size | Classification |
 | --- | ---: | ---: | --- |
-| Main counted text surface | `585` | `259409` lines | Source/docs/scripts/config surface after G1 demotion and exclusions |
-| `src` | `259` | `115245` lines | Runtime, admin, Hito DS, and checked-in source data |
-| `scripts` | `51` | `34853` lines | Validators, proof harnesses, importers, ops scripts |
-| `docs` | `195` | `90879` lines | Current docs, active/archive plans, backlog/spec/source-of-truth docs |
+| Main counted text surface | `624` | `261277` lines | Source/docs/scripts/config/agent/template text surface after G21 final sweep and exclusions |
+| `src` | `299` | `119629` lines | Runtime, admin, Hito DS, and checked-in source data |
+| `scripts` | `51` | `34066` lines | Validators, proof harnesses, importers, ops scripts |
+| `docs` | `196` | `88955` lines | Current docs, active/archive plans, backlog/spec/source-of-truth docs |
+| Other project text | `72` | `7729` lines | Agent, skill, SQL/config/template, and root supporting text outside the main roots |
 | `docs/plans/active` | `5` | `10861` lines | Active execution root after G6 paused-sandbox archive |
 | `docs/plans/archive` | `72` | `38737` lines | Historical plan evidence |
 | `docs/tasks/backlog` | `41` | `8884` lines | Backlog/future work items, including G1-demoted plans |
@@ -408,7 +431,7 @@ Largest counted source/doc/script hotspots:
 
 | File | Lines | Classification |
 | --- | ---: | --- |
-| [Hito stack simplification strike](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md) | active post-G7C reassessment owner | required cleanup history/current gate owner |
+| [archived Hito stack simplification strike](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-06-07-hito-stack-simplification-strike.md) | completed `40/40` cleanup ledger | archived cleanup history; no active gate owner |
 | [global styles](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/styles.css) | `5172` | required DS/global runtime; future DS cleanup only with visual proof |
 | [Hito DS route](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/routes/hitoDS.tsx) | `4505` | internal reference route; keep under DS IA rollout |
 | [manual authoring plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md) | `3476` | required active manual-authoring source |
@@ -425,9 +448,9 @@ Stable cleanup burndown:
 
 - Ledger: `cleanup-burndown-v1`.
 - Fixed denominator: `40` bounded cleanup gates.
-- Completed through G20: `37` gates.
-- Remaining after G20: `3` gates.
-- Current gate-burndown completion: `92.5%`.
+- Completed through G23: `40` gates.
+- Remaining after G23: `0` gates.
+- Current gate-burndown completion: `100%`.
 - Future cleanup reports should update the completed/remaining counts by delta instead of
   recalculating rough percentages from line-count impressions.
 - The previous `48%`, `35-40%`, and `11-19` estimates are retired for progress reporting.
@@ -704,8 +727,8 @@ count them as current runtime owners.
     demotion.
 19. G9 is QA-passed: current admin Users/account-menu surfaces no longer expose the future-only
     placeholder actions, and browser QA covered desktop plus `375px` mobile.
-20. Stable cleanup burndown v1 is adopted and updated after G20: `40` total gates, `37` complete,
-    `3` remaining, `92.5%` gate-burndown complete.
+20. Stable cleanup burndown v1 is adopted and updated after G22: `40` total gates, `39` complete,
+    `1` remaining, `97.5%` gate-burndown complete.
 21. G10 is complete: the residual stale `scripts/author-plan-from-text.mjs` entrypoint was deleted
     after source proof confirmed no live owner and preserved the TS-backed command.
 22. Post-G10 reassessment selected BACKEND/OPS Slice G11 for duplicate-space local ops residue:
@@ -764,15 +787,29 @@ count them as current runtime owners.
     backlog markdown copy. This is docs/admin-mirror source-of-truth hygiene only.
 44. G20 is complete: the untracked duplicate-space manual-workout backlog markdown copy was deleted
     after admin-root proof, preserving the canonical tracked backlog item and importer contract.
-45. The simplification strike is back in source-proof holding. Select a next gate only after fresh
-    source/import/docs evidence proves one owner, one risk class, and one validation story.
-46. Do not delete `qa-artifacts/` before a separate QA evidence policy exists.
+45. G21 is complete: the final codebase size and dead-code teardown sweep measured the current
+    text baseline, rechecked business-flow uniqueness, found no safe backend/runtime or
+    frontend/browser-sensitive deletion batch, and selected G22 for a business-process short-path
+    audit after current-state/dashboard source-of-truth sync.
+46. G22 is complete: the business-process short-path audit folded in the current-state/dashboard
+    sync, confirmed broad runtime/frontend deletion remains unsafe, and selected BACKEND G23 for
+    first-plan/selected-plan `training-api.ts` passthrough narrowing.
+47. G23 is complete: `OnboardingGate` imports first-plan and selected-plan runtime actions directly
+    from canonical action modules, and `training-api.ts` no longer re-exports those four passthrough
+    actions.
+48. Do not delete `qa-artifacts/` before a separate QA evidence policy exists.
 
 ## Immediate Next Gate
 
-None selected / source-proof holding.
+ARCHITECT Slice D23 for the separate Hito Docs and Artifact Compression track.
 
-G20 is complete and accepted. The cleanup ledger is now `37/40` complete, `3` remaining, `92.5%`.
-Do not route broader runtime, backend ops hardening, docs/devtools cleanup, or browser-sensitive
-cleanup unless fresh proof selects another bounded seam with one owner, one risk class, and one
-validation story.
+G23 is accepted and the simplification strike is archived. The cleanup ledger is `40/40` complete,
+`0` remaining, `100%`. Product has opened the separate docs/artifact compression track. D1-D4 and
+D12-D19 are complete as net-negative docs-size-reduction batches; D5-D10 are metadata-quality
+hygiene, not compression wins; D11 corrected that strategy split. D20 stopped before edits because
+the archive tail was already compressed enough. D21 is complete as the first net-negative
+admin-imported frontend spec compression pilot, D22 is complete as the DS/workbench frontend spec
+compression pilot, and D23 is the next completed/closed frontend spec tail pilot. Do not route
+broader runtime cleanup, backend ops hardening,
+browser-sensitive cleanup, Admin apply, log deletion, or QA artifact cleanup unless that track
+explicitly scopes the gate.

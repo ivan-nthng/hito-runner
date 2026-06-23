@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-06-20T17:57:50.669Z
+Generated: 2026-06-23T05:17:05.376Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -78,41 +78,18 @@ Context: `/admin/login` is a dedicated owner-admin login surface.
 
 ---
 
-### 2. [Hito Stack Simplification Strike](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md>)
-
-<sub><code>STATUS</code></sub>
-
-<code>in_progress / G20 accepted; source-proof holding</code>
-
-#### Task
-Resume Hito Stack Simplification only when a concrete cleanup candidate is source-proved.
-
-<sub><code>STAGE</code></sub>
-
-<code>ARCHITECT source-proof holding / no safe next implementation gate selected.</code>
-
-<sub><code>LAST VISIBLE NOTE</code></sub>
-
-G20 Closeout — 2026-06-20: complete / G20 accepted; source-proof holding.
-
-<sub><code>NEXT ROLE</code></sub>
-
-<code>architect</code>
-
----
-
-### 3. [Running Plan Creation Engine Rebuild](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md>)
+### 2. [Running Plan Creation Engine Rebuild](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md>)
 
 <sub><code>STATUS</code></sub>
 
 <code>in_progress</code>
 
 #### Task
-Resume bounded cleanup routing through the simplification strike after the accepted benchmark-backed pace truth closeout.
+Hold running-plan expansion after accepted benchmark-backed pace truth and archived simplification strike.
 
 <sub><code>STAGE</code></sub>
 
-<code>ARCHITECT checkpoint / post-benchmark-truth closeout and cleanup return.</code>
+<code>ARCHITECT holding / post-benchmark-truth and post-cleanup sequencing.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
@@ -124,30 +101,30 @@ Benchmark-Backed Pace Truth Closeout — 2026-06-17: Accepted / backend seam, fr
 
 ---
 
-### 4. [Manual Workout Authoring And User-Built Plans](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md>)
+### 3. [Manual Workout Authoring And User-Built Plans](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md>)
 
 <sub><code>STATUS</code></sub>
 
-<code>in_progress — manual Add, personal saved templates, manual Copy/Paste, manual Delete/Clear, manual Move Workout, Backend / Export Slice 7 manual active-plan JSON/Markdown export, universal active-plan Add/Clear/Move edi...</code>
+<code>in_progress</code>
 
 #### Task
-Validate the persisted future manual workout edit backend seam before frontend exposes `Edit training` on workout detail.
+Simplify the manual/template workout constructor anatomy using the accepted target-truth contract.
 
 <sub><code>STAGE</code></sub>
 
-<code>QA validation / persisted future workout editing review-confirm seam.</code>
+<code>FRONTEND implementation / manual constructor simplification and runner-facing target language.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Future Workout Detail Actions And Persisted Edit Contract — 2026-06-15: Accepted as product/architecture contract; backend implementation completed and awaiting QA.
+Current Status Detail
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>qa</code>
+<code>frontend</code>
 
 ---
 
-### 5. [Hito DS Information Architecture And Specimen Contract](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-15-hito-ds-information-architecture-and-specimen-contract.md>)
+### 4. [Hito DS Information Architecture And Specimen Contract](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-15-hito-ds-information-architecture-and-specimen-contract.md>)
 
 <sub><code>STATUS</code></sub>
 
@@ -167,6 +144,29 @@ Root Cause: `/hitoDS#calendar-workout-playground` does not feel enough like a re
 <sub><code>NEXT ROLE</code></sub>
 
 <code>frontend</code>
+
+---
+
+### 5. [Hito Docs And Artifact Compression](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-20-hito-docs-and-artifact-compression.md>)
+
+<sub><code>STATUS</code></sub>
+
+<code>in_progress</code>
+
+#### Task
+Hold docs/artifact cleanup after QA-passed E13/E14 manual-workout QA image compression apply.
+
+<sub><code>STAGE</code></sub>
+
+<code>ARCHITECT holding / post-apply closeout and next-gate safety review.</code>
+
+<sub><code>LAST VISIBLE NOTE</code></sub>
+
+E14 Closeout — Manual-Workout QA Image Compression Apply Validation: passed / E13 rollback-protected image apply accepted by QA; cleanup track holding.
+
+<sub><code>NEXT ROLE</code></sub>
+
+<code>architect</code>
 
 ## Safety Notes
 

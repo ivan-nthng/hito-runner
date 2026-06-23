@@ -15,8 +15,6 @@ import {
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import {
   clearUpcomingSchedule,
-  completeOnboarding,
-  completeTextOnboarding,
   deleteActivePlan,
   applyActivePlanRefreshProposal,
   applyActivePlanScheduleReflowPreview,
@@ -24,6 +22,7 @@ import {
   proposeActivePlanRefresh,
   type ViewerSummary,
 } from "@/lib/training-api";
+import { completeOnboarding, completeTextOnboarding } from "@/lib/plan-replacement-actions";
 import type { ProposeActivePlanRefreshResult } from "@/lib/active-plan-refresh-contract";
 import type {
   ActivePlanScheduleEditInput,
@@ -743,7 +742,7 @@ export function PlanManagementDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="hito-dialog-overlay-stable"
-        className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-2xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-wide hito-dialog-height-workflow"
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Open plan</DialogTitle>

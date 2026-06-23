@@ -1,6 +1,48 @@
 # Manual User-Built Plan Flow Spec
 
 ## Status
+
+in_progress
+
+## Type
+
+frontend_spec
+
+## Priority
+
+high
+
+## Next Recommended Role
+
+frontend
+
+## Task
+
+Use the manual user-built plan flow spec when implementing scoped manual authoring UI follow-ups.
+
+## Stage
+
+FRONTEND spec / manual user-built active-plan flow.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+Task:
+Use the manual user-built plan flow spec when implementing scoped manual authoring UI follow-ups.
+
+Stage:
+FRONTEND implementation / manual user-built active-plan flow.
+
+Context:
+This spec is current manual-authoring contract material. Preserve backend-owned review/confirm,
+manual workout authoring, template, target-truth, and active-plan lifecycle boundaries; do not
+compress or rewrite the spec body during metadata hygiene.
+```
+
+## Spec Status
+
 Draft, implementation-driving after architecture checkpoint. Updated with no-active-plan onboarding
 IA simplification and manual workout constructor UI contract.
 

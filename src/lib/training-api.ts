@@ -75,30 +75,6 @@ import {
 } from "@/lib/manual-workout-authoring";
 import { fetchManualWorkoutEvidenceWorkoutIds } from "@/lib/manual-workout-authoring/active-plan-add";
 
-export {
-  confirmStructuredFirstPlanDraft,
-  generateStructuredFirstPlanDraft,
-} from "@/lib/first-plan-actions";
-export {
-  confirmRunningPlanDraft,
-  previewRunningPlanDraft,
-} from "@/lib/running-plan-engine-actions";
-export {
-  addManualWorkoutToActivePlan,
-  createEmptyManualActivePlan,
-  confirmManualWorkoutDeleteClear,
-  confirmManualWorkoutDraft,
-  confirmManualWorkoutPersistedEdit,
-  copyManualWorkoutWithinActivePlan,
-  listManualWorkoutSavedTemplates,
-  moveManualWorkoutWithinActivePlan,
-  reconstructManualWorkoutPersistedEditDraft,
-  reviewManualWorkoutDeleteClear,
-  reviewManualWorkoutPersistedEditDraft,
-  reviewManualWorkoutSavedTemplate,
-  saveManualWorkoutSavedTemplate,
-} from "@/lib/manual-workout-authoring";
-export { completeOnboarding, completeTextOnboarding } from "@/lib/plan-replacement-actions";
 export interface ViewerSummary {
   name: string | null;
   email: string | null;

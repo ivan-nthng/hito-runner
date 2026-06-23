@@ -21,7 +21,7 @@ import { hitoToast } from "@/components/ui/hito-toast";
 import {
   confirmManualWorkoutDeleteClear,
   reviewManualWorkoutDeleteClear,
-} from "@/lib/training-api";
+} from "@/lib/manual-workout-authoring";
 import type { ManualWorkoutDeleteClearReviewResult } from "@/lib/manual-workout-authoring";
 import {
   formatManualDraftStructure,
@@ -226,7 +226,7 @@ export function ManualWorkoutSourceActionMenu({
         <DropdownMenuTrigger asChild disabled={disabled}>
           {children}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="hito-menu-width-standard">
           <DropdownMenuLabel>{formatReadableDate(sourceWorkoutDate)}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {canCopy ? (
@@ -343,7 +343,7 @@ function ManualDeleteClearReadyDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog max-w-2xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-wide"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">

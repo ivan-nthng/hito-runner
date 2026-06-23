@@ -160,6 +160,34 @@
   --sidebar-border: var(--hairline);
   --sidebar-ring: var(--ring);
   --hito-mobile-bottom-nav-height: 3.75rem;
+  --hito-shell-sidebar-width: 15rem;
+  --hito-shell-menu-width-profile: 13rem;
+  --hito-shell-menu-width-plan: 14rem;
+  --hito-shell-menu-width-account: 14rem;
+  --hito-menu-width-standard: 14rem;
+  --hito-admin-quick-note-panel-width: min(36rem, calc(100vw - 2.5rem));
+  --hito-route-support-sidebar-width: 20rem;
+  --hito-route-panel-skeleton-calendar-height: 26.25rem;
+  --hito-route-panel-skeleton-detail-height: 28.75rem;
+  --hito-form-section-label-width: 13.75rem;
+  --hito-form-section-avatar-width: 7rem;
+  --hito-readback-value-width: 12rem;
+  --hito-readback-value-compact-width: 11rem;
+  --hito-data-table-code-width-sm: 14rem;
+  --hito-data-table-code-width-md: 18rem;
+  --hito-data-table-code-width-lg: 20rem;
+  --hito-data-table-action-width: 18rem;
+  --hito-data-table-note-width: 16rem;
+  --hito-tooltip-width-lg: 18rem;
+  --hito-manual-workout-title-min-width: 14rem;
+  --hito-manual-workout-step-summary-min-width: 12rem;
+  --hito-manual-workout-menu-width-add: min(20rem, calc(100vw - 2rem));
+  --hito-manual-workout-menu-width-step: min(22rem, calc(100vw - 2rem));
+  --hito-manual-workout-menu-width-template: min(24rem, calc(100vw - 2rem));
+  --hito-manual-workout-menu-max-height-template: min(
+    32rem,
+    var(--radix-dropdown-menu-content-available-height)
+  );
 }
 
 .dark {
@@ -620,6 +648,10 @@
     min-height: 100vh;
     min-width: 0;
     color: var(--color-foreground);
+  }
+
+  .hito-workbench-shell-compact-sidebar {
+    --hito-workbench-sidebar-width: var(--hito-shell-sidebar-width);
   }
 
   .hito-workbench-sidebar {
@@ -1171,6 +1203,57 @@
     overflow: hidden;
   }
 
+  .hito-dialog-surface-product {
+    border: 1px solid var(--color-hairline);
+    background: color-mix(in oklch, var(--color-background) 95%, transparent);
+    padding: 0 !important;
+    backdrop-filter: blur(24px);
+  }
+
+  .hito-dialog-size-compact {
+    max-width: 32rem !important;
+  }
+
+  .hito-dialog-size-standard {
+    max-width: 36rem !important;
+  }
+
+  .hito-dialog-size-wide {
+    max-width: 42rem !important;
+  }
+
+  .hito-dialog-size-workflow {
+    max-width: 48rem !important;
+  }
+
+  .hito-dialog-size-review {
+    max-width: 64rem !important;
+  }
+
+  .hito-dialog-height-standard {
+    height: min(40rem, calc(100dvh - 2rem));
+  }
+
+  .hito-dialog-height-wide {
+    height: min(42rem, calc(100dvh - 2rem));
+  }
+
+  .hito-dialog-height-workflow {
+    height: min(44rem, calc(100dvh - 2rem));
+  }
+
+  .hito-dialog-height-workflow-relaxed {
+    height: min(46rem, calc(100dvh - 2rem));
+  }
+
+  .hito-dialog-height-review {
+    height: min(48rem, calc(100dvh - 2rem));
+  }
+
+  .hito-dialog-height-review-large {
+    height: min(52rem, calc(100dvh - 2rem));
+  }
+
   .hito-product-dialog-header {
     border-bottom: 1px solid var(--color-hairline);
     padding: 1.25rem 1.5rem;
@@ -1575,6 +1658,115 @@
     margin-bottom: 0;
   }
 
+  .hito-auth-entry-grid {
+    display: grid;
+    width: 100%;
+    gap: 3rem;
+  }
+
+  .hito-home-support-grid {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .hito-today-hero-grid {
+    display: grid;
+  }
+
+  .hito-route-support-grid {
+    display: grid;
+    gap: 2.5rem;
+  }
+
+  .hito-workout-hero-grid {
+    display: grid;
+    align-items: end;
+    gap: 2rem;
+  }
+
+  .hito-route-panel-skeleton {
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-background) 20%, transparent);
+  }
+
+  .hito-route-panel-skeleton-calendar {
+    height: var(--hito-route-panel-skeleton-calendar-height);
+  }
+
+  .hito-route-panel-skeleton-detail {
+    height: var(--hito-route-panel-skeleton-detail-height);
+  }
+
+  .hito-readback-value {
+    max-width: var(--hito-readback-value-width);
+    text-align: right;
+    font-size: 0.75rem;
+    line-height: 1.625;
+    color: color-mix(in oklch, var(--color-foreground) 85%, transparent);
+  }
+
+  .hito-readback-value-compact {
+    max-width: var(--hito-readback-value-compact-width);
+    line-height: 1.333;
+  }
+
+  .hito-form-section-grid {
+    display: grid;
+    row-gap: 1rem;
+    column-gap: 0;
+  }
+
+  .hito-form-section-grid-avatar {
+    row-gap: 2rem;
+  }
+
+  .hito-form-two-column-grid {
+    display: grid;
+    gap: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .hito-form-section-grid {
+      grid-template-columns: var(--hito-form-section-label-width) minmax(0, 1fr);
+      column-gap: 3rem;
+    }
+
+    .hito-form-two-column-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .hito-home-support-grid {
+      grid-template-columns: minmax(0, 1fr) var(--hito-route-support-sidebar-width);
+    }
+
+    .hito-auth-entry-grid {
+      grid-template-columns: 0.9fr 0.85fr;
+    }
+
+    .hito-today-hero-grid {
+      grid-template-columns: 1.4fr 1fr;
+    }
+
+    .hito-route-support-grid {
+      grid-template-columns: minmax(0, 1fr) var(--hito-route-support-sidebar-width);
+    }
+
+    .hito-workout-hero-grid {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .hito-form-section-grid {
+      column-gap: 4rem;
+    }
+
+    .hito-form-section-grid-avatar {
+      grid-template-columns: var(--hito-form-section-avatar-width) minmax(0, 1fr);
+      column-gap: 2rem;
+    }
+  }
+
   .ds-section {
     border-top: 1px solid var(--color-hairline);
     padding-top: 2rem;
@@ -1929,7 +2121,9 @@
   }
 
   .hito-onboarding-surface {
-    padding-bottom: 4rem;
+    max-width: 64rem;
+    margin-inline: auto;
+    padding: 1.5rem 1.5rem 4rem;
   }
 
   .hito-onboarding-surface[data-mode="quick"] {
@@ -1965,6 +2159,16 @@
   @media (min-width: 640px) {
     .hito-onboarding-submit-footer-inner {
       padding: 0.875rem 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .hito-onboarding-surface {
+      padding: 2.5rem 2.5rem 4rem;
+    }
+
+    .hito-onboarding-surface[data-mode="quick"] {
+      padding-bottom: 8rem;
     }
   }
 
@@ -2254,6 +2458,134 @@
     overflow-wrap: anywhere;
   }
 
+  .hito-manual-workout-editor-surface {
+    display: grid;
+    gap: 0.75rem;
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-surface) 25%, transparent);
+    padding: 1rem;
+  }
+
+  .hito-manual-workout-editor-surface-muted {
+    display: grid;
+    gap: 0.75rem;
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-background) 25%, transparent);
+    padding: 1rem;
+  }
+
+  .hito-manual-workout-title-field {
+    min-width: var(--hito-manual-workout-title-min-width);
+  }
+
+  .hito-manual-workout-guidance-row {
+    border: 0;
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-surface) 25%, transparent);
+  }
+
+  .hito-manual-workout-step-card {
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-surface) 25%, transparent);
+    padding: 1rem;
+    transition: background-color 160ms ease;
+  }
+
+  .hito-manual-workout-step-card:hover,
+  .hito-manual-workout-step-card:focus-within {
+    background: color-mix(in oklch, var(--color-surface) 35%, transparent);
+  }
+
+  .hito-manual-workout-step-summary {
+    min-width: var(--hito-manual-workout-step-summary-min-width);
+  }
+
+  .hito-manual-workout-structure-bar {
+    position: relative;
+    display: flex;
+    height: 3rem;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-md);
+    background: color-mix(in oklch, var(--color-background) 25%, transparent);
+  }
+
+  .hito-manual-workout-structure-segment {
+    position: relative;
+    min-width: 1.25rem;
+    overflow: hidden;
+    border-inline: 1px solid color-mix(in oklch, var(--color-background) 20%, transparent);
+  }
+
+  .hito-manual-workout-structure-segment:first-child {
+    border-left: 0;
+    border-top-left-radius: var(--radius-md);
+    border-bottom-left-radius: var(--radius-md);
+  }
+
+  .hito-manual-workout-structure-segment:last-child {
+    border-right: 0;
+    border-top-right-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+  }
+
+  .hito-manual-workout-structure-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-inline: 0.25rem;
+    color: color-mix(in oklch, var(--color-background) 80%, transparent);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    mix-blend-mode: luminosity;
+  }
+
+  .hito-manual-workout-repeat-settings-grid,
+  .hito-manual-workout-field-grid {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .hito-manual-workout-block-fields {
+    display: grid;
+    gap: 0.75rem;
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-background) 35%, transparent);
+    padding: 0.75rem;
+  }
+
+  .hito-manual-workout-menu-add {
+    width: var(--hito-manual-workout-menu-width-add);
+    padding: 0.5rem;
+  }
+
+  .hito-manual-workout-menu-step {
+    width: var(--hito-manual-workout-menu-width-step);
+    padding: 0.5rem;
+  }
+
+  .hito-manual-workout-menu-template {
+    width: var(--hito-manual-workout-menu-width-template);
+    max-height: var(--hito-manual-workout-menu-max-height-template);
+    overflow-y: auto;
+    padding: 0.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .hito-manual-workout-repeat-settings-grid {
+      grid-template-columns: minmax(0, 1fr) 9rem minmax(10rem, 0.75fr);
+    }
+
+    .hito-manual-workout-field-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
   @media (max-width: 560px) {
     .hito-selected-plan-calendar-detail {
       flex-direction: column;
@@ -2270,7 +2602,36 @@
 
   .hito-onboarding-option-button {
     align-items: flex-start;
+    justify-content: flex-start;
     gap: 0.65rem;
+    min-height: 4rem;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .hito-onboarding-option-grid {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .hito-onboarding-option-row-button {
+    width: 100%;
+    min-height: 3.5rem;
+    justify-content: space-between;
+    text-align: left;
+    white-space: normal;
+  }
+
+  @media (min-width: 640px) {
+    .hito-onboarding-option-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .hito-onboarding-option-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   .hito-onboarding-option-icon {
@@ -3620,6 +3981,14 @@
     border-top: 1px solid var(--color-hairline);
   }
 
+  .hito-list-row-signal {
+    background: color-mix(in oklch, var(--color-signal) 3%, transparent);
+  }
+
+  .hito-list-row-muted {
+    background: color-mix(in oklch, var(--color-surface) 30%, transparent);
+  }
+
   .hito-backlog-list .hito-list-row {
     border-top: 0;
     border-radius: 0;
@@ -3825,6 +4194,10 @@
     color: var(--color-muted-foreground);
   }
 
+  .hito-shell-sidebar-width {
+    width: var(--hito-shell-sidebar-width);
+  }
+
   .hito-shell-nav {
     display: grid;
     gap: 0.125rem;
@@ -3959,10 +4332,31 @@
 
   .hito-avatar-tile,
   .hito-profile-avatar {
+    width: var(--hito-form-section-avatar-width);
+    height: var(--hito-form-section-avatar-width);
     overflow: hidden;
     border: 1px solid var(--color-hairline);
     border-radius: var(--radius-xl) !important;
     background: color-mix(in oklch, var(--color-background) 70%, transparent);
+  }
+
+  .hito-settings-section,
+  .hito-settings-panel,
+  .hito-settings-actions {
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 1.25rem;
+  }
+
+  .hito-settings-panel {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .hito-settings-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .hito-avatar-action {
@@ -3989,6 +4383,22 @@
     background: color-mix(in oklch, var(--color-background) 95%, transparent);
     padding: 0.375rem;
     backdrop-filter: blur(18px);
+  }
+
+  .hito-shell-menu-profile {
+    width: var(--hito-shell-menu-width-profile);
+  }
+
+  .hito-shell-menu-plan {
+    width: var(--hito-shell-menu-width-plan);
+  }
+
+  .hito-shell-menu-account {
+    width: var(--hito-shell-menu-width-account);
+  }
+
+  .hito-menu-width-standard {
+    width: var(--hito-menu-width-standard);
   }
 
   .hito-shell-profile-menu-label {
@@ -4131,6 +4541,23 @@
     color: var(--color-muted-foreground);
   }
 
+  .hito-analytics-list-item {
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-foreground) 3.5%, transparent);
+    padding: 0.5rem 0.75rem;
+  }
+
+  .hito-analytics-list-item-spacious {
+    padding: 0.75rem 1rem;
+  }
+
+  .hito-analytics-list-item-split {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
   .hito-data-table-scroll {
     width: 100%;
     overflow-x: auto;
@@ -4143,6 +4570,18 @@
     border-collapse: separate;
     border-spacing: 0 0.5rem;
     text-align: left;
+  }
+
+  .hito-data-table-min-md {
+    min-width: 53.75rem;
+  }
+
+  .hito-data-table-min-lg {
+    min-width: 77.5rem;
+  }
+
+  .hito-data-table-min-xl {
+    min-width: 80rem;
   }
 
   .hito-data-table-cell {
@@ -4172,12 +4611,66 @@
     white-space: nowrap;
   }
 
+  .hito-data-table-code-width-sm {
+    max-width: var(--hito-data-table-code-width-sm);
+  }
+
+  .hito-data-table-code-width-md {
+    max-width: var(--hito-data-table-code-width-md);
+  }
+
+  .hito-data-table-code-width-lg {
+    max-width: var(--hito-data-table-code-width-lg);
+  }
+
+  .hito-data-table-action-stack {
+    display: grid;
+    max-width: var(--hito-data-table-action-width);
+    gap: 0.5rem;
+  }
+
+  .hito-data-table-note {
+    max-width: var(--hito-data-table-note-width);
+  }
+
   .hito-data-table-utility-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+  }
+
+  .hito-admin-utility-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .hito-admin-quick-note-panel {
+    z-index: 30;
+    width: var(--hito-admin-quick-note-panel-width);
+    max-width: calc(100vw - 2.5rem);
+    margin-top: 0.5rem;
+  }
+
+  .hito-admin-quick-note-surface {
+    display: grid;
+    gap: 1rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-2xl);
+    background: var(--color-background);
+    padding: 1rem;
+    box-shadow: 0 18px 56px color-mix(in oklch, var(--color-foreground) 14%, transparent);
+  }
+
+  @media (min-width: 640px) {
+    .hito-admin-quick-note-panel {
+      position: absolute;
+      right: 0;
+    }
   }
 
   .hito-data-table-search {
@@ -4321,6 +4814,18 @@
     max-width: min(18rem, calc(100vw - 2rem));
   }
 
+  .hito-data-table-menu-width-compact {
+    width: 14rem;
+  }
+
+  .hito-data-table-menu-width-standard {
+    width: 16rem;
+  }
+
+  .hito-data-table-menu-width-wide {
+    width: 18rem;
+  }
+
   .hito-data-table-menu-item {
     cursor: pointer;
   }
@@ -4447,6 +4952,11 @@
     text-align: left;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.44);
     backdrop-filter: blur(18px);
+  }
+
+  .hito-tooltip-width-lg {
+    width: min(var(--hito-tooltip-width-lg), calc(100vw - 2rem));
+    max-width: min(var(--hito-tooltip-width-lg), calc(100vw - 2rem));
   }
 
   .hito-tooltip-title {
@@ -4658,6 +5168,37 @@
 
   .hito-calendar-type-glyph[data-glyph="long"] {
     width: 0.92rem;
+  }
+
+  .hito-calendar-drag-preview {
+    width: max-content;
+    max-width: 15rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-popover) 96%, transparent);
+    padding: 0.625rem 0.75rem;
+    color: var(--color-foreground);
+    text-align: left;
+    box-shadow: 0 18px 42px color-mix(in oklch, black 28%, transparent);
+    opacity: 0.96;
+    backdrop-filter: blur(18px);
+  }
+
+  .hito-calendar-drag-preview-title {
+    overflow: hidden;
+    color: var(--color-foreground);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hito-calendar-drag-preview-meta {
+    margin-top: 0.25rem;
+    color: var(--color-muted-foreground);
+    font-size: 0.6875rem;
+    line-height: 1.35;
   }
 
   .hito-calendar-mobile-list {

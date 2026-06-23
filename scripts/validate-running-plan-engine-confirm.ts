@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  confirmActivePlanTransitionForUser,
+  reviewActivePlanTransitionForUser,
+  type ActivePlanTransitionDependencies,
+} from "../src/lib/active-plan-transition-actions";
+import type { ExistingPlanContext } from "../src/lib/active-plan-persistence";
+import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../src/lib/manual-workout-authoring/schema";
+import {
   buildReviewedRunningPlanPreview,
   confirmRunningPlanDraftForUser,
+  type RunningPlanConfirmActionInput,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
 import {
@@ -147,6 +155,10 @@ async function main() {
   const reviewedDrafts = await validateStableReviewContract();
   const benchmarkProof = await validateBenchmarkBackedPaceTruthContract();
   await validateFailureBoundaries(reviewedDrafts[0]);
+  const activeManualTransitionProof = await validateActiveManualPlanTransitionContract(
+    reviewedDrafts[0],
+  );
+  validateActivePlanTransitionSourceBoundaries();
   validateLegacyPlanPresetCreateSeamIsRemoved();
 
   const persistencePreflight = resolvePersistencePreflight(options);
@@ -168,6 +180,7 @@ async function main() {
       reviewContractVersion: draft.reviewContractVersion,
     })),
     benchmarkPaceTruth: benchmarkProof,
+    activeManualTransition: activeManualTransitionProof,
     persistence: persistenceResults,
   });
 }
@@ -491,6 +504,259 @@ async function validateFailureBoundaries(
   }
 }
 
+async function validateActiveManualPlanTransitionContract(
+  reviewedDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+) {
+  const userId = "transition-dry-run-user";
+  const reviewInput = {
+    activePlanId: "manual-plan-1",
+    candidate: buildConfirmInputFromDraft(reviewedDraft),
+  };
+  let context = buildManualActivePlanContext();
+  let persistCalls = 0;
+  let persistedInput: Parameters<ActivePlanTransitionDependencies["persistTransition"]>[0] | null =
+    null;
+  const dependencies: Partial<ActivePlanTransitionDependencies> = {
+    today: () => "2026-06-08",
+    getPlanContext: async () => context,
+    loadEvidenceSummary: async () => ({
+      providerEvidenceCount: 1,
+      actualMetricCount: 1,
+      comparisonCount: 1,
+      aiInsightCount: 1,
+      evidenceBackedWorkoutIds: ["manual-workout-past"],
+    }),
+    persistTransition: async (input) => {
+      persistCalls += 1;
+      persistedInput = input;
+      const seed = buildImportedPlanSeed(input.reviewedPlan);
+
+      return {
+        archivedPlan: {
+          ...input.currentActivePlan,
+          status: "archived",
+        },
+        activePlan: {
+          ...input.currentActivePlan,
+          id: "selected-plan-1",
+          title: input.reviewedPlan.plan_name,
+          source_kind: input.reviewedPlan.source_kind,
+          source_template: input.reviewedPlan.schema_version,
+          schema_version: input.reviewedPlan.schema_version,
+          start_date: input.reviewedPlan.start_date,
+          end_date:
+            input.reviewedPlan.planned_workouts.at(-1)?.date ?? input.reviewedPlan.start_date,
+          status: "active",
+        },
+        workouts: seed.workouts.map((workout, index) =>
+          buildPersistedWorkoutFromSeed(workout, index, "selected-plan-1", userId),
+        ),
+      };
+    },
+  };
+
+  const review = await reviewActivePlanTransitionForUser(userId, reviewInput, dependencies);
+  assert.equal(review.ok, true, "Active manual transition review must be available.");
+  if (!review.ok) throw new Error(review.message);
+
+  assert.equal(review.persisted, false);
+  assert.equal(review.mutates, false);
+  assert.equal(review.callsOpenAi, false);
+  assert.equal(review.currentPlan.id, "manual-plan-1");
+  assert.equal(review.currentPlan.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+  assert.equal(review.candidatePlan.sourceKind, reviewedDraft.sourceKind);
+  assert.equal(review.affectedManualSchedule.upcomingWorkoutCount, 2);
+  assert.deepEqual(review.affectedManualSchedule.upcomingWorkoutDates, [
+    "2026-06-09",
+    "2026-06-12",
+  ]);
+  assert.equal(review.preservedHistory.loggedWorkoutCount, 1);
+  assert.equal(review.preservedHistory.evidenceBackedWorkoutCount, 1);
+  assert.equal(review.manualTemplates.preserved, true);
+  assert.equal(review.metricHonesty.fakePaceAllowed, false);
+  assert.equal(review.metricHonesty.fakePersonalHrAllowed, false);
+  assert.equal(review.metricHonesty.hrTargetRowCount, 0);
+  assert.equal(review.safety.trustedClientRows, false);
+  assert.equal(review.safety.upcomingManualWorkoutsMergeIntoCandidate, false);
+  assert.equal(persistCalls, 0, "Transition review must be non-mutating.");
+
+  const clientRowsPayload = await reviewActivePlanTransitionForUser(
+    userId,
+    {
+      ...reviewInput,
+      calendarRows: reviewedDraft.calendarRows,
+    },
+    dependencies,
+  );
+  assert.equal(clientRowsPayload.ok, false);
+  if (!clientRowsPayload.ok) {
+    assert.equal(clientRowsPayload.reason, "invalid_review");
+  }
+
+  const confirmed = await confirmActivePlanTransitionForUser(
+    userId,
+    {
+      reviewInput,
+      transitionReviewToken: review.transitionReviewToken,
+      transitionReviewChecksum: review.transitionReviewChecksum,
+    },
+    dependencies,
+  );
+  assert.equal(confirmed.ok, true, "Reviewed manual transition confirm must persist.");
+  if (!confirmed.ok) throw new Error(confirmed.message);
+
+  assert.equal(persistCalls, 1);
+  assert.ok(persistedInput, "Transition confirm must call the canonical persistence owner.");
+  assert.equal(persistedInput.currentActivePlan.id, "manual-plan-1");
+  assert.equal(persistedInput.currentActivePlan.source_kind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+  assert.equal(persistedInput.expectedCurrentActivePlanUpdatedAt, "2026-06-07T10:00:00Z");
+  assert.equal(persistedInput.reviewedPlan.source_kind, reviewedDraft.sourceKind);
+  assert.equal(
+    (persistedInput.planMetadata?.goalMetadata as { active_plan_transition?: unknown })
+      .active_plan_transition != null,
+    true,
+  );
+  assert.equal(confirmed.archivedPlanId, "manual-plan-1");
+  assert.equal(confirmed.activePlanId, "selected-plan-1");
+  assert.equal(confirmed.affectedManualWorkoutCount, 2);
+  assert.equal(confirmed.safety.oldPlanArchived, true);
+  assert.equal(confirmed.safety.upcomingManualWorkoutsMerged, false);
+  assert.equal(confirmed.safety.trustedClientRows, false);
+  validateNoFakePaceOrPersonalHr(persistedInput.reviewedPlan.planned_workouts);
+  assert.doesNotMatch(
+    JSON.stringify(persistedInput.reviewedPlan.planned_workouts),
+    /manual-workout-future|manual-workout-past/,
+    "Transition candidate rows must not merge future manual workouts into the selected plan.",
+  );
+
+  context = buildManualActivePlanContext({
+    plan: { updated_at: "2026-06-07T11:00:00Z" },
+  });
+  const staleRevision = await confirmActivePlanTransitionForUser(
+    userId,
+    {
+      reviewInput,
+      transitionReviewToken: review.transitionReviewToken,
+      transitionReviewChecksum: review.transitionReviewChecksum,
+    },
+    dependencies,
+  );
+  assert.equal(staleRevision.ok, false);
+  if (!staleRevision.ok) {
+    assert.equal(staleRevision.reason, "stale_review");
+  }
+
+  context = buildManualActivePlanContext();
+  const invalidToken = await confirmActivePlanTransitionForUser(
+    userId,
+    {
+      reviewInput,
+      transitionReviewToken: `${review.transitionReviewToken.slice(0, -1)}0`,
+      transitionReviewChecksum: review.transitionReviewChecksum,
+    },
+    dependencies,
+  );
+  assert.equal(invalidToken.ok, false);
+  if (!invalidToken.ok) {
+    assert.equal(invalidToken.reason, "invalid_review");
+  }
+
+  const changedCandidate = await confirmActivePlanTransitionForUser(
+    userId,
+    {
+      reviewInput: {
+        ...reviewInput,
+        candidate: {
+          ...reviewInput.candidate,
+          previewInput: {
+            ...reviewInput.candidate.previewInput,
+            startDate: "2026-06-15",
+          },
+        },
+      },
+      transitionReviewToken: review.transitionReviewToken,
+      transitionReviewChecksum: review.transitionReviewChecksum,
+    },
+    dependencies,
+  );
+  assert.equal(changedCandidate.ok, false);
+  if (!changedCandidate.ok) {
+    assert.equal(changedCandidate.reason, "stale_review");
+  }
+
+  context = buildManualActivePlanContext({
+    plan: { source_kind: reviewedDraft.sourceKind },
+  });
+  const nonManual = await reviewActivePlanTransitionForUser(userId, reviewInput, dependencies);
+  assert.equal(nonManual.ok, false);
+  if (!nonManual.ok) {
+    assert.equal(nonManual.reason, "unsupported_active_plan_source");
+  }
+
+  context = { activePlan: null, existingWorkouts: { workouts: [], logsByWorkoutId: new Map() } };
+  const noActiveManual = await reviewActivePlanTransitionForUser(userId, reviewInput, dependencies);
+  assert.equal(noActiveManual.ok, false);
+  if (!noActiveManual.ok) {
+    assert.equal(noActiveManual.reason, "no_active_manual_plan");
+  }
+
+  return {
+    sourceKind: reviewedDraft.sourceKind,
+    reviewedUpcomingManualWorkouts: review.affectedManualSchedule.upcomingWorkoutCount,
+    protectedHistoryLoggedWorkouts: review.preservedHistory.loggedWorkoutCount,
+    transitionConfirmRows: confirmed.calendarRowCount,
+    mutatesOnlyOnConfirm: true,
+  };
+}
+
+function validateActivePlanTransitionSourceBoundaries() {
+  const persistenceSource = readFileSync("src/lib/active-plan-persistence.ts", "utf8");
+  const transitionSource = readFileSync("src/lib/active-plan-transition-actions.ts", "utf8");
+  const activePlanCreateDialogSource = readFileSync(
+    "src/components/plan-management/ActivePlanCreatePlanDialog.tsx",
+    "utf8",
+  );
+  const onboardingGateSource = readFileSync("src/components/OnboardingGate.tsx", "utf8");
+  const transitionHelperStart = persistenceSource.indexOf(
+    "export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser",
+  );
+  const nextHelperStart = persistenceSource.indexOf(
+    "export async function createEmptyActivePlanForUser",
+  );
+  const transitionHelperSource = persistenceSource.slice(transitionHelperStart, nextHelperStart);
+
+  assert.ok(transitionHelperStart >= 0, "Transition persistence helper must exist.");
+  assert.ok(
+    nextHelperStart > transitionHelperStart,
+    "Transition persistence helper must be bounded.",
+  );
+  assert.ok(
+    transitionHelperSource.indexOf("currentPlanStillCurrent") <
+      transitionHelperSource.indexOf("upsertRunnerProfile"),
+    "Transition persistence must verify active-plan revision before profile or plan mutation.",
+  );
+  assert.doesNotMatch(
+    transitionHelperSource,
+    /replaceActivePlanWithImportedInput|deletePreviousPlan|\.delete\(\)/,
+    "Active manual transition must not use the legacy import replacement path that deletes the old plan.",
+  );
+  assert.doesNotMatch(
+    transitionSource,
+    /confirmRunningPlanDraft/,
+    "Active manual transition actions must not call the no-active-plan selected confirm seam.",
+  );
+  assert.doesNotMatch(
+    activePlanCreateDialogSource,
+    /confirmRunningPlanDraft/,
+    "Saved-mode Create a plan dialog must route confirm through active-plan transition actions.",
+  );
+  assert.match(
+    onboardingGateSource,
+    /confirmRunningPlanDraft/,
+    "No-active-plan onboarding may still use the selected-plan first-plan confirm seam.",
+  );
+}
+
 function validateLegacyPlanPresetCreateSeamIsRemoved() {
   const presetActionsSource = readFileSync("src/lib/plan-preset-actions.ts", "utf8");
   const trainingApiSource = readFileSync("src/lib/training-api.ts", "utf8");
@@ -539,6 +805,11 @@ function validateLegacyPlanPresetCreateSeamIsRemoved() {
     "Runtime Plan Preset actions should not preserve a blocked create seam.",
   );
   assert.doesNotMatch(
+    presetActionsSource,
+    /active_plan_exists|getActivePlan|getPersistedUserIdForAuthContext|Plan presets can create a new plan only when there is no active plan/,
+    "Plan Preset card discovery must stay non-mutating and must not be gated by active-plan existence.",
+  );
+  assert.doesNotMatch(
     trainingApiSource,
     new RegExp(`\\b${cardDiscoveryActionName}\\b|\\b${cardDiscoveryResultName}\\b`),
     "The route-facing facade must not re-export Plan Preset card discovery.",
@@ -552,6 +823,11 @@ function validateLegacyPlanPresetCreateSeamIsRemoved() {
     runningPlanActionsSource,
     /export const confirmRunningPlanDraft/,
     "Selected running-plan confirm remains the current plan creation seam.",
+  );
+  assert.match(
+    runningPlanActionsSource,
+    /reason:\s*"active_plan_exists"/,
+    "Selected running-plan first-plan confirm must still block direct creation when an active plan exists.",
   );
 }
 
@@ -821,6 +1097,168 @@ function buildInputFromDraft(draft: RunningPlanReviewedPreviewDraft<RunningPlanP
         }
       : {}),
   } satisfies RunningPlanPreviewActionInput;
+}
+
+function buildConfirmInputFromDraft(
+  draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+): RunningPlanConfirmActionInput {
+  return {
+    previewInput: buildInputFromDraft(draft),
+    planFamily: draft.planFamily,
+    sourceKind: draft.sourceKind as RunningPlanConfirmActionInput["sourceKind"],
+    reviewToken: draft.reviewToken,
+    reviewChecksum: draft.reviewChecksum,
+  };
+}
+
+function buildManualActivePlanContext(
+  overrides: {
+    plan?: Partial<PersistedPlanCycleRow>;
+    workouts?: PersistedWorkoutRow[];
+  } = {},
+): ExistingPlanContext {
+  const plan: PersistedPlanCycleRow = {
+    created_at: "2026-06-01T10:00:00Z",
+    updated_at: "2026-06-07T10:00:00Z",
+    end_date: "2026-07-01",
+    goal_metadata: {
+      source_status: "manual_user_built_plan_created",
+    },
+    goal_summary: "Manual user-built plan",
+    id: "manual-plan-1",
+    plan_preferences: null,
+    schema_version: "training-plan-v2",
+    source_kind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    source_template: "manual_user_built_plan_v1",
+    start_date: "2026-06-01",
+    status: "active",
+    target_date: null,
+    title: "Manual Plan",
+    user_id: "transition-dry-run-user",
+    ...overrides.plan,
+  };
+  const workouts = overrides.workouts ?? [
+    buildManualPersistedWorkout({
+      id: "manual-workout-past",
+      date: "2026-06-03",
+      title: "Logged manual workout",
+      workoutType: "easy",
+      displayOrder: 0,
+    }),
+    buildManualPersistedWorkout({
+      id: "manual-workout-future-1",
+      date: "2026-06-09",
+      title: "Future manual workout",
+      workoutType: "quality",
+      displayOrder: 1,
+    }),
+    buildManualPersistedWorkout({
+      id: "manual-workout-future-2",
+      date: "2026-06-12",
+      title: "Future manual long run",
+      workoutType: "long_run",
+      displayOrder: 2,
+    }),
+  ];
+
+  return {
+    activePlan: plan,
+    existingWorkouts: {
+      workouts,
+      logsByWorkoutId: new Map([
+        [
+          "manual-workout-past",
+          {
+            actual_distance_km: 6,
+            actual_duration_min: 42,
+            body_notes: null,
+            id: "manual-log-1",
+            intervals_completed: null,
+            logged_at: "2026-06-03T12:00:00Z",
+            notes: "Completed before transition.",
+            outcome: "completed",
+            planned_workout_id: "manual-workout-past",
+            rpe: 4,
+            updated_at: "2026-06-03T12:00:00Z",
+            user_id: "transition-dry-run-user",
+          },
+        ],
+      ]),
+    },
+  };
+}
+
+function buildManualPersistedWorkout(input: {
+  id: string;
+  date: string;
+  title: string;
+  workoutType: PersistedWorkoutRow["workout_type"];
+  displayOrder: number;
+}): PersistedWorkoutRow {
+  return {
+    calendar_icon_key: "run",
+    created_at: "2026-06-01T10:00:00Z",
+    display_order: input.displayOrder,
+    estimated_fatigue: null,
+    goal_context: {
+      manual_user_built_plan: true,
+    },
+    id: input.id,
+    metric_mode: {
+      executable_mode: "structure_only_executable",
+      pace_targets_allowed: false,
+      hr_targets_allowed: false,
+    },
+    notes: null,
+    phase: "Manual",
+    plan_cycle_id: "manual-plan-1",
+    planned_rpe: null,
+    recovery_priority: null,
+    source_workout_id: input.id,
+    source_workout_type: "manual_workout",
+    steps: [],
+    title: input.title,
+    user_id: "transition-dry-run-user",
+    week_number: 1,
+    weekday: "Tuesday",
+    workout_date: input.date,
+    workout_family: "easy_run",
+    workout_identity: input.id,
+    workout_type: input.workoutType,
+  };
+}
+
+function buildPersistedWorkoutFromSeed(
+  workout: ReturnType<typeof buildImportedPlanSeed>["workouts"][number],
+  index: number,
+  planCycleId: string,
+  userId: string,
+): PersistedWorkoutRow {
+  return {
+    calendar_icon_key: workout.calendarIconKey,
+    created_at: "2026-06-08T10:00:00Z",
+    display_order: index,
+    estimated_fatigue: workout.estimatedFatigue,
+    goal_context: workout.goalContext,
+    id: `selected-workout-${index + 1}`,
+    metric_mode: workout.metricMode,
+    notes: workout.notes,
+    phase: workout.phase,
+    plan_cycle_id: planCycleId,
+    planned_rpe: workout.plannedRpe,
+    recovery_priority: workout.recoveryPriority,
+    source_workout_id: workout.sourceWorkoutId,
+    source_workout_type: workout.sourceWorkoutType,
+    steps: workout.steps,
+    title: workout.title,
+    user_id: userId,
+    week_number: workout.weekNumber,
+    weekday: workout.weekday,
+    workout_date: workout.workoutDate,
+    workout_family: workout.workoutFamily,
+    workout_identity: workout.workoutIdentity,
+    workout_type: workout.workoutType,
+  };
 }
 
 function formatDurationSeconds(seconds: number) {

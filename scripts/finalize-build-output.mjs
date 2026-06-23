@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { basename, dirname, relative, resolve } from "node:path";
 import {
   validateLocalBuildOutput,
   validateVercelBuildOutput,
@@ -109,12 +109,37 @@ function copyDirectory(sourceDir, destinationDir) {
   cpSync(sourceDir, destinationDir, { recursive: true });
 }
 
+function copyGeneratedDirectory(sourceDir, destinationDir) {
+  if (!existsSync(sourceDir)) {
+    return;
+  }
+
+  mkdirSync(destinationDir, { recursive: true });
+  cpSync(sourceDir, destinationDir, {
+    recursive: true,
+    filter: shouldCopyGeneratedBuildPath,
+  });
+}
+
+function shouldCopyGeneratedBuildPath(sourcePath) {
+  const entryName = basename(sourcePath);
+  // Local sync can resurrect duplicate generated dirs such as "assets 2";
+  // keep the canonical sibling as the only finalized build artifact.
+  const canonicalEntryName = entryName.replace(/ \d+$/, "");
+
+  if (canonicalEntryName === entryName) {
+    return true;
+  }
+
+  return !existsSync(resolve(dirname(sourcePath), canonicalEntryName));
+}
+
 function snapshotLocalOutputForLateNitroCleanup() {
   removeGeneratedPath(localFinalizeBackupDir);
   removeGeneratedPath(localFinalizedOutputDir);
 
-  copyDirectory(outputServerDir, localFinalizeServerBackupDir);
-  copyDirectory(outputPublicDir, localFinalizePublicBackupDir);
+  copyGeneratedDirectory(outputServerDir, localFinalizeServerBackupDir);
+  copyGeneratedDirectory(outputPublicDir, localFinalizePublicBackupDir);
 }
 
 async function restoreLocalOutputAfterLateNitroCleanup() {
@@ -131,16 +156,16 @@ async function restoreLocalOutputAfterLateNitroCleanup() {
 }
 
 function restoreLocalOutputSnapshot() {
-  copyDirectory(localFinalizeServerBackupDir, localFinalizedServerDir);
+  copyGeneratedDirectory(localFinalizeServerBackupDir, localFinalizedServerDir);
   copyPlanPresetProgramArtifacts(localFinalizedPlanPresetProgramOutputDir);
-  copyDirectory(localFinalizePublicBackupDir, localFinalizedPublicDir);
+  copyGeneratedDirectory(localFinalizePublicBackupDir, localFinalizedPublicDir);
   linkLocalOutputDirectory(localFinalizedServerDir, outputServerDir);
   linkLocalOutputDirectory(localFinalizedPublicDir, outputPublicDir);
 }
 
 function restoreLocalPublicOutput() {
-  copyDirectory(clientPublicSnapshotDir, localFinalizedPublicDir);
-  copyDirectory(stagedPublicDir, localFinalizedPublicDir);
+  copyGeneratedDirectory(clientPublicSnapshotDir, localFinalizedPublicDir);
+  copyGeneratedDirectory(stagedPublicDir, localFinalizedPublicDir);
   copyDirectory(sourcePublicDir, localFinalizedPublicDir);
   linkLocalOutputDirectory(localFinalizedPublicDir, outputPublicDir);
 }

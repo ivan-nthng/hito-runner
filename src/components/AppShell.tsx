@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { ReactNode, useState } from "react";
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
 import { UploadJsonDialog } from "@/components/UploadJsonDialog";
+import { ActivePlanCreatePlanDialog } from "@/components/plan-management/ActivePlanCreatePlanDialog";
 import { PlanManagementDialog } from "@/components/PlanManagementDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HitoLogo } from "@/components/ui/hito-logo";
@@ -21,6 +22,7 @@ import {
   type TrainingSnapshot,
 } from "@/lib/training";
 import type { ViewerSummary } from "@/lib/training-api";
+import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 
 const NAV: { to: string; label: string; icon: HitoIconName }[] = [
   { to: "/", label: "Calendar", icon: "calendar" },
@@ -38,6 +40,7 @@ export function AppShell({
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [planManagementOpen, setPlanManagementOpen] = useState(false);
+  const [activePlanCreateOpen, setActivePlanCreateOpen] = useState(false);
   const [showShellPlanNote, setShowShellPlanNote] = useState(true);
   const loc = useLocation();
   const nextPath = getLoginIntentPath(
@@ -64,10 +67,17 @@ export function AppShell({
   const showUploadAction = shellSnapshot.mode !== "preview";
   const showSettingsAction = shellSnapshot.mode !== "preview";
   const useFreshHomeRequest = shellSnapshot.mode !== "preview";
+  const canCreatePlanFromActiveManualPlan =
+    shellSnapshot.mode === "authenticated" &&
+    snapshot?.planMeta?.sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+  const openPlanManagement = () => {
+    setActivePlanCreateOpen(false);
+    setPlanManagementOpen(true);
+  };
 
   return (
     <div className="min-h-screen flex bg-background text-foreground hito-canvas-atmosphere">
-      <aside className="hidden md:sticky md:top-0 md:flex md:h-screen w-[240px] shrink-0 self-start flex-col border-r border-hairline bg-sidebar/60 backdrop-blur">
+      <aside className="hito-shell-sidebar-width hidden shrink-0 self-start flex-col border-r border-hairline bg-sidebar/60 backdrop-blur md:sticky md:top-0 md:flex md:h-screen">
         <div className="px-6 pt-7 pb-10">
           <Link to="/" reloadDocument={useFreshHomeRequest} aria-label="Hito home">
             <HitoLogo className="[--hito-logo-height:1.45rem]" />
@@ -145,7 +155,11 @@ export function AppShell({
                 />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="hito-shell-menu w-[208px]">
+            <DropdownMenuContent
+              side="top"
+              align="start"
+              className="hito-shell-menu hito-shell-menu-profile"
+            >
               <DropdownMenuLabel className="hito-shell-profile-menu-label pb-1">
                 <div className="hito-menu-text">{profileName}</div>
                 <div className="hito-menu-meta mt-1 truncate">{profileDetail}</div>
@@ -225,14 +239,79 @@ export function AppShell({
                 <StatusPill label="Week" value={weekStatus.label} />
               ) : null}
               {shellSnapshot.mode === "authenticated" ? (
-                <button
-                  type="button"
-                  onClick={() => setPlanManagementOpen(true)}
-                  className="hito-button hito-button-secondary hito-button-sm"
-                >
-                  <Icon name="activity" size="xs" />
-                  Open plan
-                </button>
+                <>
+                  {canCreatePlanFromActiveManualPlan ? (
+                    <button
+                      type="button"
+                      onClick={() => setActivePlanCreateOpen(true)}
+                      className="hito-button hito-button-primary hito-button-sm hidden md:inline-flex"
+                    >
+                      <Icon name="sparkles" size="xs" />
+                      Create a plan
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={openPlanManagement}
+                    className={`hito-button hito-button-secondary hito-button-sm${
+                      canCreatePlanFromActiveManualPlan ? " hidden md:inline-flex" : ""
+                    }`}
+                  >
+                    <Icon name="activity" size="xs" />
+                    Open plan
+                  </button>
+                  {canCreatePlanFromActiveManualPlan ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="hito-button hito-button-secondary hito-button-sm md:hidden"
+                        >
+                          <Icon name="activity" size="xs" />
+                          Plan
+                          <Icon name="chevron-down" size="xs" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="hito-shell-menu hito-shell-menu-plan"
+                      >
+                        <DropdownMenuLabel>Plan actions</DropdownMenuLabel>
+                        <DropdownMenuItem
+                          className="hito-shell-menu-item"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            setActivePlanCreateOpen(true);
+                          }}
+                        >
+                          <Icon name="sparkles" size="sm" />
+                          Create a plan
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="hito-shell-menu-item"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            openPlanManagement();
+                          }}
+                        >
+                          <Icon name="activity" size="sm" />
+                          Open plan
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="hito-shell-menu-separator" />
+                        <DropdownMenuItem
+                          className="hito-shell-menu-item"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            setUploadOpen(true);
+                          }}
+                        >
+                          <Icon name="import" size="sm" />
+                          Import plan
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null}
+                </>
               ) : (
                 <Link
                   to={shellSnapshot.mode === "preview" ? "/login" : "/"}
@@ -293,6 +372,12 @@ export function AppShell({
         onOpenChange={setUploadOpen}
         defaultStartDate={snapshot?.currentDate}
         hasActivePlan={Boolean(snapshot?.planMeta)}
+      />
+      <ActivePlanCreatePlanDialog
+        open={activePlanCreateOpen}
+        onOpenChange={setActivePlanCreateOpen}
+        onOpenPlan={openPlanManagement}
+        snapshot={snapshot}
       />
       <PlanManagementDialog
         open={planManagementOpen}

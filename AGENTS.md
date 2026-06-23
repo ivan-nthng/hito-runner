@@ -446,6 +446,15 @@ Do not use subagents for:
 
 Lifecycle rules:
 
+- When a role needs another role's validation, review, or read-only audit inside the same active
+  cleanup lane, and subagent/thread tools are available, the role should start that role as a
+  role-prefixed subagent itself instead of returning a copy-paste prompt to the user. The delegated
+  session must begin with `ROLE: <ROLE>` so it loads the correct role instructions, for example
+  `ROLE: QA` for QA validation or `ROLE: BACKEND` for bounded tooling verification.
+- If the delegated work is QA validation for the same bounded batch and does not require Product
+  policy input, production access, secrets, or unsafe mutation, the parent agent should wait for the
+  QA subagent result, integrate it, and continue or fix within scope. Return to Product/user only
+  with the integrated final result, a real blocker, or an owner/policy boundary crossing.
 - Reuse an already-open subagent for a similar follow-up instead of spawning a duplicate.
 - Close completed or no-longer-needed subagents so they do not remain open and consume capacity.
 - If a subagent fails, times out, or returns unclear evidence, continue locally when possible and
@@ -458,6 +467,18 @@ Lifecycle rules:
   the current role's scope.
 - The main agent owns integration: summarize relevant subagent findings, verify critical claims when
   risk is high, and make one coherent recommendation or implementation result.
+
+User copy-paste reduction rule:
+
+- Do not make the user act as a relay between ARCHITECT, BACKEND, FRONTEND, QA, or other role agents
+  for routine same-track work. If the current role can safely delegate, validate, or continue the
+  next bounded step with subagents or local sequential checks, it must do so.
+- It is acceptable to hand a prompt back to the user only when a new top-level role/session is truly
+  required and cannot be started by available tools, when explicit Product approval is needed, or
+  when the next step changes owner/risk class in a way the active plan has not authorized.
+- Final reports must say whether the role delegated the next validation/check internally. If it did
+  not, it must explain why with one of: `subagent tools unavailable`, `Product decision required`,
+  `owner boundary crossed`, `unsafe mutation boundary`, or `single-agent sequential scope`.
 
 Global cleanup autonomous batch mode:
 
@@ -482,6 +503,21 @@ Global cleanup autonomous batch mode:
   validation coverage, or needs a product decision.
 - Autonomous cleanup batches must still report progress estimate, completed gates, remaining gates,
   subagents used/reused/closed, validation evidence, and any deferred risks.
+
+Minimum documentation rule for cleanup and artifact work:
+
+- Plans and current docs should record durable decisions, compact ledgers, current owners, metrics,
+  and links to machine-readable evidence. They must not duplicate long execution logs, full
+  manifests, per-file listings, shell output, repeated handoff prompts, or subagent transcripts.
+- For retention/apply/tooling work, write the full details to machine artifacts such as manifest,
+  apply-result, dry-run output, or QA report files; the active plan should keep only a compact ledger
+  entry with date, command/slice, counts, bytes, paths to manifests, validation commands, and next
+  gate/hold decision.
+- If documenting a cleanup slice adds more durable Markdown than the slice removed from tracked docs
+  or active source-of-truth, the agent must compact the report before closeout or explain why the
+  added source-of-truth is necessary.
+- Changelog/current docs/product-history digest updates should be aggregate and user-meaningful;
+  do not list every internal micro-gate unless the list is itself the accepted source of truth.
 
 Final reports for non-trivial work must state whether subagents were used, reused, and closed. If no
 subagents were used, give a short reason such as `none — single-file change`, `none — sequential

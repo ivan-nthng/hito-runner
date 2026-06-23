@@ -234,7 +234,7 @@ function ScheduleReflowReview({
         </span>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="hito-metric-row">
         <ScheduleMetric label="Moved workouts" value={String(result.changes.movedWorkoutCount)} />
         <ScheduleMetric
           label="Preserved/protected"
@@ -409,9 +409,9 @@ function RequiresRegenerationReview({
 
 function ScheduleMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[var(--radius-hito-md)] border border-border/60 bg-card/45 p-3">
-      <p className="hito-caption">{label}</p>
-      <p className="hito-metric-value mt-1">{value}</p>
+    <div className="hito-metric">
+      <p className="hito-metric-label">{label}</p>
+      <p className="hito-metric-value">{value}</p>
     </div>
   );
 }

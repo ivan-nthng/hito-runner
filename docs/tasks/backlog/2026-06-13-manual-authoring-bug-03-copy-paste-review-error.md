@@ -2,19 +2,49 @@
 
 ## Status
 
-ready
+in_progress
 
 ## Type
 
 bug
 
-## Severity
+## Priority
 
 high
 
-## Priority
+## Next Recommended Role
 
-now
+qa
+
+## Task
+
+Validate the manual workout copy/paste review lifecycle fix on a disposable manual active-plan
+fixture.
+
+## Stage
+
+QA validation / copy-paste review fix.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: QA
+
+Task:
+Validate the manual workout copy/paste review lifecycle fix on a disposable manual active-plan
+fixture.
+
+Stage:
+QA validation / copy-paste review fix.
+
+Context:
+Frontend claims raw `reading 'ok'` paste-review failures are now normalized into bounded reviewed or
+blocked states. Prove the browser flow and DB boundaries on a disposable manual-plan fixture.
+```
+
+## Severity
+
+high
 
 ## Owner
 
@@ -82,24 +112,3 @@ response shape is wrong.
 - confirm there is no raw `reading 'ok'` leak
 - confirm reviewed or bounded blocked state
 - confirm no silent persistence before backend confirm
-
-## Next Recommended Role
-
-QA
-
-## Exact Handoff Prompt
-
-```text
-ROLE: QA
-
-Task:
-Validate the manual workout copy/paste review lifecycle fix on a disposable manual active-plan
-fixture.
-
-Stage:
-QA validation / copy-paste review fix.
-
-Context:
-Frontend claims raw `reading 'ok'` paste-review failures are now normalized into bounded reviewed or
-blocked states. Prove the browser flow and DB boundaries on a disposable manual-plan fixture.
-```

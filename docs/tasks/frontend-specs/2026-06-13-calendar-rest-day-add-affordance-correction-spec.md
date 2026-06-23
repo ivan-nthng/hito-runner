@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Frontend implementation.
+in_progress
 
 ## Type
 
@@ -14,7 +14,7 @@ high
 
 ## Next Recommended Role
 
-FRONTEND
+frontend
 
 ## Task
 
@@ -23,6 +23,24 @@ Restore and normalize `Add activity` affordances on future editable calendar day
 ## Stage
 
 DESIGN SYSTEM audit / product calendar correction spec
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+Task:
+Restore and normalize `Add activity` affordances on future editable calendar days so rest days
+remain editable and visually consistent with the Hito calendar day contract.
+
+Stage:
+FRONTEND implementation / calendar rest-day add affordance correction.
+
+Context:
+This spec defines the source-of-truth correction for editable future rest/empty days. Preserve
+backend editability and protected-history truth; do not change manual authoring persistence,
+generated-plan behavior, or unrelated calendar actions.
+```
 
 ## Owner
 

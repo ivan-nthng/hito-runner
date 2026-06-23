@@ -63,14 +63,14 @@ function HomePendingState() {
           <Skeleton className="h-4 w-40 bg-background/40" />
           <Skeleton className="mt-5 h-16 w-full max-w-2xl bg-background/40" />
           <Skeleton className="mt-4 h-5 w-full max-w-xl bg-background/30" />
-          <div className="mt-8 grid gap-3 lg:grid-cols-[1fr_320px]">
+          <div className="hito-home-support-grid mt-8">
             <Skeleton className="h-40 bg-background/30" />
             <Skeleton className="h-40 bg-background/30" />
           </div>
         </section>
         <section className="space-y-5">
           <Skeleton className="h-12 w-56 bg-background/30" />
-          <Skeleton className="h-[420px] rounded-2xl bg-background/20" />
+          <Skeleton className="hito-route-panel-skeleton hito-route-panel-skeleton-calendar" />
         </section>
       </div>
     </AppShell>

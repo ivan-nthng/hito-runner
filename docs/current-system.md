@@ -71,7 +71,7 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns the remaining route-facing server-function wrapper layer for home, shell, workout detail, progress, settings route data, login, text compatibility onboarding, advanced JSON import, direct manual Copy/Paste and Move, Delete/Clear, Add/Create/Templates, persisted-edit actions, and active-plan refresh server-action binding; it re-exports login route data, Magic Link request, first-plan, route-data, active-plan lifecycle, active-plan refresh, plan replacement, running-plan create, workout-log action names, and live manual runtime wrappers for compatibility, but no longer owns those extracted implementation bodies or proved type-only/import-map contracts whose canonical owner modules already exist; active-plan export routes import the canonical export action owner directly, onboarding Plan Preset card discovery imports the canonical Plan Preset action owner directly, `/api/auth/confirm` imports the canonical auth callback exchange owner directly, the settings route imports `saveUserSettings` directly from the user-settings action owner, settings/first-plan/selected-plan type consumers import contract types from their canonical action modules, and no-caller manual Copy/Paste / Move review-confirm compatibility exports were removed from the facade
+  owns the remaining route-facing server-function wrapper layer for home, shell, workout detail, progress, settings route data, login, active-plan lifecycle, active-plan refresh, schedule edit/reflow, workout log, and the one live manual draft review action wrapper. It no longer owns extracted implementation bodies, proved type-only/import-map contracts, plan replacement action names, or manual Add/Create/Templates/Copy/Move/Delete/Clear/Edit runtime wrappers whose canonical owner modules already exist; active-plan export routes import the canonical export action owner directly, onboarding Plan Preset card discovery imports the canonical Plan Preset action owner directly, no-active-plan first-plan and selected-plan creation imports now call the canonical action owners directly, saved-mode JSON/text replacement imports call `src/lib/plan-replacement-actions.ts` directly, `/api/auth/confirm` imports the canonical auth callback exchange owner directly, the settings route imports `saveUserSettings` directly from the user-settings action owner, settings/first-plan/selected-plan type consumers import contract types from their canonical action modules, and manual authoring runtime actions import directly from `src/lib/manual-workout-authoring/*` except for `reviewManualWorkoutDraftAction`, which remains as the TanStack server-function wrapper around the pure draft review seam
 - `src/lib/route-data-actions.ts`
   owns the shared route-data helper layer:
   home, shell, workout-detail, and progress data shaping now live there behind injected snapshot/viewer/feedback loaders, while `training-api.ts` keeps the public TanStack `createServerFn` wrappers so existing route imports and loader data shapes stay stable
@@ -91,7 +91,7 @@
   `/admin/capture` is an admin-only standalone workbench sibling to `/admin/analytics`; it renders backend-shaped backlog items with status tabs, compact search/filter controls, inline item detail, triage controls, quick-note creation, note append, archive-by-status, and deterministic copy-prompt clipboard actions while leaving admin access, storage, prompt shaping, lifecycle validation, screenshots, live UI capture, and any Codex dispatch on backend/future seams
 - `src/lib/first-plan-actions.ts`
   owns the first-plan server-action layer:
-  `completeStructuredFirstPlanOnboarding`, `generateStructuredFirstPlanDraft`, `confirmStructuredFirstPlanDraft`, `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and `completeStructuredFirstPlanOnboardingForUser` now live there while preserving the existing public runtime imports through `training-api.ts`. Current visible no-active-plan onboarding calls the structured draft/confirm actions, selected running-plan preview/confirm, and manual empty-plan creation; the voice draft/confirm actions remain backend/non-default and have no current `OnboardingGate` caller. First-plan review/confirm result types are imported directly from this owner module where needed, and the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
+  `generateStructuredFirstPlanDraft`, `confirmStructuredFirstPlanDraft`, `generateVoiceToPlanDraft`, and `confirmVoiceToPlanDraft` are the public first-plan server-action exports. Current visible no-active-plan onboarding imports the structured draft/confirm actions directly from this owner, imports selected running-plan preview/confirm directly from `running-plan-engine-actions.ts`, and keeps manual empty-plan creation on the manual-authoring facade path; the voice draft/confirm actions remain backend/non-default and have no current `OnboardingGate` caller. First-plan review/confirm result types are imported directly from this owner module where needed, internal user-scoped confirm/apply helpers stay private to the module, and the canonical write path remains sequential and calls the lower-level active-plan persistence seam directly only after validation/generation/review boundaries are satisfied
 - `src/lib/plan-presets/` and `src/lib/plan-preset-actions.ts`
   now own Plan Preset card discovery, not the active-plan create path:
   eligibility, card view models, recipe mapping, program summary/date fields, metric honesty, and
@@ -125,7 +125,7 @@
   it checks `ai_plan_update` entitlement before proposal generation, records usage only after a successful proposal with an exact draft attached, validates stale fingerprints before apply, applies only the reviewed draft without calling OpenAI or regenerating, blocks if a formerly mutable workout became logged or evidence-backed, archive/replaces the active plan while preserving fixed history/logged/Garmin evidence truth including stored rich workout fields for fixed/protected rows, and accepts the existing persisted snapshot loader from `training-api.ts` so public action result shapes remain stable
 - `src/lib/plan-replacement-actions.ts`
   owns the saved-mode plan replacement action layer:
-  advanced JSON import and text compatibility replacement actions validate their existing inputs, resolve the authenticated persisted user, preserve start-date and first-day resolution behavior, and apply canonical `training-plan-v2` plan truth through `active-plan-persistence` while `training-api.ts` keeps only the current public `completeOnboarding` and `completeTextOnboarding` action names as compatibility re-exports
+  advanced JSON import and text compatibility replacement actions validate their existing inputs, resolve the authenticated persisted user, preserve start-date and first-day resolution behavior, and apply canonical `training-plan-v2` plan truth through `active-plan-persistence`; saved-mode route/component callers import `completeOnboarding` and `completeTextOnboarding` from this canonical owner directly instead of through `training-api.ts`
 - `src/lib/changelog-utils.ts`
   owns pure `/changelog` markdown parsing, date/month/year grouping, source-derived shipped-change count and last-updated helpers, highlight classification, and milestone title derivation while the public route keeps shell, tabs, timeline rendering, and the existing `docs/history/changelog.md?raw` source import
 - `src/lib/user-settings-actions.ts`
@@ -227,18 +227,26 @@
   if a user has no `runner_entitlements` row, the effective tier is `Pro`; an explicit active `basic` row can enforce the first limits, including one lifetime included `ai_plan_update`, while `voice_to_plan` and `garmin_ai_interpretation` are Pro-only capabilities
 - authenticated users without `runner_profile` are routed into setup on `/`
 - authenticated users with a saved profile but no active `plan_cycle` now also stay honestly in setup until a canonical creation path succeeds
-- Plan Presets are now a no-active-plan discovery path:
+- Plan Presets are now a non-mutating discovery path:
   the setup surface can show backend-owned `10K Foundation`, `Half Marathon Balanced`, and
   `Marathon Base` cards, each with backend-owned eligibility, duration, workout mix, metric honesty,
   and fit copy. The setup surface imports card discovery directly from the Plan Preset action owner.
-  Selecting a card enters the selected running-plan preview/create path; the legacy Plan Preset
-  review/confirm seam has been removed from runtime. Presets apply only when there is no active plan
-  and do not implement active-plan replacement, refresh, manual workout authoring, or target-date
-  preset behavior.
+  Card discovery does not check or mutate active-plan state, so saved-mode `Create a plan` can load
+  the same backend-owned family cards for an active manual plan. Selecting a card enters selected
+  running-plan preview/create truth; the legacy Plan Preset review/confirm seam has been removed
+  from runtime. Direct selected-plan create applies only when there is no active plan through that
+  normal creation seam; starting a generated/preset plan from an existing
+  `manual_user_built_plan_v1` uses the separate backend-owned reviewed transition seam in
+  `src/lib/active-plan-transition-actions.ts`, not the removed Plan Preset review/confirm seam.
+  That transition review is non-mutating, signs stable selected-plan plus active-plan revision
+  truth, and confirm archives/supersedes the old manual plan before activating the reviewed selected
+  plan without merging upcoming manual workouts.
 - Manual user-built plans are now a canonical no-active-plan and saved-calendar creation path:
   `src/lib/manual-workout-authoring/*` owns draft validation, backend template registry, review
   token/checksum exactness, first manual plan confirm, and adding one reviewed workout into an
-  active plan. `src/lib/active-plan-workout-editing/policy.ts` now owns the shared active-plan
+  active plan; the manual Add mutation accepts eligible empty targets on today or future dates
+  while keeping past, occupied, logged/evidence-backed, and protected targets blocked.
+  `src/lib/active-plan-workout-editing/policy.ts` now owns the shared active-plan
   workout editability policy for Add/Clear/Move: accepted active-plan sources are no longer blocked
   solely because they are not `manual_user_built_plan_v1`, while backend protection can still block
   specific sources, rows, dates, logged/evidence-backed workouts, occupied targets, stale reviews,

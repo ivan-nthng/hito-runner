@@ -8,13 +8,44 @@ closed
 
 bug
 
+## Priority
+
+medium
+
+## Next Recommended Role
+
+product
+
+## Task
+
+Preserve Bug 04 as closed unless a fresh browser regression shows that non-rest template selection
+stops opening the constructor again.
+
+## Stage
+
+PRODUCT closure guard / regression-only reopen.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: PRODUCT
+
+Task:
+Preserve Bug 04 as closed unless a fresh browser regression shows that non-rest template selection
+stops opening the constructor again.
+
+Stage:
+PRODUCT closure guard / regression-only reopen.
+
+Context:
+QA passed this bug on 2026-06-15: `Add activity -> Choose template -> Easy aerobic run` and another
+non-rest template now open the constructor directly, and `Add rest day` still works. Do not reopen
+this item for unrelated constructor, menu, or calendar issues.
+```
+
 ## Severity
 
 high
-
-## Priority
-
-now
 
 ## Owner
 
@@ -96,25 +127,3 @@ non-rest templates stops opening the constructor again.
 - `Easy aerobic run` and another non-rest template should open constructor directly
 - `Add rest day` should stay working
 - accepted step-order honesty fix should not regress
-
-## Next Recommended Role
-
-product
-
-## Exact Handoff Prompt
-
-```text
-ROLE: PRODUCT
-
-Task:
-Preserve Bug 04 as closed unless a fresh browser regression shows that non-rest template selection
-stops opening the constructor again.
-
-Stage:
-PRODUCT closure guard / regression-only reopen.
-
-Context:
-QA passed this bug on 2026-06-15: `Add activity -> Choose template -> Easy aerobic run` and another
-non-rest template now open the constructor directly, and `Add rest day` still works. Do not reopen
-this item for unrelated constructor, menu, or calendar issues.
-```

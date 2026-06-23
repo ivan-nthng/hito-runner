@@ -7,7 +7,8 @@ import {
   validateImportedPlanJson,
 } from "@/lib/imported-plan";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
-import { clearUpcomingSchedule, completeOnboarding } from "@/lib/training-api";
+import { completeOnboarding } from "@/lib/plan-replacement-actions";
+import { clearUpcomingSchedule } from "@/lib/training-api";
 import {
   Dialog,
   DialogContent,
@@ -110,7 +111,7 @@ export function UploadJsonDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="hito-dialog-overlay-stable"
-        className="hito-dialog-stable hito-product-dialog h-[min(40rem,calc(100dvh-2rem))] max-w-xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-standard hito-dialog-height-standard"
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Import plan</DialogTitle>

@@ -843,7 +843,7 @@ function Tooltip({ workout }: { workout: Workout }) {
   });
 
   return (
-    <div className="hito-tooltip w-72 max-w-72">
+    <div className="hito-tooltip hito-tooltip-width-lg">
       <div className="flex items-center justify-between">
         <span className="hito-label" style={{ color: meta.color }}>
           {meta.label}
@@ -1089,7 +1089,7 @@ function getManualAddContext(
   const canAddWorkout =
     Boolean(addCapability?.allowed) &&
     !hasBlockingWorkout &&
-    iso > snapshot.currentDate &&
+    iso >= snapshot.currentDate &&
     !isBeforePlanStart(iso, snapshot);
   const canAcceptMoveTarget =
     Boolean(moveCapability?.allowed) &&
@@ -1333,34 +1333,22 @@ function setManualMoveDragImage(
   dragImage.style.top = "-1000px";
   dragImage.style.left = "-1000px";
   dragImage.style.zIndex = "2147483647";
-  dragImage.style.maxWidth = "240px";
-  dragImage.style.padding = "10px 12px";
-  dragImage.style.border = "1px solid var(--border)";
-  dragImage.style.borderRadius = "16px";
-  dragImage.style.background = "var(--card)";
-  dragImage.style.boxShadow = "0 18px 42px rgb(0 0 0 / 0.22)";
-  dragImage.style.color = "var(--foreground)";
-  dragImage.style.font = "inherit";
   dragImage.style.pointerEvents = "none";
-  dragImage.style.opacity = "0.96";
-  const title = escapeHtml(context.title);
-  dragImage.innerHTML = `
-    <div style="font-weight: 700; font-size: 13px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</div>
-    <div style="margin-top: 4px; color: var(--muted-foreground); font-size: 11px;">Move workout</div>
-  `;
+  dragImage.className = "hito-calendar-drag-preview";
+
+  const title = document.createElement("div");
+  title.className = "hito-calendar-drag-preview-title";
+  title.textContent = context.title;
+
+  const meta = document.createElement("div");
+  meta.className = "hito-calendar-drag-preview-meta";
+  meta.textContent = "Move workout";
+
+  dragImage.append(title, meta);
 
   document.body.appendChild(dragImage);
   event.dataTransfer.setDragImage(dragImage, 24, 18);
   window.setTimeout(() => dragImage.remove(), 0);
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
 
 function CalendarFeedbackMarker({

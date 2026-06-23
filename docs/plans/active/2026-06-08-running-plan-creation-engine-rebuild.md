@@ -18,12 +18,12 @@ architect
 
 ## Task
 
-Resume bounded cleanup routing through the simplification strike after the accepted benchmark-backed
-pace truth closeout.
+Hold running-plan expansion after accepted benchmark-backed pace truth and archived simplification
+strike.
 
 ## Stage
 
-ARCHITECT checkpoint / post-benchmark-truth closeout and cleanup return.
+ARCHITECT holding / post-benchmark-truth and post-cleanup sequencing.
 
 ## Exact Handoff Prompt
 
@@ -31,11 +31,11 @@ ARCHITECT checkpoint / post-benchmark-truth closeout and cleanup return.
 ROLE: ARCHITECT
 
 Task:
-Resume bounded cleanup routing through the simplification strike after the accepted benchmark-backed
-pace truth closeout.
+Hold running-plan expansion after accepted benchmark-backed pace truth and archived simplification
+strike.
 
 Stage:
-ARCHITECT checkpoint / post-benchmark-truth closeout and cleanup return.
+ARCHITECT holding / post-benchmark-truth and post-cleanup sequencing.
 
 Context:
 The selected-plan benchmark-backed pace truth path is now accepted end-to-end in the proved scope:
@@ -49,15 +49,17 @@ The selected-plan benchmark-backed pace truth path is now accepted end-to-end in
   - no fake pace and no personal HR target truth appear
 
 Root cause and architecture fit:
-The benchmark-backed metric-truth track is no longer the blocker. We should now return to bounded
-cleanup selection rather than expand running-plan UI or metric work by inertia.
+The benchmark-backed metric-truth track is no longer the blocker, and the Hito Stack Simplification
+Strike is complete and archived. Running-plan expansion should not resume by inertia; future
+provider-derived pace truth, HR-zone truth, additional families, or UI exposure need separately
+selected product gates.
 
 Required reading:
 - AGENTS.md
 - agents/architect.agent.md
 - skills/hito-architecture-audit/SKILL.md
 - skills/hito-plan-writing-and-closeout/SKILL.md
-- docs/plans/active/2026-06-07-hito-stack-simplification-strike.md
+- docs/plans/archive/2026-06-07-hito-stack-simplification-strike.md
 - docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md
 - docs/tasks/backlog/2026-06-15-workout-metric-enrichment-truth-audit.md
 - docs/current-functional-map.md
@@ -65,8 +67,9 @@ Required reading:
 - docs/current-product.md
 
 Scope:
-1. Accept the benchmark-backed pace truth track as closed in the proved scope.
-2. Select the next bounded cleanup gate through the simplification strike.
+1. Preserve the accepted benchmark-backed pace truth scope.
+2. Keep provider-derived pace truth, executable HR targets, additional selected-plan families, and
+   broader running-plan UI exposure as future-only until Product selects a separate gate.
 3. Do not reopen benchmark/UI work unless fresh source or QA evidence shows a regression.
 
 Validation:
@@ -97,8 +100,10 @@ Decision:
 
 - Accept benchmark-backed pace truth as closed in the proved scope.
 - Keep provider-derived pace truth and personal HR-zone executable truth as future-only.
-- Return the project to bounded cleanup routing through the
-  [Hito Stack Simplification Strike](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md>).
+- The
+  [Hito Stack Simplification Strike](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-06-07-hito-stack-simplification-strike.md>)
+  is now archived after reaching `40/40`; do not route new running-plan work through that completed
+  cleanup track.
 
 ## Selected-Plan Metric Truth Expansion Decision
 
@@ -177,7 +182,7 @@ Decision:
 
 - The running-plan quality blocker that paused code-freeze cleanup is closed.
 - Code-freeze cleanup may resume through the
-  [Hito Stack Simplification Strike](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-07-hito-stack-simplification-strike.md>).
+  [Hito Stack Simplification Strike](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-06-07-hito-stack-simplification-strike.md>).
 
 Changelog decision:
 
@@ -1774,7 +1779,7 @@ QA required before runner-facing Create:
 - [Current system](../../current-system.md)
 - [Current product](../../current-product.md)
 - [Current state](../../current-state.md)
-- [Hito Stack Simplification Strike](2026-06-07-hito-stack-simplification-strike.md)
+- [Hito Stack Simplification Strike](../archive/2026-06-07-hito-stack-simplification-strike.md)
 - [Archived Plan Preset plan](../archive/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md)
 - [Plan Preset actions](../../../src/lib/plan-preset-actions.ts)
 - [Plan Presets library](../../../src/lib/plan-presets/)

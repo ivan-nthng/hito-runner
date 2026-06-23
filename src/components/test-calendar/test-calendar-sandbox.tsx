@@ -375,7 +375,7 @@ function DayDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid="test-calendar-detail-dialog"
-        className="hito-product-dialog h-[min(42rem,calc(100dvh-2rem))] max-w-3xl overflow-hidden border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-wide"
       >
         <DialogHeader className="hito-product-dialog-header">
           <div className="min-w-0 pr-8">

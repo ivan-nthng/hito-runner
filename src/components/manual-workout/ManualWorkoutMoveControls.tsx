@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { hitoToast } from "@/components/ui/hito-toast";
-import { moveManualWorkoutWithinActivePlan } from "@/lib/training-api";
+import { moveManualWorkoutWithinActivePlan } from "@/lib/manual-workout-authoring";
 import type { ManualWorkoutDirectMoveResult } from "@/lib/manual-workout-authoring";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,

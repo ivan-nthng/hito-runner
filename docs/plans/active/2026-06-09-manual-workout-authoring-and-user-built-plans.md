@@ -2,35 +2,7 @@
 
 ## Status
 
-in_progress — manual Add, personal saved templates, manual Copy/Paste, manual Delete/Clear, manual
-Move Workout, Backend / Export Slice 7 manual active-plan JSON/Markdown export, universal
-active-plan Add/Clear/Move editability, backend empty manual active-plan creation, the saved
-manual active-plan workout constructor UI contract, and the persisted future manual workout edit
-backend seam are implemented in the proved scope. The
-post-universal manual Clear restore/review reconstruction regression and the constructor UI contract
-were rerun successfully on 2026-06-12. Direct manual active-plan Copy/Paste and drag/drop Move are
-now implemented and QA-passed in the manual scope on 2026-06-13, using backend direct mutations
-instead of runner-facing review/confirm. The missed-unlogged manual move contract was accepted on
-2026-06-14 and expanded on 2026-06-17: a fully unlogged manual workout missed in a bounded recent
-window may move to today or to a valid future empty day through the same backend direct move seam.
-The target-today resolver, non-rest template direct
-constructor open path, and protected-source direct-edit affordance gating are now QA-passed on
-2026-06-15. On 2026-06-15, Backend added and validated the persisted future workout-content edit
-review/confirm seam for eligible manual planned rows. QR/share-import, universal Copy/Paste,
-recurrence, workout-detail UI wiring for `Edit training`, Restore UI, active-plan replacement
-semantics expansion, broader generated-row mutation matrices, explicit persisted rest-day lifecycle
-proof, and deeper modal polish remain future-only unless selected by a separate architecture
-contract.
-
-On 2026-06-15, the protected-source direct-edit affordance gate was closed in the proved scope:
-backend row-level source capability readback and frontend consumption now prevent
-skipped/logged/evidence-backed/protected source rows from exposing dead-end direct copy/move/drag
-interactions. A small accessibility follow-up remains separate: move-only targets still retain an
-`Add activity` aria-label in one browser DOM path, but that does not reopen the protected-source
-contract. On 2026-06-15, the future workout-detail action/editing contract was accepted and the
-backend persisted workout-content edit review/confirm seam was implemented: workout detail should
-use top actions (`Copy training`, `Delete training`, `Edit training`) with mobile overflow and no
-`Move training` on this surface after QA accepts the backend seam and Frontend wires it.
+in_progress
 
 ## Type
 
@@ -42,79 +14,296 @@ high
 
 ## Next Recommended Role
 
-qa
+frontend
 
 ## Task
 
-Validate the persisted future manual workout edit backend seam before frontend exposes
-`Edit training` on workout detail.
+Simplify the manual/template workout constructor anatomy using the accepted target-truth contract.
 
 ## Stage
 
-QA validation / persisted future workout editing review-confirm seam.
-
-## Suggested Next Step
-
-QA should validate the backend persisted future workout edit seam and confirm it remains
-non-frontend-owned: eligible future manual rows reconstruct into a draft, review/confirm updates the
-same persisted row, and protected/generated/unsafe rows remain blocked. Frontend should wire
-`Edit training` only after this backend seam is accepted.
+FRONTEND implementation / manual constructor simplification and runner-facing target language.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: QA
+ROLE: FRONTEND
 
 Task:
-Validate the persisted future manual workout edit backend seam before frontend exposes
-`Edit training` on workout detail.
+Simplify the manual/template workout constructor anatomy using the accepted target-truth contract.
 
 Stage:
-QA validation / persisted workout-content editing boundary.
+FRONTEND implementation / manual constructor simplification and runner-facing target language.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
 
 Context:
-Backend implemented a persisted future workout-content edit seam for eligible manual planned rows.
-Workout detail should still not expose live `Edit training` until QA accepts this backend contract
-and Frontend wires the route to the approved seam.
+Architecture accepted a simplified manual/template constructor contract. Template-based workout
+creation should open as a prefilled editable workout, not a heavy settings form. The constructor
+should feel like: choose what kind of block this is, choose how long or how far, then choose how the
+runner should approach it.
+
+Important target-truth boundary:
+- Clear runner-facing target/guidance does not mean every block must have pace or HR.
+- Manual builder must preserve no fake pace and no fake personal HR.
+- Existing backend target modes remain the source of truth: `structure_only`,
+  `editable_default_hr`, and `none`.
+- `structure_only` remains valid when canonical pace or personal HR truth is unavailable; frontend
+  should translate that into clear runner-facing language, not fake metric targets.
 
 Root cause and architecture fit:
-The visible symptom was that future workout detail could not safely expose `Edit training`. The
-underlying cause was the missing backend-owned reconstruct -> review -> confirm seam for editing an
-existing persisted `planned_workouts` row. QA should validate the backend contract, not frontend
-route wiring or local editor state.
+Visible symptom: the template/manual constructor feels overloaded and exposes low-level editing
+grammar that does not match the runner mental model.
+Underlying cause: constructor UI anatomy and target-truth language drifted apart. Frontend exposes
+technical modes and nested block fields while backend/product truth allows honest structure-only
+output when pace/HR truth is unavailable.
+Canonical owner: frontend constructor anatomy, rendering, and copy using existing backend-shaped
+manual workout draft/review contracts. Backend remains owner of validation, template registry,
+target truth, metric mode, review token/checksum, and persistence.
 
 Required reading:
 - /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/AGENTS.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/agents/qa.agent.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/skills/hito-qa-browser-regression/SKILL.md
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/agents/frontend.agent.md
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/skills/hito-frontend-design-system/SKILL.md
 - /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-06-15-workout-detail-lifecycle-ia-spec.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/product-briefs/2026-06-11-unified-plan-creation-lifecycle.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/manual-workout-authoring/edit-workout.ts
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-product.md
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-system.md
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/components/manual-workout/ManualWorkoutAuthoringControls.tsx
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/components/manual-workout/ManualWorkoutConstructorEditor.tsx
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/components/manual-workout/manual-workout-authoring-utils.ts
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/manual-workout-authoring/schema.ts
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/manual-workout-authoring/templates.ts
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/manual-workout-authoring/validator.ts
+- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/manual-workout-authoring/normalize.ts
 - /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/scripts/validate-manual-workout-authoring.ts
 
-Validation scope:
-- Prove an eligible future manual planned workout reconstructs into manual draft input.
-- Prove edited draft review returns a bounded reviewed state with review token/checksum.
-- Prove confirm rebuilds server-side and updates the same persisted planned workout row.
-- Prove stale source row/date, invalid token/checksum, client row payload, protected source,
-  logged/evidence-backed source, unsafe metric truth, and generated/preset/imported active-plan
-  sources remain blocked.
-- Prove audit metadata uses `active_plan_user_edit_v1`, `user_edited_workout`,
-  `direct_manual_edit`, and `trustedClientRows: false`.
-- Prove no fake pace or fake personal HR is introduced.
+Scope:
+1. Keep template-based creation as a prefilled editable constructor: built-in templates remain
+   editable; saved personal templates may stay server-reconstructed/locked unless source inspection
+   proves a safe editable path already exists.
+2. Simplify block anatomy in `ManualWorkoutConstructorEditor`:
+   - header owns block/repeat identity and visible label;
+   - body owns one quantity editor with duration or distance as mutually exclusive choices;
+   - target/guidance language is shown as runner-facing guidance, not internal `Target truth`;
+   - repeat groups read as one repeat unit with rounds plus work/recovery subparts.
+3. Preserve existing backend-supported data shape: entries are still `block` or `repeat_group`;
+   blocks still carry duration or distance; backend review remains the authority.
+4. Rename or rewrite visible target labels/copy so `Structure only` and `Editable HR default` become
+   understandable runner-facing guidance without claiming unsupported pace or personal HR.
+5. Use Hito DS primitives and existing manual builder patterns. If touching a large file, extract
+   only focused presentation helpers/components by real UI seam.
+6. Add source-level safeguards or tests/lint coverage appropriate to the touched frontend files.
+
+Do not:
+- Do not change backend runtime behavior unless source proof shows the current backend contract
+  cannot support the accepted UI contract; stop before changing backend.
+- Do not add a new target truth mode.
+- Do not make pace or personal HR mandatory.
+- Do not add fake pace, fake personal HR, or target-time-derived pace.
+- Do not change manual Add/Move/Copy/Delete/Clear/Edit semantics.
+- Do not touch selected-plan creation, running-plan generation, Admin, Hito DS, Supabase, OpenAI,
+  recurrence, Restore UI, QR/share/import, or backend validation.
+- Do not create frontend-owned template eligibility, schedule truth, persistence truth, or metric
+  truth.
 
 Validation:
-- Run targeted ESLint for the edit seam, exports, active-plan policy, training API, and manual
-  authoring validator.
-- Run `node --import tsx ./scripts/validate-manual-workout-authoring.ts`.
+- Source proof that visible `Target truth` jargon no longer appears in the constructor path.
+- Source proof that duration/distance remain mutually exclusive in the edited quantity path.
+- Run targeted ESLint for touched frontend/manual workout files.
 - Run `npm run build`.
 - Run scoped `git diff --check`.
+- If the source/build proof passes, recommend QA browser validation for saved manual active-plan
+  Add activity -> built-in template -> prefilled editable constructor -> review-ready path, plus
+  375px mobile no-overflow.
+
+Stop conditions:
+- Stop if the desired UI requires always emitting pace or HR.
+- Stop if the only way to make target language clear is to weaken no-fake-pace or
+  no-fake-personal-HR doctrine.
+- Stop if saved personal templates must become editable but backend reconstruction/review does not
+  already support that safely.
+- Stop if the implementation requires backend target-mode/schema changes; route a bounded BACKEND
+  contract prompt instead.
 ```
+
+## Suggested Next Step
+
+Frontend should simplify `ManualWorkoutConstructorEditor` and the Add/template constructor flow so
+template selection opens as a prefilled editable workout with a clearer block anatomy. Block headers
+own identity, the body exposes one quantity path (`duration` or `distance`), target/guidance copy is
+runner-facing rather than internal `Target truth` jargon, and repeat groups read as one coherent
+repeat unit with work/recovery subparts. Preserve backend-owned `structure_only`,
+`editable_default_hr`, and `none` target modes; do not add fake pace or fake personal HR.
+
+## Current Status Detail
+
+Manual Add, personal saved templates, manual Copy/Paste, manual Delete/Clear, manual Move Workout,
+Backend / Export Slice 7 manual active-plan JSON/Markdown export, universal active-plan
+Add/Clear/Move editability, backend empty manual active-plan creation, the saved manual active-plan
+workout constructor UI contract, and the persisted future manual workout edit backend seam are
+implemented in the proved scope. The post-universal manual Clear restore/review reconstruction
+regression and the constructor UI contract were rerun successfully on 2026-06-12. Direct manual
+active-plan Copy/Paste and drag/drop Move are now implemented and QA-passed in the manual scope on
+2026-06-13, using backend direct mutations instead of runner-facing review/confirm. The
+missed-unlogged manual move contract was accepted on 2026-06-14 and expanded on 2026-06-17: a fully
+unlogged manual workout missed in a bounded recent window may move to today or to a valid future
+empty day through the same backend direct move seam. The target-today resolver, non-rest template
+direct constructor open path, and protected-source direct-edit affordance gating are now QA-passed on
+2026-06-15. On 2026-06-15, Backend added and validated the persisted future workout-content edit
+review/confirm seam for eligible manual planned rows. On 2026-06-20, Backend expanded the manual Add
+contract so an eligible empty day on today can be added through the same reviewed backend-owned Add
+seam as future empty days. The current calendar consumer still needs a Frontend follow-up because it
+locally gates Add affordance exposure with `iso > snapshot.currentDate`. QR/share-import, universal
+Copy/Paste, recurrence, workout-detail UI wiring for `Edit training`, Restore UI, active-plan
+replacement semantics expansion, broader generated-row mutation matrices, explicit persisted
+rest-day lifecycle proof, and deeper modal polish remain future-only unless selected by a separate
+architecture contract.
+
+On 2026-06-15, the protected-source direct-edit affordance gate was closed in the proved scope:
+backend row-level source capability readback and frontend consumption now prevent
+skipped/logged/evidence-backed/protected source rows from exposing dead-end direct copy/move/drag
+interactions. A small accessibility follow-up remains separate: move-only targets still retain an
+`Add activity` aria-label in one browser DOM path, but that does not reopen the protected-source
+contract. On 2026-06-15, the future workout-detail action/editing contract was accepted and the
+backend persisted workout-content edit review/confirm seam was implemented: workout detail should
+use top actions (`Copy training`, `Delete training`, `Edit training`) with mobile overflow and no
+`Move training` on this surface after QA accepts the backend seam and Frontend wires it.
+
+On 2026-06-20, Architecture accepted the simplified manual/template constructor contract. Template
+creation should open as a prefilled editable workout, the constructor should read as block identity
+plus one quantity path plus one runner-facing target/guidance path, and repeat groups should feel
+like one editable repeat unit rather than a dense settings matrix. The target-truth doctrine remains
+unchanged: no fake pace, no fake personal HR, and structure-only executable guidance is valid when
+canonical pace or personal HR truth is unavailable.
+
+## Manual / Template Constructor Simplification Contract — 2026-06-20
+
+Status:
+
+Accepted as architecture/product contract; Frontend implementation selected.
+
+Root cause:
+
+The visible symptom is that the manual/template constructor feels like a dense settings form. The
+underlying cause is split ownership drift: frontend exposes low-level block, target-truth, repeat,
+work, and recovery fields directly, while backend/product truth already treats manual workouts as
+reviewed canonical drafts with strict target-truth rules. The correct fix is not a frontend-only
+shortcut around backend validation and not a new editor. The existing manual workout constructor is
+the canonical editing seam, but its anatomy and copy must be simplified.
+
+Current source evidence:
+
+- Built-in template selection already opens a constructor with `selection=registry`, default title,
+  notes, target truth, and cloned `template.defaultEntries`.
+- Scratch starts empty and remains review-disabled until a backend-supported type and executable
+  structure exist.
+- Saved personal templates currently prefill from `draftPayload` but keep entries locked and trigger
+  server-side reconstruction/review.
+- The backend schema supports `block` and `repeat_group` entries. A repeat group owns `repeatCount`,
+  `safetyKind`, `workBlock`, and optional `recoveryBlock`.
+- The UI already clears distance when duration is selected and clears duration when distance is
+  selected.
+- Manual target truth modes are currently `structure_only`, `editable_default_hr`, and `none`.
+- Backend validators reject fake precise pace and fake personal HR; `editable_default_hr` is
+  advisory/editable default HR guidance only, not personal HR truth.
+
+Simplified editable block contract:
+
+- Every editable non-rest block must have a backend-supported block identity.
+- The block header owns identity: block type, visible label, summary, and row actions.
+- The block body owns quantity and guidance.
+- Quantity is one path per block at a time:
+  - duration, or
+  - distance.
+- Duration and distance remain mutually exclusive in the UI and payload.
+- Visible label can remain, but it should support the header identity instead of becoming the main
+  editing grammar.
+- Note-only blocks remain notes/cues and must not pretend to be executable metric targets.
+
+Repeat group contract:
+
+- A repeat group is one coherent editable unit, not a loose collection of independent settings.
+- Header owns repeat identity: repeat label, rounds summary, and actions.
+- Body may expose rounds and a plain-language safety/repeat kind, then show work and recovery
+  subparts.
+- Work and recovery subparts reuse the same simplified block quantity/guidance grammar.
+- Nested repeat groups remain unsupported unless a future backend contract explicitly adds them.
+
+Target / guidance contract:
+
+- Product wants every editable running block to have clear runner-facing guidance.
+- That does not mean every block must have pace or HR.
+- Pace targets require canonical pace truth. Manual builder must not invent pace from title,
+  target-time intent, block type, or perceived effort.
+- Personal HR targets require personal HR-zone truth. Manual builder must not turn age-estimated or
+  default HR guidance into personal HR truth.
+- `editable_default_hr` may be presented as editable default HR guidance only, with explicit copy
+  that it is not personal HR.
+- `structure_only` remains valid and should be presented as executable structure/guidance: duration
+  or distance, repeat/work/recovery anatomy, plus understandable block intent such as easy,
+  steady, tempo, threshold, recovery, hill, trail, or long-run finish.
+- RPE, effort, cues, and hints may support guidance, but unexplained RPE/effort jargon must not be
+  the primary editable target surface.
+
+Template behavior contract:
+
+- Built-in templates should open directly as prefilled editable workouts.
+- Template rows/cards may remain a chooser, but after selection the runner should see the actual
+  editable workout, not a separate heavy settings step.
+- Saved personal templates may remain server-reconstructed/locked in this slice if that is the only
+  currently safe path. Making saved templates fully editable is a separate backend/frontend contract
+  unless source proof shows the existing reconstruction/review seam already supports it safely.
+- Backend review remains required before persistence.
+
+Immediate decision:
+
+- Select FRONTEND as the immediate next owner.
+- The first implementation slice should simplify constructor anatomy and runner-facing target copy
+  using existing backend target modes.
+- Do not route BACKEND first because current backend target truth is sufficient for this UI
+  simplification and correctly blocks fake pace/personal HR.
+
+Stop / escalation conditions:
+
+- If Product requires every block to emit pace or HR, stop and route a Product/Running Coach/Backend
+  doctrine decision before implementation.
+- If a new target truth mode is needed, stop and route BACKEND.
+- If saved personal template editing requires changing backend reconstruction/review semantics, stop
+  and route BACKEND.
+- If implementation would weaken no-fake-pace or no-fake-personal-HR, stop.
+
+## Manual Add Today Contract — 2026-06-20
+
+Status:
+
+Backend implemented / frontend consumer follow-up required.
+
+Root cause:
+
+The visible symptom was that an eligible empty day on today did not expose `Add activity`. Source
+inspection showed this was not only a hover/UI issue: the backend manual Add mutation still rejected
+`workoutDate === currentDate`, and the calendar consumer also had a local future-only affordance
+gate.
+
+Backend decision:
+
+- Manual active-plan Add may target today or a future empty day.
+- Past days remain blocked.
+- Occupied non-rest days, explicit Rest rows, logged/evidence-backed/protected targets, stale
+  reviews, unsafe payloads, and unsupported active-plan sources remain blocked.
+- The existing reviewed manual Add seam remains canonical; no same-day parallel path was added.
+
+Backend implementation evidence:
+
+- Updated `src/lib/manual-workout-authoring/active-plan-add.ts` so only past dates are rejected by
+  the date guard.
+- Extended `scripts/manual-workout-authoring/active-plan-add-proof.ts` with an empty-today success
+  proof while preserving past, occupied, logged, evidence, stale, invalid-token, and client-row
+  rejection proofs.
+- `src/components/Calendar.tsx` still has a frontend-owned local affordance gate
+  (`iso > snapshot.currentDate`), so visible same-day Add exposure requires the Frontend follow-up
+  selected above.
 
 ## Future Workout Detail Actions And Persisted Edit Contract — 2026-06-15
 
@@ -762,7 +951,7 @@ Required reading:
 - `docs/history/changelog.md`
 - `docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md`
 - `docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md`
-- `docs/plans/active/2026-06-07-hito-stack-simplification-strike.md`
+- `docs/plans/archive/2026-06-07-hito-stack-simplification-strike.md`
 - `docs/tasks/frontend-specs/2026-06-10-manual-user-built-plan-flow-spec.md`
 
 Accepted manual-builder capabilities to preserve:
@@ -2290,8 +2479,8 @@ conflict detection, lifecycle rules, source metadata, and persistence.
 
 Implemented Hito has canonical paths for generated plans, Plan Presets, import/apply, active-plan
 refresh, schedule reflow, workout result logging, the first `manual_user_built_plan_v1` creation
-from one reviewed manual workout, and adding additional reviewed workouts to eligible future empty
-days in existing manual user-built plans. It does not yet have the remaining canonical manual
+from one reviewed manual workout, and adding additional reviewed workouts to eligible
+today-or-future empty days in existing manual user-built plans. It does not yet have the remaining canonical manual
 builder path for:
 
 - editing planned workout content
@@ -3341,8 +3530,8 @@ This plan can close when:
 
 - Backend has a canonical manual authoring review/confirm/persist seam.
 - No-active-plan user-built plan creation is implemented and QA-passed.
-- Existing manual active plans can receive additional reviewed workouts on eligible future empty
-  days without frontend-owned row appends.
+- Existing manual active plans can receive additional reviewed workouts on eligible
+  today-or-future empty days without frontend-owned row appends.
 - Frontend can create multiple manual workouts from scratch and from Hito-owned templates through
   the calendar `Add activity` flow.
 - Personal saved templates with runner-provided name and icon/glyph are persisted by backend and
@@ -3476,4 +3665,10 @@ Validation:
   flow, universal Copy/Paste, edit workout, Restore/Put back/Redo UI, recurrence, PDF/watch export,
   modal polish, active-plan replacement semantics expansion, and broader generated-row mutation
   matrices remain intentionally out of scope.
+- Starting a generated/preset plan from an existing `manual_user_built_plan_v1` now has a backend
+  reviewed transition seam, not a manual authoring mutation and not a frontend calendar shortcut.
+  Review is non-mutating; confirm revalidates selected-plan exactness plus active-plan revision,
+  archives/supersedes the old manual active plan, activates the reviewed selected plan, preserves
+  manual saved templates/history, and does not merge upcoming manual workouts into the
+  generated/preset plan by default. Frontend saved-mode wiring and QA remain separate gates.
 - Recurrence remains blocked until a separate batch-review architecture decision.

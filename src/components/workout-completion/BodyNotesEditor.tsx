@@ -132,7 +132,7 @@ export function BodyNotesModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="hito-dialog-overlay-stable"
-        className="hito-dialog-stable hito-product-dialog h-[min(46rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow-relaxed"
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Body notes</DialogTitle>

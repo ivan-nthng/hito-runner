@@ -2,19 +2,49 @@
 
 ## Status
 
-triaged
+backlog
 
 ## Type
 
-improvement
+change_request
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+frontend
+
+## Task
+
+Clean up the saved-calendar template flow and manual workout constructor grammar when this backlog
+item is prioritized.
+
+## Stage
+
+FRONTEND backlog / saved-calendar template flow and constructor grammar.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+Task:
+Clean up the saved-calendar template flow and manual workout constructor grammar when this backlog
+item is prioritized.
+
+Stage:
+FRONTEND implementation / saved-calendar template flow and constructor grammar.
+
+Context:
+This is a backlog UI/DS cleanup item. Preserve backend template taxonomy, review/confirm semantics,
+manual plan persistence, and unrelated move/copy/delete behavior.
+```
 
 ## Severity
 
 medium
-
-## Priority
-
-next
 
 ## Owner
 

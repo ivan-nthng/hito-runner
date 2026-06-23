@@ -143,6 +143,7 @@ const INPUT_FEEDBACK = ["neutral", "error", "success"] as const;
 const CHOICE_TOGGLE_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
 const SELECTION_CONTROL_KINDS = ["checkbox", "radio", "toggle"] as const;
 const SELECTION_BINARY_SIZES = ["sm", "md"] as const;
+const MODAL_SIZE_MODES = ["compact", "standard", "wide", "workflow", "review"] as const;
 const MODAL_BODY_MODES = ["content-fit", "scroll-fill"] as const;
 const MODAL_HEADER_MODES = ["compact", "large"] as const;
 const MODAL_FOOTER_MODES = ["none", "actions", "note-actions"] as const;
@@ -447,6 +448,7 @@ type InputFeedback = (typeof INPUT_FEEDBACK)[number];
 type ChoiceToggleSize = (typeof CHOICE_TOGGLE_SIZES)[number];
 type SelectionControlKind = (typeof SELECTION_CONTROL_KINDS)[number];
 type SelectionBinarySize = (typeof SELECTION_BINARY_SIZES)[number];
+type ModalSizeMode = (typeof MODAL_SIZE_MODES)[number];
 type ModalBodyMode = (typeof MODAL_BODY_MODES)[number];
 type ModalHeaderMode = (typeof MODAL_HEADER_MODES)[number];
 type ModalFooterMode = (typeof MODAL_FOOTER_MODES)[number];
@@ -626,6 +628,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
   const [selectionInvalid, setSelectionInvalid] = useState(false);
   const [selectionFocusDemo, setSelectionFocusDemo] = useState(false);
   const [selectionAccentMode, setSelectionAccentMode] = useState(false);
+  const [modalSizeMode, setModalSizeMode] = useState<ModalSizeMode>("standard");
   const [modalBodyMode, setModalBodyMode] = useState<ModalBodyMode>("content-fit");
   const [modalHeaderMode, setModalHeaderMode] = useState<ModalHeaderMode>("compact");
   const [modalFooterMode, setModalFooterMode] = useState<ModalFooterMode>("actions");
@@ -2896,11 +2899,12 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                   id="modals"
                   label="Modals"
                   title="Bounded panel, explicit body mode, reachable footer."
-                  body="Product dialogs share one stable overlay and panel recipe, then choose the body mode that matches the task. Short content fits naturally; tall workflows scroll internally."
+                  body="Product dialogs share one stable overlay, backdrop, panel chrome, size preset, and body mode. Short content fits naturally; tall workflows scroll internally."
                   status="Core overlay"
                   statusTone="signal"
                   demo={
                     <ModalWindowPreview
+                      sizeMode={modalSizeMode}
                       bodyMode={modalBodyMode}
                       headerMode={modalHeaderMode}
                       footerMode={modalFooterMode}
@@ -2914,11 +2918,12 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                       <div className="border-t border-hairline pt-5">
                         <p className="hito-label">Body mode matrix</p>
                         <p className="hito-caption mt-1">
-                          Short task dialogs fit to content; tall workflows keep footer actions
-                          reachable with internal body scroll.
+                          Short task dialogs fit to content; tall workflows and reviews keep footer
+                          actions reachable with internal body scroll.
                         </p>
                         <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-2">
                           <ModalWindowPreview
+                            sizeMode="standard"
                             bodyMode="content-fit"
                             headerMode="compact"
                             footerMode="actions"
@@ -2927,9 +2932,19 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                             longContent={false}
                           />
                           <ModalWindowPreview
+                            sizeMode="workflow"
                             bodyMode="scroll-fill"
                             headerMode="large"
                             footerMode="note-actions"
+                            showStatusPill
+                            destructive={false}
+                            longContent
+                          />
+                          <ModalWindowPreview
+                            sizeMode="review"
+                            bodyMode="scroll-fill"
+                            headerMode="large"
+                            footerMode="actions"
                             showStatusPill
                             destructive={false}
                             longContent
@@ -2945,6 +2960,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                         </p>
                         <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-2">
                           <ModalWindowPreview
+                            sizeMode="compact"
                             bodyMode="content-fit"
                             headerMode="large"
                             footerMode="none"
@@ -2953,6 +2969,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                             longContent={false}
                           />
                           <ModalWindowPreview
+                            sizeMode="wide"
                             bodyMode="content-fit"
                             headerMode="compact"
                             footerMode="actions"
@@ -2966,6 +2983,15 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                   }
                   controls={
                     <div className="hito-row-group border-0">
+                      <div className="hito-list-row items-start">
+                        <ChoiceSelector
+                          label="Size preset"
+                          value={modalSizeMode}
+                          options={MODAL_SIZE_MODES}
+                          onChange={setModalSizeMode}
+                          textTransform="none"
+                        />
+                      </div>
                       <div className="hito-list-row items-start">
                         <ChoiceSelector
                           label="Body mode"
@@ -3727,7 +3753,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                   id="shell"
                   label="Shell navigation"
                   title="Product shell rows are owned by Hito."
-                  body="Runner navigation, mobile navigation, profile triggers, and shell menu rows use one calm family instead of route-local spacing and hover rules."
+                  body="Runner navigation, mobile navigation, profile triggers, sidebar width, and shell menu rows use one calm family instead of route-local spacing, width, and hover rules."
                   status="Pattern"
                   statusTone="signal"
                   demo={
@@ -3892,6 +3918,10 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                     {
                       label: "Does not imply",
                       body: "Section-local actions, page headers, cards, or duplicated workspace identity inside content.",
+                    },
+                    {
+                      label: "Width owner",
+                      body: "Runner sidebar and profile, plan, and account menus use named shell width presets instead of route-local width utilities.",
                     },
                     {
                       label: "Used in",

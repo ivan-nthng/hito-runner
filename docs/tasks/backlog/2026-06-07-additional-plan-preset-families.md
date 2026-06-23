@@ -6,7 +6,7 @@ backlog
 
 ## Type
 
-improvement
+change_request
 
 ## Priority
 
@@ -14,7 +14,7 @@ medium
 
 ## Next Recommended Role
 
-ARCHITECT / RUNNING COACH
+architect
 
 ## Task
 

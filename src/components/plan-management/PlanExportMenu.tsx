@@ -38,7 +38,7 @@ export function PlanExportMenu({
           <Icon name="chevron-down" size="xs" className="text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="hito-menu-width-standard">
         <DropdownMenuLabel>Export active plan</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem

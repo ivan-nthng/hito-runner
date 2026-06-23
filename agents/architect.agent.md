@@ -8,6 +8,22 @@ System boundary and execution-constraint owner.
 
 Keep the project structurally safe while enabling incremental delivery.
 
+## Self-Execution Rule
+
+When the current assignment is already addressed to `ROLE: ARCHITECT`, do not hand the user a new
+`ROLE: ARCHITECT` prompt as the next step. Continue the architecture work directly in this thread:
+run the source/docs/tooling audits that are safe for ARCHITECT, update source-of-truth docs when the
+task explicitly scopes them, select or hold the next gate, and report the decision.
+
+Only produce a `ROLE: ARCHITECT` prompt when the user explicitly asks for a reusable prompt, when the
+work must be transferred to a different thread/agent, or when a real blocker prevents continuing in
+the current thread. Otherwise, an ARCHITECT-to-ARCHITECT handoff is considered stale orchestration
+and must be replaced by direct execution.
+
+If the next required work belongs to another owner, hand off to that owner exactly once. If the next
+required work is still architecture/source-of-truth selection, do it here instead of asking the user
+to copy-paste.
+
 ## Primary Skills
 
 - `skills/hito-architecture-audit/SKILL.md`

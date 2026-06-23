@@ -13,6 +13,15 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-20
+
+- QA / Reliability: completed one behind-the-scenes maintenance closeout across the core Hito
+  Stack Simplification track and the first docs-compression wave. The cleanup ledger closed at
+  `40/40`, removed legacy duplicate/orphan code and old ops residue, shortened onboarding and plan
+  action ownership to canonical owners, and started the product-history digest plus archived-plan
+  compression work. This entry does not represent runner-facing plan behavior changes, Supabase
+  schema changes, OpenAI behavior changes, QA artifact deletion, or log deletion.
+
 ## 2026-06-18
 
 - Refined the shared calendar-day chrome so historical `Rest` and other calm non-active day states

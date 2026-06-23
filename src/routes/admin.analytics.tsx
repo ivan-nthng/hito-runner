@@ -177,7 +177,7 @@ function AdminAnalyticsPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
-      <div className="hito-workbench-shell [--hito-workbench-sidebar-width:240px]">
+      <div className="hito-workbench-shell hito-workbench-shell-compact-sidebar">
         <AdminWorkspaceSidebar activeSection={activeTab} />
 
         <section className="hito-workbench-main">
@@ -509,7 +509,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
           ) : null}
 
           <div className="hito-data-table-scroll">
-            <table className="hito-data-table min-w-[1280px]">
+            <table className="hito-data-table hito-data-table-min-xl">
               <caption className="sr-only">
                 Admin real-user activity summary with search, filters, and sorting.
               </caption>
@@ -668,7 +668,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                         <span className="font-medium text-foreground">
                           {row.email ?? "No email"}
                         </span>
-                        <code className="hito-technical-mono hito-data-table-code max-w-[20rem]">
+                        <code className="hito-technical-mono hito-data-table-code hito-data-table-code-width-lg">
                           {row.userId}
                         </code>
                       </div>
@@ -837,10 +837,7 @@ function KeyCountList({ title, items }: { title: string; items: AdminAnalyticsKe
       ) : (
         <div className="mt-4 grid gap-2">
           {items.map((item) => (
-            <div
-              key={item.key}
-              className="flex items-center justify-between gap-4 rounded-2xl bg-foreground/[0.035] px-3 py-2"
-            >
+            <div key={item.key} className="hito-analytics-list-item hito-analytics-list-item-split">
               <span className="text-sm text-muted-foreground">{formatKey(item.key)}</span>
               <span className="hito-technical-mono text-sm text-foreground">
                 {formatCount(item.count)}
@@ -866,7 +863,7 @@ function CapabilityUsageList({
       ) : (
         <div className="mt-4 grid gap-2">
           {items.map((item) => (
-            <div key={item.key} className="rounded-2xl bg-foreground/[0.035] px-3 py-2">
+            <div key={item.key} className="hito-analytics-list-item">
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-muted-foreground">{formatKey(item.key)}</span>
                 <span className="hito-technical-mono text-sm text-foreground">
@@ -886,7 +883,7 @@ function CapabilityUsageList({
 
 function PipelineStep({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl bg-foreground/[0.035] px-4 py-3">
+    <div className="hito-analytics-list-item hito-analytics-list-item-spacious">
       <span className="hito-label text-muted-foreground">{label}</span>
       <div className="hito-analytics-value mt-3 text-2xl">{formatCount(value)}</div>
     </div>
@@ -1013,7 +1010,7 @@ function DataTableUtilityRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="hito-shell-menu hito-data-table-column-menu w-72"
+            className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-wide"
           >
             <DropdownMenuLabel className="hito-micro-label">Active filters</DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -1104,7 +1101,7 @@ function DataTableColumnHeader<SortKey extends string>({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
-          className="hito-shell-menu hito-data-table-column-menu w-64"
+          className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-standard"
         >
           <DropdownMenuLabel className="hito-micro-label">Sort</DropdownMenuLabel>
           {sortOptions.map((option) => {
@@ -1406,7 +1403,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
       ) : null}
 
       <div className="hito-data-table-scroll">
-        <table className="hito-data-table min-w-[1240px]">
+        <table className="hito-data-table hito-data-table-min-lg">
           <caption className="sr-only">
             Test and excluded accounts visible to the admin runtime.
           </caption>
@@ -1589,7 +1586,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   <td className="hito-data-table-cell">
                     <div className="grid gap-2">
                       <LinkedIdentityStatus status={row.linkedStatus} userId={row.linkedUserId} />
-                      <code className="hito-technical-mono hito-data-table-code max-w-[18rem]">
+                      <code className="hito-technical-mono hito-data-table-code hito-data-table-code-width-md">
                         {row.userId}
                       </code>
                     </div>
@@ -1609,7 +1606,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   </td>
                   <td className="hito-data-table-cell hito-data-table-cell-end">
                     {canDelete ? (
-                      <div className="grid max-w-[18rem] gap-2">
+                      <div className="hito-data-table-action-stack">
                         {isConfirming ? (
                           <>
                             <label className="grid gap-2">
@@ -1673,7 +1670,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                         )}
                       </div>
                     ) : (
-                      <p className="hito-field-helper max-w-[16rem]">
+                      <p className="hito-field-helper hito-data-table-note">
                         {row.protectedFromDeletion
                           ? "Protected admin accounts cannot be deleted from this local UI."
                           : "Supabase-only or suspected rows cannot be deleted from this local UI."}
@@ -1706,7 +1703,9 @@ function LinkedIdentityStatus({
         {label}
       </span>
       {userId ? (
-        <code className="hito-technical-mono hito-data-table-code max-w-[14rem]">{userId}</code>
+        <code className="hito-technical-mono hito-data-table-code hito-data-table-code-width-sm">
+          {userId}
+        </code>
       ) : null}
     </div>
   );

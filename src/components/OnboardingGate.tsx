@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { EditableValueChip } from "@/components/ui/editable-value-chip";
 import { type HitoIconName } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
-import { PlanPresetPanel, type PlanPresetUiStatus } from "@/components/onboarding/PlanPresetPanel";
+import { PlanPresetPanel } from "@/components/onboarding/PlanPresetPanel";
 import {
   OptionButton,
   OptionGrid,
@@ -11,8 +11,6 @@ import {
 } from "@/components/onboarding/StructuredPlanConstructor";
 import {
   buildStructuredInput,
-  isRecent5kPaceInAcceptedRange,
-  isRecent5kTimeInAcceptedRange,
   isPresetPrimarySetupReady,
   isStructuredConstructorReady,
   normalizePresetPrimaryFitnessLevel,
@@ -25,25 +23,19 @@ import {
   type TerrainFocus,
   type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
-import type { PlanPresetCardId, PlanPresetCardRequestInput } from "@/lib/plan-presets/schema";
-import { getPlanPresetCards, type PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
-import type { RunningPlanDistanceFamily, RunningPlanRunnerLevel } from "@/lib/plan-creation-engine";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { UserSettingsSummary } from "@/lib/user-settings-actions";
 import type { StructuredFirstPlanDraftResult } from "@/lib/first-plan-actions";
-import type {
-  RunningPlanConfirmActionResult,
-  RunningPlanPreviewActionInput,
-  RunningPlanPreviewActionResult,
-} from "@/lib/running-plan-engine-actions";
 import {
-  createEmptyManualActivePlan,
-  confirmRunningPlanDraft,
   confirmStructuredFirstPlanDraft,
   generateStructuredFirstPlanDraft,
-  previewRunningPlanDraft,
-} from "@/lib/training-api";
+} from "@/lib/first-plan-actions";
+import type { RunningPlanConfirmActionResult } from "@/lib/running-plan-engine-actions";
+import { confirmRunningPlanDraft } from "@/lib/running-plan-engine-actions";
+import { createEmptyManualActivePlan } from "@/lib/manual-workout-authoring";
 import type { ManualEmptyPlanSetupInput } from "@/lib/manual-workout-authoring/schema";
+import { buildRunningPlanConfirmInput } from "@/components/onboarding/selected-running-plan-flow-utils";
+import { useSelectedPlanPresetPreviewController } from "@/components/onboarding/use-selected-plan-preset-preview-controller";
 
 type ConstructorStatus = "idle" | "reviewing" | "creating" | "finishing";
 type ManualCreateStatus = "idle" | "creating";
@@ -58,12 +50,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const createEmptyManualActivePlanFn = useServerFn(createEmptyManualActivePlan);
   const generateStructuredFirstPlanDraftFn = useServerFn(generateStructuredFirstPlanDraft);
   const confirmStructuredFirstPlanDraftFn = useServerFn(confirmStructuredFirstPlanDraft);
-  const getPlanPresetCardsFn = useServerFn(getPlanPresetCards);
-  const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
   const confirmRunningPlanDraftFn = useServerFn(confirmRunningPlanDraft);
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
-  const presetAutoLoadKeyRef = useRef<string | null>(null);
-  const runningPlanPreviewInputKeyRef = useRef<string | null>(null);
   const runningPlanCreateInFlightRef = useRef(false);
   const manualCreateInFlightRef = useRef(false);
 
@@ -106,29 +94,15 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [structuredDraftResult, setStructuredDraftResult] =
     useState<StructuredFirstPlanDraftResult | null>(null);
   const [constructorError, setConstructorError] = useState<string | null>(null);
-  const [presetStatus, setPresetStatus] = useState<PlanPresetUiStatus>("idle");
-  const [presetCardsResult, setPresetCardsResult] = useState<PlanPresetCardsActionResult | null>(
-    null,
-  );
-  const [presetSelectedCardId, setPresetSelectedCardId] = useState<PlanPresetCardId | null>(null);
-  const [runningPlanPreviewOpen, setRunningPlanPreviewOpen] = useState(false);
-  const [runningPlanPreviewResult, setRunningPlanPreviewResult] =
-    useState<RunningPlanPreviewActionResult | null>(null);
-  const [runningPlanPreviewInput, setRunningPlanPreviewInput] =
-    useState<RunningPlanPreviewActionInput | null>(null);
   const [runningPlanConfirmResult, setRunningPlanConfirmResult] =
     useState<RunningPlanConfirmActionResult | null>(null);
   const [runningPlanCreateStatus, setRunningPlanCreateStatus] = useState<"idle" | "creating">(
     "idle",
   );
-  const [presetError, setPresetError] = useState<string | null>(null);
   const [setupMode, setSetupMode] = useState<SetupMode>("manual");
   const [activeManualEditableKey, setActiveManualEditableKey] =
     useState<ManualProfileEditableKey | null>(null);
 
-  const isPresetBusy = presetStatus !== "idle" || runningPlanCreateStatus !== "idle";
-  const isManualCreateBusy = manualCreateStatus !== "idle";
-  const isBusy = constructorStatus !== "idle" || isPresetBusy || isManualCreateBusy;
   const constructorState: StructuredConstructorState = useMemo(
     () => ({
       age,
@@ -186,8 +160,19 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
   const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(fitnessLevel);
   const isManualSetupReady = isManualProfileReady(constructorState);
-  const presetCardInput = buildPlanPresetCardInput(effectiveConstructorState);
-  const presetDiscoveryKey = buildPlanPresetCardInputKey(presetCardInput);
+  const selectedPlanPreview = useSelectedPlanPresetPreviewController({
+    state: effectiveConstructorState,
+    autoLoadEnabled: setupMode === "quick",
+    isPresetDiscoveryReady,
+    toastId: STRUCTURED_REVIEW_TOAST_ID,
+    previewReadyDescription: "Review the backend-shaped calendar before creating the plan.",
+    autoRefreshOpenPreview: true,
+    resetOnInputChange: true,
+    onResetExternalState: () => setRunningPlanConfirmResult(null),
+  });
+  const isPresetBusy = selectedPlanPreview.isBusy || runningPlanCreateStatus !== "idle";
+  const isManualCreateBusy = manualCreateStatus !== "idle";
+  const isBusy = constructorStatus !== "idle" || isPresetBusy || isManualCreateBusy;
 
   const openSavedHome = () => {
     window.location.assign("/");
@@ -196,19 +181,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   useEffect(() => {
     setManualCreateError(null);
   }, [age, fitnessLevel, heightCm, weightKg]);
-
-  useEffect(() => {
-    presetAutoLoadKeyRef.current = null;
-    runningPlanPreviewInputKeyRef.current = null;
-    setRunningPlanPreviewResult(null);
-    setRunningPlanPreviewInput(null);
-    setRunningPlanConfirmResult(null);
-    setPresetError(null);
-
-    if (!presetSelectedCardId && !runningPlanPreviewOpen) {
-      setPresetCardsResult(null);
-    }
-  }, [presetDiscoveryKey, presetSelectedCardId, runningPlanPreviewOpen]);
 
   const clearStructuredReview = () => {
     setStructuredDraftResult(null);
@@ -276,176 +248,29 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }
   };
 
-  const loadPlanPresetCards = async () => {
-    setPresetError(null);
-    setPresetSelectedCardId(null);
-    setRunningPlanPreviewResult(null);
-    setRunningPlanPreviewInput(null);
-    setRunningPlanConfirmResult(null);
-    runningPlanPreviewInputKeyRef.current = null;
-
-    try {
-      setPresetStatus("loading_cards");
-      const result = await getPlanPresetCardsFn({
-        data: buildPlanPresetCardInput(effectiveConstructorState),
-      });
-
-      setPresetCardsResult(result);
-      setPresetStatus("idle");
-
-      if (!result.ok) {
-        setPresetError(result.message);
-      }
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : "Could not load plan presets.";
-      setPresetStatus("idle");
-      setPresetError(message);
-    }
-  };
-
-  const autoLoadPlanPresetCards = useEffectEvent(() => {
-    void loadPlanPresetCards();
-  });
-
-  useEffect(() => {
-    if (
-      setupMode !== "quick" ||
-      !isPresetDiscoveryReady ||
-      presetStatus !== "idle" ||
-      presetCardsResult
-    ) {
-      return;
-    }
-
-    if (presetAutoLoadKeyRef.current === presetDiscoveryKey) {
-      return;
-    }
-
-    presetAutoLoadKeyRef.current = presetDiscoveryKey;
-    autoLoadPlanPresetCards();
-  }, [
-    setupMode,
-    isPresetDiscoveryReady,
-    presetStatus,
-    presetCardsResult,
-    presetDiscoveryKey,
-    autoLoadPlanPresetCards,
-  ]);
-
-  const refreshSelectedRunningPlanPreview = async (cardIdOverride?: PlanPresetCardId) => {
-    const cardId = cardIdOverride ?? presetSelectedCardId;
-
-    if (!cardId) {
-      setPresetStatus("idle");
-      setRunningPlanPreviewResult(null);
-      setRunningPlanPreviewInput(null);
-      setRunningPlanConfirmResult(null);
-      setPresetError("Select a plan preset before previewing it.");
-      return;
-    }
-
-    const inputResult = buildRunningPlanPreviewInput(effectiveConstructorState, cardId);
-
-    if (!inputResult.ok) {
-      setPresetStatus("idle");
-      setRunningPlanPreviewResult(null);
-      setRunningPlanPreviewInput(null);
-      setRunningPlanConfirmResult(null);
-      setPresetError(inputResult.error);
-      return;
-    }
-
-    const inputKey = JSON.stringify(inputResult.input);
-    setPresetError(null);
-    setRunningPlanConfirmResult(null);
-    setPresetStatus("previewing_plan");
-
-    try {
-      const result = await previewRunningPlanDraftFn({
-        data: inputResult.input,
-      });
-
-      runningPlanPreviewInputKeyRef.current = inputKey;
-      setRunningPlanPreviewResult(result);
-      setRunningPlanPreviewInput(result.ok ? inputResult.input : null);
-      setPresetStatus("idle");
-
-      if (!result.ok) {
-        setPresetError(null);
-        return;
-      }
-
-      hitoToast.success({
-        id: STRUCTURED_REVIEW_TOAST_ID,
-        title: `${inputResult.input.distanceFamily} preview ready`,
-        description: "Review the backend-shaped calendar before creating the plan.",
-      });
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : "Could not build this preview.";
-      setRunningPlanPreviewResult(null);
-      setRunningPlanPreviewInput(null);
-      setPresetStatus("idle");
-      setPresetError(message);
-    }
-  };
-
-  const refreshRunningPlanPreviewEffect = useEffectEvent(() => {
-    void refreshSelectedRunningPlanPreview();
-  });
-
-  useEffect(() => {
-    if (!presetSelectedCardId || !runningPlanPreviewOpen || presetStatus !== "idle") {
-      return;
-    }
-
-    const inputResult = buildRunningPlanPreviewInput(
-      effectiveConstructorState,
-      presetSelectedCardId,
-    );
-    const inputKey = inputResult.ok ? JSON.stringify(inputResult.input) : inputResult.error;
-
-    if (runningPlanPreviewInputKeyRef.current === inputKey && runningPlanPreviewResult) {
-      return;
-    }
-
-    refreshRunningPlanPreviewEffect();
-  }, [
-    effectiveConstructorState,
-    presetStatus,
-    refreshRunningPlanPreviewEffect,
-    presetSelectedCardId,
-    runningPlanPreviewOpen,
-    runningPlanPreviewResult,
-  ]);
-
-  const selectPlanPresetPreview = (cardId: PlanPresetCardId) => {
-    setPresetSelectedCardId(cardId);
-    setRunningPlanPreviewOpen(true);
-    setRunningPlanPreviewResult(null);
-    setRunningPlanPreviewInput(null);
-    setRunningPlanConfirmResult(null);
-    runningPlanPreviewInputKeyRef.current = null;
-    void refreshSelectedRunningPlanPreview(cardId);
-  };
-
   const confirmSelectedRunningPlan = async () => {
     if (runningPlanCreateInFlightRef.current) {
       return;
     }
 
-    const draft = runningPlanPreviewResult?.ok ? runningPlanPreviewResult.draft : null;
+    const draft = selectedPlanPreview.previewResult?.ok
+      ? selectedPlanPreview.previewResult.draft
+      : null;
+    const confirmInput = buildRunningPlanConfirmInput(
+      draft,
+      selectedPlanPreview.previewInput,
+      "Refresh the selected preview before creating this plan.",
+    );
 
-    if (!draft || !runningPlanPreviewInput || !draft.reviewToken || !draft.reviewChecksum) {
+    if (!confirmInput.ok) {
       setRunningPlanConfirmResult({
         ok: false,
         status: "blocked",
         persisted: false,
         reason: "invalid_review",
-        message: "Refresh the selected preview before creating this plan.",
-        ...(draft?.sourceKind ? { sourceKind: draft.sourceKind } : {}),
-        ...(draft?.planFamily ? { planFamily: draft.planFamily } : {}),
+        message: confirmInput.message,
+        ...(confirmInput.sourceKind ? { sourceKind: confirmInput.sourceKind } : {}),
+        ...(confirmInput.planFamily ? { planFamily: confirmInput.planFamily } : {}),
       });
       return;
     }
@@ -453,7 +278,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     runningPlanCreateInFlightRef.current = true;
     setRunningPlanCreateStatus("creating");
     setRunningPlanConfirmResult(null);
-    setPresetError(null);
+    selectedPlanPreview.setError(null);
     hitoToast.working({
       id: STRUCTURED_REVIEW_TOAST_ID,
       title: "Creating plan",
@@ -462,13 +287,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
     try {
       const result = await confirmRunningPlanDraftFn({
-        data: {
-          previewInput: runningPlanPreviewInput,
-          planFamily: draft.planFamily,
-          sourceKind: draft.sourceKind,
-          reviewToken: draft.reviewToken,
-          reviewChecksum: draft.reviewChecksum,
-        },
+        data: confirmInput.input,
       });
 
       setRunningPlanConfirmResult(result);
@@ -502,8 +321,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         persisted: false,
         reason: "persistence_failed",
         message,
-        sourceKind: draft.sourceKind,
-        planFamily: draft.planFamily,
+        sourceKind: confirmInput.input.sourceKind,
+        planFamily: confirmInput.input.planFamily,
       });
       hitoToast.error({
         id: STRUCTURED_REVIEW_TOAST_ID,
@@ -628,10 +447,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   };
 
   return (
-    <section
-      className="hito-surface hito-onboarding-surface mx-auto max-w-5xl px-6 pt-6 lg:px-10 lg:pt-10"
-      data-mode={setupMode}
-    >
+    <section className="hito-surface hito-onboarding-surface" data-mode={setupMode}>
       <div className="max-w-3xl">
         <p className="hito-micro-label" data-tone="signal">
           Create a plan
@@ -671,7 +487,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
       {setupMode === "manual" ? (
         <div className="mt-6 grid gap-6">
-          <section className="grid gap-y-4 gap-x-0 md:grid-cols-[220px_minmax(0,1fr)] md:gap-x-12 lg:gap-x-16">
+          <section className="hito-form-section-grid">
             <div>
               <p className="hito-micro-label">01</p>
               <h2 className="hito-panel-title mt-2">Manual setup</h2>
@@ -813,25 +629,25 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           }}
           planPresetPanel={
             <PlanPresetPanel
-              cardsResult={presetCardsResult}
+              cardsResult={selectedPlanPreview.cardsResult}
               confirmResult={runningPlanConfirmResult}
-              previewResult={runningPlanPreviewResult}
+              previewResult={selectedPlanPreview.previewResult}
               createStatus={runningPlanCreateStatus}
-              error={presetError}
-              status={presetStatus}
+              error={selectedPlanPreview.error}
+              status={selectedPlanPreview.status}
               isBusy={isBusy}
               isPresetDiscoveryReady={isPresetDiscoveryReady}
-              selectedCardId={presetSelectedCardId}
-              previewOpen={runningPlanPreviewOpen}
-              onPreviewOpenChange={setRunningPlanPreviewOpen}
+              selectedCardId={selectedPlanPreview.selectedCardId}
+              previewOpen={selectedPlanPreview.previewOpen}
+              onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
               onLoadCards={() => {
-                void loadPlanPresetCards();
+                void selectedPlanPreview.loadCards();
               }}
               onSelectPlan={(cardId) => {
-                selectPlanPresetPreview(cardId);
+                selectedPlanPreview.selectPlanPreview(cardId);
               }}
               onRefreshPreview={() => {
-                void refreshSelectedRunningPlanPreview();
+                void selectedPlanPreview.refreshPreview();
               }}
               onCreatePlan={() => {
                 void confirmSelectedRunningPlan();
@@ -842,58 +658,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       ) : null}
     </section>
   );
-}
-
-function buildPlanPresetCardInput(state: StructuredConstructorState): PlanPresetCardRequestInput {
-  const age = optionalPlanPresetNumber(state.age, { min: 13, max: 100, integer: true });
-  const weightKg = optionalPlanPresetNumber(state.weightKg, { min: 30, max: 250 });
-  const heightCm = optionalPlanPresetNumber(state.heightCm, { min: 120, max: 230, integer: true });
-  const runningDaysPerWeek = optionalPlanPresetNumber(state.maxRunningDaysPerWeek, {
-    min: 1,
-    max: 7,
-    integer: true,
-  });
-  const recent5kTime = state.recent5kTime.trim();
-  const targetTime = state.targetTime.trim();
-  const targetDate = state.targetDate.trim();
-  const startDate = state.startDate.trim();
-  const comment = state.comment.trim();
-
-  return {
-    profile: {
-      age,
-      weightKg,
-      heightCm,
-    },
-    benchmark: {
-      fitnessLevel: state.fitnessLevel,
-      recent5kTime: recent5kTime || null,
-    },
-    availability: {
-      runningDaysPerWeek,
-      fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
-      preferredLongRunDay: state.preferredLongRunDay || null,
-    },
-    goal: {
-      goalDistance: state.goalDistance,
-      goalStyle: state.goalStyle,
-      terrainFocus: state.terrainFocus,
-      targetTime: targetTime || null,
-      targetDate: targetDate || null,
-    },
-    execution: {
-      watchAccess: state.watchAccess,
-      guidancePreference: state.guidancePreference,
-    },
-    strength: {
-      preference: state.strengthPreference,
-    },
-    schedule: {
-      startDate: startDate || null,
-      targetDate: targetDate || null,
-    },
-    comment: comment || null,
-  };
 }
 
 function isManualProfileReady(state: StructuredConstructorState) {
@@ -971,143 +735,6 @@ function requiredManualNumber(
   return { ok: true, value: parsed };
 }
 
-function buildPlanPresetCardInputKey(input: PlanPresetCardRequestInput) {
-  return JSON.stringify(input);
-}
-
-function buildRunningPlanPreviewInput(
-  state: StructuredConstructorState,
-  cardId: PlanPresetCardId,
-): { ok: true; input: RunningPlanPreviewActionInput } | { ok: false; error: string } {
-  const age = requiredNumber(state.age, {
-    label: "Age",
-    min: 13,
-    max: 100,
-    integer: true,
-  });
-  const heightCm = requiredNumber(state.heightCm, {
-    label: "Height",
-    min: 120,
-    max: 230,
-    integer: true,
-  });
-  const weightKg = requiredNumber(state.weightKg, {
-    label: "Weight",
-    min: 30,
-    max: 250,
-  });
-
-  if (!age.ok) {
-    return { ok: false, error: age.error };
-  }
-  if (!heightCm.ok) {
-    return { ok: false, error: heightCm.error };
-  }
-  if (!weightKg.ok) {
-    return { ok: false, error: weightKg.error };
-  }
-
-  const daysPerWeek = optionalPlanPresetNumber(state.maxRunningDaysPerWeek, {
-    min: 1,
-    max: 7,
-    integer: true,
-  });
-  const benchmark = buildRunningPlanBenchmarkInput(state);
-
-  if (!benchmark.ok) {
-    return { ok: false, error: benchmark.error };
-  }
-
-  return {
-    ok: true,
-    input: {
-      age: age.value,
-      heightCm: heightCm.value,
-      weightKg: weightKg.value,
-      runnerLevel: mapRunnerLevelToPlanEngine(state.fitnessLevel),
-      distanceFamily: distanceFamilyForPresetCard(cardId),
-      daysPerWeek,
-      fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
-      preferredLongRunDay: state.preferredLongRunDay || null,
-      startDate: state.startDate.trim() || null,
-      benchmark: benchmark.input,
-    },
-  };
-}
-
-function buildRunningPlanBenchmarkInput(state: StructuredConstructorState):
-  | {
-      ok: true;
-      input: NonNullable<RunningPlanPreviewActionInput["benchmark"]>;
-    }
-  | { ok: false; error: string } {
-  const recent5kTime = state.recent5kTime.trim();
-  const recent5kPace = state.recent5kPace.trim();
-  const hasRecent5kTime = recent5kTime.length > 0;
-  const hasRecent5kPace = recent5kPace.length > 0;
-
-  if (hasRecent5kTime && !isRecent5kTimeInAcceptedRange(recent5kTime)) {
-    return { ok: false, error: "Use a recent 5K time between 18:00 and 55:00." };
-  }
-
-  if (hasRecent5kPace && !isRecent5kPaceInAcceptedRange(recent5kPace)) {
-    return { ok: false, error: "Use a recent 5K pace between 2:00/km and 15:00/km." };
-  }
-
-  if (hasRecent5kTime) {
-    return {
-      ok: true,
-      input: {
-        kind: "recent_5k_time",
-        recent5kTime,
-      },
-    };
-  }
-
-  if (hasRecent5kPace) {
-    return {
-      ok: true,
-      input: {
-        kind: "recent_5k_pace",
-        recent5kPace,
-      },
-    };
-  }
-
-  return {
-    ok: true,
-    input: {
-      kind: "unknown",
-    },
-  };
-}
-
-function distanceFamilyForPresetCard(cardId: PlanPresetCardId): RunningPlanDistanceFamily {
-  switch (cardId) {
-    case "10k":
-      return "10K";
-    case "half_marathon":
-      return "Half Marathon";
-    case "marathon":
-      return "Marathon Base";
-  }
-}
-
-function mapRunnerLevelToPlanEngine(level: RunnerFitnessLevel): RunningPlanRunnerLevel {
-  switch (level) {
-    case "new_to_running":
-      return "beginner_new_runner";
-    case "beginner":
-      return "sometimes_runs";
-    case "running_regularly":
-      return "runs_a_lot";
-    case "performance_focused":
-      return "professional_competitive";
-    case "custom":
-      return "sometimes_runs";
-  }
-}
-
 function manualFitnessLevelIcon(value: RunnerFitnessLevel): HitoIconName {
   switch (value) {
     case "new_to_running":
@@ -1121,60 +748,6 @@ function manualFitnessLevelIcon(value: RunnerFitnessLevel): HitoIconName {
     case "custom":
       return "edit";
   }
-}
-
-function requiredNumber(
-  value: string,
-  {
-    integer = false,
-    label,
-    max,
-    min,
-  }: {
-    label: string;
-    min: number;
-    max: number;
-    integer?: boolean;
-  },
-): { ok: true; value: number } | { ok: false; error: string } {
-  const parsed = optionalPlanPresetNumber(value, { min, max, integer });
-
-  if (parsed == null) {
-    return { ok: false, error: `${label} must be filled before selecting a plan preview.` };
-  }
-
-  return { ok: true, value: parsed };
-}
-
-function optionalPlanPresetNumber(
-  value: string,
-  {
-    min,
-    max,
-    integer = false,
-  }: {
-    min: number;
-    max: number;
-    integer?: boolean;
-  },
-) {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return null;
-  }
-
-  const parsed = Number(trimmed);
-
-  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
-    return null;
-  }
-
-  if (integer && !Number.isInteger(parsed)) {
-    return null;
-  }
-
-  return parsed;
 }
 
 function withStructuredReviewTimeout<T>(run: () => Promise<T>) {

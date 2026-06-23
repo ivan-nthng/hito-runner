@@ -16,13 +16,13 @@ const requestedStartDateSchema = z
   .trim()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a start date in YYYY-MM-DD format.");
 
-export const onboardingInputSchema = z.object({
+const onboardingInputSchema = z.object({
   importedPlan: importedPlanSchema,
   firstDayResolution: firstDayResolutionSchema.optional().nullable(),
   requestedStartDate: requestedStartDateSchema.optional().nullable(),
 });
 
-export const textAuthoringInputSchema = z.object({
+const textAuthoringInputSchema = z.object({
   authoringText: z.string().trim().min(20).max(4000),
   firstDayResolution: firstDayResolutionSchema.optional().nullable(),
 });
@@ -80,7 +80,7 @@ export const completeTextOnboarding = createServerFn({ method: "POST" })
         };
   });
 
-export async function persistImportedPlanForCurrentRequest(
+async function persistImportedPlanForCurrentRequest(
   importedPlan: ImportedPlanInput,
   firstDayResolution: FirstDayResolution | null,
   requestedStartDate: string | null = null,

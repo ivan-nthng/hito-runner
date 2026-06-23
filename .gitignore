@@ -16,6 +16,7 @@ dist-ssr
 .nitro
 *.local
 qa-artifacts/
+.local-artifact-archive/
 test-results/
 
 # Local legacy/quarantine artifacts that are not part of the app build.

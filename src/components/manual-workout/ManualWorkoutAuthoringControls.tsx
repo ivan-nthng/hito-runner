@@ -35,10 +35,10 @@ import {
   addManualWorkoutToActivePlan,
   copyManualWorkoutWithinActivePlan,
   listManualWorkoutSavedTemplates,
-  reviewManualWorkoutDraftAction,
   reviewManualWorkoutSavedTemplate,
   saveManualWorkoutSavedTemplate,
-} from "@/lib/training-api";
+} from "@/lib/manual-workout-authoring";
+import { reviewManualWorkoutDraftAction } from "@/lib/training-api";
 import type {
   ManualWorkoutDirectCopyResult,
   ManualWorkoutDraftInput,
@@ -67,10 +67,8 @@ import {
   groupManualTemplates,
   targetTruthModeCopy,
   targetTruthModeLabel,
-  templateShortLabel,
   templateIconKind,
   templateIconTone,
-  workoutToneColor,
 } from "@/components/manual-workout/manual-workout-authoring-utils";
 import {
   ManualWorkoutConstructorEditor,
@@ -88,9 +86,8 @@ export type ManualReviewReady = Extract<ManualWorkoutDraftReviewResult, { ok: tr
 export type ManualReviewRejected = Extract<ManualWorkoutDraftReviewResult, { ok: false }>;
 export type ManualDraftStatus = "idle" | "reviewing" | "creating";
 
-const MANUAL_ADD_MENU_CONTENT_CLASS = "w-[min(20rem,calc(100vw-2rem))] p-2";
-const MANUAL_ADD_MENU_SUBCONTENT_CLASS =
-  "w-[min(24rem,calc(100vw-2rem))] max-h-[min(32rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto p-2";
+const MANUAL_ADD_MENU_CONTENT_CLASS = "hito-manual-workout-menu-add";
+const MANUAL_ADD_MENU_SUBCONTENT_CLASS = "hito-manual-workout-menu-template";
 const MANUAL_ADD_MENU_ITEM_CLASS = "min-h-14 items-start gap-3 px-3 py-2.5 text-left";
 const MANUAL_ADD_MENU_ICON_CLASS = "mt-0.5 shrink-0";
 
@@ -844,14 +841,6 @@ function ManualTemplateSubmenu({
                   onSelectSavedTemplate(template);
                 }}
               >
-                <span
-                  className="hito-status-pill mt-0.5 shrink-0"
-                  data-icon="false"
-                  style={{ color: calendarIconToneColor(template.iconKey) }}
-                >
-                  <WorkoutGlyph kind={template.iconKey as WorkoutGlyphKind} className="h-3 w-3" />
-                  {calendarIconLabel(template.iconKey)}
-                </span>
                 <span className="min-w-0">
                   <span className="hito-list-row-title block">{template.displayName}</span>
                   <span className="hito-list-row-copy block">{savedTemplateSummary(template)}</span>
@@ -874,13 +863,6 @@ function ManualTemplateSubmenu({
                   onSelectTemplate(template);
                 }}
               >
-                <span
-                  className="hito-status-pill mt-0.5 shrink-0"
-                  data-icon="false"
-                  style={{ color: workoutToneColor(template) }}
-                >
-                  {templateShortLabel(template)}
-                </span>
                 <span className="min-w-0">
                   <span className="hito-list-row-title block">{template.label}</span>
                   <span className="hito-list-row-copy block">
@@ -914,7 +896,7 @@ export function ManualTemplatePickerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
@@ -986,17 +968,6 @@ export function ManualTemplatePickerDialog({
                     className="hito-list-row w-full items-start text-left"
                     onClick={() => onSelectSavedTemplate(template)}
                   >
-                    <span
-                      className="hito-status-pill mt-0.5 shrink-0"
-                      data-icon="false"
-                      style={{ color: calendarIconToneColor(template.iconKey) }}
-                    >
-                      <WorkoutGlyph
-                        kind={template.iconKey as WorkoutGlyphKind}
-                        className="h-3 w-3"
-                      />
-                      {calendarIconLabel(template.iconKey)}
-                    </span>
                     <span className="min-w-0">
                       <span className="hito-list-row-title block">{template.displayName}</span>
                       <span className="hito-list-row-copy block">
@@ -1020,13 +991,6 @@ export function ManualTemplatePickerDialog({
                     className="hito-list-row w-full items-start text-left"
                     onClick={() => onSelectTemplate(template)}
                   >
-                    <span
-                      className="hito-status-pill mt-0.5 shrink-0"
-                      data-icon="false"
-                      style={{ color: workoutToneColor(template) }}
-                    >
-                      {templateShortLabel(template)}
-                    </span>
                     <span className="min-w-0">
                       <span className="hito-list-row-title block">{template.label}</span>
                       <span className="hito-list-row-copy block">
@@ -1095,7 +1059,7 @@ export function ManualWorkoutConstructorDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
@@ -1290,7 +1254,7 @@ function ManualReviewSummaryDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog max-w-2xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-wide"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
@@ -1374,7 +1338,7 @@ function ManualSaveTemplateAction({
         Save as template
       </button>
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog max-w-lg border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-compact"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">

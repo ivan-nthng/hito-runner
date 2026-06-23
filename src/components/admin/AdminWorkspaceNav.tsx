@@ -162,7 +162,7 @@ function AdminWorkspaceAccountMenu({
       <DropdownMenuContent
         side={compact ? "bottom" : "top"}
         align={compact ? "end" : "start"}
-        className="hito-shell-menu w-[224px]"
+        className="hito-shell-menu hito-shell-menu-account"
       >
         <DropdownMenuLabel className="pb-1">
           <div className="hito-menu-text">Admin</div>

@@ -27,6 +27,7 @@ type InputFeedback = "neutral" | "error" | "success";
 type ChoiceToggleSize = "xs" | "sm" | "md" | "lg" | "xl";
 type SelectionControlKind = "checkbox" | "radio" | "toggle";
 type SelectionBinarySize = "sm" | "md";
+type ModalSizeMode = "compact" | "standard" | "wide" | "workflow" | "review";
 type ModalBodyMode = "content-fit" | "scroll-fill";
 type ModalHeaderMode = "compact" | "large";
 type ModalFooterMode = "none" | "actions" | "note-actions";
@@ -84,7 +85,7 @@ export function DataTableSpecimenPreview({
       )}
 
       <div className="hito-data-table-scroll">
-        <table className="hito-data-table min-w-[860px]">
+        <table className="hito-data-table hito-data-table-min-md">
           <caption className="sr-only">Hito data-table specimen preview.</caption>
           <thead>
             <tr>
@@ -191,7 +192,7 @@ function DataTableHeaderButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="hito-shell-menu hito-data-table-column-menu w-64"
+        className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-standard"
       >
         <DropdownMenuLabel className="hito-micro-label">Sort</DropdownMenuLabel>
         {DATA_TABLE_SORT_OPTIONS.map((option) => {
@@ -251,6 +252,7 @@ function DataTableStaticHeader({ label }: { label: string }) {
 }
 
 export function ModalWindowPreview({
+  sizeMode,
   bodyMode,
   headerMode,
   footerMode,
@@ -258,6 +260,7 @@ export function ModalWindowPreview({
   destructive,
   longContent,
 }: {
+  sizeMode: ModalSizeMode;
   bodyMode: ModalBodyMode;
   headerMode: ModalHeaderMode;
   footerMode: ModalFooterMode;
@@ -296,9 +299,24 @@ export function ModalWindowPreview({
       : "hito-product-dialog-body",
     "grid gap-3",
   );
+  const sizeClassNameByMode: Record<ModalSizeMode, string> = {
+    compact: "hito-dialog-size-compact",
+    standard: "hito-dialog-size-standard",
+    wide: "hito-dialog-size-wide",
+    workflow: "hito-dialog-size-workflow",
+    review: "hito-dialog-size-review",
+  };
+  const heightClassNameByMode: Record<ModalSizeMode, string> = {
+    compact: "hito-dialog-height-standard",
+    standard: "hito-dialog-height-standard",
+    wide: "hito-dialog-height-wide",
+    workflow: "hito-dialog-height-workflow",
+    review: "hito-dialog-height-review",
+  };
   const contentClassName = cn(
-    "hito-dialog-stable hito-product-dialog max-w-xl border-hairline bg-background/95 p-0 backdrop-blur-xl",
-    bodyMode === "scroll-fill" && "h-[min(32rem,calc(100dvh-2rem))]",
+    "hito-dialog-stable hito-product-dialog hito-dialog-surface-product",
+    sizeClassNameByMode[sizeMode],
+    bodyMode === "scroll-fill" && heightClassNameByMode[sizeMode],
   );
 
   const renderModalContents = (live: boolean) => (
@@ -306,7 +324,8 @@ export function ModalWindowPreview({
       <DialogHeader className="hito-product-dialog-header">
         <div>
           <p className="hito-label hito-label-signal">
-            {headerMode === "large" ? "Large header + close" : "Compact header + close"}
+            {sizeMode} ·{" "}
+            {headerMode === "large" ? "large header + close" : "compact header + close"}
           </p>
           {live ? (
             <>

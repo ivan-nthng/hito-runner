@@ -2,7 +2,53 @@
 
 Date: 2026-06-09
 Owner: Product / Backend / Data contract
-Status: Proposed source-of-truth for future provider ingestion and plan-vs-actual comparison
+
+## Status
+
+backlog
+
+## Type
+
+product_brief
+
+## Priority
+
+medium
+
+## Next Recommended Role
+
+backend
+
+## Task
+
+Use the provider activity ingestion and comparison contract when future provider sync work is
+selected.
+
+## Stage
+
+PRODUCT brief / future provider ingestion contract.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: BACKEND
+
+Task:
+Use the provider activity ingestion and comparison contract when future provider sync work is
+selected.
+
+Stage:
+BACKEND backlog / provider activity ingestion contract implementation.
+
+Context:
+This product brief defines a future provider-agnostic ingestion and plan-vs-actual comparison
+contract. Preserve the current local Garmin upload behavior and do not implement provider sync
+unless a bounded provider-ingestion slice is explicitly selected.
+```
+
+## Brief Status
+
+Proposed source-of-truth for future provider ingestion and plan-vs-actual comparison.
 
 ## Purpose
 

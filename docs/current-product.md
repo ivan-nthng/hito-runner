@@ -65,9 +65,11 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - signed-in users with no active plan can also choose `Build my plan myself`: the first reviewed
   manual workout creates a `manual_user_built_plan_v1` active plan through backend review
   token/checksum confirmation, and saved manual calendars can add additional reviewed workouts on
-  eligible future empty days through the existing compact calendar `Add` action. The final Add
-  confirmation repeats the selected date/weekday before mutation, persistence readback uses the same
-  date-only truth, and manual Add does not send client rows, segments, or persistence metadata;
+  eligible today-or-future empty days through the backend Add contract; the existing compact
+  calendar `Add` action still needs the frontend consumer to expose today's empty-day affordance.
+  The final Add confirmation repeats the selected date/weekday before mutation, persistence
+  readback uses the same date-only truth, and manual Add does not send client rows, segments, or
+  persistence metadata;
   runners can save reviewed manual workouts as personal templates, reuse those templates from
   `Add activity`, copy/paste manual workout days through direct backend-owned reconstruction, and
   clear eligible manual workout days through backend-shaped Delete/Clear review while the active
@@ -82,8 +84,8 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - saved active-plan calendars now use backend-shaped editability/capability metadata for
   Add/Clear/Move in the proved scope instead of treating manual and non-manual plans as separate
   calendar products:
-  supported active-plan sources can expose eligible future empty-day Add, eligible planned-workout
-  Clear, and eligible Move actions while preserving the original active-plan `source_kind` and
+  supported active-plan sources can expose eligible today-or-future empty-day Add, eligible
+  planned-workout Clear, and eligible Move actions while preserving the original active-plan `source_kind` and
   adding `active_plan_user_edit_v1` audit metadata; backend protection can still block specific
   rows, dates, source metadata, logged/evidence-backed workouts, occupied targets, stale reviews,
   or unsafe reconstruction. Universal Copy/Paste, recurrence, runner-facing `Edit training`,
@@ -135,6 +137,13 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - the first OpenAI-backed text authoring slice is also backend-only for now:
   it treats the user message as intent only, asks OpenAI for bounded structured authoring input using the same expanded goal, terrain, execution-mode, and recent-benchmark contract as structured setup, validates that output, then the saved-mode text replacement action opts into a second bounded rich workout draft that must pass backend taxonomy, rest-day, segment-structure, and metric-safety normalization before persistence; default helper usage stays deterministic, and voice-to-plan remains a separate backend action without a current visible onboarding caller
 - setup writes one profile and creates one active plan only after manual empty-plan creation, structured constructor confirmation, or selected-plan confirmation, with JSON import retained only as an advanced fallback
+- starting a selected generated/preset plan from an existing active manual plan now has a
+  backend-owned reviewed transition seam for future saved-mode `Create a plan` UI: review is
+  non-mutating, Plan Preset card discovery can load as read-only family discovery even while the
+  manual plan is active, confirm revalidates selected-plan exactness plus active-plan revision,
+  archives the old manual active plan as history, creates the selected plan as the new active plan,
+  preserves manual templates/logs/evidence/comparisons, and does not merge upcoming manual workouts
+  into the generated plan by default
 - applying a generated or imported plan now uses one shared backend start-date policy:
   explicit future starts are preserved, past or non-future starts normalize to today, and the plan is persisted only after those effective dates are resolved
 - saved-mode JSON import can now use one explicit chosen start day as the apply authority:

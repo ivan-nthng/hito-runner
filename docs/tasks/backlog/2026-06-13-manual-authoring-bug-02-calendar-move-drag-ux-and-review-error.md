@@ -2,19 +2,49 @@
 
 ## Status
 
-ready
+backlog
 
 ## Type
 
 bug
 
-## Severity
+## Priority
 
 high
 
-## Priority
+## Next Recommended Role
 
-now
+frontend
+
+## Task
+
+Fix calendar move drag UX and bounded move-review error rendering when this backlog item is
+prioritized.
+
+## Stage
+
+FRONTEND backlog / calendar move drag UX and bounded review error rendering.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+Task:
+Fix calendar move drag UX and bounded move-review error rendering when this backlog item is
+prioritized.
+
+Stage:
+FRONTEND implementation / calendar move drag UX and bounded review error rendering.
+
+Context:
+This is a backlog UI/DS cleanup item. Preserve backend schedule truth unless the response contract
+is proven wrong, and do not broaden into constructor, copy/paste, or onboarding scope.
+```
+
+## Severity
+
+high
 
 ## Owner
 

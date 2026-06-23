@@ -106,7 +106,7 @@ export function ManualWorkoutConstructorEditor({
 
   return (
     <div className="grid gap-5">
-      <section className="grid gap-3 rounded-2xl bg-surface/25 p-4">
+      <section className="hito-manual-workout-editor-surface">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span
@@ -116,7 +116,7 @@ export function ManualWorkoutConstructorEditor({
             >
               <WorkoutGlyph kind={iconKey} className="h-4 w-4" />
             </span>
-            <div className="grid min-w-[14rem] flex-1 gap-1">
+            <div className="hito-manual-workout-title-field grid flex-1 gap-1">
               <label className="sr-only" htmlFor="manual-workout-constructor-title">
                 Workout name
               </label>
@@ -173,41 +173,11 @@ export function ManualWorkoutConstructorEditor({
         reviewDisabledReason={reviewDisabledReason}
       />
 
-      <section className="grid gap-4">
-        {onTargetTruthModeChange && allowedTargetTruthModes.length > 1 ? (
-          <label className="grid gap-2">
-            <span className="hito-form-label">Target truth</span>
-            <Select
-              value={targetTruthMode}
-              onValueChange={(value) =>
-                onTargetTruthModeChange(value as ManualWorkoutTargetTruthMode)
-              }
-            >
-              <SelectTrigger aria-label="Target truth mode">
-                <SelectValue placeholder="Target truth" />
-              </SelectTrigger>
-              <SelectContent>
-                {allowedTargetTruthModes.map((mode) => (
-                  <SelectItem key={mode} value={mode}>
-                    {targetTruthModeLabel(mode)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="hito-field-helper">{targetTruthModeCopy(targetTruthMode)}</span>
-          </label>
-        ) : (
-          <div className="grid gap-2">
-            <span className="hito-form-label">Target truth</span>
-            <div className="hito-list-row items-start rounded-2xl border-0 bg-surface/25">
-              <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
-                {targetTruthModeLabel(targetTruthMode)}
-              </span>
-              <p className="hito-list-row-copy min-w-0">{targetTruthModeCopy(targetTruthMode)}</p>
-            </div>
-          </div>
-        )}
-      </section>
+      <ManualTargetGuidanceSection
+        allowedTargetTruthModes={allowedTargetTruthModes}
+        onTargetTruthModeChange={onTargetTruthModeChange}
+        targetTruthMode={targetTruthMode}
+      />
 
       <label className="grid gap-2">
         <span className="hito-form-label">Notes or cues</span>
@@ -332,24 +302,21 @@ function ManualWorkoutStructurePreview({
   );
 
   return (
-    <section className="grid gap-3 rounded-2xl bg-background/25 p-4">
+    <section className="hito-manual-workout-editor-surface-muted">
       <div className="flex items-center justify-between gap-3">
         <p className="hito-label">Workout structure</p>
         <span className="hito-caption font-mono-num">{meta}</span>
       </div>
       {segments.length ? (
         <div className="grid gap-3">
-          <div
-            className="relative flex h-12 min-w-0 overflow-hidden rounded-md border border-hairline bg-background/25"
-            aria-label="Workout structure preview"
-          >
+          <div className="hito-manual-workout-structure-bar" aria-label="Workout structure preview">
             {segments.map((segment, index) => {
               const flexGrow = segment.weight / totalWeight;
 
               return (
                 <span
                   key={`${segment.label}-${index}`}
-                  className="relative min-w-[1.25rem] overflow-hidden border-x border-background/20 first:rounded-l-md first:border-l-0 last:rounded-r-md last:border-r-0"
+                  className="hito-manual-workout-structure-segment"
                   title={`${segment.label} · ${segment.metric}`}
                   style={{
                     background: segment.background,
@@ -358,7 +325,7 @@ function ManualWorkoutStructurePreview({
                   }}
                 >
                   {flexGrow > 0.12 ? (
-                    <span className="absolute inset-0 flex items-center justify-center px-1 text-[10px] font-mono-num text-background/80 mix-blend-luminosity">
+                    <span className="hito-manual-workout-structure-label">
                       {segment.shortLabel}
                     </span>
                   ) : null}
@@ -399,6 +366,55 @@ function ManualWorkoutStructurePreview({
   );
 }
 
+function ManualTargetGuidanceSection({
+  allowedTargetTruthModes,
+  onTargetTruthModeChange,
+  targetTruthMode,
+}: {
+  allowedTargetTruthModes: ManualWorkoutTargetTruthMode[];
+  onTargetTruthModeChange?: (value: ManualWorkoutTargetTruthMode) => void;
+  targetTruthMode: ManualWorkoutTargetTruthMode;
+}) {
+  const guidanceLabel = targetTruthModeLabel(targetTruthMode);
+  const guidanceCopy = targetTruthModeCopy(targetTruthMode);
+
+  if (onTargetTruthModeChange && allowedTargetTruthModes.length > 1) {
+    return (
+      <section className="grid gap-2">
+        <span className="hito-form-label">How to approach it</span>
+        <Select
+          value={targetTruthMode}
+          onValueChange={(value) => onTargetTruthModeChange(value as ManualWorkoutTargetTruthMode)}
+        >
+          <SelectTrigger aria-label="Workout guidance">
+            <SelectValue placeholder="Choose guidance" />
+          </SelectTrigger>
+          <SelectContent>
+            {allowedTargetTruthModes.map((mode) => (
+              <SelectItem key={mode} value={mode}>
+                {targetTruthModeLabel(mode)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="hito-field-helper">{guidanceCopy}</span>
+      </section>
+    );
+  }
+
+  return (
+    <section className="grid gap-2">
+      <span className="hito-form-label">How to approach it</span>
+      <div className="hito-list-row hito-manual-workout-guidance-row items-start">
+        <div className="min-w-0">
+          <p className="hito-list-row-title">{guidanceLabel}</p>
+          <p className="hito-list-row-copy">{guidanceCopy}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ManualWorkoutEntryRow({
   editable,
   entry,
@@ -424,10 +440,10 @@ function ManualWorkoutEntryRow({
 
   if (entry.kind === "repeat_group") {
     return (
-      <article className="group/step grid gap-4 rounded-2xl bg-surface/25 p-4 transition-colors hover:bg-surface/35 focus-within:bg-surface/35">
+      <article className="group/step hito-manual-workout-step-card grid gap-4">
         <div className="flex flex-wrap items-start gap-3">
           <span className="hito-caption w-7 shrink-0 pt-2 text-right font-mono-num">{ordinal}</span>
-          <div className="min-w-[12rem] flex-1">
+          <div className="hito-manual-workout-step-summary flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="hito-status-pill" data-tone="warning">
                 Repeat
@@ -450,7 +466,7 @@ function ManualWorkoutEntryRow({
           />
         </div>
 
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_9rem_minmax(10rem,0.75fr)]">
+        <div className="hito-manual-workout-repeat-settings-grid">
           <label className="grid gap-2">
             <span className="hito-form-label">Repeat label</span>
             <input
@@ -564,7 +580,7 @@ function ManualWorkoutEntryRow({
   }
 
   return (
-    <article className="group/step grid gap-3 rounded-2xl bg-surface/25 p-4 transition-colors hover:bg-surface/35 focus-within:bg-surface/35">
+    <article className="group/step hito-manual-workout-step-card grid gap-3">
       <div className="flex flex-wrap items-start gap-3">
         <span className="hito-caption w-7 shrink-0 pt-2 text-right font-mono-num">{ordinal}</span>
         <span
@@ -572,7 +588,7 @@ function ManualWorkoutEntryRow({
           style={{ background: blockTone(entry.block.blockKey) }}
           aria-hidden="true"
         />
-        <div className="min-w-[12rem] flex-1">
+        <div className="hito-manual-workout-step-summary flex-1">
           <p className="hito-list-row-title">
             {entry.block.label ?? blockLabel(entry.block.blockKey)}
           </p>
@@ -611,23 +627,32 @@ function ManualBlockFields({
   onChange: (block: ManualWorkoutBlockInput) => void;
 }) {
   const noteOnly = isNoteBlock(block.blockKey);
-  const durationValue = block.durationSeconds == null ? "none" : String(block.durationSeconds);
-  const distanceValue = block.distanceMeters == null ? "none" : String(block.distanceMeters);
+  const quantityMode = quantityModeForBlock(block);
+  const quantityValue =
+    quantityMode === "distance"
+      ? block.distanceMeters == null
+        ? "none"
+        : String(block.distanceMeters)
+      : block.durationSeconds == null
+        ? "none"
+        : String(block.durationSeconds);
+  const quantityFieldLabel =
+    quantityMode === "none" ? "Quantity" : quantityMode === "distance" ? "Distance" : "Duration";
 
   return (
-    <div className="grid gap-3 rounded-xl bg-background/35 p-3">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <PickerField label={`${label} type`}>
+    <div className="hito-manual-workout-block-fields">
+      <div className="hito-manual-workout-field-grid">
+        <PickerField label={`${label} kind`}>
           <Select
             disabled={disabled}
             value={block.blockKey}
             onValueChange={(value) => onChange(makeDefaultBlock(value as ManualWorkoutBlockKey))}
           >
             <SelectTrigger
-              aria-label={`${label} type`}
+              aria-label={`${label} kind`}
               className="hito-field hito-field-secondary hito-field-sm"
             >
-              <SelectValue placeholder="Block type" />
+              <SelectValue placeholder="Step kind" />
             </SelectTrigger>
             <SelectContent>
               {BLOCK_MENU_GROUPS.map((group) => (
@@ -637,7 +662,7 @@ function ManualBlockFields({
           </Select>
         </PickerField>
         <label className="grid gap-2">
-          <span className="hito-form-label">Visible label</span>
+          <span className="hito-form-label">{label} label</span>
           <input
             className="hito-field hito-field-secondary hito-field-sm"
             disabled={disabled}
@@ -671,60 +696,56 @@ function ManualBlockFields({
           />
         </label>
       ) : (
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <PickerField label="Duration">
+        <div className="hito-manual-workout-field-grid">
+          <PickerField label="Measure by">
             <Select
               disabled={disabled}
-              value={durationValue}
-              onValueChange={(value) =>
-                onChange({
-                  ...block,
-                  durationSeconds: value === "none" ? undefined : parsePositiveInteger(value),
-                  distanceMeters: undefined,
-                })
-              }
+              value={quantityMode}
+              onValueChange={(value) => onChange(blockForQuantityMode(block, value))}
             >
               <SelectTrigger
-                aria-label={`${label} duration`}
+                aria-label={`${label} measure`}
                 className="hito-field hito-field-secondary hito-field-sm"
               >
-                <SelectValue placeholder="Duration" />
+                <SelectValue placeholder="Measure" />
               </SelectTrigger>
               <SelectContent>
-                {durationOptionsFor(block.durationSeconds).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
+                <SelectItem value="duration">Duration</SelectItem>
+                <SelectItem value="distance">Distance</SelectItem>
+                <SelectItem value="none">No quantity</SelectItem>
               </SelectContent>
             </Select>
           </PickerField>
-          <PickerField label="Distance">
+          <PickerField label={quantityFieldLabel}>
             <Select
-              disabled={disabled}
-              value={distanceValue}
+              disabled={disabled || quantityMode === "none"}
+              value={quantityValue}
               onValueChange={(value) =>
-                onChange({
-                  ...block,
-                  distanceMeters: value === "none" ? undefined : parsePositiveInteger(value),
-                  durationSeconds: undefined,
-                })
+                onChange(blockWithQuantityValue(block, quantityMode, value))
               }
             >
               <SelectTrigger
-                aria-label={`${label} distance`}
+                aria-label={`${label} quantity`}
                 className="hito-field hito-field-secondary hito-field-sm"
               >
-                <SelectValue placeholder="Distance" />
+                <SelectValue placeholder={quantityFieldLabel} />
               </SelectTrigger>
               <SelectContent>
-                {distanceOptionsFor(block.distanceMeters).map((option) => (
+                {(quantityMode === "distance"
+                  ? distanceOptionsFor(block.distanceMeters)
+                  : durationOptionsFor(block.durationSeconds)
+                ).map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <span className="hito-field-helper">
+              {quantityMode === "none"
+                ? "Use this only when the step is structure or cue-only."
+                : "Duration and distance stay mutually exclusive for review."}
+            </span>
           </PickerField>
         </div>
       )}
@@ -857,7 +878,7 @@ function ManualAddStepMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align={prominent ? "end" : "center"}
-          className="w-[min(22rem,calc(100vw-2rem))] p-2"
+          className="hito-manual-workout-menu-step"
         >
           <DropdownMenuLabel>Backend-supported steps</DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -1149,6 +1170,70 @@ function blockTone(blockKey: ManualWorkoutBlockKey) {
 
 function isNoteBlock(blockKey: ManualWorkoutBlockKey) {
   return blockKey === "drills_mobility_note_block" || blockKey === "coach_cue_note_block";
+}
+
+type ManualWorkoutQuantityMode = "duration" | "distance" | "none";
+
+function quantityModeForBlock(block: ManualWorkoutBlockInput): ManualWorkoutQuantityMode {
+  if (block.distanceMeters) return "distance";
+  if (block.durationSeconds) return "duration";
+  return "none";
+}
+
+function blockForQuantityMode(
+  block: ManualWorkoutBlockInput,
+  mode: string,
+): ManualWorkoutBlockInput {
+  if (mode === "distance") {
+    return {
+      ...block,
+      distanceMeters: block.distanceMeters ?? 1000,
+      durationSeconds: undefined,
+    };
+  }
+
+  if (mode === "none") {
+    return {
+      ...block,
+      distanceMeters: undefined,
+      durationSeconds: undefined,
+    };
+  }
+
+  return {
+    ...block,
+    distanceMeters: undefined,
+    durationSeconds:
+      block.durationSeconds ?? makeDefaultBlock(block.blockKey).durationSeconds ?? 600,
+  };
+}
+
+function blockWithQuantityValue(
+  block: ManualWorkoutBlockInput,
+  mode: ManualWorkoutQuantityMode,
+  value: string,
+): ManualWorkoutBlockInput {
+  if (mode === "distance") {
+    return {
+      ...block,
+      distanceMeters: value === "none" ? undefined : parsePositiveInteger(value),
+      durationSeconds: undefined,
+    };
+  }
+
+  if (mode === "none") {
+    return {
+      ...block,
+      distanceMeters: undefined,
+      durationSeconds: undefined,
+    };
+  }
+
+  return {
+    ...block,
+    distanceMeters: undefined,
+    durationSeconds: value === "none" ? undefined : parsePositiveInteger(value),
+  };
 }
 
 function durationOptionsFor(currentValue: number | undefined) {

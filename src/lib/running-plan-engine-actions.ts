@@ -62,7 +62,7 @@ const runningPlanBenchmarkSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("unknown") }).strict(),
 ]);
 
-const runningPlanPreviewInputSchema = z
+export const runningPlanPreviewInputSchema = z
   .object({
     age: z.number().finite().positive(),
     heightCm: z.number().finite().positive(),
@@ -77,14 +77,14 @@ const runningPlanPreviewInputSchema = z
   })
   .strict();
 
-const runningPlanSourceKindSchema = z.enum([
+export const runningPlanSourceKindSchema = z.enum([
   TEN_K_PLAN_BUILDER_SOURCE_KIND,
   HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
   MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
   MARATHON_COMPLETION_PLAN_BUILDER_SOURCE_KIND,
 ]);
 
-const runningPlanConfirmInputSchema = z
+export const runningPlanConfirmInputSchema = z
   .object({
     previewInput: runningPlanPreviewInputSchema,
     planFamily: z.enum(RUNNING_PLAN_DISTANCE_FAMILY_VALUES),

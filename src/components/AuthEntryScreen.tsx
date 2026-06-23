@@ -60,7 +60,7 @@ export function AuthEntryScreen({
       <img src={loginDesertHorizon} alt="" aria-hidden="true" className="auth-hero-image" />
       <div className="hito-auth-photo-overlay" aria-hidden="true" />
       <div className="auth-hero-content mx-auto flex min-h-screen max-w-5xl items-center px-6 py-12 lg:px-10">
-        <section className="grid w-full gap-12 lg:grid-cols-[0.9fr_0.85fr]">
+        <section className="hito-auth-entry-grid">
           <div className="flex flex-col justify-center gap-8">
             <div className="flex items-center">
               <HitoLogo className="[--hito-logo-height:2.35rem] lg:[--hito-logo-height:3.25rem]" />

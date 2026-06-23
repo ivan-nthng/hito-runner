@@ -14,7 +14,7 @@ import {
   confirmManualWorkoutPersistedEdit,
   reconstructManualWorkoutPersistedEditDraft,
   reviewManualWorkoutPersistedEditDraft,
-} from "@/lib/training-api";
+} from "@/lib/manual-workout-authoring";
 import type {
   ManualWorkoutDraftInput,
   ManualWorkoutPersistedEditReviewResult,
@@ -299,7 +299,7 @@ export function ManualWorkoutPersistedEditDialog({
       }}
     >
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">

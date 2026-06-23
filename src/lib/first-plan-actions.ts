@@ -19,7 +19,6 @@ import {
   buildStructuredFirstPlanDraftSummary,
   buildStructuredFirstPlanProfilePatch,
   normalizeSupportedStructuredFirstPlanOnboardingInput,
-  parseStructuredFirstPlanOnboardingInput,
   structuredFirstPlanOnboardingInputSchema,
   type StructuredFirstPlanAuthoringInput,
   type StructuredFirstPlanDraftReview,
@@ -364,14 +363,6 @@ export type ConfirmVoiceToPlanDraftResult =
       message: string;
     };
 
-export const completeStructuredFirstPlanOnboarding = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => parseStructuredFirstPlanOnboardingInput(value))
-  .handler(async ({ data }) => {
-    const userId = await requirePersistedUserIdForCurrentRequest();
-
-    return completeStructuredFirstPlanOnboardingForUser(userId, data);
-  });
-
 export const generateStructuredFirstPlanDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => structuredFirstPlanDraftInputSchema.parse(value))
   .handler(async ({ data }): Promise<StructuredFirstPlanDraftResult> => {
@@ -582,7 +573,7 @@ export async function generateStructuredFirstPlanDraftForUser(
   }
 }
 
-export async function confirmStructuredFirstPlanDraftForUser(
+async function confirmStructuredFirstPlanDraftForUser(
   userId: string,
   input: unknown,
 ): Promise<ConfirmStructuredFirstPlanDraftResult> {
@@ -698,23 +689,6 @@ export async function confirmStructuredFirstPlanDraftForUser(
         "This structured draft is no longer valid. Generate a fresh review before creating a plan.",
     };
   }
-}
-
-export async function completeStructuredFirstPlanOnboardingForUser(
-  userId: string,
-  input: StructuredFirstPlanOnboardingInput,
-) {
-  void userId;
-  void input;
-
-  return {
-    ok: false,
-    status: "blocked",
-    reason: "review_required",
-    message:
-      "Structured first-plan creation now requires a successful AI blueprint draft and explicit review confirmation.",
-    onboardingContract: "structured_first_plan_onboarding_v1" as const,
-  };
 }
 
 function parseStructuredFirstPlanDraftInput(input: unknown):

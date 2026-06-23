@@ -150,11 +150,11 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
     });
   }
 
-  if (reviewed.draft.workoutDate <= currentDate) {
+  if (reviewed.draft.workoutDate < currentDate) {
     return buildManualWorkoutAddFailure({
       reason: "protected_day",
       message:
-        "Manual workout additions can only target future empty days. Past and current days stay protected.",
+        "Manual workout additions can target today or future empty days. Past days stay protected.",
     });
   }
 

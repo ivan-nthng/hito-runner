@@ -98,6 +98,66 @@ export async function validateManualActivePlanAddWorkoutContract() {
     },
   ]);
 
+  const todayInput: ManualWorkoutDraftInput = {
+    ...input,
+    workoutDate: "2026-06-10",
+    notes: "Same-day empty manual workout.",
+  };
+  const todayReview = assertReady("today manual active-plan add review", todayInput);
+  const todayActivePlan = buildFakePlanCycle({
+    userId,
+    id: "11111111-1111-4111-8111-111111111112",
+    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    startDate: "2026-06-09",
+    endDate: "2026-06-09",
+  });
+  const todayExistingWorkout = buildFakePlannedWorkout({
+    userId,
+    planCycleId: todayActivePlan.id,
+    id: "22222222-2222-4222-8222-222222222223",
+    date: "2026-06-09",
+    displayOrder: 0,
+  });
+  const todayPersistedAdds: Array<{
+    workoutDate: string;
+    displayOrder: number;
+    reviewChecksum: string;
+  }> = [];
+  const todaySuccess = await addManualWorkoutToActivePlanForUser(
+    userId,
+    buildConfirmInput(todayInput, todayReview),
+    buildFakeAddDependencies({
+      activePlan: todayActivePlan,
+      workouts: [todayExistingWorkout],
+      onPersist: ({ workoutSeed, reviewMetadata }) => {
+        todayPersistedAdds.push({
+          workoutDate: workoutSeed.workoutDate,
+          displayOrder: workoutSeed.displayOrder,
+          reviewChecksum: reviewMetadata.review_checksum,
+        });
+      },
+    }),
+  );
+
+  assert.equal(todaySuccess.ok, true, formatAddResult(todaySuccess));
+  if (todaySuccess.ok) {
+    assert.equal(todaySuccess.status, "created");
+    assert.equal(todaySuccess.workoutDate, todayInput.workoutDate);
+    assert.equal(todaySuccess.calendarRowCount, 2);
+    assert.equal(todaySuccess.nonRestWorkoutCount, 2);
+    assert.equal(todaySuccess.sourceMetadata.workoutDate, todayInput.workoutDate);
+    assert.equal(todaySuccess.safety.targetDayWasEmpty, true);
+    assert.equal(todaySuccess.safety.trustedClientRows, false);
+    assert.equal(todaySuccess.safety.serverRebuiltReview, true);
+  }
+  assert.deepEqual(todayPersistedAdds, [
+    {
+      workoutDate: todayInput.workoutDate,
+      displayOrder: 1,
+      reviewChecksum: todayReview.reviewChecksum,
+    },
+  ]);
+
   const changedDate = await addManualWorkoutToActivePlanForUser(
     userId,
     buildConfirmInput({ ...input, workoutDate: "2026-06-18" }, reviewed),

@@ -393,7 +393,7 @@ export function StructuredPlanConstructor({
               </Field>
 
               {showsTargetFields ? (
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="hito-form-two-column-grid">
                   <HitoMaskedTimeField
                     id="structured-plan-target-time"
                     label="Target time"
@@ -543,12 +543,7 @@ export function ConstructorSection({
   divider?: boolean;
 }) {
   return (
-    <section
-      className={cn(
-        "grid gap-y-4 gap-x-0 md:grid-cols-[220px_minmax(0,1fr)] md:gap-x-12 lg:gap-x-16",
-        divider && "hito-section-divider pt-6",
-      )}
-    >
+    <section className={cn("hito-form-section-grid", divider && "hito-section-divider pt-6")}>
       <div>
         <p className="hito-micro-label">{eyebrow}</p>
         <h2 className="hito-panel-title mt-2">{title}</h2>
@@ -605,7 +600,7 @@ function StructuredDraftReadyReviewModal({
       }}
     >
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog h-[min(44rem,calc(100dvh-2rem))] max-w-3xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
@@ -806,7 +801,7 @@ const PRESET_RUNNING_DAY_OPTIONS: { value: string; label: string; copy: string }
 
 export function OptionGrid({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label={label}>
+    <div className="hito-onboarding-option-grid" role="radiogroup" aria-label={label}>
       {children}
     </div>
   );
@@ -832,7 +827,7 @@ export function OptionButton({
       aria-checked={active}
       onClick={onClick}
       className={cn(
-        "hito-button hito-button-sm hito-onboarding-option-button min-h-16 justify-start whitespace-normal text-left",
+        "hito-button hito-button-sm hito-onboarding-option-button",
         active ? "hito-button-primary" : "hito-button-secondary",
       )}
     >
@@ -881,7 +876,7 @@ function OptionRow({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "hito-button hito-button-md min-h-14 w-full justify-between whitespace-normal text-left",
+        "hito-button hito-button-md hito-onboarding-option-row-button",
         active ? "hito-button-primary" : "hito-button-secondary",
       )}
     >

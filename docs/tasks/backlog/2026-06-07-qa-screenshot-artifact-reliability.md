@@ -6,7 +6,7 @@ backlog
 
 ## Type
 
-qa_hygiene
+change_request
 
 ## Priority
 
@@ -14,7 +14,7 @@ low
 
 ## Next Recommended Role
 
-QA / BACKEND
+qa
 
 ## Task
 

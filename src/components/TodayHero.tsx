@@ -47,7 +47,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
 
   return (
     <section className="pt-2 lg:pt-4">
-      <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:gap-10">
+      <div className="hito-today-hero-grid gap-8 lg:gap-10">
         <div>
           <div className="flex items-center gap-3 hito-section-subtitle">
             <span className="h-1.5 w-1.5 rounded-full bg-signal animate-pulse" />
@@ -198,7 +198,7 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
 
   return (
     <section className="pt-2 lg:pt-4">
-      <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
+      <div className="hito-today-hero-grid gap-10">
         <div>
           <div className="flex items-center gap-3 hito-section-subtitle">
             <span className="h-1.5 w-1.5 rounded-full bg-signal animate-pulse" />

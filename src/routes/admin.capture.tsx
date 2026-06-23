@@ -501,7 +501,7 @@ function AdminCapturePage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
-      <div className="hito-workbench-shell [--hito-workbench-sidebar-width:240px]">
+      <div className="hito-workbench-shell hito-workbench-shell-compact-sidebar">
         <AdminWorkspaceSidebar activeSection="work-items" />
 
         <section className="hito-workbench-main">
@@ -639,7 +639,7 @@ function CaptureUtilityRow({
   };
 
   return (
-    <div className="hito-data-table-utility-row">
+    <div className="hito-admin-utility-row">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {isSearchOpen ? (
           <label className="hito-field hito-field-sm hito-data-table-search">
@@ -700,7 +700,7 @@ function CaptureUtilityRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="hito-shell-menu hito-data-table-column-menu w-72"
+            className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-wide"
           >
             {activeFilters.length > 0 ? (
               <>
@@ -859,17 +859,8 @@ function QuickNotePanel({
           </>
         )}
       </summary>
-      <div
-        className={
-          isHeader
-            ? "z-30 mt-2 w-[min(36rem,calc(100vw-2.5rem))] max-w-[calc(100vw-2.5rem)] sm:absolute sm:right-0"
-            : undefined
-        }
-      >
-        <form
-          className="grid gap-4 rounded-2xl border border-hairline bg-background p-4 shadow-soft"
-          onSubmit={onSubmit}
-        >
+      <div className={isHeader ? "hito-admin-quick-note-panel" : undefined}>
+        <form className="hito-admin-quick-note-surface" onSubmit={onSubmit}>
           <div className="grid gap-1">
             <h2 className="hito-body font-medium text-foreground">Add quick note</h2>
             <p className="hito-field-helper">Capture a work item without selecting UI.</p>
@@ -1577,7 +1568,10 @@ function MetadataMenu({
           </button>
         </HitoMetadataTag>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="hito-shell-menu hito-data-table-column-menu w-56">
+      <DropdownMenuContent
+        align="end"
+        className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-compact"
+      >
         <DropdownMenuLabel className="hito-micro-label">{label}</DropdownMenuLabel>
         {options.map((option) => {
           const selected = value === option.value;
@@ -1613,14 +1607,12 @@ function readOnlyMetadataTooltip(kind: "status" | "type" | "priority" | "role" |
 }
 
 function SelectField({
-  compact = false,
   label,
   name,
   onChange,
   options,
   value,
 }: {
-  compact?: boolean;
   label: string;
   name?: string;
   onChange?: (value: string) => void;
@@ -1628,13 +1620,10 @@ function SelectField({
   value: string;
 }) {
   return (
-    <label className={compact ? "grid min-w-0 gap-1" : "grid min-w-0 flex-1 gap-2"}>
-      <span className={compact ? "sr-only" : "hito-label"}>{label}</span>
+    <label className="grid min-w-0 flex-1 gap-2">
+      <span className="hito-label">{label}</span>
       <select
-        aria-label={compact ? label : undefined}
-        className={
-          compact ? "hito-field hito-field-sm max-w-44 rounded-full" : "hito-field hito-field-md"
-        }
+        className="hito-field hito-field-md"
         name={name}
         {...(onChange ? { value } : { defaultValue: value })}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}

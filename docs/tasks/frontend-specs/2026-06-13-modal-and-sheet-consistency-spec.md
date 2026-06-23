@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Frontend implementation.
+in_progress
 
 ## Type
 
@@ -14,7 +14,7 @@ high
 
 ## Next Recommended Role
 
-FRONTEND
+frontend
 
 ## Task
 
@@ -23,6 +23,28 @@ Audit Hito modal and sheet behavior, then normalize one canonical overlay and wi
 ## Stage
 
 DESIGN SYSTEM audit / modal consistency specification
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+
+Task:
+Audit Hito modal and sheet behavior, then normalize one canonical overlay and window contract across
+`/hitoDS` and product surfaces.
+
+Stage:
+FRONTEND implementation / modal and sheet consistency normalization.
+
+Context:
+This spec defines the Hito modal/sheet consistency contract. Preserve existing shared dialog/sheet
+wrappers, product-dialog anatomy, keyboard semantics, and route behavior while normalizing only the
+scoped overlay/window patterns selected by the current plan.
+```
+
+## Spec Status
+
+Ready for Frontend implementation.
 
 ## Owner
 

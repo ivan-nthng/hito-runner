@@ -73,6 +73,29 @@ When a track is complete:
   bounded changelog entry or explicitly record why it is not shipped-history material
 - archive from `docs/plans/active/` to `docs/plans/archive/` only when the plan no longer guides active/future execution
 
+## Compact Cleanup Ledger Rules
+
+For cleanup, docs compression, artifact retention, QA evidence cleanup, local tooling, and apply
+slices, active plans should stay compact.
+
+Record only durable source-of-truth facts:
+
+- date and slice/command
+- root cause and owner boundary in one or two lines
+- affected root or file set
+- before/after counts and bytes when relevant
+- manifest, dry-run, QA report, or apply-result paths
+- validation commands passed
+- next gate, hold decision, or blocker
+
+Do not paste full terminal output, per-file manifests, subagent transcripts, repeated handoff
+prompts, long execution logs, or large inventories into active plans. Those details belong in
+machine-readable manifests, QA reports, apply-result files, or the role's final report.
+
+If a cleanup slice removes files/bytes but the closeout adds a large Markdown block, compact the
+closeout before returning. A plan update should not materially undo the readability win of the
+cleanup it records.
+
 ## Changelog Gate
 
 `docs/history/changelog.md` is the source of truth for `/changelog` shipped history. It is manual by

@@ -208,21 +208,21 @@ export function templateIconTone(template: ManualWorkoutTemplate | null | undefi
 }
 
 export function targetTruthModeLabel(mode: ManualWorkoutTargetTruthMode | string) {
-  if (mode === "editable_default_hr") return "Editable HR default";
-  if (mode === "none") return "No run target";
-  return "Structure only";
+  if (mode === "editable_default_hr") return "Advisory HR guidance";
+  if (mode === "none") return "Rest or no run";
+  return "Structure guidance";
 }
 
 export function targetTruthModeCopy(mode: ManualWorkoutTargetTruthMode) {
   if (mode === "editable_default_hr") {
-    return "Executable structure with editable default HR guidance; no personal HR truth is claimed.";
+    return "Keep the workout structure and show editable, advisory HR guidance. This is not a personal HR target.";
   }
 
   if (mode === "none") {
-    return "Rest or no executable run target.";
+    return "Use this for rest or no-run days. No workout target is created.";
   }
 
-  return "Duration, distance, repeat, work, and recovery structure without pace or HR targets.";
+  return "Use duration, distance, repeats, work, and recovery. Pace and personal HR stay blank unless backend truth exists.";
 }
 
 export function formatManualDraftStructure(totalDurationMin: number, totalDistanceKm: number) {

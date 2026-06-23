@@ -8,13 +8,44 @@ in_progress
 
 bug
 
+## Priority
+
+medium
+
+## Next Recommended Role
+
+product
+
+## Task
+
+Continue maintaining the numbered manual authoring bug stack when new screenshot-backed bugs are
+reported.
+
+## Stage
+
+PRODUCT backlog intake / manual authoring bug stack maintenance.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: PRODUCT
+
+Task:
+Continue maintaining the numbered manual authoring bug stack when new screenshot-backed bugs are
+reported.
+
+Stage:
+PRODUCT backlog intake / manual authoring bug stack maintenance.
+
+Context:
+Manual authoring bugs must no longer live only in chat. Each new bug should be captured as its own
+backlog file under docs/tasks/backlog, linked from the numbered stack, with screenshot evidence,
+likely owner, validation expectations, and one exact next-role prompt.
+```
+
 ## Severity
 
 high
-
-## Priority
-
-now
 
 ## Owner
 
@@ -89,25 +120,3 @@ Use this tracker as the numbered index and keep each bug in its own backlog file
 
 - Future manual authoring bug reports should be added here as new numbered entries.
 - Each linked item should keep its own exact next-role prompt and evidence.
-
-## Next Recommended Role
-
-PRODUCT
-
-## Exact Handoff Prompt
-
-```text
-ROLE: PRODUCT
-
-Task:
-Continue maintaining the numbered manual authoring bug stack when new screenshot-backed bugs are
-reported.
-
-Stage:
-PRODUCT backlog intake / manual authoring bug stack maintenance.
-
-Context:
-Manual authoring bugs must no longer live only in chat. Each new bug should be captured as its own
-backlog file under docs/tasks/backlog, linked from the numbered stack, with screenshot evidence,
-likely owner, validation expectations, and one exact next-role prompt.
-```

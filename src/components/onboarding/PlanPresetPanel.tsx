@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import type { ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SelectedRunningPlanPreviewDialog } from "@/components/onboarding/SelectedTenKPlanPreviewDialog";
 import type {
@@ -32,6 +33,10 @@ interface PlanPresetPanelProps {
   onSelectPlan: (cardId: PlanPresetCardId) => void;
   onRefreshPreview: () => void;
   onCreatePlan: () => void;
+  previewDialogDescription?: string;
+  previewDialogPrimaryActionLabel?: string;
+  previewDialogPrimaryActionPendingLabel?: string;
+  previewDialogExtraNotice?: ReactNode;
 }
 
 export function PlanPresetPanel({
@@ -48,6 +53,10 @@ export function PlanPresetPanel({
   onSelectPlan,
   previewOpen,
   previewResult,
+  previewDialogDescription,
+  previewDialogExtraNotice,
+  previewDialogPrimaryActionLabel,
+  previewDialogPrimaryActionPendingLabel,
   selectedCardId,
   status,
 }: PlanPresetPanelProps) {
@@ -124,6 +133,10 @@ export function PlanPresetPanel({
         error={error}
         onRefresh={onRefreshPreview}
         onCreate={onCreatePlan}
+        description={previewDialogDescription}
+        primaryActionLabel={previewDialogPrimaryActionLabel}
+        primaryActionPendingLabel={previewDialogPrimaryActionPendingLabel}
+        extraNotice={previewDialogExtraNotice}
       />
     </section>
   );
@@ -241,7 +254,7 @@ function PlanPresetUnavailableSelectAction({ reason }: { reason: string }) {
             Select Plan
           </button>
         </TooltipTrigger>
-        <TooltipContent className="hito-tooltip max-w-72" sideOffset={8}>
+        <TooltipContent className="hito-tooltip hito-tooltip-width-lg" sideOffset={8}>
           <span className="hito-tooltip-meta block">{reason}</span>
         </TooltipContent>
       </Tooltip>

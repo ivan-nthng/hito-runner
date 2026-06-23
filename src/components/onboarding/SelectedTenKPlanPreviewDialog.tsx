@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +55,10 @@ interface SelectedRunningPlanPreviewDialogProps {
   error: string | null;
   onRefresh: () => void;
   onCreate: () => void;
+  description?: string;
+  primaryActionLabel?: string;
+  primaryActionPendingLabel?: string;
+  extraNotice?: ReactNode;
 }
 
 export function SelectedRunningPlanPreviewDialog({
@@ -65,6 +69,10 @@ export function SelectedRunningPlanPreviewDialog({
   onOpenChange,
   onRefresh,
   open,
+  description = "Backend-built preview from the running plan engine. Create confirms this reviewed preview server-side before anything is saved.",
+  primaryActionLabel = "Create plan",
+  primaryActionPendingLabel = "Creating plan...",
+  extraNotice,
   result,
   status,
 }: SelectedRunningPlanPreviewDialogProps) {
@@ -77,7 +85,7 @@ export function SelectedRunningPlanPreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog h-[min(48rem,calc(100dvh-2rem))] max-w-5xl border-hairline bg-background/95 p-0 backdrop-blur-xl"
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-review hito-dialog-height-review"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
@@ -88,10 +96,7 @@ export function SelectedRunningPlanPreviewDialog({
             <DialogTitle className="hito-modal-title mt-2">
               {draft?.planFamily ?? unavailable?.planFamily ?? "Selected"} plan preview
             </DialogTitle>
-            <DialogDescription className="hito-body max-w-2xl">
-              Backend-built preview from the running plan engine. Create confirms this reviewed
-              preview server-side before anything is saved.
-            </DialogDescription>
+            <DialogDescription className="hito-body max-w-2xl">{description}</DialogDescription>
           </div>
         </DialogHeader>
 
@@ -118,6 +123,7 @@ export function SelectedRunningPlanPreviewDialog({
           {confirmResult && !confirmResult.ok ? (
             <CreateBlockedNotice result={confirmResult} />
           ) : null}
+          {extraNotice}
         </div>
 
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
@@ -150,7 +156,11 @@ export function SelectedRunningPlanPreviewDialog({
             disabled={!reviewReady || loading || creating}
             onClick={onCreate}
           >
-            {creating ? "Creating plan..." : reviewReady ? "Create plan" : "Review required"}
+            {creating
+              ? primaryActionPendingLabel
+              : reviewReady
+                ? primaryActionLabel
+                : "Review required"}
           </button>
         </DialogFooter>
       </DialogContent>

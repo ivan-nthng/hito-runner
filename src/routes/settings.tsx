@@ -240,9 +240,9 @@ function SettingsPage() {
         </div>
 
         {activeTab === "personal" ? (
-          <section className="grid gap-8 lg:grid-cols-[7rem_minmax(0,1fr)]" role="tabpanel">
+          <section className="hito-form-section-grid hito-form-section-grid-avatar" role="tabpanel">
             <div className="hito-avatar-stack self-start">
-              <Avatar className="hito-avatar-tile hito-profile-avatar h-28 w-28">
+              <Avatar className="hito-avatar-tile hito-profile-avatar">
                 {settings.avatarUrl ? (
                   <AvatarImage src={settings.avatarUrl} alt="Profile avatar" />
                 ) : null}
@@ -307,7 +307,7 @@ function SettingsPage() {
             </div>
 
             <div className="space-y-8">
-              <section className="border-t border-hairline pt-5">
+              <section className="hito-settings-section">
                 <div className="flex items-center gap-2">
                   <Icon name="user" size="sm" className="text-signal" />
                   <h2 className="hito-section-title">Identity</h2>
@@ -338,7 +338,7 @@ function SettingsPage() {
                 </div>
               </section>
 
-              <section className="border-t border-hairline pt-5">
+              <section className="hito-settings-section">
                 <h2 className="hito-section-title">Body data</h2>
                 <p className="hito-support-copy mt-2">
                   The same compact profile facts used during plan setup.
@@ -389,7 +389,7 @@ function SettingsPage() {
 
               <HeartRateZonesPanel summary={settings.heartRateZones} />
 
-              <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
+              <div className="hito-settings-actions">
                 <button
                   type="button"
                   disabled={isSaving}
@@ -412,7 +412,7 @@ function SettingsPage() {
             </div>
           </section>
         ) : (
-          <section className="grid gap-6 border-t border-hairline pt-5" role="tabpanel">
+          <section className="hito-settings-panel" role="tabpanel">
             <div>
               <div className="flex items-center gap-2">
                 <Icon name="calendar" size="sm" className="text-signal" />
@@ -459,7 +459,7 @@ function SettingsPage() {
               preferredLongRunHelper="Rest days are unavailable here. Leave unselected to keep Sunday as the default."
             />
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-5">
+            <div className="hito-settings-actions">
               <button
                 type="button"
                 disabled={isSaving}
@@ -531,7 +531,7 @@ function HeartRateZonesPanel({ summary }: { summary: UserSettingsSummary["heartR
   const isPersonal = summary.source === "personal";
 
   return (
-    <section className="border-t border-hairline pt-5">
+    <section className="hito-settings-section">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">

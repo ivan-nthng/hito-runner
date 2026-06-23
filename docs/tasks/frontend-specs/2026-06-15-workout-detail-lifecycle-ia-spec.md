@@ -2,8 +2,7 @@
 
 ## Status
 
-in_progress — lifecycle IA is QA-passed; future planned workout action contract reopened for
-persisted workout editing.
+in_progress
 
 ## Type
 
@@ -25,14 +24,6 @@ workout-detail action.
 ## Stage
 
 BACKEND implementation / persisted future workout editing review-confirm seam
-
-## Owner
-
-ARCHITECT
-
-## Last Updated
-
-2026-06-15
 
 ## Exact Handoff Prompt
 
@@ -103,6 +94,19 @@ Validation:
 - Run scoped `git diff --check`.
 - Run `npm run build` if runtime source changed.
 ```
+
+## Owner
+
+ARCHITECT
+
+## Last Updated
+
+2026-06-15
+
+## Spec Status
+
+The lifecycle IA is QA-passed. The future planned workout action contract is reopened for persisted
+workout editing.
 
 ## Future Workout Detail Action Contract Update — 2026-06-15
 

@@ -154,7 +154,7 @@ function WorkoutPage() {
         </div>
 
         <section className="relative mt-5 overflow-hidden border-t border-hairline/80 px-1 pb-3 pt-6 lg:pt-7">
-          <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="hito-workout-hero-grid">
             <div>
               <div className="flex flex-wrap items-center gap-3 hito-section-subtitle">
                 {resultMeta ? (
@@ -233,7 +233,7 @@ function WorkoutPage() {
           </div>
         )}
 
-        <div className="mt-8 grid lg:grid-cols-[1fr_320px] gap-10">
+        <div className="hito-route-support-grid mt-8">
           <div
             className={cn(
               "relative",
@@ -298,7 +298,7 @@ function WorkoutPage() {
                           className="flex items-start justify-between gap-3 py-1 last:border-0"
                         >
                           <span className="hito-section-subtitle">{entry.label}</span>
-                          <span className="max-w-[11rem] text-xs text-right text-foreground/85">
+                          <span className="hito-readback-value hito-readback-value-compact">
                             {entry.value}
                           </span>
                         </div>
@@ -411,7 +411,7 @@ function WorkoutPendingState() {
         <div className="flex items-center gap-3 hito-section-subtitle">
           <Skeleton className="h-3 w-32 bg-background/30" />
         </div>
-        <div className="grid lg:grid-cols-[1fr_auto] gap-8 items-end">
+        <div className="hito-workout-hero-grid">
           <div>
             <Skeleton className="h-4 w-64 bg-background/30" />
             <Skeleton className="mt-4 h-16 w-full max-w-2xl bg-background/40" />
@@ -424,8 +424,8 @@ function WorkoutPendingState() {
           </div>
         </div>
         <Skeleton className="h-10 w-72 bg-background/30" />
-        <div className="grid lg:grid-cols-[1fr_320px] gap-10">
-          <Skeleton className="h-[460px] rounded-2xl bg-background/20" />
+        <div className="hito-route-support-grid">
+          <Skeleton className="hito-route-panel-skeleton hito-route-panel-skeleton-detail" />
           <div className="space-y-4">
             <Skeleton className="h-32 rounded-2xl bg-background/20" />
             <Skeleton className="h-32 rounded-2xl bg-background/20" />
@@ -614,7 +614,7 @@ function FutureWorkoutActions({
               <Icon name="more-horizontal" size="sm" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="hito-menu-width-standard">
             <DropdownMenuLabel>Workout actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setEditOpen(true)}>
@@ -796,8 +796,8 @@ function SidebarSection({
     <section
       className={cn(
         "hito-list-row items-start",
-        tone === "signal" && "bg-signal/[0.03]",
-        muted && "bg-surface/30",
+        tone === "signal" && "hito-list-row-signal",
+        muted && "hito-list-row-muted",
       )}
     >
       <div className="w-full min-w-0">
@@ -821,9 +821,7 @@ function ReadbackRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-3 py-1">
       <span className="hito-section-subtitle">{label}</span>
-      <span className="max-w-[12rem] text-right text-xs leading-relaxed text-foreground/85">
-        {value}
-      </span>
+      <span className="hito-readback-value">{value}</span>
     </div>
   );
 }

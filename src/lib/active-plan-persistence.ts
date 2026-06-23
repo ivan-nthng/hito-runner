@@ -149,6 +149,93 @@ export async function createFirstPlanFromReviewedCanonicalPlanForUser(
   };
 }
 
+export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(input: {
+  userId: string;
+  currentActivePlan: PersistedPlanCycleRow;
+  expectedCurrentActivePlanUpdatedAt: string;
+  reviewedPlan: ImportedPlanInput;
+  profilePatch: StructuredFirstPlanProfilePatch | null;
+  planMetadata: AdditionalPlanPersistenceMetadata | null;
+}) {
+  const supabase = createAdminSupabaseClient();
+  const importedSeed = buildReviewedFirstPlanImportedSeed(input.reviewedPlan);
+  const currentPlanStillCurrent = await supabase
+    .from("plan_cycles")
+    .select("id")
+    .eq("id", input.currentActivePlan.id)
+    .eq("user_id", input.userId)
+    .eq("status", "active")
+    .eq("updated_at", input.expectedCurrentActivePlanUpdatedAt)
+    .maybeSingle();
+
+  if (currentPlanStillCurrent.error) {
+    throw new Error(currentPlanStillCurrent.error.message);
+  }
+
+  if (!currentPlanStillCurrent.data) {
+    throw new Error("The active manual plan changed before transition persistence started.");
+  }
+
+  await upsertRunnerProfile(input.userId, importedSeed.profile, input.profilePatch);
+  const insertedPlan = await createAssignedPlanFromImportedSeed(
+    input.userId,
+    importedSeed,
+    "archived",
+    input.planMetadata,
+  );
+
+  const archiveExisting = await supabase
+    .from("plan_cycles")
+    .update({
+      status: "archived",
+      goal_metadata: mergePlanPersistenceMetadata(input.currentActivePlan.goal_metadata, {
+        active_plan_transition_superseded_by: {
+          source_status: "superseded_by_reviewed_active_plan_transition",
+          next_plan_id: insertedPlan.planCycle.id,
+          next_plan_source_kind: insertedPlan.planCycle.source_kind,
+          transition_review_contract_version: "active_plan_transition_review_v1",
+          upcoming_manual_workouts_merged: false,
+        },
+      }),
+    })
+    .eq("id", input.currentActivePlan.id)
+    .eq("user_id", input.userId)
+    .eq("status", "active")
+    .eq("updated_at", input.expectedCurrentActivePlanUpdatedAt)
+    .select("*")
+    .single();
+
+  if (archiveExisting.error) {
+    await rollbackInsertedPlan(insertedPlan.planCycle.id);
+    throw new Error(archiveExisting.error.message);
+  }
+
+  const activateInserted = await supabase
+    .from("plan_cycles")
+    .update({ status: "active" })
+    .eq("id", insertedPlan.planCycle.id)
+    .eq("user_id", input.userId)
+    .eq("status", "archived")
+    .select("*")
+    .single();
+
+  if (activateInserted.error) {
+    await supabase
+      .from("plan_cycles")
+      .update({ status: "active" })
+      .eq("id", input.currentActivePlan.id)
+      .eq("user_id", input.userId);
+    await rollbackInsertedPlan(insertedPlan.planCycle.id);
+    throw new Error(activateInserted.error.message);
+  }
+
+  return {
+    archivedPlan: archiveExisting.data,
+    activePlan: activateInserted.data,
+    workouts: insertedPlan.workouts,
+  };
+}
+
 export async function createEmptyActivePlanForUser(
   userId: string,
   input: EmptyActivePlanCreationInput,

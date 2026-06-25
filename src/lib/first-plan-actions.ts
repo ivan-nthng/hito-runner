@@ -412,7 +412,7 @@ export const confirmVoiceToPlanDraft = createServerFn({ method: "POST" })
         status: "blocked",
         reason: "active_plan_exists",
         message:
-          "Voice-to-plan can create a first plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
+          "Voice-to-plan can create a first plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
       };
     }
 
@@ -583,7 +583,7 @@ async function confirmStructuredFirstPlanDraftForUser(
       status: "blocked",
       reason: "active_plan_exists",
       message:
-        "Structured setup can create a first plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
+        "Structured setup can create a first plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
     };
   }
 

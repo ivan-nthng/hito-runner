@@ -56,6 +56,10 @@ For training-plan matrices, prefer a table with:
 
 After writing an artifact, the chat response should be short: task, stage, artifact link, key decisions, next recommended role, and blockers. Do not paste the whole table back into chat.
 
+Do not create a coaching Markdown file for routine acceptance, a small source review, or a narrow
+backend-ready rule set. In those cases, return a concise report and push durable enforcement into
+backend validators/source contracts instead of prose.
+
 Artifact limits:
 
 - Markdown coaching artifacts are allowed.

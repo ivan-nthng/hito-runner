@@ -242,7 +242,9 @@ function buildLongRunSegments({
         ...(normalized.runnerProfile.baselineLongRunKm
           ? { distance_km: distanceKm }
           : { duration_min: durationMin }),
-        target: buildLongRunTarget(normalized),
+        target: buildLongRunTarget(normalized, {
+          allowDefaultEstimatedHr: !isMountainSpecificPlan(normalized),
+        }),
       },
     ];
   }
@@ -379,7 +381,9 @@ function buildLongAerobicSupportSegments({
           distance_km: mainDistanceKm,
         },
         distance_km: mainDistanceKm,
-        target: buildLongRunTarget(normalized),
+        target: buildLongRunTarget(normalized, {
+          allowDefaultEstimatedHr: !isMountainSpecificPlan(normalized),
+        }),
       },
       {
         segment_id: `${workoutId}_seg_3`,
@@ -454,7 +458,9 @@ function buildLongAerobicSupportSegments({
         duration_min: mainMin,
       },
       duration_min: mainMin,
-      target: buildLongRunTarget(normalized),
+      target: buildLongRunTarget(normalized, {
+        allowDefaultEstimatedHr: !isMountainSpecificPlan(normalized),
+      }),
     },
     {
       segment_id: `${workoutId}_seg_3`,

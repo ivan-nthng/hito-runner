@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+completed
 
 ## Type
 
@@ -18,11 +18,11 @@ frontend
 
 ## Task
 
-Define and implement a mobile full-screen dropdown/navigation pattern for long or nested menu flows.
+Preserve the completed mobile fullscreen dropdown rollout as accepted Hito DS interaction history.
 
 ## Stage
 
-FRONTEND design-system implementation / mobile dropdown-to-fullscreen navigation contract.
+FRONTEND implementation closeout / mobile dropdown-to-workflow-dialog rollout completed.
 
 ## Exact Handoff Prompt
 
@@ -30,60 +30,52 @@ FRONTEND design-system implementation / mobile dropdown-to-fullscreen navigation
 ROLE: FRONTEND
 
 Task:
-Introduce a mobile full-screen navigation pattern for dropdown flows that do not fit honestly inside near-trigger menu chrome.
+Use this completed backlog item only as historical context if a fresh mobile dropdown or picker
+regression appears.
 
 Stage:
-FRONTEND implementation / mobile dropdown fullscreen navigation contract.
+FRONTEND regression fix / completed mobile dropdown escalation guard.
 
 Context:
-On narrow mobile screens, the current dropdown/submenu pattern can overflow, clip, or become hard to navigate. Product direction for future work is explicit:
-- when a long or nested dropdown opens on mobile, it should be able to switch into a full-screen menu/sheet surface
-- the mobile surface should have a header with the current menu title
-- the header should always keep a close button on the right
-- when the runner enters a second level, the header should show a back affordance on the left and keep the close button on the right
-- this should feel like one Hito DS-owned mobile navigation/menu pattern, not a one-off manual-authoring patch
-
-Root cause and architecture fit:
-- Visible symptom: nested/long dropdown content does not fit honestly on narrow mobile screens.
-- Underlying cause: the current dropdown family is optimized for near-trigger anchored menus, but some product flows need a mobile-specific full-screen navigation treatment.
-- Canonical owner: frontend shared DS interaction layer for dropdown/menu/sheet behavior, reusing existing Hito dialog/sheet/dropdown primitives before introducing anything new.
-
-Required reading:
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/AGENTS.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/agents/frontend.agent.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/skills/hito-frontend-design-system/SKILL.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-20-mobile-dropdown-fullscreen-navigation.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-06-10-manual-user-built-plan-flow-spec.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-06-13-modal-and-sheet-consistency-spec.md
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/components/ui/dropdown-menu.tsx
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/components/ui/sheet.tsx
-- /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/components/manual-workout/ManualWorkoutAuthoringControls.tsx
-
-Scope:
-1. Define when a mobile dropdown/submenu must remain anchored and when it must switch to a full-screen surface.
-2. Reuse existing Hito sheet/dialog/dropdown primitives and DS header/close patterns.
-3. Support:
-   - top-level mobile menu title
-   - close button in header
-   - second-level back button in header
-   - second-level close button still present
-4. Prove the pattern first on the manual calendar `Add activity -> Choose template` flow.
-5. Keep the solution reusable for other cramped nested mobile dropdowns later.
-
-Do not:
-- Do not invent a second unrelated mobile menu system.
-- Do not broaden into desktop dropdown redesign.
-- Do not change backend add/template/constructor semantics.
-- Do not weaken existing Hito dialog/sheet overlay contracts.
-
-Validation:
-- targeted ESLint for touched dropdown/sheet/manual-authoring files
-- `npm run build`
-- scoped `git diff --check`
-- browser proof at exact `375px`
-- prove top-level open, second-level navigation, back, and close behavior
-- prove no horizontal overflow and reachable actions
+This item is complete. Current rule: short action/utility menus stay anchored; long, grouped, or
+nested mobile picker flows escalate to the existing Hito workflow-dialog seam. Do not reopen this
+item unless source or QA proof shows a fresh unconverted long/grouped/nested mobile picker.
 ```
+
+## Historical Outcome
+
+The top-level mobile fullscreen dropdown rollout is closed as a service-level frontend/DS interaction
+cleanup. The accepted behavior now lives in product source and `/hitoDS#dropdowns`:
+
+- manual calendar `Add activity -> Choose template` uses a mobile workflow dialog while desktop keeps
+  the anchored template submenu;
+- manual workout constructor `Add piece` uses a mobile workflow dialog while desktop keeps the
+  anchored add-piece menu;
+- manual workout constructor `Piece type` uses a mobile workflow dialog while desktop keeps the
+  select;
+- manual workout constructor scratch `Workout type` uses a mobile workflow dialog while desktop
+  keeps the select;
+- `/hitoDS#dropdowns` documents the rule and shows the workflow-dialog anatomy.
+
+## Accepted Behavior
+
+- Short action, utility, table, shell, account, export, row-action, workout-overflow, admin metadata,
+  native body-note, and sandbox menus remain anchored or stay in their separate component-adoption
+  lanes.
+- Long, grouped, or nested mobile picker flows use the existing Hito workflow-dialog seam:
+  `Dialog`, `hito-product-dialog`, `hito-dialog-size-workflow`,
+  `hito-dialog-height-workflow`, `hito-product-dialog-body-scroll-fill`, `hito-row-group`,
+  `hito-list-row`, and existing Hito buttons/icons/status markers.
+- The rollout does not change backend review/confirm, persistence, auth, manual workout semantics,
+  template taxonomy, or constructor draft behavior.
+
+## Source Proof
+
+Final frontend source inventory on 2026-06-24 found no remaining true long/grouped/nested runtime
+mobile picker that still needs conversion in this closure batch. Remaining `DropdownMenuContent`,
+`DropdownMenuSubContent`, `SelectContent`, and native `select` usages in the inspected runtime
+surfaces are either already escalated on mobile, desktop-only picker controls, short utility/action
+menus, admin/table metadata menus, or separate-lane native select exceptions.
 
 ## Severity
 

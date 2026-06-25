@@ -1,4 +1,14 @@
-import { cpSync, existsSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readlinkSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
 import {
   validateLocalBuildOutput,
@@ -19,6 +29,7 @@ const localFinalizePublicBackupDir = resolve(localFinalizeBackupDir, "public");
 const localFinalizedOutputDir = resolve(rootDir, "logs/build-output-finalized");
 const localFinalizedServerDir = resolve(localFinalizedOutputDir, "server");
 const localFinalizedPublicDir = resolve(localFinalizedOutputDir, "public");
+const localFinalizedNitroManifest = resolve(localFinalizedOutputDir, "nitro.json");
 const clientPublicSnapshotDir = resolve(rootDir, "logs/build-output-public-snapshot");
 const vercelOutputDir = resolve(rootDir, ".vercel/output");
 const vercelStaticDir = resolve(vercelOutputDir, "static");
@@ -105,6 +116,7 @@ function copyDirectory(sourceDir, destinationDir) {
     return;
   }
 
+  removeGeneratedSiblingConflicts(destinationDir);
   mkdirSync(destinationDir, { recursive: true });
   cpSync(sourceDir, destinationDir, { recursive: true });
 }
@@ -114,11 +126,22 @@ function copyGeneratedDirectory(sourceDir, destinationDir) {
     return;
   }
 
+  removeGeneratedSiblingConflicts(destinationDir);
   mkdirSync(destinationDir, { recursive: true });
   cpSync(sourceDir, destinationDir, {
     recursive: true,
     filter: shouldCopyGeneratedBuildPath,
   });
+}
+
+function copyGeneratedFile(sourcePath, destinationPath) {
+  if (!existsSync(sourcePath)) {
+    return;
+  }
+
+  removeGeneratedSiblingConflicts(destinationPath);
+  mkdirSync(dirname(destinationPath), { recursive: true });
+  cpSync(sourcePath, destinationPath);
 }
 
 function shouldCopyGeneratedBuildPath(sourcePath) {
@@ -136,10 +159,13 @@ function shouldCopyGeneratedBuildPath(sourcePath) {
 
 function snapshotLocalOutputForLateNitroCleanup() {
   removeGeneratedPath(localFinalizeBackupDir);
+  removeGeneratedSiblingConflicts(localFinalizeBackupDir);
   removeGeneratedPath(localFinalizedOutputDir);
+  removeGeneratedSiblingConflicts(localFinalizedOutputDir);
 
   copyGeneratedDirectory(outputServerDir, localFinalizeServerBackupDir);
   copyGeneratedDirectory(outputPublicDir, localFinalizePublicBackupDir);
+  copyGeneratedFile(outputNitroManifest, localFinalizedNitroManifest);
 }
 
 async function restoreLocalOutputAfterLateNitroCleanup() {
@@ -175,9 +201,17 @@ function linkLocalOutputDirectory(sourceDir, outputPath) {
     return;
   }
 
+  const linkTarget = relative(dirname(outputPath), sourceDir);
+
   removeGeneratedPath(outputPath);
+  removeGeneratedSiblingConflicts(outputPath);
   mkdirSync(dirname(outputPath), { recursive: true });
-  symlinkSync(relative(dirname(outputPath), sourceDir), outputPath, "dir");
+  symlinkSync(linkTarget, outputPath, "dir");
+  canonicalizeGeneratedSymlink({ outputPath, linkTarget });
+
+  if (!existsSync(outputPath)) {
+    throw new Error(`Expected finalized local build output link is missing: ${outputPath}`);
+  }
 }
 
 function copyPlanPresetProgramArtifacts(destinationDir) {
@@ -207,4 +241,51 @@ function removeGeneratedPath(path) {
     maxRetries: 8,
     retryDelay: 125,
   });
+}
+
+function removeGeneratedSiblingConflicts(path) {
+  for (const conflictPath of generatedSiblingConflictPaths(path)) {
+    removeGeneratedPath(conflictPath);
+  }
+}
+
+function canonicalizeGeneratedSymlink({ outputPath, linkTarget }) {
+  if (existsSync(outputPath)) {
+    return;
+  }
+
+  const conflictPath = generatedSiblingConflictPaths(outputPath).find((candidatePath) =>
+    symlinkPointsTo(candidatePath, linkTarget),
+  );
+
+  if (conflictPath) {
+    renameSync(conflictPath, outputPath);
+  }
+}
+
+function generatedSiblingConflictPaths(path) {
+  const parentDir = dirname(path);
+  const entryName = basename(path);
+
+  if (!existsSync(parentDir)) {
+    return [];
+  }
+
+  const conflictPattern = new RegExp(`^${escapeRegExp(entryName)} \\d+$`);
+
+  return readdirSync(parentDir)
+    .filter((entry) => conflictPattern.test(entry))
+    .map((entry) => resolve(parentDir, entry));
+}
+
+function symlinkPointsTo(path, linkTarget) {
+  try {
+    return lstatSync(path).isSymbolicLink() && readlinkSync(path) === linkTarget;
+  } catch {
+    return false;
+  }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

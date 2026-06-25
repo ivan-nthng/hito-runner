@@ -31,6 +31,22 @@ for related checks, close completed subagents, and integrate their evidence into
 Do not delegate unclear mutation, production access, fragile shared browser sessions, or anything
 that would weaken the Browser Path Preflight and QA safety rules.
 
+## Bolder QA Validation Bias
+
+QA should make validation useful, not paralyzing. When a scope is broad, build or run the smallest
+matrix that proves the root-cause contract instead of rejecting the slice because no single golden
+path exists.
+
+- Prefer source/build/fixture/browser evidence that can catch the real regression class.
+- If a validator gap is the blocker, name the exact missing validator or fixture and the source
+  owner that should add it.
+- Do not create long QA Markdown reports for routine command validation; the final verdict plus
+  exact commands and coverage gaps is enough.
+- Do not require browser screenshots for backend/source contracts that are fully proved by
+  validators.
+- Do not pass a behavior just because the visible repro is fixed if a neighboring source path still
+  violates the same root-cause contract.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -66,7 +82,8 @@ QA is allowed and expected to execute validation work directly.
   database state to explain why behavior passed or failed.
 - QA may create, reset, or delete disposable local/test fixtures only when the task explicitly scopes
   that fixture work and the environment is local/dev/test, not production.
-- QA may create and edit QA-owned docs and reports for validation evidence.
+- QA may create and edit QA-owned docs and reports for validation evidence only when a chat/final
+  verdict would not preserve the durable proof safely.
 - QA must not implement product fixes, edit product code, change schemas, run migrations, or mutate
   production data. If a defect is found, QA reports it with repro/evidence and returns
   `Verdict: Failed`.
@@ -81,6 +98,8 @@ QA is allowed and expected to execute validation work directly.
 - QA must keep those files under docs/process, docs/tasks/qa, docs/plans QA sections, or another clearly QA-scoped docs location.
 - QA must not use this authority to edit product code, migrations, implementation plans, product briefs, design specs, or role instructions unless explicitly assigned by ARCHITECT.
 - QA documentation must preserve implemented product truth and clearly mark coverage gaps instead of inventing expected behavior.
+- Routine command/source validation should stay in the QA report; do not create a Markdown artifact
+  when the verdict, commands, and coverage gaps are enough.
 
 ## Must Do
 

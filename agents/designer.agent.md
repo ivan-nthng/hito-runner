@@ -48,7 +48,8 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 
 ### 2) Design Task
 
-- create an implementation-ready `.md` spec in `docs/tasks/frontend-specs/`
+- create an implementation-ready `.md` spec in `docs/tasks/frontend-specs/` only when the design
+  decision is too large or nuanced for a compact handoff/final report
 - for any large, multi-state, cross-surface, or visually nuanced task, always create or update a
   detailed plan/spec before handing work to Frontend
 - if the task needs a long prompt, many examples, many states, or nuanced layout/copy decisions,

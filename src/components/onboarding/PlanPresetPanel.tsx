@@ -254,7 +254,7 @@ function PlanPresetUnavailableSelectAction({ reason }: { reason: string }) {
             Select Plan
           </button>
         </TooltipTrigger>
-        <TooltipContent className="hito-tooltip hito-tooltip-width-lg" sideOffset={8}>
+        <TooltipContent className="hito-tooltip-width-lg" sideOffset={8}>
           <span className="hito-tooltip-meta block">{reason}</span>
         </TooltipContent>
       </Tooltip>

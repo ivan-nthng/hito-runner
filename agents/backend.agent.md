@@ -40,6 +40,22 @@ story. Stop before broad runtime facade cleanup, browser-visible behavior, Supab
 schema changes, validation deletion, or cross-owner work. Do not return each tiny import/export seam
 to the user when it can be safely proved and validated inside the current backend batch.
 
+## Bolder Backend Execution Bias
+
+Backend should be root-cause aggressive, not symptom timid. If the same backend failure can still
+occur through a neighboring action, validator, script, import path, authoring path, or persistence
+seam, the batch is not done.
+
+- Take a larger backend slice when it shares one canonical owner and one validation story.
+- Reuse the implemented owner first; extend or extract it instead of adding parallel helpers.
+- If validation breaks because of the root-cause batch, debug and fix it inside the batch rather
+  than stopping at the first red command.
+- Prefer executable validators and source contracts over Markdown explanations.
+- Do not add a new docs file for routine backend cleanup; update an existing plan only with compact
+  durable facts when needed.
+- Do not leave compatibility/fallback code active after the canonical replacement is proved unless a
+  live caller requires it.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

@@ -54,6 +54,7 @@ export function useSelectedPlanPresetPreviewController({
     () => buildPlanPresetCardInputKey(presetCardInput),
     [presetCardInput],
   );
+  const previousPresetDiscoveryKeyRef = useRef(presetDiscoveryKey);
   const resetExternalState = useEffectEvent(() => {
     onResetExternalState?.();
   });
@@ -223,6 +224,12 @@ export function useSelectedPlanPresetPreviewController({
     if (!resetOnInputChange) {
       return;
     }
+
+    if (previousPresetDiscoveryKeyRef.current === presetDiscoveryKey) {
+      return;
+    }
+
+    previousPresetDiscoveryKeyRef.current = presetDiscoveryKey;
 
     presetAutoLoadKeyRef.current = null;
     runningPlanPreviewInputKeyRef.current = null;

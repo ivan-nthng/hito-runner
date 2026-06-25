@@ -3,6 +3,7 @@ import {
   toCanonicalMetricModeJson,
   type LegacyWorkoutType,
 } from "@/lib/rich-workout-model";
+import { stripDisallowedDefaultEstimatedHrTargetsFromSegments } from "@/lib/default-estimated-hr-target-policy";
 import { buildGeneratedWorkoutMetricMode } from "@/lib/structured-plan-authoring-metrics";
 import type { NormalizedStructuredInput } from "@/lib/structured-plan-authoring-schema";
 
@@ -29,16 +30,21 @@ function attachCanonicalWorkoutFields<T extends GeneratedWorkoutDraft>(
   workout: T,
   normalized: NormalizedStructuredInput,
 ) {
+  const segments = stripDisallowedDefaultEstimatedHrTargetsFromSegments(workout.segments, {
+    sourceWorkoutType: workout.source_workout_type,
+    workoutType: workout.workout_type,
+  });
   const richWorkout = resolveCanonicalWorkoutModel({
     workoutType: workout.workout_type,
     sourceWorkoutType: workout.source_workout_type,
     title: workout.title,
-    steps: workout.segments,
-    metricMode: buildGeneratedWorkoutMetricMode(normalized, workout.segments),
+    steps: segments,
+    metricMode: buildGeneratedWorkoutMetricMode(normalized, segments),
   });
 
   return {
     ...workout,
+    segments,
     workout_family: richWorkout.workoutFamily,
     workout_identity: richWorkout.workoutIdentity,
     calendar_icon_key: richWorkout.calendarIconKey,

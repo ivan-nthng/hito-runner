@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { HitoNativeSelectField } from "@/components/ui/native-select-field";
 
 export type BodyNoteDraft = {
   area: BodyNoteArea;
@@ -249,19 +250,19 @@ function BodyNoteEditorCard({
       <BodyAreaMapField value={bodyNote.area} onChange={(value) => onChange({ area: value })} />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <NoteSelectField
+        <HitoNativeSelectField
           label="When"
           value={bodyNote.timing}
-          onChange={(value) => onChange({ timing: value as BodyNoteTiming })}
+          onValueChange={(value) => onChange({ timing: value as BodyNoteTiming })}
           options={BODY_NOTE_TIMINGS.map((timing) => ({
             value: timing,
             label: timing === "during" ? "During the run" : "After the run",
           }))}
         />
-        <NoteSelectField
+        <HitoNativeSelectField
           label="Sensation"
           value={bodyNote.sensation}
-          onChange={(value) => onChange({ sensation: value as BodyNoteSensation | "" })}
+          onValueChange={(value) => onChange({ sensation: value as BodyNoteSensation | "" })}
           options={[
             { value: "", label: "Choose one" },
             ...BODY_NOTE_SENSATIONS.map((sensation) => ({
@@ -452,35 +453,6 @@ function BodyMapSilhouette() {
       <line x1="78" y1="320" x2="93" y2="320" />
       <line x1="107" y1="320" x2="122" y2="320" />
     </g>
-  );
-}
-
-function NoteSelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <label className="block">
-      <span className="hito-form-label">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="hito-field hito-input-md mt-2"
-      >
-        {options.map((option) => (
-          <option key={option.value || option.label} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 

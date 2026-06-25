@@ -65,8 +65,8 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - signed-in users with no active plan can also choose `Build my plan myself`: the first reviewed
   manual workout creates a `manual_user_built_plan_v1` active plan through backend review
   token/checksum confirmation, and saved manual calendars can add additional reviewed workouts on
-  eligible today-or-future empty days through the backend Add contract; the existing compact
-  calendar `Add` action still needs the frontend consumer to expose today's empty-day affordance.
+  eligible today-or-future empty days through the backend Add contract and backend-shaped calendar
+  affordance metadata.
   The final Add confirmation repeats the selected date/weekday before mutation, persistence
   readback uses the same date-only truth, and manual Add does not send client rows, segments, or
   persistence metadata;
@@ -76,25 +76,26 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   manual plan remains active. Runners can also move eligible manual workout days to another empty
   day through direct backend-owned Move Workout mutation; the same persisted row moves, source and
   target dates refresh from saved truth, and frontend never owns schedule mutation truth.
-  JSON/Markdown export for persisted manual active plans is available through `Open plan` and uses
-  the canonical active-plan export seam with safe export ids. Recurrence, runner-facing
+  JSON/Markdown export for persisted manual active plans is available through the calendar header
+  overflow and uses the canonical active-plan export seam with safe export ids. Recurrence, runner-facing
   `Edit training`, Restore/Put back/Redo UI, QR/share/import, PDF/watch export, coach/organization
   authoring, and deeper modal polish remain future-only until their own QA/front-end gates accept
   them
 - saved active-plan calendars now use backend-shaped editability/capability metadata for
-  Add/Clear/Move in the proved scope instead of treating manual and non-manual plans as separate
-  calendar products:
-  supported active-plan sources can expose eligible today-or-future empty-day Add, eligible
-  planned-workout Clear, and eligible Move actions while preserving the original active-plan `source_kind` and
-  adding `active_plan_user_edit_v1` audit metadata; backend protection can still block specific
-  rows, dates, source metadata, logged/evidence-backed workouts, occupied targets, stale reviews,
+  Add/Clear/Move instead of treating manual and non-manual plans as separate calendar products:
+  supported active-plan sources can expose eligible today-or-future empty-day Add, row-state
+  Clear, and direct Move actions while preserving the original active-plan `source_kind` and adding
+  `active_plan_user_edit_v1` audit metadata; backend protection can still block specific rows,
+  past move targets, logged/evidence-backed workouts, occupied targets, stale reviews, rest rows,
   or unsafe reconstruction. Universal Copy/Paste, recurrence, runner-facing `Edit training`,
-  Restore UI, active-plan replacement semantics expansion, and broader generated-row mutation
-  matrices remain future-only
+  Restore UI, active-plan replacement semantics expansion, and generated-row content editing remain
+  future-only
 - the Advanced custom program path remains separate and secondary for target date/time, unusual
   constraints, injury/pain/caution, uncommon goals, and detailed comments; Plan Presets do not own
   manual-builder behavior, and current manual-builder capabilities are described separately above
-- setup-required accounts now see `Create a Plan` in the home header where saved-mode accounts see `Open plan`
+- saved-mode accounts now use one calendar header action model: primary `Add plan` opens the
+  supported plan-add/create choices, while the adjacent overflow owns safe utilities such as
+  `Export JSON`, `Edit schedule`, and `Clear upcoming schedule`
 - the backend now also supports one first-pass free-text authoring seam:
   one user message is turned into validated canonical plan data server-side through OpenAI before the saved weekly plan opens; the saved-mode text replacement action explicitly opts into a separate rich workout-structure draft after structured intent validates, but backend normalization remains the only path to persisted `training-plan-v2` truth and falls back to the deterministic generator if the draft is unsafe or malformed
 - the backend now also supports one first-pass voice-to-plan transcript draft seam, but it is not a current visible onboarding flow:
@@ -159,20 +160,18 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   normal text-first and JSON apply no longer stop on a preserve-vs-ignore chooser
   safe apply keeps any existing workout on the chosen start date and starts the rest the following day
   and the replace action remains available only as an explicit destructive override behind a quieter disclosure
-- saved mode now has a backend-owned plan deletion meaning:
-  `Delete plan` archives the current active plan, preserves planned-workout/log history under that archived plan, removes the active schedule from saved-mode view, and returns the runner to the same no-plan creation state
 - saved mode now also has a backend-owned `Clear upcoming schedule` meaning:
   it is the one-action way to remove today and future planned schedule before starting a later new plan, while preserving past history and any logged truth, including logged truth from today, under archived plan history
   the v1 model archives the active plan and returns to no-plan state rather than keeping a half-active truncated plan, because that is the smallest clean lifecycle state before create/import
-- saved mode now exposes that lifecycle through one compact `Open plan` modal:
-  it summarizes the active plan, offers text-first plan replacement as the primary path, keeps JSON import as an advanced path with a chosen start day, exposes `Clear upcoming schedule` as a confirmed secondary action for removing the active upcoming schedule while preserving history, and keeps `Delete plan` in a quieter destructive section
+- saved mode exposes safe active-plan utilities through the calendar header overflow:
+  `Export JSON`, `Edit schedule`, and `Clear upcoming schedule` are current accepted utilities;
+  `Open plan`, visible `Update plan`, and `Delete active plan` are not current header/product IA
 - later-starting saved-mode JSON import can also opt into clearing the previous upcoming schedule before apply:
   the UI calls the backend clear-upcoming lifecycle first, then applies the validated imported plan through the same requested-start-date seam, without per-day schedule editing
-- the backend now owns the first active-plan export model for the upcoming `Open plan` export action:
+- the backend owns the active-plan export model for the calendar overflow export action:
   JSON export is shaped as canonical `training-plan-v2` truth using the active saved schedule dates, now including rich workout family, exact identity, calendar icon key, goal context, and metric mode; Markdown export is derived from the same payload for readable sharing with a compact workout focus line, and both omit completion, Garmin, comparison, AI, and other runtime-only saved-mode state
-  visible JSON/Markdown export controls are now available from `Open plan`, including proved manual
-  active-plan export; PDF, watch export, QR/public sharing, and import-from-share remain later
-  slices
+  visible JSON export is available from the header overflow; PDF, watch export, QR/public sharing,
+  and import-from-share remain later slices
 - home and calendar now default to the real current day instead of a frozen demo start date
 - today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
 - when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero
@@ -251,9 +250,9 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   it does not parse raw FIT, does not overwrite `workout_logs`, does not silently edit the plan, does not diagnose or give medical advice from body notes, and stays cautious when deterministic evidence is partial or unclear
   visibly broken generated phrases are not shown to the runner; the backend replaces malformed recommendation text with shorter stable fallback copy when needed
   Pro gating applies only to the AI interpretation portion; deterministic Garmin upload, parse, comparison, and feedback readback remain core saved-mode truth when AI interpretation is locked
-- the first proposal-only surface for explicit plan refresh now exists inside `Open plan`:
+- the active-plan refresh backend proposal/apply seam exists, but visible `Update plan` is not a current accepted calendar-header action:
   the backend can build one compact `RunnerCoachContext` from saved profile, active plan, remaining schedule, recent adherence, Garmin comparison signals, actual load, and workout-scoped body-note caution context
-  the runner can open a quiet `Update plan` disclosure, enter short intent such as missed days, heavy fatigue, or adjusting the rest of the plan, and review a compact proposal covering why change is suggested, what would change from today forward, what stays fixed, caution context, and the explicit proposal-only boundary
+  a future UI may expose reviewed refresh/update, but current one-calendar IA does not show `Update plan`
   the proposal review data is now backend-shaped for runners rather than implementation-shaped: raw ids and internal field names are removed, malformed fragments fall back to clean copy, a dedicated `What stays the same` section is always provided, and scope distinguishes the total remaining schedule from the targeted upcoming changes shown in the review
   fixed weekday rest days, when known, now travel through that context as preserved plan truth, appear in the fixed-truth review copy, and are validated before any later explicit refresh apply can persist a replacement plan
   the proposal review now exposes explicit `Apply update` and `Keep current plan` actions: proposal generation builds the exact non-mutating future schedule draft that the runner is reviewing, keeping the plan clears the review without mutation, and applying verifies stale/off-day/draft-checksum truth before archive/replacing the active plan with that reviewed draft rather than regenerating during apply
@@ -264,11 +263,11 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   same-frequency schedule edits can be previewed as deterministic date moves for future mutable workouts while preserving workout content, steps, rich identity, metric targets, and source metadata; changing weekly running frequency returns a bounded `requires_regeneration` result that should route through the existing active-plan refresh review/apply flow
   the preview treats past/today, logged, Garmin/evidence-backed, comparison-backed, and AI-insight-backed workouts as protected, proves proposed fixed rest days stay empty of non-rest workouts when reflow is possible, and does not update runner Settings defaults or mutate the active plan
   the backend apply seam now consumes the reviewed preview token rather than frontend-provided date moves, rebuilds the current preview before writing, rejects stale/protected/regeneration-required cases, and applies only reviewed future non-rest date metadata plus active-plan schedule preferences in one atomic database operation while keeping workout content and runner Settings defaults unchanged
-  the `Open plan` modal now includes `Edit schedule`, where runners see active-plan scheduling preferences when available and can review fixed rest-day, running-day, and long-run day changes before applying; same-frequency changes apply only through the reviewed backend token, while frequency/fit changes copy a suggested prompt into `Update plan` for the existing regeneration review flow
-- the first Hito design-system toast primitive now supports those long-running `Open plan` refresh actions:
+  the calendar overflow now includes `Edit schedule`, where runners see active-plan scheduling preferences when available and can review fixed rest-day, running-day, and long-run day changes before applying; same-frequency changes apply only through the reviewed backend token, while frequency/fit changes must not silently regenerate the plan
+- the first Hito design-system toast primitive supports long-running reviewed plan actions:
   `/hitoDS` defines info, working, success, and error toast variants with Safari-stable top-center visibility, inside-toast dismiss anatomy, dismiss-only indeterminate progress for working state, and in-place working-to-success/error resolution; proposal generation and `Apply update` consume one shared action-family toast id so the latest refresh outcome replaces older proposal feedback while validation errors, proposal review, stale explanation, and mutation boundaries stay inline
 - week status shown in home, workout detail, and progress is derived from workout logs and current plan state
-- signed-in surfaces now expose one quiet `Export` action inside `Open plan`
+- signed-in surfaces now expose one quiet `Export JSON` utility in the calendar overflow
   it downloads the active saved plan as canonical JSON or readable Markdown from the same backend-owned export truth
   PDF remains deferred
 - the runner profile area now shows the current runner name and active plan title, keeps sign-out inside the dropdown, and offers a lightweight advanced JSON plan-replacement flow
@@ -285,11 +284,12 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - richer imported workout detail now renders scalar target truth only, so structured metadata no longer leaks into visible `[object Object]` text
 - richer imported interval workouts now keep an honest visible interval identity instead of being mislabeled as easy runs, and compact reference-style plan files without explicit rich fields can preserve tempo, distance/time interval, race-rhythm, taper tune-up, hill, progression, and stride meaning through backend title/segment inference rather than frontend guesswork
 - the advanced import flow still includes a lightweight `Download JSON template` affordance for users who already need file-based plan handoff
-- the advanced import modal now follows the same stable bounded modal behavior as `Open plan` and `Body notes`, while keeping its own smaller width and import-specific content
+- the advanced import modal now follows the same stable bounded modal behavior as other product
+  dialogs, while keeping its own smaller width and import-specific content
 - that downloadable template now includes one reserved `_ml_agent_template` instruction block plus rich workout field examples so ML-generated files can target the canonical `training-plan-v2` contract more explicitly without turning template-only guidance into runtime truth or inventing fake pace/HR targets
 - rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
 - auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress summary metrics, legends, and bar chrome, body severity micro-UI, preserved integration utility rows, public changelog editorial timeline chrome, launcher/auth/admin atmospheric shells, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share Hito component primitives for canonical typography roles, low-card surfaces, open/divider grouping, tiered controls, helper/error text, grouped rows, metric rows, compact legends, compact tooltips, compact chart notes, comparison-bar fills, editorial date rails, highlight tags, timeline entries, bounded canvas/photo/launch/state/editorial overlay recipes, Hito-native dialog/sheet/menu/select/progress/card/sidebar wrapper defaults, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, disclosure, labels, captions, tabs, and dividers, keeping structured first-plan onboarding primary and advanced JSON import secondary
-- the first typography canonicalization pass is implemented for the highest-drift runner-facing surfaces: `Open plan`, saved-mode JSON import, workout `Log result`/`Feedback`, and `User settings` now use shared modal title, panel title, body/body-small, form-label, feedback, and technical-mono roles instead of local heading and helper/body recipes where practical
+- the first typography canonicalization pass is implemented for the highest-drift runner-facing surfaces: saved-mode plan-management/import, workout `Log result`/`Feedback`, and `User settings` now use shared modal title, panel title, body/body-small, form-label, feedback, and technical-mono roles instead of local heading and helper/body recipes where practical
 - the icon canonicalization pass is implemented on top of the Tabler-backed Hito `Icon` primitive: product surfaces consume stable Hito icon names through the shared registry, `/hitoDS` documents approved icon names, categories, and sizes, and raw SVG icon folders are not part of the product design-system source
 - remaining chart heights/widths, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are treated as product visualization geometry, not runner-facing component chrome
 - from the visible product perspective, the interface is now treated as normalized into Hito DS ownership, and future UI work should reuse shared Hito primitives or documented geometry exceptions instead of adding new custom route-local chrome

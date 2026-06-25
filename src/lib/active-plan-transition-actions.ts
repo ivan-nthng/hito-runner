@@ -6,7 +6,6 @@ import {
   type ExistingPlanContext,
 } from "@/lib/active-plan-persistence";
 import { getRequestAuthContext } from "@/lib/backend/auth";
-import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import {
@@ -53,8 +52,7 @@ export type ActivePlanTransitionFailureReason =
   | "stale_review"
   | "input_mismatch"
   | "preview_unavailable"
-  | "no_active_manual_plan"
-  | "unsupported_active_plan_source"
+  | "no_active_plan"
   | "persistence_failed";
 
 export type ActivePlanTransitionReviewResult =
@@ -180,7 +178,7 @@ export type ActivePlanTransitionEvidenceSummary = {
 
 type ActivePlanTransitionReviewPayload = {
   contract_version: typeof ACTIVE_PLAN_TRANSITION_REVIEW_CONTRACT_VERSION;
-  transition_kind: "manual_active_plan_to_selected_running_plan";
+  transition_kind: "active_plan_to_selected_running_plan";
   user_id: string;
   review_date: string;
   current_plan: {
@@ -327,7 +325,7 @@ export async function confirmActivePlanTransitionForUser(
     return buildTransitionFailure({
       reason: "stale_review",
       message:
-        "This active-plan transition no longer matches the current manual plan or selected candidate. Refresh the review.",
+        "This active-plan transition no longer matches the current plan or selected candidate. Refresh the review.",
       input: parsed.data.reviewInput.candidate,
     });
   }
@@ -347,11 +345,13 @@ export async function confirmActivePlanTransitionForUser(
       currentActivePlan: review.currentPlanContext.activePlan!,
       expectedCurrentActivePlanUpdatedAt: review.currentPlan.updatedAt,
       reviewedPlan: review.canonicalPlan,
+      replacementStartsAt: review.affectedManualSchedule.affectedFromDate,
       profilePatch: review.profilePatch,
       planMetadata: mergeTransitionPersistenceMetadata(review.persistenceMetadata, {
         transitionReviewChecksum: review.transitionReviewChecksum,
         archivedPlanId: review.currentPlan.id,
         affectedManualWorkoutCount: review.affectedManualSchedule.upcomingWorkoutCount,
+        previousPlanSourceKind: review.currentPlan.sourceKind,
       }),
     });
 
@@ -385,7 +385,7 @@ export async function confirmActivePlanTransitionForUser(
     return buildTransitionFailure({
       reason: "persistence_failed",
       message:
-        "The selected plan could not replace the current manual plan. The current plan is unchanged.",
+        "The selected plan could not replace the current plan. The current plan is unchanged.",
       input: parsed.data.reviewInput.candidate,
     });
   }
@@ -412,8 +412,8 @@ async function buildActivePlanTransitionReview(
 
   if (!activePlan) {
     return buildTransitionFailure({
-      reason: "no_active_manual_plan",
-      message: "There is no active manual plan to transition from.",
+      reason: "no_active_plan",
+      message: "There is no active plan to replace.",
       input: candidate,
     });
   }
@@ -421,15 +421,7 @@ async function buildActivePlanTransitionReview(
   if (request.activePlanId && request.activePlanId !== activePlan.id) {
     return buildTransitionFailure({
       reason: "stale_review",
-      message: "The active manual plan changed. Refresh the transition review.",
-      input: candidate,
-    });
-  }
-
-  if (activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
-    return buildTransitionFailure({
-      reason: "unsupported_active_plan_source",
-      message: "Only active manual plans can use this reviewed transition path.",
+      message: "The active plan changed. Refresh the transition review.",
       input: candidate,
     });
   }
@@ -473,18 +465,24 @@ async function buildActivePlanTransitionReview(
   const workouts = context.existingWorkouts.workouts.filter(
     (workout) => workout.plan_cycle_id === activePlan.id,
   );
-  const upcomingManualWorkouts = workouts
+  const upcomingWorkouts = workouts
     .filter((workout) => workout.workout_date >= reviewDate)
     .sort((left, right) => left.workout_date.localeCompare(right.workout_date));
   const workoutIds = workouts.map((workout) => workout.id);
   const loggedWorkoutIds = Array.from(context.existingWorkouts.logsByWorkoutId.keys()).sort();
   const evidence = await dependencies.loadEvidenceSummary(userId, workoutIds);
+  const evidenceWorkoutIds = new Set(evidence.evidenceBackedWorkoutIds);
+  const futureMutableWorkouts = upcomingWorkouts.filter(
+    (workout) =>
+      !context.existingWorkouts.logsByWorkoutId.has(workout.id) &&
+      !evidenceWorkoutIds.has(workout.id),
+  );
   const candidateRows = exactness.canonicalPlan.planned_workouts;
   const nonRestRows = candidateRows.filter((workout) => workout.workout_type !== "rest");
   const metricHonesty = summarizeMetricHonesty(candidateRows);
   const payload: ActivePlanTransitionReviewPayload = {
     contract_version: ACTIVE_PLAN_TRANSITION_REVIEW_CONTRACT_VERSION,
-    transition_kind: "manual_active_plan_to_selected_running_plan",
+    transition_kind: "active_plan_to_selected_running_plan",
     user_id: userId,
     review_date: reviewDate,
     current_plan: {
@@ -504,7 +502,7 @@ async function buildActivePlanTransitionReview(
       selected_plan_review_payload: exactness.reviewPayload,
     },
     affected_manual_schedule: {
-      upcoming_workouts: upcomingManualWorkouts.map((workout) => ({
+      upcoming_workouts: futureMutableWorkouts.map((workout) => ({
         id: workout.id,
         date: workout.workout_date,
         title: workout.title,
@@ -542,7 +540,7 @@ async function buildActivePlanTransitionReview(
       endDate: activePlan.end_date,
       updatedAt: activePlan.updated_at,
       workoutCount: workouts.length,
-      upcomingWorkoutCount: upcomingManualWorkouts.length,
+      upcomingWorkoutCount: upcomingWorkouts.length,
     },
     candidatePlan: {
       sourceKind: candidate.sourceKind,
@@ -557,10 +555,10 @@ async function buildActivePlanTransitionReview(
     },
     affectedManualSchedule: {
       affectedFromDate: reviewDate,
-      upcomingWorkoutCount: upcomingManualWorkouts.length,
-      upcomingWorkoutDates: upcomingManualWorkouts.map((workout) => workout.workout_date),
+      upcomingWorkoutCount: futureMutableWorkouts.length,
+      upcomingWorkoutDates: futureMutableWorkouts.map((workout) => workout.workout_date),
       statement:
-        "Upcoming manual workouts stay with the archived manual plan and are not merged into the selected plan.",
+        "Past, logged, and evidence-backed rows stay visible in the runner calendar; only future mutable rows from this date are replaced by the reviewed plan.",
     },
     preservedHistory: {
       loggedWorkoutCount: loggedWorkoutIds.length,
@@ -569,7 +567,7 @@ async function buildActivePlanTransitionReview(
       comparisonCount: evidence.comparisonCount,
       aiInsightCount: evidence.aiInsightCount,
       statement:
-        "Logged workouts, provider evidence, comparisons, and protected history stay attached to the runner and archived manual plan.",
+        "Logged workouts, provider evidence, comparisons, and protected history are carried forward into the active calendar and remain recoverable from runner history.",
     },
     manualTemplates: {
       preserved: true,
@@ -631,6 +629,7 @@ function mergeTransitionPersistenceMetadata(
     transitionReviewChecksum: string;
     archivedPlanId: string;
     affectedManualWorkoutCount: number;
+    previousPlanSourceKind: string | null;
   },
 ): AdditionalPlanPersistenceMetadata {
   return {
@@ -640,8 +639,10 @@ function mergeTransitionPersistenceMetadata(
         review_checksum: transition.transitionReviewChecksum,
         source_status: ACTIVE_PLAN_TRANSITION_SOURCE_STATUS,
         archived_plan_id: transition.archivedPlanId,
-        previous_plan_source_kind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+        previous_plan_source_kind: transition.previousPlanSourceKind,
         affected_manual_workout_count: transition.affectedManualWorkoutCount,
+        future_mutable_workouts_replaced: true,
+        protected_history_carried_forward: true,
         upcoming_manual_workouts_merged: false,
       },
     }),

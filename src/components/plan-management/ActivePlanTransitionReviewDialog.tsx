@@ -45,7 +45,7 @@ export function ActivePlanTransitionReviewDialog({
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Review active-plan change</DialogTitle>
           <DialogDescription className="hito-body max-w-2xl">
-            This review is non-mutating. Your manual plan changes only after explicit confirmation.
+            This review is non-mutating. Your calendar changes only after explicit confirmation.
           </DialogDescription>
         </DialogHeader>
 
@@ -59,7 +59,8 @@ export function ActivePlanTransitionReviewDialog({
             <div className="hito-surface-wash" data-tone="signal">
               <p className="hito-list-row-title">Reviewed plan applied</p>
               <p className="hito-list-row-copy">
-                The previous manual plan was archived as history and the reviewed plan is active.
+                Past calendar history was carried forward and the reviewed plan now owns the future
+                schedule.
               </p>
             </div>
           ) : null}
@@ -114,11 +115,11 @@ function TransitionReviewSummary({ review }: { review: TransitionReviewOk }) {
         <div className="flex items-start gap-3">
           <Icon name="calendar" size="sm" className="mt-0.5 text-signal" />
           <div className="min-w-0">
-            <p className="hito-list-row-title">Upcoming manual workouts stay with history</p>
+            <p className="hito-list-row-title">Future mutable workouts will be replaced</p>
             <p className="hito-list-row-copy">{review.affectedManualSchedule.statement}</p>
             <p className="hito-field-helper mt-2">
               From {formatDate(review.affectedManualSchedule.affectedFromDate)} ·{" "}
-              {review.affectedManualSchedule.upcomingWorkoutCount} upcoming manual rows affected
+              {review.affectedManualSchedule.upcomingWorkoutCount} future mutable rows affected
             </p>
           </div>
         </div>
@@ -236,7 +237,7 @@ export function CustomPlanTransitionNotice({
           className="hito-button hito-button-secondary hito-button-md"
           onClick={onOpenPlan}
         >
-          Open plan
+          Plan actions
         </button>
       </div>
     </div>
@@ -248,10 +249,10 @@ export function UnsupportedActivePlanNotice({ onOpenPlan }: { onOpenPlan: () => 
     <div className="hito-surface-wash" data-tone="destructive">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="hito-list-row-title">Create a plan is available for manual plans first</p>
+          <p className="hito-list-row-title">Create a plan needs an active plan first</p>
           <p className="hito-list-row-copy">
-            This reviewed transition currently supports active manual plans. Your current plan is
-            unchanged.
+            This reviewed transition starts from the current active plan. Your current plan is
+            unchanged if Hito cannot verify that active-plan state.
           </p>
         </div>
         <button
@@ -259,7 +260,7 @@ export function UnsupportedActivePlanNotice({ onOpenPlan }: { onOpenPlan: () => 
           className="hito-button hito-button-secondary hito-button-sm shrink-0"
           onClick={onOpenPlan}
         >
-          Open plan
+          Plan actions
         </button>
       </div>
     </div>

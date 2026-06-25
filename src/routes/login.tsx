@@ -43,7 +43,7 @@ function LoginPage() {
   if (snapshot.source === "persisted") {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
-        <div className="px-6 py-10 lg:px-10">
+        <div className="hito-route-gutter py-10">
           <section className="hito-surface max-w-3xl p-6 lg:p-10">
             <p className="hito-micro-label">
               {snapshot.mode === "authenticated" ? "Saved mode" : "Setup required"}

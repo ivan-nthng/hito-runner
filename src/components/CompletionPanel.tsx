@@ -27,6 +27,7 @@ import {
   toneForComparison,
 } from "@/components/workout-completion/WorkoutComparisonReadback";
 import { WorkoutAiInsightReadback } from "@/components/workout-completion/WorkoutAiInsightReadback";
+import { formatWorkoutFeedbackTimestamp } from "@/components/workout-completion/workout-feedback-time";
 
 type Outcome = "completed" | "partial" | "skipped";
 type CompletionFormState = {
@@ -236,7 +237,7 @@ export function CompletionPanel({
                     ? hasSavedResult
                       ? `This workout already has a saved ${workout.log?.outcome ?? outcome} result. ${
                           hasSavedLog && workout.log?.loggedAt
-                            ? `Last updated ${formatLoggedAt(workout.log.loggedAt)}.`
+                            ? `Last updated ${formatWorkoutFeedbackTimestamp(workout.log.loggedAt)}.`
                             : "This result is already saved."
                         }`
                       : "Save this result to update the workout and this week's status."
@@ -1002,7 +1003,7 @@ function AttachedEvidenceReadback({
 }) {
   const metadata = [
     asset.assetKind === "garmin_zip" ? "Garmin ZIP" : "Garmin FIT",
-    `Added ${formatLoggedAt(asset.createdAt)}`,
+    `Added ${formatWorkoutFeedbackTimestamp(asset.createdAt)}`,
     actualMetrics?.activityLocalDate ? `Run date ${actualMetrics.activityLocalDate}` : null,
   ].filter(Boolean);
 
@@ -1330,13 +1331,4 @@ function Slider({
       </div>
     </div>
   );
-}
-
-function formatLoggedAt(value: string) {
-  return new Date(value).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }

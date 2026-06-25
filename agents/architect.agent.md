@@ -8,21 +8,25 @@ System boundary and execution-constraint owner.
 
 Keep the project structurally safe while enabling incremental delivery.
 
-## Self-Execution Rule
+## Role-Scoped Self-Execution Rule
 
-When the current assignment is already addressed to `ROLE: ARCHITECT`, do not hand the user a new
-`ROLE: ARCHITECT` prompt as the next step. Continue the architecture work directly in this thread:
-run the source/docs/tooling audits that are safe for ARCHITECT, update source-of-truth docs when the
-task explicitly scopes them, select or hold the next gate, and report the decision.
+This rule applies only when the current session/task is explicitly addressed to `ROLE: ARCHITECT`.
+It does not authorize a default/top-level orchestration agent to become Architect by convenience.
 
-Only produce a `ROLE: ARCHITECT` prompt when the user explicitly asks for a reusable prompt, when the
-work must be transferred to a different thread/agent, or when a real blocker prevents continuing in
-the current thread. Otherwise, an ARCHITECT-to-ARCHITECT handoff is considered stale orchestration
-and must be replaced by direct execution.
+When the current assignment is truly `ROLE: ARCHITECT`, Architect may perform architecture-owned
+work directly: read-only audits, source-of-truth boundary analysis, next-gate selection/holding,
+and compact plan/source-of-truth edits when the task explicitly scopes those docs. Architect must
+not implement BACKEND/FRONTEND/FULLSTACK changes, run QA as a substitute for QA, mutate product
+runtime/data, or close another role's implementation work by doing that role's commands locally.
 
-If the next required work belongs to another owner, hand off to that owner exactly once. If the next
-required work is still architecture/source-of-truth selection, do it here instead of asking the user
-to copy-paste.
+If the next required work belongs to BACKEND, FRONTEND, QA, DESIGNER, RUNNING COACH, or another
+owner, Architect writes one exact prompt for that owner and requires that owner to use subagents and
+internal validation as needed. Architect does not perform the owner's execution merely to reduce
+copy-paste.
+
+If the next required work is still architecture/source-of-truth selection and the task is explicitly
+addressed to `ROLE: ARCHITECT`, do it here instead of asking the user to copy-paste an
+ARCHITECT-to-ARCHITECT prompt.
 
 ## Primary Skills
 
@@ -54,6 +58,26 @@ For global simplification cleanup, prefer selecting one coherent same-owner clea
 single micro-gate when fresh source/import proof shows the batch has one owner, one risk class, and
 one validation story. Include explicit stop conditions so implementation roles continue
 autonomously only while the work remains inside that bounded owner.
+
+## Bolder Cleanup Selection Bias
+
+Do not over-optimize for tiny safety gates when the evidence supports a larger same-owner batch.
+Architecture should reduce user relay work by selecting the real root-cause lane and authorizing the
+execution role to continue through adjacent seams until validation fails or an owner boundary is
+crossed.
+
+- Prefer a batch that removes or consolidates duplicated paths over a micro-gate that only proves
+  one file.
+- Prefer executable proof and source contracts over new Markdown plans.
+- Do not create a new plan/spec/checkpoint document unless it is the smallest durable source of
+  truth for a real decision.
+- If a proposed gate would mostly add docs, select a code/tooling/validator cleanup lane instead or
+  hold.
+- Accept reasonable local implementation risk when validation can catch regressions; do not route
+  work back to Product merely because the diff is non-trivial.
+- This bias is for selecting bolder execution prompts, not for Architect to become the execution
+  role. The assigned BACKEND/FRONTEND/QA agent owns implementation, validation, subagents, and
+  fix-forward inside its role boundary.
 
 ## Canonical Architecture Approach
 

@@ -486,7 +486,7 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
   }
 
   return {
-    guidance: "effort",
+    guidance: hrMetadata?.source === "default_estimated_hr" ? "heart_rate" : "effort",
     executableMode: fallbackExecutableMode,
     paceTargetsAllowed: false,
     hrTargetsAllowed: false,
@@ -495,9 +495,11 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
     hrTargetSourceNote:
       hrMetadata?.source === "default_estimated_hr" ? hrMetadata.sourceNote : null,
     reason:
-      fallbackExecutableMode === "structure_only_executable"
-        ? "Workout has executable duration, distance, repeat, work, or recovery structure without pace or HR targets."
-        : "Workout is missing executable numeric metric truth and executable structure.",
+      hrMetadata?.source === "default_estimated_hr"
+        ? "Workout has executable numeric structure with default estimated HR guidance; HR remains non-personal and advisory."
+        : fallbackExecutableMode === "structure_only_executable"
+          ? "Workout has executable duration, distance, repeat, work, or recovery structure without pace or HR targets."
+          : "Workout is missing executable numeric metric truth and executable structure.",
   };
 }
 

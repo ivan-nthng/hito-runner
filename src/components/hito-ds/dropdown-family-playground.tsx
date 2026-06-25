@@ -97,6 +97,10 @@ export function DropdownFamilyPlayground() {
           label: "Used in",
           body: "Manual calendar actions, admin filters, profile/account menus, compact controls, and Figma export menu boards.",
         },
+        {
+          label: "Mobile escalation",
+          body: "Short action menus stay anchored. Long grouped or nested mobile pickers escalate to the workflow dialog with a scroll-fill body; the anatomy is visible in Variants.",
+        },
       ]}
     />
   );
@@ -418,6 +422,88 @@ function DropdownAnatomyDemo({ settings }: { settings: DropdownPlaygroundSetting
           settings={settings}
         />
       </OpenMenuSurface>
+
+      <MobileDropdownEscalationSpecimen />
+    </div>
+  );
+}
+
+function MobileDropdownEscalationSpecimen() {
+  return (
+    <div className="grid min-w-0 gap-4 rounded-2xl border border-hairline bg-background/35 p-4 xl:col-span-2 xl:grid-cols-[minmax(0,0.9fr)_minmax(18rem,1fr)]">
+      <div className="grid min-w-0 content-start gap-3">
+        <div>
+          <p className="hito-label">Mobile escalation rule</p>
+          <h4 className="hito-list-row-title mt-1">Long choice flows use the workflow dialog.</h4>
+          <p className="hito-list-row-copy mt-2">
+            Short action menus stay anchored. Long grouped or nested mobile pickers, like manual
+            workout templates, escalate to the product workflow dialog so the list can scroll and
+            close safely.
+          </p>
+        </div>
+        <div className="hito-row-group">
+          <div className="hito-list-row items-start">
+            <Icon name="more-horizontal" size="sm" className="mt-0.5 text-muted-foreground" />
+            <span className="min-w-0">
+              <span className="hito-list-row-title block">Short menu</span>
+              <span className="hito-list-row-copy block">
+                Keep `DropdownMenuContent` anchored to the trigger.
+              </span>
+            </span>
+          </div>
+          <div className="hito-list-row items-start">
+            <Icon name="file-text" size="sm" className="mt-0.5 text-muted-foreground" />
+            <span className="min-w-0">
+              <span className="hito-list-row-title block">Long mobile picker</span>
+              <span className="hito-list-row-copy block">
+                Use `hito-dialog-size-workflow` with a scroll-fill body.
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto grid min-h-[22rem] w-full max-w-sm min-w-0 overflow-hidden rounded-2xl border border-hairline bg-background/95 shadow-soft">
+        <div className="hito-product-dialog-header flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="hito-modal-title text-xl">Choose template</p>
+            <p className="hito-body mt-1">Workflow dialog anatomy for grouped mobile choices.</p>
+          </div>
+          <Icon name="close" size="sm" className="shrink-0 text-muted-foreground" />
+        </div>
+        <div className="hito-product-dialog-body-scroll-fill grid gap-3">
+          <div className="hito-list-row items-start">
+            <Icon name="chevron-left" size="sm" className="mt-0.5 text-muted-foreground" />
+            <span className="min-w-0">
+              <span className="hito-list-row-title block">Back expectation</span>
+              <span className="hito-list-row-copy block">
+                Nested steps return inside the workflow, not a hidden submenu.
+              </span>
+            </span>
+          </div>
+          <div className="hito-row-group">
+            <div className="hito-list-row items-start">
+              <Icon name="activity" size="sm" className="mt-0.5 text-muted-foreground" />
+              <span className="min-w-0">
+                <span className="hito-list-row-title block">Easy aerobic run</span>
+                <span className="hito-list-row-copy block">Structure-first template choice.</span>
+              </span>
+            </div>
+            <div className="hito-list-row items-start">
+              <Icon name="sparkles" size="sm" className="mt-0.5 text-muted-foreground" />
+              <span className="min-w-0">
+                <span className="hito-list-row-title block">Quality session</span>
+                <span className="hito-list-row-copy block">Grouped rows can scroll calmly.</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="hito-product-dialog-footer flex justify-end">
+          <button type="button" className="hito-button hito-button-secondary hito-button-sm">
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

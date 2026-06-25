@@ -113,12 +113,12 @@ Active
   edit/recurrence remain future-only.
 - Universal active-plan Add/Clear/Move editability is accepted in the proved scope:
   saved calendars now use backend-shaped capability metadata and
-  `active_plan_user_edit_v1` audit metadata for eligible future Add, Clear, and Move actions across
-  accepted active-plan sources, while preserving the original plan `source_kind`. Manual
-  Copy/Paste and Move are direct backend-owned mutations in the proved manual path; universal
-  Copy/Paste, recurrence, runner-facing `Edit training`, Restore UI, active-plan replacement
-  semantics expansion, and broader generated-row mutation matrices remain future-only until their
-  own backend/QA/frontend gates accept them.
+  `active_plan_user_edit_v1` audit metadata for eligible today-or-future Add plus row-state Clear
+  and direct Move actions across accepted active-plan sources, while preserving the original plan
+  `source_kind` as provenance. Manual Copy/Paste remains a direct backend-owned mutation in the
+  proved manual path; universal Copy/Paste, recurrence, runner-facing `Edit training`, Restore UI,
+  active-plan replacement semantics expansion, and generated-row content editing remain future-only
+  until their own backend/QA/frontend gates accept them.
 - The plan-authoring quality backend refinement has been hardened beyond the original slice 3:
   structured authoring accepts generation-only execution mode, uses an executable-mode resolver so numeric pace targets require execution support plus usable recent 5K truth, personal HR zones remain the only executable HR target truth, target time alone does not create pace targets, age-estimated HR remains advisory/readback-only, allowed non-pace/non-HR workouts use `structure_only_executable` numeric duration/distance/repeat/recovery anatomy instead of vague effort-only happy-path output, emits exact generated workout identity plus cutback/long-run steady-finish structure inside valid `training-plan-v2` workout data, and now adds goal-family long-run floors/peaks/ceilings, taper reductions aligned to the `Taper` phase boundary, Base/Build/Specific/Taper workout selection, runner-fit safety adjustments, target-time honesty assumptions for weak or aggressive benchmark support, long-distance review assumptions for low-support marathon/ultra/mountain contexts, mountain/trail-specific technical terrain/controlled descent/hike-run/time-on-feet doctrine without exact elevation prescriptions, sharper 5K/10K/half/marathon/ultra workout identities without changing hard-day frequency, a beginner/low-support `build_consistency` cap that keeps those plans out of tempo, interval, and race-like tune-up identities, richer opener/main/finish support-run structure for normal longer easy/steady/cutback/taper/long days, safe recovery/cutback identity variation for conservative low-support balanced plans, bounded plan-scoped authoring snapshots so refresh can preserve target-time, benchmark, execution-mode, rest-day, and metric-policy truth instead of degrading to legacy reconstruction, and rich canonical workout fields/mapping plus additive saved-mode persistence, import/export/template roundtrip, calendar/glyph rendering adoption, and workout/readback helpers that foreground backend-shaped executable target entries while keeping cues, focus, RPE, source copy, default/age-estimated HR, and legacy effort/cue-only rows secondary or legacy-readable.
 - The first OpenAI rich-workout draft backend slice is implemented behind text authoring only:
@@ -153,8 +153,11 @@ Active
   `src/lib/active-plan-schedule-edit-preview.ts` validates proposed fixed rest days, running-day count, optional explicit running weekdays, and preferred long-run day through shared training-preference rules, then returns a non-mutating `schedule_reflow` preview for same-frequency date moves or `requires_regeneration` for weekly frequency changes; protected past/today, logged, Garmin/evidence-backed, comparison-backed, and AI-insight-backed workouts stay out of proposed moves, and no OpenAI call, profile/default update, or plan mutation occurs in preview.
 - Active-plan schedule reflow apply Slice 2B is implemented:
   `applyActivePlanScheduleReflowPreview` consumes the reviewed `previewToken` plus original schedule input, reloads active-plan/workout/log/evidence truth, rejects stale/protected/regeneration-required cases, and persists only reviewed future non-rest date/weekday/week/display metadata plus active-plan `plan_preferences` through one transaction-backed Supabase RPC; failed or stale applies leave workout dates and plan preferences unchanged, while runner-level `training_preferences`, workout content, rich fields, steps, metric targets, source ids, goal context, and evidence-backed rows remain unchanged.
-- Active-plan schedule edit UI Slice 3A is implemented:
-  `Open plan` now includes an `Edit schedule` disclosure that prefills from active-plan `plan_preferences` when available, reuses Hito weekday/running-day controls, calls the backend preview, renders `schedule_reflow` review details, applies only with the reviewed preview token, and routes `requires_regeneration` results into the existing `Update plan` prompt path without changing runner Settings defaults.
+- Active-plan schedule edit UI is implemented under the current one-calendar IA:
+  the calendar overflow exposes `Edit schedule`, prefills from active-plan `plan_preferences` when
+  available, reuses Hito weekday/running-day controls, calls the backend preview, renders
+  `schedule_reflow` review details, and applies only with the reviewed preview token without
+  changing runner Settings defaults.
 - The text-authoring ops smoke path is now TS-backed:
   `npm run author-plan-from-text` calls the real `src/lib/openai-plan-authoring.ts` seam, defaults to deterministic no-rich-draft output, accepts `--rich-draft` for the rich workout draft seam, accepts `--dry-run` and `--mock-openai` for bounded non-persistent validation, and reports bounded rich-draft status/fallback plus sample rich workout metadata. The former legacy MJS text-authoring fallback has been removed and is no longer a validation path.
 - The structured review-before-create backend slice is now implemented:
@@ -206,7 +209,7 @@ Active
 - The auth callback exchange facade narrowing slice is now implemented:
   `/api/auth/confirm` imports `exchangeCodeForSession` directly from `src/lib/auth-actions.ts`, and
   `training-api.ts` no longer keeps the auth callback exchange compatibility re-export.
-- The Open plan type-contract facade narrowing slice is now implemented:
+- The former plan-management type-contract facade narrowing slice is implemented:
   plan-management refresh and schedule-edit components import refresh/reflow contract types directly
   from `src/lib/active-plan-refresh-contract.ts` and
   `src/lib/active-plan-schedule-edit-preview.ts`, while `training-api.ts` keeps only the runtime
@@ -220,18 +223,11 @@ Active
   import from `src/lib/manual-workout-authoring/*`; `training-api.ts` keeps only
   `reviewManualWorkoutDraftAction` as the TanStack server-function wrapper around the pure draft
   review seam.
-- The first `PlanManagementDialog` decomposition slice is now implemented:
-  the saved-mode `Open plan` export dropdown UI now lives in `src/components/plan-management/PlanExportMenu.tsx`, while the parent dialog still owns export status, error handling, the authenticated iframe download path, and all existing plan-management actions.
-- The second `PlanManagementDialog` decomposition slice is now implemented:
-  the saved-mode `Open plan` refresh proposal prompt/review UI now lives in `src/components/plan-management/PlanRefreshPanel.tsx`, while the parent dialog still owns proposal generation, apply calls, refresh state, errors, stale recovery, and the explicit mutation boundary.
-- The third `PlanManagementDialog` decomposition slice is now implemented:
-  the saved-mode `Open plan` JSON import UI now lives in `src/components/plan-management/PlanImportPanel.tsx`, while the parent dialog still owns imported-plan validation state, file-read state updates, `completeOnboarding` apply calls, clear-before-import sequencing, and success/failure navigation.
-- The fourth `PlanManagementDialog` decomposition slice is now implemented:
-  the saved-mode `Open plan` clear-upcoming and delete/archive lifecycle controls now live in `src/components/plan-management/PlanLifecycleControls.tsx`, while the parent dialog still owns confirmation state, lifecycle action calls, errors, status transitions, and success navigation.
-- The fifth `PlanManagementDialog` decomposition slice is now implemented:
-  the saved-mode `Open plan` text replacement UI now lives in `src/components/plan-management/PlanTextReplacementPanel.tsx`, while the parent dialog still owns the prompt state, minimum-length validation, `completeTextOnboarding` call, replacement status/error state, and success navigation.
-- The sixth `PlanManagementDialog` decomposition slice is now implemented:
-  the saved-mode `Open plan` active-plan summary/header UI now lives in `src/components/plan-management/PlanSummaryHeader.tsx`, while the parent dialog still owns export status/errors, export download orchestration, timers, reset behavior, and all server-action calls.
+- The previous `PlanManagementDialog` decomposition work remains useful implementation history:
+  export, refresh, import, lifecycle, text replacement, and summary/header UI were isolated into
+  `src/components/plan-management/*`; current runner-facing IA should expose only `Add plan` plus
+  overflow utilities (`Export JSON`, `Edit schedule`, `Clear upcoming schedule`) and should not
+  teach `Open plan`, visible `Update plan`, or `Delete active plan` as current product concepts.
 - The first `CompletionPanel` decomposition slice is now implemented:
   the workout-scoped body-note summary and modal editor UI now live in `src/components/workout-completion/BodyNotesEditor.tsx`, while the parent panel still owns completion form state, workout-log payload construction, `saveWorkoutLog`, route invalidation, Garmin upload/remove, and feedback/readback orchestration.
 - The `CompletionPanel` post-save reconciliation fix is now implemented:
@@ -323,17 +319,27 @@ Active
 - The first saved-mode plan-management backend slice is now implemented:
   a canonical delete-plan action archives the active `plan_cycle` without deleting planned workouts or logs, leaving the runner in authenticated no-plan/setup-ready state, and the JSON import apply seam can now accept a `requestedStartDate` that becomes the effective schedule authority for saved-mode import.
 - The first saved-mode plan-management frontend slice is now implemented:
-  `Open plan` opens a compact active-plan modal with plan summary, primary text-first replacement, secondary JSON import with chosen start day, and a destructive `Delete plan` action wired to the backend archival seam.
+  Current one-calendar IA does not expose an `Open plan` hub or `Delete active plan`; active-plan
+  creation starts from `Add plan`, while safe utilities live in the adjacent overflow.
 - The saved-mode `Clear upcoming schedule` backend lifecycle slice is now implemented:
   a canonical action archives the current active plan out of the active schedule from today forward, keeps planned-workout rows and workout logs preserved as archived history, and leaves the runner in no-plan/setup-ready state so later-starting imports or generated plans do not inherit stale future workouts.
-- The saved-mode `Clear upcoming schedule` frontend slice is now implemented:
-  `Open plan` exposes the action as a confirmed secondary schedule-management control distinct from `Delete plan`, tall plan-management dialogs keep their header/footer usable with internal scroll, and later-starting JSON import can explicitly clear the previous upcoming schedule before applying the new backend-owned plan start.
+- The saved-mode `Clear upcoming schedule` frontend slice is implemented as an overflow utility:
+  the action remains confirmed, preserves history, and can support later-starting JSON import before
+  applying the new backend-owned plan start.
 - The first saved-mode plan-export backend slice is now implemented:
-  one canonical active-plan export payload is derived from the active `plan_cycle` plus saved `planned_workouts`, JSON export projects that payload into `training-plan-v2` using the current applied dates and rich workout fields, and Markdown export uses the same payload for a concise runner-readable artifact with backend-owned workout focus; visible `Open plan` export controls remain unchanged and PDF remains later.
-- The first saved-mode plan-export frontend slice is now implemented:
-  `Open plan` now shows one compact `Export` menu for active plans, downloads backend-owned JSON and Markdown artifacts through real browser file save behavior, hides export when no active plan exists, and still defers PDF.
-- The Safari export-download bugfix is now implemented:
-  `Open plan` no longer depends on a client-side blob/objectURL download helper for active-plan export, so JSON no longer hangs in `Preparing...` and JSON plus Markdown now start through the same authenticated attachment route while still using backend-owned filename, content type, and body truth.
+  one canonical active-plan export payload is derived from the active `plan_cycle` plus saved
+  `planned_workouts`, JSON export projects that payload into `training-plan-v2` using the current
+  applied dates and rich workout fields, and Markdown export uses the same payload for a concise
+  runner-readable artifact with backend-owned workout focus; current visible export is the calendar
+  overflow `Export JSON` utility and PDF remains later.
+- The saved-mode plan-export frontend slice is implemented:
+  the calendar overflow exposes `Export JSON` for active plans through backend-owned file save
+  behavior and hides export when no active plan exists; Markdown/PDF/watch/share remain out of
+  current header IA until accepted separately.
+- The Safari export-download bugfix is implemented:
+  active-plan export no longer depends on a client-side blob/objectURL download helper, so JSON
+  starts through the authenticated attachment route while still using backend-owned filename,
+  content type, and body truth.
 - The body-notes and user-settings persistence repair is now implemented:
   the linked Supabase project now has `workout_logs.body_notes`, bounded settings/avatar columns on `runner_profiles`, and the `profile-avatars` bucket; `/settings` and shell viewer profile reads now resolve through the same persisted-user mapping used by saved mode instead of the raw local bypass id.
 - The first frontend follow-up for body notes is now implemented:
@@ -341,39 +347,61 @@ Active
 - The first workout-scoped body-note modal slice is now implemented:
   `Log result` no longer carries the heavy inline body-note editor in the main page flow, a compact summary row now opens one modal editor for bounded body-note entries, and the modal keeps the existing saved schema of area, timing, sensation, severity, and optional note.
 - The Safari body-note modal layout fix is now implemented:
-  the workout-scoped body-note modal now uses the same stable bounded-height dialog pattern as `Open plan`, so Safari keeps the panel in-viewport, scrolls the body region internally, and leaves `Cancel` plus `Save body notes` reachable without page-behind scrolling.
+  the workout-scoped body-note modal now uses the same stable bounded-height product-dialog pattern
+  as other workflow dialogs, so Safari keeps the panel in-viewport, scrolls the body region
+  internally, and leaves `Cancel` plus `Save body notes` reachable without page-behind scrolling.
 - The Safari stable-dialog overlay cleanup is now implemented:
   the same stable dialog pair now also forces closed overlays non-blocking, so saving or cancelling the workout-scoped body-note modal no longer leaves a dimmed pointer-blocking layer over the workout page.
 - The bounded modal consolidation slice is now implemented:
-  `UploadJsonDialog` now uses the same stable product-dialog recipe as `Open plan` and `Body notes`, the shared CSS now owns the canonical three-row panel and internal scroll region, and `/hitoDS` documents the live modal anatomy without introducing a broad modal wrapper.
+  `UploadJsonDialog` now uses the same stable product-dialog recipe as other saved-mode workflow
+  dialogs, the shared CSS now owns the canonical three-row panel and internal scroll region, and
+  `/hitoDS` documents the live modal anatomy without introducing a broad modal wrapper.
 - The body-note AI context slice is now implemented:
   saved workout-scoped body notes now feed the existing bounded Garmin recommendation seam as optional caution context only, while deterministic comparison remains primary and the prompt explicitly forbids diagnosis, medical advice, injury certainty, treatment instructions, or silent plan mutation.
 - The workout AI-output hygiene fix is now implemented:
   the backend now rejects malformed runner-facing AI text such as dangling fragments, ampersand continuations, replacement glyphs, or non-English character artifacts, and persists stable deterministic fallback sentences instead while preserving body-note caution and severity softening behavior.
 - The first longitudinal AI plan-refresh backend foundation is now implemented:
   saved mode now has one canonical `RunnerCoachContext` builder over persisted runner/profile/plan/log/Garmin/body-note truth, plus one proposal-only active-plan refresh seam that consumes that bounded context and an explicit runner prompt while targeting only the remaining active schedule; final apply flow and silent plan mutation remain absent.
-- The first runner-facing AI-assisted plan-refresh proposal slice is now implemented:
-  `Open plan` now includes a quiet `Update plan` disclosure where saved-mode runners can enter a short intent, generate a backend-owned refresh proposal from persisted history, and read back why the remaining schedule might change, what would change, relevant caution context, and the explicit not-applied boundary.
+- The AI-assisted plan-refresh proposal/apply seam remains backend-owned future capability:
+  visible `Update plan` is not part of the current accepted calendar header/overflow IA.
 - The first runner-facing active-plan refresh confirm/apply slice is now implemented:
   proposal review now exposes `Apply update` and `Keep current plan`; keeping the current plan dismisses the proposal without mutation, applying calls the backend seam with stale/off-day revalidation, successful apply returns to the updated active-plan view, and stale proposals show a specific fresh-proposal recovery path.
 - The first Hito design-system toast slice is now implemented:
-  `/hitoDS` now documents and exercises the reusable info, working, success, and error toast primitive; working toasts use dismiss-only indeterminate progress with Safari-stable visible state, keep the dismiss action inside the toast anatomy, and can resolve in place to success or error, while `Open plan` proposal generation and `Apply update` consume one shared action-family toast id and keep source buttons plus inline review/stale feedback intact.
+  `/hitoDS` now documents and exercises the reusable info, working, success, and error toast
+  primitive; working toasts use dismiss-only indeterminate progress with Safari-stable visible state,
+  keep the dismiss action inside the toast anatomy, and can resolve in place to success or error,
+  while reviewed plan actions consume one shared action-family toast id and keep source buttons plus
+  inline review/stale feedback intact.
 - The first Hito typography canonicalization slice is now implemented:
-  shared CSS roles now cover display, page, modal, section, panel, body, body-small, helper, caption, label, form-label, button, nav/menu, metric, status, error/success, and technical mono text; `/hitoDS` now documents those roles as the canonical reference, and the first high-drift surfaces (`Open plan`, saved-mode JSON import, workout `Log result`/`Feedback`, and `User settings`) use those roles for headings, form labels, helper/body copy, status feedback, and fixed-format metadata.
+  shared CSS roles now cover display, page, modal, section, panel, body, body-small, helper, caption,
+  label, form-label, button, nav/menu, metric, status, error/success, and technical mono text;
+  `/hitoDS` now documents those roles as the canonical reference, and the first high-drift surfaces
+  (saved-mode plan-management/import, workout `Log result`/`Feedback`, and `User settings`) use
+  those roles for headings, form labels, helper/body copy, status feedback, and fixed-format
+  metadata.
 - The shared dialog typography contract is now fixed:
-  Radix-backed `DialogTitle` and `DialogDescription` no longer force generic shadcn typography defaults over product classes, so `Open plan`, saved-mode JSON import, and the workout body-note modal resolve their title/description rhythm from canonical Hito roles.
+  Radix-backed `DialogTitle` and `DialogDescription` no longer force generic shadcn typography
+  defaults over product classes, so saved-mode plan-management/import and the workout body-note modal
+  resolve their title/description rhythm from canonical Hito roles.
 - The Hito icon-system normalization slice is now implemented:
   Hito now owns one Tabler-backed `Icon` primitive with stable product names, four canonical sizes, and documented `/hitoDS#icons` usage examples; product-level surfaces consume that layer, and the raw SVG icon folders have been removed.
 - The first `/hitoDS` card-reduction slice is now implemented:
   the Overview, Typography, and Icons reference sections use open rhythm, divider-led rows, quiet support notes, and one shared usage/demo surface where useful instead of nested bordered card grids; live product component behavior is unchanged.
 - The first modal anatomy helper slice is now implemented:
-  shared Hito modal classes now name content-fit and scroll-fill body modes, header, footer, footer-note, and footer-action anatomy; `/hitoDS#modals` documents short content-fit and tall scroll-fill examples separately so short modals no longer imply a dead zone above the footer, while `Open plan`, `Import plan`, and `Body notes` keep their stable product behavior through the same named helpers.
+  shared Hito modal classes now name content-fit and scroll-fill body modes, header, footer,
+  footer-note, and footer-action anatomy; `/hitoDS#modals` documents short content-fit and tall
+  scroll-fill examples separately so short modals no longer imply a dead zone above the footer,
+  while saved-mode plan-management/import and `Body notes` keep their stable product behavior
+  through the same named helpers.
 - The first `/hitoDS` inputs normalization slice is now implemented:
   Hito fields now expose primary and secondary variants, demo-able default/hover/active/disabled/read-only states, reusable error/success feedback shell states, canonical icon padding, and matching XS input/button height plus radius rhythm; `/hitoDS#inputs` uses an interactive builder like Buttons while product form behavior remains compatible with existing `hito-field` usage.
 - The Hito button variant semantics fix is now implemented:
   secondary buttons are now soft, borderless tinted support actions, while outlined buttons remain the border-led neutral-emphasis variant; `/hitoDS#buttons` shows the variant contrast directly.
 - The first semantic button tone slice is now implemented:
-  Hito buttons now compose default, success, and error tones with primary, secondary, outlined, and ghost hierarchy classes; destructive product actions in onboarding, JSON import, and `Open plan` use the canonical error tone instead of local red override classes, and AppShell’s repeated tiny uppercase chrome labels use the shared `hito-micro-label` role.
+  Hito buttons now compose default, success, and error tones with primary, secondary, outlined, and
+  ghost hierarchy classes; destructive product actions in onboarding and JSON import use the
+  canonical error tone instead of local red override classes, and AppShell’s repeated tiny uppercase
+  chrome labels use the shared `hito-micro-label` role.
 - The active-plan refresh apply hardening slice is now implemented:
   refresh proposal generation now derives one schedule authority from the current remaining active schedule, preserves the original target date only when it is still valid at least seven days after the refresh start, resolves stored or reconstructed authoring truth, builds and signs the exact future draft before review, clamps replacement workouts to the original remaining-schedule window, and returns bounded stale/blocked results instead of leaking low-level authoring validation text.
 - The active-plan refresh proposal-output hygiene pass is now implemented:
@@ -500,34 +528,29 @@ The current cleanup checkpoint is after accepted G23 business-process short-path
   manual empty-plan creation and unrelated route-facing wrappers remain on the facade.
 - The Hito Stack Simplification Strike is archived as completed cleanup history after G23; future
   docs compression, artifact retention, or roadmap review work should use separately named tracks.
-- The active docs/artifact compression plan owns that follow-up track. Slices D1-D4 and D12-D19
-  are accepted net-negative docs-size-reduction batches, while D5-D10 are accepted Admin importer
-  metadata-quality hygiene and D11 rebaselined the track so metadata-only work is not counted as
-  compression progress. D20 stopped before edits because the selected archive tail was already
-  compressed enough. D21 compressed the first post-archive admin-imported frontend spec pilot from
-  `4542` lines to `693` lines, net `-3849`; D22 compressed the DS/workbench frontend spec pilot
-  from `2255` lines to `407` lines, net `-1848`; D23 is the next completed/closed frontend spec
-  tail compression pilot.
+- The active docs/artifact compression plan owns that follow-up track. It now separates
+  docs-size-reduction, Admin metadata-quality hygiene, and local artifact retention. Docs
+  compression has removed large historical Markdown surfaces, while QA artifact retention has
+  advanced through accepted policy, manifest-safe quarantine, and QA-passed manual-workout image
+  compression. The track is currently holding after E13/E14 until a fresh dry-run manifest and
+  targeted estimate prove one material same-owner candidate with one risk class and one validation
+  story.
 - The G21 counted text baseline is `624` files / `261277` lines overall, with `src` at `299` files /
   `119629` lines, `scripts` at `51` files / `34066` lines, and `docs` at `196` files /
   `88955` lines.
-- The docs-only baseline has dropped from the initial `89204` markdown lines under `docs/` to about
-  `49300` after D22, with archived plans reduced from `42188` lines to about `6174`. The active
-  compression plan and product-history digest remain the sources for detailed D-track line deltas.
-- Generated/protected roots remain outside product-code size claims: `logs` is about `22MB`,
-  `qa-artifacts` is about `746MB`, and `test-results` is about `4KB`. These roots must not be
-  deleted through cleanup momentum; `qa-artifacts/` remains protected evidence until a separate QA
-  retention policy exists.
+- The active compression plan and product-history digest remain the sources for detailed D-track
+  line deltas, QA artifact policy, quarantine manifests, and apply/rollback boundaries.
+- Generated/protected roots remain outside product-code size claims. `logs`, `test-results`,
+  `qa-artifacts/`, and `.local-artifact-archive/` must be handled only through the accepted
+  artifact-retention policy and manifest-backed tooling, never by cleanup momentum.
 - G22/G23 source-of-truth sync regenerated the work dashboard through the safe no-admin dashboard
   command. Runtime behavior changes, frontend rewrites, Supabase, OpenAI, Admin apply, artifact
   deletion, and browser QA were out of scope for the docs/devtools sync portion.
 
 ## Next Recommended Steps
 
-1. Run ARCHITECT Slice D23 from the Hito Docs and Artifact Compression plan: continue the
-   admin-imported frontend spec compression lane on completed/closed DS/admin tail candidates while
-   preserving Admin importer metadata, current-contract truth, validation evidence,
-   current-owner links, and changelog/current-doc semantics.
+1. Keep the Hito Docs and Artifact Compression plan in holding until a fresh manifest/estimate
+   proves one material same-owner candidate with one risk class and one validation story.
 2. Keep the archived Hito Stack Simplification Strike as completed cleanup evidence; do not reopen it
    unless source proof shows a missed closeout issue.
 3. Use backlog-only follow-ups for additional Plan Preset families, preset-based active-plan

@@ -119,10 +119,13 @@ function validateUniversalActivePlanEditabilityPolicy() {
       `${sourceKind} should be an editable active-plan source`,
     );
 
-    const editability = resolveActivePlanWorkoutEditability(activePlan, "add_workout");
-    assert.equal(editability.ok, true, `${sourceKind} add editability should pass.`);
-    if (editability.ok) {
-      assert.equal(editability.sourceKind, sourceKind);
+    for (const operation of ["add_workout", "clear_workout", "move_workout"] as const) {
+      const editability = resolveActivePlanWorkoutEditability(activePlan, operation);
+      assert.equal(editability.ok, true, `${sourceKind} ${operation} editability should pass.`);
+      if (editability.ok) {
+        assert.equal(editability.sourceKind, sourceKind);
+        assert.equal(editability.operation, operation);
+      }
     }
   }
 

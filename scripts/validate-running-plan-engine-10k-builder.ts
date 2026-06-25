@@ -10,6 +10,12 @@ import {
 } from "../src/lib/plan-creation-engine";
 import { findForbiddenRunnerFacingLanguageMatches } from "../src/lib/plan-creation-engine/forbidden-runner-facing-language";
 import { validateTenKDiversityPolicy } from "../src/lib/plan-creation-engine/ten-k-diversity-policy";
+import type { RunningPlanBenchmarkInput } from "../src/lib/plan-creation-engine/source-types";
+
+const RECENT_5K_BENCHMARK = {
+  kind: "recent_5k_time",
+  recent5kTime: "25:00",
+} as const satisfies RunningPlanBenchmarkInput;
 
 function main() {
   const draft = validateHappyPath();
@@ -99,7 +105,8 @@ function validateHappyPath() {
   validateFixedRestDays(draft.calendarRows);
   validatePreferredLongRunDay(draft.calendarRows);
   validateRecoveryAfterLongRuns(draft.calendarRows);
-  validateRecoveryAfterSharpening(draft.calendarRows);
+  validateNoLowSupportSharpening(draft.calendarRows);
+  validateLowSupportDosePolicy(draft);
   validateCutbackWeeks(draft.calendarRows);
   validateTaperSharpeningWeek(draft.calendarRows);
   validateSingleDevelopmentTouchPerWeek(draft.calendarRows);
@@ -119,12 +126,21 @@ function validateRunnerLevelDiversityMatrix() {
     label: "beginner_new_runner",
   });
 
-  const sometimesDraft = buildValidDraft("sometimes_runs");
+  const sometimesLowSupportDraft = buildValidDraft("sometimes_runs");
+  assertWorkoutKinds(sometimesLowSupportDraft, {
+    includes: ["strides"],
+    excludes: ["tempo", "intervals", "hills", "threshold"],
+    label: "sometimes_runs no-benchmark low-support",
+  });
+  validateLowSupportDosePolicy(sometimesLowSupportDraft);
+
+  const sometimesDraft = buildValidDraft("sometimes_runs", undefined, RECENT_5K_BENCHMARK);
   assertWorkoutKinds(sometimesDraft, {
     includes: ["strides", "tempo", "intervals"],
     excludes: ["threshold"],
-    label: "sometimes_runs standard",
+    label: "sometimes_runs benchmark-backed standard",
   });
+  validateRecoveryAfterSharpening(sometimesDraft.calendarRows);
 
   const runsALotDraft = buildValidDraft("runs_a_lot");
   assertWorkoutKinds(runsALotDraft, {
@@ -529,10 +545,7 @@ function validateOptionalBenchmarkPaceTruth() {
     fixedRestDays: ["Wednesday", "Saturday"],
     preferredLongRunDay: "Sunday",
     startDate: "2026-06-08",
-    benchmark: {
-      kind: "recent_5k_time",
-      recent5kTime: "25:00",
-    },
+    benchmark: RECENT_5K_BENCHMARK,
   });
 
   assert.equal(result.ok, true, "10K optional benchmark fixture must still build.");
@@ -543,6 +556,11 @@ function validateOptionalBenchmarkPaceTruth() {
   assert.equal(result.draft.normalizedInputSummary.benchmarkPaceTruth?.kind, "recent_5k");
   assert.equal(result.draft.normalizedInputSummary.benchmarkPaceTruth.source, "recent_5k_time");
   assert.equal(result.draft.normalizedInputSummary.benchmarkPaceTruth.paceSecondsPerKm, 300);
+  assertWorkoutKinds(result.draft, {
+    includes: ["tempo", "intervals"],
+    excludes: ["threshold"],
+    label: "optional benchmark 10K",
+  });
 }
 
 function buildValidDraft(
@@ -552,6 +570,7 @@ function buildValidDraft(
     heightCm: 178,
     weightKg: 74,
   },
+  benchmark?: RunningPlanBenchmarkInput,
 ): TenKPlanPreviewDraft {
   const result = buildTenKPlanPreviewDraft({
     ...runnerBasics,
@@ -561,6 +580,7 @@ function buildValidDraft(
     fixedRestDays: ["Wednesday", "Saturday"],
     preferredLongRunDay: "Sunday",
     startDate: "2026-06-08",
+    ...(benchmark ? { benchmark } : {}),
   });
 
   assert.equal(result.ok, true, `${runnerLevel} 10K fixture must build.`);
@@ -592,6 +612,62 @@ function assertWorkoutKinds(
   }
 }
 
+function validateLowSupportDosePolicy(draft: TenKPlanPreviewDraft) {
+  const weekOneRows = draft.calendarRows.filter((row) => !row.isRestDay && row.weekNumber === 1);
+  const weekOneRunningMinutes = sumRowMinutes(weekOneRows);
+  const weekOneLongRun = weekOneRows.find((row) => row.workoutDayKind === "long_run");
+  const peakLongRunMinutes = Math.max(
+    ...draft.calendarRows
+      .filter((row) => !row.isRestDay && row.workoutDayKind === "long_run")
+      .map(rowMinutes),
+  );
+  const finalNonRestRow = draft.calendarRows.filter((row) => !row.isRestDay).at(-1);
+
+  assert.ok(
+    weekOneRunningMinutes <= 150,
+    `Low-support Week 1 must stay <= 150 min, got ${weekOneRunningMinutes}.`,
+  );
+  assert.ok(
+    weekOneRunningMinutes >= 90 && weekOneRunningMinutes <= 130,
+    `Low-support Week 1 target should be about 90-130 min, got ${weekOneRunningMinutes}.`,
+  );
+  assert.ok(weekOneLongRun, "Low-support Week 1 must include a long run.");
+  assert.ok(
+    weekOneLongRun && rowMinutes(weekOneLongRun) <= 50,
+    `Low-support Week 1 long run must stay <= 50 min, got ${
+      weekOneLongRun ? rowMinutes(weekOneLongRun) : "missing"
+    }.`,
+  );
+
+  for (const row of draft.calendarRows.filter((candidate) => !candidate.isRestDay)) {
+    if (row.workoutDayKind === "easy") {
+      assert.ok(rowMinutes(row) <= 35, `${row.rowId} easy run must stay <= 35 min.`);
+    }
+
+    if (row.workoutDayKind === "recovery") {
+      assert.ok(rowMinutes(row) <= 30, `${row.rowId} recovery must stay <= 30 min.`);
+    }
+  }
+
+  assert.ok(
+    peakLongRunMinutes <= 80,
+    `Low-support peak long run must stay <= 80 min, got ${peakLongRunMinutes}.`,
+  );
+  assert.equal(finalNonRestRow?.workoutDayKind, "final_selected_distance_day");
+  assert.equal(finalNonRestRow?.endpointDistanceMeters, 10_000);
+}
+
+function validateNoLowSupportSharpening(rows: readonly TenKPlanCalendarRow[]) {
+  const forbiddenKinds = new Set(["tempo", "intervals", "hills", "threshold"]);
+  assert.deepEqual(
+    rows
+      .filter((row) => !row.isRestDay && forbiddenKinds.has(row.workoutDayKind))
+      .map((row) => `${row.weekNumber}:${row.workoutDayKind}`),
+    [],
+    "Low-support visible-Beginner 10K must not include tempo, intervals, hills, or threshold.",
+  );
+}
+
 function workoutKindSet(rows: readonly TenKPlanCalendarRow[]) {
   return new Set(rows.filter((row) => !row.isRestDay).map((row) => row.workoutDayKind));
 }
@@ -604,6 +680,42 @@ function developmentSequence(rows: readonly TenKPlanCalendarRow[]) {
   return rows
     .filter((row) => !row.isRestDay && isDevelopmentTouch(row.workoutDayKind))
     .map((row) => `${row.weekNumber}:${row.workoutDayKind}`);
+}
+
+function sumRowMinutes(rows: readonly TenKPlanCalendarRow[]) {
+  return rows.reduce((total, row) => total + rowMinutes(row), 0);
+}
+
+function rowMinutes(row: TenKPlanCalendarRow) {
+  return row.segments.reduce((total, segment) => {
+    const prescription = segment.primaryPrescription;
+    switch (prescription.mode) {
+      case "time":
+      case "open_warmup":
+      case "open_cooldown":
+      case "time_with_default_hr_cap":
+        return total + prescription.durationSeconds.min / 60;
+      case "recovery_time":
+        return total + prescription.recoveryDurationSeconds.min / 60;
+      case "free_run_with_cap":
+        return total + prescription.durationSecondsOrDistanceMeters.min / 60;
+      case "repeat": {
+        const repeatCount = prescription.repeatCount.min;
+        const workMinutes =
+          prescription.work.mode === "time" ? prescription.work.durationSeconds.min / 60 : 0;
+        const recoveryMinutes =
+          prescription.recovery.mode === "recovery_time"
+            ? prescription.recovery.recoveryDurationSeconds.min / 60
+            : 0;
+
+        return total + repeatCount * (workMinutes + recoveryMinutes);
+      }
+      case "distance":
+      case "distance_with_default_hr_cap":
+      case "recovery_distance":
+        return total;
+    }
+  }, 0);
 }
 
 function replaceWorkoutKind(

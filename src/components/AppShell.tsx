@@ -1,11 +1,20 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { ReactNode, useState } from "react";
+import { type MutableRefObject, ReactNode, useEffect, useRef, useState } from "react";
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
 import { UploadJsonDialog } from "@/components/UploadJsonDialog";
 import { ActivePlanCreatePlanDialog } from "@/components/plan-management/ActivePlanCreatePlanDialog";
-import { PlanManagementDialog } from "@/components/PlanManagementDialog";
+import {
+  PlanManagementDialog,
+  type PlanManagementDialogMode,
+} from "@/components/PlanManagementDialog";
+import {
+  type PlanExportStatus,
+  scheduleExportStatusReset,
+  startPlanExportDownload,
+} from "@/components/plan-management/plan-export-download";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HitoLogo } from "@/components/ui/hito-logo";
+import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import {
   DropdownMenu,
@@ -22,7 +31,6 @@ import {
   type TrainingSnapshot,
 } from "@/lib/training";
 import type { ViewerSummary } from "@/lib/training-api";
-import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 
 const NAV: { to: string; label: string; icon: HitoIconName }[] = [
   { to: "/", label: "Calendar", icon: "calendar" },
@@ -39,9 +47,15 @@ export function AppShell({
   viewer?: ViewerSummary | null;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [planManagementOpen, setPlanManagementOpen] = useState(false);
+  const [planActionDialogMode, setPlanActionDialogMode] = useState<PlanManagementDialogMode | null>(
+    null,
+  );
   const [activePlanCreateOpen, setActivePlanCreateOpen] = useState(false);
   const [showShellPlanNote, setShowShellPlanNote] = useState(true);
+  const [exportStatus, setExportStatus] = useState<PlanExportStatus>("idle");
+  const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const exportResetTimerRef = useRef<number | null>(null);
+  const headerDialogOpenTimerRef = useRef<number | null>(null);
   const loc = useLocation();
   const nextPath = getLoginIntentPath(
     loc.pathname,
@@ -67,13 +81,49 @@ export function AppShell({
   const showUploadAction = shellSnapshot.mode !== "preview";
   const showSettingsAction = shellSnapshot.mode !== "preview";
   const useFreshHomeRequest = shellSnapshot.mode !== "preview";
-  const canCreatePlanFromActiveManualPlan =
-    shellSnapshot.mode === "authenticated" &&
-    snapshot?.planMeta?.sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-  const openPlanManagement = () => {
-    setActivePlanCreateOpen(false);
-    setPlanManagementOpen(true);
+  const showPlanHeaderActions = shellSnapshot.mode === "authenticated";
+  const planAvailable = Boolean(snapshot?.planMeta);
+  const deferHeaderDialogOpen = (openDialog: () => void) => {
+    clearPlanExportResetTimer(headerDialogOpenTimerRef);
+
+    if (typeof window === "undefined") {
+      openDialog();
+      return;
+    }
+
+    headerDialogOpenTimerRef.current = window.setTimeout(() => {
+      headerDialogOpenTimerRef.current = null;
+      openDialog();
+    }, 0);
   };
+  const openPlanActionDialog = (mode: PlanManagementDialogMode) => {
+    setActivePlanCreateOpen(false);
+    deferHeaderDialogOpen(() => setPlanActionDialogMode(mode));
+  };
+  const exportJson = () => {
+    setExportStatus("exporting-json");
+
+    try {
+      startPlanExportDownload("json", exportFrameRef.current?.name);
+      scheduleExportStatusReset(exportResetTimerRef, setExportStatus);
+    } catch (exportError) {
+      setExportStatus("idle");
+      hitoToast.error({
+        title: "Export not started",
+        description:
+          exportError instanceof Error
+            ? exportError.message
+            : "Could not start the active plan download.",
+      });
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearPlanExportResetTimer(exportResetTimerRef);
+      clearPlanExportResetTimer(headerDialogOpenTimerRef);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen flex bg-background text-foreground hito-canvas-atmosphere">
@@ -117,7 +167,7 @@ export function AppShell({
                   </div>
                   <p className="hito-list-row-copy">
                     {shellSnapshot.source === "persisted"
-                      ? "Your saved plan and workout results show up here. Open plan also lets you export JSON or Markdown."
+                      ? "Your saved plan and workout results show up here. Add plan starts reviewed changes, and the actions menu keeps export and future-schedule tools nearby."
                       : "You can browse the preview here until you sign in and save a plan."}
                   </p>
                   <button
@@ -238,79 +288,93 @@ export function AppShell({
               {shellSnapshot.mode === "authenticated" ? (
                 <StatusPill label="Week" value={weekStatus.label} />
               ) : null}
-              {shellSnapshot.mode === "authenticated" ? (
+              {showPlanHeaderActions ? (
                 <>
-                  {canCreatePlanFromActiveManualPlan ? (
-                    <button
-                      type="button"
-                      onClick={() => setActivePlanCreateOpen(true)}
-                      className="hito-button hito-button-primary hito-button-sm hidden md:inline-flex"
-                    >
-                      <Icon name="sparkles" size="xs" />
-                      Create a plan
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={openPlanManagement}
-                    className={`hito-button hito-button-secondary hito-button-sm${
-                      canCreatePlanFromActiveManualPlan ? " hidden md:inline-flex" : ""
-                    }`}
-                  >
-                    <Icon name="activity" size="xs" />
-                    Open plan
-                  </button>
-                  {canCreatePlanFromActiveManualPlan ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="hito-button hito-button-secondary hito-button-sm md:hidden"
-                        >
-                          <Icon name="activity" size="xs" />
-                          Plan
-                          <Icon name="chevron-down" size="xs" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="hito-shell-menu hito-shell-menu-plan"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="hito-button hito-button-secondary hito-button-sm"
                       >
-                        <DropdownMenuLabel>Plan actions</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          className="hito-shell-menu-item"
-                          onSelect={(event) => {
-                            event.preventDefault();
-                            setActivePlanCreateOpen(true);
-                          }}
-                        >
-                          <Icon name="sparkles" size="sm" />
-                          Create a plan
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="hito-shell-menu-item"
-                          onSelect={(event) => {
-                            event.preventDefault();
-                            openPlanManagement();
-                          }}
-                        >
-                          <Icon name="activity" size="sm" />
-                          Open plan
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="hito-shell-menu-separator" />
-                        <DropdownMenuItem
-                          className="hito-shell-menu-item"
-                          onSelect={(event) => {
-                            event.preventDefault();
-                            setUploadOpen(true);
-                          }}
-                        >
-                          <Icon name="import" size="sm" />
-                          Import plan
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : null}
+                        <Icon name="sparkles" size="xs" />
+                        Add plan
+                        <Icon name="chevron-down" size="xs" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="hito-shell-menu hito-shell-menu-plan"
+                    >
+                      <DropdownMenuLabel>Add plan</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        className="hito-shell-menu-item"
+                        onSelect={() => {
+                          deferHeaderDialogOpen(() => setActivePlanCreateOpen(true));
+                        }}
+                      >
+                        <Icon name="sparkles" size="sm" />
+                        Create reviewed plan
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="hito-shell-menu-item"
+                        onSelect={() => {
+                          deferHeaderDialogOpen(() => setUploadOpen(true));
+                        }}
+                      >
+                        <Icon name="import" size="sm" />
+                        Import JSON
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Plan actions"
+                        className="hito-button hito-button-secondary hito-button-sm aspect-square p-0"
+                      >
+                        <Icon name="more-horizontal" size="sm" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="hito-shell-menu hito-shell-menu-plan"
+                    >
+                      <DropdownMenuLabel>Plan utilities</DropdownMenuLabel>
+                      <DropdownMenuItem
+                        className="hito-shell-menu-item"
+                        disabled={!planAvailable || exportStatus !== "idle"}
+                        onSelect={() => {
+                          exportJson();
+                        }}
+                      >
+                        <Icon name="download" size="sm" />
+                        {exportStatus === "exporting-json" ? "Preparing JSON..." : "Export JSON"}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="hito-shell-menu-separator" />
+                      <DropdownMenuItem
+                        className="hito-shell-menu-item"
+                        disabled={!planAvailable}
+                        onSelect={() => {
+                          openPlanActionDialog("edit-schedule");
+                        }}
+                      >
+                        <Icon name="calendar-clock" size="sm" />
+                        Edit schedule
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="hito-shell-menu-item"
+                        disabled={!planAvailable}
+                        onSelect={() => {
+                          openPlanActionDialog("clear-upcoming");
+                        }}
+                      >
+                        <Icon name="clear-calendar" size="sm" />
+                        Clear upcoming schedule
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               ) : (
                 <Link
@@ -376,14 +440,38 @@ export function AppShell({
       <ActivePlanCreatePlanDialog
         open={activePlanCreateOpen}
         onOpenChange={setActivePlanCreateOpen}
-        onOpenPlan={openPlanManagement}
+        onOpenPlan={() => openPlanActionDialog("edit-schedule")}
         snapshot={snapshot}
       />
       <PlanManagementDialog
-        open={planManagementOpen}
-        onOpenChange={setPlanManagementOpen}
+        mode={planActionDialogMode ?? "edit-schedule"}
+        open={planActionDialogMode !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setPlanActionDialogMode(null);
+          }
+        }}
         snapshot={snapshot}
         viewer={viewer}
+      />
+      <iframe
+        ref={exportFrameRef}
+        name="shell-plan-export-download-frame"
+        title="Plan export download"
+        className="hidden"
+        onLoad={() => {
+          const bodyText = exportFrameRef.current?.contentDocument?.body?.textContent?.trim();
+
+          if (!bodyText) {
+            return;
+          }
+
+          setExportStatus("idle");
+          hitoToast.error({
+            title: "Export not ready",
+            description: bodyText,
+          });
+        }}
       />
     </div>
   );
@@ -410,6 +498,13 @@ function weekStatusTone(value: string) {
   }
 
   return "success";
+}
+
+function clearPlanExportResetTimer(timerRef: MutableRefObject<number | null>) {
+  if (timerRef.current != null && typeof window !== "undefined") {
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }
 }
 
 function buildInitials(name: string) {

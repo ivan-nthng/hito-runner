@@ -426,10 +426,10 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
   const currentDate = todayIso();
   const persistedWorkoutIds = persistedWorkouts.map((workout) => workout.id);
   const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMapForServer(persistedWorkoutIds);
-  const evidenceWorkoutIds =
-    planCycle.source_kind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND
-      ? await fetchManualWorkoutEvidenceWorkoutIds(userId, persistedWorkoutIds)
-      : new Set<string>();
+  const evidenceWorkoutIds = await fetchManualWorkoutEvidenceWorkoutIds(
+    userId,
+    persistedWorkoutIds,
+  );
   const workouts = persistedWorkouts.map((workout) =>
     dbWorkoutToView(
       workout,

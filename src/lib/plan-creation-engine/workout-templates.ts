@@ -34,11 +34,12 @@ const recoveryTemplate: RunningPlanWorkoutDayTemplate = {
       order: 2,
       segmentRole: "main",
       primaryPrescription: {
-        mode: "time",
+        mode: "time_with_default_hr_cap",
         durationSeconds: seconds(20, 30),
+        defaultHrZoneLabelOrCap: "editable default HR cap",
         intensityLabel: "softer_than_easy",
       },
-      targetTruthMode: "structure_only",
+      targetTruthMode: "editable_default_hr",
       secondaryCue: "Softer than a normal easy run.",
     },
     {

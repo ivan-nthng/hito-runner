@@ -48,6 +48,7 @@ import type {
   ManualWorkoutSavedTemplateView,
   ManualWorkoutTemplateKey,
   ManualWorkoutTargetTruthMode,
+  ManualWorkoutMoveTargetMode,
 } from "@/lib/manual-workout-authoring";
 import { type ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import {
@@ -143,6 +144,7 @@ export function ManualWorkoutAddMenu({
   onAdded,
   onMoveCanceled,
   onMoveTargetSelected,
+  moveTargetMode = "empty",
   moveWorkoutSource = null,
   moveOnly = false,
 }: {
@@ -155,6 +157,7 @@ export function ManualWorkoutAddMenu({
   onAdded: () => void | Promise<void>;
   onMoveCanceled?: () => void;
   onMoveTargetSelected?: (targetDate: string, source?: ManualCopiedWorkoutSource | null) => void;
+  moveTargetMode?: ManualWorkoutMoveTargetMode;
   moveWorkoutSource?: ManualCopiedWorkoutSource | null;
   moveOnly?: boolean;
 }) {
@@ -166,6 +169,7 @@ export function ManualWorkoutAddMenu({
   const addManualWorkoutToActivePlanFn = useServerFn(addManualWorkoutToActivePlan);
   const confirmInFlightRef = useRef(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [constructorOpen, setConstructorOpen] = useState(false);
   const [selection, setSelection] = useState<ManualDraftSelection | null>(null);
   const [title, setTitle] = useState("");
@@ -224,6 +228,21 @@ export function ManualWorkoutAddMenu({
     openConstructorDialog();
   };
 
+  const openTemplatePickerDialog = () => {
+    setAddMenuOpen(false);
+
+    if (savedTemplatesState.status === "idle" || savedTemplatesState.status === "failed") {
+      void loadSavedTemplates();
+    }
+
+    if (typeof window === "undefined") {
+      setTemplatePickerOpen(true);
+      return;
+    }
+
+    window.requestAnimationFrame(() => setTemplatePickerOpen(true));
+  };
+
   const handleAddMenuOpenChange = (open: boolean) => {
     setAddMenuOpen(open);
 
@@ -239,7 +258,7 @@ export function ManualWorkoutAddMenu({
     draftSelection: Extract<ManualDraftSelection, { kind: "registry" | "scratch" }>,
   ) => {
     if (!draftSelection.template) {
-      throw new Error("Choose a backend-supported workout type before review.");
+      throw new Error("Choose a supported workout type before review.");
     }
 
     return buildManualDraftInput({
@@ -311,9 +330,7 @@ export function ManualWorkoutAddMenu({
     draftSelection: Extract<ManualDraftSelection, { kind: "registry" | "scratch" }>,
   ) => {
     if (!draftSelection.template) {
-      setReviewResult(
-        buildManualReviewRejected("Choose a backend-supported workout type before review."),
-      );
+      setReviewResult(buildManualReviewRejected("Choose a supported workout type before review."));
       return;
     }
 
@@ -347,7 +364,7 @@ export function ManualWorkoutAddMenu({
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
         title: "Workout reviewed",
-        description: "Review the backend-shaped draft before adding it to the plan.",
+        description: "Check the reviewed workout before adding it to the plan.",
       });
     } catch (error) {
       const message =
@@ -382,7 +399,7 @@ export function ManualWorkoutAddMenu({
     hitoToast.working({
       id: MANUAL_ADD_TOAST_ID,
       title: "Reviewing saved template",
-      description: "Hito is reconstructing the personal template server-side.",
+      description: "Hito is rebuilding the personal template for review.",
     });
 
     try {
@@ -407,7 +424,7 @@ export function ManualWorkoutAddMenu({
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
         title: "Template reviewed",
-        description: "Review the backend-shaped draft before adding it to the plan.",
+        description: "Check the reviewed workout before adding it to the plan.",
       });
     } catch (error) {
       const message =
@@ -503,7 +520,7 @@ export function ManualWorkoutAddMenu({
     hitoToast.working({
       id: MANUAL_ADD_TOAST_ID,
       title: "Adding workout",
-      description: "Hito is confirming the reviewed draft server-side.",
+      description: "Hito is confirming the reviewed workout.",
     });
 
     try {
@@ -564,7 +581,7 @@ export function ManualWorkoutAddMenu({
     hitoToast.working({
       id: MANUAL_COPY_PASTE_TOAST_ID,
       title: "Pasting workout",
-      description: "Hito is copying from the saved source workout server-side.",
+      description: "Hito is copying from the saved source workout.",
     });
 
     try {
@@ -632,7 +649,7 @@ export function ManualWorkoutAddMenu({
                 <span className="min-w-0">
                   <span className="hito-list-row-title block">Move selected workout here</span>
                   <span className="hito-list-row-copy block">
-                    Use this empty day as the target.
+                    {moveTargetMenuCopy(moveTargetMode)}
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -663,7 +680,7 @@ export function ManualWorkoutAddMenu({
                 <span className="min-w-0">
                   <span className="hito-list-row-title block">Paste copied workout</span>
                   <span className="hito-list-row-copy block">
-                    Save into this empty day from backend truth.
+                    Save the copied workout into this empty day.
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -680,7 +697,20 @@ export function ManualWorkoutAddMenu({
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="edit" size="xs" />
                 <span className="min-w-0">
                   <span className="hito-list-row-title block">Start from scratch</span>
-                  <span className="hito-list-row-copy block">Open an empty constructor.</span>
+                  <span className="hito-list-row-copy block">Start with a blank workout.</span>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={`${MANUAL_ADD_MENU_ITEM_CLASS} md:hidden`}
+                disabled={isBusy}
+                onSelect={openTemplatePickerDialog}
+              >
+                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="workout" size="xs" />
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">Choose template</span>
+                  <span className="hito-list-row-copy block">
+                    Browse built-in and saved templates.
+                  </span>
                 </span>
               </DropdownMenuItem>
               <ManualTemplateSubmenu
@@ -688,6 +718,7 @@ export function ManualWorkoutAddMenu({
                 onSelectSavedTemplate={openSavedTemplate}
                 onSelectTemplate={openConstructor}
                 savedTemplatesState={savedTemplatesState}
+                triggerClassName="hidden md:flex"
               />
               <DropdownMenuItem
                 className={MANUAL_ADD_MENU_ITEM_CLASS}
@@ -706,6 +737,21 @@ export function ManualWorkoutAddMenu({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ManualTemplatePickerDialog
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
+        onRefreshSavedTemplates={() => void loadSavedTemplates()}
+        onSelectSavedTemplate={(template) => {
+          setTemplatePickerOpen(false);
+          openSavedTemplate(template);
+        }}
+        onSelectTemplate={(template) => {
+          setTemplatePickerOpen(false);
+          openConstructor(template);
+        }}
+        savedTemplatesState={savedTemplatesState}
+      />
 
       <ManualWorkoutConstructorDialog
         entries={entries}
@@ -771,8 +817,8 @@ export function ManualWorkoutAddMenu({
           review={reviewedDraft.review}
           onSaveTemplate={saveReviewedTemplate}
           status={status}
-          supportCopy="Backend returned `draft_ready`. Add sends only active plan id, draft input, review token, and checksum."
-          safetyCopy="No client rows, segments, or persistence metadata are sent to the add-workout seam."
+          supportCopy="Hito reviewed this workout and it is ready to add to the selected day."
+          safetyCopy="Nothing is saved until you confirm; Hito adds the reviewed workout to the plan."
         />
       ) : null}
     </>
@@ -784,15 +830,20 @@ function ManualTemplateSubmenu({
   onSelectSavedTemplate,
   onSelectTemplate,
   savedTemplatesState,
+  triggerClassName,
 }: {
   disabled: boolean;
   onSelectSavedTemplate: (template: ManualWorkoutSavedTemplateView) => void;
   onSelectTemplate: (template: ManualWorkoutTemplate) => void;
   savedTemplatesState: ManualSavedTemplatesState;
+  triggerClassName?: string;
 }) {
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger className={MANUAL_ADD_MENU_ITEM_CLASS} disabled={disabled}>
+      <DropdownMenuSubTrigger
+        className={[MANUAL_ADD_MENU_ITEM_CLASS, triggerClassName].filter(Boolean).join(" ")}
+        disabled={disabled}
+      >
         <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="workout" size="xs" />
         <span className="min-w-0">
           <span className="hito-list-row-title block">Choose template</span>
@@ -902,8 +953,8 @@ export function ManualTemplatePickerDialog({
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Choose template</DialogTitle>
           <DialogDescription className="hito-body">
-            Templates come from the backend manual authoring registry. Hito reviews the structure
-            before anything is created.
+            Choose a template, adjust the workout, then ask Hito to review it before anything is
+            created.
           </DialogDescription>
         </DialogHeader>
 
@@ -1129,7 +1180,7 @@ export function ManualWorkoutConstructorDialog({
             disabled={!canReview}
             onClick={onReview}
           >
-            {status === "reviewing" ? "Reviewing workout..." : "Save Workout"}
+            {status === "reviewing" ? "Reviewing workout..." : "Review workout"}
           </button>
         </DialogFooter>
       </DialogContent>
@@ -1161,6 +1212,9 @@ export function ManualReviewSummary({
   supportCopy: string;
 }) {
   const reviewedDateLabel = formatReadableDate(review.draft.workoutDate);
+  const reviewBullets = review.review.bullets.map((bullet) =>
+    manualReviewBulletCopy(bullet, review.draft.templateKey),
+  );
 
   return (
     <div className="hito-row-group">
@@ -1186,7 +1240,7 @@ export function ManualReviewSummary({
 
       <div className="hito-list-row items-start">
         <div className="grid min-w-0 gap-2">
-          {review.review.bullets.map((bullet) => (
+          {reviewBullets.map((bullet) => (
             <p key={bullet} className="hito-list-row-copy">
               {bullet}
             </p>
@@ -1200,9 +1254,9 @@ export function ManualReviewSummary({
         </div>
       </div>
 
-      <div className="hito-list-row">
-        <p className="hito-field-helper min-w-0">{safetyCopy}</p>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+      <div className="hito-list-row flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+        <p className="hito-field-helper min-w-0 sm:flex-1">{safetyCopy}</p>
+        <div className="flex w-full shrink-0 flex-wrap justify-end gap-2 sm:w-auto">
           {onSaveTemplate ? (
             <ManualSaveTemplateAction
               defaultName={review.draft.title}
@@ -1222,6 +1276,37 @@ export function ManualReviewSummary({
       </div>
     </div>
   );
+}
+
+function manualReviewBulletCopy(bullet: string, templateKey: ManualWorkoutTemplateKey) {
+  if (bullet === `Template: ${templateKey}.`) {
+    const template = MANUAL_WORKOUT_TEMPLATES.find(
+      (candidate) => candidate.templateKey === templateKey,
+    );
+    return `Built from ${template?.label ?? readableManualToken(templateKey)}.`;
+  }
+
+  const structureMatch = bullet.match(
+    /^Executable structure: (?<segments>\d+ segments?), (?<duration>\d+ min) planned duration\.$/,
+  );
+
+  if (structureMatch?.groups) {
+    return `Workout structure: ${structureMatch.groups.segments}, ${structureMatch.groups.duration} planned.`;
+  }
+
+  if (bullet === "Rest day has no executable run targets.") {
+    return "Rest day has no running target.";
+  }
+
+  if (bullet === "No Supabase write happens in this review step.") {
+    return "Nothing is saved until you confirm.";
+  }
+
+  return bullet;
+}
+
+function readableManualToken(value: string) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function ManualReviewSummaryDialog({
@@ -1344,8 +1429,8 @@ function ManualSaveTemplateAction({
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Save as template</DialogTitle>
           <DialogDescription className="hito-body">
-            Save this reviewed workout as a personal template. Hito rebuilds and validates it
-            server-side before it appears in your picker.
+            Save this reviewed workout as a personal template. Hito rebuilds and checks it before it
+            appears in your picker.
           </DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body grid gap-4">
@@ -1412,7 +1497,9 @@ export function ManualReviewResultNotice({ result }: { result: ManualWorkoutDraf
       <div className="hito-list-row items-start">
         <div className="min-w-0">
           <p className="hito-list-row-title">{result.review.headline}</p>
-          <p className="hito-list-row-copy">Review token and checksum are held for confirm only.</p>
+          <p className="hito-list-row-copy">
+            Nothing is saved until you confirm this reviewed workout.
+          </p>
         </div>
         <span className="hito-status-pill" data-tone="success">
           Ready
@@ -1517,7 +1604,7 @@ function constructorReviewDisabledReason(
   entries: ManualWorkoutConstructorEntryInput[],
 ) {
   if (selection.kind === "scratch" && !selectedTemplate) {
-    return "Choose a backend-supported workout type before review.";
+    return "Choose a supported workout type before review.";
   }
   if (selectedTemplate?.workoutType === "rest" && entries.length > 0) {
     return "Rest/no-run drafts cannot include workout blocks.";
@@ -1591,6 +1678,18 @@ function buildPasteUnavailableResult(): ManualWorkoutDirectCopyResult {
     sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
+}
+
+function moveTargetMenuCopy(mode: ManualWorkoutMoveTargetMode) {
+  if (mode === "workout_replacement") {
+    return "Review before replacing the planned workout on this day.";
+  }
+
+  if (mode === "rest_replacement") {
+    return "Use this rest day as the target.";
+  }
+
+  return "Use this empty day as the target.";
 }
 
 function isManualWorkoutDirectCopyResult(value: unknown): value is ManualWorkoutDirectCopyResult {

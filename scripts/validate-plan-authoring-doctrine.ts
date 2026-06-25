@@ -14,6 +14,7 @@ import {
   deriveExecutableModeFromSegments,
   resolveCanonicalWorkoutModel,
 } from "../src/lib/rich-workout-model";
+import { allowsDefaultEstimatedHrTarget } from "../src/lib/default-estimated-hr-target-policy";
 import { assertFirstPlanReleaseGateContracts } from "./plan-authoring-doctrine/first-plan-release-gates";
 import {
   assertAiFirstPlanBlueprintEnvelopeContracts,
@@ -841,6 +842,66 @@ function assertRichWorkoutContract(plan: TrainingPlanV2, label: string) {
       );
     }
     if (hasTargetKey({ ...plan, planned_workouts: [workout] }, "hr_bpm_range")) {
+      const hasDefaultEstimatedHrTargets = workout.segments.some((segment) => {
+        const target = segment.target as Record<string, unknown> | undefined;
+        const recoveryTarget = segment.recovery_target as Record<string, unknown> | undefined;
+
+        return [target, recoveryTarget].some(
+          (candidate) =>
+            candidate?.hr_target_source === "default_estimated_hr" &&
+            typeof candidate.hr_bpm_range === "string",
+        );
+      });
+
+      if (hasDefaultEstimatedHrTargets) {
+        const defaultEstimatedHrOffenders = (workout.segments as SegmentRecord[]).flatMap(
+          (segment) => {
+            const target = segment.target as Record<string, unknown> | undefined;
+            const recoveryTarget = segment.recovery_target as Record<string, unknown> | undefined;
+
+            return [
+              { target, targetKind: "target" as const },
+              { target: recoveryTarget, targetKind: "recovery_target" as const },
+            ]
+              .filter(
+                (entry) =>
+                  entry.target?.hr_target_source === "default_estimated_hr" &&
+                  typeof entry.target.hr_bpm_range === "string" &&
+                  !allowsDefaultEstimatedHrTarget({
+                    sourceWorkoutType: workout.source_workout_type,
+                    workoutType: workout.workout_type,
+                    segmentType: String(segment.segment_type ?? ""),
+                    segmentId: String(segment.segment_id ?? ""),
+                    targetKind: entry.targetKind,
+                  }),
+              )
+              .map(
+                (entry) =>
+                  `${workout.workout_id}.${String(segment.segment_type ?? "unknown")}.${
+                    entry.targetKind
+                  }`,
+              );
+          },
+        );
+
+        assert.deepEqual(
+          defaultEstimatedHrOffenders,
+          [],
+          `${label}: default estimated HR targets are allowed only on aerobic support main work`,
+        );
+        assert.equal(
+          workout.metric_mode.hr_targets_allowed,
+          false,
+          `${label}: default estimated HR targets must not enable personal HR target mode`,
+        );
+        assert.equal(
+          workout.metric_mode.hr_target_source,
+          "default_estimated_hr",
+          `${label}: default estimated HR targets should preserve source metadata`,
+        );
+        continue;
+      }
+
       assert.equal(
         workout.metric_mode.hr_targets_allowed,
         true,

@@ -42,6 +42,13 @@ contains the fuller implementation discipline.
 - This agent never writes code, edits files, applies patches, runs migrations, or performs implementation work directly.
 - The only project-file exception is this instruction layer itself (`AGENTS.md` and project skill instruction files) when the user explicitly asks to change agent instructions.
 - Product code, docs, migrations, scripts, styles, tests, generated files, and config are never edited by this orchestration agent.
+- This orchestration ban does not revoke explicit non-code documentation authority granted by role
+  files or skills to Product, Backlog Manager, Designer, QA, Running Coach, or other roles when the
+  current task is actually addressed to that role.
+- A normal/default chat turn is orchestration unless the task is explicitly addressed to a role
+  with `ROLE: <ROLE>` or the user explicitly assigns that role to the current agent. The
+  orchestration agent must not silently self-promote into `ARCHITECT`, `BACKEND`, `FRONTEND`, or
+  `QA` execution because that is the fastest path to doing another role's work.
 - If the user asks this agent to "fix", "build", "change", "remove", "validate", "run", "QA", or "check" product work, the response must be a handoff prompt for the correct role, not direct execution.
 - Even tiny or obvious changes must not be implemented directly. No "just one quick patch" exception exists.
 - This agent is limited to:
@@ -57,6 +64,10 @@ contains the fuller implementation discipline.
   - identify the right next owner
   - explain the issue clearly
   - prepare the exact prompt needed for execution
+- When the user asks for autonomous work, the orchestration agent must encode that autonomy inside
+  the next-role prompt. The BACKEND/FRONTEND/QA/ARCHITECT role agent then owns its own subagents,
+  validation, fix-forward loop, and final integrated report. The orchestration agent must not run
+  that role's commands or mutate that role's files as a substitute for delegation.
 - Prefer extraction and targeted fixes over broad rewrites in recommendations.
 - Reuse existing project patterns before recommending new abstractions.
 - Avoid over-engineering:
@@ -73,6 +84,9 @@ Explicitly forbidden:
 - running implementation, deployment, browser QA, production smoke, CLI verification, curl checks, Vercel checks, or app-opening workflows that belong to another role
 - opening deployed/local product URLs, logging into product/admin surfaces, or validating runtime behavior directly unless the user explicitly asks this orchestration agent to perform that exact manual action
 - converting a request for the "next step" into direct execution; default to a role prompt instead
+- using subagents to make the orchestration agent effectively perform BACKEND, FRONTEND, QA, or
+  other execution-role work. Subagents may gather routing evidence for orchestration, but execution
+  subagents for implementation/QA belong under the assigned role agent.
 
 Important role-boundary clarification:
 
@@ -148,15 +162,9 @@ One-prompt handoff rule:
 - Do not bundle implementation and QA prompts together.
 - Do not provide prompts for "later" roles in the same answer.
 
-Required default output shape for implementation work:
-
-1. Task
-2. Stage
-3. Root cause
-4. Files changed
-5. What changed
-6. Validation results
-7. Blockers (only if any)
+Implementation and execution work must use the matching standard report format in section 2.9. Do
+not use shorter legacy summaries when the standard format requires files inspected, preserved
+boundaries, next role, QA authority, or explicit verdict.
 
 Feedback and handoff reports must always name:
 
@@ -281,6 +289,57 @@ Goal:
 Make every implementation answer the question: "what did we reuse, and why did we need anything
 custom?"
 
+## 2.58) Bolder Root-Cause Batch Mode And Documentation Restraint (Mandatory)
+
+Agents should be careful with production truth, but not timid with local source cleanup and
+root-cause implementation. Excessive caution creates its own damage: tiny handoff loops, duplicated
+compatibility paths, long Markdown logs, and partial symptom patches.
+
+This section changes batching bias, not role authority. It does not override product-code bans for
+orchestration roles, QA's ban on product fixes, Running Coach's ban on technical validation, or any
+mutation/safety boundary elsewhere in this file.
+
+Default bias for code executors and code researchers:
+
+These bullets apply only to the agent currently assigned to the relevant role. They do not expand a
+top-level orchestration/router agent's authority. If the current role is not the owner, route an
+autonomous prompt to the owner instead of doing the work locally.
+
+- prefer one substantial root-cause batch over several micro-gates when the work shares one owner,
+  one risk class, and one validation story
+- fix the canonical owner even if the diff is larger than a symptom patch
+- reuse existing implemented functionality before adding new seams, states, helpers, docs, scripts,
+  or fallback paths
+- delete, inline, or consolidate stale paths when the replacement is proved
+- take reasonable local development risk; if a validation command breaks because of the batch, debug
+  and fix it instead of stopping at the first failure
+- do not ask the user to relay routine Backend, Frontend, QA, Running Coach, Architect, or code-audit
+  follow-ups when subagents or local validation can close the loop
+- use subagents for independent evidence, QA, or coaching acceptance on larger batches, but keep the
+  main agent accountable for integration
+
+Do not use this rule to justify reckless work. Stop at real boundaries:
+
+- production data, secrets, migrations, paid/provider calls, destructive file operations, or broad
+  rewrites without an active scope
+- changes that cross unrelated owners or risk classes
+- changes that weaken validation, review/confirm safety, auth/admin boundaries, or trusted
+  persistence
+- product decisions that cannot be inferred from implemented behavior or accepted doctrine
+
+Documentation restraint is mandatory:
+
+- do not create a new Markdown file when a compact active-plan note, validator, source comment, or
+  final report is enough
+- do not paste command output, full manifests, subagent transcripts, repeated handoff prompts, or
+  long inventories into plans
+- prefer executable validators, source contracts, manifests, and concise ledgers over prose-only
+  proof
+- if a task adds more Markdown than the code/docs/artifacts it simplifies, compact the Markdown
+  before closeout or justify why it is durable source-of-truth
+- changelog/current docs should describe shipped or durable user/product meaning, not every internal
+  cleanup micro-step
+
 ## 2.6) Canonical Hito Architecture Approach (Mandatory)
 
 Every agent must preserve one canonical Hito architecture. Do not create parallel product systems
@@ -401,6 +460,12 @@ subagent tools are available. On global simplification cleanup, this is not opti
 ARCHITECT and BACKEND agents must perform an explicit subagent preflight before selecting or
 executing a non-trivial cleanup batch.
 
+Subagents reduce relay work; they do not erase role boundaries. The agent that receives the
+role-prefixed task owns its subagents. A top-level orchestration/router agent may use subagents for
+read-only routing audits, instruction-layer audits, or explicitly requested instruction-file edits,
+but it must not spawn QA/Backend/Frontend subagents to complete product work that should have been
+handed to a role agent.
+
 This applies especially to agents that write code, validate behavior, inspect source, perform
 cleanup audits, investigate bugs, review artifacts, or prepare source-of-truth decisions:
 `ARCHITECT`, `BACKEND`, `FRONTEND`, `FULLSTACK`, `QA`, `DESIGNER`, `DESIGN SYSTEM`, `LAYOUT`,
@@ -471,8 +536,13 @@ Lifecycle rules:
 User copy-paste reduction rule:
 
 - Do not make the user act as a relay between ARCHITECT, BACKEND, FRONTEND, QA, or other role agents
-  for routine same-track work. If the current role can safely delegate, validate, or continue the
-  next bounded step with subagents or local sequential checks, it must do so.
+  for routine same-track work. Reduce relay by giving the next owner an autonomous role prompt and
+  requiring that owner to delegate/validate/fix-forward inside its scope. If the current role can
+  safely delegate, validate, or continue the next bounded step with subagents or local sequential
+  checks, it must do so.
+- Do not reduce user relay by letting the orchestration agent become the implementer. If the next
+  action belongs to BACKEND, FRONTEND, QA, DESIGNER, RUNNING COACH, or another execution role, the
+  orchestration answer is the exact prompt for that role, not local execution.
 - It is acceptable to hand a prompt back to the user only when a new top-level role/session is truly
   required and cannot be started by available tools, when explicit Product approval is needed, or
   when the next step changes owner/risk class in a way the active plan has not authorized.
@@ -492,15 +562,15 @@ Global cleanup autonomous batch mode:
   crossing, mutation/browser-risk escalation, or product decision need.
 - BACKEND cleanup prompts should explicitly authorize the role to use subagents and continue through
   several same-owner bounded seams without another user copy-paste step, as long as the active plan
-  scopes that batch and validation covers it. FRONTEND, DEVTOOLS, and QA prompts may do the same
+  scopes that batch and validation covers it. FRONTEND, BACKEND/OPS, and QA prompts may do the same
   when their scope is similarly bounded.
-- BACKEND, FRONTEND, DEVTOOLS, and QA agents working on global cleanup should finish the scoped
+- BACKEND, FRONTEND, BACKEND/OPS, and QA agents working on global cleanup should finish the scoped
   autonomous batch end-to-end when safe. They should not stop after the first tiny seam merely to ask
   Product/user for another prompt if the next adjacent seam is already in scope and has the same
   owner, risk class, and validation story.
-- Stop and return to Product/user only when the next candidate crosses owner boundaries, becomes
-  browser-visible, touches mutation safety, requires Supabase/OpenAI/production access, weakens
-  validation coverage, or needs a product decision.
+- Stop and return to Product/user only when the next candidate crosses owner boundaries, changes
+  unscoped browser-visible behavior without a validation path, touches mutation safety, requires
+  Supabase/OpenAI/production access, weakens validation coverage, or needs a product decision.
 - Autonomous cleanup batches must still report progress estimate, completed gates, remaining gates,
   subagents used/reused/closed, validation evidence, and any deferred risks.
 
@@ -631,18 +701,25 @@ Read in this order for non-trivial work:
 
 ## 4) Delivery Workflow (Plan, Implement, Validate)
 
+The delivery workflow is executed by the role that owns the work. Orchestration/Product routing
+agents describe and hand off these responsibilities; they do not implement, validate, or close
+another role's delivery workflow directly.
+
 Plan discipline:
 
 - Create/update a plan in `docs/plans/active/` for multi-step, risky, cross-surface, migration, or workflow changes.
 - Small isolated edits may proceed without a formal plan.
 
-Active plans should include at minimum:
+New or substantially reworked active plans should include at minimum:
 
 - `Status`
 - `Owner`
 - `Last Updated`
 - `Checklist`
 - `Exit Criteria`
+
+Routine cleanup ledger updates and metadata-only syncs should stay compact and should not restate
+the full plan structure unless that structure is missing and needed for execution.
 
 Execution discipline:
 
@@ -767,6 +844,9 @@ canonical block, the work is incomplete because admin Backlog mirroring and prom
 
 ## 6.6) QA Screenshot Artifact Policy
 
+- This policy applies to UI-facing visual evidence. It does not require screenshots for backend,
+  source-only, docs-only, artifact-manifest, or CLI/validator QA when those checks fully prove the
+  assigned contract.
 - Routine QA screenshots must be saved under the gitignored local artifact root:
   `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/`
 - Do not commit `qa-artifacts/` by default.

@@ -6,12 +6,12 @@ import type {
 import { resolveActivePlanWorkoutEditability } from "@/lib/active-plan-workout-editing/policy";
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
-import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
-import { diffDaysIso } from "@/lib/training";
 
 export const MISSED_UNLOGGED_MOVE_WINDOW_DAYS = 7;
 
 export type ActivePlanWorkoutSourceEditingEligibility =
+  | "eligible_past_unlogged"
+  | "eligible_current_unlogged"
   | "eligible_future_unlogged"
   | "eligible_missed_unlogged_recent"
   | "blocked";
@@ -21,20 +21,25 @@ export type ActivePlanWorkoutSourceEditingReason =
   | "skipped_logged_workout"
   | "evidence_backed_workout"
   | "protected_history"
-  | "unsafe_metric_truth"
   | "unsupported_source_metadata"
   | "unsupported_source_workout"
   | "rest_day"
-  | "past_not_missed_unlogged"
-  | "missed_window_expired"
-  | "unsupported_active_plan_source";
+  | "unsupported_active_plan_source"
+  | "copy_requires_editor_support"
+  | "edit_content_requires_editor_support";
 
 export interface ActivePlanWorkoutSourceEditingCapabilities {
+  canMove: boolean;
+  canClear: boolean;
+  canCopy: boolean;
+  canEditContent: boolean;
   canDirectCopy: boolean;
   canDirectMove: boolean;
   canDragInitiate: boolean;
   eligibility: ActivePlanWorkoutSourceEditingEligibility;
   reason: ActivePlanWorkoutSourceEditingReason | null;
+  copyReason: ActivePlanWorkoutSourceEditingReason | null;
+  editContentReason: ActivePlanWorkoutSourceEditingReason | null;
   message: string | null;
 }
 
@@ -51,24 +56,17 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
   evidenceWorkoutIds: ReadonlySet<string>;
   currentDate: string;
 }): ActivePlanWorkoutSourceEditingCapabilities {
-  if (!activePlan || activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+  if (!activePlan) {
     return blockedSourceEditing(
       "unsupported_active_plan_source",
-      "Direct move, copy, and drag are available only for manual user-built active plans.",
-    );
-  }
-
-  if (activePlan.status !== "active") {
-    return blockedSourceEditing(
-      "protected_history",
-      "Only active manual plan rows can start direct workout edits.",
+      "There is no active plan for direct workout actions.",
     );
   }
 
   if (workout.user_id !== activePlan.user_id || workout.plan_cycle_id !== activePlan.id) {
     return blockedSourceEditing(
       "unsupported_source_metadata",
-      "This workout row is not part of the current active manual plan.",
+      "This workout row is not part of the current active plan.",
     );
   }
 
@@ -78,36 +76,30 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
       moveEditability.reason === "unsupported_source_metadata"
         ? "unsupported_source_metadata"
         : "unsupported_active_plan_source",
-      "This active plan is not currently editable for direct manual workout interactions.",
+      moveEditability.message,
     );
   }
 
   if (workout.workout_type === "rest") {
-    return blockedSourceEditing("rest_day", "Rest days cannot start direct workout edits.");
+    return blockedSourceEditing("rest_day", "Rest days cannot start direct workout actions.");
   }
 
   if (log) {
     return blockedSourceEditing(
       log.outcome === "skipped" ? "skipped_logged_workout" : "logged_workout",
-      "Logged workouts cannot be moved, copied, or dragged.",
+      "Logged workouts cannot be moved, cleared, copied, or dragged.",
     );
   }
 
   if (evidenceWorkoutIds.has(workout.id)) {
     return blockedSourceEditing(
       "evidence_backed_workout",
-      "Evidence-backed workouts cannot be moved, copied, or dragged.",
+      "Evidence-backed workouts cannot be moved, cleared, copied, or dragged.",
     );
   }
 
-  if (persistedManualWorkoutHasUnsafeMetricTruth(workout)) {
-    return blockedSourceEditing(
-      "unsafe_metric_truth",
-      "This workout has metric targets that cannot be moved or copied safely.",
-    );
-  }
-
-  const sourceShape = buildManualWorkoutDraftInputFromPersistedWorkout(
+  const supportsManualDraftReconstruction = !persistedManualWorkoutHasUnsafeMetricTruth(workout);
+  const reconstructableManualDraft = buildManualWorkoutDraftInputFromPersistedWorkout(
     workout,
     workout.workout_date < currentDate ? currentDate : workout.workout_date,
     {
@@ -115,50 +107,45 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
       activePlanSourceKind: activePlan.source_kind,
     },
   );
+  const canCopyOrEditContent = supportsManualDraftReconstruction && reconstructableManualDraft.ok;
 
-  if (!sourceShape.ok) {
-    return blockedSourceEditing(
-      sourceShape.reason === "unsupported_payload"
-        ? "unsupported_source_metadata"
-        : "unsupported_source_workout",
-      sourceShape.message,
-    );
+  if (workout.workout_date >= currentDate) {
+    return allowedSourceEditing({
+      eligibility:
+        workout.workout_date === currentDate
+          ? "eligible_current_unlogged"
+          : "eligible_future_unlogged",
+      canCopyOrEditContent,
+    });
   }
 
-  if (workout.workout_date > currentDate) {
-    return {
-      canDirectCopy: true,
-      canDirectMove: true,
-      canDragInitiate: true,
-      eligibility: "eligible_future_unlogged",
-      reason: null,
-      message: null,
-    };
-  }
+  return allowedSourceEditing({
+    eligibility: "eligible_past_unlogged",
+    canCopyOrEditContent: false,
+  });
+}
 
-  const missedAgeDays = diffDaysIso(currentDate, workout.workout_date);
-  if (missedAgeDays >= 1 && missedAgeDays <= MISSED_UNLOGGED_MOVE_WINDOW_DAYS) {
-    return {
-      canDirectCopy: false,
-      canDirectMove: true,
-      canDragInitiate: true,
-      eligibility: "eligible_missed_unlogged_recent",
-      reason: null,
-      message: null,
-    };
-  }
-
-  if (missedAgeDays > MISSED_UNLOGGED_MOVE_WINDOW_DAYS) {
-    return blockedSourceEditing(
-      "missed_window_expired",
-      "This missed workout is outside the recent move window.",
-    );
-  }
-
-  return blockedSourceEditing(
-    "past_not_missed_unlogged",
-    "Only future workouts or recent missed unlogged workouts can start direct moves.",
-  );
+function allowedSourceEditing({
+  eligibility,
+  canCopyOrEditContent,
+}: {
+  eligibility: Exclude<ActivePlanWorkoutSourceEditingEligibility, "blocked">;
+  canCopyOrEditContent: boolean;
+}): ActivePlanWorkoutSourceEditingCapabilities {
+  return {
+    canMove: true,
+    canClear: true,
+    canCopy: canCopyOrEditContent,
+    canEditContent: canCopyOrEditContent,
+    canDirectCopy: canCopyOrEditContent,
+    canDirectMove: true,
+    canDragInitiate: true,
+    eligibility,
+    reason: null,
+    copyReason: canCopyOrEditContent ? null : "copy_requires_editor_support",
+    editContentReason: canCopyOrEditContent ? null : "edit_content_requires_editor_support",
+    message: null,
+  };
 }
 
 function blockedSourceEditing(
@@ -166,11 +153,17 @@ function blockedSourceEditing(
   message: string,
 ): ActivePlanWorkoutSourceEditingCapabilities {
   return {
+    canMove: false,
+    canClear: false,
+    canCopy: false,
+    canEditContent: false,
     canDirectCopy: false,
     canDirectMove: false,
     canDragInitiate: false,
     eligibility: "blocked",
     reason,
+    copyReason: reason,
+    editContentReason: reason,
     message,
   };
 }

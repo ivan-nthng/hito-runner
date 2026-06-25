@@ -208,21 +208,21 @@ export function templateIconTone(template: ManualWorkoutTemplate | null | undefi
 }
 
 export function targetTruthModeLabel(mode: ManualWorkoutTargetTruthMode | string) {
-  if (mode === "editable_default_hr") return "Advisory HR guidance";
-  if (mode === "none") return "Rest or no run";
-  return "Structure guidance";
+  if (mode === "editable_default_hr") return "Editable HR guide";
+  if (mode === "none") return "Rest / no run";
+  return "Structure-first guidance";
 }
 
 export function targetTruthModeCopy(mode: ManualWorkoutTargetTruthMode) {
   if (mode === "editable_default_hr") {
-    return "Keep the workout structure and show editable, advisory HR guidance. This is not a personal HR target.";
+    return "Use the workout structure plus an editable HR suggestion. It is guidance, not a personal HR zone.";
   }
 
   if (mode === "none") {
-    return "Use this for rest or no-run days. No workout target is created.";
+    return "Use this for rest or no-run days. Hito will not create a running target.";
   }
 
-  return "Use duration, distance, repeats, work, and recovery. Pace and personal HR stay blank unless backend truth exists.";
+  return "Follow the duration, distance, repeat, work, and recovery structure. Hito will not invent pace or personal HR targets.";
 }
 
 export function formatManualDraftStructure(totalDurationMin: number, totalDistanceKm: number) {

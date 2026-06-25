@@ -18,7 +18,7 @@ item, frontend spec, archive doc, QA report, or current-doc path as a clickable 
 absolute workspace path. Do not leave project document paths as plain relative text or inline-code
 only references.
 
-Every active plan should include:
+Every new or substantially reworked active plan should include:
 
 - Status
 - Owner
@@ -31,6 +31,9 @@ Every active plan should include:
 - Exit Criteria
 - Next Recommended Role
 - Suggested Next Step
+
+Routine ledger updates, cleanup closeouts, dashboard syncs, and metadata-only maintenance do not need
+to restate every section. Keep them to the compact facts needed by the next role.
 
 ## Repo-Derived Admin Backlog Mirror Compatibility
 
@@ -95,6 +98,21 @@ machine-readable manifests, QA reports, apply-result files, or the role's final 
 If a cleanup slice removes files/bytes but the closeout adds a large Markdown block, compact the
 closeout before returning. A plan update should not materially undo the readability win of the
 cleanup it records.
+
+## Minimal Documentation Gate
+
+Before creating or expanding Markdown, ask whether source code, a validator, a manifest, a QA
+artifact, or a short final report would be the better source of truth.
+
+- Do not create new plan/spec/task docs for routine implementation, cleanup, validation, or
+  regression-fix slices.
+- Prefer appending one compact ledger entry to an existing active plan when durable tracking is
+  needed.
+- Do not duplicate evidence already stored in validators, manifests, QA reports, build output, or
+  source comments.
+- Keep active plans useful for next execution, not as transcripts of agent work.
+- If a docs update is larger than the durable decision it records, rewrite it smaller before
+  closeout.
 
 ## Changelog Gate
 

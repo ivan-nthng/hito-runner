@@ -41,7 +41,7 @@ function Index() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="px-6 py-8 lg:px-10 lg:py-10">
+      <div className="hito-route-gutter py-8 lg:py-10">
         {snapshot.mode === "onboarding" ? (
           <OnboardingGate defaults={onboardingDefaults} />
         ) : (
@@ -58,7 +58,7 @@ function Index() {
 function HomePendingState() {
   return (
     <AppShell>
-      <div className="px-6 lg:px-10 py-8 lg:py-10 space-y-12">
+      <div className="hito-route-gutter space-y-12 py-8 lg:py-10">
         <section className="hito-surface p-6 lg:p-10">
           <Skeleton className="h-4 w-40 bg-background/40" />
           <Skeleton className="mt-5 h-16 w-full max-w-2xl bg-background/40" />
@@ -80,7 +80,7 @@ function HomePendingState() {
 function HomeErrorState({ reset }: { error: Error; reset: () => void }) {
   return (
     <AppShell>
-      <div className="px-6 lg:px-10 py-20 max-w-2xl">
+      <div className="hito-route-gutter max-w-2xl py-20">
         <section className="hito-state-surface" data-tone="destructive">
           <p className="hito-label text-destructive">Home unavailable</p>
           <h1 className="hito-page-title">We couldn&apos;t load this week&apos;s plan.</h1>

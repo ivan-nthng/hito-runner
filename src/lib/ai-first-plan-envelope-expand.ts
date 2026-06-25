@@ -259,13 +259,27 @@ function validateMetricGates(
     });
   }
 
-  if (serialized.includes("hr_bpm_range") || serialized.includes("hr_bpm")) {
+  if (
+    (serialized.includes("hr_bpm_range") || serialized.includes("hr_bpm")) &&
+    hasUnsupportedHrTarget(workout)
+  ) {
     issues.push({
       code: "envelope_unsupported_hr_target",
       path: `${workout.date}.segments`,
       message: "Expanded envelope cannot introduce HR targets without personal HR-zone truth.",
     });
   }
+}
+
+function hasUnsupportedHrTarget(workout: CanonicalWorkout) {
+  return workout.segments.some((segment) => {
+    const target = segment.target as Record<string, unknown> | undefined;
+
+    return (
+      (typeof target?.hr_bpm_range === "string" || typeof target?.hr_bpm === "string") &&
+      target.hr_target_source !== "default_estimated_hr"
+    );
+  });
 }
 
 function validatePreferredLongRunDay(

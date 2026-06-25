@@ -2,6 +2,12 @@ import { Link, createFileRoute, redirect, useRouter } from "@tanstack/react-rout
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, type ReactNode } from "react";
 import {
+  AdminDataTableColumnHeader,
+  AdminDataTableStaticHeader,
+  AdminDataTableToolbar,
+  type AdminDataTableActiveFilter,
+} from "@/components/admin/AdminOperationalComponents";
+import {
   AdminWorkspacePageHeader,
   AdminWorkspaceSidebar,
 } from "@/components/admin/AdminWorkspaceNav";
@@ -10,14 +16,6 @@ import {
   parseAdminAnalyticsSection,
   type AdminAnalyticsSectionId,
 } from "@/components/admin/admin-workspace-nav-model";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import {
   getAdminAnalytics,
@@ -141,24 +139,6 @@ type TestAccountOpsRow = {
   classificationReason: string;
   classificationSource: string;
   localAccount: AdminLocalTestAccountView | null;
-};
-
-type ActiveFilterItem = {
-  id: string;
-  label: string;
-  value: string;
-  onRemove: () => void;
-};
-
-type ColumnSortOption<SortKey extends string> = {
-  label: string;
-  key: SortKey;
-  direction: SortDirection;
-};
-
-type ColumnFilterOption = {
-  label: string;
-  value: string;
 };
 
 const initialDeleteState: DeleteState = {
@@ -489,7 +469,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
         />
       ) : (
         <div className="grid gap-4">
-          <DataTableUtilityRow
+          <AdminDataTableToolbar
             activeFilters={activeFilters}
             clearAllFilters={clearAllFilters}
             onQueryChange={(value) => setFilter("query", value)}
@@ -515,7 +495,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
               </caption>
               <thead>
                 <tr>
-                  <DataTableColumnHeader
+                  <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="user"
                     filterActive={false}
@@ -527,7 +507,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                       { label: "Z to A", key: "user", direction: "desc" },
                     ]}
                   />
-                  <DataTableColumnHeader
+                  <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="profile"
                     filterActive={filters.profile !== "all"}
@@ -548,7 +528,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                       { label: "Missing first", key: "profile", direction: "asc" },
                     ]}
                   />
-                  <DataTableColumnHeader
+                  <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="activePlan"
                     filterActive={filters.activePlan !== "all"}
@@ -569,7 +549,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                       { label: "No active first", key: "activePlan", direction: "asc" },
                     ]}
                   />
-                  <DataTableColumnHeader
+                  <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="plans"
                     filterActive={false}
@@ -581,7 +561,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                       { label: "Lowest first", key: "plans", direction: "asc" },
                     ]}
                   />
-                  <DataTableColumnHeader
+                  <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="workoutLogs"
                     filterActive={filters.activity !== "all"}
@@ -602,7 +582,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                       { label: "Lowest first", key: "workoutLogs", direction: "asc" },
                     ]}
                   />
-                  <DataTableColumnHeader
+                  <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="lastActivity"
                     filterActive={filters.lastActivity !== "all"}
@@ -624,7 +604,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                       { label: "Oldest first", key: "lastActivity", direction: "asc" },
                     ]}
                   />
-                  <DataTableColumnHeader
+                  <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="feedback"
                     filterActive={false}
@@ -636,7 +616,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                       { label: "Lowest first", key: "feedback", direction: "asc" },
                     ]}
                   />
-                  <DataTableColumnHeader
+                  <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="entitlement"
                     filterActive={filters.entitlement !== "all"}
@@ -929,250 +909,6 @@ function CompactCount({ label, value }: { label: string; value: number }) {
   );
 }
 
-function DataTableUtilityRow({
-  activeFilters,
-  clearAllFilters,
-  onQueryChange,
-  query,
-  rowCountLabel,
-  searchLabel,
-  searchPlaceholder,
-}: {
-  activeFilters: ActiveFilterItem[];
-  clearAllFilters: () => void;
-  onQueryChange: (value: string) => void;
-  query: string;
-  rowCountLabel: string;
-  searchLabel: string;
-  searchPlaceholder: string;
-}) {
-  const [searchOpen, setSearchOpen] = useState(Boolean(query));
-  const isSearchOpen = searchOpen || query.length > 0;
-  const activeCount = activeFilters.length;
-
-  return (
-    <div className="hito-data-table-utility-row">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {isSearchOpen ? (
-          <label className="hito-field hito-field-sm hito-data-table-search">
-            <span className="sr-only">{searchLabel}</span>
-            <Icon name="search" size="xs" className="text-muted-foreground" />
-            <input
-              autoFocus
-              className="hito-data-table-search-input"
-              onBlur={() => {
-                if (!query) {
-                  setSearchOpen(false);
-                }
-              }}
-              onChange={(event) => onQueryChange(event.target.value)}
-              placeholder={searchPlaceholder}
-              type="search"
-              value={query}
-            />
-            {query ? (
-              <button
-                type="button"
-                aria-label={`Clear ${searchLabel.toLowerCase()}`}
-                className="hito-button hito-button-ghost hito-button-xs hito-data-table-search-clear"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => onQueryChange("")}
-              >
-                <Icon name="close" size="xs" />
-              </button>
-            ) : null}
-          </label>
-        ) : (
-          <button
-            type="button"
-            aria-label={searchLabel}
-            className="hito-button hito-button-secondary hito-button-sm hito-data-table-icon-button"
-            onClick={() => setSearchOpen(true)}
-          >
-            <Icon name="search" size="sm" />
-          </button>
-        )}
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild disabled={activeCount === 0}>
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-sm hito-data-table-filter-summary"
-              disabled={activeCount === 0}
-              aria-label={
-                activeCount > 0 ? `${activeCount} active table filters` : "No active table filters"
-              }
-            >
-              <Icon name="settings" size="xs" />
-              Filters
-              {activeCount > 0 ? <span className="hito-tab-badge">{activeCount}</span> : null}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-wide"
-          >
-            <DropdownMenuLabel className="hito-micro-label">Active filters</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {activeFilters.map((filter) => (
-              <DropdownMenuItem
-                key={filter.id}
-                className="hito-shell-menu-item hito-data-table-menu-item"
-                onSelect={filter.onRemove}
-              >
-                <Icon name="close" size="xs" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{filter.label}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {filter.value}
-                  </span>
-                </span>
-              </DropdownMenuItem>
-            ))}
-            {activeCount > 1 ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="hito-shell-menu-item hito-data-table-menu-item"
-                  onSelect={clearAllFilters}
-                >
-                  <Icon name="x-circle" size="xs" />
-                  Clear all
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <p className="hito-field-helper whitespace-nowrap">{rowCountLabel}</p>
-    </div>
-  );
-}
-
-function DataTableColumnHeader<SortKey extends string>({
-  activeSort,
-  column,
-  filterActive,
-  filterOptions,
-  label,
-  menuLabel,
-  onFilterChange,
-  onSort,
-  selectedFilter = "all",
-  sortOptions,
-}: {
-  activeSort: { key: SortKey; direction: SortDirection };
-  column: SortKey;
-  filterActive: boolean;
-  filterOptions?: ColumnFilterOption[];
-  label: string;
-  menuLabel: string;
-  onFilterChange?: (value: string) => void;
-  onSort: (column: SortKey, direction: SortDirection) => void;
-  selectedFilter?: string;
-  sortOptions: Array<ColumnSortOption<SortKey>>;
-}) {
-  const isActive = activeSort.key === column;
-
-  return (
-    <th
-      scope="col"
-      aria-sort={isActive ? (activeSort.direction === "asc" ? "ascending" : "descending") : "none"}
-      className="whitespace-nowrap px-2 py-2 font-medium"
-    >
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label={menuLabel}
-            className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
-            data-active={isActive || filterActive ? "true" : undefined}
-          >
-            <span>{label}</span>
-            {filterActive ? <span className="hito-data-table-filter-dot" /> : null}
-            <Icon
-              aria-hidden="true"
-              name={isActive && activeSort.direction === "asc" ? "chevron-up" : "chevron-down"}
-              size="xs"
-              className="hito-data-table-sort-indicator"
-              data-active={isActive ? "true" : undefined}
-            />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-standard"
-        >
-          <DropdownMenuLabel className="hito-micro-label">Sort</DropdownMenuLabel>
-          {sortOptions.map((option) => {
-            const optionActive =
-              activeSort.key === option.key && activeSort.direction === option.direction;
-            return (
-              <DropdownMenuItem
-                key={`${option.key}-${option.direction}`}
-                className="hito-shell-menu-item hito-data-table-menu-item"
-                onSelect={() => onSort(option.key, option.direction)}
-              >
-                <Icon
-                  name={optionActive ? "check" : "chevron-right"}
-                  size="xs"
-                  className={optionActive ? "text-signal" : "text-muted-foreground"}
-                />
-                {option.label}
-              </DropdownMenuItem>
-            );
-          })}
-          {(filterOptions?.length ?? 0) > 0 && onFilterChange ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="hito-micro-label">Filter</DropdownMenuLabel>
-              {filterOptions.map((option) => {
-                const optionActive = selectedFilter === option.value;
-                return (
-                  <DropdownMenuItem
-                    key={option.value}
-                    className="hito-shell-menu-item hito-data-table-menu-item"
-                    onSelect={() => onFilterChange(option.value)}
-                  >
-                    <Icon
-                      name={optionActive ? "check" : "chevron-right"}
-                      size="xs"
-                      className={optionActive ? "text-signal" : "text-muted-foreground"}
-                    />
-                    {option.label}
-                  </DropdownMenuItem>
-                );
-              })}
-              {filterActive ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="hito-shell-menu-item hito-data-table-menu-item"
-                    onSelect={() => onFilterChange("all")}
-                  >
-                    <Icon name="x-circle" size="xs" />
-                    Clear filter
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </th>
-  );
-}
-
-function DataTableStaticHeader({ label }: { label: string }) {
-  return (
-    <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
-      <span className="hito-data-table-header hito-data-table-header-static" data-disabled="true">
-        {label}
-      </span>
-    </th>
-  );
-}
-
 function TestAccountsSection({
   result,
   excludedUsers,
@@ -1383,7 +1119,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
         </p>
       ) : null}
 
-      <DataTableUtilityRow
+      <AdminDataTableToolbar
         activeFilters={activeFilters}
         clearAllFilters={clearAllFilters}
         onQueryChange={(value) => setFilter("query", value)}
@@ -1409,7 +1145,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
           </caption>
           <thead>
             <tr>
-              <DataTableColumnHeader
+              <AdminDataTableColumnHeader
                 activeSort={sort}
                 column="username"
                 filterActive={false}
@@ -1421,7 +1157,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   { label: "Z to A", key: "username", direction: "desc" },
                 ]}
               />
-              <DataTableColumnHeader
+              <AdminDataTableColumnHeader
                 activeSort={sort}
                 column="email"
                 filterActive={false}
@@ -1433,8 +1169,8 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   { label: "Z to A", key: "email", direction: "desc" },
                 ]}
               />
-              <DataTableStaticHeader label="Password" />
-              <DataTableColumnHeader
+              <AdminDataTableStaticHeader label="Password" />
+              <AdminDataTableColumnHeader
                 activeSort={sort}
                 column="role"
                 filterActive={filters.role !== "all"}
@@ -1453,7 +1189,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   { label: "Tester first", key: "role", direction: "desc" },
                 ]}
               />
-              <DataTableColumnHeader
+              <AdminDataTableColumnHeader
                 activeSort={sort}
                 column="classification"
                 filterActive={filters.classification !== "all"}
@@ -1477,7 +1213,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   { label: "Z to A", key: "classification", direction: "desc" },
                 ]}
               />
-              <DataTableColumnHeader
+              <AdminDataTableColumnHeader
                 activeSort={sort}
                 column="linkedStatus"
                 filterActive={filters.linkStatus !== "all"}
@@ -1500,7 +1236,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   { label: "Missing first", key: "linkedStatus", direction: "desc" },
                 ]}
               />
-              <DataTableColumnHeader
+              <AdminDataTableColumnHeader
                 activeSort={sort}
                 column="deletable"
                 filterActive={filters.deletable !== "all"}
@@ -1521,7 +1257,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   { label: "Protected first", key: "deletable", direction: "asc" },
                 ]}
               />
-              <DataTableStaticHeader label="Delete" />
+              <AdminDataTableStaticHeader label="Delete" />
             </tr>
           </thead>
           <tbody>
@@ -1739,8 +1475,8 @@ function linkedIdentityTone(status: AdminLocalTestAccountLinkStatus) {
 function buildUsersActiveFilters(
   filters: UsersFilters,
   setFilter: <Key extends keyof UsersFilters>(key: Key, value: UsersFilters[Key]) => void,
-): ActiveFilterItem[] {
-  const items: ActiveFilterItem[] = [];
+): AdminDataTableActiveFilter[] {
+  const items: AdminDataTableActiveFilter[] = [];
 
   if (filters.query) {
     items.push({
@@ -1995,8 +1731,8 @@ function buildTestAccountActiveFilters(
     key: Key,
     value: TestAccountsFilters[Key],
   ) => void,
-): ActiveFilterItem[] {
-  const items: ActiveFilterItem[] = [];
+): AdminDataTableActiveFilter[] {
+  const items: AdminDataTableActiveFilter[] = [];
 
   if (filters.query) {
     items.push({

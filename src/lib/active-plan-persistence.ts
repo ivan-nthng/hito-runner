@@ -15,6 +15,11 @@ import {
   mergePlanPersistenceMetadata,
   type AdditionalPlanPersistenceMetadata,
 } from "@/lib/plan-authoring-snapshot";
+import {
+  buildActivePlanReplacementCarryForward,
+  copyCarryForwardLogs,
+  relinkCarryForwardEvidence,
+} from "@/lib/active-plan-replacement-carry-forward";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
 import type { StructuredFirstPlanProfilePatch } from "@/lib/structured-first-plan-onboarding";
 import type { Database, Json } from "@/lib/supabase/database";
@@ -154,11 +159,12 @@ export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(i
   currentActivePlan: PersistedPlanCycleRow;
   expectedCurrentActivePlanUpdatedAt: string;
   reviewedPlan: ImportedPlanInput;
+  replacementStartsAt: string;
   profilePatch: StructuredFirstPlanProfilePatch | null;
   planMetadata: AdditionalPlanPersistenceMetadata | null;
 }) {
   const supabase = createAdminSupabaseClient();
-  const importedSeed = buildReviewedFirstPlanImportedSeed(input.reviewedPlan);
+  const reviewedSeed = buildReviewedFirstPlanImportedSeed(input.reviewedPlan);
   const currentPlanStillCurrent = await supabase
     .from("plan_cycles")
     .select("id")
@@ -173,16 +179,42 @@ export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(i
   }
 
   if (!currentPlanStillCurrent.data) {
-    throw new Error("The active manual plan changed before transition persistence started.");
+    throw new Error("The active plan changed before transition persistence started.");
   }
 
-  await upsertRunnerProfile(input.userId, importedSeed.profile, input.profilePatch);
+  const existingWorkouts = await getResolvedPlanWorkoutsWithLogs(
+    input.userId,
+    input.currentActivePlan,
+  );
+  const carryForward = await buildActivePlanReplacementCarryForward({
+    userId: input.userId,
+    importedSeed: reviewedSeed,
+    existingWorkouts: existingWorkouts.workouts,
+    logsByWorkoutId: existingWorkouts.logsByWorkoutId,
+    replacementStartsAt: input.replacementStartsAt,
+  });
+
+  await upsertRunnerProfile(input.userId, carryForward.importedSeed.profile, input.profilePatch);
   const insertedPlan = await createAssignedPlanFromImportedSeed(
     input.userId,
-    importedSeed,
+    carryForward.importedSeed,
     "archived",
     input.planMetadata,
   );
+  let carryForwardAttachmentMap: Awaited<ReturnType<typeof copyCarryForwardLogs>>;
+
+  try {
+    carryForwardAttachmentMap = await copyCarryForwardLogs({
+      supabase,
+      userId: input.userId,
+      insertedWorkouts: insertedPlan.workouts,
+      sourceLogsByWorkoutId: existingWorkouts.logsByWorkoutId,
+      preservedWorkouts: carryForward.preservedWorkouts,
+    });
+  } catch (error) {
+    await rollbackInsertedPlan(insertedPlan.planCycle.id);
+    throw error;
+  }
 
   const archiveExisting = await supabase
     .from("plan_cycles")
@@ -194,6 +226,9 @@ export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(i
           next_plan_id: insertedPlan.planCycle.id,
           next_plan_source_kind: insertedPlan.planCycle.source_kind,
           transition_review_contract_version: "active_plan_transition_review_v1",
+          replacement_starts_at: input.replacementStartsAt,
+          preserved_workout_count: carryForward.preservedWorkouts.length,
+          future_mutable_workouts_replaced: true,
           upcoming_manual_workouts_merged: false,
         },
       }),
@@ -210,30 +245,58 @@ export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(i
     throw new Error(archiveExisting.error.message);
   }
 
-  const activateInserted = await supabase
-    .from("plan_cycles")
-    .update({ status: "active" })
-    .eq("id", insertedPlan.planCycle.id)
-    .eq("user_id", input.userId)
-    .eq("status", "archived")
-    .select("*")
-    .single();
+  let rollbackRelinkedEvidence: (() => Promise<void>) | null = null;
 
-  if (activateInserted.error) {
+  try {
+    rollbackRelinkedEvidence = await relinkCarryForwardEvidence({
+      supabase,
+      userId: input.userId,
+      sourceWorkoutIds: carryForward.preservedWorkouts.map((workout) => workout.sourceWorkoutId),
+      nextWorkoutIdBySourceWorkoutId: carryForwardAttachmentMap.nextWorkoutIdBySourceWorkoutId,
+      nextLogIdBySourceLogId: carryForwardAttachmentMap.nextLogIdBySourceLogId,
+    });
+
+    const activateInserted = await supabase
+      .from("plan_cycles")
+      .update({ status: "active" })
+      .eq("id", insertedPlan.planCycle.id)
+      .eq("user_id", input.userId)
+      .eq("status", "archived")
+      .select("*")
+      .single();
+
+    if (activateInserted.error) {
+      throw new Error(activateInserted.error.message);
+    }
+
+    return {
+      archivedPlan: archiveExisting.data,
+      activePlan: activateInserted.data,
+      workouts: insertedPlan.workouts,
+    };
+  } catch (error) {
+    let relinkRollbackError: unknown = null;
+
+    if (rollbackRelinkedEvidence) {
+      try {
+        await rollbackRelinkedEvidence();
+      } catch (rollbackError) {
+        relinkRollbackError = rollbackError;
+      }
+    }
+
     await supabase
       .from("plan_cycles")
       .update({ status: "active" })
       .eq("id", input.currentActivePlan.id)
       .eq("user_id", input.userId);
-    await rollbackInsertedPlan(insertedPlan.planCycle.id);
-    throw new Error(activateInserted.error.message);
-  }
 
-  return {
-    archivedPlan: archiveExisting.data,
-    activePlan: activateInserted.data,
-    workouts: insertedPlan.workouts,
-  };
+    if (!relinkRollbackError) {
+      await rollbackInsertedPlan(insertedPlan.planCycle.id);
+    }
+
+    throw relinkRollbackError ?? error;
+  }
 }
 
 export async function createEmptyActivePlanForUser(
@@ -358,46 +421,41 @@ async function replaceActivePlanWithImportedInput(
   planMetadata: AdditionalPlanPersistenceMetadata | null = null,
 ) {
   const supabase = createAdminSupabaseClient();
-  const { importedSeed, preservationPlan } = preparedApply;
+  const carryForward = planContext.activePlan
+    ? await buildActivePlanReplacementCarryForward({
+        userId,
+        importedSeed: preparedApply.importedSeed,
+        existingWorkouts: planContext.existingWorkouts.workouts,
+        logsByWorkoutId: planContext.existingWorkouts.logsByWorkoutId,
+        replacementStartsAt: preparedApply.result.effectiveStartDate,
+      })
+    : {
+        importedSeed: preparedApply.importedSeed,
+        preservedWorkouts: [],
+      };
   const insertedPlan = await createAssignedPlanFromImportedSeed(
     userId,
-    importedSeed,
+    carryForward.importedSeed,
     planContext.activePlan ? "archived" : "active",
     planMetadata,
   );
-  const insertedWorkoutsByDate = new Map(
-    insertedPlan.workouts.map((workout) => [workout.workout_date, workout]),
-  );
+  let carryForwardAttachmentMap: Awaited<ReturnType<typeof copyCarryForwardLogs>> = {
+    nextWorkoutIdBySourceWorkoutId: new Map(),
+    nextLogIdBySourceLogId: new Map(),
+  };
 
-  if (preservationPlan.logs.length > 0) {
-    const copiedLogs = preservationPlan.logs.map(({ log, workoutDate }) => {
-      const nextWorkout = insertedWorkoutsByDate.get(workoutDate);
-
-      if (!nextWorkout) {
-        throw new Error(
-          `Imported plan replacement lost the inserted workout for ${workoutDate}. Current plan is unchanged.`,
-        );
-      }
-
-      return {
-        planned_workout_id: nextWorkout.id,
-        user_id: userId,
-        outcome: log.outcome,
-        actual_distance_km: log.actual_distance_km,
-        actual_duration_min: log.actual_duration_min,
-        rpe: log.rpe,
-        notes: log.notes,
-        intervals_completed: log.intervals_completed,
-        logged_at: log.logged_at,
-        updated_at: log.updated_at,
-      };
-    });
-
-    const logInsert = await supabase.from("workout_logs").insert(copiedLogs);
-
-    if (logInsert.error) {
+  if (planContext.activePlan) {
+    try {
+      carryForwardAttachmentMap = await copyCarryForwardLogs({
+        supabase,
+        userId,
+        insertedWorkouts: insertedPlan.workouts,
+        sourceLogsByWorkoutId: planContext.existingWorkouts.logsByWorkoutId,
+        preservedWorkouts: carryForward.preservedWorkouts,
+      });
+    } catch (error) {
       await rollbackInsertedPlan(insertedPlan.planCycle.id);
-      throw new Error(logInsert.error.message);
+      throw error;
     }
   }
 
@@ -407,7 +465,19 @@ async function replaceActivePlanWithImportedInput(
 
   const archiveExisting = await supabase
     .from("plan_cycles")
-    .update({ status: "archived" })
+    .update({
+      status: "archived",
+      goal_metadata: mergePlanPersistenceMetadata(planContext.activePlan.goal_metadata, {
+        active_plan_replacement_superseded_by: {
+          source_status: "superseded_by_reviewed_plan_replacement",
+          next_plan_id: insertedPlan.planCycle.id,
+          next_plan_source_kind: insertedPlan.planCycle.source_kind,
+          replacement_starts_at: preparedApply.result.effectiveStartDate,
+          preserved_workout_count: carryForward.preservedWorkouts.length,
+          future_mutable_workouts_replaced: true,
+        },
+      }),
+    })
     .eq("id", planContext.activePlan.id)
     .eq("status", "active");
 
@@ -416,33 +486,52 @@ async function replaceActivePlanWithImportedInput(
     throw new Error(archiveExisting.error.message);
   }
 
-  const activateInserted = await supabase
-    .from("plan_cycles")
-    .update({ status: "active" })
-    .eq("id", insertedPlan.planCycle.id)
-    .eq("status", "archived")
-    .select("*")
-    .single();
+  let rollbackRelinkedEvidence: (() => Promise<void>) | null = null;
 
-  if (activateInserted.error) {
+  try {
+    rollbackRelinkedEvidence = await relinkCarryForwardEvidence({
+      supabase,
+      userId,
+      sourceWorkoutIds: carryForward.preservedWorkouts.map((workout) => workout.sourceWorkoutId),
+      nextWorkoutIdBySourceWorkoutId: carryForwardAttachmentMap.nextWorkoutIdBySourceWorkoutId,
+      nextLogIdBySourceLogId: carryForwardAttachmentMap.nextLogIdBySourceLogId,
+    });
+
+    const activateInserted = await supabase
+      .from("plan_cycles")
+      .update({ status: "active" })
+      .eq("id", insertedPlan.planCycle.id)
+      .eq("status", "archived")
+      .select("*")
+      .single();
+
+    if (activateInserted.error) {
+      throw new Error(activateInserted.error.message);
+    }
+
+    return activateInserted.data;
+  } catch (error) {
+    let relinkRollbackError: unknown = null;
+
+    if (rollbackRelinkedEvidence) {
+      try {
+        await rollbackRelinkedEvidence();
+      } catch (rollbackError) {
+        relinkRollbackError = rollbackError;
+      }
+    }
+
     await supabase
       .from("plan_cycles")
       .update({ status: "active" })
       .eq("id", planContext.activePlan.id);
-    await rollbackInsertedPlan(insertedPlan.planCycle.id);
-    throw new Error(activateInserted.error.message);
+
+    if (!relinkRollbackError) {
+      await rollbackInsertedPlan(insertedPlan.planCycle.id);
+    }
+
+    throw relinkRollbackError ?? error;
   }
-
-  const deletePreviousPlan = await supabase
-    .from("plan_cycles")
-    .delete()
-    .eq("id", planContext.activePlan.id);
-
-  if (deletePreviousPlan.error) {
-    throw new Error(deletePreviousPlan.error.message);
-  }
-
-  return activateInserted.data;
 }
 
 async function prepareImportedPlanApply(

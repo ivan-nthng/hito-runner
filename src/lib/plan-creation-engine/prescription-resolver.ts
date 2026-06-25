@@ -11,6 +11,7 @@ import {
   resolveBeginnerHalfMarathonLongRunMinuteBounds,
 } from "@/lib/plan-creation-engine/beginner-half-marathon-policy";
 import { isMarathonCompletionAdaptationWeek } from "@/lib/plan-creation-engine/marathon-completion-policy";
+import { resolveTenKBeginnerDosePrescription } from "@/lib/plan-creation-engine/ten-k-beginner-dose-policy";
 import type {
   RunningPlanDistanceFamily,
   RunningPlanRange,
@@ -31,6 +32,7 @@ export interface ResolveRunningPlanPreviewSegmentsOptions {
   loadContext: RunningPlanPrescriptionLoadContext;
   weekNumber: number;
   horizonWeeks: number;
+  beginnerDosePolicy?: boolean;
   segments: readonly RunningPlanWatchExecutableSegmentTemplate[];
 }
 
@@ -51,11 +53,21 @@ export function resolveRunningPlanPreviewSegments({
       segment.primaryPrescription,
       resolvedContext,
     );
+    const beginnerDosePrescription =
+      resolvedContext.beginnerDosePolicy && resolvedContext.family === "10K"
+        ? resolveTenKBeginnerDosePrescription({
+            workoutDayKind: resolvedContext.workoutDayKind,
+            segmentRole: resolvedContext.segmentRole,
+            weekNumber: resolvedContext.weekNumber,
+            horizonWeeks: resolvedContext.horizonWeeks,
+            prescription: resolvedPrescription,
+          })
+        : resolvedPrescription;
 
     return enrichResolvedSegment({
       segment,
       context: resolvedContext,
-      primaryPrescription: resolvedPrescription,
+      primaryPrescription: beginnerDosePrescription,
     });
   });
 }

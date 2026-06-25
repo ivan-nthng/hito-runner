@@ -54,8 +54,16 @@ export function buildWorkoutCalendarDayPresentation(
     });
   }
 
+  if (workout.type === "rest") {
+    return buildRestCalendarDayPresentation({
+      feedback: options.feedback,
+      stateLabel: options.stateLabel,
+      supportingText: options.supportingText,
+      title: options.title === undefined ? undefined : (options.title ?? undefined),
+    });
+  }
+
   const state = calendarDayBaseState(workout);
-  const hasWorkout = workout.type !== "rest";
   const title =
     options.title === undefined
       ? stripCalendarWorkoutTitle(workout.title, Boolean(options.stripLocalizedPrefix))
@@ -63,16 +71,14 @@ export function buildWorkoutCalendarDayPresentation(
 
   return {
     feedback: options.feedback ?? "none",
-    result: calendarDayResultState(workout.status, hasWorkout),
+    result: calendarDayResultState(workout.status, true),
     state,
     stateLabel: options.stateLabel,
     supportingText:
       options.supportingText === undefined
-        ? hasWorkout
-          ? compactCalendarWorkoutSummary(workout)
-          : null
+        ? compactCalendarWorkoutSummary(workout)
         : options.supportingText,
-    title: hasWorkout || options.includeRestTitle ? title : undefined,
+    title,
     workout: calendarWorkoutIdentity(workout),
   };
 }

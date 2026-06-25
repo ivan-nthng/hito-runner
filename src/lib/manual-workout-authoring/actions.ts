@@ -291,7 +291,7 @@ export async function confirmManualWorkoutDraftForUser(
     return buildManualWorkoutConfirmFailure({
       reason: "active_plan_exists",
       message:
-        "Manual user-built plans can be created only when there is no active plan. Use Open plan to update or replace an existing plan.",
+        "Manual user-built plans can be created only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
     });
   }
 
@@ -356,7 +356,7 @@ export async function confirmManualWorkoutDraftForUser(
       return buildManualWorkoutConfirmFailure({
         reason: "active_plan_exists",
         message:
-          "Manual user-built plans can be created only when there is no active plan. Use Open plan to update or replace an existing plan.",
+          "Manual user-built plans can be created only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
       });
     }
 

@@ -93,7 +93,7 @@ export async function validateManualDeleteClearContract() {
     assertRepeatWithRecovery(review.restore.review.draft.steps, "delete restore review");
     assertNoFakePaceOrHr(review.restore.review.draft.steps, "delete restore review");
     assert.equal(review.safety.trustedClientRows, false);
-    assert.equal(review.safety.lastWorkoutProtected, true);
+    assert.equal(review.safety.lastWorkoutDeleteAllowed, true);
   }
 
   const overlongPersistedGuidance = "Stay steady and controlled without chasing pace. ".repeat(15);
@@ -201,7 +201,10 @@ export async function validateManualDeleteClearContract() {
     assert.equal(success.calendarRowCount, 1);
     assert.equal(success.nonRestWorkoutCount, 1);
     assert.equal(success.restore.label, "Restore");
-    assert.equal(success.restore.review.draft.workoutDate, targetWorkout.workout_date);
+    assert.equal(success.restore.available, true);
+    if (success.restore.available) {
+      assert.equal(success.restore.review.draft.workoutDate, targetWorkout.workout_date);
+    }
     assert.equal(success.safety.deletedExactlyOneRow, true);
     assert.equal(success.safety.activePlanRemainsActive, true);
     assert.equal(success.safety.serverRebuiltReview, true);
@@ -320,6 +323,94 @@ export async function validateManualDeleteClearContract() {
     assert.equal(presetConfirm.safety.deletedExactlyOneRow, true);
   }
 
+  const selectedPlan = buildFakePlanCycle({
+    userId,
+    id: activePlan.id,
+    sourceKind: "running_plan_engine_10k_builder_v1",
+    startDate: "2026-06-18",
+    endDate: "2026-06-21",
+  });
+  const selectedGeneratedTarget = buildFakePlannedWorkout({
+    userId,
+    planCycleId: selectedPlan.id,
+    id: "99999999-9999-4999-8999-000000000509",
+    date: "2026-06-24",
+    displayOrder: 0,
+    title: "Selected-plan generated easy run",
+    sourceWorkoutType: "selected_plan_easy_run",
+    workoutFamily: "easy",
+    workoutIdentity: "easy_aerobic_run",
+    calendarIconKey: "easy",
+    metricMode: { mode: "pace_executable" },
+    steps: [
+      {
+        type: "work",
+        segment_type: "main",
+        duration_min: 30,
+        target: {
+          effort: "easy",
+          pace_min_per_km_range: [5.4, 5.9],
+          hr_bpm_range: [150, 164],
+        },
+      },
+    ] as PersistedPlannedWorkoutRow["steps"],
+  });
+  const selectedReview = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: selectedPlan.id,
+      plannedWorkoutId: selectedGeneratedTarget.id,
+    },
+    buildFakeDeleteDependencies({
+      activePlan: selectedPlan,
+      workouts: [selectedGeneratedTarget, keptWorkout],
+    }),
+  );
+  assert.equal(selectedReview.ok, true, formatDeleteReviewResult(selectedReview));
+  if (selectedReview.ok) {
+    assert.equal(selectedReview.sourceKind, "running_plan_engine_10k_builder_v1");
+    assert.equal(selectedReview.templateKey, "selected_plan_easy_run");
+    assert.equal(selectedReview.restore.available, false);
+    assert.equal(selectedReview.restore.reason, "restore_requires_editor_support");
+  }
+
+  const selectedDeletes: Array<{ targetWorkoutId: string; remainingWorkoutIds: string[] }> = [];
+  const selectedConfirm = await confirmManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: selectedPlan.id,
+      plannedWorkoutId: selectedGeneratedTarget.id,
+      ...(selectedReview.ok
+        ? {
+            reviewToken: selectedReview.review.reviewToken,
+            reviewChecksum: selectedReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeDeleteDependencies({
+      activePlan: selectedPlan,
+      workouts: [selectedGeneratedTarget, keptWorkout],
+      onPersist: ({ targetWorkout: persistedTarget, remainingWorkouts }) => {
+        selectedDeletes.push({
+          targetWorkoutId: persistedTarget.id,
+          remainingWorkoutIds: remainingWorkouts.map((workout) => workout.id),
+        });
+      },
+    }),
+  );
+  assert.equal(selectedConfirm.ok, true, formatDeleteConfirmResult(selectedConfirm));
+  if (selectedConfirm.ok) {
+    assert.equal(selectedConfirm.sourceKind, "running_plan_engine_10k_builder_v1");
+    assert.equal(selectedConfirm.safety.deletedExactlyOneRow, true);
+    assert.equal(selectedConfirm.restore.available, false);
+  }
+  assert.deepEqual(selectedDeletes, [
+    {
+      targetWorkoutId: selectedGeneratedTarget.id,
+      remainingWorkoutIds: [keptWorkout.id],
+    },
+  ]);
+
   const unsupportedSource = await reviewManualWorkoutDeleteClearForUser(
     userId,
     {
@@ -394,11 +485,12 @@ export async function validateManualDeleteClearContract() {
     },
     buildFakeDeleteDependencies({ activePlan, workouts: [unsupportedTarget, keptWorkout] }),
   );
-  assertDeleteReviewBlocked(
-    unsupported,
-    "target_workout_not_supported",
-    "unsupported delete target payload",
-  );
+  assert.equal(unsupported.ok, true, formatDeleteReviewResult(unsupported));
+  if (unsupported.ok) {
+    assert.equal(unsupported.templateKey, "legacy_easy");
+    assert.equal(unsupported.restore.available, false);
+    assert.equal(unsupported.restore.reason, "restore_requires_editor_support");
+  }
 
   const loggedTarget = await reviewManualWorkoutDeleteClearForUser(
     userId,
@@ -447,7 +539,7 @@ export async function validateManualDeleteClearContract() {
     id: "99999999-9999-4999-8999-000000000507",
     review: pastReview,
   });
-  const protectedPast = await reviewManualWorkoutDeleteClearForUser(
+  const pastDeleteReview = await reviewManualWorkoutDeleteClearForUser(
     userId,
     {
       activePlanId: activePlan.id,
@@ -455,7 +547,36 @@ export async function validateManualDeleteClearContract() {
     },
     buildFakeDeleteDependencies({ activePlan, workouts: [pastTarget, keptWorkout] }),
   );
-  assertDeleteReviewBlocked(protectedPast, "protected_day", "past delete target");
+  assert.equal(pastDeleteReview.ok, true, formatDeleteReviewResult(pastDeleteReview));
+  if (pastDeleteReview.ok) {
+    assert.equal(pastDeleteReview.workoutDate, "2026-06-09");
+    assert.equal(pastDeleteReview.restore.available, true);
+  }
+
+  const todayReview = assertReady("today delete target review", {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-10",
+    title: "Today easy run",
+  });
+  const todayTarget = buildCanonicalPersistedPlannedWorkoutFromReview({
+    userId,
+    planCycleId: activePlan.id,
+    id: "99999999-9999-4999-8999-000000000510",
+    review: todayReview,
+  });
+  const todayDeleteReview = await reviewManualWorkoutDeleteClearForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: todayTarget.id,
+    },
+    buildFakeDeleteDependencies({ activePlan, workouts: [todayTarget, keptWorkout] }),
+  );
+  assert.equal(todayDeleteReview.ok, true, formatDeleteReviewResult(todayDeleteReview));
+  if (todayDeleteReview.ok) {
+    assert.equal(todayDeleteReview.workoutDate, "2026-06-10");
+    assert.equal(todayDeleteReview.restore.available, true);
+  }
 
   const lastWorkout = await reviewManualWorkoutDeleteClearForUser(
     userId,
@@ -465,11 +586,12 @@ export async function validateManualDeleteClearContract() {
     },
     buildFakeDeleteDependencies({ activePlan, workouts: [targetWorkout] }),
   );
-  assertDeleteReviewBlocked(
-    lastWorkout,
-    "last_workout_not_deletable",
-    "last manual workout delete",
-  );
+  assert.equal(lastWorkout.ok, true, formatDeleteReviewResult(lastWorkout));
+  if (lastWorkout.ok) {
+    assert.equal(lastWorkout.plannedWorkoutId, targetWorkout.id);
+    assert.equal(lastWorkout.workoutDate, targetWorkout.workout_date);
+    assert.equal(lastWorkout.restore.available, true);
+  }
 
   const persistenceFailure = await confirmManualWorkoutDeleteClearForUser(
     userId,

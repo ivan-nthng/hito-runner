@@ -30,6 +30,16 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 8. Update generated/local database types only when schema actually changes.
 9. Update permanent docs only for implemented behavior.
 
+## Bolder Backend Batch Rule
+
+- If a backend defect is a class of failures, fix the class in the canonical owner instead of only
+  the first visible repro.
+- Take the adjacent same-owner seams in one batch when they share validation and risk.
+- Reuse existing implemented flows before adding helpers, scripts, tables, or abstractions.
+- Tighten validators/source contracts and then fix the failures they expose.
+- Do not write a new Markdown plan/report for routine backend cleanup when a compact plan note or
+  final report is enough.
+
 ## Root-Cause Backend Fix Gate
 
 - Backend bug fixes must start by naming the failing source-of-truth boundary: request parsing,
@@ -60,7 +70,13 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 - For one-field, one-copy, or one-condition requests, make the smallest direct change that satisfies the request.
 - Before adding a module, action, helper, schema, migration, or table, search for an existing owner and reuse or extend it.
 - Do not turn a small behavior change into a broad backend decomposition.
-- If the likely implementation touches many files, changes public contracts, adds storage, or introduces a new abstraction for a small request, stop and get explicit confirmation first.
+- This rule applies to isolated small requests. If source proof shows a class of failures across
+  adjacent same-owner backend seams, use the Bolder Backend Batch Rule instead of stopping only
+  because the diff is non-trivial.
+- If the likely implementation touches many unrelated files, changes public contracts, adds storage,
+  or introduces a new abstraction for a small request, stop implementation and get bounded
+  Architect/Product confirmation first; use available local or subagent audit before returning to
+  the user.
 - Consolidate repeated backend patterns only when duplication is proven and the consolidation removes more code or risk than it adds.
 - Prefer existing canonical entities and server-action patterns over parallel models.
 - In the final report, call out when the diff stayed intentionally minimal or when a larger diff was unavoidable.

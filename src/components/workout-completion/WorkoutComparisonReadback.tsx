@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { formatDurationMin } from "@/lib/training";
+import { Icon } from "@/components/ui/icon";
 import type {
   WorkoutComparisonDifferencePayload,
   WorkoutComparisonSegmentGroup,
@@ -94,9 +95,12 @@ export function DeterministicComparisonReadback({
       </div>
 
       {technicalNotes.length > 0 ? (
-        <details className="border-t border-hairline pt-4">
-          <summary className="hito-label cursor-pointer list-none">Comparison notes</summary>
-          <div className="mt-3 space-y-2">
+        <details className="hito-disclosure">
+          <summary className="hito-disclosure-summary">
+            <span className="hito-label text-foreground">Comparison notes</span>
+            <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
+          </summary>
+          <div className="hito-disclosure-body">
             {technicalNotes.map((note) => (
               <p key={note} className="hito-body-small">
                 {note}

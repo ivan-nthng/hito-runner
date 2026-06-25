@@ -25,6 +25,7 @@ export interface PlanScheduleEditSummary {
 
 export function PlanScheduleEditPanel({
   available,
+  defaultOpen = false,
   fixedRestDays,
   restDaysAnswered,
   maxRunningDaysPerWeek,
@@ -44,9 +45,9 @@ export function PlanScheduleEditPanel({
   onReview,
   onApply,
   onReviewAgain,
-  onUseRefreshPrompt,
 }: {
   available: boolean;
+  defaultOpen?: boolean;
   fixedRestDays: WeekdayName[];
   restDaysAnswered: boolean;
   maxRunningDaysPerWeek: string;
@@ -66,7 +67,6 @@ export function PlanScheduleEditPanel({
   onReview: () => void;
   onApply: () => void;
   onReviewAgain: () => void;
-  onUseRefreshPrompt: (prompt: string) => void;
 }) {
   if (!available) {
     return null;
@@ -78,7 +78,10 @@ export function PlanScheduleEditPanel({
   const regenerationResult = result?.ok && result.mode === "requires_regeneration" ? result : null;
 
   return (
-    <details className="hito-disclosure hito-plan-schedule-edit">
+    <details
+      className="hito-disclosure hito-plan-schedule-edit"
+      open={defaultOpen ? true : undefined}
+    >
       <summary className="hito-disclosure-summary">
         <span>Edit schedule</span>
         <Icon name="chevron-down" className="hito-disclosure-chevron" />
@@ -148,7 +151,7 @@ export function PlanScheduleEditPanel({
             preferredLongRunMode="optional-any"
             showFitnessBenchmark={false}
             fixedRestDaysHelper="Choose rest days for this active-plan edit only. This does not update profile defaults."
-            maxRunningDaysHelper="Keep the same weekly frequency for a date-only reflow. A frequency change routes to Update plan."
+            maxRunningDaysHelper="Keep the same weekly frequency for a date-only reflow. A frequency change needs a reviewed plan change from Add plan."
             preferredLongRunHelper="Optional. Rest days are unavailable; leaving this empty lets the backend choose the safe fallback."
           />
 
@@ -181,12 +184,7 @@ export function PlanScheduleEditPanel({
             />
           ) : null}
 
-          {regenerationResult ? (
-            <RequiresRegenerationReview
-              result={regenerationResult}
-              onUseRefreshPrompt={onUseRefreshPrompt}
-            />
-          ) : null}
+          {regenerationResult ? <RequiresRegenerationReview result={regenerationResult} /> : null}
         </div>
       </div>
     </details>
@@ -350,22 +348,16 @@ function ScheduleReflowReview({
   );
 }
 
-function RequiresRegenerationReview({
-  result,
-  onUseRefreshPrompt,
-}: {
-  result: ScheduleRegenerationPreview;
-  onUseRefreshPrompt: (prompt: string) => void;
-}) {
+function RequiresRegenerationReview({ result }: { result: ScheduleRegenerationPreview }) {
   return (
     <div className="hito-row-group">
       <div className="hito-list-row items-start">
         <div>
-          <p className="hito-list-row-title">Use Update plan for this change</p>
+          <p className="hito-list-row-title">Reviewed plan change needed</p>
           <p className="hito-list-row-copy">{result.message}</p>
         </div>
         <span className="hito-status-pill" data-tone="warning">
-          Refresh needed
+          Add plan
         </span>
       </div>
 
@@ -382,24 +374,17 @@ function RequiresRegenerationReview({
 
       <div className="hito-list-row items-start">
         <div className="min-w-0">
-          <p className="hito-list-row-title">Suggested Update plan prompt</p>
+          <p className="hito-list-row-title">Suggested Add plan context</p>
           <p className="hito-list-row-copy">{result.suggestedRefreshPrompt}</p>
         </div>
-        <button
-          type="button"
-          className="hito-button hito-button-secondary hito-button-sm"
-          onClick={() => onUseRefreshPrompt(result.suggestedRefreshPrompt)}
-        >
-          <Icon name="refresh" size="sm" />
-          Use in Update plan
-        </button>
       </div>
 
       <div className="hito-list-row items-start">
         <div>
           <p className="hito-list-row-title">No schedule applied here</p>
           <p className="hito-list-row-copy">
-            Frequency or fit changes need the existing Update plan review/apply flow.
+            Frequency or fit changes cannot be applied from Edit schedule. Start a reviewed plan
+            change from Add plan instead.
           </p>
         </div>
       </div>

@@ -97,11 +97,11 @@ user-supplied or intentionally promoted evidence that must travel with the backl
 
 Classify each item by:
 
-- type: `bug`, `improvement`, `design`, `copy`, `backend`, `qa`, `research`, `question`
+- issue category: `bug`, `improvement`, `design`, `copy`, `backend`, `qa`, `research`, `question`
 - severity: `blocker`, `high`, `medium`, `low`
-- priority: `now`, `next`, `later`, `parking-lot`
+- human priority: `now`, `next`, `later`, `parking-lot`
 - owner: `PRODUCT`, `ARCHITECT`, `FRONTEND`, `BACKEND`, `QA`, `DESIGNER`, `COPY`, `RUNNING COACH`
-- status: `new`, `triaged`, `ready`, `blocked`, `done`, `archived`
+- human status: `new`, `triaged`, `ready`, `blocked`, `done`, `archived`
 
 ### 5) Handoff
 
@@ -140,9 +140,13 @@ Classify each item by:
 
 ## Status
 
-new
+backlog
 
 ## Type
+
+bug | change_request | context_capture
+
+## Issue Category
 
 bug | improvement | design | copy | backend | qa | research | question
 
@@ -152,7 +156,15 @@ blocker | high | medium | low
 
 ## Priority
 
+low | medium | high | urgent
+
+## Human Priority
+
 now | next | later | parking-lot
+
+## Human Status
+
+new | triaged | ready | blocked | done | archived
 
 ## Owner
 

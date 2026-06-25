@@ -25,6 +25,16 @@ checks, follow the subagent delegation discipline in `AGENTS.md`: use read-only 
 safe, reuse open subagents for related follow-ups, close completed subagents, and integrate evidence
 into one verdict or recommendation.
 
+## Bolder Data-Quality Bias
+
+Data-quality work should find the shared failing contract, not only flag one bad row.
+
+- Prefer validator/source-contract fixes over prose-only reports.
+- When one anomaly implies a class of bad outputs, audit the neighboring paths in the same owner.
+- Do not create long Markdown inventories unless they are the only durable evidence needed.
+- If validation breaks after a contract is tightened, treat the break as useful signal and identify
+  the canonical owner to fix.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

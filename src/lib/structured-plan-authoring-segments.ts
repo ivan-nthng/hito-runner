@@ -3,7 +3,6 @@ import {
   type NormalizedStructuredInput,
 } from "@/lib/structured-plan-authoring-schema";
 import {
-  buildDefaultEstimatedHrTarget,
   buildEasyTarget,
   buildLongRunTarget,
   buildRepeatRecoveryTarget,
@@ -52,7 +51,10 @@ export function buildEasyRunSegments({
           mode: "time" as const,
           duration_min: durationMin,
         },
-        target: buildEasyTarget(normalized, { hrBand: easyHrBand }),
+        target: buildEasyTarget(normalized, {
+          hrBand: easyHrBand,
+          allowDefaultEstimatedHr: true,
+        }),
       },
     ];
   }
@@ -110,7 +112,10 @@ export function buildEasyRunSegments({
         duration_min: mainMin,
       },
       duration_min: mainMin,
-      target: buildEasyTarget(normalized, { hrBand: easyHrBand }),
+      target: buildEasyTarget(normalized, {
+        hrBand: easyHrBand,
+        allowDefaultEstimatedHr: true,
+      }),
     },
     {
       segment_id: `${workoutId}_seg_3`,
@@ -212,7 +217,6 @@ export function buildRunWalkAdaptationSegments({
       },
       duration_min: cooldownMin,
       target: {
-        ...buildDefaultEstimatedHrTarget(normalized, role === "recovery" ? "recovery" : "easy"),
         intensity: "walk_down_recovery",
         cue: "Keep this easier than the run/walk body.",
       },
@@ -230,10 +234,10 @@ export function buildSteadyRunSegments({
   normalized: NormalizedStructuredInput;
 }) {
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const steadyPaceTarget = paceTargets?.steady;
   const steadyTarget = {
     intensity: "steady_aerobic",
-    ...(paceTargets?.steady ? { pace_min_per_km_range: paceTargets.steady } : {}),
-    ...buildDefaultEstimatedHrTarget(normalized, "steady"),
+    ...(steadyPaceTarget ? { pace_min_per_km_range: steadyPaceTarget } : {}),
     cue: "Controlled breathing, still sustainable.",
   };
 
@@ -324,6 +328,7 @@ export function buildWarmupSegment(
   normalized: NormalizedStructuredInput,
 ) {
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const easyPaceTarget = paceTargets?.easy;
 
   return {
     segment_id: `${workoutId}_seg_${sequence}`,
@@ -337,8 +342,7 @@ export function buildWarmupSegment(
     duration_min: durationMin,
     target: {
       intensity: "easy",
-      ...(paceTargets?.easy ? { pace_min_per_km_range: paceTargets.easy } : {}),
-      ...buildDefaultEstimatedHrTarget(normalized, "easy"),
+      ...(easyPaceTarget ? { pace_min_per_km_range: easyPaceTarget } : {}),
       cue: "Start gently and loosen up.",
     },
   };
@@ -351,6 +355,7 @@ export function buildCooldownSegment(
   normalized: NormalizedStructuredInput,
 ) {
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const recoveryPaceTarget = paceTargets?.recovery;
 
   return {
     segment_id: `${workoutId}_seg_${sequence}`,
@@ -363,8 +368,7 @@ export function buildCooldownSegment(
     },
     duration_min: durationMin,
     target: {
-      ...(paceTargets?.recovery ? { pace_min_per_km_range: paceTargets.recovery } : {}),
-      ...buildDefaultEstimatedHrTarget(normalized, "recovery"),
+      ...(recoveryPaceTarget ? { pace_min_per_km_range: recoveryPaceTarget } : {}),
       hint: "Walk if needed before stopping.",
     },
   };

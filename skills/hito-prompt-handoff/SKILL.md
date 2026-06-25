@@ -12,6 +12,11 @@ Create precise next-role prompts that preserve Hito decisions and avoid scope dr
 This skill is owned by Product for routine Hito routing. Product reads the prior-agent report,
 explains the current state to the user, and writes the next-role prompt directly.
 
+Prompt handoff is routing, not execution. When the next step belongs to BACKEND, FRONTEND, QA,
+DESIGNER, RUNNING COACH, or another execution role, this skill should produce one self-contained
+role prompt. It must not make the router/orchestrator run that role's commands, browser checks,
+implementation patches, or QA proof locally. Autonomy belongs inside the assigned role prompt.
+
 ## Always-Visible Root-Cause Handoff Gate
 
 Before writing any next-role prompt, ask:
@@ -52,6 +57,23 @@ section. For QA prompts, this gate becomes explicit source-boundary proof and st
    the task needs stricter evidence, unusual ordering, or a non-standard report shape.
 10. Do not include a long continuity footer by default. Use only the standard shell plus `Blockers`
    for routine Product prompt-routing.
+
+## Bolder Autonomous Prompt Rule
+
+When the next owner can safely handle a root-cause batch, write the prompt for that batch instead of
+one micro-step.
+
+- Authorize the next role to use/reuse subagents for QA, code audit, coaching, or validation inside
+  the same lane.
+- Tell the role to continue through adjacent same-owner seams until validation fails, an owner
+  boundary is crossed, unsafe mutation appears, or a Product decision is needed.
+- Prefer prompts that require executable validators/source proof over prompts that ask for another
+  Markdown report.
+- Do not ask the user to relay routine Backend -> QA -> Backend or Frontend -> QA loops.
+- Include stop conditions, but do not turn every possible risk into a reason to avoid doing the
+  work.
+- Do not satisfy this rule by having the handoff writer run the implementation or QA itself. The
+  assigned role agent owns its own subagents and final integrated result.
 
 ## Product-Owned Direct Handoff
 
@@ -165,6 +187,9 @@ Blockers:
   tools are available. The delegated prompt must begin with `ROLE: <ROLE>` so the subagent loads the
   correct role instructions. Do not make the user copy-paste routine QA, source audit, or validation
   prompts when the parent role can safely delegate and integrate the result.
+- This delegation instruction applies to the parent execution role that owns the batch. A top-level
+  Product/orchestration router should normally write the autonomous prompt and stop, not spawn QA or
+  implementation subagents to complete another role's work.
 - For Hito Stack Simplification prompts to ARCHITECT or BACKEND, include subagent expectations by
   default. If you intentionally omit them, state why the task is single-file, inherently sequential,
   or blocked by unavailable subagent tooling.

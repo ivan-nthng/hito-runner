@@ -169,6 +169,7 @@ function collectCanonicalTargetIssues({
   }
 
   const hasHonestIntensityTarget =
+    hasPaceTarget(target) ||
     hasNonEmptyString(target.rpe) ||
     hasNonEmptyString(target.cadence_spm_range) ||
     hasNonEmptyString(target.hr_target_source);
@@ -188,7 +189,11 @@ function collectCanonicalTargetIssues({
     });
   }
 
-  if (row.metric_mode?.hr_targets_allowed === false && hasHrRangeTarget(target)) {
+  if (
+    row.metric_mode?.hr_targets_allowed === false &&
+    hasHrRangeTarget(target) &&
+    target.hr_target_source !== "default_estimated_hr"
+  ) {
     issues.push({
       kind: "fake_personal_hr_target",
       message: `${context} exposes HR range while metric policy disallows HR targets.`,
@@ -310,7 +315,10 @@ function hasHrRangeTarget(target: Record<string, unknown>) {
 }
 
 function hasPersonalHrTarget(target: Record<string, unknown>) {
-  return target.hr_target_source === "personal_hr_zone" || hasHrRangeTarget(target);
+  return (
+    target.hr_target_source === "personal_hr_zone" ||
+    (hasHrRangeTarget(target) && target.hr_target_source !== "default_estimated_hr")
+  );
 }
 
 function hasNonEmptyString(value: unknown) {

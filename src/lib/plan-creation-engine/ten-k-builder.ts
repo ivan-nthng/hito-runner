@@ -13,6 +13,13 @@ import {
   validateTenKDiversityPolicy,
 } from "@/lib/plan-creation-engine/ten-k-diversity-policy";
 import {
+  collectTenKBeginnerDosePolicyIssues,
+  resolveTenKBeginnerDosePolicyRunnerLevel,
+  shouldApplyTenKBeginnerDosePolicy,
+  summarizeTenKBeginnerDosePolicy,
+  type TenKBeginnerDosePolicySummary,
+} from "@/lib/plan-creation-engine/ten-k-beginner-dose-policy";
+import {
   resolveRunningPlanHorizonSelection,
   type RunningPlanHorizonSelection,
 } from "@/lib/plan-creation-engine/horizon-policy";
@@ -82,6 +89,7 @@ export interface TenKPlanNormalizedInputSummary extends RunningPlanBuilderInput 
   trainingWeekdays: readonly WeekdayName[];
   loadContext: TenKLoadContext;
   horizonSelection: RunningPlanHorizonSelection;
+  beginnerDosePolicy: TenKBeginnerDosePolicySummary;
 }
 
 export interface TenKPlanEndpointProof {
@@ -289,6 +297,7 @@ function normalizeTenKPlanBuilderInput(input: BuildTenKPlanPreviewInput):
     return failure(trainingWeekdays.code, trainingWeekdays.message);
   }
   const loadContext = resolveLoadContext(input);
+  const benchmarkPaceTruth = normalizeRunningPlanBenchmarkPaceTruth(input.benchmark);
 
   return {
     ok: true,
@@ -302,7 +311,7 @@ function normalizeTenKPlanBuilderInput(input: BuildTenKPlanPreviewInput):
       fixedRestDays,
       preferredLongRunDay: longRunResolution.longRunDay,
       startDate,
-      benchmarkPaceTruth: normalizeRunningPlanBenchmarkPaceTruth(input.benchmark),
+      benchmarkPaceTruth,
       normalizedBy: TEN_K_PLAN_BUILDER_SOURCE_KIND,
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
       longRunDaySource: longRunResolution.source,
@@ -313,6 +322,10 @@ function normalizeTenKPlanBuilderInput(input: BuildTenKPlanPreviewInput):
         runnerLevel: input.runnerLevel,
         loadContext,
         daysPerWeek,
+      }),
+      beginnerDosePolicy: summarizeTenKBeginnerDosePolicy({
+        runnerLevel: input.runnerLevel,
+        benchmarkPaceTruth,
       }),
     },
   };
@@ -331,6 +344,10 @@ function buildTenKCalendarRows(
     input.trainingWeekdays,
     input.preferredLongRunDay,
   );
+  const beginnerDosePolicy = shouldApplyTenKBeginnerDosePolicy({
+    runnerLevel: input.runnerLevel,
+    benchmarkPaceTruth: input.benchmarkPaceTruth,
+  });
   const horizonWeeks = input.horizonSelection.horizonWeeks;
   const finalEndpointDayNumber = resolveFinalEndpointDayNumber({
     startDate: input.startDate,
@@ -362,6 +379,7 @@ function buildTenKCalendarRows(
       runnerLevel: input.runnerLevel,
       loadContext: input.loadContext,
       horizonWeeks,
+      beginnerDosePolicy,
     });
 
     rows.push(
@@ -374,6 +392,7 @@ function buildTenKCalendarRows(
         runnerLevel: input.runnerLevel,
         loadContext: input.loadContext,
         horizonWeeks,
+        beginnerDosePolicy,
       }),
     );
   }
@@ -390,6 +409,7 @@ function buildWorkoutRow({
   runnerLevel,
   loadContext,
   horizonWeeks,
+  beginnerDosePolicy,
 }: {
   date: string;
   weekNumber: number;
@@ -399,6 +419,7 @@ function buildWorkoutRow({
   runnerLevel: RunningPlanRunnerLevel;
   loadContext: TenKPlanNormalizedInputSummary["loadContext"];
   horizonWeeks: number;
+  beginnerDosePolicy: boolean;
 }): TenKPlanCalendarRow {
   const template =
     workoutDayKind === "final_selected_distance_day"
@@ -411,6 +432,7 @@ function buildWorkoutRow({
     loadContext,
     weekNumber,
     horizonWeeks,
+    beginnerDosePolicy,
     segments: template.segments,
   });
 
@@ -478,6 +500,7 @@ function selectWorkoutDayKind({
   runnerLevel,
   loadContext,
   horizonWeeks,
+  beginnerDosePolicy,
 }: {
   weekNumber: number;
   weekday: WeekdayName;
@@ -487,7 +510,10 @@ function selectWorkoutDayKind({
   runnerLevel: RunningPlanRunnerLevel;
   loadContext: TenKPlanNormalizedInputSummary["loadContext"];
   horizonWeeks: number;
+  beginnerDosePolicy: boolean;
 }): RunningPlanWorkoutDayKind {
+  const effectiveRunnerLevel = beginnerDosePolicy ? "beginner_new_runner" : runnerLevel;
+
   if (weekday === longRunDay) {
     if (weekNumber === horizonWeeks) {
       return "final_selected_distance_day";
@@ -501,7 +527,7 @@ function selectWorkoutDayKind({
   }
 
   const developmentTouch = resolveTenKDevelopmentTouch({
-    runnerLevel,
+    runnerLevel: effectiveRunnerLevel,
     loadContext,
     weekNumber,
     horizonWeeks,
@@ -554,6 +580,10 @@ function enforceRecoveryAfterStressors(
       runnerLevel: input.runnerLevel,
       loadContext: input.loadContext,
       horizonWeeks: input.horizonSelection.horizonWeeks,
+      beginnerDosePolicy: shouldApplyTenKBeginnerDosePolicy({
+        runnerLevel: input.runnerLevel,
+        benchmarkPaceTruth: input.benchmarkPaceTruth,
+      }),
     });
   }
 
@@ -605,8 +635,18 @@ function validateTenKPlanPreview({
   validateForbiddenSignals(calendarRows, issues);
   issues.push(
     ...validateTenKDiversityPolicy({
-      runnerLevel: normalizedInputSummary.runnerLevel,
+      runnerLevel: resolveTenKBeginnerDosePolicyRunnerLevel({
+        runnerLevel: normalizedInputSummary.runnerLevel,
+        benchmarkPaceTruth: normalizedInputSummary.benchmarkPaceTruth,
+      }),
       loadContext: normalizedInputSummary.loadContext,
+      rows: calendarRows,
+    }),
+  );
+  issues.push(
+    ...collectTenKBeginnerDosePolicyIssues({
+      runnerLevel: normalizedInputSummary.runnerLevel,
+      benchmarkPaceTruth: normalizedInputSummary.benchmarkPaceTruth,
       rows: calendarRows,
     }),
   );

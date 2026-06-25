@@ -1322,7 +1322,7 @@ function buildRequiresRegenerationPreview({
       summary: message,
       bullets: [
         "Completed, logged, and evidence-backed workouts stay protected.",
-        "Use the existing Update plan review before applying any regenerated schedule.",
+        "Use Add plan from the calendar to start a reviewed plan change before applying any regenerated schedule.",
       ],
     },
   };

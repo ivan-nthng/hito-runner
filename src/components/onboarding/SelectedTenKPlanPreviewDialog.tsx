@@ -185,7 +185,7 @@ function CreateBlockedNotice({
         </div>
         {view.openPlan ? (
           <a href="/" className="hito-button hito-button-secondary hito-button-sm shrink-0">
-            Open plan
+            Back to calendar
           </a>
         ) : null}
       </div>
@@ -205,7 +205,7 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
       return {
         title: "Active plan already exists",
         copy: "Selected plans can create a new plan only when there is no active plan.",
-        helper: "Open plan to review the saved plan before changing anything.",
+        helper: "Use Add plan from the calendar to start a reviewed plan change.",
         openPlan: true,
         tone: "signal",
       };
@@ -416,7 +416,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
                               />
                             </button>
                           </TooltipTrigger>
-                          <TooltipContent className="hito-tooltip max-w-80" sideOffset={8}>
+                          <TooltipContent className="max-w-80" sideOffset={8}>
                             <span className="hito-tooltip-meta block">
                               {row.date} · {row.weekday} · {meta.label}
                             </span>
@@ -471,8 +471,20 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
           </p>
         </div>
         <div className="grid gap-3 lg:grid-cols-2">
-          {endpointRow ? <SegmentReadbackCard label="Endpoint day" row={endpointRow} /> : null}
-          {sampleRow ? <SegmentReadbackCard label="Sample workout day" row={sampleRow} /> : null}
+          {endpointRow ? (
+            <SegmentReadbackCard
+              benchmarkPaceAvailable={Boolean(draft.normalizedInputSummary.benchmarkPaceTruth)}
+              label="Endpoint day"
+              row={endpointRow}
+            />
+          ) : null}
+          {sampleRow ? (
+            <SegmentReadbackCard
+              benchmarkPaceAvailable={Boolean(draft.normalizedInputSummary.benchmarkPaceTruth)}
+              label="Sample workout day"
+              row={sampleRow}
+            />
+          ) : null}
         </div>
       </section>
     </div>
@@ -643,12 +655,16 @@ function expectedOutcomeCopy(draft: SelectedRunningPlanPreviewDraft) {
 }
 
 function SegmentReadbackCard({
+  benchmarkPaceAvailable,
   label,
   row,
 }: {
+  benchmarkPaceAvailable: boolean;
   label: string;
   row: SelectedRunningPlanCalendarRow;
 }) {
+  const targetBadge = segmentTargetBadge(row, benchmarkPaceAvailable);
+
   return (
     <article className="hito-selected-plan-segment-card">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
@@ -660,7 +676,7 @@ function SegmentReadbackCard({
           </p>
         </div>
         <span className="hito-status-pill" data-tone="success">
-          numeric structure
+          {targetBadge}
         </span>
       </div>
 
@@ -673,7 +689,9 @@ function SegmentReadbackCard({
             <span className="hito-body-small text-foreground/90">
               {formatPrescription(segment.primaryPrescription)}
             </span>
-            <span className="hito-caption">{truthModeReadback(segment.targetTruthMode)}</span>
+            <span className="hito-caption">
+              {truthModeReadback(segment.targetTruthMode, benchmarkPaceAvailable)}
+            </span>
             <span className="hito-caption">{segment.secondaryCue}</span>
           </li>
         ))}
@@ -693,10 +711,15 @@ function PreviewFact({ label, value }: { label: string; value: string }) {
 
 function metricTruthReadback(draft: SelectedRunningPlanPreviewDraft) {
   const benchmarkPaceTruth = draft.normalizedInputSummary.benchmarkPaceTruth;
+  const hasEditableDefaultHrGuidance = draft.calendarRows.some((row) =>
+    row.targetTruthModes.includes("editable_default_hr"),
+  );
 
   return benchmarkPaceTruth
     ? `${benchmarkPaceTruth.label} · personal HR targets blocked`
-    : "No benchmark pace supplied · structure-only targets";
+    : hasEditableDefaultHrGuidance
+      ? "No benchmark pace supplied · estimated HR guidance where allowed"
+      : "No benchmark pace supplied · structure-only targets";
 }
 
 function groupRowsByWeek(rows: readonly SelectedRunningPlanCalendarRow[]) {
@@ -986,10 +1009,29 @@ function formatNumberRange(range: RunningPlanRange) {
   return `${range.min}${range.min === range.max ? "" : `-${range.max}`}`;
 }
 
-function truthModeReadback(mode: SelectedRunningPlanCalendarRow["targetTruthModes"][number]) {
-  if (mode === "editable_default_hr") {
-    return "Default HR guidance is advisory, not personal HR target truth.";
+function segmentTargetBadge(row: SelectedRunningPlanCalendarRow, benchmarkPaceAvailable: boolean) {
+  if (benchmarkPaceAvailable) {
+    return "Structure + pace";
   }
 
-  return "Executable structure: duration, distance, repeats, work, and recovery.";
+  if (row.targetTruthModes.includes("editable_default_hr")) {
+    return "Structure + estimated HR";
+  }
+
+  return "Structure + effort";
+}
+
+function truthModeReadback(
+  mode: SelectedRunningPlanCalendarRow["targetTruthModes"][number],
+  benchmarkPaceAvailable: boolean,
+) {
+  if (benchmarkPaceAvailable) {
+    return "Trusted recent-5K pace is applied where this segment is eligible; HR targets remain blocked.";
+  }
+
+  if (mode === "editable_default_hr") {
+    return "Structure plus estimated HR guidance where allowed; advisory, not personal HR truth.";
+  }
+
+  return "Follow the shown structure and effort cue; no pace or HR target is supplied.";
 }

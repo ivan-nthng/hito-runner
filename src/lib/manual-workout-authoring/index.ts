@@ -51,7 +51,9 @@ export {
   type ManualWorkoutMoveConfirmResult,
   type ManualWorkoutMoveDependencies,
   type ManualWorkoutMoveFailureReason,
+  type ManualWorkoutMoveReplacementTarget,
   type ManualWorkoutMoveReviewResult,
+  type ManualWorkoutMoveTargetMode,
 } from "@/lib/manual-workout-authoring/move-workout";
 export {
   confirmManualWorkoutPersistedEdit,

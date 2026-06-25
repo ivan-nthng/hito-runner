@@ -32,6 +32,7 @@ import {
   DataTableSpecimenPreview,
   DemoButton,
   DemoInput,
+  InfoWindowPreview,
   MenuRow,
   ModalWindowPreview,
   SelectionControlPreview,
@@ -478,7 +479,7 @@ const TYPOGRAPHY_ROLES = [
   {
     role: "Modal title",
     className: "hito-modal-title",
-    sample: "Open plan",
+    sample: "Edit schedule",
     use: "Primary heading inside bounded product dialogs.",
     spec: "Fraunces · 1.75-2rem · 400 · -0.02em · lh 1.1",
   },
@@ -2736,9 +2737,9 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                         </div>
                         <div className="grid max-w-xl gap-3">
                           <div className="flex items-start gap-3">
-                            <Icon name="warning" size="sm" className="mt-1 text-destructive" />
+                            <Icon name="clear-calendar" size="sm" className="mt-1 text-signal" />
                             <p className="hito-field-helper">
-                              This archives the active plan and clears the active schedule view.
+                              This clears future scheduled workouts while keeping history archived.
                             </p>
                           </div>
                           <label className="hito-control-label hito-control-label-sm">
@@ -2752,10 +2753,9 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                           </label>
                           <button
                             type="button"
-                            data-tone="error"
-                            className="hito-button hito-button-outlined hito-button-sm justify-self-start"
+                            className="hito-button hito-button-secondary hito-button-sm justify-self-start"
                           >
-                            Delete plan
+                            Clear upcoming schedule
                           </button>
                         </div>
                       </article>
@@ -2916,6 +2916,17 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                   variants={
                     <div className="grid min-w-0 gap-6">
                       <div className="border-t border-hairline pt-5">
+                        <p className="hito-label">Compact info-window</p>
+                        <p className="hito-caption mt-1">
+                          Short confirmations stay small, keep the route visible, and avoid
+                          review-card anatomy.
+                        </p>
+                        <div className="mt-4">
+                          <InfoWindowPreview />
+                        </div>
+                      </div>
+
+                      <div className="border-t border-hairline pt-5">
                         <p className="hito-label">Body mode matrix</p>
                         <p className="hito-caption mt-1">
                           Short task dialogs fit to content; tall workflows and reviews keep footer
@@ -3038,7 +3049,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                   caption={[
                     {
                       label: "Proves",
-                      body: "The same stable overlay, centered product dialog shell, internal body scroll, and reachable footer used by review-before-apply flows, imports, body notes, and active-plan management.",
+                      body: "The same stable overlay, centered product dialog shell, internal body scroll, and reachable footer used by review-before-apply flows, imports, body notes, and calendar utilities.",
                     },
                     {
                       label: "Does not imply",
@@ -3049,7 +3060,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                       body: (
                         <ProductLinks
                           links={[
-                            { href: "/", label: "Open plan" },
+                            { href: "/", label: "Edit schedule" },
                             { href: "/settings", label: "Import plan" },
                             { href: "/workout/2026-05-18", label: "Body notes" },
                             { href: "/admin/login", label: "/admin/login" },

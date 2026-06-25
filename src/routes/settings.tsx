@@ -144,7 +144,7 @@ function SettingsPage() {
   if (snapshot.mode === "preview") {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
-        <div className="px-6 py-20 lg:px-10">
+        <div className="hito-route-gutter py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label">Sign in first</p>
             <h1 className="hito-page-title">User settings open after sign-in.</h1>
@@ -166,7 +166,7 @@ function SettingsPage() {
   if (!settings) {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
-        <div className="px-6 py-20 lg:px-10">
+        <div className="hito-route-gutter py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label">Finish setup first</p>
             <h1 className="hito-page-title">User settings need a saved runner profile.</h1>
@@ -190,7 +190,7 @@ function SettingsPage() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="hito-route-stack max-w-5xl px-6 py-10 lg:px-10">
+      <div className="hito-route-gutter hito-route-stack max-w-5xl py-10">
         <header className="hito-page-header">
           <p className="hito-label">User settings</p>
           <h1 className="hito-page-title">Profile details that follow your training.</h1>

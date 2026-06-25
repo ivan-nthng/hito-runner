@@ -8,8 +8,8 @@ import type { Json } from "@/lib/supabase/database";
 import type { Database } from "@/lib/supabase/database";
 import { normalizeExecutableStepInstructions, type Step } from "@/lib/training";
 
-type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
-type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
+export type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
+export type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 
 export function buildPersistedWorkoutInsertRows(
   planCycleId: string,
@@ -110,14 +110,12 @@ export function buildImportedLogCarryForwardPlan(
   const importedWorkoutsByDate = new Map(
     importedWorkouts.map((workout) => [workout.workoutDate, workout]),
   );
-  const unmatchedLoggedDates: string[] = [];
   const preservedLogs: Array<{ log: PersistedWorkoutLogRow; workoutDate: string }> = [];
 
   for (const entry of loggedExistingWorkouts) {
     const importedWorkout = importedWorkoutsByDate.get(entry.workout.workout_date);
 
     if (!importedWorkout || !isSameImportedWorkout(entry.workout, importedWorkout)) {
-      unmatchedLoggedDates.push(entry.workout.workout_date);
       continue;
     }
 
@@ -125,13 +123,6 @@ export function buildImportedLogCarryForwardPlan(
       log: entry.log!,
       workoutDate: importedWorkout.workoutDate,
     });
-  }
-
-  if (unmatchedLoggedDates.length > 0) {
-    return {
-      ok: false as const,
-      message: `This JSON was not applied because it would detach saved workout history on ${unmatchedLoggedDates.join(", ")}. Logged days must match exactly by date and workout content before the active plan can be replaced.`,
-    };
   }
 
   return {

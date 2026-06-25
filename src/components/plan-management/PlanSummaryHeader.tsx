@@ -1,7 +1,6 @@
 import type { PlanMeta } from "@/lib/training";
 import { formatDate } from "@/lib/training";
 import { Icon } from "@/components/ui/icon";
-import { PlanExportMenu, type PlanExportStatus } from "@/components/plan-management/PlanExportMenu";
 
 export function PlanSummaryHeader({
   planMeta,
@@ -10,10 +9,6 @@ export function PlanSummaryHeader({
   planDayCount,
   planWorkoutCount,
   defaultStartDate,
-  exportStatus,
-  exportError,
-  isBusy,
-  onExport,
 }: {
   planMeta: PlanMeta | null | undefined;
   goalFallback: string | null | undefined;
@@ -21,10 +16,6 @@ export function PlanSummaryHeader({
   planDayCount: number;
   planWorkoutCount: number;
   defaultStartDate: string;
-  exportStatus: PlanExportStatus;
-  exportError: string | null;
-  isBusy: boolean;
-  onExport: (format: "json" | "markdown") => void;
 }) {
   return (
     <section className="grid gap-3">
@@ -36,17 +27,9 @@ export function PlanSummaryHeader({
             {planMeta?.goal ?? goalFallback ?? `Saved schedule for ${runnerLabel}.`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <PlanExportMenu
-            available={Boolean(planMeta)}
-            disabled={isBusy}
-            status={exportStatus}
-            onExport={onExport}
-          />
-          <span className="hito-status-pill" data-tone="success">
-            Active
-          </span>
-        </div>
+        <span className="hito-status-pill" data-tone="success">
+          Active
+        </span>
       </div>
 
       <div className="hito-row-group">
@@ -78,8 +61,6 @@ export function PlanSummaryHeader({
           <Icon name="calendar" size="sm" className="text-muted-foreground" />
         </div>
       </div>
-
-      {exportError ? <p className="hito-field-error">{exportError}</p> : null}
     </section>
   );
 }

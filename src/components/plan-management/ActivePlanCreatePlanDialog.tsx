@@ -26,13 +26,11 @@ import {
   type ActivePlanTransitionReviewInput,
   type ActivePlanTransitionReviewResult,
 } from "@/lib/active-plan-transition-actions";
-import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 import type { TrainingSnapshot } from "@/lib/training";
 import {
   ActivePlanTransitionReviewDialog,
   CustomPlanTransitionNotice,
   TransitionBlockedNotice,
-  UnsupportedActivePlanNotice,
 } from "@/components/plan-management/ActivePlanTransitionReviewDialog";
 import {
   buildCandidateInput,
@@ -166,7 +164,7 @@ export function ActivePlanCreatePlanDialog({
     }),
     [constructorState, goalDistance, terrainFocus],
   );
-  const isActiveManualPlan = snapshot?.planMeta?.sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+  const hasActivePlan = Boolean(snapshot?.planMeta?.id);
   const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: effectiveConstructorState,
@@ -255,7 +253,7 @@ export function ActivePlanCreatePlanDialog({
       id: ACTIVE_PLAN_CREATE_TOAST_ID,
       title: "Reviewing plan change",
       description:
-        "Hito is checking the current manual plan and selected candidate before anything changes.",
+        "Hito is checking the current plan and selected candidate before anything changes.",
     });
 
     try {
@@ -344,7 +342,7 @@ export function ActivePlanCreatePlanDialog({
       hitoToast.success({
         id: ACTIVE_PLAN_CREATE_TOAST_ID,
         title: "Reviewed plan applied",
-        description: "Your previous manual plan was kept as history.",
+        description: "Your previous plan history stays in the calendar.",
         duration: 3000,
       });
       window.location.assign("/");
@@ -399,8 +397,6 @@ export function ActivePlanCreatePlanDialog({
 
           <div className="hito-product-dialog-body-scroll-fill">
             <div className="grid gap-6">
-              {!isActiveManualPlan ? <UnsupportedActivePlanNotice onOpenPlan={onOpenPlan} /> : null}
-
               <div
                 className="hito-tabs hito-tabs-simple w-fit max-w-full flex-wrap"
                 role="tablist"
@@ -459,7 +455,7 @@ export function ActivePlanCreatePlanDialog({
                   constructorStatus="idle"
                   draftResult={null}
                   constructorError={null}
-                  isBusy={isBusy || !isActiveManualPlan}
+                  isBusy={isBusy || !hasActivePlan}
                   isConstructorReady={isPresetDiscoveryReady}
                   onSubmit={() => {
                     selectedPlanPreview.setError(
@@ -476,7 +472,7 @@ export function ActivePlanCreatePlanDialog({
                       createStatus={transitionStatus === "reviewing" ? "creating" : "idle"}
                       error={selectedPlanPreview.error}
                       status={selectedPlanPreview.status}
-                      isBusy={isBusy || !isActiveManualPlan}
+                      isBusy={isBusy || !hasActivePlan}
                       isPresetDiscoveryReady={isPresetDiscoveryReady}
                       selectedCardId={selectedPlanPreview.selectedCardId}
                       previewOpen={selectedPlanPreview.previewOpen}
@@ -498,7 +494,7 @@ export function ActivePlanCreatePlanDialog({
                       onCreatePlan={() => {
                         void reviewSelectedPlanTransition();
                       }}
-                      previewDialogDescription="This candidate is still preview-only. Next, Hito reviews what changes in your current manual plan before anything is saved."
+                      previewDialogDescription="This candidate is still preview-only. Next, Hito reviews what changes in your current plan before anything is saved."
                       previewDialogPrimaryActionLabel="Review plan change"
                       previewDialogPrimaryActionPendingLabel="Reviewing change..."
                       previewDialogExtraNotice={

@@ -1,6 +1,6 @@
 ---
 name: hito-qa-browser-regression
-description: Use for Hito QA browser validation, Safari regression testing, auth/admin flow checks, frontend verification, and any report that needs a Passed/Failed verdict.
+description: Use for Hito QA validation reports that need a Passed/Failed verdict, including browser UI validation, Safari regression testing, auth/admin flow checks, frontend verification, or source/CLI validator QA. Browser and screenshot evidence are required only when the assigned scope is UI-facing or visual.
 ---
 
 # Hito QA Browser Regression
@@ -16,6 +16,8 @@ Verify Hito behavior with real browser evidence and honest coverage.
 - Keep QA-owned docs in `docs/process/`, `docs/tasks/qa/`, a plan's QA section, or another clearly QA-scoped docs location.
 - Do not edit product code, migrations, implementation plans, product briefs, design specs, or role instructions through this skill unless ARCHITECT explicitly assigns that docs-maintenance task.
 - QA docs must describe implemented behavior, expected validation, and coverage gaps; they must not invent new product requirements.
+- Do not create a QA Markdown artifact for routine command/source validation when the final verdict
+  can carry the durable evidence compactly.
 
 ## QA Execution Authority
 
@@ -83,6 +85,8 @@ Verify Hito behavior with real browser evidence and honest coverage.
 ## Screenshot Artifact Policy
 
 - For any visual, interface, layout, design-system, calendar, workout-detail, admin, onboarding, or other UI-facing QA task, capture screenshot evidence whenever the browser/tooling can reasonably do so.
+- Do not create screenshots for backend-only, source-only, docs-only, artifact-manifest, or
+  CLI/validator QA when those checks fully prove the assigned contract.
 - Screenshot evidence should cover the states that make the verdict believable: the main inspected surface, important before/after or pass/fail states, and any visual bug or regression being reported.
 - If screenshots are not possible or not useful for a UI-facing task, state the concrete reason in `Coverage gaps`.
 - Save routine screenshots under the gitignored local artifact root:
@@ -111,6 +115,16 @@ Verify Hito behavior with real browser evidence and honest coverage.
 10. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
 11. Report exact failures with repro steps.
 12. End with a verdict.
+
+## Bolder QA Matrix Rule
+
+- For broad root-cause fixes, validate the class of behavior, not only the first repro.
+- Prefer targeted source/build/fixture matrices over long Markdown reports when they prove the
+  contract better.
+- If the current validators are too narrow, fail with the exact missing validator or fixture class.
+- Do not require browser or screenshot evidence for backend/source contracts already proven by
+  no-write validators.
+- Do not pass a fix when a neighboring implemented path still violates the same root-cause contract.
 
 ## Hito-Specific Checks
 

@@ -144,6 +144,96 @@ Backend Slice R14A implementation result, 2026-06-15:
   - target-time-only diagnostic input emitted zero pace targets
   - source, 10K, R6, confirm, doctrine, ESLint, and build gates passed
 
+Backend metric-target fallback follow-up, 2026-06-23:
+
+- Promoted existing editable default estimated HR zones into the backend generated-plan target
+  fallback after RPE-first executable target readback was removed.
+- Contract now remains `pace OR estimated HR`: benchmark-backed segments keep pace targets where
+  allowed; no-benchmark generated non-rest segments emit `default_estimated_hr` `hr_bpm_range`
+  guidance derived from the existing age-estimated zone seam.
+- Personal HR-zone truth remains blocked: `hr_targets_allowed` stays `false` unless a real
+  personal zone source exists, and default estimated HR is labeled/read back as estimated guidance,
+  not personalized HR truth.
+- Validation evidence:
+  - no-benchmark selected 10K probe kept `84` rows / `60` non-rest rows and emitted `192`
+    default-estimated HR segment targets
+  - benchmark-backed selected 10K probe kept pace targets (`77` pace-capable segments)
+  - running-plan source, 10K, R6, confirm, doctrine, ESLint, build, and diff-check gates passed
+
+Backend beginner 10K dose and metric-target realism follow-up, 2026-06-23:
+
+- Added `ten_k_beginner_dose_policy_v1` for `beginner_new_runner` and visible-Beginner
+  `sometimes_runs` without usable benchmark truth.
+- Low-support 10K now applies conservative generation and review gates before acceptance:
+  Week 1 `120` running minutes, Week 1 long run `40` minutes, easy max `30` minutes, recovery max
+  `25` minutes, peak long run `75` minutes, no tempo/intervals/hills/threshold, exact final
+  `10000m` endpoint.
+- Narrowed default-estimated HR target output to allowed aerobic support rows
+  (`easy`/`recovery`/`long_run`/`cutback_long_run` main segments). Hard work without benchmark or
+  personal zones stays structure-first with effort/cue guidance, no fake pace, and no executable
+  default-HR target.
+- Benchmark-backed pace truth remains intact: targeted proof kept benchmark pace output (`77`
+  pace-capable segments, sample `6:30-7:30/km`) while no-benchmark hard rows emitted `0` fake pace
+  targets and `0` default-estimated HR targets.
+- Validation evidence:
+  - source, 10K builder, confirm, targeted dose/metric probes, scoped ESLint, build, and scoped
+    diff-check gates passed
+  - Supabase persistence proof remained skipped in confirm validation because Supabase env was not
+    configured
+
+Backend full quality matrix and target-doctrine follow-up, 2026-06-23:
+
+- Root cause: current validators could still accept `valid but weak coaching`, especially when
+  no-benchmark visible-Beginner `10K` was generated through low-support policy but scenario
+  richness still evaluated it as supported and expected tempo/interval work.
+- Aligned low-support `10K` source policy constants with the stricter accepted doctrine:
+  Week 1 `120` minutes, Week 1 long run `40` minutes, easy `30`, recovery `25`, peak long run
+  `75`, no tempo/intervals/hills/threshold, exact `10000m`.
+- Added a no-write quality matrix validator for the selected-plan engine and shared target-readback
+  contract proof. The matrix covers:
+  `10k_beginner_no_benchmark`, `10k_visible_beginner_sometimes_no_benchmark`,
+  `10k_sometimes_recent_5k_benchmark`, `10k_target_time_pressure_diagnostic`,
+  `half_beginner_no_benchmark`, `half_supported_no_benchmark`,
+  `marathon_base_beginner_no_benchmark`, `marathon_base_supported_no_benchmark`,
+  `marathon_completion_beginner_no_benchmark`, and
+  `marathon_completion_supported_no_benchmark`.
+- Fixed scenario richness evaluation to use the effective low-support `10K` runner level before
+  requiring supported tempo/interval richness; the artifact-writing scenario generator is now
+  secondary evidence, not the only acceptance gate.
+- Target doctrine is now validator-backed across the matrix:
+  no pace without recent-5K benchmark truth, benchmark-backed pace reaches useful quality/specific
+  rows across all selected families, default estimated HR appears only on aerobic support main
+  rows, hard rows never receive default low-HR targets, `hr_targets_allowed` stays `false`, and
+  generated target/readback text avoids personal/personalized HR wording.
+- Validation evidence:
+  - `node --import tsx ./scripts/validate-running-plan-engine-quality-matrix.ts` passed with all
+    `10` required fixtures
+  - source, 10K builder, R6 builders, confirm, scenario matrix, doctrine, scoped ESLint,
+    `npm run build`, and scoped `git diff --check` gates passed
+  - confirm benchmark proof preserved pace rows for `10K`, `Half Marathon`, `Marathon Base`, and
+    `Marathon Completion`; Supabase persistence proof remained skipped because Supabase env was not
+    configured
+
+Structured authoring default-HR doctrine blocker follow-up, 2026-06-23:
+
+- Root cause: selected-plan validation encoded the stricter target doctrine, but structured and
+  AI-first generated-plan target generation still had a neighboring path where age-estimated
+  `default_estimated_hr` could be emitted on hard tempo/threshold/steady-specificity rows.
+- Added one shared backend default-HR allowlist policy and reused it across structured finalization,
+  AI-first blueprint normalization, selected-plan target-readback validation, and plan-authoring
+  doctrine validation.
+- Structured authoring now strips disallowed default-HR targets before canonical metric-mode
+  resolution; tempo, threshold, intervals, hills, strides, progression, hard steady/specificity, and
+  hard-work recovery targets stay structure/effort-only unless recent-5K benchmark pace truth
+  exists.
+- Validation evidence:
+  - `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts` passed
+  - `node --import tsx ./scripts/validate-running-plan-engine-quality-matrix.ts` passed
+  - `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts` passed
+  - targeted structured probes proved no-benchmark threshold/tempo/hard rows emitted `0` fake pace
+    and `0` default-HR targets, while benchmark-backed threshold/tempo kept pace targets
+  - scoped ESLint, `npm run build`, and scoped `git diff --check` gates passed
+
 Source artifact:
 
 - [workout-metric-enrichment-truth-audit.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-15-workout-metric-enrichment-truth-audit.md>)
@@ -211,7 +301,8 @@ Status update, 2026-06-12:
   Half Marathon and Marathon Completion selected-distance endpoints no longer have to emit
   `race_pace_session`.
 - Preserved strict metric truth: no fake pace targets, no fake personal HR targets, and
-  `structure_only_executable` remains numeric structure plus runner-friendly RPE/effort target.
+  `structure_only_executable` remains numeric duration, distance, repeat, work, and recovery
+  structure instead of RPE-first executable target readback.
 
 Validation:
 

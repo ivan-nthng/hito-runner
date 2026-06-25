@@ -49,6 +49,10 @@ export function validateManualSourceEditingCapabilityReadback() {
   });
   assert.deepEqual(
     {
+      canMove: futureCapability.canMove,
+      canClear: futureCapability.canClear,
+      canCopy: futureCapability.canCopy,
+      canEditContent: futureCapability.canEditContent,
       canDirectCopy: futureCapability.canDirectCopy,
       canDirectMove: futureCapability.canDirectMove,
       canDragInitiate: futureCapability.canDragInitiate,
@@ -56,6 +60,10 @@ export function validateManualSourceEditingCapabilityReadback() {
       reason: futureCapability.reason,
     },
     {
+      canMove: true,
+      canClear: true,
+      canCopy: true,
+      canEditContent: true,
       canDirectCopy: true,
       canDirectMove: true,
       canDragInitiate: true,
@@ -118,7 +126,7 @@ export function validateManualSourceEditingCapabilityReadback() {
       },
     ],
   } satisfies PersistedPlannedWorkoutRow;
-  assertSourceEditingBlocked(
+  assertSourceEditingAllowed(
     resolveActivePlanWorkoutSourceEditingCapabilities({
       activePlan,
       workout: unsafeMetricWorkout,
@@ -126,8 +134,14 @@ export function validateManualSourceEditingCapabilityReadback() {
       evidenceWorkoutIds: new Set(),
       currentDate,
     }),
-    "unsafe_metric_truth",
-    "unsafe metric truth should block direct source affordances",
+    {
+      canClear: true,
+      canCopy: false,
+      canEditContent: false,
+      canMove: true,
+      eligibility: "eligible_future_unlogged",
+    },
+    "metric target truth should allow move/clear/drag but block copy/content edit",
   );
 
   const unsupportedWorkout = {
@@ -135,16 +149,23 @@ export function validateManualSourceEditingCapabilityReadback() {
     id: "00000000-0000-4000-8000-000000000024",
     source_workout_type: "legacy_freeform_workout",
   } satisfies PersistedPlannedWorkoutRow;
-  assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
-      workout: unsupportedWorkout,
-      log: null,
-      evidenceWorkoutIds: new Set(),
-      currentDate,
-    }),
-    "unsupported_source_workout",
-    "unsupported source metadata should block direct source affordances",
+  const unsupportedCapability = resolveActivePlanWorkoutSourceEditingCapabilities({
+    activePlan,
+    workout: unsupportedWorkout,
+    log: null,
+    evidenceWorkoutIds: new Set(),
+    currentDate,
+  });
+  assertSourceEditingAllowed(
+    unsupportedCapability,
+    {
+      canClear: true,
+      canCopy: false,
+      canEditContent: false,
+      canMove: true,
+      eligibility: "eligible_future_unlogged",
+    },
+    "unsupported source metadata should still allow row move/clear but not copy/content edit",
   );
 
   const restWorkout = buildFakePlannedWorkout({
@@ -192,6 +213,10 @@ export function validateManualSourceEditingCapabilityReadback() {
   });
   assert.deepEqual(
     {
+      canMove: missedCapability.canMove,
+      canClear: missedCapability.canClear,
+      canCopy: missedCapability.canCopy,
+      canEditContent: missedCapability.canEditContent,
       canDirectCopy: missedCapability.canDirectCopy,
       canDirectMove: missedCapability.canDirectMove,
       canDragInitiate: missedCapability.canDragInitiate,
@@ -199,13 +224,17 @@ export function validateManualSourceEditingCapabilityReadback() {
       reason: missedCapability.reason,
     },
     {
+      canMove: true,
+      canClear: true,
+      canCopy: false,
+      canEditContent: false,
       canDirectCopy: false,
       canDirectMove: true,
       canDragInitiate: true,
-      eligibility: "eligible_missed_unlogged_recent",
+      eligibility: "eligible_past_unlogged",
       reason: null,
     },
-    "recent missed unlogged rows should expose move/drag source capability for valid current or future empty targets",
+    "past missed unlogged rows should expose move/clear/drag source capability for valid empty targets",
   );
 
   const oldMissedReview = assertReady("source editing expired missed source", {
@@ -219,7 +248,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     id: "00000000-0000-4000-8000-000000000027",
     review: oldMissedReview,
   });
-  assertSourceEditingBlocked(
+  assertSourceEditingAllowed(
     resolveActivePlanWorkoutSourceEditingCapabilities({
       activePlan,
       workout: oldMissedWorkout,
@@ -227,8 +256,14 @@ export function validateManualSourceEditingCapabilityReadback() {
       evidenceWorkoutIds: new Set(),
       currentDate,
     }),
-    "missed_window_expired",
-    "expired missed rows should block direct source affordances",
+    {
+      canClear: true,
+      canCopy: false,
+      canEditContent: false,
+      canMove: true,
+      eligibility: "eligible_past_unlogged",
+    },
+    "older missed unlogged rows should remain mutable when they have no log or evidence",
   );
 
   const todayReview = assertReady("source editing today source", {
@@ -242,16 +277,37 @@ export function validateManualSourceEditingCapabilityReadback() {
     id: "00000000-0000-4000-8000-000000000028",
     review: todayReview,
   });
-  assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
-      workout: todayWorkout,
-      log: null,
-      evidenceWorkoutIds: new Set(),
-      currentDate,
-    }),
-    "past_not_missed_unlogged",
-    "today source rows should not expose missed-workout drag/move affordances",
+  const todayCapability = resolveActivePlanWorkoutSourceEditingCapabilities({
+    activePlan,
+    workout: todayWorkout,
+    log: null,
+    evidenceWorkoutIds: new Set(),
+    currentDate,
+  });
+  assert.deepEqual(
+    {
+      canMove: todayCapability.canMove,
+      canClear: todayCapability.canClear,
+      canCopy: todayCapability.canCopy,
+      canEditContent: todayCapability.canEditContent,
+      canDirectCopy: todayCapability.canDirectCopy,
+      canDirectMove: todayCapability.canDirectMove,
+      canDragInitiate: todayCapability.canDragInitiate,
+      eligibility: todayCapability.eligibility,
+      reason: todayCapability.reason,
+    },
+    {
+      canMove: true,
+      canClear: true,
+      canCopy: true,
+      canEditContent: true,
+      canDirectCopy: true,
+      canDirectMove: true,
+      canDragInitiate: true,
+      eligibility: "eligible_current_unlogged",
+      reason: null,
+    },
+    "today unlogged manual source rows should expose direct copy/move/drag source capability",
   );
 
   const presetPlan = buildFakePlanCycle({
@@ -261,16 +317,71 @@ export function validateManualSourceEditingCapabilityReadback() {
     startDate: "2026-06-01",
     endDate: "2026-06-30",
   });
-  assertSourceEditingBlocked(
+  const presetWorkout = {
+    ...futureWorkout,
+    plan_cycle_id: presetPlan.id,
+  } satisfies PersistedPlannedWorkoutRow;
+  assertSourceEditingAllowed(
     resolveActivePlanWorkoutSourceEditingCapabilities({
       activePlan: presetPlan,
-      workout: futureWorkout,
+      workout: presetWorkout,
       log: null,
       evidenceWorkoutIds: new Set(),
       currentDate,
     }),
-    "unsupported_active_plan_source",
-    "direct manual source affordances should stay manual-plan-only",
+    {
+      canClear: true,
+      canCopy: true,
+      canEditContent: true,
+      canMove: true,
+      eligibility: "eligible_future_unlogged",
+    },
+    "editable active-plan sources should expose row lifecycle affordances regardless of source kind",
+  );
+
+  const selectedPlan = buildFakePlanCycle({
+    userId,
+    id: "00000000-0000-4000-8000-000000000030",
+    sourceKind: "running_plan_engine_10k_builder_v1",
+    startDate: "2026-06-01",
+    endDate: "2026-06-30",
+  });
+  const selectedWorkout = buildFakePlannedWorkout({
+    userId,
+    planCycleId: selectedPlan.id,
+    id: "00000000-0000-4000-8000-000000000031",
+    date: "2026-06-18",
+    displayOrder: 3,
+    title: "Selected-plan aerobic run",
+    sourceWorkoutType: "selected_plan_easy_run",
+    workoutFamily: "easy",
+    workoutIdentity: "easy_aerobic_run",
+    calendarIconKey: "easy",
+    steps: [
+      {
+        type: "work",
+        segment_type: "main",
+        duration_min: 30,
+        target: { effort: "easy" },
+      },
+    ] as PersistedPlannedWorkoutRow["steps"],
+  });
+  assertSourceEditingAllowed(
+    resolveActivePlanWorkoutSourceEditingCapabilities({
+      activePlan: selectedPlan,
+      workout: selectedWorkout,
+      log: null,
+      evidenceWorkoutIds: new Set(),
+      currentDate,
+    }),
+    {
+      canClear: true,
+      canCopy: false,
+      canEditContent: false,
+      canMove: true,
+      eligibility: "eligible_future_unlogged",
+    },
+    "selected-plan generated rows should expose move/clear while copy/content edit stay editor-gated",
   );
 }
 
@@ -454,6 +565,51 @@ function assertSourceEditingBlocked(
   assert.equal(result.eligibility, "blocked", `${label}: eligibility should be blocked`);
   assert.equal(result.reason, reason, `${label}: blocked reason should be ${reason}`);
   assert.equal(typeof result.message, "string", `${label}: blocked message should be present`);
+}
+
+function assertSourceEditingAllowed(
+  result: ReturnType<typeof resolveActivePlanWorkoutSourceEditingCapabilities>,
+  expected: {
+    canClear: boolean;
+    canCopy: boolean;
+    canEditContent: boolean;
+    canMove: boolean;
+    eligibility: Exclude<
+      ReturnType<typeof resolveActivePlanWorkoutSourceEditingCapabilities>["eligibility"],
+      "blocked"
+    >;
+  },
+  label: string,
+) {
+  assert.deepEqual(
+    {
+      canClear: result.canClear,
+      canCopy: result.canCopy,
+      canDirectCopy: result.canDirectCopy,
+      canDirectMove: result.canDirectMove,
+      canDragInitiate: result.canDragInitiate,
+      canEditContent: result.canEditContent,
+      canMove: result.canMove,
+      copyReason: result.copyReason,
+      editContentReason: result.editContentReason,
+      eligibility: result.eligibility,
+      reason: result.reason,
+    },
+    {
+      canClear: expected.canClear,
+      canCopy: expected.canCopy,
+      canDirectCopy: expected.canCopy,
+      canDirectMove: expected.canMove,
+      canDragInitiate: expected.canMove,
+      canEditContent: expected.canEditContent,
+      canMove: expected.canMove,
+      copyReason: expected.canCopy ? null : "copy_requires_editor_support",
+      editContentReason: expected.canEditContent ? null : "edit_content_requires_editor_support",
+      eligibility: expected.eligibility,
+      reason: null,
+    },
+    label,
+  );
 }
 
 function formatResult(result: ManualWorkoutDraftReviewResult) {

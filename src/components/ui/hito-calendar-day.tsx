@@ -25,6 +25,8 @@ type HitoCalendarActionVisual = {
   disabled?: boolean;
   ariaLabel?: string;
   focusDemo?: boolean;
+  alwaysVisible?: boolean;
+  showCompactLabel?: boolean;
 };
 
 type HitoCalendarDateParts = {
@@ -42,6 +44,7 @@ type SharedVisualProps = {
   result?: HitoCalendarDayResultState;
   feedback?: HitoCalendarFeedbackState;
   action?: HitoCalendarActionVisual | null;
+  slotAction?: HitoCalendarActionVisual | null;
   today?: boolean;
   selected?: boolean;
   focused?: boolean;
@@ -77,6 +80,7 @@ export function HitoCalendarDayCell({
   pendingLabel,
   result = "none",
   selected = false,
+  slotAction,
   state,
   stateLabel,
   supportingText,
@@ -98,7 +102,7 @@ export function HitoCalendarDayCell({
       aria-label={ariaLabel}
       className={cn(
         "relative h-full min-w-0 border-hairline bg-transparent text-left transition-colors",
-        action && "group/hito-calendar-day",
+        (action || slotAction) && "group/hito-calendar-day",
         week
           ? "flex min-h-[170px] flex-col border-b p-4 lg:border-r lg:border-b-0"
           : "flex min-h-[8rem] flex-col border-r border-b p-2.5 xl:p-3",
@@ -125,6 +129,7 @@ export function HitoCalendarDayCell({
         dense={dense}
         result={showWorkoutMarkers ? result : "none"}
         reserveActionSpace={cornerAction || Boolean(pendingLabel)}
+        slotAction={slotAction}
         today={today}
         week={week}
         weekday={weekday}
@@ -152,6 +157,7 @@ export function HitoCalendarDayCell({
           className={cn(
             "mt-auto flex flex-wrap items-center gap-2 pt-3 transition-opacity",
             !action.focusDemo &&
+              !action.alwaysVisible &&
               "opacity-0 group-hover/hito-calendar-day:opacity-100 group-focus-within/hito-calendar-day:opacity-100",
           )}
         >
@@ -165,6 +171,7 @@ export function HitoCalendarDayCell({
             "absolute z-20 transition-opacity",
             week ? "right-3 top-3" : dense ? "right-1.5 top-1.5" : "right-2 top-2",
             !action.focusDemo &&
+              !action.alwaysVisible &&
               "opacity-0 group-hover/hito-calendar-day:opacity-100 group-focus-within/hito-calendar-day:opacity-100",
           )}
         >
@@ -191,6 +198,7 @@ export function HitoWorkoutDayRow({
   pendingLabel,
   result = "none",
   selected = false,
+  slotAction,
   state,
   stateLabel,
   supportingText,
@@ -212,6 +220,7 @@ export function HitoWorkoutDayRow({
       aria-label={ariaLabel}
       className={cn(
         "hito-calendar-mobile-row relative w-full items-start",
+        (action || slotAction) && "group/hito-calendar-day",
         interactive && "group-focus-visible:border-signal/45",
         today && "hito-calendar-mobile-row-today",
         outside && "hito-calendar-mobile-row-muted",
@@ -223,10 +232,12 @@ export function HitoWorkoutDayRow({
       {date ? (
         <span className="hito-calendar-mobile-date">
           {date.eyebrow ? <span>{date.eyebrow}</span> : null}
-          <span className="hito-calendar-mobile-date-main">
-            <strong>{date.day}</strong>
-            {showWorkoutMarkers ? <ResultMarker result={result} /> : null}
-          </span>
+          <DateSlotContent
+            day={date.day}
+            result={showWorkoutMarkers ? result : "none"}
+            slotAction={slotAction}
+            today={today}
+          />
           {date.meta ? <span>{date.meta}</span> : null}
         </span>
       ) : null}
@@ -286,6 +297,7 @@ function CellHeader({
   dense,
   result,
   reserveActionSpace,
+  slotAction,
   today,
   week,
   weekday,
@@ -294,6 +306,7 @@ function CellHeader({
   dense: boolean;
   result: HitoCalendarDayResultState;
   reserveActionSpace: boolean;
+  slotAction?: HitoCalendarActionVisual | null;
   today: boolean;
   week: boolean;
   weekday?: string;
@@ -302,32 +315,87 @@ function CellHeader({
     return (
       <div className="flex items-center justify-between">
         <span className="hito-micro-label">{weekday}</span>
-        <span className={cn("flex items-center gap-1.5", reserveActionSpace && "pr-7")}>
-          <span className="hito-technical-mono">{day}</span>
-          <ResultMarker result={result} />
-        </span>
+        <DateSlotContent
+          day={day}
+          result={result}
+          reserveActionSpace={reserveActionSpace}
+          slotAction={slotAction}
+          today={today}
+        />
       </div>
     );
   }
 
   return (
-    <div className={cn("flex min-w-0 items-center gap-1.5", reserveActionSpace && "pr-7")}>
+    <DateSlotContent
+      day={day}
+      dense={dense}
+      result={result}
+      reserveActionSpace={reserveActionSpace}
+      slotAction={slotAction}
+      today={today}
+      weekday={weekday}
+    />
+  );
+}
+
+function DateSlotContent({
+  day,
+  dense = false,
+  reserveActionSpace = false,
+  result,
+  slotAction,
+  today = false,
+  weekday,
+}: {
+  day: string;
+  dense?: boolean;
+  reserveActionSpace?: boolean;
+  result: HitoCalendarDayResultState;
+  slotAction?: HitoCalendarActionVisual | null;
+  today?: boolean;
+  weekday?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "relative inline-flex min-w-0 items-center gap-1.5",
+        reserveActionSpace && "pr-7",
+      )}
+    >
       <span
         className={cn(
-          "hito-technical-mono text-muted-foreground",
-          dense && "text-[0.625rem]",
-          today && "text-signal",
+          "inline-flex min-w-0 items-center gap-1.5 transition-opacity",
+          slotAction &&
+            "group-hover/hito-calendar-day:opacity-0 group-focus-within/hito-calendar-day:opacity-0 group-hover/manual-day:opacity-0 group-focus-within/manual-day:opacity-0",
         )}
       >
-        {day}
+        <span
+          className={cn(
+            "hito-technical-mono text-muted-foreground",
+            dense && "text-[0.625rem]",
+            today && "text-signal",
+          )}
+        >
+          {day}
+        </span>
+        {weekday ? (
+          <span className="hito-micro-label ml-1 text-[0.625rem] text-muted-foreground">
+            {weekday}
+          </span>
+        ) : null}
+        <ResultMarker result={result} />
       </span>
-      {weekday ? (
-        <span className="hito-micro-label ml-1 text-[0.625rem] text-muted-foreground">
-          {weekday}
+      {slotAction ? (
+        <span
+          className="hito-label pointer-events-none absolute inset-y-0 left-0 inline-flex items-center gap-1 whitespace-nowrap text-signal opacity-0 transition-opacity group-hover/hito-calendar-day:opacity-100 group-focus-within/hito-calendar-day:opacity-100 group-hover/manual-day:opacity-100 group-focus-within/manual-day:opacity-100"
+          aria-hidden="true"
+        >
+          {slotAction.icon ? <Icon name={slotAction.icon} size="xs" /> : null}
+          {slotAction.label}
         </span>
       ) : null}
-      <ResultMarker result={result} />
-    </div>
+    </span>
   );
 }
 
@@ -525,7 +593,7 @@ function ActionVisual({
   action: HitoCalendarActionVisual;
   compact?: boolean;
 }) {
-  const label = compact && !action.trailingIcon ? null : action.label;
+  const label = compact && !action.trailingIcon && !action.showCompactLabel ? null : action.label;
 
   if (action.button) {
     const iconOnly = action.button === "icon-ghost";

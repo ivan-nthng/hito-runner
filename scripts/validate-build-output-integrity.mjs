@@ -6,18 +6,20 @@ const rootDir = process.cwd();
 
 export function validateLocalBuildOutput(options = {}) {
   const validationRoot = options.rootDir ?? rootDir;
+  const runtimeOutput = resolveLocalRuntimeOutput(validationRoot);
   const requiredPaths = [
-    ".output/nitro.json",
-    ".output/public/favicon.svg",
-    ".output/public/templates/hito-training-plan-v2-template.json",
-    ".output/server/index.mjs",
+    runtimeOutput.nitroManifest,
+    resolve(runtimeOutput.publicDir, "favicon.svg"),
+    resolve(runtimeOutput.publicDir, "templates/hito-training-plan-v2-template.json"),
+    resolve(runtimeOutput.serverDir, "index.mjs"),
   ];
 
   validateRequiredPaths(validationRoot, requiredPaths);
 
-  const importSummary = validateRelativeMjsImports(resolve(validationRoot, ".output/server"));
+  const importSummary = validateRelativeMjsImports(runtimeOutput.serverDir);
   return {
     mode: "local",
+    runtimeServerRoot: relative(validationRoot, runtimeOutput.serverDir),
     ...importSummary,
   };
 }
@@ -55,6 +57,30 @@ function validateRequiredPaths(validationRoot, requiredPaths) {
         .join(", ")}`,
     );
   }
+}
+
+function resolveLocalRuntimeOutput(validationRoot) {
+  const finalizedServerDir = resolve(validationRoot, "logs/build-output-finalized/server");
+  const finalizedPublicDir = resolve(validationRoot, "logs/build-output-finalized/public");
+  const finalizedNitroManifest = resolve(validationRoot, "logs/build-output-finalized/nitro.json");
+
+  if (
+    existsSync(resolve(finalizedServerDir, "index.mjs")) &&
+    existsSync(resolve(finalizedPublicDir, "favicon.svg")) &&
+    existsSync(finalizedNitroManifest)
+  ) {
+    return {
+      serverDir: finalizedServerDir,
+      publicDir: finalizedPublicDir,
+      nitroManifest: finalizedNitroManifest,
+    };
+  }
+
+  return {
+    serverDir: resolve(validationRoot, ".output/server"),
+    publicDir: resolve(validationRoot, ".output/public"),
+    nitroManifest: resolve(validationRoot, ".output/nitro.json"),
+  };
 }
 
 function validateRelativeMjsImports(serverRoot) {
@@ -151,7 +177,7 @@ function runCli() {
   const summary = mode === "vercel" ? validateVercelBuildOutput() : validateLocalBuildOutput();
 
   console.log(
-    `[build-integrity] ${summary.mode} ok: mjsFiles=${summary.mjsFileCount}, relativeMjsImports=${summary.relativeMjsImportCount}`,
+    `[build-integrity] ${summary.mode} ok: runtime=${summary.runtimeServerRoot ?? "vercel"} mjsFiles=${summary.mjsFileCount}, relativeMjsImports=${summary.relativeMjsImportCount}`,
   );
 }
 

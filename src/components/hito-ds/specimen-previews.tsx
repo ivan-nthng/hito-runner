@@ -423,6 +423,66 @@ export function ModalWindowPreview({
   );
 }
 
+export function InfoWindowPreview() {
+  const contentClassName =
+    "hito-dialog-stable hito-window hito-window-content-fit hito-info-window";
+
+  const renderInfoWindowContents = (live: boolean) => (
+    <>
+      <DialogHeader className="hito-info-window-header">
+        {live ? (
+          <>
+            <DialogTitle className="hito-info-window-title">Replace target workout?</DialogTitle>
+            <DialogDescription className="hito-info-window-copy">
+              This will replace the workout currently on the target day.
+            </DialogDescription>
+          </>
+        ) : (
+          <>
+            <h3 className="hito-info-window-title">Replace target workout?</h3>
+            <p className="hito-info-window-copy">
+              This will replace the workout currently on the target day.
+            </p>
+          </>
+        )}
+      </DialogHeader>
+      <DialogFooter className="hito-info-window-footer">
+        <button type="button" className="hito-button hito-button-secondary hito-button-sm">
+          Cancel
+        </button>
+        <button type="button" className="hito-button hito-button-primary hito-button-sm">
+          Replace workout
+        </button>
+      </DialogFooter>
+    </>
+  );
+
+  return (
+    <div className="grid gap-4">
+      <article className={contentClassName}>{renderInfoWindowContents(false)}</article>
+      <div className="flex flex-wrap items-center gap-3">
+        <Dialog>
+          <DialogTrigger asChild>
+            <button type="button" className="hito-button hito-button-primary hito-button-md">
+              Open live info-window
+            </button>
+          </DialogTrigger>
+          <DialogContent
+            className={contentClassName}
+            overlayClassName="hito-dialog-overlay-stable hito-info-window-overlay"
+          >
+            {renderInfoWindowContents(true)}
+          </DialogContent>
+        </Dialog>
+        <p className="hito-caption max-w-md">
+          Use for one short confirmation where the runner should keep the current calendar or route
+          in view behind a light overlay.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ChoiceSelector<T extends string>({
   label,
   value,

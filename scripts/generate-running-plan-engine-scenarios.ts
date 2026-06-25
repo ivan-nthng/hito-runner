@@ -21,6 +21,7 @@ import {
   type RunningPlanRunnerLevel,
 } from "../src/lib/plan-creation-engine";
 import { findForbiddenRunnerFacingLanguageMatchesInText } from "../src/lib/plan-creation-engine/forbidden-runner-facing-language";
+import { resolveTenKBeginnerDosePolicyRunnerLevel } from "../src/lib/plan-creation-engine/ten-k-beginner-dose-policy";
 import {
   buildCoachReviewScenarioDefinitions,
   buildCoachReviewSubset,
@@ -251,11 +252,12 @@ function buildScenarioOutput(definition: ScenarioDefinition) {
   }
 
   const draft = result.draft;
+  const qualityGateRunnerLevel = resolveScenarioQualityGateRunnerLevel(draft);
   const exactness = summarizeExactness(draft.calendarRows);
   const metricTruthScan = scanRunnerFacingMetricTruth(draft.calendarRows);
   const runnerFacingRichness = summarizeRunnerFacingPreviewRichness({
     family: draft.planFamily,
-    runnerLevel: definition.input.runnerLevel,
+    runnerLevel: qualityGateRunnerLevel,
     loadContext: draft.normalizedInputSummary.loadContext,
     rows: draft.calendarRows,
   });
@@ -267,6 +269,7 @@ function buildScenarioOutput(definition: ScenarioDefinition) {
     status: "preview_ready" as const,
     family: draft.planFamily,
     runnerLevel: definition.input.runnerLevel,
+    qualityGateRunnerLevel,
     bodyProfile: definition.bodyProfile,
     bodyProfileLabel: definition.bodyProfileLabel,
     bodyLoadProfile: definition.bodyLoadProfile,
@@ -287,7 +290,7 @@ function buildScenarioOutput(definition: ScenarioDefinition) {
     compositionGrammar: summarizeCompositionGrammar({
       rows: draft.calendarRows,
       family: draft.planFamily,
-      runnerLevel: definition.input.runnerLevel,
+      runnerLevel: qualityGateRunnerLevel,
       loadContext: draft.normalizedInputSummary.loadContext,
     }),
     durabilitySignals: summarizeDurabilitySignals(draft.calendarRows),
@@ -309,6 +312,19 @@ function buildScenarioOutput(definition: ScenarioDefinition) {
     metricTruthScan,
     draft,
   };
+}
+
+function resolveScenarioQualityGateRunnerLevel(
+  draft: Extract<ReturnType<typeof buildScenario>, { ok: true }>["draft"],
+) {
+  if (draft.planFamily !== "10K") {
+    return draft.normalizedInputSummary.runnerLevel;
+  }
+
+  return resolveTenKBeginnerDosePolicyRunnerLevel({
+    runnerLevel: draft.normalizedInputSummary.runnerLevel,
+    benchmarkPaceTruth: draft.normalizedInputSummary.benchmarkPaceTruth,
+  });
 }
 
 function buildScenario(input: ScenarioInput) {

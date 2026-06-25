@@ -4,6 +4,10 @@ import {
   deriveExecutableModeFromSegments,
   normalizeCanonicalMetricMode,
 } from "../../src/lib/rich-workout-model";
+import {
+  allowsDefaultEstimatedHrTarget,
+  targetIsDefaultEstimatedHr,
+} from "../../src/lib/default-estimated-hr-target-policy";
 import type { StructuredFirstPlanOnboardingRequestInput } from "../../src/lib/structured-first-plan-onboarding";
 import type { StructuredPlanAuthoringInput } from "../../src/lib/structured-plan-authoring";
 import {
@@ -129,28 +133,117 @@ function assertStructureOnlyReadbackKeepsNumericAnatomy(plan: TrainingPlanV2, la
 }
 
 function hrTargetRecords(plan: TrainingPlanV2) {
-  return allSegments(plan).flatMap((segment) => {
-    const targets = [segment.target, segment.recovery_target] as Array<
-      Record<string, unknown> | undefined
-    >;
+  return plan.planned_workouts.flatMap((workout) =>
+    (workout.segments as SegmentRecord[]).flatMap((segment) => {
+      const targets = [
+        { target: segment.target as Record<string, unknown> | undefined, targetKind: "target" },
+        {
+          target: segment.recovery_target as Record<string, unknown> | undefined,
+          targetKind: "recovery_target",
+        },
+      ] as const;
 
-    return targets.filter(
-      (target): target is Record<string, unknown> =>
-        typeof target?.hr_bpm_range === "string" || typeof target?.hr_bpm === "string",
-    );
-  });
+      return targets
+        .filter(
+          (entry): entry is (typeof targets)[number] & { target: Record<string, unknown> } =>
+            typeof entry.target?.hr_bpm_range === "string" ||
+            typeof entry.target?.hr_bpm === "string",
+        )
+        .map((entry) => ({
+          workout,
+          segment,
+          target: entry.target,
+          targetKind: entry.targetKind,
+        }));
+    }),
+  );
 }
 
 export function assertNoDefaultEstimatedHrTargets(plan: TrainingPlanV2, label: string) {
+  assertDefaultEstimatedHrTargetsAreAdvisory(plan, label);
+}
+
+export function assertDefaultEstimatedHrTargetsAreAdvisory(plan: TrainingPlanV2, label: string) {
   const hrTargets = hrTargetRecords(plan);
 
-  assert.deepEqual(hrTargets, [], `${label}: age-estimated HR must not emit HR target ranges`);
+  for (const { workout, segment, target, targetKind } of hrTargets) {
+    assert.equal(
+      target.hr_target_source,
+      "default_estimated_hr",
+      `${label}: HR target ranges without personal zones must be explicitly default-estimated`,
+    );
+    assert.notEqual(
+      target.hr_target_source,
+      "personal_hr_zone",
+      `${label}: default estimated HR must not become personal HR-zone truth`,
+    );
+    assert.equal(
+      allowsDefaultEstimatedHrTarget({
+        sourceWorkoutType: workout.source_workout_type,
+        workoutType: workout.workout_type,
+        segmentType: String(segment.segment_type ?? ""),
+        segmentId: String(segment.segment_id ?? ""),
+        targetKind,
+      }),
+      true,
+      `${label}: ${workout.workout_id}.${String(
+        segment.segment_type ?? "unknown",
+      )}.${targetKind} default estimated HR is allowed only on aerobic support main work`,
+    );
+  }
 
   for (const workout of plan.planned_workouts) {
     assert.equal(
       workout.metric_mode?.hr_targets_allowed,
       false,
       `${label}: metric_mode must not claim HR targets without personal zone truth`,
+    );
+    assert.notEqual(
+      workout.metric_mode?.hr_target_source,
+      "personal_hr_zone",
+      `${label}: metric_mode must not claim personal HR-zone source without personal zones`,
+    );
+  }
+}
+
+function assertDefaultEstimatedHrReadbackSurvivesSavedWorkoutReadback(
+  plan: TrainingPlanV2,
+  label: string,
+) {
+  const importedSeed = buildImportedPlanSeed(plan);
+  const defaultHrWorkouts = importedSeed.workouts.filter((workout) => {
+    const metricMode = normalizeCanonicalMetricMode(workout.metricMode);
+    const primaryTarget = primaryWorkoutTarget({ steps: workout.steps });
+    const executableTargets = displayExecutableTargetEntries(primaryTarget, metricMode);
+
+    return executableTargets.some((entry) => entry.key === "hr_bpm_range");
+  });
+
+  assert.ok(
+    defaultHrWorkouts.length > 0,
+    `${label}: expected saved-readback workouts with default estimated HR target guidance`,
+  );
+
+  for (const workout of defaultHrWorkouts) {
+    const metricMode = normalizeCanonicalMetricMode(workout.metricMode);
+    const primaryTarget = primaryWorkoutTarget({ steps: workout.steps });
+    const executableTargets = displayExecutableTargetEntries(primaryTarget, metricMode);
+
+    assert.equal(
+      metricMode?.hrTargetsAllowed,
+      false,
+      `${label}: ${workout.workoutDate} default HR readback must not claim personal HR targets`,
+    );
+    assert.equal(
+      metricMode?.hrTargetSource,
+      "default_estimated_hr",
+      `${label}: ${workout.workoutDate} default HR readback should preserve source metadata`,
+    );
+    assert.ok(
+      executableTargets.some(
+        (entry) => entry.key === "hr_bpm_range" && entry.label === "Estimated HR",
+      ),
+      `${label}: ${workout.workoutDate} should expose default HR as Estimated HR, not hidden structure-only readback`,
     );
   }
 }
@@ -217,6 +310,10 @@ function targetHasHr(target: Record<string, unknown> | undefined) {
   return typeof target?.hr_bpm_range === "string" || typeof target?.hr_bpm === "string";
 }
 
+function targetHasNonDefaultHr(target: Record<string, unknown> | undefined) {
+  return targetHasHr(target) && !targetIsDefaultEstimatedHr(target);
+}
+
 function nonRestWorkouts(plan: TrainingPlanV2) {
   return plan.planned_workouts.filter((workout) => workout.workout_type !== "rest");
 }
@@ -238,7 +335,9 @@ function assertNoHrOnMainTargetsForIdentities(
           String(segment.segment_type ?? ""),
         ),
       )
-      .filter((segment) => targetHasHr(segment.target as Record<string, unknown> | undefined))
+      .filter((segment) =>
+        targetHasNonDefaultHr(segment.target as Record<string, unknown> | undefined),
+      )
       .map((segment) => `${workout.workout_id}:${workout.source_workout_type}:${segment.label}`);
   });
 
@@ -255,7 +354,7 @@ export function assertNoFakeMetricTargetRegression(plan: TrainingPlanV2, label: 
     false,
     `${label}: should not add fake pace targets`,
   );
-  assertNoDefaultEstimatedHrTargets(plan, label);
+  assertDefaultEstimatedHrTargetsAreAdvisory(plan, label);
 }
 
 export function assertMetricTargetReadbackContracts({
@@ -333,11 +432,15 @@ export function assertMetricTargetReadbackContracts({
     noBenchmarkMixedGuidance,
     "mixed guidance without usable recent 5K truth",
   );
+  assertDefaultEstimatedHrReadbackSurvivesSavedWorkoutReadback(
+    noBenchmarkMixedGuidance,
+    "mixed guidance without usable recent 5K truth",
+  );
 
   for (const plan of [supportedPace, buildPlan(buildRequest("marathon")).plan, mountainPlan]) {
-    assertNoDefaultEstimatedHrTargets(
+    assertDefaultEstimatedHrTargetsAreAdvisory(
       plan,
-      "age-supported plan without personal HR zones should not emit default HR targets",
+      "age-supported plan without personal HR zones should keep default HR advisory",
     );
   }
 
@@ -374,12 +477,14 @@ export function assertMetricTargetReadbackContracts({
     .filter((segment) =>
       ["main", "tempo_block", "interval_block"].includes(String(segment.segment_type ?? "")),
     )
-    .filter((segment) => targetHasHr(segment.target as Record<string, unknown> | undefined));
+    .filter((segment) =>
+      targetHasNonDefaultHr(segment.target as Record<string, unknown> | undefined),
+    );
 
   assert.deepEqual(
     sustainedTempoHrTargets,
     [],
-    "sustained tempo/threshold blocks must not receive age-estimated HR ranges without personal zones",
+    "sustained tempo/threshold blocks must not receive HR ranges without personal zones",
   );
   assertStructureOnlyExecutableContract(halfPlan, "half-marathon metric-truth executable contract");
 }

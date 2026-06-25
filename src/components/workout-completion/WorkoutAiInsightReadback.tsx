@@ -3,6 +3,8 @@ import type {
   WorkoutComparisonSummary,
 } from "@/lib/workout-result-import/types";
 import { hasPrimaryMatchedVerdict } from "@/components/workout-completion/WorkoutComparisonReadback";
+import { Icon } from "@/components/ui/icon";
+import { formatWorkoutFeedbackTimestamp } from "@/components/workout-completion/workout-feedback-time";
 
 export function WorkoutAiInsightReadback({
   insight,
@@ -43,7 +45,7 @@ export function WorkoutAiInsightReadback({
         <span className="hito-status-pill" data-tone={recommendationTone}>
           {recommendationLabel}
         </span>
-        <span className="hito-caption">{formatAiInsightLoggedAt(insight.createdAt)}</span>
+        <span className="hito-caption">{formatWorkoutFeedbackTimestamp(insight.createdAt)}</span>
       </div>
 
       <p className="hito-caption">{supportCopy}</p>
@@ -59,9 +61,12 @@ export function WorkoutAiInsightReadback({
       {matchedPrimaryVerdict ? (
         <AiInsightSection label={differenceLabel} body={insight.differenceExplanation} />
       ) : (
-        <details className="border-t border-hairline pt-4">
-          <summary className="hito-label cursor-pointer list-none">{differenceLabel}</summary>
-          <div className="mt-3 space-y-3">
+        <details className="hito-disclosure">
+          <summary className="hito-disclosure-summary">
+            <span className="hito-label text-foreground">{differenceLabel}</span>
+            <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
+          </summary>
+          <div className="hito-disclosure-body">
             <p className="hito-body-small">{insight.differenceExplanation}</p>
             {cautionSummary ? (
               <div className="rounded-lg bg-background/18 px-3 py-2">
@@ -161,13 +166,4 @@ function summarizeAiCautionFlags(flags: string[]) {
   }
 
   return `This note stays cautious because ${uniqueClauses.join(", ")}.`;
-}
-
-function formatAiInsightLoggedAt(value: string) {
-  return new Date(value).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }

@@ -25,6 +25,17 @@ research, follow the subagent delegation discipline in `AGENTS.md`: use read-onl
 they can reduce user routing, reuse open subagents for similar follow-ups, close them when done, and
 integrate findings into one strategic recommendation.
 
+## Bolder System Advice Bias
+
+When the system is accumulating duplicate paths, docs, or compatibility layers, recommend the
+root-cause cleanup lane instead of another cautious planning loop.
+
+- Prefer fewer canonical paths over preserving every legacy option.
+- Prefer a larger same-owner cleanup batch over many micro-prompts when validation can cover it.
+- Prefer implemented functionality and existing owners over new frameworks, docs, or orchestration.
+- Do not recommend new Markdown process unless it directly removes ambiguity or replaces larger
+  recurring noise.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

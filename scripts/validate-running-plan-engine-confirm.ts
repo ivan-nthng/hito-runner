@@ -5,6 +5,7 @@ import {
   reviewActivePlanTransitionForUser,
   type ActivePlanTransitionDependencies,
 } from "../src/lib/active-plan-transition-actions";
+import { buildActivePlanReplacementCarryForward } from "../src/lib/active-plan-replacement-carry-forward";
 import type { ExistingPlanContext } from "../src/lib/active-plan-persistence";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../src/lib/manual-workout-authoring/schema";
 import {
@@ -28,9 +29,14 @@ import {
   summarizeRunnerFacingCanonicalRichness,
 } from "../src/lib/plan-creation-engine";
 import type { RunningPlanDistanceFamily } from "../src/lib/plan-creation-engine";
+import { resolveTenKBeginnerDosePolicyRunnerLevel } from "../src/lib/plan-creation-engine/ten-k-beginner-dose-policy";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import type { Database, Json } from "../src/lib/supabase/database";
 import { createAdminSupabaseClient } from "../src/lib/supabase/server";
+import {
+  benchmarkPaceUsefulWorkoutKinds,
+  validateRunnerFacingTargetReadbackContract,
+} from "./running-plan-engine-target-readback-contract";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -98,6 +104,11 @@ const baseInput = {
   preferredLongRunDay: "Sunday",
   startDate: "2026-06-08",
 } as const;
+
+const RECENT_5K_BENCHMARK = {
+  kind: "recent_5k_time",
+  recent5kTime: "25:00",
+} as const satisfies NonNullable<RunningPlanPreviewActionInput["benchmark"]>;
 
 const supportedFixtures: readonly Array<{
   family: RunningPlanDistanceFamily;
@@ -200,7 +211,7 @@ async function validateStableReviewContract() {
     const importedSeed = buildImportedPlanSeed(canonicalPlan);
     const runnerFacingRichness = summarizeRunnerFacingCanonicalRichness({
       family: draft.planFamily,
-      runnerLevel: draft.normalizedInputSummary.runnerLevel,
+      runnerLevel: resolveRunnerLevelForConfirmQualityGates(draft),
       loadContext: draft.normalizedInputSummary.loadContext,
       rows: canonicalPlan.planned_workouts,
     });
@@ -233,6 +244,7 @@ async function validateStableReviewContract() {
     );
 
     validateNoFakePaceOrPersonalHr(canonicalPlan.planned_workouts);
+    validateRunnerFacingTargetReadbackContract(canonicalPlan, fixture.family);
     validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts);
     assert.deepEqual(
       runnerFacingRichness.issues,
@@ -279,98 +291,126 @@ async function validateBenchmarkBackedPaceTruthContract() {
   validateNoFakePaceOrPersonalHr(
     buildRunningPlanCanonicalPlan(targetTimeOnlyResult.draft).planned_workouts,
   );
-
-  const benchmarkInput = {
-    ...buildFixtureInput(supportedFixtures[0]),
-    benchmark: {
-      kind: "recent_5k_time",
-      recent5kTime: "25:00",
-    },
-  } satisfies RunningPlanPreviewActionInput;
-  const result = await buildReviewedRunningPlanPreview(benchmarkInput);
-  assert.equal(result.ok, true, "Benchmark-backed selected-plan preview must build.");
-  if (!result.ok) throw new Error(result.unavailable.error.message);
-
-  const draft = result.draft;
-  const canonicalPlan = buildRunningPlanCanonicalPlan(draft);
-  const importedSeed = buildImportedPlanSeed(canonicalPlan);
-  const paceRows = canonicalPlan.planned_workouts.filter(rowHasPaceTargets);
-  const nonPaceRows = canonicalPlan.planned_workouts.filter(
-    (row) => row.workout_type !== "rest" && !rowHasPaceTargets(row),
-  );
-  const importedPaceWorkouts = importedSeed.workouts.filter((workout) =>
-    JSON.stringify(workout).includes("pace_min_per_km_range"),
+  validateRunnerFacingTargetReadbackContract(
+    buildRunningPlanCanonicalPlan(targetTimeOnlyResult.draft),
+    "Target-time-only selected-plan fixture",
   );
 
-  assert.equal(draft.normalizedInputSummary.benchmarkPaceTruth?.kind, "recent_5k");
-  assert.equal(draft.normalizedInputSummary.benchmarkPaceTruth.source, "recent_5k_time");
-  assert.ok(
-    paceRows.length > 0,
-    "Benchmark-backed selected-plan canonical rows must include pace-capable rows.",
-  );
-  assert.ok(
-    importedPaceWorkouts.length > 0,
-    "Benchmark-backed pace targets must survive export-shaped readback.",
-  );
+  const benchmarkProofs = [];
 
-  for (const row of paceRows) {
-    assert.equal(row.metric_mode?.executable_mode, "pace_executable");
-    assert.equal(row.metric_mode?.pace_targets_allowed, true);
-    assert.equal(row.metric_mode?.hr_targets_allowed, false);
-  }
+  for (const fixture of supportedFixtures) {
+    const benchmarkInput = {
+      ...buildFixtureInput(fixture),
+      benchmark: RECENT_5K_BENCHMARK,
+    } satisfies RunningPlanPreviewActionInput;
+    const result = await buildReviewedRunningPlanPreview(benchmarkInput);
+    assert.equal(result.ok, true, `${fixture.family} benchmark-backed preview must build.`);
+    if (!result.ok) throw new Error(result.unavailable.error.message);
 
-  for (const row of nonPaceRows) {
-    assert.equal(
-      row.metric_mode?.pace_targets_allowed,
-      false,
-      `${row.workout_id} without pace targets must not advertise pace capability.`,
+    const draft = result.draft;
+    const canonicalPlan = buildRunningPlanCanonicalPlan(draft);
+    const importedSeed = buildImportedPlanSeed(canonicalPlan);
+    const paceRows = canonicalPlan.planned_workouts.filter(rowHasPaceTargets);
+    const nonPaceRows = canonicalPlan.planned_workouts.filter(
+      (row) => row.workout_type !== "rest" && !rowHasPaceTargets(row),
     );
-    assert.equal(row.metric_mode?.hr_targets_allowed, false);
+    const importedPaceWorkouts = importedSeed.workouts.filter((workout) =>
+      JSON.stringify(workout).includes("pace_min_per_km_range"),
+    );
+    const benchmarkQualityPaceRows = paceRows.filter((row) =>
+      benchmarkPaceUsefulWorkoutKinds(fixture.family).has(String(row.source_workout_type)),
+    );
+
+    assert.equal(draft.normalizedInputSummary.benchmarkPaceTruth?.kind, "recent_5k");
+    assert.equal(draft.normalizedInputSummary.benchmarkPaceTruth.source, "recent_5k_time");
+    assert.ok(
+      paceRows.length > 0,
+      `${fixture.family} benchmark-backed canonical rows must include pace-capable rows.`,
+    );
+    assert.ok(
+      benchmarkQualityPaceRows.length > 0,
+      `${fixture.family} benchmark-backed pace must reach quality/specific workouts, not only easy support rows.`,
+    );
+    assert.ok(
+      importedPaceWorkouts.length > 0,
+      `${fixture.family} benchmark-backed pace targets must survive export-shaped readback.`,
+    );
+
+    for (const row of paceRows) {
+      assert.equal(row.metric_mode?.executable_mode, "pace_executable");
+      assert.equal(row.metric_mode?.pace_targets_allowed, true);
+      assert.equal(row.metric_mode?.hr_targets_allowed, false);
+    }
+
+    for (const row of nonPaceRows) {
+      assert.equal(
+        row.metric_mode?.pace_targets_allowed,
+        false,
+        `${row.workout_id} without pace targets must not advertise pace capability.`,
+      );
+      assert.equal(row.metric_mode?.hr_targets_allowed, false);
+    }
+
+    validateNoPersonalHrTargets(canonicalPlan.planned_workouts);
+    validateRunnerFacingTargetReadbackContract(
+      canonicalPlan,
+      `${fixture.family} benchmark-backed selected-plan fixture`,
+    );
+    validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts, {
+      expectedMode: "mixed",
+    });
+    assert.deepEqual(
+      summarizeRunningPlanCanonicalPrescriptionGrammar(canonicalPlan.planned_workouts).issues,
+      [],
+      `${fixture.family} benchmark-backed selected-plan rows must still satisfy executable prescription grammar.`,
+    );
+
+    const exactness = await validateRunningPlanReviewExactness({
+      draft,
+      reviewToken: draft.reviewToken,
+      reviewChecksum: draft.reviewChecksum,
+    });
+    assert.equal(
+      exactness.ok,
+      true,
+      `${fixture.family} benchmark-backed review token must validate.`,
+    );
+
+    const changedBenchmark = await buildReviewedRunningPlanPreview({
+      ...benchmarkInput,
+      benchmark: {
+        kind: "recent_5k_time",
+        recent5kTime: "30:00",
+      },
+    });
+    assert.equal(
+      changedBenchmark.ok,
+      true,
+      `${fixture.family} changed benchmark fixture should build.`,
+    );
+    if (!changedBenchmark.ok) throw new Error(changedBenchmark.unavailable.error.message);
+
+    const changedBenchmarkExactness = await validateRunningPlanReviewExactness({
+      draft: changedBenchmark.draft,
+      reviewToken: draft.reviewToken,
+      reviewChecksum: draft.reviewChecksum,
+    });
+    assert.equal(changedBenchmarkExactness.ok, false);
+    if (!changedBenchmarkExactness.ok) {
+      assert.equal(changedBenchmarkExactness.reason, "stale_review");
+    }
+
+    benchmarkProofs.push({
+      family: fixture.family,
+      sourceKind: draft.sourceKind,
+      paceRows: paceRows.length,
+      qualityPaceRows: benchmarkQualityPaceRows.length,
+      importedPaceWorkouts: importedPaceWorkouts.length,
+      hrTargetsAllowed: false,
+    });
   }
 
-  validateNoPersonalHrTargets(canonicalPlan.planned_workouts);
-  validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts, {
-    expectedMode: "mixed",
-  });
-  assert.deepEqual(
-    summarizeRunningPlanCanonicalPrescriptionGrammar(canonicalPlan.planned_workouts).issues,
-    [],
-    "Benchmark-backed selected-plan rows must still satisfy executable prescription grammar.",
-  );
-
-  const exactness = await validateRunningPlanReviewExactness({
-    draft,
-    reviewToken: draft.reviewToken,
-    reviewChecksum: draft.reviewChecksum,
-  });
-  assert.equal(exactness.ok, true, "Benchmark-backed review token must validate.");
-
-  const changedBenchmark = await buildReviewedRunningPlanPreview({
-    ...benchmarkInput,
-    benchmark: {
-      kind: "recent_5k_time",
-      recent5kTime: "30:00",
-    },
-  });
-  assert.equal(changedBenchmark.ok, true, "Changed benchmark fixture should still build.");
-  if (!changedBenchmark.ok) throw new Error(changedBenchmark.unavailable.error.message);
-
-  const changedBenchmarkExactness = await validateRunningPlanReviewExactness({
-    draft: changedBenchmark.draft,
-    reviewToken: draft.reviewToken,
-    reviewChecksum: draft.reviewChecksum,
-  });
-  assert.equal(changedBenchmarkExactness.ok, false);
-  if (!changedBenchmarkExactness.ok) {
-    assert.equal(changedBenchmarkExactness.reason, "stale_review");
-  }
-
-  return {
-    sourceKind: draft.sourceKind,
-    paceRows: paceRows.length,
-    importedPaceWorkouts: importedPaceWorkouts.length,
-    hrTargetsAllowed: false,
-  };
+  return benchmarkProofs;
 }
 
 async function validateFailureBoundaries(
@@ -434,7 +474,7 @@ async function validateFailureBoundaries(
 
   const invalidTokenExactness = await validateRunningPlanReviewExactness({
     draft: reviewedDraft,
-    reviewToken: `${reviewedDraft.reviewToken.slice(0, -1)}0`,
+    reviewToken: tamperReviewToken(reviewedDraft.reviewToken),
     reviewChecksum: reviewedDraft.reviewChecksum,
   });
   assert.equal(invalidTokenExactness.ok, false);
@@ -516,6 +556,7 @@ async function validateActiveManualPlanTransitionContract(
   let persistCalls = 0;
   let persistedInput: Parameters<ActivePlanTransitionDependencies["persistTransition"]>[0] | null =
     null;
+  let persistedRows: PersistedWorkoutRow[] = [];
   const dependencies: Partial<ActivePlanTransitionDependencies> = {
     today: () => "2026-06-08",
     getPlanContext: async () => context,
@@ -530,6 +571,17 @@ async function validateActiveManualPlanTransitionContract(
       persistCalls += 1;
       persistedInput = input;
       const seed = buildImportedPlanSeed(input.reviewedPlan);
+      const carried = await buildActivePlanReplacementCarryForward({
+        userId,
+        importedSeed: seed,
+        existingWorkouts: context.existingWorkouts.workouts,
+        logsByWorkoutId: context.existingWorkouts.logsByWorkoutId,
+        replacementStartsAt: input.replacementStartsAt,
+        evidenceWorkoutIds: new Set(["manual-workout-past"]),
+      });
+      persistedRows = carried.importedSeed.workouts.map((workout, index) =>
+        buildPersistedWorkoutFromSeed(workout, index, "selected-plan-1", userId),
+      );
 
       return {
         archivedPlan: {
@@ -548,9 +600,7 @@ async function validateActiveManualPlanTransitionContract(
             input.reviewedPlan.planned_workouts.at(-1)?.date ?? input.reviewedPlan.start_date,
           status: "active",
         },
-        workouts: seed.workouts.map((workout, index) =>
-          buildPersistedWorkoutFromSeed(workout, index, "selected-plan-1", userId),
-        ),
+        workouts: persistedRows,
       };
     },
   };
@@ -619,14 +669,22 @@ async function validateActiveManualPlanTransitionContract(
   assert.equal(confirmed.archivedPlanId, "manual-plan-1");
   assert.equal(confirmed.activePlanId, "selected-plan-1");
   assert.equal(confirmed.affectedManualWorkoutCount, 2);
+  assert.equal(confirmed.calendarRowCount, reviewedDraft.canonicalRowCount + 1);
   assert.equal(confirmed.safety.oldPlanArchived, true);
   assert.equal(confirmed.safety.upcomingManualWorkoutsMerged, false);
   assert.equal(confirmed.safety.trustedClientRows, false);
+  assert.equal(persistedInput.replacementStartsAt, "2026-06-08");
   validateNoFakePaceOrPersonalHr(persistedInput.reviewedPlan.planned_workouts);
+  const serializedPersistedRows = JSON.stringify(persistedRows);
+  assert.match(
+    serializedPersistedRows,
+    /manual-workout-past/,
+    "Past logged/evidence-backed workout history must carry forward into the new active calendar.",
+  );
   assert.doesNotMatch(
-    JSON.stringify(persistedInput.reviewedPlan.planned_workouts),
-    /manual-workout-future|manual-workout-past/,
-    "Transition candidate rows must not merge future manual workouts into the selected plan.",
+    serializedPersistedRows,
+    /manual-workout-future/,
+    "Future mutable rows from the previous plan must not merge into the selected plan.",
   );
 
   context = buildManualActivePlanContext({
@@ -651,7 +709,7 @@ async function validateActiveManualPlanTransitionContract(
     userId,
     {
       reviewInput,
-      transitionReviewToken: `${review.transitionReviewToken.slice(0, -1)}0`,
+      transitionReviewToken: tamperReviewToken(review.transitionReviewToken),
       transitionReviewChecksum: review.transitionReviewChecksum,
     },
     dependencies,
@@ -688,16 +746,17 @@ async function validateActiveManualPlanTransitionContract(
     plan: { source_kind: reviewedDraft.sourceKind },
   });
   const nonManual = await reviewActivePlanTransitionForUser(userId, reviewInput, dependencies);
-  assert.equal(nonManual.ok, false);
-  if (!nonManual.ok) {
-    assert.equal(nonManual.reason, "unsupported_active_plan_source");
-  }
+  assert.equal(
+    nonManual.ok,
+    true,
+    "Reviewed active-plan replacement must support non-manual sources.",
+  );
 
   context = { activePlan: null, existingWorkouts: { workouts: [], logsByWorkoutId: new Map() } };
-  const noActiveManual = await reviewActivePlanTransitionForUser(userId, reviewInput, dependencies);
-  assert.equal(noActiveManual.ok, false);
-  if (!noActiveManual.ok) {
-    assert.equal(noActiveManual.reason, "no_active_manual_plan");
+  const noActivePlan = await reviewActivePlanTransitionForUser(userId, reviewInput, dependencies);
+  assert.equal(noActivePlan.ok, false);
+  if (!noActivePlan.ok) {
+    assert.equal(noActivePlan.reason, "no_active_plan");
   }
 
   return {
@@ -705,6 +764,7 @@ async function validateActiveManualPlanTransitionContract(
     reviewedUpcomingManualWorkouts: review.affectedManualSchedule.upcomingWorkoutCount,
     protectedHistoryLoggedWorkouts: review.preservedHistory.loggedWorkoutCount,
     transitionConfirmRows: confirmed.calendarRowCount,
+    activeCalendarPastRowsCarriedForward: 1,
     mutatesOnlyOnConfirm: true,
   };
 }
@@ -740,6 +800,19 @@ function validateActivePlanTransitionSourceBoundaries() {
     /replaceActivePlanWithImportedInput|deletePreviousPlan|\.delete\(\)/,
     "Active manual transition must not use the legacy import replacement path that deletes the old plan.",
   );
+  assert.match(
+    transitionHelperSource,
+    /buildActivePlanReplacementCarryForward/,
+    "Active-plan transition persistence must carry forward protected history into the new active calendar.",
+  );
+  assert.doesNotMatch(
+    persistenceSource.slice(
+      persistenceSource.indexOf("async function replaceActivePlanWithImportedInput"),
+      persistenceSource.indexOf("async function prepareImportedPlanApply"),
+    ),
+    /deletePreviousPlan|\.from\("plan_cycles"\)\s*\.delete\(\)\s*\.eq\("id", planContext\.activePlan\.id\)/,
+    "Imported/text plan replacement must archive the previous plan instead of deleting it.",
+  );
   assert.doesNotMatch(
     transitionSource,
     /confirmRunningPlanDraft/,
@@ -749,6 +822,11 @@ function validateActivePlanTransitionSourceBoundaries() {
     activePlanCreateDialogSource,
     /confirmRunningPlanDraft/,
     "Saved-mode Create a plan dialog must route confirm through active-plan transition actions.",
+  );
+  assert.doesNotMatch(
+    activePlanCreateDialogSource,
+    /MANUAL_USER_BUILT_PLAN_SOURCE_KIND|isActiveManualPlan/,
+    "Saved-mode Create a plan dialog must not hard-block reviewed replacement to manual active plans.",
   );
   assert.match(
     onboardingGateSource,
@@ -1295,12 +1373,31 @@ function validateCanonicalRowsAreNumeric(
   }
 }
 
+function resolveRunnerLevelForConfirmQualityGates(
+  draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+) {
+  if (draft.planFamily !== "10K") {
+    return draft.normalizedInputSummary.runnerLevel;
+  }
+
+  return resolveTenKBeginnerDosePolicyRunnerLevel({
+    runnerLevel: draft.normalizedInputSummary.runnerLevel,
+    benchmarkPaceTruth: draft.normalizedInputSummary.benchmarkPaceTruth,
+  });
+}
+
 function validateNoFakePaceOrPersonalHr(rows: readonly unknown[]) {
   const serialized = JSON.stringify(rows);
 
   assert.doesNotMatch(serialized, /"pace_min_per_km_range"|"pace_range_min_km"|"pace"/i);
   assert.doesNotMatch(serialized, /race_pace_session/i);
   validateNoPersonalHrTargets(rows);
+}
+
+function tamperReviewToken(token: string) {
+  const replacement = token.endsWith("0") ? "1" : "0";
+
+  return `${token.slice(0, -1)}${replacement}`;
 }
 
 function validateNoPersonalHrTargets(rows: readonly unknown[]) {

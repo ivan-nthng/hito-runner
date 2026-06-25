@@ -3,6 +3,10 @@ import {
   type NormalizedStructuredInput,
   type StructuredMetricMode,
 } from "@/lib/structured-plan-authoring-schema";
+import {
+  DEFAULT_ESTIMATED_HR_SOURCE_NOTE,
+  buildDefaultEstimatedHrBandReadback,
+} from "@/lib/heart-rate-zones";
 import { deriveExecutableModeFromSegments } from "@/lib/rich-workout-model";
 import {
   getRecent5kPaceSecondsPerKm,
@@ -29,6 +33,9 @@ export function buildGeneratedWorkoutMetricMode(
   const metricMode = resolveStructuredMetricMode(normalized);
   const hasPaceTargets = segments.some((segment) => targetHasMetric(segment, "pace"));
   const hasPersonalHrTargets = segments.some((segment) => targetHasPersonalHrMetric(segment));
+  const hasDefaultEstimatedHrTargets = segments.some((segment) =>
+    targetHasDefaultEstimatedHrMetric(segment),
+  );
   const structureExecutableMode = deriveExecutableModeFromSegments(segments);
   const executableMode =
     hasPaceTargets && hasPersonalHrTargets
@@ -44,16 +51,23 @@ export function buildGeneratedWorkoutMetricMode(
       : "pace"
     : hasPersonalHrTargets
       ? "heart_rate"
-      : "effort";
+      : hasDefaultEstimatedHrTargets
+        ? "heart_rate"
+        : "effort";
+  const hrTargetSource = hasPersonalHrTargets
+    ? metricMode.heartRateTargetSource
+    : hasDefaultEstimatedHrTargets
+      ? "default_estimated_hr"
+      : metricMode.heartRateTargetSource;
 
   return {
     guidance,
     executableMode,
     paceTargetsAllowed: hasPaceTargets,
     hrTargetsAllowed: hasPersonalHrTargets,
-    hrTargetSource: hasPersonalHrTargets ? metricMode.heartRateTargetSource : "effort_only",
-    hrTargetLabel: null,
-    hrTargetSourceNote: null,
+    hrTargetSource,
+    hrTargetLabel: hasDefaultEstimatedHrTargets ? "Editable default estimated HR guidance" : null,
+    hrTargetSourceNote: hasDefaultEstimatedHrTargets ? DEFAULT_ESTIMATED_HR_SOURCE_NOTE : null,
     reason:
       hasPaceTargets && hasPersonalHrTargets
         ? "Watch/app pace guidance and personal HR-zone truth allow mixed executable targets."
@@ -61,9 +75,11 @@ export function buildGeneratedWorkoutMetricMode(
           ? "Watch/app pace guidance and recent 5K benchmark truth allow broad pace targets."
           : hasPersonalHrTargets
             ? "Personal HR-zone truth allows HR executable targets."
-            : executableMode === "structure_only_executable"
-              ? "Watch/app execution support is available; this workout uses executable duration, distance, repeat, work, and recovery structure without pace or HR targets."
-              : "This workout requires correction because it lacks executable metric truth and executable numeric structure.",
+            : hasDefaultEstimatedHrTargets
+              ? "Watch/app execution support is available; this workout uses executable numeric structure with editable default estimated HR guidance, not personal HR-zone truth."
+              : executableMode === "structure_only_executable"
+                ? "Watch/app execution support is available; this workout uses executable duration, distance, repeat, work, and recovery structure without pace or HR targets."
+                : "This workout requires correction because it lacks executable metric truth and executable numeric structure.",
   };
 }
 
@@ -95,6 +111,16 @@ function targetHasPersonalHrMetric(segment: {
   );
 }
 
+function targetHasDefaultEstimatedHrMetric(segment: {
+  target?: Record<string, unknown>;
+  recovery_target?: Record<string, unknown>;
+}) {
+  return [segment.target, segment.recovery_target].some(
+    (target) =>
+      targetHasMetric({ target }, "hr") && target?.hr_target_source === "default_estimated_hr",
+  );
+}
+
 export function buildRepeatRecoveryTarget(normalized: NormalizedStructuredInput) {
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
@@ -107,7 +133,10 @@ export function buildRepeatRecoveryTarget(normalized: NormalizedStructuredInput)
 
 export function buildEasyTarget(
   normalized: NormalizedStructuredInput,
-  options: { hrBand?: DefaultEstimatedHrBand | null } = {},
+  options: {
+    hrBand?: DefaultEstimatedHrBand | null;
+    allowDefaultEstimatedHr?: boolean;
+  } = {},
 ) {
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
   const hrBand = options.hrBand === undefined ? "easy" : options.hrBand;
@@ -115,18 +144,29 @@ export function buildEasyTarget(
   return {
     intensity: "easy_aerobic",
     ...(paceTargets?.easy ? { pace_min_per_km_range: paceTargets.easy } : {}),
-    ...(hrBand ? buildDefaultEstimatedHrTarget(normalized, hrBand) : {}),
+    ...(!paceTargets?.easy && hrBand
+      ? buildDefaultEstimatedHrTarget(normalized, hrBand, {
+          allowDefaultEstimatedHr: options.allowDefaultEstimatedHr === true,
+        })
+      : {}),
     cue: buildEasyCue(normalized),
   };
 }
 
-export function buildLongRunTarget(normalized: NormalizedStructuredInput) {
+export function buildLongRunTarget(
+  normalized: NormalizedStructuredInput,
+  options: { allowDefaultEstimatedHr?: boolean } = {},
+) {
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
 
   return {
     intensity: "easy_aerobic",
     ...(paceTargets?.longRun ? { pace_min_per_km_range: paceTargets.longRun } : {}),
-    ...buildDefaultEstimatedHrTarget(normalized, "longAerobic"),
+    ...(!paceTargets?.longRun
+      ? buildDefaultEstimatedHrTarget(normalized, "longAerobic", {
+          allowDefaultEstimatedHr: options.allowDefaultEstimatedHr === true,
+        })
+      : {}),
     cue: buildLongRunCue(normalized),
   };
 }
@@ -157,7 +197,6 @@ export function buildSteadyFinishTarget(normalized: NormalizedStructuredInput) {
   return {
     intensity: "steady_finish",
     ...(paceTargets?.steady ? { pace_min_per_km_range: paceTargets.steady } : {}),
-    ...buildDefaultEstimatedHrTarget(normalized, "steady"),
     cue: "Slightly stronger than easy, never a race finish.",
   };
 }
@@ -186,11 +225,24 @@ export function deriveBenchmarkPaceTargets(normalized: NormalizedStructuredInput
 export function buildDefaultEstimatedHrTarget(
   normalized: NormalizedStructuredInput,
   band: DefaultEstimatedHrBand,
+  options: { allowDefaultEstimatedHr?: boolean } = {},
 ) {
-  void normalized;
-  void band;
+  if (options.allowDefaultEstimatedHr !== true) {
+    return {};
+  }
 
-  return {};
+  const readback = buildDefaultEstimatedHrBandReadback(normalized.runnerProfile.age, band);
+
+  if (!readback) {
+    return {};
+  }
+
+  return {
+    hr_bpm_range: readback.rangeBpm,
+    hr_target_source: "default_estimated_hr",
+    label: `${readback.label} estimated HR guidance`,
+    source_note: DEFAULT_ESTIMATED_HR_SOURCE_NOTE,
+  };
 }
 
 export function resolveStructuredMetricMode(
@@ -210,7 +262,7 @@ export function resolveStructuredMetricMode(
       canFollowNumericTargets && wantsPaceTargets && recent5kPaceSecondsPerKm,
     ),
     heartRateTargetsAllowed: false,
-    heartRateTargetSource: "effort_only",
+    heartRateTargetSource: estimatedMaxHr ? "default_estimated_hr" : "effort_only",
     defaultEstimatedHrAvailable: Boolean(estimatedMaxHr),
     estimatedMaxHr,
     recent5kPaceSecondsPerKm,

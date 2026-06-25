@@ -9,6 +9,12 @@ description: Use for Hito architecture audits, hotspot selection, cleanup checkp
 
 Produce evidence-based architecture recommendations without drifting into speculative rewrites.
 
+This skill does not turn an orchestration/router agent into an implementation owner. Unless the
+current task is explicitly addressed to `ROLE: ARCHITECT` and scopes architecture-owned
+source-of-truth edits, use this skill to audit, select/hold the next gate, and write the exact
+prompt for the correct execution owner. BACKEND, FRONTEND, QA, DESIGNER, and RUNNING COACH work must
+be executed by those role agents, with their own subagents where useful.
+
 ## Required Reading
 
 For non-trivial Hito architecture work, read in order:
@@ -36,6 +42,19 @@ For non-trivial Hito architecture work, read in order:
    - backlog
    - no longer worth touching
 6. Recommend exactly one next action unless the user asks for a broader comparison.
+
+## Bolder Audit Bias
+
+- Do not select a micro-gate when one same-owner batch can remove the root cause.
+- Prefer implemented source truth, validators, and executable checks over new prose artifacts.
+- Treat duplicated paths and unused compatibility layers as deletion/consolidation candidates, not
+  permanent risk to route around.
+- If the next useful step mostly writes Markdown, challenge whether a code/tooling/validator batch
+  would reduce more real complexity.
+- Accept reasonable local implementation risk when validation can catch breakage; name the stop
+  conditions instead of blocking by default.
+- Authorize the execution role to take that risk inside its own boundary; do not perform another
+  role's implementation or QA from the architecture/router layer.
 
 ## Hito Architecture Rules
 

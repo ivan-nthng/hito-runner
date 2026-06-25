@@ -73,7 +73,7 @@ function WorkoutPage() {
   if (!workout) {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
-        <div className="px-6 lg:px-10 py-20 max-w-2xl">
+        <div className="hito-route-gutter max-w-2xl py-20">
           <section
             className="hito-state-surface"
             data-tone={snapshot.mode === "onboarding" ? "signal" : undefined}
@@ -119,11 +119,9 @@ function WorkoutPage() {
   const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
   const primaryTarget = primaryWorkoutTarget(workout);
   const primaryTargetMetrics = displayExecutableTargetEntries(primaryTarget, workout.metricMode);
-  const structureOnly = workout.metricMode.executableMode === "structure_only_executable";
-  const primaryStructureMetrics =
-    primaryTargetMetrics.length === 0 && structureOnly
-      ? displayWorkoutStructureEntries(workout).slice(0, 2)
-      : [];
+  const primaryStructureMetrics = isRestDay
+    ? []
+    : displayWorkoutStructureEntries(workout).slice(0, 2);
   const targetSupportEntries = displayTargetSupportEntries(primaryTarget);
   const executionSummary = workoutExecutionSummary(workout);
   const identityRows = workoutIdentityRows(workout, meta.label);
@@ -144,7 +142,7 @@ function WorkoutPage() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="relative max-w-6xl px-6 py-8 lg:px-10">
+      <div className="hito-route-gutter relative max-w-6xl py-8">
         <div className="flex items-center gap-3 hito-section-subtitle">
           <Link to="/" className="inline-flex items-center gap-1 hover:text-foreground">
             <Icon name="arrow-left" size="xs" /> Calendar
@@ -407,7 +405,7 @@ function WorkoutPage() {
 function WorkoutPendingState() {
   return (
     <AppShell>
-      <div className="px-6 lg:px-10 py-8 max-w-6xl space-y-8">
+      <div className="hito-route-gutter max-w-6xl space-y-8 py-8">
         <div className="flex items-center gap-3 hito-section-subtitle">
           <Skeleton className="h-3 w-32 bg-background/30" />
         </div>
@@ -440,7 +438,7 @@ function WorkoutPendingState() {
 function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
   return (
     <AppShell>
-      <div className="px-6 lg:px-10 py-20 max-w-2xl">
+      <div className="hito-route-gutter max-w-2xl py-20">
         <section className="hito-state-surface" data-tone="destructive">
           <p className="hito-label text-destructive">Workout unavailable</p>
           <h1 className="hito-page-title">We couldn&apos;t load this workout.</h1>

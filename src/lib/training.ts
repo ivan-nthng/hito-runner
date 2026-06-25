@@ -872,7 +872,7 @@ export function displayTargetEntries(target: StepTarget | undefined) {
 
   const entries: Array<{ key: string; label: string; value: string }> = [];
   const seen = new Set<string>();
-  const pushEntry = (key: string, value: string | number | undefined) => {
+  const pushEntry = (key: string, value: string | number | undefined, labelOverride?: string) => {
     if (value == null) {
       return;
     }
@@ -886,13 +886,17 @@ export function displayTargetEntries(target: StepTarget | undefined) {
     seen.add(key);
     entries.push({
       key,
-      label: humanizeTargetLabel(key),
+      label: labelOverride ?? humanizeTargetLabel(key),
       value: humanizeTargetValue(key, stringValue),
     });
   };
 
   pushEntry("intensity", target.intensity);
-  pushEntry("hr_bpm_range", target.hr_bpm_range ?? target.hr_bpm);
+  pushEntry(
+    "hr_bpm_range",
+    target.hr_bpm_range ?? target.hr_bpm,
+    target.hr_target_source === "default_estimated_hr" ? "Estimated HR" : undefined,
+  );
   pushEntry("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
   pushEntry("pace", target.pace);
   pushEntry("rpe", target.rpe);
@@ -915,11 +919,15 @@ const EXECUTABLE_TARGET_ENTRY_KEYS = new Set([
   "pace_min_per_km_range",
   "pace",
   "cadence_spm_range",
-  "rpe",
-  "intensity",
 ]);
 
-const SUPPORT_TARGET_ENTRY_KEYS = new Set(["cue", "hint", "source_note", "coaching_hint"]);
+const SUPPORT_TARGET_ENTRY_KEYS = new Set([
+  "intensity",
+  "cue",
+  "hint",
+  "source_note",
+  "coaching_hint",
+]);
 
 export function displayExecutableTargetEntries(
   target: StepTarget | undefined,
@@ -934,7 +942,12 @@ export function displayExecutableTargetEntries(
       return false;
     }
 
-    if (isHrTargetEntry(entry.key) && metricMode && !metricMode.hrTargetsAllowed) {
+    if (
+      isHrTargetEntry(entry.key) &&
+      metricMode &&
+      !metricMode.hrTargetsAllowed &&
+      target?.hr_target_source !== "default_estimated_hr"
+    ) {
       return false;
     }
 

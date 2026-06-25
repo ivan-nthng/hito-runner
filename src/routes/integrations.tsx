@@ -84,7 +84,7 @@ function Integrations() {
   const feedbackWorkout = resolveFeedbackWorkout(snapshot.workouts, snapshot.currentDate);
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="px-6 py-10 lg:px-10 max-w-5xl">
+      <div className="hito-route-gutter max-w-5xl py-10">
         <header className="hito-page-header">
           <p className="hito-label">{snapshot.source === "persisted" ? "Saved plan" : "Preview"}</p>
           <h1 className="hito-page-title">Connections</h1>

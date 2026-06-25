@@ -108,8 +108,11 @@ Every backlog item should include:
 - `Type`
 - `Task`
 - `Stage`
+- `Issue Category`
 - `Severity`
 - `Priority`
+- `Human Priority`
+- `Human Status`
 - `Owner`
 - `Reported`
 - `User Report`
@@ -124,9 +127,12 @@ Every backlog item should include:
 - `Next Recommended Role`
 - `Exact Handoff Prompt`
 
-## Triage Labels
+## Human Triage Labels
 
-Type:
+These labels are for human backlog filtering only. They must not replace the canonical Admin importer
+`Status`, `Type`, or `Priority` block.
+
+Issue Category:
 
 - `bug`
 - `improvement`
@@ -144,14 +150,14 @@ Severity:
 - `medium`
 - `low`
 
-Priority:
+Human Priority:
 
 - `now`
 - `next`
 - `later`
 - `parking-lot`
 
-Status:
+Human Status:
 
 - `new`
 - `triaged`

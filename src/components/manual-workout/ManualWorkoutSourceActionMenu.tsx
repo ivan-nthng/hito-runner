@@ -106,7 +106,7 @@ export function ManualWorkoutSourceActionMenu({
     hitoToast.success({
       id: MANUAL_COPY_PASTE_TOAST_ID,
       title: "Move source selected",
-      description: "Choose an empty future day and use Add to move this workout there.",
+      description: "Pick a day to move or replace from the calendar.",
     });
   };
 
@@ -169,7 +169,7 @@ export function ManualWorkoutSourceActionMenu({
     hitoToast.working({
       id: MANUAL_DELETE_CLEAR_TOAST_ID,
       title: "Clearing workout",
-      description: "Hito is confirming the reviewed delete server-side.",
+      description: "Hito is confirming this calendar change before removing the planned row.",
     });
 
     try {
@@ -336,10 +336,6 @@ function ManualDeleteClearReadyDialog({
   result: ManualWorkoutDeleteClearReady;
   status: ManualSourceActionStatus;
 }) {
-  const draft = result.restore.review.draft;
-  const metricPolicy = targetTruthModeLabel(result.restore.draftInput.targetTruthMode);
-  const restoreLabels = [result.restore.label, ...result.restore.alternateLabels].join(" / ");
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -369,10 +365,7 @@ function ManualDeleteClearReadyDialog({
             <div className="hito-list-row items-start">
               <div className="min-w-0">
                 <p className="hito-list-row-title">{result.title}</p>
-                <p className="hito-list-row-copy">
-                  {formatManualDraftStructure(draft.totalDurationMin, draft.totalDistanceKm)} ·{" "}
-                  {metricPolicy}
-                </p>
+                <p className="hito-list-row-copy">{formatDeleteClearWorkoutSummary(result)}</p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
                 {result.templateKey.replaceAll("_", " ")}
@@ -394,14 +387,15 @@ function ManualDeleteClearReadyDialog({
 
             <div className="hito-list-row items-start">
               <div className="min-w-0">
-                <p className="hito-list-row-title">Restore affordance</p>
+                <p className="hito-list-row-title">If you need it again</p>
                 <p className="hito-list-row-copy">
-                  Backend returned reviewed next-step data for {restoreLabels}. Actual restore must
-                  go back through the active-plan Add review flow.
+                  {result.restore.available
+                    ? "Add it again from the calendar later. Hito will review it as a new planned workout before saving anything."
+                    : "This clears only the planned row. Hito will not recreate unsupported workout sources automatically."}
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
-                {result.restore.label}
+                {result.restore.available ? "Add later" : "Clear only"}
               </span>
             </div>
 
@@ -444,4 +438,15 @@ function ManualDeleteClearReadyDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function formatDeleteClearWorkoutSummary(result: ManualWorkoutDeleteClearReady) {
+  if (!result.restore.available) {
+    return "Planned workout content stays protected; clearing removes only this calendar row.";
+  }
+
+  const draft = result.restore.review.draft;
+  const metricPolicy = targetTruthModeLabel(result.restore.draftInput.targetTruthMode);
+
+  return `${formatManualDraftStructure(draft.totalDurationMin, draft.totalDistanceKm)} · ${metricPolicy}`;
 }

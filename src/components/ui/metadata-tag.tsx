@@ -58,7 +58,7 @@ const HitoMetadataTag = React.forwardRef<HTMLElement, HitoMetadataTagProps>(
       <TooltipProvider delayDuration={220}>
         <Tooltip>
           <TooltipTrigger asChild>{tag}</TooltipTrigger>
-          <TooltipContent className="hito-tooltip" sideOffset={8}>
+          <TooltipContent sideOffset={8}>
             {stringTooltip ? (
               <span className="hito-tooltip-meta block">{stringTooltip}</span>
             ) : (

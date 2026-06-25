@@ -44,6 +44,18 @@ subagents for similar follow-ups, close them when done, and integrate their find
 contract or handoff. Do not delegate Figma file mutation, product-runtime redesign, or browser QA
 unless the active task explicitly scopes that execution.
 
+## Bolder Design-System Cleanup Bias
+
+Design-system architecture should remove repeated local UI systems, not document them forever.
+
+- Prefer migrating a whole repeated local pattern family to an implemented DS owner over selecting
+  one tiny token offender.
+- Prefer `/hitoDS`, `src/styles.css`, and existing primitives as source truth before proposing new
+  specs or Figma artifacts.
+- Do not create a new frontend spec when the correct action is a safe reuse/deletion batch.
+- If an audit finds many equivalent route-local patterns, route one autonomous Frontend cleanup
+  batch with clear validation instead of a chain of micro-gates.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
@@ -424,7 +436,7 @@ For implementation reviews:
 Use one role at a time.
 
 ```md
-You are <FRONTEND / LAYOUT / DESIGNER / QA>.
+ROLE: <FRONTEND / LAYOUT / DESIGNER / QA>
 
 Task:
 <exact DS cleanup slice>
@@ -452,14 +464,9 @@ Validation:
 - inspect affected surfaces
 - use Safari for visible UI QA when required
 
-Output format:
-1. Task
-2. Stage
-3. Root cause
-4. Files changed
-5. What changed
-6. Validation results
-7. Blockers
+Output:
+Use the matching standard report format in `AGENTS.md`; add custom evidence only if this task
+requires it.
 ```
 
 ## Optional Continuity Footer

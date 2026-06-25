@@ -10,6 +10,8 @@ import type {
 import { FUTURE_TEMPLATE_VERSION } from "@/lib/imported-plan";
 import { mainLikeSegmentTypes } from "@/lib/ai-first-plan-blueprint-taxonomy";
 import type { AiFirstPlanBlueprintNormalizationContext } from "@/lib/ai-first-plan-blueprint-validation";
+import { stripDisallowedDefaultEstimatedHrTargetsFromSegments } from "@/lib/default-estimated-hr-target-policy";
+import { DEFAULT_ESTIMATED_HR_SOURCE_NOTE } from "@/lib/heart-rate-zones";
 import {
   canonicalFamilyToLegacyWorkoutType,
   deriveExecutableModeFromSegments,
@@ -86,7 +88,7 @@ export function normalizeBlueprintWorkout({
       adaptationHorizonWeeks,
     ) &&
     hasRunWalkAdaptationSegments(deterministicWorkout);
-  const segments = normalizeExecutableStepInstructions(
+  const rawSegments = normalizeExecutableStepInstructions(
     buildWorkoutSegments({
       workout: canonicalWorkout,
       date,
@@ -98,6 +100,13 @@ export function normalizeBlueprintWorkout({
       repairs,
     }) as unknown as Step[],
   ) as unknown as CanonicalSegment[];
+  const segments = stripDisallowedDefaultEstimatedHrTargetsFromSegments(rawSegments, {
+    sourceWorkoutType: resolved.workoutIdentity,
+    workoutType: canonicalFamilyToLegacyWorkoutType(
+      resolved.workoutFamily,
+      resolved.workoutIdentity,
+    ),
+  });
 
   if (
     totalDurationMin >= 35 &&
@@ -297,6 +306,11 @@ function buildWorkoutMetricMode(segments: CanonicalSegment[]): CanonicalMetricMo
       targetHasMetric(segment.target, "hr") &&
       segment.target?.hr_target_source === "personal_hr_zone",
   );
+  const hasDefaultEstimatedHr = segments.some(
+    (segment) =>
+      targetHasMetric(segment.target, "hr") &&
+      segment.target?.hr_target_source === "default_estimated_hr",
+  );
   const executableMode =
     hasPace && hasPersonalHr
       ? "mixed_metric_executable"
@@ -311,16 +325,22 @@ function buildWorkoutMetricMode(segments: CanonicalSegment[]): CanonicalMetricMo
       : "pace"
     : hasPersonalHr
       ? "heart_rate"
-      : "effort";
+      : hasDefaultEstimatedHr
+        ? "heart_rate"
+        : "effort";
 
   return toCanonicalMetricModeJson({
     guidance,
     executableMode,
     paceTargetsAllowed: hasPace,
     hrTargetsAllowed: hasPersonalHr,
-    hrTargetSource: hasPersonalHr ? "personal_hr_zone" : "effort_only",
-    hrTargetLabel: null,
-    hrTargetSourceNote: null,
+    hrTargetSource: hasPersonalHr
+      ? "personal_hr_zone"
+      : hasDefaultEstimatedHr
+        ? "default_estimated_hr"
+        : "effort_only",
+    hrTargetLabel: hasDefaultEstimatedHr ? "Editable default estimated HR guidance" : null,
+    hrTargetSourceNote: hasDefaultEstimatedHr ? DEFAULT_ESTIMATED_HR_SOURCE_NOTE : null,
     reason:
       hasPace && hasPersonalHr
         ? "Pace guidance is gated by benchmark/watch truth, and HR guidance uses personal HR-zone truth."
@@ -328,9 +348,11 @@ function buildWorkoutMetricMode(segments: CanonicalSegment[]): CanonicalMetricMo
           ? "Pace guidance is gated by benchmark/watch truth."
           : hasPersonalHr
             ? "HR guidance uses personal HR-zone truth."
-            : executableMode === "structure_only_executable"
-              ? "Workout is executable by numeric duration, distance, repeat, work, and recovery structure without pace or HR targets."
-              : "Workout requires correction because it lacks executable metric truth and executable numeric structure.",
+            : hasDefaultEstimatedHr
+              ? "Workout uses default estimated HR guidance as non-personal target fallback."
+              : executableMode === "structure_only_executable"
+                ? "Workout is executable by numeric duration, distance, repeat, work, and recovery structure without pace or HR targets."
+                : "Workout requires correction because it lacks executable metric truth and executable numeric structure.",
   });
 }
 

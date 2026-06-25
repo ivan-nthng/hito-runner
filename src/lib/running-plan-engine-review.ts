@@ -1,8 +1,17 @@
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import {
+  DEFAULT_ESTIMATED_HR_SOURCE_NOTE,
+  buildDefaultEstimatedHrBandReadback,
+  type DefaultEstimatedHrBandKey,
+} from "@/lib/heart-rate-zones";
+import {
   buildSelectedPlanSegmentPaceTarget,
   selectedPlanSegmentsContainPaceTargets,
 } from "@/lib/plan-creation-engine/benchmark-pace-truth";
+import {
+  collectTenKBeginnerDosePolicyIssues,
+  resolveTenKBeginnerDosePolicyRunnerLevel,
+} from "@/lib/plan-creation-engine/ten-k-beginner-dose-policy";
 import {
   RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION,
   isRunningPlanCompositionDevelopmentTouch,
@@ -98,7 +107,7 @@ export async function validateRunningPlanReviewExactness(input: {
   const canonicalPlan = buildRunningPlanCanonicalPlan(input.draft);
   const richnessIssues = collectRunnerFacingCanonicalRichnessIssues({
     family: input.draft.planFamily,
-    runnerLevel: input.draft.normalizedInputSummary.runnerLevel,
+    runnerLevel: resolveRunnerLevelForCanonicalQualityGates(input.draft),
     loadContext: input.draft.normalizedInputSummary.loadContext,
     rows: canonicalPlan.planned_workouts,
   });
@@ -121,6 +130,20 @@ export async function validateRunningPlanReviewExactness(input: {
       reason: "invalid_review",
       message:
         "This selected-plan review no longer satisfies Hito's executable workout prescription grammar. Refresh the preview before creating a plan.",
+    };
+  }
+
+  const beginnerDoseIssues = collectTenKBeginnerDosePolicyIssues({
+    runnerLevel: input.draft.normalizedInputSummary.runnerLevel,
+    benchmarkPaceTruth: input.draft.normalizedInputSummary.benchmarkPaceTruth,
+    rows: canonicalPlan.planned_workouts.map(canonicalWorkoutToTenKDoseValidationRow),
+  });
+  if (beginnerDoseIssues.length > 0) {
+    return {
+      ok: false,
+      reason: "invalid_review",
+      message:
+        "This selected-plan review no longer satisfies Hito's beginner 10K dose policy. Refresh the preview before creating a plan.",
     };
   }
 
@@ -189,7 +212,7 @@ export function buildRunningPlanCanonicalPlan(draft: RunningPlanPreviewDraft): T
       weight_kg: normalizedInput.weightKg,
       primary_goal: goalLabel,
       risk_policy:
-        "Backend-selected running-plan preview. Exact watch-executable structure; no fake pace or personal HR truth.",
+        "Backend-selected running-plan preview. Exact watch-executable structure; no fake pace or unverified HR-zone truth.",
       preferred_effort_language: "Use exact structure first; keep effort cues secondary.",
     },
     start_date: normalizedInput.startDate,
@@ -253,7 +276,7 @@ export function buildRunningPlanPersistenceMetadata(input: {
   const compositionGrammar = summarizeRunningPlanCompositionGrammar(draft);
   const runnerFacingRichness = summarizeRunnerFacingCanonicalRichness({
     family: draft.planFamily,
-    runnerLevel: draft.normalizedInputSummary.runnerLevel,
+    runnerLevel: resolveRunnerLevelForCanonicalQualityGates(draft),
     loadContext: draft.normalizedInputSummary.loadContext,
     rows: canonicalPlan.planned_workouts,
   });
@@ -423,7 +446,14 @@ function buildCanonicalSegment({
     sequence: segment.order,
     guidance: segment.secondaryCue,
     prescription,
-    target: buildSegmentTarget(segment.primaryPrescription, segment.targetTruthMode, paceTarget),
+    target: buildSegmentTarget({
+      row,
+      segment,
+      prescription: segment.primaryPrescription,
+      targetTruthMode: segment.targetTruthMode,
+      paceTarget,
+      runnerAge: draft.normalizedInputSummary.age,
+    }),
   };
 }
 
@@ -470,68 +500,155 @@ function buildCanonicalPrescription(
   }
 }
 
-function buildSegmentTarget(
-  prescription: RunningPlanSegmentPrescription,
-  targetTruthMode: RunningPlanWatchExecutableSegmentTemplate["targetTruthMode"],
-  paceTarget: string | null,
-) {
+function buildSegmentTarget({
+  row,
+  segment,
+  prescription,
+  targetTruthMode,
+  paceTarget,
+  runnerAge,
+}: {
+  row: RunningPlanPreviewCalendarRow;
+  segment: RunningPlanWatchExecutableSegmentTemplate;
+  prescription: RunningPlanSegmentPrescription;
+  targetTruthMode: RunningPlanWatchExecutableSegmentTemplate["targetTruthMode"];
+  paceTarget: string | null;
+  runnerAge: number;
+}) {
   const effortTarget = resolveEffortTarget(prescriptionIntensityLabel(prescription));
-  const baseTarget = {
+  const defaultHrTarget = paceTarget
+    ? null
+    : buildAllowedDefaultEstimatedHrTarget({
+        row,
+        segment,
+        prescription,
+        runnerAge,
+        targetTruthMode,
+      });
+  const paceTargetFields = paceTarget
+    ? {
+        intensity: effortTarget.intensity,
+        label: "Benchmark-backed pace target",
+        pace_min_per_km_range: paceTarget,
+      }
+    : {};
+  const effortGuidanceFields = {
     intensity: effortTarget.intensity,
-    rpe: effortTarget.rpe,
-    label: paceTarget ? "Benchmark-backed pace and RPE target" : "Effort and RPE target",
-    ...(paceTarget ? { pace_min_per_km_range: paceTarget } : {}),
   };
 
-  if (targetTruthMode === "editable_default_hr") {
+  if (defaultHrTarget) {
     return {
-      ...baseTarget,
-      label: paceTarget
-        ? "Benchmark-backed pace with estimated HR guidance"
-        : "Estimated HR guidance",
+      ...effortGuidanceFields,
+      label: `${defaultHrTarget.label} estimated HR guidance`,
+      hr_bpm_range: defaultHrTarget.rangeBpm,
       hr_target_source: "default_estimated_hr",
-      source_note: paceTarget
-        ? "Broad pace range comes from a recent 5K benchmark; HR remains an estimate only."
-        : "Estimate only; not personal HR-zone truth.",
+      source_note: DEFAULT_ESTIMATED_HR_SOURCE_NOTE,
     };
   }
 
   return {
-    ...baseTarget,
+    ...paceTargetFields,
     source_note: paceTarget
-      ? "Broad pace range comes from a recent 5K benchmark; no personal HR target is inferred."
-      : "No pace or personal HR target is inferred.",
+      ? "Broad pace range comes from a recent 5K benchmark; HR-zone targets require measured zone data."
+      : "No pace target is inferred; HR-zone targets require measured zone data.",
   };
 }
 
-function resolveEffortTarget(intensityLabel: string): { intensity: string; rpe: string } {
+function resolveDefaultEstimatedHrBand(
+  prescription: RunningPlanSegmentPrescription,
+): DefaultEstimatedHrBandKey {
+  const label = prescriptionIntensityLabel(prescription).toLowerCase();
+
+  if (/threshold|tempo|fast|stride|quick|turnover/.test(label)) {
+    return "tempo";
+  }
+
+  if (/hill|uphill|progression|steady|durable|completion|checkpoint/.test(label)) {
+    return "steady";
+  }
+
+  if (/long|endurance/.test(label)) {
+    return "longAerobic";
+  }
+
+  if (/recovery|walk|jog|settle|cool|warm|adaptation/.test(label)) {
+    return "recovery";
+  }
+
+  return "easy";
+}
+
+function buildAllowedDefaultEstimatedHrTarget({
+  prescription,
+  row,
+  runnerAge,
+  segment,
+  targetTruthMode,
+}: {
+  row: RunningPlanPreviewCalendarRow;
+  segment: RunningPlanWatchExecutableSegmentTemplate;
+  prescription: RunningPlanSegmentPrescription;
+  runnerAge: number;
+  targetTruthMode: RunningPlanWatchExecutableSegmentTemplate["targetTruthMode"];
+}) {
+  if (targetTruthMode !== "editable_default_hr") {
+    return null;
+  }
+
+  if (!defaultEstimatedHrIsAllowedForWorkout(row.workoutDayKind, segment.segmentRole)) {
+    return null;
+  }
+
+  return buildDefaultEstimatedHrBandReadback(
+    runnerAge,
+    resolveDefaultEstimatedHrBand(prescription),
+  );
+}
+
+function defaultEstimatedHrIsAllowedForWorkout(
+  workoutDayKind: RunningPlanPreviewCalendarRow["workoutDayKind"],
+  segmentRole: RunningPlanWatchExecutableSegmentTemplate["segmentRole"],
+) {
+  if (segmentRole !== "main") {
+    return false;
+  }
+
+  return (
+    workoutDayKind === "recovery" ||
+    workoutDayKind === "easy" ||
+    workoutDayKind === "long_run" ||
+    workoutDayKind === "cutback_long_run"
+  );
+}
+
+function resolveEffortTarget(intensityLabel: string): { intensity: string } {
   const normalized = intensityLabel.toLowerCase();
 
   if (/stride|quick|turnover|fast/.test(normalized)) {
-    return { intensity: "Quick but relaxed / RPE 7-8", rpe: "7-8" };
+    return { intensity: "Quick but relaxed" };
   }
 
   if (/threshold/.test(normalized)) {
-    return { intensity: "Strong controlled / RPE 7", rpe: "7" };
+    return { intensity: "Strong controlled" };
   }
 
   if (/tempo/.test(normalized)) {
-    return { intensity: "Controlled tempo / RPE 6-7", rpe: "6-7" };
+    return { intensity: "Controlled tempo" };
   }
 
   if (/hill|uphill/.test(normalized)) {
-    return { intensity: "Controlled hill effort / RPE 6-7", rpe: "6-7" };
+    return { intensity: "Controlled hill effort" };
   }
 
   if (/progression|steady|durable|completion|checkpoint/.test(normalized)) {
-    return { intensity: "Steady controlled / RPE 4-6", rpe: "4-6" };
+    return { intensity: "Steady controlled" };
   }
 
   if (/recovery|walk|jog|settle|cool|finish|easy|adaptation/.test(normalized)) {
-    return { intensity: "Easy / RPE 2-3", rpe: "2-3" };
+    return { intensity: "Easy" };
   }
 
-  return { intensity: "Comfortably controlled / RPE 3-5", rpe: "3-5" };
+  return { intensity: "Comfortably controlled" };
 }
 
 function resolveSegmentType(
@@ -668,8 +785,9 @@ function buildMetricMode({
   row: RunningPlanPreviewCalendarRow;
   segments: TrainingPlanV2["planned_workouts"][number]["segments"];
 }): CanonicalMetricModeJson {
-  const hasEditableDefaultHr = row.targetTruthModes.includes("editable_default_hr");
   const hasPaceTargets = selectedPlanSegmentsContainPaceTargets(segments);
+  const hasDefaultEstimatedHrTargets =
+    selectedPlanSegmentsContainDefaultEstimatedHrTargets(segments);
 
   if (hasPaceTargets) {
     return {
@@ -677,11 +795,11 @@ function buildMetricMode({
       executable_mode: "pace_executable",
       pace_targets_allowed: true,
       hr_targets_allowed: false,
-      hr_target_source: hasEditableDefaultHr ? "default_estimated_hr" : "effort_only",
-      ...(hasEditableDefaultHr
+      hr_target_source: hasDefaultEstimatedHrTargets ? "default_estimated_hr" : "effort_only",
+      ...(hasDefaultEstimatedHrTargets
         ? {
             hr_target_label: "Editable estimated HR guidance",
-            hr_target_source_note: "Default estimate only; not personal HR-zone truth.",
+            hr_target_source_note: "Default estimate only; not measured HR-zone data.",
           }
         : {}),
       reason:
@@ -690,20 +808,35 @@ function buildMetricMode({
   }
 
   return {
-    guidance: hasEditableDefaultHr ? "mixed" : "effort",
+    guidance: hasDefaultEstimatedHrTargets ? "heart_rate" : "effort",
     executable_mode: "structure_only_executable",
     pace_targets_allowed: false,
     hr_targets_allowed: false,
-    ...(hasEditableDefaultHr
+    ...(hasDefaultEstimatedHrTargets
       ? {
           hr_target_source: "default_estimated_hr",
           hr_target_label: "Editable Hito default HR guidance",
-          hr_target_source_note: "Default estimate only; not personal HR-zone truth.",
+          hr_target_source_note: DEFAULT_ESTIMATED_HR_SOURCE_NOTE,
         }
       : {}),
-    reason:
-      "Selected running-plan engine emits exact numeric structure without pace truth or personal HR-zone truth.",
+    reason: hasDefaultEstimatedHrTargets
+      ? "Selected running-plan engine emits exact numeric structure with editable default estimated HR guidance; measured HR-zone targets remain blocked."
+      : "Selected running-plan engine emits exact numeric structure without pace truth or measured HR-zone data.",
   };
+}
+
+function selectedPlanSegmentsContainDefaultEstimatedHrTargets(
+  segments: TrainingPlanV2["planned_workouts"][number]["segments"],
+) {
+  return segments.some((segment) => {
+    const target = segment.target as Record<string, unknown> | undefined;
+
+    return (
+      target?.hr_target_source === "default_estimated_hr" &&
+      typeof target.hr_bpm_range === "string" &&
+      target.hr_bpm_range.trim().length > 0
+    );
+  });
 }
 
 function buildWorkoutSummary(
@@ -914,6 +1047,139 @@ function summarizeMetricPolicy(rows: readonly RunningPlanPreviewCalendarRow[]) {
       JSON.stringify(rows),
     ),
   };
+}
+
+function resolveRunnerLevelForCanonicalQualityGates(draft: RunningPlanPreviewDraft) {
+  if (draft.planFamily !== "10K") {
+    return draft.normalizedInputSummary.runnerLevel;
+  }
+
+  return resolveTenKBeginnerDosePolicyRunnerLevel({
+    runnerLevel: draft.normalizedInputSummary.runnerLevel,
+    benchmarkPaceTruth: draft.normalizedInputSummary.benchmarkPaceTruth,
+  });
+}
+
+function canonicalWorkoutToTenKDoseValidationRow(row: TrainingPlanV2["planned_workouts"][number]) {
+  return {
+    rowId: row.workout_id,
+    weekNumber: row.week_number,
+    isRestDay: row.workout_type === "rest",
+    workoutDayKind: (row.source_workout_type ??
+      "rest") as RunningPlanPreviewCalendarRow["workoutDayKind"],
+    endpointDistanceMeters: canonicalEndpointDistanceMeters(row),
+    segments: row.segments.map((segment) => ({
+      primaryPrescription: canonicalPrescriptionToDosePrescription(segment.prescription),
+    })),
+  };
+}
+
+function canonicalPrescriptionToDosePrescription(
+  prescription: TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"],
+): RunningPlanSegmentPrescription {
+  if (!prescription || prescription.mode === "none") {
+    return {
+      mode: "time",
+      durationSeconds: { min: 0, max: 0 },
+      intensityLabel: "none",
+    };
+  }
+
+  if (prescription.mode === "distance") {
+    const distanceMeters = Math.round((prescription.distance_km ?? 0) * 1000);
+    return {
+      mode: "distance",
+      distanceMeters: { min: distanceMeters, max: distanceMeters },
+      intensityLabel: "canonical_distance",
+    };
+  }
+
+  if (prescription.mode === "repeats") {
+    const repeatCount = prescription.repeat_count ?? 0;
+    return {
+      mode: "repeat",
+      repeatCount: { min: repeatCount, max: repeatCount },
+      work: canonicalRepeatUnitToDoseWork(prescription.repeat_unit),
+      recovery: canonicalRepeatUnitToDoseRecovery(prescription.recovery_unit),
+    };
+  }
+
+  const durationSeconds = Math.round((prescription.duration_min ?? 0) * 60);
+  return {
+    mode: "time",
+    durationSeconds: { min: durationSeconds, max: durationSeconds },
+    intensityLabel: "canonical_time",
+  };
+}
+
+function canonicalRepeatUnitToDoseWork(
+  unit:
+    | NonNullable<
+        Extract<
+          NonNullable<
+            TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"]
+          >,
+          { mode: "repeats" }
+        >["repeat_unit"]
+      >
+    | undefined,
+): Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["work"] {
+  if (unit?.mode === "distance") {
+    const distanceMeters = Math.round((unit.distance_km ?? 0) * 1000);
+    return {
+      mode: "distance",
+      distanceMeters: { min: distanceMeters, max: distanceMeters },
+      intensityLabel: "canonical_repeat_distance",
+    };
+  }
+
+  const durationSeconds = Math.round((unit?.duration_min ?? 0) * 60);
+  return {
+    mode: "time",
+    durationSeconds: { min: durationSeconds, max: durationSeconds },
+    intensityLabel: "canonical_repeat_time",
+  };
+}
+
+function canonicalRepeatUnitToDoseRecovery(
+  unit:
+    | NonNullable<
+        Extract<
+          NonNullable<
+            TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"]
+          >,
+          { mode: "repeats" }
+        >["recovery_unit"]
+      >
+    | undefined,
+): Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["recovery"] {
+  if (unit?.mode === "distance") {
+    const distanceMeters = Math.round((unit.distance_km ?? 0) * 1000);
+    return {
+      mode: "recovery_distance",
+      recoveryDistanceMeters: { min: distanceMeters, max: distanceMeters },
+      intensityLabel: "canonical_recovery_distance",
+    };
+  }
+
+  const durationSeconds = Math.round((unit?.duration_min ?? 0) * 60);
+  return {
+    mode: "recovery_time",
+    recoveryDurationSeconds: { min: durationSeconds, max: durationSeconds },
+    intensityLabel: "canonical_recovery_time",
+  };
+}
+
+function canonicalEndpointDistanceMeters(row: TrainingPlanV2["planned_workouts"][number]) {
+  if (row.source_workout_type !== "final_selected_distance_day") {
+    return null;
+  }
+
+  const mainDistanceKm = row.segments
+    .map((segment) => segment.prescription)
+    .find((prescription) => prescription?.mode === "distance")?.distance_km;
+
+  return typeof mainDistanceKm === "number" ? Math.round(mainDistanceKm * 1000) : null;
 }
 
 function maxWeekNumber(rows: readonly RunningPlanPreviewCalendarRow[]) {

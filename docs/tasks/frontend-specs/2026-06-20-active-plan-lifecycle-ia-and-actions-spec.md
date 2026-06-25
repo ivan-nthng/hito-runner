@@ -97,14 +97,9 @@ Use the Implementation Report format from AGENTS.md.
 
 The no-active-plan creation experience is now much clearer than the saved-mode active-plan
 experience. Manual setup, Quick setup, selected running-plan previews, and plan presets all support
-the first-plan mental model. Once a runner already has a manual active plan, the product becomes too
-current-plan-centric:
-
-- the header exposes `Open plan`;
-- `Open plan` contains plan summary, update, schedule edit, import, clear, delete, and export;
-- selected running-plan creation blocks when an active plan exists;
-- the runner does not have a clearly trusted way to say, "I built something manually, but now I want
-  Hito to make me a generated 10K / 21K / 42K plan."
+the first-plan mental model. The accepted saved-mode answer is now one calendar with a primary
+`Add plan` action plus adjacent safe overflow utilities. Older `Open plan` analysis below is kept as
+historical context only.
 
 This spec defines the interaction and information architecture only. It does not define backend
 replacement semantics.
@@ -118,10 +113,10 @@ Visible symptom:
 
 Likely underlying cause:
 
-- Current saved-mode IA treats `Open plan` as the main active-plan action, while generated-plan
-  creation remains mostly scoped to no-active-plan onboarding.
-- Replacement/refresh/restart semantics are intentionally blocked until architecture defines the
-  risk boundary, so the UI has avoided exposing a strong `Create a plan` path in saved mode.
+- The previous saved-mode IA treated `Open plan` as the main active-plan action, while generated-plan
+  creation remained mostly scoped to no-active-plan onboarding.
+- The accepted correction is `Add plan` plus overflow utilities, with backend-owned review/confirm
+  for any future/upcoming schedule replacement.
 
 Canonical owner:
 
@@ -145,13 +140,31 @@ Canonical owner:
 - Use Hito DS primitives and existing product/admin patterns first. Do not introduce a new action
   system, local chooser UI kit, or custom modal grammar.
 
+## Current Accepted One-Calendar IA
+
+This spec's earlier `Create a plan` / `Open plan` split has been superseded by the QA-passed
+one-calendar header IA. Current product truth is:
+
+- the calendar header primary action is `Add plan`;
+- the adjacent overflow owns safe utilities only: `Export JSON`, `Edit schedule`, and
+  `Clear upcoming schedule`;
+- `Open plan` is not a current product concept;
+- visible `Update plan` is not shipped now;
+- `Delete active plan` is not shown;
+- calendar history is sacred, and replacement/clearing may affect only future mutable schedule
+  through backend-owned review/confirm semantics.
+
+The older variant analysis below remains historical design context only and must not be used as the
+current implementation target.
+
 ## Current Product Reality
 
 Implemented or documented realities this spec depends on:
 
-- `Open plan` is the saved-mode plan-management modal.
-- `Open plan` already exposes active-plan summary, export, update plan, edit schedule, import JSON,
-  clear upcoming schedule, and delete active plan.
+- The accepted saved-mode calendar header exposes `Add plan` plus an adjacent overflow.
+- The accepted overflow utilities are `Export JSON`, `Edit schedule`, and `Clear upcoming schedule`.
+- `Open plan`, visible `Update plan`, and `Delete active plan` are historical/unsupported current
+  IA, even when old implementation modules or archive docs still use those names internally.
 - Plan Presets are currently a no-active-plan discovery path. Selecting a card enters selected
   running-plan preview/create, and active-plan creation is blocked when an active plan exists.
 - Active-plan refresh exists as a reviewed proposal/apply flow for the remaining schedule.
@@ -165,9 +178,10 @@ Implemented or documented realities this spec depends on:
 - Deleting or clearing active plan history must preserve logs/history according to backend-owned
   lifecycle rules.
 
-## Recommended IA
+## Historical Recommended IA Superseded By One-Calendar IA
 
-Recommended variant: **Header action cluster + `Open plan` management modal + reviewed create flow**.
+The former recommended variant was **Header action cluster + `Open plan` management modal + reviewed
+create flow**. It is no longer the current implementation target.
 
 The saved-mode header should express two different jobs:
 
@@ -713,10 +727,10 @@ Runner chooses Create a plan
   manual active plan.
 - Runner has protected completed/logged/evidence-backed history: review must explain preserved
   history; Frontend must not decide this locally.
-- Runner chooses `Import JSON` from header overflow: route into existing `Open plan` import panel or
-  a modal using the same `PlanImportPanel` anatomy.
+- Runner chooses import/create from `Add plan`: route into existing supported plan-add/create
+  surfaces using the same backend-owned review/confirm boundaries.
 - Runner chooses `Clear upcoming schedule`: use existing lifecycle confirmation pattern.
-- Runner chooses `Delete active plan`: use existing destructive confirmation pattern.
+- `Delete active plan` is not shown in the accepted current IA.
 - Plan-family eligibility cannot load: show recoverable error; current plan stays unchanged.
 - Plan-family eligibility/card discovery loads even when the runner has an active manual plan; it
   remains non-mutating discovery only.
@@ -726,17 +740,16 @@ Runner chooses Create a plan
 
 ## Acceptance Criteria
 
-- A runner with a manual active plan can discover `Create a plan` without opening a hidden advanced
+- A runner with a manual active plan can discover `Add plan` without opening a hidden advanced
   import path.
-- `Create a plan` and `Open plan` have different, understandable jobs.
-- Desktop placement keeps `Create a plan` visible; mobile placement keeps it reachable without
-  cramping the header.
+- `Add plan` and the overflow utilities have different, understandable jobs.
+- Desktop and mobile placement keep `Add plan` reachable without cramping the header.
 - Generated/preset creation reuses known runner facts and asks only for missing or custom-specific
   details.
 - `10K`, `21K`, and `42K` plan-family choices are represented as compact Hito DS option surfaces,
   not new local cards.
-- `Import JSON`, `Clear upcoming schedule`, and `Delete active plan` are easier to find but stay
-  secondary/advanced/destructive.
+- `Export JSON`, `Edit schedule`, and `Clear upcoming schedule` are available from overflow as safe
+  utilities; `Delete active plan` is not shown.
 - The review/confirm boundary is explicit before any plan mutation.
 - No copy or layout implies silent replacement.
 - No backend lifecycle, persistence, protected-history, or active-plan mutation semantics are

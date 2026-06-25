@@ -1,7 +1,7 @@
 # Current Functional Map
 
 Status: canonical freeze-readiness map
-Last Updated: 2026-06-20
+Last Updated: 2026-06-24
 Owner: ARCHITECT
 
 ## Purpose
@@ -50,6 +50,77 @@ Do not delete or demote code because it looks large. First map it to one of the 
 If a file supports no current flow, no accepted validation gate, and no explicit future-only artifact,
 then it becomes a deletion/demotion candidate.
 
+## Business-Flow Source-Of-Truth Audit — 2026-06-24
+
+Root-cause decision:
+
+Hito should be audited as one calendar, not as separate manual/generated/imported/preset products.
+A plan is bulk scheduled workout creation on that calendar. After a row is scheduled, source kind is
+provenance and safety metadata; runner actions should be driven by row state, backend capabilities,
+history/evidence protection, and explicit review/confirm boundaries.
+
+Current flow count:
+
+- User-facing plan creation has five supported runtime entry families:
+  no-active structured/custom first-plan review, no-active selected-plan preset review, no-active
+  empty manual calendar creation, advanced JSON import/paste, and active-calendar `Add plan`
+  reviewed transition for selected running-plan candidates.
+- Backend voice-to-plan remains preserved backend truth but has no current visible onboarding caller.
+- Workout creation has three current product meanings:
+  bulk plan application into `planned_workouts`, manual calendar Add activity through the shared
+  manual constructor/review/add seam, and copy/paste/reuse paths that reconstruct through the same
+  manual draft/review model. FIT upload creates actual evidence/readback, not planned workouts.
+
+Current canonical seams:
+
+- No-active onboarding: `OnboardingGate` routes structured/custom, selected-plan presets, and empty
+  manual calendar creation through first-plan/running-plan/manual backend actions.
+- Active `Add plan`: `ActivePlanCreatePlanDialog` reviews a candidate plan through
+  `active-plan-transition-actions.ts`; mutation requires explicit confirm and protects history.
+- Advanced JSON import: `UploadJsonDialog` and backend `training-plan-v2` import policy remain a
+  supported advanced lane with start-date and carry-forward safeguards. It is not the same UI seam
+  as selected-plan transition and should stay visibly advanced.
+- Calendar Add/Clear/Move/Edit/Copy: backend capability metadata and row state decide affordances;
+  source kind is metadata/provenance except where an operation is intentionally scoped to manual
+  reconstruction support.
+- Workout detail and FIT feedback: logging and Garmin FIT/ZIP upload/readback live in the feedback
+  lane; FIT files provide actual evidence and lap/record reality checks, not device-trusted workout
+  intent labels.
+
+Reality-check findings from the supplied FIT files:
+
+- `/Users/ivan/Downloads/6a214c7570a5da09d440a1e3.fit` is a running activity of about 14.81 km /
+  76.05 timer minutes with HR/cadence and a likely lap-derived interval structure: long warmup, five
+  1.5 km faster reps with 0.5 km recoveries, and cooldown.
+- `/Users/ivan/Downloads/21767983470_ACTIVITY.fit` is a running activity of about 4.85 km / 40
+  timer minutes with HR/cadence and a likely 6 x 2 min work / 1 min recovery pattern after an easy
+  opener.
+- Neither file carries reliable explicit FIT workout-step labels, so Hito should keep comparing
+  date/duration/distance/simple structure from backend-normalized evidence and treat
+  warmup/work/recovery/cooldown labels as inferred, not device-provided truth.
+
+Cleanup candidate matrix:
+
+- Selected next gate — Frontend plan/manual entrypoint dead-branch consolidation:
+  `PlanManagementDialog` full-mode is unreachable from `AppShell`; its full-only text/import/refresh
+  panels preserve old plan-hub semantics beside the accepted `Add plan` + overflow model. The old
+  `ManualUserBuiltPlanPanel` also appears orphaned now that onboarding creates an empty manual
+  calendar. This is one frontend owner, one dead-branch risk class, and one validation story.
+- Backend lifecycle cleanup candidate:
+  centralize repeated evidence/protected-workout lookup and remove stale source-capability
+  vocabulary such as `eligible_missed_unlogged_recent` after source proof. Keep for a later backend
+  slice because it touches evidence read-model plumbing rather than visible entrypoint drift.
+- Backend template quality candidate:
+  the manual template registry is not empty and already has warmup/body/repeat/recovery/cooldown
+  anatomy; the main known gap is run/walk identity mapping. Keep for a later backend/running-coach
+  parity pass, not the first business-flow cleanup.
+- FIT/evidence candidate:
+  parser normalization may eventually recover more lap-derived detail for laps with null summary
+  fields, but no product behavior should be invented from two files alone.
+- Docs-only cleanup candidate:
+  historical `Open plan` mentions may remain when explicitly historical, but current docs should
+  continue teaching only `Add plan` plus overflow utilities.
+
 ## Freeze Sequencing Decision
 
 Refresh the business-flow map and continue code-freeze cleanup from proved behavior, not from raw
@@ -81,11 +152,11 @@ Reason:
 - Manual builder MVP behavior is shipped in the proved scope: first create, Add activity, personal
   saved templates, direct manual Copy/Paste, Delete/Clear, direct manual Move Workout, constructor UI,
   and JSON/Markdown export.
-- The saved calendar is a shared active-plan viewing surface, but mutation eligibility remains
-  source-kind/capability bounded.
-- Manual active plans are editable in the proved MVP scope. AI/generated/selected/preset/imported
-  active plans are not universally editable unless accepted backend capability metadata and QA proof
-  exist for the specific operation.
+- The saved calendar is one active-plan surface. Add/Clear/Move eligibility is now row-state and
+  backend-capability shaped: source kind is provenance, while logged/evidence/protected/occupied/rest
+  state and backend policy decide affordances.
+- Manual authoring still owns manual workout content, templates, and proved Copy/Paste; it does not
+  own the general active-plan lifecycle gate for Add/Clear/Move across accepted plan sources.
 - Running-plan universal runner-facing richness and executable prescription grammar is accepted;
   the old flat generated-plan quality blocker should no longer pause cleanup.
 - Cleanup Slices 12A-12G and 13A-13I reduced proof-infrastructure hotspots without changing runtime
@@ -287,12 +358,11 @@ Reason:
 - The no-active-plan onboarding IA/runtime blocker around `isManualProfileReady` is not marked as
   accepted by this map because the inspected docs did not provide an explicit latest QA closeout for
   that blocker.
-- Persisted future manual workout-content edit has a backend seam recorded in the manual plan, but
-  runner-facing `Edit training` remains blocked until QA accepts that backend seam and frontend wires
-  the detail surface.
-- Universal Copy/Paste, recurrence, runner-facing persisted workout editing, Restore UI, active-plan
-  replacement expansion, and broader generated-row mutation matrices beyond proved slices remain
-  future-only.
+- Persisted future manual workout-content edit is QA-passed for eligible future manual planned rows
+  through backend review/confirm and workout-detail `Edit training`.
+- Universal Copy/Paste, recurrence, runner-facing persisted workout editing, Restore UI,
+  active-plan replacement expansion, and generated-row content editing / Copy-Paste beyond proved
+  row-state Move/Clear/drag slices remain future-only.
 - QR/share/import remains future-only and must not be selected as immediate implementation during
   this freeze-readiness pass.
 - Stable cleanup burndown `cleanup-burndown-v1` is now the progress source: fixed denominator `40`
@@ -304,21 +374,19 @@ Reason:
 
 Immediate docs/artifact compression gate:
 
-ARCHITECT Slice D23 for the separate Hito Docs and Artifact Compression track.
+Holding for the separate Hito Docs and Artifact Compression track.
 
 G23 is accepted and the simplification strike is archived. The cleanup ledger is `40/40` complete,
-`0` remaining, `100%`. Product has opened a separate docs/artifact compression track. D1-D4 and
-D12-D19 are accepted net-negative docs-size-reduction batches, D5-D10 are accepted Admin importer
-metadata-quality hygiene, and D11 rebaselined the track so metadata-only work is not counted as
-compression progress. D20 stopped before edits because the selected archive tail was already
-compressed enough. D21 compressed the first post-archive admin-imported frontend spec pilot from
-`4542` lines to `693` lines, net `-3849`; D22 compressed the DS/workbench frontend spec pilot from
-`2255` lines to `407` lines, net `-1848`. D23 should continue with completed/closed frontend spec
-tail candidates before artifact-retention apply work. Broad
-`training-api.ts`, manual calendar runtime UI, admin
-table primitives, Hito DS feature work, validation thinning, live OpenAI calls, Supabase mutation,
-artifact deletion, and `qa-artifacts/` cleanup remain deferred unless Product opens a separately
-named future track.
+`0` remaining, `100%`. Product opened a separate docs/artifact compression track. D1-D4, D12-D19,
+D21-D24, and D26-D28 are accepted net-negative docs-size-reduction batches; D5-D10 are accepted
+Admin importer metadata-quality hygiene and must not be counted as compression wins. The artifact
+lane now has an accepted local QA evidence policy, quarantine/apply tooling for manifest-safe
+classes, and QA-passed manual-workout image compression through E13/E14. The active compression plan
+is intentionally holding until a fresh dry-run manifest and targeted estimate prove one material
+same-owner candidate with one risk class and one validation story. Broad `training-api.ts`, manual
+calendar runtime UI, admin table primitives, Hito DS feature work, validation thinning, live OpenAI
+calls, Supabase mutation, log deletion, generated/vendor residue cleanup, and additional
+`qa-artifacts/` cleanup remain deferred unless that track explicitly scopes a safe gate.
 
 ## Shared Calendar And Mutation Ownership
 
@@ -364,19 +432,18 @@ named future track.
 | Plan Presets | Runner can use 10K Foundation, Half Marathon Balanced, or Marathon Base cards as non-mutating discovery into selected running-plan preview/create, including saved-mode active-manual transition discovery. | Shipped as discovery; creation is owned by the running-plan engine or active-plan transition seam | `src/lib/plan-preset-actions.ts` keeps `getPlanPresetCards(...)`; selected create/review/confirm lives in running-plan engine actions/review; active-manual replacement uses `src/lib/active-plan-transition-actions.ts` | Preset cards in onboarding plus selected-plan preview dialog and future saved-mode `Create a plan` transition UI | Card discovery does not persist; selected running-plan confirm persists `runner_profiles`, `plan_cycles`, and `planned_workouts` only when no active plan exists; active manual transition archives/supersedes through reviewed confirm | Changelog 2026-06-07 history plus later selected-plan create proof; Slice G2A removed old Plan Preset review/confirm blocked actions; saved-mode card discovery no longer has an active-plan read gate | No new preset families; no Plan Preset active-plan replacement; no legacy Plan Preset review/confirm creation seam; no direct selected-plan confirm while an active plan exists |
 | Active manual plan -> selected generated plan transition | Runner can be shown a backend-shaped impact review for replacing an active manual plan with a reviewed selected generated/preset plan; frontend wiring/QA remains separate. | Backend seam implemented / QA pending / not runner-facing shipped | `src/lib/active-plan-transition-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/active-plan-persistence.ts` | Future saved-mode `Create a plan` transition UI | Old `plan_cycles` row archived/superseded; new selected plan persisted as active; manual templates remain user-library rows | `scripts/validate-running-plan-engine-confirm.ts` transition proof | No silent replacement; no clear-then-create shortcut; no merge of upcoming manual workouts; no deletion of logs/evidence/comparisons/protected history |
 | Manual first create | Runner chooses `Build my plan myself`, reviews one workout, and creates a manual active plan. | Shipped | `src/lib/manual-workout-authoring/actions.ts`, `persistence.ts`, `review-exactness.ts`, `active-plan-persistence.ts` | `src/components/onboarding/ManualUserBuiltPlanPanel.tsx`, shared manual controls | `runner_profiles`, `plan_cycles`, `planned_workouts` | `scripts/validate-manual-workout-authoring.ts`; browser/DB proof; changelog 2026-06-10 | Do not persist empty active manual plans silently |
-| Active-plan Add activity | Runner adds a reviewed user-authored workout to an eligible future empty day in an accepted active plan. | Shipped in proved manual and non-manual Add scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/manual-workout-authoring/active-plan-add.ts`, `actions.ts`, `review-exactness.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`, `manual-workout-authoring-utils.ts` | Existing `plan_cycles`; new `planned_workouts` rows with `active_plan_user_edit_v1` metadata | Manual browser/DB proof plus universal editability QA; changelog 2026-06-11 and 2026-06-12 | No frontend row append; no unproved source/row mutation; no universal Copy/Paste |
+| Active-plan Add activity | Runner adds a reviewed user-authored workout to an eligible today-or-future empty day in an accepted active plan. | Shipped in proved manual and non-manual Add scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/manual-workout-authoring/active-plan-add.ts`, `actions.ts`, `review-exactness.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`, `manual-workout-authoring-utils.ts` | Existing `plan_cycles`; new `planned_workouts` rows with `active_plan_user_edit_v1` metadata | Manual browser/DB proof plus universal editability QA; changelog 2026-06-11 and 2026-06-12 | No frontend row append; no unproved source/row mutation; no universal Copy/Paste |
 | Personal saved templates | Runner saves a reviewed manual workout as a personal template and reuses it from Add activity. | Shipped in scoped first-create and existing-plan Add paths | `src/lib/manual-workout-authoring/saved-templates.ts`, `saved-template-repository.ts`, review reconstruction through manual authoring | Manual save modal and template picker in shared controls | `runner_manual_workout_templates`, `planned_workouts` when later confirmed | Browser/DB proof; changelog 2026-06-11 | No organization/coach templates; no frontend-owned template rows |
 | Manual Copy/Paste | Runner copies a manual workout and pastes it onto an eligible target day through direct backend mutation without a runner-facing review dialog. | Shipped in the proved manual scope | `src/lib/manual-workout-authoring/copy-paste.ts`, `copy-paste-reconstruction.ts`, `active-plan-add.ts` | `Calendar.tsx` occupied-day menu and Add/Paste menu | Existing `plan_cycles`; new `planned_workouts` rows | Backend live proof plus browser/DB proof; changelog 2026-06-11 and direct-edit update 2026-06-13 | No raw row duplication; no recurrence; no move disguised as copy/delete; no universal Copy/Paste across generated/selected/preset/imported plans |
-| Active-plan Delete/Clear | Runner clears an eligible future planned workout after backend-shaped review; active plan remains active. | Shipped in proved manual and non-manual Clear scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/manual-workout-authoring/delete-clear.ts`, `review-exactness.ts`, `persistence.ts` | `Calendar.tsx`, `ManualWorkoutAuthoringControls.tsx` review dialog | Existing `planned_workouts` row removed; metadata updated with `active_plan_user_edit_v1` | Manual browser/DB proof plus universal editability QA; changelog 2026-06-12 | Restore/Put back/Redo UI is not shipped; last-workout delete remains blocked unless Product changes empty-plan policy |
-| Active-plan Move Workout | Runner moves an eligible manual workout through direct backend mutation; accepted capability-gated non-manual Move remains bounded to proved source/row scopes only. | Shipped in proved manual scope; non-manual source behavior remains capability/QA bounded | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/manual-workout-authoring/move-workout.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutMoveControls.tsx`, existing manual controls/utils | Existing `planned_workouts` row date/weekday/week update; original plan source preserved | Manual browser/DB/mobile/WebKit proof, direct-move proof, missed-unlogged move-to-today proof, and universal editability QA; changelog 2026-06-12 and 2026-06-13 | No swap, no batch move, no recurrence, no runner-facing edit, no Restore UI, no QR/share/import, no frontend copy+delete, no local schedule truth, no universal direct generated-plan move beyond accepted proof |
-| Persisted future manual workout edit | Backend can reconstruct and review/confirm edits for eligible future manual planned rows, but runner-facing `Edit training` is not live until QA and frontend wiring pass. | Backend seam implemented / QA pending / not runner-facing shipped | `src/lib/manual-workout-authoring/edit-workout.ts`, `edit-workout-review-token.ts`, active-plan editability policy | Future workout detail action surface and manual constructor/editor reuse after QA | Same `planned_workouts` row updates after accepted confirm | Manual plan records backend implementation and validation; QA is next owner | No generated/selected/preset/imported content editing; no frontend-only editor; no today/past/logged/evidence-backed/protected edits; no fake pace or fake personal HR |
+| Active-plan Delete/Clear | Runner clears an eligible unlogged planned workout after backend-shaped review; active plan remains active. Source kind is provenance, not the row lifecycle gate. | Shipped in proved manual and non-manual Clear scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/active-plan-workout-editing/source-capabilities.ts`, `src/lib/manual-workout-authoring/delete-clear.ts`, `review-exactness.ts`, `persistence.ts` | `Calendar.tsx`, `ManualWorkoutAuthoringControls.tsx` review dialog | Existing `planned_workouts` row removed; metadata updated with `active_plan_user_edit_v1` | Manual browser/DB proof plus universal row-state editability proof; changelog 2026-06-12 | Restore/Put back/Redo UI is not shipped; logged/evidence-backed/protected/occupied/rest rows remain blocked |
+| Active-plan Move Workout | Runner moves an eligible unlogged planned workout from a past, today, or future source date to today or a future empty target through direct backend mutation; source kind is preserved as provenance while completion/evidence state owns row eligibility. | Shipped in proved manual and selected/generated row-state scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/active-plan-workout-editing/source-capabilities.ts`, `src/lib/manual-workout-authoring/move-workout.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutMoveControls.tsx`, existing manual controls/utils | Existing `planned_workouts` row date/weekday/week update; original plan source preserved | Manual browser/DB/mobile/WebKit proof, direct-move proof, missed-unlogged proof, selected/generated direct move proof, and universal row-state editability validator | No swap, no batch move, no recurrence, no runner-facing content edit without editor support, no Restore UI, no QR/share/import, no frontend copy+delete, no local schedule truth |
+| Persisted manual workout edit | Runner edits eligible future manual planned rows through backend review/confirm from workout detail. | QA-passed for eligible future manual rows | `src/lib/manual-workout-authoring/edit-workout.ts`, `edit-workout-review-token.ts`, active-plan editability policy | Workout detail `Edit training` action plus manual constructor/editor reuse | Same `planned_workouts` row updates after accepted confirm | Manual plan closeout records backend implementation, frontend wiring, and QA acceptance | No generated/selected/preset/imported content editing; no frontend-only editor; no today/past/logged/evidence-backed/protected edits; no fake pace or fake personal HR |
 | Active plan viewing | Runner sees the shared saved calendar, workout detail, progress, and result state for any active plan source. | Shipped | `src/lib/training.ts`, `src/lib/route-data-actions.ts`, `src/lib/workout-log-actions.ts`, feedback/import modules | `src/components/Calendar.tsx`, `src/routes/workout.$date.tsx`, `src/routes/progress.tsx`, `src/components/CompletionPanel.tsx` | `plan_cycles`, `planned_workouts`, `workout_logs`, provider evidence tables | Changelog-backed saved-mode, Garmin feedback, target-display QA, manual builder browser/DB proof | Do not move schedule truth into frontend; viewing all sources does not imply all sources are manually editable; `/hitoDS` specimens are not product behavior |
-| Open plan actions | Runner opens plan management modal for summary, import/replace, text replacement, clear upcoming, delete/archive, and export. | Shipped by action as listed below | `src/lib/active-plan-lifecycle-actions.ts`, `plan-replacement-actions.ts`, `active-plan-export-actions.ts`, `active-plan-refresh-actions.ts` | `src/components/PlanManagementDialog.tsx`, `src/components/plan-management/*` | `plan_cycles`, `planned_workouts`, `workout_logs` | Multiple changelog and validators; export proof accepted 2026-06-12 | No silent replacement; no per-day schedule editing through Open plan |
-| Active plan delete | Runner can delete/archive the active plan and return to no-plan state while history remains archived. | Shipped | `src/lib/active-plan-lifecycle-actions.ts` via `training-api.ts` wrappers | `PlanLifecycleControls.tsx` within `Open plan` | `plan_cycles` archived; workouts/logs preserved under archived plan | Current-product backed | No hard deletion of history as normal runner action |
-| Clear upcoming schedule | Runner can clear upcoming schedule by archiving active plan and returning to no-plan state. | Shipped | `src/lib/active-plan-lifecycle-actions.ts` | `PlanLifecycleControls.tsx` | `plan_cycles` archived; protected past/logged truth preserved | Current-product backed | No half-active truncated plan state |
+| Calendar plan actions | Runner uses one calendar header: primary `Add plan` plus overflow utilities (`Export JSON`, `Edit schedule`, `Clear upcoming schedule`). | Shipped IA | `src/lib/active-plan-lifecycle-actions.ts`, `active-plan-export-actions.ts`, schedule-edit preview/apply seams, active-plan transition seams | Calendar/header plan action controls, `PlanManagementDialog.tsx`, `src/components/plan-management/*` as implementation modules | `plan_cycles`, `planned_workouts`, `workout_logs` | One-calendar IA QA passed; source/docs scan now treats old labels only as historical or explicitly rejected language | No `Open plan` concept, no visible `Update plan`, no `Delete active plan`, no silent replacement |
+| Clear upcoming schedule | Runner can clear upcoming mutable schedule while archived/protected history remains preserved. | Shipped overflow utility | `src/lib/active-plan-lifecycle-actions.ts` | Overflow clear-upcoming control; `PlanLifecycleControls.tsx` as implementation module | `plan_cycles` archived; protected past/logged truth preserved | Current-product backed | No half-active truncated plan state; no hard deletion of history |
 | Advanced JSON import / replace | Runner can import an existing `training-plan-v2` artifact as advanced fallback, with backend start-date policy. | Shipped | `src/lib/imported-plan.ts`, `src/lib/plan-replacement-actions.ts`, `src/lib/active-plan-persistence.ts` | `PlanImportPanel.tsx`, advanced onboarding/import UI | `runner_profiles`, `plan_cycles`, `planned_workouts` | Doctrine/import validators; current-product backed | Legacy `week_1_preview[]` removed; no share/import-from-QR yet |
 | Text replacement / refresh | Saved-mode plan replacement and refresh proposal use backend review/apply seams. | Shipped for current described scopes | `src/lib/plan-replacement-actions.ts`, `active-plan-refresh-actions.ts`, `active-plan-refresh-draft.ts`, AI proposal modules | `PlanTextReplacementPanel.tsx`, `PlanRefreshPanel.tsx` | Archive/replace plan rows only after apply | Doctrine validators; current-product backed | No AI direct mutation; no silent refresh apply |
-| JSON/Markdown export | Runner exports persisted active plan JSON/Markdown from Open plan. Manual plans are now proven. | Shipped for authenticated active-plan export including manual plan proof | `src/lib/active-plan-export-actions.ts`, `src/lib/plan-export.ts` | `PlanExportMenu.tsx`, `PlanManagementDialog.tsx` iframe download orchestration | Reads active `plan_cycles` and `planned_workouts`; no mutation | Browser/download/DB proof; changelog 2026-06-12 | No PDF, watch export, public links, QR, import-from-export, or mobile deep links |
+| JSON export | Runner exports persisted active plan JSON from the calendar overflow. Manual plans are proven. | Shipped for authenticated active-plan export including manual plan proof | `src/lib/active-plan-export-actions.ts`, `src/lib/plan-export.ts` | `PlanExportMenu.tsx`, `PlanManagementDialog.tsx` iframe download orchestration as implementation modules | Reads active `plan_cycles` and `planned_workouts`; no mutation | Browser/download/DB proof; changelog 2026-06-12 | Markdown/PDF/watch export, public links, QR, import-from-export, and mobile deep links remain outside current header IA |
 | QA server lifecycle | QA uses one canonical built local server to prove browser behavior. | Shipped internal process | `scripts/qa-local-server.mjs`, build/finalize scripts | Browser QA only | None | Reused in browser QA reports | Do not start duplicate app servers unless required |
 | Admin work items | Admin can see repo-derived work items and quick notes in one Work Items surface. | Shipped internal/admin | `src/lib/admin-capture*`, `scripts/import-repo-work-items-to-admin-backlog.ts` | `src/routes/admin.capture.tsx`, admin shell | `admin_capture_items` | Importer dry-run/live proof; admin QA | Not a substitute for changelog or markdown source truth |
 | Future exchange / share | QR/share/import model for Hito plan exchange. | Future-only | Architecture contract not accepted yet | No frontend implementation | Unknown; do not add tables yet | None | QR, public/private links, import from share, applying someone else's plan, expiry/revocation remain future-only |
@@ -801,15 +868,13 @@ count them as current runtime owners.
 
 ## Immediate Next Gate
 
-ARCHITECT Slice D23 for the separate Hito Docs and Artifact Compression track.
+Holding for the separate Hito Docs and Artifact Compression track.
 
 G23 is accepted and the simplification strike is archived. The cleanup ledger is `40/40` complete,
-`0` remaining, `100%`. Product has opened the separate docs/artifact compression track. D1-D4 and
-D12-D19 are complete as net-negative docs-size-reduction batches; D5-D10 are metadata-quality
-hygiene, not compression wins; D11 corrected that strategy split. D20 stopped before edits because
-the archive tail was already compressed enough. D21 is complete as the first net-negative
-admin-imported frontend spec compression pilot, D22 is complete as the DS/workbench frontend spec
-compression pilot, and D23 is the next completed/closed frontend spec tail pilot. Do not route
-broader runtime cleanup, backend ops hardening,
-browser-sensitive cleanup, Admin apply, log deletion, or QA artifact cleanup unless that track
-explicitly scopes the gate.
+`0` remaining, `100%`. Product has opened the separate docs/artifact compression track. Accepted
+docs-size-reduction and metadata-quality work is ledgered in that active plan, and QA artifact
+cleanup is now in holding after QA-passed E13/E14 manual-workout image compression. Resume only from
+a fresh manifest/estimate that proves material value, one owner, one risk class, and one validation
+story. Do not route broader runtime cleanup, backend ops hardening, browser-sensitive cleanup, Admin
+apply, log deletion, generated/vendor residue cleanup, or additional QA artifact cleanup unless that
+track explicitly scopes the gate.

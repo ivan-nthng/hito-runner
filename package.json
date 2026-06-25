@@ -14,7 +14,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "start": "node --env-file=.env.local .output/server/index.mjs",
-    "serve:local": "node --env-file=.env.local .output/server/index.mjs --host 127.0.0.1 --port 3000",
+    "serve:local": "node --env-file=.env.local logs/build-output-finalized/server/index.mjs --host 127.0.0.1 --port 3000",
     "qa:server": "node ./scripts/qa-local-server.mjs",
     "qa:server:status": "node ./scripts/qa-local-server.mjs status",
     "qa:server:start": "node ./scripts/qa-local-server.mjs start",

@@ -6,7 +6,7 @@
 - the imported baseline structure remains preserved in `src/`, including generated route tree, shell, components, UI primitives, and styles
 - build and dev commands come from `package.json`
 - local production-like `npm run start` now explicitly loads `.env.local` so server-only admin and Supabase env reaches the built server path
-- local QA on `localhost:3000` uses the current built output through `npm run serve:local` after `npm run build`; `npm run qa:server:start|status|restart|stop` manages that canonical built server lifecycle, keeps PID/log state under gitignored `logs/`, and restarts stale build output so HTML and hashed assets come from the same `.output`
+- local QA on `localhost:3000` uses the finalized local build snapshot through `npm run serve:local` after `npm run build`; `npm run qa:server:start|status|restart|stop` manages that canonical built server lifecycle, keeps PID/log state under gitignored `logs/`, and restarts stale build output so HTML and hashed assets come from `logs/build-output-finalized`
 - local artifact hygiene uses `npm run artifact:hygiene` as a non-mutating dry-run reporter for `logs/`, build-output residues, and generated `test-results/`; `qa-artifacts/` remains protected evidence and is counted only with explicit `--include-qa-artifacts` as non-disposable
 - the canonical deployment runtime is now Nitro for Vercel:
   `npm run build` emits `.output/` locally
@@ -265,8 +265,8 @@
   review/confirm, and direct backend-owned Move Workout. Move updates the same persisted
   `planned_workouts` row date/weekday/week truth; frontend renders the menu, drag/drop affordance,
   and refresh from persisted state without owning schedule mutation truth. Universal Copy/Paste,
-  recurrence, runner-facing `Edit training`, Restore/Put back/Redo UI, active-plan replacement
-  semantics expansion, broader generated-row mutation matrices, QR/share/import, PDF/watch export,
+  recurrence, runner-facing `Edit training`, generated/selected content editing, Restore/Put
+  back/Redo UI, active-plan replacement semantics expansion, QR/share/import, PDF/watch export,
   and coach/organization templates are not implemented yet.
 - visible onboarding on `/` is now split between manual setup and quick setup:
   authenticated users without setup can create an empty manual plan from required basics, or use Quick setup for the bounded first-plan constructor plus backend-owned Plan Preset / selected running-plan review. The visible structured constructor calls `generateStructuredFirstPlanDraft` first, keeps `correction_required` inline near the form, opens a `Review your setup` modal only for `draft_ready`, and calls `confirmStructuredFirstPlanDraft` only from the modal `Yes, create plan` action
@@ -312,12 +312,16 @@
 - saved mode also has a narrower backend `Clear upcoming schedule` lifecycle action:
   clearing the upcoming schedule archives the current active `plan_cycle` from the active schedule view, preserves all planned-workout rows and workout logs under archived history, records the clear cutoff as today for the action result, and returns the runner to the authenticated no-plan/setup-ready state so a later-starting imported or generated plan cannot inherit stale future workouts
   if today already has logged truth, that log remains attached to its archived planned-workout row; the action removes it only from the active schedule, not from saved history
-- the saved-mode `Open plan` modal now exposes that clear-upcoming lifecycle as a confirmed secondary action distinct from `Delete plan`, and later-starting JSON import surfaces can explicitly clear the current upcoming schedule before applying the new plan through the backend seam
+- the saved-mode calendar header overflow now exposes that clear-upcoming lifecycle as a confirmed
+  utility, and later-starting JSON import surfaces can explicitly clear the current upcoming
+  schedule before applying the new plan through the backend seam; visible `Delete active plan` is
+  not part of current accepted IA
   the clear-upcoming and delete/archive controls are isolated in [src/components/plan-management/PlanLifecycleControls.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanLifecycleControls.tsx), while `PlanManagementDialog` remains the owner of confirmation state, lifecycle server calls, errors, status transitions, and success navigation
 - saved mode now has a backend-owned active-plan export seam:
   [src/lib/active-plan-export-actions.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-export-actions.ts) owns the authenticated action/helper layer and [src/lib/plan-export.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-export.ts) builds one canonical payload from the current active `plan_cycle` plus its saved `planned_workouts`, then projects that same payload into `training-plan-v2` JSON and runner-readable Markdown
   exported dates come from the active saved workout rows, so chosen-start-day effects are reflected in the artifact, and runtime-only saved-mode state such as logs, Garmin evidence, comparisons, and AI feedback is intentionally excluded
-  the saved-mode `Open plan` modal now exposes one compact `Export` action for JSON and Markdown download using that same backend-owned document truth and backend-provided filename
+  the saved-mode calendar header overflow now exposes one compact `Export JSON` action using that
+  same backend-owned document truth and backend-provided filename
   Safari-compatible delivery now uses one authenticated attachment route for the actual browser download request instead of reconstructing files from a client-side blob URL
   the active-plan summary/header UI is isolated in [src/components/plan-management/PlanSummaryHeader.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanSummaryHeader.tsx), preserving title, goal fallback, active status, date/count/target summary, export menu placement, and export error rendering
   the export dropdown UI is isolated in [src/components/plan-management/PlanExportMenu.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanExportMenu.tsx), while `PlanManagementDialog` remains the owner of export status, errors, iframe download orchestration, and the surrounding plan-management modal state
@@ -325,8 +329,9 @@
 - the frontend now mirrors that simplified policy instead of the older symmetric chooser:
   text-first apply and advanced JSON apply both use the safe backend default without a required preserve-vs-ignore modal step
   and only one explicit destructive override remains in the UI, now kept behind a quieter disclosure instead of being shown as an equal sibling of the safe action
-  the saved-mode `Open plan` text replacement UI is isolated in [src/components/plan-management/PlanTextReplacementPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanTextReplacementPanel.tsx), while `PlanManagementDialog` remains the owner of prompt state, minimum-length validation, `completeTextOnboarding` server calls, replacement status/errors, and success navigation
-  the saved-mode `Open plan` JSON import UI is isolated in [src/components/plan-management/PlanImportPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanImportPanel.tsx), while `PlanManagementDialog` remains the owner of imported-plan validation state, file-read state updates, import/apply server calls, clear-before-import sequencing, and success/failure navigation
+  the saved-mode plan replacement/import panels remain implementation modules, but current calendar
+  IA routes plan creation through `Add plan` and safe utilities through overflow instead of a
+  runner-facing `Open plan` hub
 - OpenAI-generated authoring output never persists directly:
   the app validates model responses, converts them into canonical plan data, and persists through the same `plan_cycles` plus `planned_workouts` seam already used by JSON import and structured authoring; the richer text-authoring draft is never stored as a raw AI artifact and can only survive after backend normalization into canonical `training-plan-v2` workouts
 - saved mode now has the first active-plan refresh foundation and proposal UI:
@@ -337,7 +342,8 @@
   explicit proposal apply now exists as a backend-only seam: apply must be called intentionally, revalidates a backend fingerprint against current active-plan/context truth including fixed weekday rest-day constraints, verifies the reviewed draft checksum, blocks stale or genuinely invalid proposals with bounded proposal-specific copy, and uses archive/replace by creating a new `active_plan_refresh_v1` plan while archiving the previous active plan
   apply no longer calls OpenAI or regenerates the schedule; if a previously mutable workout becomes logged, Garmin evidence-backed, comparison-backed, or AI-insight-backed after proposal generation, apply blocks and asks for a fresh proposal
   past/logged/Garmin-backed history remains fixed by carrying fixed workout/log/evidence truth into the replacement active plan and retaining the previous plan as archived audit history
-  the saved-mode `Open plan` modal now exposes a quiet `Update plan` disclosure that collects a short runner prompt, calls the backend proposal seam, renders the proposal review, and lets the runner explicitly choose `Apply update` or `Keep current plan`
+  the active-plan refresh proposal/apply seam remains backend-owned future capability; visible
+  `Update plan` is not part of the current accepted calendar-header IA
   the refresh proposal disclosure and review UI are isolated in [src/components/plan-management/PlanRefreshPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanRefreshPanel.tsx), while `PlanManagementDialog` remains the owner of proposal/apply server calls, refresh state transitions, stale/error handling, and success navigation
   `Apply update` calls the backend apply seam and returns to the refreshed active-plan view after success; `Keep current plan` clears the proposal review without mutation; stale apply responses stay in the modal with a fresh-proposal recovery action
   proposal generation now checks `ai_plan_update` entitlement before OpenAI generation and records usage only after successful proposal generation for explicit Basic users; applying an approved proposal does not consume additional usage
@@ -347,7 +353,10 @@
   when the weekly running-day count changes or the proposed schedule cannot safely fit future mutable workouts, the preview returns `requires_regeneration` with a bounded reason and refresh prompt so the existing exact-reviewed active-plan refresh flow remains the only regeneration path
   past/today, logged, Garmin asset, actual metrics, comparison, and AI-insight-backed workouts are treated as protected and stay out of proposed date moves
   the same module now owns the schedule reflow apply seam: `applyActivePlanScheduleReflowPreview` accepts the reviewed `previewToken` plus the original schedule input, reloads active-plan/workout/log/evidence truth, rebuilds the preview server-side, rejects stale or regeneration-required results, and calls one transaction-backed Supabase RPC so reviewed future non-rest workout date/weekday/week/display metadata and active-plan schedule preferences commit atomically; workout content, steps, rich fields, metric mode, goal context, source ids, logged/evidence-backed rows, and runner-level Settings defaults are not changed
-  the saved-mode `Open plan` modal exposes this through an `Edit schedule` disclosure that prefills from active-plan `plan_preferences` when available, collects rest-day/running-day/long-run choices, renders the backend review, applies only the reviewed preview token, and copies regeneration-required prompts into the existing `Update plan` flow without mutating from the schedule panel
+  the saved-mode calendar header overflow exposes this through `Edit schedule`, which prefills from
+  active-plan `plan_preferences` when available, collects rest-day/running-day/long-run choices,
+  renders the backend review, and applies only the reviewed preview token without mutating from the
+  schedule panel
 - canonical richer-plan truth now survives more explicitly in that same seam across JSON import, structured authoring, and OpenAI text authoring:
   `plan_cycles` preserves `schema_version`, `source_kind`, `target_date`, goal metadata, and plan preferences
   while `planned_workouts` preserves source workout identity plus normalized fatigue and recovery semantics
@@ -363,12 +372,16 @@
 - calendar month tooltips now render through one viewport-clamped fixed layer instead of absolute cell-local placement, and narrow month view switches to a vertical day list while preserving workout links, glyphs, status markers, today/completed treatment, and feedback markers
 - workout completion is the canonical mutation and upserts one `workout_log` per planned workout
 - the sidebar profile trigger now resolves one viewer label plus current plan title from the shared auth and snapshot seam, and owns the saved-mode advanced import entry point plus sign-out action
-- the saved-mode header `Open plan` action now opens one compact plan-management modal around the active plan summary, text-first replacement, advanced JSON import, and backend-owned plan deletion
+- the saved-mode calendar header uses primary `Add plan` plus adjacent overflow; overflow utilities
+  are `Export JSON`, `Edit schedule`, and `Clear upcoming schedule`, and the old `Open plan`,
+  `Update plan`, and `Delete active plan` concepts are not current product IA
 - `/integrations` remains routable as a quiet connections/status utility, but it is no longer part of the primary desktop or mobile runner navigation
 - `/body` is now a retired legacy path that redirects to `/`, so older bookmarks recover into the current plan experience instead of opening a competing body-notes surface or a raw 404
 - the sidebar plan-note support block is locally dismissible and no longer repeats the same week status already shown in the top header
 - the saved-mode advanced import dialog reuses the canonical onboarding mutation instead of creating a second plan-import path
-- that same saved-mode import dialog now follows the same stable product-dialog recipe as `Open plan` and `Body notes`: bounded panel height, internal body scroll, reachable footer, stable Safari content behavior, and stable non-blocking overlay close behavior
+- that same saved-mode import dialog now follows the same stable product-dialog recipe as the other
+  saved-mode workflow dialogs: bounded panel height, internal body scroll, reachable footer, stable
+  Safari content behavior, and stable non-blocking overlay close behavior
 - after a successful saved-mode advanced import apply, the client now leaves the current page through a fresh document request to `/` instead of relying on an immediate in-place router refresh on the replaced plan state
 - the saved-mode advanced import dialog now accepts only canonical `training-plan-v2` files, and runtime-only v2 fields such as `status`, `completion_state`, and sync or feedback placeholders remain non-canonical
 - the downloadable `training-plan-v2` JSON template now demonstrates rich workout family, exact identity, calendar icon, goal context, and metric mode fields plus metric-safety guidance; its instruction block remains accepted-but-ignored template guidance, not persisted runtime truth
@@ -400,7 +413,7 @@
 - the workout-detail `Week Status` block now answers one deterministic question through a progress bar:
   completed non-rest workouts in the current week
 - `src/components/CompletionPanel.tsx`
-  now keeps `Log result` focused on manual completion truth, uses a compact workout-scoped body-note summary row plus modal editor instead of the older inline body-note block, keeps that body-note modal on the same Safari-stable bounded-height dialog pattern already used by `Open plan` so the title, internal scroll, and footer actions stay reachable, adds one lighter state-aware Garmin continuation row into `Feedback`, and keeps the dedicated workout-detail `Feedback` surface as the canonical owner of the live `FIT / ZIP file` control, parsed Garmin evidence summary, factual plan-vs-run comparison readback, and the bounded AI interpretation readback
+  now keeps `Log result` focused on manual completion truth, uses a compact workout-scoped body-note summary row plus modal editor instead of the older inline body-note block, keeps that body-note modal on the same Safari-stable bounded-height dialog pattern used by product workflow dialogs so the title, internal scroll, and footer actions stay reachable, adds one lighter state-aware Garmin continuation row into `Feedback`, and keeps the dedicated workout-detail `Feedback` surface as the canonical owner of the live `FIT / ZIP file` control, parsed Garmin evidence summary, factual plan-vs-run comparison readback, and the bounded AI interpretation readback
   the workout-scoped body-note summary/modal editor UI is isolated in [src/components/workout-completion/BodyNotesEditor.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/workout-completion/BodyNotesEditor.tsx), while `CompletionPanel` remains the owner of completion form state, save payload construction, `saveWorkoutLog`, route invalidation, Garmin upload/remove behavior, and feedback/readback orchestration
   the deterministic comparison readback UI is isolated in [src/components/workout-completion/WorkoutComparisonReadback.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/workout-completion/WorkoutComparisonReadback.tsx), while `CompletionPanel` remains the owner of Garmin file input, upload/remove mutations, route invalidation, and AI insight rendering
   the bounded AI insight readback UI is isolated in [src/components/workout-completion/WorkoutAiInsightReadback.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/workout-completion/WorkoutAiInsightReadback.tsx), while `CompletionPanel` remains the owner of `WorkoutFeedbackPanel`, feedback data selection, Garmin file input, upload/remove mutations, route invalidation, manual save logic, and body-note integration
@@ -465,7 +478,7 @@
 - the Settings DS foundations cleanup slice now keeps `/settings` behavior stable while moving the large profile avatar surface to DS-owned `hito-profile-avatar` and `hito-profile-avatar-fallback` recipes, removing route-local arbitrary radius and gradient fallback styling from the settings avatar cluster
 - the Hito primary sans family is now Poppins at the foundations layer: `src/styles.css` loads Poppins through the canonical font import and maps `--font-sans` to Poppins, while Fraunces display roles and JetBrains Mono technical/metric roles remain unchanged
 - Hito now owns selection-control recipes for checkbox, radio, and toggle-radio controls in `sm` and `md` sizes; selected states use the normal `signal` tone, focus-visible stays separate from selected state, labels provide the click target, and destructive confirmation keeps destructive meaning in warning copy/icons/buttons rather than red selected controls
-- the first canonical typography normalization slice now defines reusable text roles for display, page title, modal title, section title, panel title, body, body small, helper, caption, label, form label, button, navigation/menu, metric, status, error/success, and technical mono text; `Open plan`, the saved-mode JSON import dialog, `Log result`/`Feedback` typography hotspots, and `/settings` now use those roles for their highest-drift headings, form labels, helper/body copy, status text, and technical metadata
+- the first canonical typography normalization slice now defines reusable text roles for display, page title, modal title, section title, panel title, body, body small, helper, caption, label, form label, button, navigation/menu, metric, status, error/success, and technical mono text; saved-mode plan-management/import, `Log result`/`Feedback` typography hotspots, and `/settings` now use those roles for their highest-drift headings, form labels, helper/body copy, status text, and technical metadata
 - shared Radix dialog title and description primitives are now typography-neutral so product dialogs must opt into canonical Hito roles such as `hito-modal-title` and `hito-body`; the primitive preserves accessibility behavior without reintroducing generic `text-lg`, `font-semibold`, `leading-none`, `tracking-tight`, or muted-description defaults that can override the design-system contract
 - the Hito icon-system slice now centralizes product icon usage in `src/components/ui/icon.tsx`: the Hito `Icon` primitive maps stable product names to the approved Tabler source set, limits ordinary usage to `xs`, `sm`, `md`, and `lg` sizes, and keeps raw SVG folders out of the design-system source of truth
 - the product modal family now also has a small shared recipe:

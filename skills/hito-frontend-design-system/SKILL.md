@@ -41,6 +41,17 @@ API tools, load the applicable Figma plugin skills first.
 6. Handle loading, empty, error, success, disabled, and destructive confirmation states.
 7. Verify mobile width and Safari-sensitive controls when relevant.
 
+## Bolder Frontend Batch Rule
+
+- If a UI issue reveals repeated route-local drift, migrate the repeated pattern to the existing DS
+  or product/admin owner in one validated batch.
+- Prefer deleting local wrappers/classes/helpers over adding another compatibility layer.
+- Reuse implemented Hito DS primitives even when the diff is larger than a one-line patch.
+- Do not create a new frontend spec for routine reuse/deletion work; write docs only for durable
+  cross-surface decisions.
+- If browser/build validation fails after a root-cause cleanup, debug and fix the affected path
+  inside the batch when the owner/risk class has not changed.
+
 ## Figma Bridge Workflow
 
 Use this when the task mentions Figma, Figma API, Figma MCP, design-system export/import,
@@ -90,6 +101,8 @@ Figma bridge ownership rules:
 
 - If a Designer task is large, multi-state, cross-surface, visually nuanced, or would require a long
   handoff prompt, create or update a detailed Markdown plan/spec before Frontend implementation.
+- Do not use this gate for routine implementation cleanup, source-contract reuse, deletion-only
+  work, or already-scoped active-plan slices; those should use compact plan notes or final reports.
 - Prefer `docs/tasks/frontend-specs/` for implementation-ready UI specs; use an active plan only
   when the work is multi-slice, risky, or cross-role.
 - Do not compress complex design direction into a short chat answer. The document should be detailed
@@ -131,7 +144,12 @@ Figma bridge ownership rules:
 - For copy-only or token-only requests, change only the requested copy/token unless a real bug blocks it.
 - Before adding a component, hook, helper, or local style, search for an existing equivalent and reuse it.
 - If the requested change should be one or two lines, do not turn it into a refactor.
-- If implementation appears likely to touch many files, add a new abstraction, or produce a large diff for a small request, stop and get explicit confirmation first.
+- This rule applies to isolated small requests. If source proof shows repeated same-surface drift
+  with one owner and one validation story, use the Bolder Frontend Batch Rule instead of stopping
+  only because the diff is non-trivial.
+- If implementation appears likely to touch many unrelated files, add a new abstraction, or produce
+  a broad diff for a small request, stop implementation and get bounded Architect/Designer/Product
+  confirmation first; use available local or subagent audit before returning to the user.
 - Consolidate repeated UI patterns only when repetition is proven by nearby code; do not create generic components speculatively.
 - Prefer deleting route-local drift and wiring to existing DS primitives over adding new wrapper layers.
 - In the final report, call out when the diff stayed intentionally minimal or when a larger diff was unavoidable.
@@ -180,7 +198,8 @@ After meaningful frontend changes:
 
 - run relevant static checks/build if product code changed
 - use the built-in browser for local visual verification when practical
-- hand off to Safari QA for final browser verification when the task is user-facing or Safari-sensitive
+- delegate to QA for final browser verification when needed; Safari is required only for
+  Safari-specific coverage or when the built-in browser is blocked
 
 After meaningful Figma bridge changes:
 

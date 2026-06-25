@@ -4,7 +4,6 @@ import {
   type TrainingPhase,
 } from "@/lib/structured-plan-authoring-schema";
 import {
-  buildDefaultEstimatedHrTarget,
   buildEasyTarget,
   buildRepeatRecoveryTarget,
   buildSteadyFinishTarget,
@@ -576,6 +575,7 @@ export function buildHalfMarathonThresholdWorkout({
   const repeatCount = phase === "Specific" ? 3 : 2;
   const blockDurationMin = Math.min(12, 8 + Math.floor((weekNumber - 1) / 5) * 2);
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const tempoPaceTarget = paceTargets?.tempo;
 
   return {
     workout_id: workoutId,
@@ -611,8 +611,7 @@ export function buildHalfMarathonThresholdWorkout({
         },
         target: {
           intensity: "threshold_steady",
-          ...(paceTargets?.tempo ? { pace_min_per_km_range: paceTargets.tempo } : {}),
-          ...buildDefaultEstimatedHrTarget(normalized, "tempo"),
+          ...(tempoPaceTarget ? { pace_min_per_km_range: tempoPaceTarget } : {}),
           cue: "Sustained and controlled, with enough restraint to finish strong.",
         },
         recovery_target: buildRepeatRecoveryTarget(normalized),
@@ -632,6 +631,7 @@ export function buildMarathonSteadySpecificityWorkout({
 }: BuildWorkoutContext) {
   const steadyDurationMin = Math.min(45, 22 + Math.floor((weekNumber - 1) / 3) * 4);
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const steadyPaceTarget = paceTargets?.steady;
 
   return {
     workout_id: workoutId,
@@ -660,8 +660,7 @@ export function buildMarathonSteadySpecificityWorkout({
         duration_min: steadyDurationMin,
         target: {
           intensity: "marathon_steady",
-          ...(paceTargets?.steady ? { pace_min_per_km_range: paceTargets.steady } : {}),
-          ...buildDefaultEstimatedHrTarget(normalized, "steady"),
+          ...(steadyPaceTarget ? { pace_min_per_km_range: steadyPaceTarget } : {}),
           cue: "Steady, patient, and controlled; never a time trial.",
         },
       },
@@ -696,7 +695,6 @@ export function buildUltraDurabilityWorkout({
           duration_min: durationSplit.openerMin,
           target: {
             intensity: "easy_time_on_feet",
-            ...buildDefaultEstimatedHrTarget(normalized, "longAerobic"),
             cue: "Aerobic patience first; speed is not the goal.",
           },
         },
@@ -714,7 +712,6 @@ export function buildUltraDurabilityWorkout({
           duration_min: durationSplit.mainMin,
           target: {
             intensity: "easy_time_on_feet",
-            ...buildDefaultEstimatedHrTarget(normalized, "longAerobic"),
             cue: "Time on feet and recovery protection matter more than road-race speed.",
           },
         },
@@ -732,7 +729,6 @@ export function buildUltraDurabilityWorkout({
           duration_min: durationSplit.finishMin,
           target: {
             intensity: "easy_time_on_feet",
-            ...buildDefaultEstimatedHrTarget(normalized, "longAerobic"),
             hint: "Leave enough in reserve for the next training day.",
           },
         },
@@ -751,7 +747,6 @@ export function buildUltraDurabilityWorkout({
           },
           target: {
             intensity: "easy_time_on_feet",
-            ...buildDefaultEstimatedHrTarget(normalized, "longAerobic"),
             cue: "Durability and patience matter more than road-race speed.",
           },
         },
@@ -1236,6 +1231,7 @@ export function buildTempoWorkout({
 }: BuildWorkoutContext) {
   const tempoDurationMin = Math.min(35, 16 + (weekNumber - 1) * 2);
   const paceTargets = deriveBenchmarkPaceTargets(normalized);
+  const tempoPaceTarget = paceTargets?.tempo;
 
   return {
     workout_id: workoutId,
@@ -1263,8 +1259,7 @@ export function buildTempoWorkout({
         duration_min: tempoDurationMin,
         target: {
           intensity: "tempo",
-          ...(paceTargets?.tempo ? { pace_min_per_km_range: paceTargets.tempo } : {}),
-          ...buildDefaultEstimatedHrTarget(normalized, "tempo"),
+          ...(tempoPaceTarget ? { pace_min_per_km_range: tempoPaceTarget } : {}),
           cue: "Comfortably hard, sustainable for the whole block.",
         },
       },

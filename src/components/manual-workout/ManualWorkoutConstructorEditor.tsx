@@ -1,4 +1,12 @@
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -6,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import {
   Select,
@@ -33,8 +41,11 @@ import { formatDistanceMeters, formatDurationMin } from "@/lib/training";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import {
   cloneManualWorkoutEntries,
+  groupManualTemplates,
   targetTruthModeCopy,
   targetTruthModeLabel,
+  templateIconKind,
+  templateIconTone,
 } from "@/components/manual-workout/manual-workout-authoring-utils";
 
 export type ManualWorkoutConstructorSource = "template" | "scratch" | "saved_template";
@@ -141,29 +152,17 @@ export function ManualWorkoutConstructorEditor({
         </div>
 
         {source === "scratch" ? (
-          <label className="grid gap-2">
+          <div className="grid gap-2">
             <span className="hito-form-label">Workout type</span>
-            <Select
-              value={selectedTemplateKey ?? undefined}
-              onValueChange={(value) =>
-                onScratchTemplateChange?.(value as ManualWorkoutTemplate["templateKey"])
-              }
-            >
-              <SelectTrigger aria-label="Workout type">
-                <SelectValue placeholder="Choose workout type" />
-              </SelectTrigger>
-              <SelectContent>
-                {templateOptions.map((template) => (
-                  <SelectItem key={template.templateKey} value={template.templateKey}>
-                    {template.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ManualScratchWorkoutTypePicker
+              onChange={onScratchTemplateChange}
+              selectedTemplateKey={selectedTemplateKey}
+              templateOptions={templateOptions}
+            />
             <span className="hito-field-helper">
-              Scratch starts empty. Pick a backend-supported type before review.
+              Scratch starts empty. Choose the kind of run, then add the pieces you want reviewed.
             </span>
-          </label>
+          </div>
         ) : null}
       </section>
 
@@ -193,10 +192,9 @@ export function ManualWorkoutConstructorEditor({
       <section className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="hito-label">Structure</p>
+            <p className="hito-label">Workout pieces</p>
             <p className="hito-field-helper">
-              Add ordered steps from backend-supported blocks. Hito review remains the authority
-              before save.
+              Build the workout from ordered pieces. Hito checks the draft before it can be added.
             </p>
           </div>
         </div>
@@ -248,11 +246,13 @@ export function ManualWorkoutConstructorEditor({
                 {isRestDraft ? "Rest" : "Empty"}
               </span>
               <div className="min-w-0">
-                <p className="hito-list-row-title">{isRestDraft ? "No run steps" : "Add Step"}</p>
+                <p className="hito-list-row-title">
+                  {isRestDraft ? "No run pieces" : "Add workout piece"}
+                </p>
                 <p className="hito-list-row-copy">
                   {isRestDraft
                     ? "Rest/no-run structure is represented without fake workout targets."
-                    : "Scratch drafts need a supported type and at least one step before review."}
+                    : "Choose a run type and add at least one duration or distance piece before review."}
                 </p>
               </div>
               {editable && !isRestDraft ? (
@@ -269,8 +269,7 @@ export function ManualWorkoutConstructorEditor({
 
         {entriesLocked ? (
           <p className="hito-field-helper">
-            Saved template structure is reconstructed server-side; edit title and notes before
-            review.
+            Saved template structure is rebuilt for review; title and notes can still be adjusted.
           </p>
         ) : null}
       </section>
@@ -293,9 +292,9 @@ function ManualWorkoutStructurePreview({
   const structureParts = [
     totalSeconds > 0 ? formatDurationMin(totalSeconds / 60) : null,
     totalDistanceMeters > 0 ? formatDistanceMeters(totalDistanceMeters) : null,
-    entries.length ? `${entries.length} step${entries.length === 1 ? "" : "s"}` : null,
+    entries.length ? `${entries.length} piece${entries.length === 1 ? "" : "s"}` : null,
   ].filter(Boolean);
-  const meta = structureParts.length ? structureParts.join(" · ") : "0 min · 0 steps";
+  const meta = structureParts.length ? structureParts.join(" · ") : "0 min · 0 pieces";
   const totalWeight = Math.max(
     segments.reduce((sum, segment) => sum + segment.weight, 0),
     1,
@@ -439,20 +438,33 @@ function ManualWorkoutEntryRow({
   const ordinal = String(index + 1).padStart(2, "0");
 
   if (entry.kind === "repeat_group") {
+    const updateGroup = (group: ManualWorkoutRepeatGroupInput) =>
+      onChange({
+        kind: "repeat_group",
+        group,
+      });
+
     return (
       <article className="group/step hito-manual-workout-step-card grid gap-4">
         <div className="flex flex-wrap items-start gap-3">
           <span className="hito-caption w-7 shrink-0 pt-2 text-right font-mono-num">{ordinal}</span>
-          <div className="hito-manual-workout-step-summary flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="hito-status-pill" data-tone="warning">
-                Repeat
-              </span>
-              <p className="hito-list-row-title">
-                {entry.group.groupLabel ?? `${entry.group.repeatCount} rounds`}
-              </p>
+          <div className="hito-manual-workout-step-summary grid flex-1 gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="hito-status-pill" data-tone="warning">
+                  Repeat
+                </span>
+                <p className="hito-list-row-title">
+                  {entry.group.groupLabel ?? `${entry.group.repeatCount} rounds`}
+                </p>
+              </div>
+              <p className="hito-list-row-copy">{repeatGroupSummary(entry.group)}</p>
             </div>
-            <p className="hito-list-row-copy">{repeatGroupSummary(entry.group)}</p>
+            <ManualRepeatIdentityFields
+              disabled={!editable}
+              group={entry.group}
+              onChange={updateGroup}
+            />
           </div>
           <EntryRowActions
             disabled={!editable}
@@ -466,118 +478,43 @@ function ManualWorkoutEntryRow({
           />
         </div>
 
-        <div className="hito-manual-workout-repeat-settings-grid">
-          <label className="grid gap-2">
-            <span className="hito-form-label">Repeat label</span>
-            <input
-              className="hito-field hito-field-secondary hito-field-sm"
+        <div className="grid gap-3">
+          <div className="grid gap-1">
+            <p className="hito-form-label">Repeat unit</p>
+            <p className="hito-field-helper">
+              Each round uses the work piece and recovery piece below.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <ManualBlockPartFields
+              block={entry.group.workBlock}
               disabled={!editable}
-              value={entry.group.groupLabel ?? ""}
-              onChange={(event) =>
-                onChange({
-                  kind: "repeat_group",
-                  group: {
-                    ...entry.group,
-                    groupLabel: event.target.value || undefined,
-                  },
-                })
-              }
-              placeholder="Repeat label"
-            />
-          </label>
-          <PickerField label="Rounds">
-            <Select
-              disabled={!editable}
-              value={String(entry.group.repeatCount)}
-              onValueChange={(value) =>
-                onChange({
-                  kind: "repeat_group",
-                  group: {
-                    ...entry.group,
-                    repeatCount: clampInteger(value, 2, 50),
-                  },
-                })
-              }
-            >
-              <SelectTrigger
-                aria-label="Repeat rounds"
-                className="hito-field hito-field-secondary hito-field-sm"
-              >
-                <SelectValue placeholder="Rounds" />
-              </SelectTrigger>
-              <SelectContent>
-                {REPEAT_COUNT_OPTIONS.map((count) => (
-                  <SelectItem key={count} value={String(count)}>
-                    {count} rounds
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </PickerField>
-          <PickerField label="Repeat safety">
-            <Select
-              disabled={!editable}
-              value={entry.group.safetyKind}
-              onValueChange={(value) =>
-                onChange({
-                  kind: "repeat_group",
-                  group: {
-                    ...entry.group,
-                    safetyKind: value as ManualWorkoutRepeatSafetyKind,
-                  },
-                })
-              }
-            >
-              <SelectTrigger
-                aria-label="Repeat safety kind"
-                className="hito-field hito-field-secondary hito-field-sm"
-              >
-                <SelectValue placeholder="Repeat safety" />
-              </SelectTrigger>
-              <SelectContent>
-                {MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES.map((kind) => (
-                  <SelectItem key={kind} value={kind}>
-                    {readableToken(kind)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </PickerField>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <ManualBlockFields
-            block={entry.group.workBlock}
-            disabled={!editable}
-            label="Work"
-            onChange={(block) =>
-              onChange({
-                kind: "repeat_group",
-                group: {
+              roleLabel="Work"
+              onChange={(block) =>
+                updateGroup({
                   ...entry.group,
                   workBlock: block,
-                },
-              })
-            }
-          />
-          <ManualBlockFields
-            block={entry.group.recoveryBlock ?? makeDefaultBlock("interval_recovery_block")}
-            disabled={!editable}
-            label="Recovery"
-            onChange={(block) =>
-              onChange({
-                kind: "repeat_group",
-                group: {
+                })
+              }
+            />
+            <ManualBlockPartFields
+              block={entry.group.recoveryBlock ?? makeDefaultBlock("interval_recovery_block")}
+              disabled={!editable}
+              roleLabel="Recovery"
+              onChange={(block) =>
+                updateGroup({
                   ...entry.group,
                   recoveryBlock: block,
-                },
-              })
-            }
-          />
+                })
+              }
+            />
+          </div>
         </div>
       </article>
     );
   }
+
+  const updateBlock = (block: ManualWorkoutBlockInput) => onChange({ kind: "block", block });
 
   return (
     <article className="group/step hito-manual-workout-step-card grid gap-3">
@@ -588,11 +525,19 @@ function ManualWorkoutEntryRow({
           style={{ background: blockTone(entry.block.blockKey) }}
           aria-hidden="true"
         />
-        <div className="hito-manual-workout-step-summary flex-1">
-          <p className="hito-list-row-title">
-            {entry.block.label ?? blockLabel(entry.block.blockKey)}
-          </p>
-          <p className="hito-list-row-copy">{blockSummary(entry.block)}</p>
+        <div className="hito-manual-workout-step-summary grid flex-1 gap-3">
+          <div className="min-w-0">
+            <p className="hito-list-row-title">
+              {entry.block.label ?? blockLabel(entry.block.blockKey)}
+            </p>
+            <p className="hito-list-row-copy">{blockSummary(entry.block)}</p>
+          </div>
+          <ManualBlockIdentityFields
+            block={entry.block}
+            disabled={!editable}
+            onChange={updateBlock}
+            roleLabel="Piece"
+          />
         </div>
         <EntryRowActions
           disabled={!editable}
@@ -605,26 +550,194 @@ function ManualWorkoutEntryRow({
           total={total}
         />
       </div>
-      <ManualBlockFields
-        block={entry.block}
-        disabled={!editable}
-        label="Step"
-        onChange={(block) => onChange({ kind: "block", block })}
-      />
+      <div className="hito-manual-workout-block-fields">
+        <ManualBlockQuantityFields
+          block={entry.block}
+          disabled={!editable}
+          onChange={updateBlock}
+          roleLabel="Piece"
+        />
+      </div>
     </article>
   );
 }
 
-function ManualBlockFields({
+function ManualRepeatIdentityFields({
+  disabled,
+  group,
+  onChange,
+}: {
+  disabled: boolean;
+  group: ManualWorkoutRepeatGroupInput;
+  onChange: (group: ManualWorkoutRepeatGroupInput) => void;
+}) {
+  return (
+    <div className="hito-manual-workout-repeat-settings-grid">
+      <label className="grid gap-2">
+        <span className="hito-form-label">Repeat label</span>
+        <input
+          className="hito-field hito-field-secondary hito-field-sm"
+          disabled={disabled}
+          value={group.groupLabel ?? ""}
+          onChange={(event) =>
+            onChange({
+              ...group,
+              groupLabel: event.target.value || undefined,
+            })
+          }
+          placeholder="Repeat label"
+        />
+      </label>
+      <PickerField label="Rounds">
+        <Select
+          disabled={disabled}
+          value={String(group.repeatCount)}
+          onValueChange={(value) =>
+            onChange({
+              ...group,
+              repeatCount: clampInteger(value, 2, 50),
+            })
+          }
+        >
+          <SelectTrigger
+            aria-label="Repeat rounds"
+            className="hito-field hito-field-secondary hito-field-sm"
+          >
+            <SelectValue placeholder="Rounds" />
+          </SelectTrigger>
+          <SelectContent>
+            {REPEAT_COUNT_OPTIONS.map((count) => (
+              <SelectItem key={count} value={String(count)}>
+                {count} rounds
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </PickerField>
+      <PickerField label="Repeat focus">
+        <Select
+          disabled={disabled}
+          value={group.safetyKind}
+          onValueChange={(value) =>
+            onChange({
+              ...group,
+              safetyKind: value as ManualWorkoutRepeatSafetyKind,
+            })
+          }
+        >
+          <SelectTrigger
+            aria-label="Repeat focus"
+            className="hito-field hito-field-secondary hito-field-sm"
+          >
+            <SelectValue placeholder="Repeat focus" />
+          </SelectTrigger>
+          <SelectContent>
+            {MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES.map((kind) => (
+              <SelectItem key={kind} value={kind}>
+                {readableToken(kind)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </PickerField>
+    </div>
+  );
+}
+
+function ManualBlockPartFields({
   block,
   disabled,
-  label,
   onChange,
+  roleLabel,
 }: {
   block: ManualWorkoutBlockInput;
   disabled: boolean;
-  label: string;
   onChange: (block: ManualWorkoutBlockInput) => void;
+  roleLabel: string;
+}) {
+  return (
+    <div className="hito-manual-workout-block-fields">
+      <div className="grid gap-3">
+        <div className="flex min-w-0 flex-wrap items-start gap-2">
+          <span
+            className="hito-status-pill shrink-0"
+            data-icon="false"
+            style={{ color: blockTone(block.blockKey) }}
+          >
+            {roleLabel}
+          </span>
+          <div className="min-w-0">
+            <p className="hito-list-row-title">{block.label ?? blockLabel(block.blockKey)}</p>
+            <p className="hito-list-row-copy">{blockSummary(block)}</p>
+          </div>
+        </div>
+        <ManualBlockIdentityFields
+          block={block}
+          disabled={disabled}
+          onChange={onChange}
+          roleLabel={roleLabel}
+        />
+      </div>
+      <ManualBlockQuantityFields
+        block={block}
+        disabled={disabled}
+        onChange={onChange}
+        roleLabel={roleLabel}
+      />
+    </div>
+  );
+}
+
+function ManualBlockIdentityFields({
+  block,
+  disabled,
+  onChange,
+  roleLabel,
+}: {
+  block: ManualWorkoutBlockInput;
+  disabled: boolean;
+  onChange: (block: ManualWorkoutBlockInput) => void;
+  roleLabel: string;
+}) {
+  return (
+    <div className="hito-manual-workout-field-grid">
+      <PickerField label={`${roleLabel} type`}>
+        <ManualBlockTypePicker
+          disabled={disabled}
+          label={`${roleLabel} type`}
+          onChange={(blockKey) => onChange(makeDefaultBlock(blockKey))}
+          value={block.blockKey}
+        />
+      </PickerField>
+      <label className="grid gap-2">
+        <span className="hito-form-label">{roleLabel} label</span>
+        <input
+          className="hito-field hito-field-secondary hito-field-sm"
+          disabled={disabled}
+          value={block.label ?? ""}
+          onChange={(event) =>
+            onChange({
+              ...block,
+              label: event.target.value || undefined,
+            })
+          }
+          placeholder={blockLabel(block.blockKey)}
+        />
+      </label>
+    </div>
+  );
+}
+
+function ManualBlockQuantityFields({
+  block,
+  disabled,
+  onChange,
+  roleLabel,
+}: {
+  block: ManualWorkoutBlockInput;
+  disabled: boolean;
+  onChange: (block: ManualWorkoutBlockInput) => void;
+  roleLabel: string;
 }) {
   const noteOnly = isNoteBlock(block.blockKey);
   const quantityMode = quantityModeForBlock(block);
@@ -639,48 +752,11 @@ function ManualBlockFields({
   const quantityFieldLabel =
     quantityMode === "none" ? "Quantity" : quantityMode === "distance" ? "Distance" : "Duration";
 
-  return (
-    <div className="hito-manual-workout-block-fields">
-      <div className="hito-manual-workout-field-grid">
-        <PickerField label={`${label} kind`}>
-          <Select
-            disabled={disabled}
-            value={block.blockKey}
-            onValueChange={(value) => onChange(makeDefaultBlock(value as ManualWorkoutBlockKey))}
-          >
-            <SelectTrigger
-              aria-label={`${label} kind`}
-              className="hito-field hito-field-secondary hito-field-sm"
-            >
-              <SelectValue placeholder="Step kind" />
-            </SelectTrigger>
-            <SelectContent>
-              {BLOCK_MENU_GROUPS.map((group) => (
-                <SelectGroupForBlocks key={group.label} group={group} />
-              ))}
-            </SelectContent>
-          </Select>
-        </PickerField>
+  if (noteOnly) {
+    return (
+      <div className="grid gap-3">
         <label className="grid gap-2">
-          <span className="hito-form-label">{label} label</span>
-          <input
-            className="hito-field hito-field-secondary hito-field-sm"
-            disabled={disabled}
-            value={block.label ?? ""}
-            onChange={(event) =>
-              onChange({
-                ...block,
-                label: event.target.value || undefined,
-              })
-            }
-            placeholder={blockLabel(block.blockKey)}
-          />
-        </label>
-      </div>
-
-      {noteOnly ? (
-        <label className="grid gap-2">
-          <span className="hito-form-label">Note</span>
+          <span className="hito-form-label">{roleLabel} cue</span>
           <textarea
             className="hito-field hito-field-secondary hito-textarea-md resize-none"
             disabled={disabled}
@@ -695,70 +771,389 @@ function ManualBlockFields({
             placeholder="Cue or mobility note"
           />
         </label>
-      ) : (
-        <div className="hito-manual-workout-field-grid">
-          <PickerField label="Measure by">
-            <Select
-              disabled={disabled}
-              value={quantityMode}
-              onValueChange={(value) => onChange(blockForQuantityMode(block, value))}
-            >
-              <SelectTrigger
-                aria-label={`${label} measure`}
-                className="hito-field hito-field-secondary hito-field-sm"
-              >
-                <SelectValue placeholder="Measure" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="duration">Duration</SelectItem>
-                <SelectItem value="distance">Distance</SelectItem>
-                <SelectItem value="none">No quantity</SelectItem>
-              </SelectContent>
-            </Select>
-          </PickerField>
-          <PickerField label={quantityFieldLabel}>
-            <Select
-              disabled={disabled || quantityMode === "none"}
-              value={quantityValue}
-              onValueChange={(value) =>
-                onChange(blockWithQuantityValue(block, quantityMode, value))
-              }
-            >
-              <SelectTrigger
-                aria-label={`${label} quantity`}
-                className="hito-field hito-field-secondary hito-field-sm"
-              >
-                <SelectValue placeholder={quantityFieldLabel} />
-              </SelectTrigger>
-              <SelectContent>
-                {(quantityMode === "distance"
-                  ? distanceOptionsFor(block.distanceMeters)
-                  : durationOptionsFor(block.durationSeconds)
-                ).map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="hito-field-helper">
-              {quantityMode === "none"
-                ? "Use this only when the step is structure or cue-only."
-                : "Duration and distance stay mutually exclusive for review."}
-            </span>
-          </PickerField>
-        </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="grid gap-2">
+        <span className="hito-form-label">Quantity</span>
+        <QuantityModeToggle
+          disabled={disabled}
+          label={roleLabel}
+          onChange={(mode) => onChange(blockForQuantityMode(block, mode))}
+          value={quantityMode}
+        />
+      </div>
+      <PickerField label={quantityFieldLabel}>
+        <Select
+          disabled={disabled || quantityMode === "none"}
+          value={quantityValue}
+          onValueChange={(value) => onChange(blockWithQuantityValue(block, quantityMode, value))}
+        >
+          <SelectTrigger
+            aria-label={`${roleLabel} quantity`}
+            className="hito-field hito-field-secondary hito-field-sm"
+          >
+            <SelectValue placeholder={quantityFieldLabel} />
+          </SelectTrigger>
+          <SelectContent>
+            {(quantityMode === "distance"
+              ? distanceOptionsFor(block.distanceMeters)
+              : durationOptionsFor(block.durationSeconds)
+            ).map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="hito-field-helper">
+          {quantityMode === "none"
+            ? "Review needs duration or distance for run pieces."
+            : "Switching between duration and distance keeps only one quantity for review."}
+        </span>
+      </PickerField>
+    </div>
+  );
+}
+
+function QuantityModeToggle({
+  disabled,
+  label,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  label: string;
+  onChange: (value: ManualWorkoutQuantityMode) => void;
+  value: ManualWorkoutQuantityMode;
+}) {
+  return (
+    <div
+      className="hito-choice-toggle-group"
+      role="radiogroup"
+      aria-label={`${label} quantity path`}
+    >
+      {QUANTITY_MODE_OPTIONS.map((option) => {
+        const selected = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            className="hito-choice-toggle hito-choice-toggle-sm"
+            aria-checked={selected}
+            aria-disabled={disabled || undefined}
+            data-selected={selected}
+            disabled={disabled}
+            role="radio"
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 function PickerField({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <label className="grid gap-2">
+    <div className="grid gap-2">
       <span className="hito-form-label">{label}</span>
       {children}
-    </label>
+    </div>
+  );
+}
+
+function ManualScratchWorkoutTypePicker({
+  onChange,
+  selectedTemplateKey,
+  templateOptions,
+}: {
+  onChange?: (templateKey: ManualWorkoutTemplate["templateKey"]) => void;
+  selectedTemplateKey?: ManualWorkoutTemplate["templateKey"] | null;
+  templateOptions: ManualWorkoutTemplate[];
+}) {
+  const [mobilePickerOpen, setMobilePickerOpen] = useState(false);
+  const selectedTemplate = templateOptions.find(
+    (template) => template.templateKey === selectedTemplateKey,
+  );
+  const disabled = !onChange;
+
+  const selectTemplate = (template: ManualWorkoutTemplate) => {
+    setMobilePickerOpen(false);
+    onChange?.(template.templateKey);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="hito-field hito-field-secondary hito-field-sm flex w-full items-center justify-between gap-3 text-left md:hidden"
+        disabled={disabled}
+        aria-label="Workout type"
+        onClick={() => setMobilePickerOpen(true)}
+      >
+        <span className="min-w-0 truncate">{selectedTemplate?.label ?? "Choose workout type"}</span>
+        <Icon name="chevron-down" size="xs" className="shrink-0 text-muted-foreground" />
+      </button>
+
+      <div className="hidden md:block">
+        <Select
+          disabled={disabled}
+          value={selectedTemplateKey ?? undefined}
+          onValueChange={(value) => onChange?.(value as ManualWorkoutTemplate["templateKey"])}
+        >
+          <SelectTrigger aria-label="Workout type">
+            <SelectValue placeholder="Choose workout type" />
+          </SelectTrigger>
+          <SelectContent>
+            {templateOptions.map((template) => (
+              <SelectItem key={template.templateKey} value={template.templateKey}>
+                {template.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <ManualScratchWorkoutTypePickerDialog
+        onOpenChange={setMobilePickerOpen}
+        onSelect={selectTemplate}
+        open={mobilePickerOpen}
+        selectedTemplateKey={selectedTemplateKey}
+        templateOptions={templateOptions}
+      />
+    </>
+  );
+}
+
+function ManualScratchWorkoutTypePickerDialog({
+  onOpenChange,
+  onSelect,
+  open,
+  selectedTemplateKey,
+  templateOptions,
+}: {
+  onOpenChange: (open: boolean) => void;
+  onSelect: (template: ManualWorkoutTemplate) => void;
+  open: boolean;
+  selectedTemplateKey?: ManualWorkoutTemplate["templateKey"] | null;
+  templateOptions: ManualWorkoutTemplate[];
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
+        overlayClassName="hito-dialog-overlay-stable"
+      >
+        <DialogHeader className="hito-product-dialog-header">
+          <DialogTitle className="hito-modal-title">Choose workout type</DialogTitle>
+          <DialogDescription className="hito-body">
+            Pick the kind of workout to build. The draft stays editable and Hito reviews it before
+            anything is saved.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="hito-product-dialog-body-scroll-fill">
+          <ManualTemplateChoiceRows
+            onSelect={onSelect}
+            selectedTemplateKey={selectedTemplateKey}
+            templateOptions={templateOptions}
+          />
+        </div>
+
+        <DialogFooter className="hito-product-dialog-footer">
+          <button
+            type="button"
+            className="hito-button hito-button-secondary hito-button-sm"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ManualTemplateChoiceRows({
+  onSelect,
+  selectedTemplateKey,
+  templateOptions,
+}: {
+  onSelect: (template: ManualWorkoutTemplate) => void;
+  selectedTemplateKey?: ManualWorkoutTemplate["templateKey"] | null;
+  templateOptions: ManualWorkoutTemplate[];
+}) {
+  const groupedTemplates = groupedTemplateOptions(templateOptions);
+
+  return (
+    <div className="grid gap-4">
+      {groupedTemplates.map((group) => (
+        <section key={group.id} className="grid gap-2">
+          <p className="hito-label">{group.label}</p>
+          <div className="hito-row-group">
+            {group.templates.map((template) => {
+              const selected = template.templateKey === selectedTemplateKey;
+
+              return (
+                <button
+                  key={template.templateKey}
+                  type="button"
+                  className="hito-list-row w-full items-start text-left"
+                  aria-pressed={selected || undefined}
+                  data-selected={selected || undefined}
+                  onClick={() => onSelect(template)}
+                >
+                  <span
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-hairline bg-surface"
+                    style={{ color: templateIconTone(template) }}
+                    aria-hidden="true"
+                  >
+                    <WorkoutGlyph kind={templateIconKind(template)} className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="hito-list-row-title block">{template.label}</span>
+                    <span className="hito-list-row-copy block">
+                      {selected ? "Current type · " : ""}
+                      {targetTruthModeCopy(template.defaultTargetTruthMode)}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function groupedTemplateOptions(templateOptions: ManualWorkoutTemplate[]) {
+  const optionKeys = new Set(templateOptions.map((template) => template.templateKey));
+  const grouped = groupManualTemplates()
+    .map((group) => ({
+      id: group.id,
+      label: group.label,
+      templates: group.templates.filter((template) => optionKeys.has(template.templateKey)),
+    }))
+    .filter((group) => group.templates.length > 0);
+  const groupedKeys = new Set(
+    grouped.flatMap((group) => group.templates.map((template) => template.templateKey)),
+  );
+  const remaining = templateOptions.filter((template) => !groupedKeys.has(template.templateKey));
+
+  return remaining.length
+    ? [...grouped, { id: "other", label: "Other workout types", templates: remaining }]
+    : grouped;
+}
+
+function ManualBlockTypePicker({
+  disabled,
+  label,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  label: string;
+  onChange: (blockKey: ManualWorkoutBlockKey) => void;
+  value: ManualWorkoutBlockKey;
+}) {
+  const [mobilePickerOpen, setMobilePickerOpen] = useState(false);
+
+  const selectBlock = (blockKey: ManualWorkoutBlockKey) => {
+    setMobilePickerOpen(false);
+    onChange(blockKey);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="hito-field hito-field-secondary hito-field-sm flex w-full items-center justify-between gap-3 text-left md:hidden"
+        disabled={disabled}
+        aria-label={label}
+        onClick={() => setMobilePickerOpen(true)}
+      >
+        <span className="min-w-0 truncate">{blockLabel(value)}</span>
+        <Icon name="chevron-down" size="xs" className="shrink-0 text-muted-foreground" />
+      </button>
+
+      <div className="hidden md:block">
+        <Select
+          disabled={disabled}
+          value={value}
+          onValueChange={(nextValue) => onChange(nextValue as ManualWorkoutBlockKey)}
+        >
+          <SelectTrigger
+            aria-label={label}
+            className="hito-field hito-field-secondary hito-field-sm"
+          >
+            <SelectValue placeholder={label} />
+          </SelectTrigger>
+          <SelectContent>
+            {BLOCK_MENU_GROUPS.map((group) => (
+              <SelectGroupForBlocks key={group.label} group={group} />
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <ManualBlockTypePickerDialog
+        label={label}
+        onOpenChange={setMobilePickerOpen}
+        onSelect={selectBlock}
+        open={mobilePickerOpen}
+        value={value}
+      />
+    </>
+  );
+}
+
+function ManualBlockTypePickerDialog({
+  label,
+  onOpenChange,
+  onSelect,
+  open,
+  value,
+}: {
+  label: string;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (blockKey: ManualWorkoutBlockKey) => void;
+  open: boolean;
+  value: ManualWorkoutBlockKey;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
+        overlayClassName="hito-dialog-overlay-stable"
+      >
+        <DialogHeader className="hito-product-dialog-header">
+          <DialogTitle className="hito-modal-title">Choose {label.toLowerCase()}</DialogTitle>
+          <DialogDescription className="hito-body">
+            Pick the piece type. Duration, distance, and labels stay editable after selection.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="hito-product-dialog-body-scroll-fill">
+          <ManualBlockChoiceRows currentBlockKey={value} onSelect={onSelect} showCurrent />
+        </div>
+
+        <DialogFooter className="hito-product-dialog-footer">
+          <button
+            type="button"
+            className="hito-button hito-button-secondary hito-button-sm"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -814,24 +1209,24 @@ function EntryRowActions({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel>Step actions</DropdownMenuLabel>
+        <DropdownMenuLabel>Piece actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={index === 0} onSelect={onMoveUp}>
           <Icon name="chevron-up" size="xs" />
-          Move step up
+          Move piece up
         </DropdownMenuItem>
         <DropdownMenuItem disabled={index >= total - 1} onSelect={onMoveDown}>
           <Icon name="chevron-down" size="xs" />
-          Move step down
+          Move piece down
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onDuplicate}>
           <Icon name="copy" size="xs" />
-          Duplicate step
+          Duplicate piece
         </DropdownMenuItem>
         <DropdownMenuItem className="text-destructive" onSelect={onDelete}>
           <Icon name="trash" size="xs" />
-          Delete step
+          Delete piece
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -849,6 +1244,25 @@ function ManualAddStepMenu({
   onAddRepeatGroup: () => void;
   prominent?: boolean;
 }) {
+  const [mobilePickerOpen, setMobilePickerOpen] = useState(false);
+
+  const addBlockFromMobilePicker = (blockKey: ManualWorkoutBlockKey) => {
+    setMobilePickerOpen(false);
+    onAddBlock(blockKey);
+  };
+
+  const addRepeatFromMobilePicker = () => {
+    setMobilePickerOpen(false);
+    onAddRepeatGroup();
+  };
+
+  const triggerClassName = [
+    "hito-button hito-button-secondary hito-button-sm relative z-10",
+    prominent
+      ? ""
+      : "opacity-100 md:opacity-0 md:transition-opacity md:group-hover/add-step:opacity-100 md:group-focus-within/add-step:opacity-100 focus-visible:opacity-100",
+  ].join(" ");
+
   return (
     <div
       className={
@@ -860,19 +1274,21 @@ function ManualAddStepMenu({
       {prominent ? null : (
         <span className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-hairline" />
       )}
+      <button
+        type="button"
+        className={`${triggerClassName} md:hidden`}
+        onClick={() => setMobilePickerOpen(true)}
+      >
+        <Icon name="plus" size="xs" />
+        Add piece
+        <Icon name="chevron-down" size="xs" />
+      </button>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className={[
-              "hito-button hito-button-secondary hito-button-sm relative z-10",
-              prominent
-                ? ""
-                : "opacity-100 md:opacity-0 md:transition-opacity md:group-hover/add-step:opacity-100 md:group-focus-within/add-step:opacity-100 focus-visible:opacity-100",
-            ].join(" ")}
-          >
+          <button type="button" className={`${triggerClassName} hidden md:inline-flex`}>
             <Icon name="plus" size="xs" />
-            Add Step
+            Add piece
             <Icon name="chevron-down" size="xs" />
           </button>
         </DropdownMenuTrigger>
@@ -880,13 +1296,13 @@ function ManualAddStepMenu({
           align={prominent ? "end" : "center"}
           className="hito-manual-workout-menu-step"
         >
-          <DropdownMenuLabel>Backend-supported steps</DropdownMenuLabel>
+          <DropdownMenuLabel>Workout pieces</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem disabled={hasRepeatGroup} onSelect={onAddRepeatGroup}>
             <span className="hito-status-pill" data-tone="warning">
               Repeat
             </span>
-            Add Repeat
+            Add repeat unit
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {BLOCK_MENU_GROUPS.map((group) => (
@@ -908,6 +1324,131 @@ function ManualAddStepMenu({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ManualAddPiecePickerDialog
+        hasRepeatGroup={hasRepeatGroup}
+        onAddBlock={addBlockFromMobilePicker}
+        onAddRepeatGroup={addRepeatFromMobilePicker}
+        onOpenChange={setMobilePickerOpen}
+        open={mobilePickerOpen}
+      />
+    </div>
+  );
+}
+
+function ManualAddPiecePickerDialog({
+  hasRepeatGroup,
+  onAddBlock,
+  onAddRepeatGroup,
+  onOpenChange,
+  open,
+}: {
+  hasRepeatGroup: boolean;
+  onAddBlock: (blockKey: ManualWorkoutBlockKey) => void;
+  onAddRepeatGroup: () => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
+        overlayClassName="hito-dialog-overlay-stable"
+      >
+        <DialogHeader className="hito-product-dialog-header">
+          <DialogTitle className="hito-modal-title">Add piece</DialogTitle>
+          <DialogDescription className="hito-body">
+            Choose one piece for this manual workout. Hito reviews the full draft before anything is
+            saved.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="hito-product-dialog-body-scroll-fill grid gap-4">
+          <section className="grid gap-2">
+            <p className="hito-label">Repeat unit</p>
+            <div className="hito-row-group">
+              <button
+                type="button"
+                className="hito-list-row w-full items-start text-left disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={hasRepeatGroup}
+                onClick={onAddRepeatGroup}
+              >
+                <span className="hito-status-pill mt-0.5 shrink-0" data-tone="warning">
+                  Repeat
+                </span>
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">Add repeat unit</span>
+                  <span className="hito-list-row-copy block">
+                    Group work and recovery into one reviewed repeat piece.
+                  </span>
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <ManualBlockChoiceRows onSelect={onAddBlock} />
+        </div>
+
+        <DialogFooter className="hito-product-dialog-footer">
+          <button
+            type="button"
+            className="hito-button hito-button-secondary hito-button-sm"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ManualBlockChoiceRows({
+  currentBlockKey,
+  onSelect,
+  showCurrent = false,
+}: {
+  currentBlockKey?: ManualWorkoutBlockKey;
+  onSelect: (blockKey: ManualWorkoutBlockKey) => void;
+  showCurrent?: boolean;
+}) {
+  return (
+    <div className="grid gap-4">
+      {BLOCK_MENU_GROUPS.map((group) => (
+        <section key={group.label} className="grid gap-2">
+          <p className="hito-label">{group.label}</p>
+          <div className="hito-row-group">
+            {group.items.map((blockKey) => {
+              const selected = showCurrent && currentBlockKey === blockKey;
+
+              return (
+                <button
+                  key={blockKey}
+                  type="button"
+                  className="hito-list-row w-full items-start text-left"
+                  aria-pressed={selected || undefined}
+                  data-selected={selected || undefined}
+                  onClick={() => onSelect(blockKey)}
+                >
+                  <span
+                    className="hito-status-pill mt-0.5 shrink-0"
+                    data-icon="false"
+                    style={{ color: blockTone(blockKey) }}
+                  >
+                    {blockShortLabel(blockKey)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="hito-list-row-title block">{blockLabel(blockKey)}</span>
+                    {selected ? (
+                      <span className="hito-list-row-copy block">Current type</span>
+                    ) : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
@@ -958,7 +1499,7 @@ function makeRepeatEntry(): ManualWorkoutConstructorEntryInput {
     group: {
       repeatCount: 6,
       safetyKind: "intervals",
-      groupLabel: "6 x 2 min work / 1 min easy jog",
+      groupLabel: "6 rounds: 2 min work + 1 min easy jog",
       workBlock: makeDefaultBlock("interval_work_block"),
       recoveryBlock: makeDefaultBlock("interval_recovery_block"),
     },
@@ -1114,8 +1655,8 @@ function blockWeight(block: ManualWorkoutBlockInput) {
 }
 
 function repeatGroupSummary(group: ManualWorkoutRepeatGroupInput) {
-  const recovery = group.recoveryBlock ? ` / ${blockSummary(group.recoveryBlock)}` : "";
-  return `${group.repeatCount} x ${blockSummary(group.workBlock)}${recovery}`;
+  const recovery = group.recoveryBlock ? ` + ${blockSummary(group.recoveryBlock)} recovery` : "";
+  return `${group.repeatCount} rounds · ${blockSummary(group.workBlock)} work${recovery}`;
 }
 
 function blockSummary(block: ManualWorkoutBlockInput) {
@@ -1173,6 +1714,12 @@ function isNoteBlock(blockKey: ManualWorkoutBlockKey) {
 }
 
 type ManualWorkoutQuantityMode = "duration" | "distance" | "none";
+
+const QUANTITY_MODE_OPTIONS: Array<{ label: string; value: ManualWorkoutQuantityMode }> = [
+  { label: "Duration", value: "duration" },
+  { label: "Distance", value: "distance" },
+  { label: "No quantity", value: "none" },
+];
 
 function quantityModeForBlock(block: ManualWorkoutBlockInput): ManualWorkoutQuantityMode {
   if (block.distanceMeters) return "distance";

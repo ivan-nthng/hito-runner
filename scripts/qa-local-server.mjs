@@ -19,9 +19,12 @@ const healthUrl = `http://${host}:${port}/`;
 const logsDir = resolve(rootDir, "logs");
 const statePath = resolve(logsDir, "qa-local-server-state.json");
 const logPath = resolve(logsDir, "qa-local-server.log");
-const serverEntry = resolve(rootDir, ".output/server/index.mjs");
-const nitroManifest = resolve(rootDir, ".output/nitro.json");
-const publicDir = resolve(rootDir, ".output/public");
+const finalizedOutputDir = resolve(rootDir, "logs/build-output-finalized");
+const finalizedServerDir = resolve(finalizedOutputDir, "server");
+const finalizedPublicDir = resolve(finalizedOutputDir, "public");
+const serverEntry = resolve(finalizedServerDir, "index.mjs");
+const nitroManifest = resolve(finalizedOutputDir, "nitro.json");
+const publicDir = finalizedPublicDir;
 const requiredBuildArtifacts = [
   serverEntry,
   nitroManifest,
@@ -76,7 +79,9 @@ async function startCommand() {
 
   const currentBuild = readBuildFingerprint();
   if (!currentBuild) {
-    throw new Error("Build output is missing after build. Expected .output/server/index.mjs.");
+    throw new Error(
+      "Build output is missing after build. Expected logs/build-output-finalized/server/index.mjs.",
+    );
   }
 
   const status = await resolveServerStatus();
@@ -342,7 +347,8 @@ function processStartedAtMs(pid) {
 function isCompatibleServerCommand(commandLine) {
   return Boolean(
     commandLine &&
-    commandLine.includes(".output/server/index.mjs") &&
+    (commandLine.includes("logs/build-output-finalized/server/index.mjs") ||
+      commandLine.includes(".output/server/index.mjs")) &&
     commandLine.includes("--port 3000"),
   );
 }

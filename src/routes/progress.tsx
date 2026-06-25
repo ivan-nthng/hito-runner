@@ -30,7 +30,7 @@ function Progress() {
   if (snapshot.mode === "onboarding") {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
-        <div className="px-6 lg:px-10 py-20 max-w-3xl">
+        <div className="hito-route-gutter max-w-3xl py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label">Setup required</p>
             <h1 className="hito-page-title">Finish setup before reviewing progress.</h1>
@@ -52,7 +52,7 @@ function Progress() {
   if (!hasPlannedWorkouts) {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
-        <div className="px-6 lg:px-10 py-20 max-w-3xl">
+        <div className="hito-route-gutter max-w-3xl py-20">
           <section className="hito-state-surface">
             <p className="hito-label">Progress unavailable</p>
             <h1 className="hito-page-title">There isn&apos;t a visible plan to summarize yet.</h1>
@@ -83,7 +83,7 @@ function Progress() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="hito-route-stack max-w-5xl px-6 py-10 lg:px-10">
+      <div className="hito-route-gutter hito-route-stack max-w-5xl py-10">
         <header className="hito-page-header">
           <p className="hito-label">
             {snapshot.source === "persisted" ? "Saved progress" : "Preview"}
@@ -227,7 +227,7 @@ function Progress() {
 function ProgressPendingState() {
   return (
     <AppShell>
-      <div className="max-w-5xl space-y-10 px-6 py-10 lg:px-10">
+      <div className="hito-route-gutter max-w-5xl space-y-10 py-10">
         <div>
           <Skeleton className="h-4 w-28 bg-background/30" />
           <Skeleton className="mt-4 h-14 w-80 bg-background/40" />
@@ -243,7 +243,7 @@ function ProgressPendingState() {
 function ProgressErrorState({ reset }: { error: Error; reset: () => void }) {
   return (
     <AppShell>
-      <div className="px-6 lg:px-10 py-20 max-w-3xl">
+      <div className="hito-route-gutter max-w-3xl py-20">
         <section className="hito-state-surface" data-tone="destructive">
           <p className="hito-label text-destructive">Progress unavailable</p>
           <h1 className="hito-page-title">We couldn&apos;t load this progress view.</h1>

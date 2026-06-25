@@ -254,7 +254,7 @@ export async function confirmRunningPlanDraftForUser(
     return buildConfirmFailure({
       reason: "active_plan_exists",
       message:
-        "Selected plans can create a new plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
+        "Selected plans can create a new plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
       sourceKind: request.sourceKind,
       planFamily: request.planFamily,
     });
@@ -338,7 +338,7 @@ export async function confirmRunningPlanDraftForUser(
       return buildConfirmFailure({
         reason: "active_plan_exists",
         message:
-          "Selected plans can create a new plan only when there is no active plan. Use Open plan to update or replace an existing plan.",
+          "Selected plans can create a new plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
         sourceKind: request.sourceKind,
         planFamily: request.planFamily,
       });

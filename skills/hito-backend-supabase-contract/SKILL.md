@@ -30,6 +30,17 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 8. Update generated/local database types only when schema actually changes.
 9. Update permanent docs only for implemented behavior.
 
+## Backend / Frontend Boundary
+
+- Treat frontend route/component/style/Hito DS/copy files as read-only consumer context.
+- Backend may inspect frontend consumers to understand contract impact, but must not edit them.
+- If a backend-owned contract cleanup creates required frontend compile, rendering, or copy changes,
+  stop at the backend boundary after backend proof is green or clearly blocked, then route one
+  FRONTEND follow-up with exact consumer-impact notes.
+- Do not hide frontend work inside a backend batch as "small compile-impact updates".
+- Backend may use QA, ARCHITECT, or FRONTEND subagents for read-only audits and validation evidence,
+  but the backend agent remains responsible only for backend-owned edits.
+
 ## Bolder Backend Batch Rule
 
 - If a backend defect is a class of failures, fix the class in the canonical owner instead of only
@@ -100,6 +111,8 @@ Implement backend-owned truth safely while preserving Hito's canonical persisted
 - Compatibility exports may remain only when useful and should not re-own logic.
 - Do not duplicate canonical lifecycle, validation, persistence, admin, entitlement, or AI-context logic in a parallel seam.
 - Do not leave dead code behind for "maybe later"; move it to a documented backlog/plan or delete it.
+- Do not edit frontend-owned files from this backend skill; route frontend consumer changes to
+  FRONTEND after backend contract proof.
 
 ## Validation
 

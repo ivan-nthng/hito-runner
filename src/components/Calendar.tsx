@@ -34,7 +34,7 @@ import {
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
 import type {
   ManualWorkoutDirectMoveResult,
-  ManualWorkoutMoveTargetMode,
+  ManualWorkoutMoveTargetDayKind,
 } from "@/lib/manual-workout-authoring";
 
 type View = "month" | "week";
@@ -71,7 +71,7 @@ type ManualWorkoutCalendarActionContext = ManualCopiedWorkoutSource & {
 };
 type ManualWorkoutMoveTargetHint = {
   canAcceptMoveTarget: boolean;
-  mode: ManualWorkoutMoveTargetMode;
+  dayKind: ManualWorkoutMoveTargetDayKind;
 };
 type ManualOptimisticMoveDisplay = {
   requestId: string;
@@ -185,7 +185,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
   }
 
   function recordDirectManualMoveUndo(result: ManualWorkoutDirectMoveSuccess) {
-    if (result.safety.targetWorkoutReplaced) return;
+    if (result.targetDayKind !== "rest_day") return;
 
     const now = Date.now();
 
@@ -240,16 +240,16 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
     if (!sourceWorkout) return;
 
     const requestId = `${moveSource.sourceWorkoutId}:${targetDate}:${Date.now()}`;
-    const targetMode = resolveManualMoveTargetMode(snapshot.workouts, targetDate, moveSource);
+    const targetDayKind = resolveManualMoveTargetDayKind(snapshot.workouts, targetDate, moveSource);
 
     setLastMoveUndo(null);
     setManualMoveRequest({
       ...moveSource,
-      targetMode,
+      targetDayKind,
       targetDate,
       requestId,
     });
-    if (targetMode !== "workout_replacement") {
+    if (targetDayKind !== "workout_day") {
       projectManualOptimisticMove({
         requestId,
         sourceWorkoutDate: moveSource.sourceWorkoutDate,
@@ -584,7 +584,7 @@ function MobileMonthList({
               activePlanSourceKind={manualAddContext.activePlanSourceKind}
               copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
               date={iso}
-              moveTargetMode={manualAddContext.moveTargetMode}
+              moveTargetDayKind={manualAddContext.moveTargetDayKind}
               moveOnly={manualAddContext.moveOnly}
               moveWorkoutSource={canMoveHere ? manualCalendarActionState.moveWorkoutSource : null}
               onAdded={manualCalendarActionState.onManualPlanChanged}
@@ -597,7 +597,7 @@ function MobileMonthList({
                 aria-label={manualTargetButtonAriaLabel(
                   iso,
                   canMoveHere,
-                  manualAddContext.moveTargetMode,
+                  manualAddContext.moveTargetDayKind,
                 )}
                 onDragEnter={(event) =>
                   handleManualMoveDragEnter(event, canMoveHere, iso, manualCalendarActionState)
@@ -614,7 +614,7 @@ function MobileMonthList({
                   {...addPresentation}
                   action={
                     canMoveHere
-                      ? calendarMoveTargetAction(manualAddContext.moveTargetMode)
+                      ? calendarMoveTargetAction(manualAddContext.moveTargetDayKind)
                       : calendarAddAction()
                   }
                   className={isMoveTargetHovered ? "hito-calendar-move-target" : undefined}
@@ -849,7 +849,7 @@ function DayCell({
           activePlanSourceKind={manualAddContext.activePlanSourceKind}
           copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
           date={iso}
-          moveTargetMode={manualAddContext.moveTargetMode}
+          moveTargetDayKind={manualAddContext.moveTargetDayKind}
           moveOnly={manualAddContext.moveOnly}
           moveWorkoutSource={canMoveHere ? manualCalendarActionState.moveWorkoutSource : null}
           onAdded={manualCalendarActionState.onManualPlanChanged}
@@ -862,7 +862,7 @@ function DayCell({
             aria-label={manualTargetButtonAriaLabel(
               iso,
               canMoveHere,
-              manualAddContext.moveTargetMode,
+              manualAddContext.moveTargetDayKind,
             )}
             onDragEnter={(event) =>
               handleManualMoveDragEnter(event, canMoveHere, iso, manualCalendarActionState)
@@ -879,7 +879,7 @@ function DayCell({
               {...addPresentation}
               action={
                 canMoveHere
-                  ? calendarMoveTargetAction(manualAddContext.moveTargetMode)
+                  ? calendarMoveTargetAction(manualAddContext.moveTargetDayKind)
                   : calendarAddAction()
               }
               day={String(day).padStart(2, "0")}
@@ -1243,7 +1243,7 @@ function WeekStrip({
               activePlanSourceKind={manualAddContext.activePlanSourceKind}
               copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
               date={iso}
-              moveTargetMode={manualAddContext.moveTargetMode}
+              moveTargetDayKind={manualAddContext.moveTargetDayKind}
               moveOnly={manualAddContext.moveOnly}
               moveWorkoutSource={canMoveHere ? manualCalendarActionState.moveWorkoutSource : null}
               onAdded={manualCalendarActionState.onManualPlanChanged}
@@ -1256,7 +1256,7 @@ function WeekStrip({
                 aria-label={manualTargetButtonAriaLabel(
                   iso,
                   canMoveHere,
-                  manualAddContext.moveTargetMode,
+                  manualAddContext.moveTargetDayKind,
                 )}
                 onDragEnter={(event) =>
                   handleManualMoveDragEnter(event, canMoveHere, iso, manualCalendarActionState)
@@ -1273,7 +1273,7 @@ function WeekStrip({
                   {...addPresentation}
                   action={
                     canMoveHere
-                      ? calendarMoveTargetAction(manualAddContext.moveTargetMode)
+                      ? calendarMoveTargetAction(manualAddContext.moveTargetDayKind)
                       : calendarAddAction()
                   }
                   day={iso.slice(8)}
@@ -1365,7 +1365,7 @@ function getManualAddContext(
   activePlanId: string;
   activePlanSourceKind: string;
   canAcceptMoveTarget: boolean;
-  moveTargetMode: ManualWorkoutMoveTargetMode;
+  moveTargetDayKind: ManualWorkoutMoveTargetDayKind;
   moveOnly: boolean;
 } | null {
   const planMeta = snapshot.planMeta;
@@ -1396,7 +1396,7 @@ function getManualAddContext(
     activePlanId: planMeta.id,
     activePlanSourceKind,
     canAcceptMoveTarget,
-    moveTargetMode: moveTargetHint.mode,
+    moveTargetDayKind: moveTargetHint.dayKind,
     moveOnly: !canAddWorkout || Boolean(workout),
   };
 }
@@ -1407,48 +1407,47 @@ function resolveManualMoveTargetHint(
   workout: Workout | undefined,
   moveSource: ManualCopiedWorkoutSource | null,
 ): ManualWorkoutMoveTargetHint {
-  const mode = resolveManualMoveTargetModeFromWorkout(workout);
+  const dayKind = resolveManualMoveTargetDayKindFromWorkout(workout);
 
   if (!moveSource || isBeforePlanStart(iso, snapshot) || moveSource.sourceWorkoutDate === iso) {
-    return { canAcceptMoveTarget: false, mode };
+    return { canAcceptMoveTarget: false, dayKind };
   }
 
   if (!workout) {
     return {
       canAcceptMoveTarget:
         iso > snapshot.currentDate || canExposeTodayAsManualMoveTarget(snapshot, iso, moveSource),
-      mode,
+      dayKind,
     };
   }
 
   if (iso <= snapshot.currentDate) {
-    return { canAcceptMoveTarget: false, mode };
+    return { canAcceptMoveTarget: false, dayKind };
   }
 
   if (workout.type === "rest") {
-    return { canAcceptMoveTarget: true, mode };
+    return { canAcceptMoveTarget: true, dayKind };
   }
 
   return {
     canAcceptMoveTarget: Boolean(workout.sourceEditing?.canClear),
-    mode,
+    dayKind,
   };
 }
 
-function resolveManualMoveTargetModeFromWorkout(
+function resolveManualMoveTargetDayKindFromWorkout(
   workout: Workout | undefined,
-): ManualWorkoutMoveTargetMode {
-  if (!workout) return "empty";
-  if (workout.type === "rest") return "rest_replacement";
-  return "workout_replacement";
+): ManualWorkoutMoveTargetDayKind {
+  if (!workout || workout.type === "rest") return "rest_day";
+  return "workout_day";
 }
 
-function resolveManualMoveTargetMode(
+function resolveManualMoveTargetDayKind(
   workouts: Workout[],
   targetDate: string,
   moveSource: ManualCopiedWorkoutSource,
-): ManualWorkoutMoveTargetMode {
-  return resolveManualMoveTargetModeFromWorkout(
+): ManualWorkoutMoveTargetDayKind {
+  return resolveManualMoveTargetDayKindFromWorkout(
     workouts.find(
       (workout) => workout.date === targetDate && workout.id !== moveSource.sourceWorkoutId,
     ),
@@ -1505,9 +1504,7 @@ function canExposeTodayAsManualMoveTarget(
   const sourceEditing = sourceWorkout?.sourceEditing;
 
   return Boolean(
-    sourceEditing?.canDirectMove &&
-    (sourceEditing.eligibility === "eligible_past_unlogged" ||
-      sourceEditing.eligibility === "eligible_missed_unlogged_recent"),
+    sourceEditing?.canDirectMove && sourceEditing.eligibility === "eligible_past_unlogged",
   );
 }
 
@@ -1587,8 +1584,8 @@ function calendarMoveSourceSlotAction() {
   };
 }
 
-function calendarMoveTargetAction(mode: ManualWorkoutMoveTargetMode) {
-  if (mode === "workout_replacement") {
+function calendarMoveTargetAction(dayKind: ManualWorkoutMoveTargetDayKind) {
+  if (dayKind === "workout_day") {
     return {
       label: "Replace",
       icon: "arrow-right" as const,
@@ -1601,10 +1598,7 @@ function calendarMoveTargetAction(mode: ManualWorkoutMoveTargetMode) {
     label: "Move",
     icon: "arrow-right" as const,
     tone: "signal" as const,
-    ariaLabel:
-      mode === "rest_replacement"
-        ? "Move selected workout to rest day"
-        : "Move selected workout here",
+    ariaLabel: "Move selected workout to rest day",
   };
 }
 
@@ -1623,7 +1617,7 @@ function calendarMoveUndoAction(secondsRemaining: number) {
 function manualTargetButtonAriaLabel(
   iso: string,
   canMoveHere: boolean,
-  mode: ManualWorkoutMoveTargetMode,
+  dayKind: ManualWorkoutMoveTargetDayKind,
 ) {
   const dateLabel = formatDate(iso, {
     month: "short",
@@ -1632,13 +1626,10 @@ function manualTargetButtonAriaLabel(
   });
 
   if (!canMoveHere) return `${dateLabel}. Add activity.`;
-  if (mode === "workout_replacement") {
+  if (dayKind === "workout_day") {
     return `${dateLabel}. Review replacement for selected workout.`;
   }
-  if (mode === "rest_replacement") {
-    return `${dateLabel}. Move selected workout to rest day.`;
-  }
-  return `${dateLabel}. Move selected workout here.`;
+  return `${dateLabel}. Move selected workout to rest day.`;
 }
 
 function buildManualMoveTargetPresentation(

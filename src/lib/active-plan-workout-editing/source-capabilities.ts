@@ -7,13 +7,10 @@ import { resolveActivePlanWorkoutEditability } from "@/lib/active-plan-workout-e
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
 
-export const MISSED_UNLOGGED_MOVE_WINDOW_DAYS = 7;
-
 export type ActivePlanWorkoutSourceEditingEligibility =
   | "eligible_past_unlogged"
   | "eligible_current_unlogged"
   | "eligible_future_unlogged"
-  | "eligible_missed_unlogged_recent"
   | "blocked";
 
 export type ActivePlanWorkoutSourceEditingReason =

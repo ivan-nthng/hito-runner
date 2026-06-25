@@ -125,7 +125,7 @@
   it checks `ai_plan_update` entitlement before proposal generation, records usage only after a successful proposal with an exact draft attached, validates stale fingerprints before apply, applies only the reviewed draft without calling OpenAI or regenerating, blocks if a formerly mutable workout became logged or evidence-backed, archive/replaces the active plan while preserving fixed history/logged/Garmin evidence truth including stored rich workout fields for fixed/protected rows, and accepts the existing persisted snapshot loader from `training-api.ts` so public action result shapes remain stable
 - `src/lib/plan-replacement-actions.ts`
   owns the saved-mode plan replacement action layer:
-  advanced JSON import and text compatibility replacement actions validate their existing inputs, resolve the authenticated persisted user, preserve start-date and first-day resolution behavior, and apply canonical `training-plan-v2` plan truth through `active-plan-persistence`; saved-mode route/component callers import `completeOnboarding` and `completeTextOnboarding` from this canonical owner directly instead of through `training-api.ts`
+  advanced JSON import and text compatibility replacement actions validate their existing inputs, resolve the authenticated persisted user, preserve start-date and first-day resolution behavior, and apply canonical `training-plan-v2` plan truth through `active-plan-persistence`; saved-mode JSON callers import `completeOnboarding` from this canonical owner directly instead of through `training-api.ts`, while `completeTextOnboarding` remains backend/non-default compatibility with no current visible route/component caller and must not be deleted without a separate Product/Backend source-of-truth decision
 - `src/lib/changelog-utils.ts`
   owns pure `/changelog` markdown parsing, date/month/year grouping, source-derived shipped-change count and last-updated helpers, highlight classification, and milestone title derivation while the public route keeps shell, tabs, timeline rendering, and the existing `docs/history/changelog.md?raw` source import
 - `src/lib/user-settings-actions.ts`
@@ -244,7 +244,7 @@
 - Manual user-built plans are now a canonical no-active-plan and saved-calendar creation path:
   `src/lib/manual-workout-authoring/*` owns draft validation, backend template registry, review
   token/checksum exactness, first manual plan confirm, and adding one reviewed workout into an
-  active plan; the manual Add mutation accepts eligible empty targets on today or future dates
+  active plan; the manual Add mutation accepts eligible Rest/no-workout targets on today or future dates
   while keeping past, occupied, logged/evidence-backed, and protected targets blocked.
   `src/lib/active-plan-workout-editing/policy.ts` now owns the shared active-plan
   workout editability policy for Add/Clear/Move: accepted active-plan sources are no longer blocked
@@ -323,15 +323,13 @@
   the saved-mode calendar header overflow now exposes one compact `Export JSON` action using that
   same backend-owned document truth and backend-provided filename
   Safari-compatible delivery now uses one authenticated attachment route for the actual browser download request instead of reconstructing files from a client-side blob URL
-  the active-plan summary/header UI is isolated in [src/components/plan-management/PlanSummaryHeader.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanSummaryHeader.tsx), preserving title, goal fallback, active status, date/count/target summary, export menu placement, and export error rendering
-  the export dropdown UI is isolated in [src/components/plan-management/PlanExportMenu.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanExportMenu.tsx), while `PlanManagementDialog` remains the owner of export status, errors, iframe download orchestration, and the surrounding plan-management modal state
+  the active-plan summary/header UI is isolated in [src/components/plan-management/PlanSummaryHeader.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanSummaryHeader.tsx), preserving title, goal fallback, active status, and date/count/target summary
+  the calendar header overflow in [src/components/AppShell.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/AppShell.tsx) owns the visible `Export JSON` action, while [src/components/plan-management/plan-export-download.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/plan-export-download.ts) owns the Safari-compatible iframe download helper
   PDF export remains a later slice, but it must reuse this same payload rather than shaping a second export truth
 - the frontend now mirrors that simplified policy instead of the older symmetric chooser:
   text-first apply and advanced JSON apply both use the safe backend default without a required preserve-vs-ignore modal step
   and only one explicit destructive override remains in the UI, now kept behind a quieter disclosure instead of being shown as an equal sibling of the safe action
-  the saved-mode plan replacement/import panels remain implementation modules, but current calendar
-  IA routes plan creation through `Add plan` and safe utilities through overflow instead of a
-  runner-facing `Open plan` hub
+  saved-mode import uses [src/components/UploadJsonDialog.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/UploadJsonDialog.tsx), while current calendar IA routes plan creation through `Add plan` and safe utilities through overflow instead of a runner-facing `Open plan` hub
 - OpenAI-generated authoring output never persists directly:
   the app validates model responses, converts them into canonical plan data, and persists through the same `plan_cycles` plus `planned_workouts` seam already used by JSON import and structured authoring; the richer text-authoring draft is never stored as a raw AI artifact and can only survive after backend normalization into canonical `training-plan-v2` workouts
 - saved mode now has the first active-plan refresh foundation and proposal UI:
@@ -342,10 +340,8 @@
   explicit proposal apply now exists as a backend-only seam: apply must be called intentionally, revalidates a backend fingerprint against current active-plan/context truth including fixed weekday rest-day constraints, verifies the reviewed draft checksum, blocks stale or genuinely invalid proposals with bounded proposal-specific copy, and uses archive/replace by creating a new `active_plan_refresh_v1` plan while archiving the previous active plan
   apply no longer calls OpenAI or regenerates the schedule; if a previously mutable workout becomes logged, Garmin evidence-backed, comparison-backed, or AI-insight-backed after proposal generation, apply blocks and asks for a fresh proposal
   past/logged/Garmin-backed history remains fixed by carrying fixed workout/log/evidence truth into the replacement active plan and retaining the previous plan as archived audit history
-  the active-plan refresh proposal/apply seam remains backend-owned future capability; visible
-  `Update plan` is not part of the current accepted calendar-header IA
-  the refresh proposal disclosure and review UI are isolated in [src/components/plan-management/PlanRefreshPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/plan-management/PlanRefreshPanel.tsx), while `PlanManagementDialog` remains the owner of proposal/apply server calls, refresh state transitions, stale/error handling, and success navigation
-  `Apply update` calls the backend apply seam and returns to the refreshed active-plan view after success; `Keep current plan` clears the proposal review without mutation; stale apply responses stay in the modal with a fresh-proposal recovery action
+  the active-plan refresh proposal/apply seam remains backend-owned future capability; no visible
+  `Update plan` panel is part of the current accepted calendar-header IA, and future proposal UI must reuse this backend seam instead of resurrecting a stale plan-management hub
   proposal generation now checks `ai_plan_update` entitlement before OpenAI generation and records usage only after successful proposal generation for explicit Basic users; applying an approved proposal does not consume additional usage
 - saved mode now also has a backend-only active-plan schedule edit preview contract:
   [src/lib/active-plan-schedule-edit-preview.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-schedule-edit-preview.ts) validates proposed fixed rest days, running-day count, optional explicit running weekdays, and preferred long-run day through the shared runner training-preference rules, then builds a non-mutating preview from the active `plan_cycle` and saved `planned_workouts`
@@ -405,7 +401,7 @@
 - saved workout logs now also carry optional workout-linked `body_notes` as bounded JSON array truth; those notes belong to the specific workout result and are read back through the same saved-mode workout snapshot seam as completion notes and actual metrics
 - past-due planned workouts without a saved log are treated as `skipped` until the user overwrites them with a real result
 - `week_status` is derived on the backend-facing seam from persisted workout state, not from client-only heuristics
-- rest days no longer render distance, duration, load, or empty target and note sections by default; only genuine assigned rest-day content is surfaced
+- rest days no longer render distance, duration, load, or placeholder target and note sections by default; only genuine assigned rest-day content is surfaced
 - workout detail now shows saved result semantics directly in the route chrome:
   check for `completed`
   dash for `partial`

@@ -21,6 +21,7 @@ import type {
   CanonicalWorkoutFamily,
   CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
+import { resolveActivePlanSourceStatus } from "@/lib/active-plan-workout-editing/policy";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -109,7 +110,7 @@ export function buildActivePlanExportPayload(args: {
       effectiveEndDate: lastWorkoutDate,
       targetDate: args.planCycle.target_date,
       sourceKind: args.planCycle.source_kind,
-      sourceStatus: resolvePlanSourceStatus(args.planCycle.goal_metadata),
+      sourceStatus: resolveActivePlanSourceStatus(args.planCycle),
       exportedAt: args.exportedAt ?? new Date().toISOString(),
     },
     summary: {
@@ -333,20 +334,6 @@ function buildPlanExportMetadata(payload: ActivePlanExportPayload) {
       provider_tokens_omitted: true,
     },
   };
-}
-
-function resolvePlanSourceStatus(goalMetadata: unknown) {
-  const root = asRecord(goalMetadata);
-  const direct = stringValue(root.source_status);
-
-  if (direct) {
-    return direct;
-  }
-
-  const manualPlan = asRecord(root.manual_user_built_plan);
-  const manualSourceStatus = stringValue(manualPlan.source_status);
-
-  return manualSourceStatus;
 }
 
 function buildSafePlanExportId(planCycle: PersistedPlanCycleRow, firstWorkoutDate: string) {

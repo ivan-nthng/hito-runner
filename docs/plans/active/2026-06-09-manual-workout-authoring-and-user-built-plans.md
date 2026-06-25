@@ -18,11 +18,11 @@ frontend
 
 ## Task
 
-Remove stale plan-management and manual-first-create dead branches after the business-flow audit.
+Remove stale frontend sourceEditing compatibility branch after backend metadata cleanup.
 
 ## Stage
 
-FRONTEND cleanup / one-calendar entrypoint and manual residue consolidation.
+FRONTEND behavior-preserving consumer cleanup / active-plan capability vocabulary simplification.
 
 ## Exact Handoff Prompt
 
@@ -30,75 +30,83 @@ FRONTEND cleanup / one-calendar entrypoint and manual residue consolidation.
 ROLE: FRONTEND
 
 Task:
-Remove stale plan-management and manual-first-create dead branches after the business-flow audit.
+Remove stale frontend sourceEditing compatibility branch after backend source-capability vocabulary simplification.
 
 Stage:
-FRONTEND cleanup / one-calendar entrypoint and manual residue consolidation.
+FRONTEND behavior-preserving consumer cleanup / active-plan capability vocabulary simplification.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
 
 Context:
-ARCHITECT completed a full business-flow audit. The accepted product model is one calendar:
-`Add plan` opens reviewed plan creation/import entrypoints, adjacent overflow owns safe utilities,
-and a scheduled workout is just a calendar workout after creation. `Open plan`, visible `Update
-plan`, and `Delete active plan` are not current runner-facing IA.
-
-Source proof found stale frontend entrypoint residue:
-- `AppShell` opens `PlanManagementDialog` only with `edit-schedule` or `clear-upcoming`.
-- `PlanManagementDialog` still has unreachable `full` mode and full-only refresh/text/import panels.
-- The current JSON import UI owner is `UploadJsonDialog`; `PlanImportPanel` is full-mode-only residue
-  unless source proof finds another live caller.
-- `ManualUserBuiltPlanPanel` appears orphaned; current onboarding creates an empty manual active plan
-  through `OnboardingGate` and then uses calendar Add activity.
-- Clear-review copy still exposes restore/internal future wording even though Restore UI is
-  future-only.
+Backend removed the stale missed-window source-capability vocabulary and aligned export
+`source_status` readback through the shared active-plan source-status resolver. One frontend
+compatibility predicate remains in `src/components/Calendar.tsx`: `canExposeTodayAsManualMoveTarget`
+still accepts the old missed-window eligibility name even though backend now exposes past unlogged
+rows as `eligible_past_unlogged`.
 
 Scope:
-1. Perform a reuse/source preflight before editing: inspect `AppShell`, `PlanManagementDialog`,
-   `UploadJsonDialog`, `ActivePlanCreatePlanDialog`, `OnboardingGate`,
-   `ManualUserBuiltPlanPanel`, `ManualWorkoutAuthoringControls`, and existing Hito DS primitives.
-2. Remove or explicitly retire `PlanManagementDialog` `full` mode and full-only UI branches if no
-   live caller exists.
-3. Consolidate JSON import UI ownership to `UploadJsonDialog`; delete/demote `PlanImportPanel` only
-   if `rg` proves it has no live caller after full-mode cleanup.
-4. Delete/demote orphan `ManualUserBuiltPlanPanel` only if `rg` proves it has no runtime imports.
-5. Replace restore/internal clear-review copy with current runner-facing language, or hide it until
-   a real Restore UI ships.
-6. Keep `AppShell`, `ActivePlanCreatePlanDialog`, `OnboardingGate`, `Calendar`,
-   `ManualWorkoutAddMenu`, and backend-owned capability/review/confirm contracts behaviorally
-   unchanged.
-7. Use subagents or local sequential checks for no-caller proof and regression validation; do not
-   return routine QA prompts to Product.
+1. Edit `src/components/Calendar.tsx` only unless TypeScript reveals another direct consumer.
+2. Remove the stale missed-window eligibility comparison from `canExposeTodayAsManualMoveTarget`.
+3. Preserve behavior: past unlogged movable rows still expose today as a move target through
+   `eligible_past_unlogged`; current/future Add/Clear/Move behavior remains backend-shaped.
+4. Do not change copy, menu labels, drag/drop behavior, manual-workout mutation semantics, backend
+   files, docs, or `/hitoDS`.
 
 Do not:
-- Do not change backend behavior, persistence, auth, Supabase, OpenAI, running-plan generation,
-  active-plan transition semantics, JSON import semantics, manual Add/Move/Copy/Delete/Edit
-  semantics, artifact cleanup, logs, qa-artifacts, or Hito DS unrelated surfaces.
-- Do not create a new plan-management hub or route-local replacement UI.
-- Do not remove any panel with a live caller; stop and report the caller instead.
+- Do not change backend source-capability semantics, manual mutation behavior, copy, move, clear,
+  add, persisted edit, Supabase schema, migrations, OpenAI behavior, `/hitoDS`, or copy.
 
 Validation:
-- `rg` proof for each removed/demoted component or mode.
-- Targeted lint for touched frontend files.
+- Targeted ESLint for `src/components/Calendar.tsx`.
 - `npm run build`.
+- `rg` proof that old missed-window eligibility vocabulary is gone from live `src/` source or
+  retained only in historical docs.
 - Scoped `git diff --check`.
-- If source/build pass, run or delegate QA for the authenticated calendar header:
-  `Add plan`, `Import JSON`, `Export JSON`, `Edit schedule`, `Clear upcoming schedule`, plus
-  no visible `Open plan`/`Update plan`/`Delete active plan` and no manual-first-create dead UI.
 
 Stop conditions:
-- Stop if any candidate has a live caller, if cleanup requires backend lifecycle changes, if JSON
-  import semantics would change, or if the batch crosses into product redesign rather than
-  dead-branch consolidation.
+- Stop if cleanup requires changing backend semantics, visible UI behavior, or calendar mutation
+  rules.
 ```
 
 ## Suggested Next Step
 
-Frontend should consolidate the stale plan/manual entrypoint residue found by the business-flow
-audit. The goal is not a redesign: remove unreachable `PlanManagementDialog` full-mode branches,
-keep the accepted `Add plan` + overflow IA, preserve backend seams, and delete/demote orphan manual
-first-create UI only after source no-caller proof.
+Frontend should remove the one remaining stale sourceEditing compatibility predicate in
+`Calendar.tsx`. Backend source-capability vocabulary and export `source_status` readback are now
+aligned with backend row-state/provenance truth.
+
+## Queued High-Priority Gate After Calendar Stabilization
+
+Current calendar stabilization remains first. Do not start taxonomy implementation, rename backend
+identities, alter JSON/export/import language, or change template behavior until the active calendar
+cleanup gate is accepted.
+
+- Current calendar stabilization remains first; taxonomy reconciliation is queued only after that
+  gate is accepted.
+- This docs slice records sequencing only and does not start taxonomy implementation.
+
+Queued next gate:
+
+ARCHITECT: unified runner-facing workout taxonomy reconciliation.
+
+Accepted future direction:
+
+- Runner-facing workout types for v1: Rest, Recovery, Easy, Steady, Long Run, Progression, Tempo,
+  Intervals, Hills, Run/Walk.
+- Runner-facing step types for v1: Warm-up, Run, Work, Recover, Finish, Cooldown, Repeat set.
+- Backend canonical workout identities remain internal and must continue to support
+  `training-plan-v2`, export/import, Garmin/FIT comparison, future Strava/provider comparison,
+  metric truth, and running-plan engine generation.
+
+Reconciliation scope:
+
+- manual constructor taxonomy
+- template library
+- backend canonical workout identities
+- running-plan engine identities
+- `training-plan-v2` JSON/export/import language
+- Garmin/FIT comparison needs
+- future Strava/provider comparison implications
 
 ## Current Status Detail
 
@@ -111,21 +119,23 @@ implemented in the proved scope. The post-universal manual Clear restore/review 
 regression and the constructor UI contract were rerun successfully on 2026-06-12. Direct manual
 active-plan Copy/Paste and drag/drop Move are now implemented and QA-passed in the manual scope on
 2026-06-13, using backend direct mutations instead of runner-facing review/confirm. The
-missed-unlogged manual move contract was accepted on 2026-06-14 and expanded on 2026-06-17: a fully
-unlogged manual workout missed in a bounded recent window may move to today or to a valid future
-empty day through the same backend direct move seam. The target-today resolver, non-rest template
+missed-unlogged manual move contract was accepted on 2026-06-14 and later folded into row-state
+truth: a fully unlogged past manual workout may move to today or to a valid future no-workout target
+through the same backend direct move seam. The target-today resolver, non-rest template
 direct constructor open path, and protected-source direct-edit affordance gating are now QA-passed on
 2026-06-15. On 2026-06-15, Backend added and validated the persisted future workout-content edit
 review/confirm seam for eligible manual planned rows. On 2026-06-20, Backend expanded the manual Add
-contract so an eligible empty day on today can be added through the same reviewed backend-owned Add
-seam as future empty days. The calendar consumer now exposes Add for today or future empty days
-through `iso >= snapshot.currentDate`; today-as-move-target remains separately guarded by the
-move-source resolver. QR/share-import, universal Copy/Paste, recurrence, Restore UI,
-active-plan replacement semantics expansion, generated-row
-content editing, explicit persisted rest-day lifecycle proof, and deeper modal polish remain
-future-only unless selected by a separate architecture contract. On 2026-06-24, Backend repaired the
-remaining generated/selected row lifecycle blocker: metric-target rows now expose move/clear/drag
-when unlogged and evidence-free, while copy/edit/restore remain editor-gated.
+contract so an eligible no-workout day on today can be added through the same reviewed backend-owned
+Add seam as future no-workout days. The calendar consumer now exposes Add for today or future
+no-workout days through `iso >= snapshot.currentDate`; today-as-move-target remains separately
+guarded by the move-source resolver. QR/share-import, universal Copy/Paste, recurrence, Restore UI,
+active-plan replacement semantics expansion, generated-row content editing, explicit persisted
+rest-day lifecycle proof, and deeper modal polish remain future-only unless selected by a separate
+architecture contract. On 2026-06-24, Backend repaired the remaining generated/selected row
+lifecycle blocker: metric-target rows now expose move/clear/drag when unlogged and evidence-free,
+while copy/edit/restore remain editor-gated. On 2026-06-25, the business-process/entity audit
+selected the next backend cleanup gate: delete stale active-plan source-capability vocabulary and
+align provenance readback without changing row-state behavior.
 
 On 2026-06-15, the protected-source direct-edit affordance gate was closed in the proved scope:
 backend row-level source capability readback and frontend consumption now prevent
@@ -400,14 +410,13 @@ Status:
 
 Superseded by universal row-state lifecycle semantics after the 2026-06-24 backend cleanup. The
 original manual missed-workout contract remains historical context for why past unlogged rows are
-allowed, but source kind and the old seven-day missed window are no longer the primary row
-editability gate.
+allowed, but source kind and age-window vocabulary are no longer the primary row editability gate.
 
 Root cause:
 
-The visible symptom is that drag/drop move still does not deliver the runner's missed-workout use
-case for future rescheduling. The underlying cause is that the accepted direct manual move contract
-was still implemented and documented as a move-to-today-only exception for recent missed sources.
+The visible symptom was that drag/drop move did not deliver the runner's missed-workout use case for
+future rescheduling. The underlying cause was that the accepted direct manual move contract was
+documented as a special missed-source exception instead of universal row-state truth.
 The canonical owner is backend mutation safety/lifecycle plus the active-plan editability contract,
 not a route-local frontend exception.
 
@@ -461,9 +470,9 @@ Blocked even after this change:
 
 Next gate:
 
-- Frontend: update saved-calendar target affordances so drag/drop and menu move can expose
-  backend-shaped empty, Rest replacement, and review-required occupied replacement targets instead
-  of the old empty-day-only local gate.
+- QA: validate the saved-calendar move target behavior against the simplified backend contract:
+  public target truth is now `rest_day` or `workout_day`, while no-row persistence remains an
+  internal exactness detail.
 
 Backend implementation evidence:
 
@@ -477,11 +486,16 @@ Backend implementation evidence:
   manual draft reconstruction, so eligible unlogged/evidence-free selected/generated and AI
   provenance rows can be reviewed for replacement through the backend move checksum seam.
 - Preserved protected-history safety by rejecting logged/evidence-backed source rows.
-- Replaced the old empty-target-only move contract with backend target modes:
-  `empty`, `rest_replacement`, and `workout_replacement`.
-- Kept direct move for empty/Rest targets only; occupied workout replacement now requires the
+- Replaced the previous target-mode vocabulary with `targetDayKind: "rest_day" | "workout_day"`.
+  Missing target rows and explicit unprotected Rest rows are both public `rest_day`; occupied
+  unprotected workout rows are public `workout_day`.
+- Kept direct move for Rest-day targets only; occupied workout replacement still requires the
   existing backend move review/confirm seam and includes replacement target truth in checksum and
   audit metadata.
+- Renamed new move metadata writes from `target_mode` / `target_day_was_empty` to
+  `target_day_kind` plus the internal exactness field `target_had_no_persisted_workout_row`.
+- Renamed Add and Copy/Paste saved-calendar target success safety from `targetDayWasEmpty` to
+  `targetDayKind: "rest_day"` without changing Add/Copy target eligibility.
 - Extended `scripts/validate-manual-workout-authoring.ts` and manual proof modules with
   deterministic proof for past/today/future unlogged source capabilities, selected/generated row
   direct move/delete, Rest target replacement, occupied-workout replacement review/confirm,
@@ -490,6 +504,13 @@ Backend implementation evidence:
 - Validation run by Backend on 2026-06-14:
   `npm exec eslint -- src/lib/manual-workout-authoring/move-workout.ts src/lib/manual-workout-authoring/index.ts src/lib/training-api.ts scripts/validate-manual-workout-authoring.ts`
   and `node --import tsx ./scripts/validate-manual-workout-authoring.ts`.
+- Validation run by Backend on 2026-06-25 for the Rest/Workout target contract simplification:
+  targeted ESLint for touched manual/calendar/proof files,
+  `node --import tsx ./scripts/validate-manual-workout-authoring.ts`,
+  `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`, `npm run build`, and
+  source `rg` proof that manual saved-calendar code no longer exports `targetDayWasEmpty`,
+  `target_day_was_empty`, `rest_replacement`, `workout_replacement`, or product-facing
+  `empty target` / `empty day` vocabulary.
 - Fix-forward validation on 2026-06-24 added proof that UI-shaped move review/confirm payloads may
   include both `sourceWorkoutId` and `sourceWorkoutDate` when they resolve to the same current row,
   mismatched pairs are rejected as stale source-date truth, and occupied replacement review/confirm

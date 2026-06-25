@@ -18,7 +18,7 @@ import type {
   ManualWorkoutDirectMoveResult,
   ManualWorkoutMoveConfirmResult,
   ManualWorkoutMoveReviewResult,
-  ManualWorkoutMoveTargetMode,
+  ManualWorkoutMoveTargetDayKind,
 } from "@/lib/manual-workout-authoring";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
@@ -34,7 +34,7 @@ export type ManualWorkoutMoveRequest = {
   requestId: string;
   sourceWorkoutDate: string;
   sourceWorkoutId: string;
-  targetMode: ManualWorkoutMoveTargetMode;
+  targetDayKind: ManualWorkoutMoveTargetDayKind;
   targetDate: string;
   title: string;
 };
@@ -78,7 +78,7 @@ export function ManualWorkoutMoveController({
     moveInFlightRef.current = true;
 
     async function runMove(nextRequest: ManualWorkoutMoveRequest) {
-      if (nextRequest.targetMode === "workout_replacement") {
+      if (nextRequest.targetDayKind === "workout_day") {
         try {
           await runReplacementReview(nextRequest);
         } finally {
@@ -324,6 +324,7 @@ function isManualWorkoutDirectMoveResult(value: unknown): value is ManualWorkout
     typeof value.sourceWorkoutDate === "string" &&
     typeof value.targetDate === "string" &&
     typeof value.targetWeekday === "string" &&
+    isManualWorkoutMoveTargetDayKind(value.targetDayKind) &&
     typeof value.title === "string" &&
     typeof value.templateKey === "string" &&
     value.mutationMode === "direct_manual_edit"
@@ -342,6 +343,7 @@ function isManualWorkoutMoveReviewResult(value: unknown): value is ManualWorkout
     typeof value.sourceWorkoutDate === "string" &&
     typeof value.targetDate === "string" &&
     typeof value.targetWeekday === "string" &&
+    isManualWorkoutMoveTargetDayKind(value.targetDayKind) &&
     typeof value.title === "string" &&
     isRecord(value.review)
   );
@@ -359,9 +361,14 @@ function isManualWorkoutMoveConfirmResult(value: unknown): value is ManualWorkou
     typeof value.sourceWorkoutDate === "string" &&
     typeof value.targetDate === "string" &&
     typeof value.targetWeekday === "string" &&
+    isManualWorkoutMoveTargetDayKind(value.targetDayKind) &&
     typeof value.title === "string" &&
     typeof value.templateKey === "string"
   );
+}
+
+function isManualWorkoutMoveTargetDayKind(value: unknown): value is ManualWorkoutMoveTargetDayKind {
+  return value === "rest_day" || value === "workout_day";
 }
 
 function isMoveBlockedResult(

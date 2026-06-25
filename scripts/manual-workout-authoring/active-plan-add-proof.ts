@@ -85,7 +85,7 @@ export async function validateManualActivePlanAddWorkoutContract() {
     assert.equal(success.sourceMetadata.originalPlanSourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
     assert.equal(success.sourceMetadata.reviewChecksum, reviewed.reviewChecksum);
     assert.equal(success.sourceMetadata.metricTruthMode, "structure_only");
-    assert.equal(success.safety.targetDayWasEmpty, true);
+    assert.equal(success.safety.targetDayKind, "rest_day");
     assert.equal(success.safety.trustedClientRows, false);
     assert.equal(success.safety.serverRebuiltReview, true);
   }
@@ -101,7 +101,7 @@ export async function validateManualActivePlanAddWorkoutContract() {
   const todayInput: ManualWorkoutDraftInput = {
     ...input,
     workoutDate: "2026-06-10",
-    notes: "Same-day empty manual workout.",
+    notes: "Same-day manual workout on a Rest day.",
   };
   const todayReview = assertReady("today manual active-plan add review", todayInput);
   const todayActivePlan = buildFakePlanCycle({
@@ -146,7 +146,7 @@ export async function validateManualActivePlanAddWorkoutContract() {
     assert.equal(todaySuccess.calendarRowCount, 2);
     assert.equal(todaySuccess.nonRestWorkoutCount, 2);
     assert.equal(todaySuccess.sourceMetadata.workoutDate, todayInput.workoutDate);
-    assert.equal(todaySuccess.safety.targetDayWasEmpty, true);
+    assert.equal(todaySuccess.safety.targetDayKind, "rest_day");
     assert.equal(todaySuccess.safety.trustedClientRows, false);
     assert.equal(todaySuccess.safety.serverRebuiltReview, true);
   }

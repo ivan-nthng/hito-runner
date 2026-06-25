@@ -138,6 +138,7 @@ export async function validateManualCopyPasteContract() {
     assert.equal(success.targetDate, targetDate);
     assert.equal(success.workoutDate, targetDate);
     assert.equal(success.templateKey, sourceInput.templateKey);
+    assert.equal(success.safety.targetDayKind, "rest_day");
     assert.equal(success.safety.trustedClientRows, false);
     assert.equal(success.safety.serverRebuiltReview, true);
     assert.equal(success.safety.sourceWorkoutVerified, true);
@@ -401,6 +402,7 @@ export async function validateManualCopyPasteContract() {
     assert.equal(directCopy.sourceMetadata.targetWorkoutId, directCopy.targetWorkoutId);
     assert.equal(directCopy.safety.requiresExplicitConfirm, false);
     assert.equal(directCopy.safety.directMutation, true);
+    assert.equal(directCopy.safety.targetDayKind, "rest_day");
     assert.equal(directCopy.safety.trustedClientRows, false);
     assert.equal(directCopy.safety.serverRebuiltReview, true);
   }

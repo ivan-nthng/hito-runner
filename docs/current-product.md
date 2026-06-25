@@ -65,7 +65,7 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - signed-in users with no active plan can also choose `Build my plan myself`: the first reviewed
   manual workout creates a `manual_user_built_plan_v1` active plan through backend review
   token/checksum confirmation, and saved manual calendars can add additional reviewed workouts on
-  eligible today-or-future empty days through the backend Add contract and backend-shaped calendar
+  eligible today-or-future Rest/no-workout dates through the backend Add contract and backend-shaped calendar
   affordance metadata.
   The final Add confirmation repeats the selected date/weekday before mutation, persistence
   readback uses the same date-only truth, and manual Add does not send client rows, segments, or
@@ -73,8 +73,8 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   runners can save reviewed manual workouts as personal templates, reuse those templates from
   `Add activity`, copy/paste manual workout days through direct backend-owned reconstruction, and
   clear eligible manual workout days through backend-shaped Delete/Clear review while the active
-  manual plan remains active. Runners can also move eligible manual workout days to another empty
-  day through direct backend-owned Move Workout mutation; the same persisted row moves, source and
+  manual plan remains active. Runners can also move eligible manual workout days to another
+  Rest/no-workout date through direct backend-owned Move Workout mutation; the same persisted row moves, source and
   target dates refresh from saved truth, and frontend never owns schedule mutation truth.
   JSON/Markdown export for persisted manual active plans is available through the calendar header
   overflow and uses the canonical active-plan export seam with safe export ids. Recurrence, runner-facing
@@ -83,7 +83,7 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   them
 - saved active-plan calendars now use backend-shaped editability/capability metadata for
   Add/Clear/Move instead of treating manual and non-manual plans as separate calendar products:
-  supported active-plan sources can expose eligible today-or-future empty-day Add, row-state
+  supported active-plan sources can expose eligible today-or-future Rest/no-workout Add, row-state
   Clear, and direct Move actions while preserving the original active-plan `source_kind` and adding
   `active_plan_user_edit_v1` audit metadata; backend protection can still block specific rows,
   past move targets, logged/evidence-backed workouts, occupied targets, stale reviews, rest rows,
@@ -287,7 +287,7 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - the advanced import modal now follows the same stable bounded modal behavior as other product
   dialogs, while keeping its own smaller width and import-specific content
 - that downloadable template now includes one reserved `_ml_agent_template` instruction block plus rich workout field examples so ML-generated files can target the canonical `training-plan-v2` contract more explicitly without turning template-only guidance into runtime truth or inventing fake pace/HR targets
-- rest days now stay intentionally sparse: no workout metrics, no empty targets or note sections, and no fake completion affordance from home
+- rest days now stay intentionally sparse: no workout metrics, no placeholder targets or note sections, and no fake completion affordance from home
 - auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress summary metrics, legends, and bar chrome, body severity micro-UI, preserved integration utility rows, public changelog editorial timeline chrome, launcher/auth/admin atmospheric shells, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share Hito component primitives for canonical typography roles, low-card surfaces, open/divider grouping, tiered controls, helper/error text, grouped rows, metric rows, compact legends, compact tooltips, compact chart notes, comparison-bar fills, editorial date rails, highlight tags, timeline entries, bounded canvas/photo/launch/state/editorial overlay recipes, Hito-native dialog/sheet/menu/select/progress/card/sidebar wrapper defaults, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, disclosure, labels, captions, tabs, and dividers, keeping structured first-plan onboarding primary and advanced JSON import secondary
 - the first typography canonicalization pass is implemented for the highest-drift runner-facing surfaces: saved-mode plan-management/import, workout `Log result`/`Feedback`, and `User settings` now use shared modal title, panel title, body/body-small, form-label, feedback, and technical-mono roles instead of local heading and helper/body recipes where practical
 - the icon canonicalization pass is implemented on top of the Tabler-backed Hito `Icon` primitive: product surfaces consume stable Hito icon names through the shared registry, `/hitoDS` documents approved icon names, categories, and sizes, and raw SVG icon folders are not part of the product design-system source

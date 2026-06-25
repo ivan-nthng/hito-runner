@@ -111,7 +111,7 @@ export type ManualWorkoutMoveFailureReason =
   | "unsafe_target_state"
   | "persistence_failed";
 
-export type ManualWorkoutMoveTargetMode = "empty" | "rest_replacement" | "workout_replacement";
+export type ManualWorkoutMoveTargetDayKind = "rest_day" | "workout_day";
 
 export type ManualWorkoutMoveDependencies = Pick<
   ManualWorkoutActivePlanAddDependencies,
@@ -136,8 +136,7 @@ type ManualWorkoutMoveReview = {
   sourceWorkoutDate: string;
   targetDate: string;
   targetWeekday: string;
-  targetMode: ManualWorkoutMoveTargetMode;
-  targetDayWasEmpty: boolean;
+  targetDayKind: ManualWorkoutMoveTargetDayKind;
   targetReplacement: ManualWorkoutMoveReplacementTarget | null;
   title: string;
   templateKey: string;
@@ -171,7 +170,7 @@ export type ManualWorkoutMoveReviewResult =
       sourceWorkoutDate: string;
       targetDate: string;
       targetWeekday: string;
-      targetMode: ManualWorkoutMoveTargetMode;
+      targetDayKind: ManualWorkoutMoveTargetDayKind;
       targetReplacement: ManualWorkoutMoveReplacementTarget | null;
       title: string;
       templateKey: string;
@@ -183,9 +182,7 @@ export type ManualWorkoutMoveReviewResult =
         sourceWorkoutVerified: true;
         activePlanSourceVerified: true;
         protectedHistoryChecked: true;
-        targetDayWasEmpty: boolean;
-        targetRestRowReplaced: boolean;
-        targetWorkoutReplaced: boolean;
+        targetDayKind: ManualWorkoutMoveTargetDayKind;
         targetWeekdayDerivedServerSide: true;
         lastWorkoutMoveAllowedWithinSamePlan: true;
         trustedClientRows: false;
@@ -207,7 +204,7 @@ export type ManualWorkoutMoveConfirmResult =
       sourceWorkoutDate: string;
       targetDate: string;
       targetWeekday: string;
-      targetMode: ManualWorkoutMoveTargetMode;
+      targetDayKind: ManualWorkoutMoveTargetDayKind;
       targetReplacement: ManualWorkoutMoveReplacementTarget | null;
       title: string;
       templateKey: string;
@@ -222,9 +219,7 @@ export type ManualWorkoutMoveConfirmResult =
         protectedHistoryChecked: true;
         movedExactlyOneRow: true;
         sourceDateBecameEmpty: true;
-        targetDayWasEmpty: boolean;
-        targetRestRowReplaced: boolean;
-        targetWorkoutReplaced: boolean;
+        targetDayKind: ManualWorkoutMoveTargetDayKind;
         targetWeekdayDerivedServerSide: true;
         activePlanRemainsActive: true;
         lastWorkoutMoveAllowedWithinSamePlan: true;
@@ -248,7 +243,7 @@ export type ManualWorkoutDirectMoveResult =
       sourceWorkoutDate: string;
       targetDate: string;
       targetWeekday: string;
-      targetMode: ManualWorkoutMoveTargetMode;
+      targetDayKind: ManualWorkoutMoveTargetDayKind;
       targetReplacement: ManualWorkoutMoveReplacementTarget | null;
       title: string;
       templateKey: string;
@@ -265,9 +260,7 @@ export type ManualWorkoutDirectMoveResult =
         protectedHistoryChecked: true;
         movedExactlyOneRow: true;
         sourceDateBecameEmpty: true;
-        targetDayWasEmpty: boolean;
-        targetRestRowReplaced: boolean;
-        targetWorkoutReplaced: boolean;
+        targetDayKind: ManualWorkoutMoveTargetDayKind;
         targetWeekdayDerivedServerSide: true;
         activePlanRemainsActive: true;
         lastWorkoutMoveAllowedWithinSamePlan: true;
@@ -291,7 +284,7 @@ type ManualWorkoutMoveTarget =
       targetReview?: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
       review: ManualWorkoutMoveReview;
       targetWeekNumber: number;
-      targetMode: ManualWorkoutMoveTargetMode;
+      targetDayKind: ManualWorkoutMoveTargetDayKind;
       targetReplacementWorkout: PersistedPlannedWorkoutRow | null;
     }
   | {
@@ -381,7 +374,7 @@ export async function reviewManualWorkoutMoveForUser(
   }
 
   if (
-    target.review.targetMode !== "workout_replacement" &&
+    target.review.targetDayKind !== "workout_day" &&
     (!target.draftInput || !target.targetReview)
   ) {
     return buildMoveBlocked({
@@ -401,7 +394,7 @@ export async function reviewManualWorkoutMoveForUser(
     sourceWorkoutDate: target.sourceWorkout.workout_date,
     targetDate: target.review.targetDate,
     targetWeekday: target.review.targetWeekday,
-    targetMode: target.review.targetMode,
+    targetDayKind: target.review.targetDayKind,
     targetReplacement: target.review.targetReplacement,
     title: target.sourceWorkout.title,
     templateKey: target.review.templateKey,
@@ -413,9 +406,7 @@ export async function reviewManualWorkoutMoveForUser(
       sourceWorkoutVerified: true,
       activePlanSourceVerified: true,
       protectedHistoryChecked: true,
-      targetDayWasEmpty: target.review.targetDayWasEmpty,
-      targetRestRowReplaced: target.review.targetMode === "rest_replacement",
-      targetWorkoutReplaced: target.review.targetMode === "workout_replacement",
+      targetDayKind: target.review.targetDayKind,
       targetWeekdayDerivedServerSide: true,
       lastWorkoutMoveAllowedWithinSamePlan: true,
       trustedClientRows: false,
@@ -445,7 +436,7 @@ export async function confirmManualWorkoutMoveForUser(
   }
 
   if (
-    target.review.targetMode !== "workout_replacement" &&
+    target.review.targetDayKind !== "workout_day" &&
     (!target.draftInput || !target.targetReview)
   ) {
     return buildMoveBlocked({
@@ -500,7 +491,7 @@ export async function confirmManualWorkoutMoveForUser(
       sourceWorkoutDate: target.sourceWorkout.workout_date,
       targetDate: target.review.targetDate,
       targetWeekday: target.review.targetWeekday,
-      targetMode: target.review.targetMode,
+      targetDayKind: target.review.targetDayKind,
       targetReplacement: target.review.targetReplacement,
       title: target.sourceWorkout.title,
       templateKey: target.review.templateKey,
@@ -516,9 +507,7 @@ export async function confirmManualWorkoutMoveForUser(
         protectedHistoryChecked: true,
         movedExactlyOneRow: true,
         sourceDateBecameEmpty: true,
-        targetDayWasEmpty: target.review.targetDayWasEmpty,
-        targetRestRowReplaced: target.review.targetMode === "rest_replacement",
-        targetWorkoutReplaced: target.review.targetMode === "workout_replacement",
+        targetDayKind: target.review.targetDayKind,
         targetWeekdayDerivedServerSide: true,
         activePlanRemainsActive: true,
         lastWorkoutMoveAllowedWithinSamePlan: true,
@@ -560,7 +549,7 @@ export async function moveManualWorkoutWithinActivePlanForUser(
     return buildMoveBlocked(target);
   }
 
-  if (target.review.targetMode === "workout_replacement") {
+  if (target.review.targetDayKind === "workout_day") {
     return buildMoveBlocked({
       reason: "replacement_requires_review",
       message: "This target day already has a workout. Review and confirm before replacing it.",
@@ -573,7 +562,7 @@ export async function moveManualWorkoutWithinActivePlanForUser(
     sourceWorkoutDate: target.sourceWorkout.workout_date,
     targetDate: target.review.targetDate,
     targetWeekday: target.review.targetWeekday,
-    targetMode: target.review.targetMode,
+    targetDayKind: target.review.targetDayKind,
     targetReplacement: target.review.targetReplacement,
     templateKey: target.review.templateKey,
     reviewChecksum: target.review.reviewChecksum,
@@ -616,7 +605,7 @@ export async function moveManualWorkoutWithinActivePlanForUser(
       sourceWorkoutDate: target.sourceWorkout.workout_date,
       targetDate: directReview.targetDate,
       targetWeekday: directReview.targetWeekday,
-      targetMode: directReview.targetMode,
+      targetDayKind: directReview.targetDayKind,
       targetReplacement: directReview.targetReplacement,
       title: target.sourceWorkout.title,
       templateKey: directReview.templateKey,
@@ -634,9 +623,7 @@ export async function moveManualWorkoutWithinActivePlanForUser(
         protectedHistoryChecked: true,
         movedExactlyOneRow: true,
         sourceDateBecameEmpty: true,
-        targetDayWasEmpty: directReview.targetDayWasEmpty,
-        targetRestRowReplaced: directReview.targetMode === "rest_replacement",
-        targetWorkoutReplaced: directReview.targetMode === "workout_replacement",
+        targetDayKind: directReview.targetDayKind,
         targetWeekdayDerivedServerSide: true,
         activePlanRemainsActive: true,
         lastWorkoutMoveAllowedWithinSamePlan: true,
@@ -870,7 +857,7 @@ async function resolveManualWorkoutMoveTarget(
   const targetDateWorkouts = planContext.existingWorkouts.workouts.filter(
     (workout) => workout.workout_date === input.targetDate && workout.id !== source.workout.id,
   );
-  const targetResolution = await resolveMoveTargetMode({
+  const targetResolution = await resolveMoveTargetDay({
     currentDate,
     fetchEvidence,
     logsByWorkoutId: planContext.existingWorkouts.logsByWorkoutId,
@@ -883,8 +870,7 @@ async function resolveManualWorkoutMoveTarget(
   }
 
   const requiresManualDraftReview =
-    options.requiresManualDraftReview !== false &&
-    targetResolution.targetMode !== "workout_replacement";
+    options.requiresManualDraftReview !== false && targetResolution.targetDayKind !== "workout_day";
 
   if (requiresManualDraftReview && persistedManualWorkoutHasUnsafeMetricTruth(source.workout)) {
     return {
@@ -940,7 +926,7 @@ async function resolveManualWorkoutMoveTarget(
     targetDate: input.targetDate,
     targetWeekday: weekdayLong(input.targetDate),
     targetWeekNumber,
-    targetMode: targetResolution.targetMode,
+    targetDayKind: targetResolution.targetDayKind,
     targetReplacementWorkout: targetResolution.targetReplacementWorkout,
     templateKey: targetReview?.draft.templateKey ?? resolveWorkoutSourceTemplateKey(source.workout),
     draftInput,
@@ -956,12 +942,12 @@ async function resolveManualWorkoutMoveTarget(
     targetReview,
     review,
     targetWeekNumber,
-    targetMode: targetResolution.targetMode,
+    targetDayKind: targetResolution.targetDayKind,
     targetReplacementWorkout: targetResolution.targetReplacementWorkout,
   };
 }
 
-async function resolveMoveTargetMode(input: {
+async function resolveMoveTargetDay(input: {
   userId: string;
   currentDate: string;
   targetDateWorkouts: readonly PersistedPlannedWorkoutRow[];
@@ -970,14 +956,14 @@ async function resolveMoveTargetMode(input: {
 }):
   | {
       ok: true;
-      targetMode: ManualWorkoutMoveTargetMode;
+      targetDayKind: ManualWorkoutMoveTargetDayKind;
       targetReplacementWorkout: PersistedPlannedWorkoutRow | null;
     }
   | { ok: false; reason: ManualWorkoutMoveFailureReason; message: string } {
   if (input.targetDateWorkouts.length === 0) {
     return {
       ok: true,
-      targetMode: "empty",
+      targetDayKind: "rest_day",
       targetReplacementWorkout: null,
     };
   }
@@ -1023,7 +1009,7 @@ async function resolveMoveTargetMode(input: {
 
   return {
     ok: true,
-    targetMode: targetWorkout.workout_type === "rest" ? "rest_replacement" : "workout_replacement",
+    targetDayKind: targetWorkout.workout_type === "rest" ? "rest_day" : "workout_day",
     targetReplacementWorkout: targetWorkout,
   };
 }
@@ -1112,7 +1098,7 @@ function buildMoveReview(input: {
   targetDate: string;
   targetWeekday: string;
   targetWeekNumber: number;
-  targetMode: ManualWorkoutMoveTargetMode;
+  targetDayKind: ManualWorkoutMoveTargetDayKind;
   targetReplacementWorkout: PersistedPlannedWorkoutRow | null;
   templateKey: string;
   draftInput?: ManualWorkoutDraftInput;
@@ -1126,8 +1112,7 @@ function buildMoveReview(input: {
     sourceWorkoutDate: input.sourceWorkout.workout_date,
     targetDate: input.targetDate,
     targetWeekday: input.targetWeekday,
-    targetMode: input.targetMode,
-    targetDayWasEmpty: input.targetMode === "empty",
+    targetDayKind: input.targetDayKind,
     targetReplacement: input.targetReplacementWorkout
       ? buildMoveReplacementTarget(input.targetReplacementWorkout)
       : null,
@@ -1146,7 +1131,7 @@ function buildMoveExactnessPayload(input: {
   targetDate: string;
   targetWeekday: string;
   targetWeekNumber: number;
-  targetMode: ManualWorkoutMoveTargetMode;
+  targetDayKind: ManualWorkoutMoveTargetDayKind;
   targetReplacementWorkout: PersistedPlannedWorkoutRow | null;
   templateKey: string;
   draftInput?: ManualWorkoutDraftInput;
@@ -1162,8 +1147,8 @@ function buildMoveExactnessPayload(input: {
     targetDate: input.targetDate,
     targetWeekday: input.targetWeekday,
     targetWeekNumber: input.targetWeekNumber,
-    targetMode: input.targetMode,
-    targetDayWasEmpty: input.targetMode === "empty",
+    targetDayKind: input.targetDayKind,
+    targetHadNoPersistedWorkoutRow: input.targetReplacementWorkout === null,
     targetReplacement: input.targetReplacementWorkout
       ? {
           ...buildMoveReplacementTarget(input.targetReplacementWorkout),
@@ -1278,8 +1263,8 @@ function buildManualWorkoutMoveGoalMetadata(input: {
         source_workout_date: input.review.sourceWorkoutDate,
         target_date: input.review.targetDate,
         target_weekday: input.review.targetWeekday,
-        target_mode: input.review.targetMode,
-        target_day_was_empty: input.review.targetDayWasEmpty,
+        target_day_kind: input.review.targetDayKind,
+        target_had_no_persisted_workout_row: input.review.targetReplacement === null,
         target_replacement: input.review.targetReplacement,
         title: input.review.title,
         template_key: input.review.templateKey,
@@ -1329,8 +1314,8 @@ function buildManualWorkoutMovePlanPreferences(input: {
     source_workout_date: input.review.sourceWorkoutDate,
     target_date: input.review.targetDate,
     target_weekday: input.review.targetWeekday,
-    target_mode: input.review.targetMode,
-    target_day_was_empty: input.review.targetDayWasEmpty,
+    target_day_kind: input.review.targetDayKind,
+    target_had_no_persisted_workout_row: input.review.targetReplacement === null,
     target_replacement: input.review.targetReplacement,
     title: input.review.title,
     template_key: input.review.templateKey,
@@ -1375,7 +1360,7 @@ function buildDirectMoveMutationChecksum(input: {
   sourceWorkoutDate: string;
   targetDate: string;
   targetWeekday: string;
-  targetMode: ManualWorkoutMoveTargetMode;
+  targetDayKind: ManualWorkoutMoveTargetDayKind;
   targetReplacement: ManualWorkoutMoveReplacementTarget | null;
   templateKey: string;
   reviewChecksum: string;
@@ -1389,7 +1374,7 @@ function buildDirectMoveMutationChecksum(input: {
     sourceWorkoutDate: input.sourceWorkoutDate,
     targetDate: input.targetDate,
     targetWeekday: input.targetWeekday,
-    targetMode: input.targetMode,
+    targetDayKind: input.targetDayKind,
     targetReplacement: input.targetReplacement,
     templateKey: input.templateKey,
     reviewChecksum: input.reviewChecksum,

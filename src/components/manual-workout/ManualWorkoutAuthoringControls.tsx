@@ -48,7 +48,7 @@ import type {
   ManualWorkoutSavedTemplateView,
   ManualWorkoutTemplateKey,
   ManualWorkoutTargetTruthMode,
-  ManualWorkoutMoveTargetMode,
+  ManualWorkoutMoveTargetDayKind,
 } from "@/lib/manual-workout-authoring";
 import { type ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import {
@@ -144,7 +144,7 @@ export function ManualWorkoutAddMenu({
   onAdded,
   onMoveCanceled,
   onMoveTargetSelected,
-  moveTargetMode = "empty",
+  moveTargetDayKind = "rest_day",
   moveWorkoutSource = null,
   moveOnly = false,
 }: {
@@ -157,7 +157,7 @@ export function ManualWorkoutAddMenu({
   onAdded: () => void | Promise<void>;
   onMoveCanceled?: () => void;
   onMoveTargetSelected?: (targetDate: string, source?: ManualCopiedWorkoutSource | null) => void;
-  moveTargetMode?: ManualWorkoutMoveTargetMode;
+  moveTargetDayKind?: ManualWorkoutMoveTargetDayKind;
   moveWorkoutSource?: ManualCopiedWorkoutSource | null;
   moveOnly?: boolean;
 }) {
@@ -649,7 +649,7 @@ export function ManualWorkoutAddMenu({
                 <span className="min-w-0">
                   <span className="hito-list-row-title block">Move selected workout here</span>
                   <span className="hito-list-row-copy block">
-                    {moveTargetMenuCopy(moveTargetMode)}
+                    {moveTargetMenuCopy(moveTargetDayKind)}
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -680,7 +680,7 @@ export function ManualWorkoutAddMenu({
                 <span className="min-w-0">
                   <span className="hito-list-row-title block">Paste copied workout</span>
                   <span className="hito-list-row-copy block">
-                    Save the copied workout into this empty day.
+                    Save the copied workout into this Rest day.
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -1680,16 +1680,12 @@ function buildPasteUnavailableResult(): ManualWorkoutDirectCopyResult {
   };
 }
 
-function moveTargetMenuCopy(mode: ManualWorkoutMoveTargetMode) {
-  if (mode === "workout_replacement") {
+function moveTargetMenuCopy(dayKind: ManualWorkoutMoveTargetDayKind) {
+  if (dayKind === "workout_day") {
     return "Review before replacing the planned workout on this day.";
   }
 
-  if (mode === "rest_replacement") {
-    return "Use this rest day as the target.";
-  }
-
-  return "Use this empty day as the target.";
+  return "Use this Rest day as the target.";
 }
 
 function isManualWorkoutDirectCopyResult(value: unknown): value is ManualWorkoutDirectCopyResult {

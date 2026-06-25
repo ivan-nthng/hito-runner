@@ -181,7 +181,7 @@ async function assertFirstAddWorksOnEmptyManualPlan(input: {
     assert.equal(result.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
     assert.equal(result.calendarRowCount, 1);
     assert.equal(result.nonRestWorkoutCount, 1);
-    assert.equal(result.safety.targetDayWasEmpty, true);
+    assert.equal(result.safety.targetDayKind, "rest_day");
     assert.equal(result.safety.trustedClientRows, false);
     assert.equal(result.safety.serverRebuiltReview, true);
   }

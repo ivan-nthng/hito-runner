@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-06-24T17:16:12.079Z
+Generated: 2026-06-25T04:24:06.520Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -108,15 +108,15 @@ Benchmark-Backed Pace Truth Closeout — 2026-06-17: Accepted / backend seam, fr
 <code>in_progress</code>
 
 #### Task
-Remove stale plan-management and manual-first-create dead branches after the business-flow audit.
+Remove stale frontend sourceEditing compatibility branch after backend metadata cleanup.
 
 <sub><code>STAGE</code></sub>
 
-<code>FRONTEND cleanup / one-calendar entrypoint and manual residue consolidation.</code>
+<code>FRONTEND behavior-preserving consumer cleanup / active-plan capability vocabulary simplification.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Current Status Detail
+Queued High-Priority Gate After Calendar Stabilization: Current calendar stabilization remains first; taxonomy reconciliation is queued only after that
 
 <sub><code>NEXT ROLE</code></sub>
 

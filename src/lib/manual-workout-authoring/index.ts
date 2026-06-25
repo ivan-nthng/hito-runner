@@ -53,7 +53,7 @@ export {
   type ManualWorkoutMoveFailureReason,
   type ManualWorkoutMoveReplacementTarget,
   type ManualWorkoutMoveReviewResult,
-  type ManualWorkoutMoveTargetMode,
+  type ManualWorkoutMoveTargetDayKind,
 } from "@/lib/manual-workout-authoring/move-workout";
 export {
   confirmManualWorkoutPersistedEdit,

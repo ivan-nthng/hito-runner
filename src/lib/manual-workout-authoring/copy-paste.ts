@@ -174,7 +174,7 @@ export type ManualWorkoutDirectCopyResult =
         sourceWorkoutVerified: true;
         reconstructedFromPersistedWorkout: true;
         reviewedThroughManualAuthoring: true;
-        targetDayWasEmpty: true;
+        targetDayKind: "rest_day";
         targetDateDerivedServerSide: true;
         trustedClientRows: false;
         serverRebuiltReview: true;
@@ -469,7 +469,7 @@ export async function copyManualWorkoutWithinActivePlanForUser(
       sourceWorkoutVerified: true,
       reconstructedFromPersistedWorkout: true,
       reviewedThroughManualAuthoring: true,
-      targetDayWasEmpty: true,
+      targetDayKind: "rest_day",
       targetDateDerivedServerSide: true,
       trustedClientRows: false,
       serverRebuiltReview: true,

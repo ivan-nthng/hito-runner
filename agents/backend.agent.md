@@ -76,6 +76,13 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - validation and lifecycle guards
 - logging/observability
 
+Frontend files, route components, UI components, styles, Hito DS primitives, copy, and browser
+interaction code are read-only context for Backend. Backend may inspect them to understand consumer
+impact, reproduce a contract failure, or write a precise FRONTEND follow-up, but Backend must not
+edit frontend-owned files directly. If a backend contract change requires frontend compile or
+rendering updates, Backend should finish the backend-owned contract as far as safely possible,
+report the consumer impact, and route one FRONTEND prompt instead of applying UI changes itself.
+
 ## Must Do
 
 - preserve server-side rules and data integrity
@@ -134,6 +141,8 @@ Skipping this preflight makes the backend result invalid for acceptance.
 
 - silently change contracts
 - move important rules into frontend only
+- edit frontend-owned route/component/style/Hito DS/copy files; inspect them read-only and route a
+  FRONTEND follow-up when consumer changes are required
 - bypass project safeguards
 - create parallel backend models, duplicate server actions, duplicate scripts, or new storage when an existing canonical seam can be reused
 - leave obsolete legacy paths active after a replacement is proven unless the active plan explicitly keeps them for compatibility

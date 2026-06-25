@@ -178,6 +178,10 @@ Blockers:
 - Do not let BACKEND or FRONTEND prompts ask for symptom patches only. They must direct the agent to
   find the canonical owner, reuse existing Hito seams, and fix the underlying cause when the slice can
   safely cover it.
+- Do not ask BACKEND prompts to edit frontend-owned route/component/style/Hito DS/copy files, even
+  for "small compile-impact" updates. BACKEND may inspect frontend consumers read-only, then route a
+  FRONTEND follow-up if consumer changes are required. Conversely, do not ask FRONTEND prompts to
+  change backend contracts, persistence, schema, or server-side lifecycle truth.
 - For non-trivial prompts to agents that code, QA, audit, research, design, or route work, include
   subagent expectations when useful: the next agent should use or reuse subagents for safe
   independent read-only audits, tests, source scans, and non-mutating validation; close completed

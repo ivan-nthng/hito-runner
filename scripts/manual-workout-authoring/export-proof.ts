@@ -159,6 +159,33 @@ export function validateManualActivePlanExportContract() {
     exportedWorkouts,
     "manual Markdown export",
   );
+
+  const selectedPlanWithNestedSourceStatus = {
+    ...buildFakePlanCycle({
+      userId,
+      id: "99999999-9999-4999-8999-000000000606",
+      sourceKind: "running_plan_engine_10k_builder_v1",
+      startDate: "2026-06-18",
+      endDate: "2026-06-22",
+    }),
+    goal_metadata: {
+      selected_plan_engine: {
+        source_kind: "running_plan_engine_10k_builder_v1",
+        source_status: "preview_ready",
+      },
+    },
+  } satisfies PersistedPlanCycleRow;
+  const selectedPayload = buildActivePlanExportPayload({
+    planCycle: selectedPlanWithNestedSourceStatus,
+    workouts: exportedWorkouts,
+    exportedAt: "2026-06-12T12:00:00.000Z",
+  });
+
+  assert.equal(
+    selectedPayload.plan.sourceStatus,
+    "preview_ready",
+    "active-plan export source_status should use the shared active-plan source-status resolver",
+  );
 }
 
 function assertReady(

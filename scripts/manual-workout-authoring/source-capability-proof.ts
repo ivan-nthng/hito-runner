@@ -193,10 +193,10 @@ export function validateManualSourceEditingCapabilityReadback() {
     "rest rows should not expose direct workout source affordances",
   );
 
-  const missedReview = assertReady("source editing missed recent source", {
+  const missedReview = assertReady("source editing past unlogged source", {
     templateKey: "easy_aerobic_run",
     workoutDate: "2026-06-09",
-    title: "Recent missed unlogged source",
+    title: "Past unlogged source",
   });
   const missedWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
     userId,
@@ -234,13 +234,13 @@ export function validateManualSourceEditingCapabilityReadback() {
       eligibility: "eligible_past_unlogged",
       reason: null,
     },
-    "past missed unlogged rows should expose move/clear/drag source capability for valid empty targets",
+    "past missed unlogged rows should expose move/clear/drag source capability for valid Rest-day targets",
   );
 
-  const oldMissedReview = assertReady("source editing expired missed source", {
+  const oldMissedReview = assertReady("source editing older past unlogged source", {
     templateKey: "easy_aerobic_run",
     workoutDate: "2026-06-02",
-    title: "Expired missed source",
+    title: "Older past unlogged source",
   });
   const oldMissedWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({
     userId,

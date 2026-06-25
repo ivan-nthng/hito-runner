@@ -1,7 +1,7 @@
 # Current Functional Map
 
 Status: canonical freeze-readiness map
-Last Updated: 2026-06-24
+Last Updated: 2026-06-25
 Owner: ARCHITECT
 
 ## Purpose
@@ -101,25 +101,60 @@ Reality-check findings from the supplied FIT files:
 
 Cleanup candidate matrix:
 
-- Selected next gate — Frontend plan/manual entrypoint dead-branch consolidation:
-  `PlanManagementDialog` full-mode is unreachable from `AppShell`; its full-only text/import/refresh
-  panels preserve old plan-hub semantics beside the accepted `Add plan` + overflow model. The old
-  `ManualUserBuiltPlanPanel` also appears orphaned now that onboarding creates an empty manual
-  calendar. This is one frontend owner, one dead-branch risk class, and one validation story.
-- Backend lifecycle cleanup candidate:
-  centralize repeated evidence/protected-workout lookup and remove stale source-capability
-  vocabulary such as `eligible_missed_unlogged_recent` after source proof. Keep for a later backend
-  slice because it touches evidence read-model plumbing rather than visible entrypoint drift.
-- Backend template quality candidate:
-  the manual template registry is not empty and already has warmup/body/repeat/recovery/cooldown
-  anatomy; the main known gap is run/walk identity mapping. Keep for a later backend/running-coach
-  parity pass, not the first business-flow cleanup.
-- FIT/evidence candidate:
-  parser normalization may eventually recover more lap-derived detail for laps with null summary
-  fields, but no product behavior should be invented from two files alone.
-- Docs-only cleanup candidate:
-  historical `Open plan` mentions may remain when explicitly historical, but current docs should
-  continue teaching only `Add plan` plus overflow utilities.
+- Superseded source-proof note:
+  the earlier `PlanManagementDialog` full-mode and old panel-owner finding is stale in current
+  source. `PlanManagementDialog` now accepts only `edit-schedule` and `clear-upcoming`; JSON import
+  is owned by `UploadJsonDialog`; export is owned by `AppShell` plus `plan-export-download`; and the
+  old `ManualUserBuiltPlanPanel`, `PlanImportPanel`, `PlanExportMenu`, `PlanRefreshPanel`, and
+  `PlanTextReplacementPanel` files are not current runtime owners.
+- Completed backend gate — active-plan capability metadata vocabulary cleanup:
+  backend source-capability readback now uses only current/future/past unlogged eligibility or
+  blocked, and active-plan export `source_status` reuses the shared provenance resolver. `Calendar.tsx`
+  still has one stale compatibility branch to remove as a frontend consumer cleanup.
+- Frontend/Hito DS cleanup candidate:
+  runner-facing and `/hitoDS` calendar wording still leak `empty` as a visible day state. Product
+  `Calendar.tsx` already mostly maps missing workout rows to Rest/no-workout presentation, so this
+  should follow after backend metadata vocabulary cleanup as a rendering/DS specimen cleanup, not a
+  backend mutation contract change.
+- Backend provenance alignment:
+  export source-status readback now shares the active-plan editability provenance resolver, so manual,
+  selected-plan, preset, refresh, and AI source-status metadata use one backend owner.
+- Keep/defer candidates:
+  manual template richness, FIT lap-detail normalization, and text/voice plan authoring are not
+  deletion-safe in this pass; each needs its own owner because they touch training quality, evidence
+  interpretation, or OpenAI behavior.
+
+## Business Process And Entity Cleanup Map — 2026-06-25
+
+Root-cause decision:
+
+The current runtime should keep one canonical calendar pipeline:
+`profile/input -> reviewed plan or workout draft -> plan_cycles/planned_workouts -> row-state
+capabilities -> explicit risky mutation review -> workout_logs/provider evidence/readback`. Source
+kind and source status are provenance/audit metadata, not separate runner-facing products.
+
+| Process area | Current entrypoints | Canonical entities / metadata | Classification | Cleanup read |
+| --- | --- | --- | --- | --- |
+| First plan creation | Manual setup, structured Quick setup, selected-distance preset review, advanced JSON import | `runner_profiles`, `plan_cycles`, `planned_workouts`, review tokens/checksums, `source_kind`/`source_status` | Keep: user-facing and safety/audit | Multiple entrypoints are product choices, but persistence converges; no schema cleanup selected. |
+| Active `Add plan` / replacement | Calendar `Add plan`, selected generated/preset transition, advanced import fallback | old/new `plan_cycles`, archive/supersession metadata, transition checksum/revision | Keep: safety/audit/recovery | No silent replace or clear-then-create shortcut; preserve history. |
+| Calendar Add/Clear/Move/Edit | Calendar row menus, drag/drop, workout detail edit | `planned_workouts`, `sourceEditing`/`workoutEditing`, `active_plan_user_edit_v1`, `targetDayKind` | Keep with cleanup: backend vocabulary aligned; frontend consumer cleanup remains | Backend source-capability vocabulary cleanup is complete; one `Calendar.tsx` compatibility branch remains. |
+| Manual authoring/templates/copy | Manual constructor, saved templates, copy/paste, persisted future edit | `runner_manual_workout_templates`, reviewed draft metadata, manual reconstruction metadata | Keep: user-facing/recovery | Do not raw-clone rows; template and copy metadata remain useful. |
+| Workout detail/completion/FIT | Log result, Garmin/FIT/ZIP upload, comparison, AI insight | `workout_logs`, `workout_result_assets`, `workout_actual_metrics`, `workout_comparisons`, `workout_ai_insights` | Keep: evidence/audit/readback | FIT upload is actual evidence, not plan creation or planned-workout truth. |
+| Generated plan engine / refresh | Structured authoring, selected plans, active-plan refresh proposal/apply | rich workout fields, `plan_preferences`, blueprint/refresh review metadata, source status | Keep with later review | Debug/proof metadata may be pruned only after validators and QA no longer consume it. |
+| Admin/backlog import | Admin capture and repo-derived work items | `admin_capture_items`, markdown source path/type/status metadata | Keep: internal ops/source mirror | Not runner product truth; cleanup only through importer-safe Admin slices. |
+
+| Entity / metadata group | Classification | Reason | Selected action |
+| --- | --- | --- | --- |
+| `source_kind`, `source_status`, `source_workout_id`, archive/supersession metadata | Keep: safety/audit/recovery | Needed for provenance, export/readback, protected history, and rollback reasoning. | Preserve. |
+| review tokens/checksums, mutation checksums, `active_plan_user_edit_v1` | Keep: safety/audit/recovery | Proves explicit review/confirm, same-row move, no trusted-client-row mutation, and stale-token safety. | Preserve. |
+| `targetDayKind: rest_day/workout_day` | Keep: product/view-model contract | Collapses no-row and explicit Rest targets into one public Rest-day target while preserving replacement review. | Preserve as canonical. |
+| `target_had_no_persisted_workout_row` | Keep: internal exactness | Useful to distinguish missing persisted row from explicit Rest row without exposing a runner-facing Empty state. | Keep internal only. |
+| Old missed-window source-capability vocabulary | Deleted/collapsed in backend | Current resolver uses current/future/past unlogged eligibility or blocked. | FRONTEND cleanup remains for one compatibility predicate. |
+| Export source-status resolver duplication | Collapsed in backend | Export readback now reuses active-plan provenance resolver coverage. | Preserve shared resolver. |
+| `/hitoDS` and shared calendar `empty` base state | Collapse candidate | Current product truth is Rest or Workout; `empty` is a rendering/specimen leak. | Later FRONTEND/Hito DS cleanup after backend metadata gate. |
+| Runner-facing internal proof metadata in review modals | Collapse candidate | Useful for QA/debug but noisy for runners. | Later FRONTEND cleanup; keep safety hidden or dev-only. |
+| `completeTextOnboarding` / voice-to-plan backend seam | Unknown/manual review | No visible caller, but may call OpenAI and is documented as compatibility/non-default truth. | Do not delete without separate Product/Backend decision. |
+| `training-api.ts` wrappers | Keep: compatibility | Route-facing server-function facade still has current wrappers. | Narrow only with fresh import map. |
 
 ## Freeze Sequencing Decision
 
@@ -246,8 +281,7 @@ Reason:
 - Slice G5A removed the legacy MJS text-authoring ops fallback after final import/reference proof
   found no live owner.
 - Slice G5B deleted the orphaned onboarding `JsonImportPanel` after final source/import proof found
-  no live source import; current advanced JSON import remains owned by `PlanImportPanel` inside
-  `PlanManagementDialog`.
+  no live source import; current advanced JSON import is owned by `UploadJsonDialog`.
 - Post-G5B reassessment was resolved through Slices G4D and G4E: proved type-only
   `training-api.ts` compatibility exports were removed while runtime server-function wrappers stay in
   the facade.
@@ -335,7 +369,7 @@ Reason:
   confirmed current Plan Preset truth is card discovery only and selected-plan preview/create owns
   plan creation.
 - G18 is complete: tracked orphan `JsonImportPanel` residue was deleted, and current JSON import
-  behavior remains owned by `PlanImportPanel`, `PlanManagementDialog`, and `UploadJsonDialog`.
+  behavior is now owned by `UploadJsonDialog`.
 - Post-G18 reassessment selected FRONTEND G19 for tracked orphan `DictateToPlanPanel` UI residue.
   Fresh source proof found no live source/package/script caller outside the file itself, while
   backend `voice-to-plan` truth remains a non-default backend seam and is not selected for deletion.
@@ -431,19 +465,19 @@ calls, Supabase mutation, log deletion, generated/vendor residue cleanup, and ad
 | Selected-distance plan creation | Runner can create accepted selected-distance plans after preview/review/create. | 10K, Half Marathon, and Marathon Base create accepted; Marathon Completion backend preview/review/confirm artifacts accepted, with runner-facing selected-option exposure still separate | `src/lib/running-plan-engine-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/plan-creation-engine/*`, `src/lib/active-plan-persistence.ts` | `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`, onboarding selected-plan UI | `runner_profiles`, `plan_cycles`, `planned_workouts` after confirm | `scripts/validate-running-plan-engine-*`, `scripts/generate-running-plan-engine-scenarios.ts`, R8 browser/DB proof, universal richness/prescription QA + Running Coach acceptance | Do not treat Marathon Completion selected-option UI exposure as shipped unless a product/UI gate accepts it; do not turn Marathon Base into completion |
 | Plan Presets | Runner can use 10K Foundation, Half Marathon Balanced, or Marathon Base cards as non-mutating discovery into selected running-plan preview/create, including saved-mode active-manual transition discovery. | Shipped as discovery; creation is owned by the running-plan engine or active-plan transition seam | `src/lib/plan-preset-actions.ts` keeps `getPlanPresetCards(...)`; selected create/review/confirm lives in running-plan engine actions/review; active-manual replacement uses `src/lib/active-plan-transition-actions.ts` | Preset cards in onboarding plus selected-plan preview dialog and future saved-mode `Create a plan` transition UI | Card discovery does not persist; selected running-plan confirm persists `runner_profiles`, `plan_cycles`, and `planned_workouts` only when no active plan exists; active manual transition archives/supersedes through reviewed confirm | Changelog 2026-06-07 history plus later selected-plan create proof; Slice G2A removed old Plan Preset review/confirm blocked actions; saved-mode card discovery no longer has an active-plan read gate | No new preset families; no Plan Preset active-plan replacement; no legacy Plan Preset review/confirm creation seam; no direct selected-plan confirm while an active plan exists |
 | Active manual plan -> selected generated plan transition | Runner can be shown a backend-shaped impact review for replacing an active manual plan with a reviewed selected generated/preset plan; frontend wiring/QA remains separate. | Backend seam implemented / QA pending / not runner-facing shipped | `src/lib/active-plan-transition-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/active-plan-persistence.ts` | Future saved-mode `Create a plan` transition UI | Old `plan_cycles` row archived/superseded; new selected plan persisted as active; manual templates remain user-library rows | `scripts/validate-running-plan-engine-confirm.ts` transition proof | No silent replacement; no clear-then-create shortcut; no merge of upcoming manual workouts; no deletion of logs/evidence/comparisons/protected history |
-| Manual first create | Runner chooses `Build my plan myself`, reviews one workout, and creates a manual active plan. | Shipped | `src/lib/manual-workout-authoring/actions.ts`, `persistence.ts`, `review-exactness.ts`, `active-plan-persistence.ts` | `src/components/onboarding/ManualUserBuiltPlanPanel.tsx`, shared manual controls | `runner_profiles`, `plan_cycles`, `planned_workouts` | `scripts/validate-manual-workout-authoring.ts`; browser/DB proof; changelog 2026-06-10 | Do not persist empty active manual plans silently |
-| Active-plan Add activity | Runner adds a reviewed user-authored workout to an eligible today-or-future empty day in an accepted active plan. | Shipped in proved manual and non-manual Add scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/manual-workout-authoring/active-plan-add.ts`, `actions.ts`, `review-exactness.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`, `manual-workout-authoring-utils.ts` | Existing `plan_cycles`; new `planned_workouts` rows with `active_plan_user_edit_v1` metadata | Manual browser/DB proof plus universal editability QA; changelog 2026-06-11 and 2026-06-12 | No frontend row append; no unproved source/row mutation; no universal Copy/Paste |
+| Manual first create | Runner chooses `Build my plan myself`, reviews one workout, and creates a manual active plan. | Shipped | `src/lib/manual-workout-authoring/actions.ts`, `persistence.ts`, `review-exactness.ts`, `active-plan-persistence.ts` | `OnboardingGate.tsx`, shared manual controls | `runner_profiles`, `plan_cycles`, `planned_workouts` | `scripts/validate-manual-workout-authoring.ts`; browser/DB proof; changelog 2026-06-10 | Do not persist empty active manual plans silently |
+| Active-plan Add activity | Runner adds a reviewed user-authored workout to an eligible today-or-future Rest/no-workout date in an accepted active plan. | Shipped in proved manual and non-manual Add scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/manual-workout-authoring/active-plan-add.ts`, `actions.ts`, `review-exactness.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`, `manual-workout-authoring-utils.ts` | Existing `plan_cycles`; new `planned_workouts` rows with `active_plan_user_edit_v1` metadata | Manual browser/DB proof plus universal editability QA; changelog 2026-06-11 and 2026-06-12 | No frontend row append; no unproved source/row mutation; no universal Copy/Paste |
 | Personal saved templates | Runner saves a reviewed manual workout as a personal template and reuses it from Add activity. | Shipped in scoped first-create and existing-plan Add paths | `src/lib/manual-workout-authoring/saved-templates.ts`, `saved-template-repository.ts`, review reconstruction through manual authoring | Manual save modal and template picker in shared controls | `runner_manual_workout_templates`, `planned_workouts` when later confirmed | Browser/DB proof; changelog 2026-06-11 | No organization/coach templates; no frontend-owned template rows |
 | Manual Copy/Paste | Runner copies a manual workout and pastes it onto an eligible target day through direct backend mutation without a runner-facing review dialog. | Shipped in the proved manual scope | `src/lib/manual-workout-authoring/copy-paste.ts`, `copy-paste-reconstruction.ts`, `active-plan-add.ts` | `Calendar.tsx` occupied-day menu and Add/Paste menu | Existing `plan_cycles`; new `planned_workouts` rows | Backend live proof plus browser/DB proof; changelog 2026-06-11 and direct-edit update 2026-06-13 | No raw row duplication; no recurrence; no move disguised as copy/delete; no universal Copy/Paste across generated/selected/preset/imported plans |
 | Active-plan Delete/Clear | Runner clears an eligible unlogged planned workout after backend-shaped review; active plan remains active. Source kind is provenance, not the row lifecycle gate. | Shipped in proved manual and non-manual Clear scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/active-plan-workout-editing/source-capabilities.ts`, `src/lib/manual-workout-authoring/delete-clear.ts`, `review-exactness.ts`, `persistence.ts` | `Calendar.tsx`, `ManualWorkoutAuthoringControls.tsx` review dialog | Existing `planned_workouts` row removed; metadata updated with `active_plan_user_edit_v1` | Manual browser/DB proof plus universal row-state editability proof; changelog 2026-06-12 | Restore/Put back/Redo UI is not shipped; logged/evidence-backed/protected/occupied/rest rows remain blocked |
-| Active-plan Move Workout | Runner moves an eligible unlogged planned workout from a past, today, or future source date to today or a future empty target through direct backend mutation; source kind is preserved as provenance while completion/evidence state owns row eligibility. | Shipped in proved manual and selected/generated row-state scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/active-plan-workout-editing/source-capabilities.ts`, `src/lib/manual-workout-authoring/move-workout.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutMoveControls.tsx`, existing manual controls/utils | Existing `planned_workouts` row date/weekday/week update; original plan source preserved | Manual browser/DB/mobile/WebKit proof, direct-move proof, missed-unlogged proof, selected/generated direct move proof, and universal row-state editability validator | No swap, no batch move, no recurrence, no runner-facing content edit without editor support, no Restore UI, no QR/share/import, no frontend copy+delete, no local schedule truth |
+| Active-plan Move Workout | Runner moves an eligible unlogged planned workout from a past, today, or future source date to today or a future Rest/no-workout target through direct backend mutation; source kind is preserved as provenance while completion/evidence state owns row eligibility. | Shipped in proved manual and selected/generated row-state scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/active-plan-workout-editing/source-capabilities.ts`, `src/lib/manual-workout-authoring/move-workout.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutMoveControls.tsx`, existing manual controls/utils | Existing `planned_workouts` row date/weekday/week update; original plan source preserved | Manual browser/DB/mobile/WebKit proof, direct-move proof, missed-unlogged proof, selected/generated direct move proof, and universal row-state editability validator | No swap, no batch move, no recurrence, no runner-facing content edit without editor support, no Restore UI, no QR/share/import, no frontend copy+delete, no local schedule truth |
 | Persisted manual workout edit | Runner edits eligible future manual planned rows through backend review/confirm from workout detail. | QA-passed for eligible future manual rows | `src/lib/manual-workout-authoring/edit-workout.ts`, `edit-workout-review-token.ts`, active-plan editability policy | Workout detail `Edit training` action plus manual constructor/editor reuse | Same `planned_workouts` row updates after accepted confirm | Manual plan closeout records backend implementation, frontend wiring, and QA acceptance | No generated/selected/preset/imported content editing; no frontend-only editor; no today/past/logged/evidence-backed/protected edits; no fake pace or fake personal HR |
 | Active plan viewing | Runner sees the shared saved calendar, workout detail, progress, and result state for any active plan source. | Shipped | `src/lib/training.ts`, `src/lib/route-data-actions.ts`, `src/lib/workout-log-actions.ts`, feedback/import modules | `src/components/Calendar.tsx`, `src/routes/workout.$date.tsx`, `src/routes/progress.tsx`, `src/components/CompletionPanel.tsx` | `plan_cycles`, `planned_workouts`, `workout_logs`, provider evidence tables | Changelog-backed saved-mode, Garmin feedback, target-display QA, manual builder browser/DB proof | Do not move schedule truth into frontend; viewing all sources does not imply all sources are manually editable; `/hitoDS` specimens are not product behavior |
 | Calendar plan actions | Runner uses one calendar header: primary `Add plan` plus overflow utilities (`Export JSON`, `Edit schedule`, `Clear upcoming schedule`). | Shipped IA | `src/lib/active-plan-lifecycle-actions.ts`, `active-plan-export-actions.ts`, schedule-edit preview/apply seams, active-plan transition seams | Calendar/header plan action controls, `PlanManagementDialog.tsx`, `src/components/plan-management/*` as implementation modules | `plan_cycles`, `planned_workouts`, `workout_logs` | One-calendar IA QA passed; source/docs scan now treats old labels only as historical or explicitly rejected language | No `Open plan` concept, no visible `Update plan`, no `Delete active plan`, no silent replacement |
 | Clear upcoming schedule | Runner can clear upcoming mutable schedule while archived/protected history remains preserved. | Shipped overflow utility | `src/lib/active-plan-lifecycle-actions.ts` | Overflow clear-upcoming control; `PlanLifecycleControls.tsx` as implementation module | `plan_cycles` archived; protected past/logged truth preserved | Current-product backed | No half-active truncated plan state; no hard deletion of history |
-| Advanced JSON import / replace | Runner can import an existing `training-plan-v2` artifact as advanced fallback, with backend start-date policy. | Shipped | `src/lib/imported-plan.ts`, `src/lib/plan-replacement-actions.ts`, `src/lib/active-plan-persistence.ts` | `PlanImportPanel.tsx`, advanced onboarding/import UI | `runner_profiles`, `plan_cycles`, `planned_workouts` | Doctrine/import validators; current-product backed | Legacy `week_1_preview[]` removed; no share/import-from-QR yet |
-| Text replacement / refresh | Saved-mode plan replacement and refresh proposal use backend review/apply seams. | Shipped for current described scopes | `src/lib/plan-replacement-actions.ts`, `active-plan-refresh-actions.ts`, `active-plan-refresh-draft.ts`, AI proposal modules | `PlanTextReplacementPanel.tsx`, `PlanRefreshPanel.tsx` | Archive/replace plan rows only after apply | Doctrine validators; current-product backed | No AI direct mutation; no silent refresh apply |
-| JSON export | Runner exports persisted active plan JSON from the calendar overflow. Manual plans are proven. | Shipped for authenticated active-plan export including manual plan proof | `src/lib/active-plan-export-actions.ts`, `src/lib/plan-export.ts` | `PlanExportMenu.tsx`, `PlanManagementDialog.tsx` iframe download orchestration as implementation modules | Reads active `plan_cycles` and `planned_workouts`; no mutation | Browser/download/DB proof; changelog 2026-06-12 | Markdown/PDF/watch export, public links, QR, import-from-export, and mobile deep links remain outside current header IA |
+| Advanced JSON import / replace | Runner can import an existing `training-plan-v2` artifact as advanced fallback, with backend start-date policy. | Shipped | `src/lib/imported-plan.ts`, `src/lib/plan-replacement-actions.ts`, `src/lib/active-plan-persistence.ts` | `UploadJsonDialog.tsx`, advanced onboarding/import UI | `runner_profiles`, `plan_cycles`, `planned_workouts` | Doctrine/import validators; current-product backed | Legacy `week_1_preview[]` removed; no share/import-from-QR yet |
+| Text replacement / refresh | Saved-mode text replacement and refresh remain backend review/apply seams; visible `Update plan` is not part of the accepted calendar header IA. | Backend seams preserved / not current visible header action | `src/lib/plan-replacement-actions.ts`, `active-plan-refresh-actions.ts`, `active-plan-refresh-draft.ts`, AI proposal modules | No current visible plan-management panel owner | Archive/replace plan rows only after apply | Doctrine validators; current-product backed | No AI direct mutation; no silent refresh apply; do not invent a runner-facing Update Plan surface |
+| JSON export | Runner exports persisted active plan JSON from the calendar overflow. Manual plans are proven. | Shipped for authenticated active-plan export including manual plan proof | `src/lib/active-plan-export-actions.ts`, `src/lib/plan-export.ts` | `AppShell.tsx`, `plan-export-download.ts` | Reads active `plan_cycles` and `planned_workouts`; no mutation | Browser/download/DB proof; changelog 2026-06-12 | Markdown/PDF/watch export, public links, QR, import-from-export, and mobile deep links remain outside current header IA |
 | QA server lifecycle | QA uses one canonical built local server to prove browser behavior. | Shipped internal process | `scripts/qa-local-server.mjs`, build/finalize scripts | Browser QA only | None | Reused in browser QA reports | Do not start duplicate app servers unless required |
 | Admin work items | Admin can see repo-derived work items and quick notes in one Work Items surface. | Shipped internal/admin | `src/lib/admin-capture*`, `scripts/import-repo-work-items-to-admin-backlog.ts` | `src/routes/admin.capture.tsx`, admin shell | `admin_capture_items` | Importer dry-run/live proof; admin QA | Not a substitute for changelog or markdown source truth |
 | Future exchange / share | QR/share/import model for Hito plan exchange. | Future-only | Architecture contract not accepted yet | No frontend implementation | Unknown; do not add tables yet | None | QR, public/private links, import from share, applying someone else's plan, expiry/revocation remain future-only |
@@ -609,9 +643,8 @@ or future-only:
   `scripts/author-plan-from-text.ts`, and current OpenAI text-authoring source ownership is
   `src/lib/openai-plan-authoring.ts`.
 - Orphaned onboarding `JsonImportPanel`: removed in Slice G5B after final `rg` proof found no live
-  source imports. The shipped advanced JSON import UI remains
-  `src/components/plan-management/PlanImportPanel.tsx` inside
-  `src/components/PlanManagementDialog.tsx`.
+  source imports. The shipped advanced JSON import UI is now
+  `src/components/UploadJsonDialog.tsx`.
 - `src/lib/auth-actions.ts`: required canonical auth owner. Keep login route data, Magic Link
   request, auth callback exchange, local-auth/public-runtime availability helpers, and redirect
   semantics here; G4C changed only the route import path for `/api/auth/confirm`.
@@ -663,8 +696,9 @@ or future-only:
 
 - `src/components/OnboardingGate.tsx`
 - `src/components/onboarding/StructuredPlanConstructor.tsx`
-- `src/components/onboarding/ManualUserBuiltPlanPanel.tsx`
 - `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`
+- `src/components/UploadJsonDialog.tsx`
+- `src/components/AppShell.tsx`
 - `src/components/Calendar.tsx`
 - `src/components/ui/hito-calendar-day.tsx`
 - `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`
@@ -674,12 +708,12 @@ or future-only:
 - `src/components/manual-workout/ManualWorkoutPersistedEditControls.tsx` only after persisted edit QA/frontend wiring accepts the runner-facing edit path
 - `src/components/manual-workout/manual-workout-authoring-utils.ts`
 - `src/components/PlanManagementDialog.tsx`
-- `src/components/plan-management/PlanExportMenu.tsx`
-- `src/components/plan-management/PlanImportPanel.tsx`
+- `src/components/plan-management/ActivePlanCreatePlanDialog.tsx`
+- `src/components/plan-management/ActivePlanTransitionReviewDialog.tsx`
 - `src/components/plan-management/PlanLifecycleControls.tsx`
-- `src/components/plan-management/PlanRefreshPanel.tsx`
-- `src/components/plan-management/PlanTextReplacementPanel.tsx`
+- `src/components/plan-management/PlanScheduleEditPanel.tsx`
 - `src/components/plan-management/PlanSummaryHeader.tsx`
+- `src/components/plan-management/plan-export-download.ts`
 - `src/routes/workout.$date.tsx`
 - `src/components/CompletionPanel.tsx`
 
@@ -841,9 +875,9 @@ count them as current runtime owners.
     discovery owners remain untouched.
 39. Post-G17 reassessment selected FRONTEND G18 for the tracked orphan onboarding
     `JsonImportPanel.tsx`. This is deletion-only source repair; current JSON import behavior remains
-    owned by `PlanImportPanel`, `PlanManagementDialog`, and `UploadJsonDialog`.
+    owned by `UploadJsonDialog`.
 40. G18 is complete: tracked orphan `JsonImportPanel` residue was deleted while current JSON import
-    behavior remains owned by `PlanImportPanel`, `PlanManagementDialog`, and `UploadJsonDialog`.
+    behavior remains owned by `UploadJsonDialog`.
 41. Post-G18 reassessment selected FRONTEND G19 for tracked orphan `DictateToPlanPanel.tsx` UI
     residue. This is deletion-only source cleanup; backend `voice-to-plan` truth remains a
     non-default backend seam and must not be deleted or changed.

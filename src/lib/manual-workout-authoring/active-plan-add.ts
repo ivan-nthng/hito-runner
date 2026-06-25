@@ -154,7 +154,7 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
     return buildManualWorkoutAddFailure({
       reason: "protected_day",
       message:
-        "Manual workout additions can target today or future empty days. Past days stay protected.",
+        "Manual workout additions can target today or future available Rest days. Past days stay protected.",
     });
   }
 
@@ -187,7 +187,7 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
       reason: protectedTarget ? "protected_day" : "occupied_day",
       message: protectedTarget
         ? "This day already has protected workout history or evidence and cannot be changed here."
-        : "This day already has a planned workout. Choose an empty day before adding another workout.",
+        : "This day already has a planned workout. Choose an available Rest day before adding another workout.",
     });
   }
 
@@ -251,7 +251,7 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
         requiresExplicitConfirm: true,
         trustedClientRows: false,
         serverRebuiltReview: true,
-        targetDayWasEmpty: true,
+        targetDayKind: "rest_day",
         activePlanSourceVerified: true,
         callsOpenAi: false,
       },

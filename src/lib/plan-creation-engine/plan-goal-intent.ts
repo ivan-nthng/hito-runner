@@ -52,6 +52,7 @@ export type PlanGoalIntentFeasibilityStatus =
   | "supported"
   | "supported_with_assumptions"
   | "aggressive_or_short_horizon"
+  | "impossible_goal"
   | "unsupported_for_current_builder";
 
 export const normalizedPlanGoalIntentSchema = z
@@ -111,6 +112,7 @@ export const normalizedPlanGoalIntentSchema = z
           "supported",
           "supported_with_assumptions",
           "aggressive_or_short_horizon",
+          "impossible_goal",
           "unsupported_for_current_builder",
         ]),
         reasons: z.array(z.string().trim().min(1)),
@@ -431,24 +433,24 @@ function resolveFeasibility(input: {
   if (input.distance?.kind === "custom" && input.distanceFamily) {
     status = maxFeasibility(status, "supported_with_assumptions");
     reasons.push(
-      "Custom distance is supported by the unified AI-authored generated-plan path; deterministic fixture builders may still use preset endpoints for validator scaffolding.",
+      "Custom distance is supported by the unified AI-authored generated-plan path; the selected distance family is routing context only.",
     );
   }
 
-  if (input.distanceFamily === "Marathon Base") {
-    if (
-      input.supplied.targetDate ||
-      input.supplied.targetFinishTime ||
-      input.supplied.targetOutcomePace
-    ) {
-      status = "unsupported_for_current_builder";
-      reasons.push(
-        "Marathon Base is a durability/base endpoint and cannot promise a race date, finish time, or outcome pace.",
-      );
-    } else {
-      status = maxFeasibility(status, "supported_with_assumptions");
-      reasons.push("Marathon Base is treated as base-building intent, not a marathon race claim.");
-    }
+  if (input.horizonDays != null && input.horizonDays <= 0) {
+    status = "impossible_goal";
+    reasons.push("Target date must be after the plan start date.");
+  }
+
+  if (
+    status !== "impossible_goal" &&
+    input.horizonDays != null &&
+    input.distance?.distanceMeters != null &&
+    input.distance.distanceMeters >= 42_195 &&
+    input.horizonDays < 14
+  ) {
+    status = "impossible_goal";
+    reasons.push("A marathon in less than two weeks is not enough time to prepare safely.");
   }
 
   if (input.horizonDays != null && input.horizonDays < 28) {
@@ -498,7 +500,6 @@ function presetDistanceForFamily(family: RunningPlanDistanceFamily): PlanGoalInt
       return "10K";
     case "Half Marathon":
       return "Half Marathon";
-    case "Marathon Base":
     case "Marathon Completion":
       return "Marathon";
   }
@@ -548,6 +549,7 @@ function maxFeasibility(
     "supported_with_assumptions",
     "aggressive_or_short_horizon",
     "unsupported_for_current_builder",
+    "impossible_goal",
   ];
 
   return order.indexOf(next) > order.indexOf(current) ? next : current;

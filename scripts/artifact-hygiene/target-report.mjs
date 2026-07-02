@@ -7,6 +7,8 @@ import {
   MAX_SAMPLES,
   OLD_LOG_DAYS,
   RECENT_LOG_DAYS,
+  STALE_REPO_LOCAL_QA_RUNTIME_PATHS,
+  STALE_REPO_LOCAL_QA_RUNTIME_RETENTION,
 } from "./policy.mjs";
 import { ageDays, formatBytes, safeLstat } from "./utils.mjs";
 
@@ -196,6 +198,10 @@ function classifyRetention({ summary, target }) {
     return "generated_test_runner_residue";
   }
 
+  if (target.artifactKind.startsWith("stale_repo_local_qa_server_")) {
+    return STALE_REPO_LOCAL_QA_RUNTIME_RETENTION;
+  }
+
   const classificationMtime = summary.newestContentMtime ?? summary.newestMtime;
   const newestAge = classificationMtime ? ageDays(classificationMtime) : 0;
 
@@ -224,6 +230,8 @@ function buildSuggestedAction({ summary, target, retentionCategory }) {
       return "No action needed; path is empty.";
     case "generated_test_runner_residue":
       return "Generated test-runner residue. Eligible for future explicit cleanup, not deleted by this dry-run.";
+    case STALE_REPO_LOCAL_QA_RUNTIME_RETENTION:
+      return "Stale repo-local QA runtime residue. Verify qa:server:status points at the cache runtime, then delete this legacy file instead of using it as current diagnostics.";
     case "recent_raw_logs":
       return "Keep as recent local diagnostic output.";
     case "old_logs_archive_candidate":
@@ -236,11 +244,19 @@ function buildSuggestedAction({ summary, target, retentionCategory }) {
 }
 
 function buildManifestEntry(rootDir, absolutePath, stat, target) {
-  const retentionCategory = classifyManifestRetention({ stat, target });
+  const relativePath = relative(rootDir, absolutePath) || ".";
+  const staleRepoLocalQaRuntimeResidue = STALE_REPO_LOCAL_QA_RUNTIME_PATHS.has(relativePath);
+  const retentionCategory = classifyManifestRetention({
+    stat,
+    target,
+    staleRepoLocalQaRuntimeResidue,
+  });
 
   return {
-    path: relative(rootDir, absolutePath) || ".",
-    artifactKind: target.artifactKind,
+    path: relativePath,
+    artifactKind: staleRepoLocalQaRuntimeResidue
+      ? "stale_repo_local_qa_runtime_residue"
+      : target.artifactKind,
     kind: stat.isSymbolicLink() ? MANIFEST_KIND_SYMLINK : MANIFEST_KIND_FILE,
     protectedEvidence: target.protectedEvidence === true,
     retentionCategory,
@@ -254,13 +270,21 @@ function buildManifestEntry(rootDir, absolutePath, stat, target) {
   };
 }
 
-function classifyManifestRetention({ stat, target }) {
+function classifyManifestRetention({ stat, target, staleRepoLocalQaRuntimeResidue }) {
   if (target.protectedEvidence) {
     return "protected_qa_evidence";
   }
 
   if (target.artifactKind === "generated_test_runner_residue") {
     return "generated_test_runner_residue";
+  }
+
+  if (target.artifactKind.startsWith("stale_repo_local_qa_server_")) {
+    return STALE_REPO_LOCAL_QA_RUNTIME_RETENTION;
+  }
+
+  if (staleRepoLocalQaRuntimeResidue) {
+    return STALE_REPO_LOCAL_QA_RUNTIME_RETENTION;
   }
 
   const itemAge = ageDays(stat.mtime);
@@ -284,6 +308,8 @@ function buildManifestSuggestedAction({ target, retentionCategory }) {
   switch (retentionCategory) {
     case "generated_test_runner_residue":
       return "Generated test-runner residue. Eligible for future explicit cleanup, not deleted by this dry-run.";
+    case STALE_REPO_LOCAL_QA_RUNTIME_RETENTION:
+      return "Stale repo-local QA runtime residue. Verify qa:server:status points at the cache runtime, then delete this legacy file instead of using it as current diagnostics.";
     case "recent_raw_logs":
       return "Keep as recent local diagnostic output.";
     case "old_logs_archive_candidate":

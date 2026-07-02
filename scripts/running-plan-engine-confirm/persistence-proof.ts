@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 
-import type { RunningPlanDistanceFamily } from "../../src/lib/plan-creation-engine";
 import {
   confirmRunningPlanDraftForUser,
   type RunningPlanPreviewActionInput,
@@ -201,27 +200,28 @@ export async function validatePersistenceContract(
   buildPreviewInputForConfirm: BuildPreviewInputForConfirm,
 ) {
   const supabase = createAdminSupabaseClient();
-  const persistedFamilies: Array<{
-    family: RunningPlanDistanceFamily;
+  const persistedDistanceGoals: Array<{
+    goalLabel: string;
+    distanceMeters: number | null;
     rows: number;
     sourceKind: string;
     cleanup: DisposableCleanupProof;
   }> = [];
 
   for (const draft of reviewedDrafts) {
-    const userId = await createDisposableUser(supabase, draft.planFamily);
-    let familyProof: Omit<(typeof persistedFamilies)[number], "cleanup"> | null = null;
+    const distanceGoal = distanceGoalSummary(draft);
+    const userId = await createDisposableUser(supabase, distanceGoal.goalLabel);
+    let distanceGoalProof: Omit<(typeof persistedDistanceGoals)[number], "cleanup"> | null = null;
     let cleanupProof: DisposableCleanupProof | null = null;
 
     try {
       const result = await confirmRunningPlanDraftForUser(userId, {
         previewInput: buildPreviewInputForConfirm(draft),
-        planFamily: draft.planFamily,
         sourceKind: draft.sourceKind,
         reviewToken: draft.reviewToken,
         reviewChecksum: draft.reviewChecksum,
       });
-      assert.equal(result.ok, true, `${draft.planFamily} confirm should persist.`);
+      assert.equal(result.ok, true, `${distanceGoal.goalLabel} confirm should persist.`);
       if (!result.ok) throw new Error(result.message);
 
       const persisted = await loadPersistedPlanForUser(supabase, userId);
@@ -246,7 +246,6 @@ export async function validatePersistenceContract(
 
       const duplicate = await confirmRunningPlanDraftForUser(userId, {
         previewInput: buildPreviewInputForConfirm(draft),
-        planFamily: draft.planFamily,
         sourceKind: draft.sourceKind,
         reviewToken: draft.reviewToken,
         reviewChecksum: draft.reviewChecksum,
@@ -256,8 +255,9 @@ export async function validatePersistenceContract(
         assert.equal(duplicate.reason, "active_plan_exists");
       }
 
-      familyProof = {
-        family: draft.planFamily,
+      distanceGoalProof = {
+        goalLabel: distanceGoal.goalLabel,
+        distanceMeters: distanceGoal.distanceMeters,
         rows: persisted.workouts.length,
         sourceKind: draft.sourceKind,
       };
@@ -265,9 +265,9 @@ export async function validatePersistenceContract(
       cleanupProof = await cleanupDisposableUser(supabase, userId);
     }
 
-    if (familyProof && cleanupProof) {
-      persistedFamilies.push({
-        ...familyProof,
+    if (distanceGoalProof && cleanupProof) {
+      persistedDistanceGoals.push({
+        ...distanceGoalProof,
         cleanup: cleanupProof,
       });
     }
@@ -276,7 +276,7 @@ export async function validatePersistenceContract(
   return {
     mode: preflight.mode,
     target: preflight.target,
-    persistedFamilies,
+    persistedDistanceGoals,
   };
 }
 
@@ -301,9 +301,9 @@ function parsePersistenceTarget(url: string): PersistenceTarget | null {
 
 async function createDisposableUser(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
-  family: RunningPlanDistanceFamily,
+  goalLabel: string,
 ) {
-  const slug = family.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const slug = goalLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const email = `running-plan-confirm-${slug}-${Date.now()}-${Math.random()
     .toString(16)
     .slice(2)}@example.test`;
@@ -317,6 +317,15 @@ async function createDisposableUser(
   }
 
   return created.data.user.id;
+}
+
+function distanceGoalSummary(draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>) {
+  const distance = draft.normalizedInputSummary.planGoalIntent.distance;
+
+  return {
+    goalLabel: distance?.label ?? "Distance goal",
+    distanceMeters: distance?.distanceMeters ?? null,
+  };
 }
 
 async function loadPersistedPlanForUser(

@@ -9,7 +9,6 @@ import { getRequestAuthContext } from "@/lib/backend/auth";
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import {
-  buildRunningPlanPreview,
   runningPlanConfirmInputSchema,
   type RunningPlanConfirmActionInput,
 } from "@/lib/running-plan-engine-actions";
@@ -22,7 +21,6 @@ import {
   buildRunningPlanPersistenceMetadata,
   buildRunningPlanProfilePatch,
   validateSelfContainedRunningPlanReviewToken,
-  validateRunningPlanReviewExactness,
 } from "@/lib/running-plan-engine-review";
 import type { Json } from "@/lib/supabase/database";
 import { serverEnv } from "@/lib/supabase/env";
@@ -98,7 +96,6 @@ export type ActivePlanTransitionConfirmResult =
       activePlanId: string;
       sourceKind: RunningPlanConfirmActionInput["sourceKind"];
       sourceStatus: typeof RUNNING_PLAN_CONFIRMED_SOURCE_STATUS;
-      planFamily: RunningPlanConfirmActionInput["planFamily"];
       schemaVersion: "training-plan-v2";
       workoutCount: number;
       calendarRowCount: number;
@@ -124,7 +121,6 @@ type ActivePlanTransitionBlockedResult = {
   reason: ActivePlanTransitionFailureReason;
   message: string;
   sourceKind?: RunningPlanConfirmActionInput["sourceKind"];
-  planFamily?: RunningPlanConfirmActionInput["planFamily"];
 };
 
 type ActivePlanTransitionCurrentPlanSummary = {
@@ -142,7 +138,10 @@ type ActivePlanTransitionCurrentPlanSummary = {
 type ActivePlanTransitionCandidateSummary = {
   sourceKind: RunningPlanConfirmActionInput["sourceKind"];
   sourceStatus: typeof RUNNING_PLAN_CONFIRMED_SOURCE_STATUS;
-  planFamily: RunningPlanConfirmActionInput["planFamily"];
+  goalLabel: string;
+  distanceMeters: number | null;
+  targetDate: string | null;
+  targetFinishTime: string | null;
   startDate: string;
   endDate: string;
   rowCount: number;
@@ -198,7 +197,7 @@ type ActivePlanTransitionReviewPayload = {
   };
   candidate: {
     source_kind: RunningPlanConfirmActionInput["sourceKind"];
-    plan_family: RunningPlanConfirmActionInput["planFamily"];
+    distance_goal: ActivePlanTransitionDistanceGoalSummary;
     selected_plan_review_checksum: string;
     selected_plan_review_payload: unknown;
   };
@@ -222,6 +221,13 @@ type BuildTransitionReviewOk = Extract<ActivePlanTransitionReviewResult, { ok: t
   persistenceMetadata: AdditionalPlanPersistenceMetadata;
   currentPlanContext: ExistingPlanContext;
   payload: ActivePlanTransitionReviewPayload;
+};
+
+type ActivePlanTransitionDistanceGoalSummary = {
+  label: string;
+  distance_meters: number | null;
+  target_date: string | null;
+  target_finish_time: string | null;
 };
 
 export type ActivePlanTransitionDependencies = {
@@ -368,7 +374,6 @@ export async function confirmActivePlanTransitionForUser(
       activePlanId: result.activePlan.id,
       sourceKind: review.candidatePlan.sourceKind,
       sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
-      planFamily: review.candidatePlan.planFamily,
       schemaVersion: review.canonicalPlan.schema_version,
       workoutCount: result.workouts.filter((workout) => workout.workout_type !== "rest").length,
       calendarRowCount: result.workouts.length,
@@ -380,8 +385,7 @@ export async function confirmActivePlanTransitionForUser(
       safety: {
         requiresExplicitConfirm: true,
         trustedClientRows: false,
-        serverRebuiltCandidate:
-          review.candidatePlan.sourceKind !== AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+        serverRebuiltCandidate: false,
         oldPlanArchived: true,
         upcomingManualWorkoutsMerged: false,
         callsOpenAi: false,
@@ -432,10 +436,16 @@ async function buildActivePlanTransitionReview(
     });
   }
 
-  const candidateReview =
-    candidate.sourceKind === AI_GENERATED_RUNNING_PLAN_SOURCE_KIND
-      ? await resolveAiGeneratedTransitionCandidate(candidate)
-      : await resolveDeterministicTransitionCandidate(candidate);
+  if (candidate.sourceKind !== AI_GENERATED_RUNNING_PLAN_SOURCE_KIND) {
+    return buildTransitionFailure({
+      reason: "input_mismatch",
+      message:
+        "Active-plan transitions now require a reviewed AI-authored distance-goal candidate. Refresh the plan preview.",
+      input: candidate,
+    });
+  }
+
+  const candidateReview = await resolveAiGeneratedTransitionCandidate(candidate);
 
   if (!candidateReview.ok) {
     return buildTransitionFailure({
@@ -446,6 +456,7 @@ async function buildActivePlanTransitionReview(
   }
 
   const { draft, exactness } = candidateReview;
+  const distanceGoal = buildTransitionDistanceGoalSummary(draft);
 
   const reviewDate = dependencies.today();
   const workouts = context.existingWorkouts.workouts.filter(
@@ -483,7 +494,7 @@ async function buildActivePlanTransitionReview(
     },
     candidate: {
       source_kind: candidate.sourceKind,
-      plan_family: candidate.planFamily,
+      distance_goal: distanceGoal,
       selected_plan_review_checksum: exactness.reviewChecksum,
       selected_plan_review_payload: exactness.reviewPayload,
     },
@@ -531,7 +542,10 @@ async function buildActivePlanTransitionReview(
     candidatePlan: {
       sourceKind: candidate.sourceKind,
       sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
-      planFamily: candidate.planFamily,
+      goalLabel: distanceGoal.label,
+      distanceMeters: distanceGoal.distance_meters,
+      targetDate: distanceGoal.target_date,
+      targetFinishTime: distanceGoal.target_finish_time,
       startDate: exactness.canonicalPlan.start_date,
       endDate:
         exactness.canonicalPlan.planned_workouts.at(-1)?.date ?? exactness.canonicalPlan.start_date,
@@ -564,7 +578,7 @@ async function buildActivePlanTransitionReview(
     safety: {
       requiresExplicitConfirm: true,
       trustedClientRows: false,
-      serverRebuiltCandidate: candidate.sourceKind !== AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+      serverRebuiltCandidate: false,
       oldPlanWillBeArchived: true,
       upcomingManualWorkoutsMergeIntoCandidate: false,
     },
@@ -577,49 +591,6 @@ async function buildActivePlanTransitionReview(
     }),
     currentPlanContext: context,
     payload,
-  };
-}
-
-async function resolveDeterministicTransitionCandidate(candidate: RunningPlanConfirmActionInput) {
-  const preview = buildRunningPlanPreview(candidate.previewInput);
-  if (!preview.ok) {
-    return {
-      ok: false as const,
-      reason: "preview_unavailable" as const,
-      message: preview.unavailable.error.message,
-    };
-  }
-
-  if (
-    preview.draft.sourceKind !== candidate.sourceKind ||
-    preview.draft.planFamily !== candidate.planFamily
-  ) {
-    return {
-      ok: false as const,
-      reason: "input_mismatch" as const,
-      message:
-        "The selected candidate rebuilt to a different source or family. Refresh the review.",
-    };
-  }
-
-  const exactness = await validateRunningPlanReviewExactness({
-    draft: preview.draft,
-    reviewToken: candidate.reviewToken,
-    reviewChecksum: candidate.reviewChecksum,
-  });
-
-  if (!exactness.ok) {
-    return {
-      ok: false as const,
-      reason: exactness.reason,
-      message: exactness.message,
-    };
-  }
-
-  return {
-    ok: true as const,
-    draft: preview.draft,
-    exactness,
   };
 }
 
@@ -639,14 +610,13 @@ async function resolveAiGeneratedTransitionCandidate(candidate: RunningPlanConfi
 
   if (
     !isAiGeneratedRunningPlanPreviewDraft(exactness.draft) ||
-    exactness.draft.sourceKind !== candidate.sourceKind ||
-    exactness.draft.planFamily !== candidate.planFamily
+    exactness.draft.sourceKind !== candidate.sourceKind
   ) {
     return {
       ok: false as const,
       reason: "input_mismatch" as const,
       message:
-        "The AI-authored generated-plan candidate no longer matches the selected family or source. Refresh the review.",
+        "The AI-authored generated-plan candidate no longer matches the reviewed source. Refresh the review.",
     };
   }
 
@@ -691,7 +661,19 @@ function buildTransitionFailure(input: {
     reason: input.reason,
     message: input.message,
     sourceKind: input.input?.sourceKind,
-    planFamily: input.input?.planFamily,
+  };
+}
+
+function buildTransitionDistanceGoalSummary(
+  draft: Parameters<typeof buildRunningPlanPersistenceMetadata>[0]["draft"],
+): ActivePlanTransitionDistanceGoalSummary {
+  const intent = draft.normalizedInputSummary.planGoalIntent;
+
+  return {
+    label: intent.distance?.label ?? "Distance goal",
+    distance_meters: intent.distance?.distanceMeters ?? null,
+    target_date: intent.targetDate ?? null,
+    target_finish_time: intent.targetFinishTime?.label ?? null,
   };
 }
 

@@ -74,7 +74,7 @@
   status derivation
   weekly aggregates
 - `src/lib/training-api.ts`
-  owns the remaining route-facing server-function wrapper layer for home, shell, workout detail, progress, settings route data, login, active-plan lifecycle, active-plan refresh, schedule edit/reflow, workout log, and the one live manual draft review action wrapper. It no longer owns extracted implementation bodies, proved type-only/import-map contracts, plan replacement action names, or manual Add/Create/Templates/Copy/Move/Delete/Clear/Edit runtime wrappers whose canonical owner modules already exist; active-plan export routes import the canonical export action owner directly, onboarding Plan Preset card discovery imports the canonical Plan Preset action owner directly, no-active-plan first-plan and selected-plan creation imports now call the canonical action owners directly, saved-mode JSON/text replacement imports call `src/lib/plan-replacement-actions.ts` directly, `/api/auth/confirm` imports the canonical auth callback exchange owner directly, the settings route imports `saveUserSettings` directly from the user-settings action owner, settings/first-plan/selected-plan type consumers import contract types from their canonical action modules, and manual authoring runtime actions import directly from `src/lib/manual-workout-authoring/*` except for `reviewManualWorkoutDraftAction`, which remains as the TanStack server-function wrapper around the pure draft review seam
+  owns the remaining route-facing server-function wrapper layer for home, shell, workout detail, progress, settings route data, login, active-plan lifecycle, active-plan refresh, schedule edit/reflow, workout log, and the one live manual draft review action wrapper. It no longer owns extracted implementation bodies, proved type-only/import-map contracts, plan replacement action names, or manual Add/Create/Templates/Copy/Move/Delete/Clear/Edit runtime wrappers whose canonical owner modules already exist; active-plan export routes import the canonical export action owner directly, no-active-plan first-plan and selected-plan creation imports now call the canonical action owners directly, saved-mode JSON/text replacement imports call `src/lib/plan-replacement-actions.ts` directly, `/api/auth/confirm` imports the canonical auth callback exchange owner directly, the settings route imports `saveUserSettings` directly from the user-settings action owner, settings/first-plan/selected-plan type consumers import contract types from their canonical action modules, and manual authoring runtime actions import directly from `src/lib/manual-workout-authoring/*` except for `reviewManualWorkoutDraftAction`, which remains as the TanStack server-function wrapper around the pure draft review seam
 - `src/lib/route-data-actions.ts`
   owns the shared route-data helper layer:
   home, shell, workout-detail, and progress data shaping now live there behind injected snapshot/viewer/feedback loaders, while `training-api.ts` keeps the public TanStack `createServerFn` wrappers so existing route imports and loader data shapes stay stable
@@ -103,22 +103,21 @@
   user-scoped confirm/apply helpers stay private to the module, and the canonical write path remains
   sequential and calls the lower-level active-plan persistence seam directly only after
   validation/generation/review boundaries are satisfied
-- `src/lib/plan-presets/` and `src/lib/plan-preset-actions.ts`
-  now own Plan Preset card discovery, not the active-plan create path:
-  eligibility, card view models, recipe mapping, program summary/date fields, metric honesty, and
-  fit copy stay server-owned for `10K Foundation`, `Half Marathon Balanced`, and `Marathon Base`.
-  Onboarding UI surfaces import `getPlanPresetCards(...)` and `PlanPresetCardsActionResult` from
-  this canonical action owner instead of through `training-api.ts`.
-  Selecting a card routes into the selected running-plan preview/create seam owned by
-  `src/lib/running-plan-engine-actions.ts` and `src/lib/running-plan-engine-review.ts`. The old Plan
-  Preset review/confirm actions have been removed from runtime and are no longer product creation
-  owners.
+- Quick setup goal cards are UI shortcuts into `planGoalIntent.distanceMeters`, not backend Plan
+  Preset programs:
+  selected running-plan preview/create is owned by `src/lib/running-plan-engine-actions.ts` and
+  `src/lib/running-plan-engine-review.ts`. The old Plan Preset discovery/review/confirm actions and
+  deterministic product builders are removed from current runtime truth.
 - `src/lib/active-plan-persistence.ts`
   owns the shared imported-plan apply and active-plan persistence primitives used by first-plan creation and saved-mode flows:
   `applyImportedPlanForUser`, active-plan lookup, planned-workout/log readback with archived-log recovery, assigned-plan insertion including nullable rich workout family/identity/icon/goal-context/metric-mode columns, profile upsert during apply including structured first-plan training preference snapshots, optional bounded plan-scoped authoring metadata, and rollback of inserted plans now live there so first-plan actions no longer depend backward on `training-api.ts`
 - `src/lib/plan-authoring-snapshot.ts`
   owns the bounded plan-scoped structured authoring snapshot mapper:
-  structured, voice-confirmed, and text-generated plans can persist the validated authoring truth needed for later refresh, including goal family/style, target time/date intent, recent 5K benchmark truth, execution mode, fixed rest days, preferred long-run day, review assumptions, and metric-policy summary, while raw optional comments and transcript text are filtered out instead of becoming long-lived plan/profile truth
+  structured and text-generated plans can persist the validated authoring truth needed for later
+  refresh, including goal family/style, target time/date intent, recent 5K benchmark truth,
+  execution mode, fixed rest days, preferred long-run day, review assumptions, and metric-policy
+  summary, while raw optional comments are filtered out instead of becoming long-lived plan/profile
+  truth
 - `src/lib/active-plan-export-actions.ts`
   owns the active-plan export server-action and user-scoped export helper:
   it resolves the authenticated persisted user, reads the current active plan through `active-plan-persistence`, delegates payload/document shaping to `plan-export.ts`, and is imported directly by the active-plan export API route rather than through `training-api.ts`
@@ -158,7 +157,7 @@
   owns the workout-log save action helper layer:
   it validates completed, partial, and skipped workout-result payloads, normalizes skipped results to null actual metrics, validates bounded workout-scoped body notes, checks that the planned workout belongs to the persisted user and is not a rest day, and upserts the canonical `workout_logs` row while `training-api.ts` keeps the public `saveWorkoutLog` server-action wrapper for compatibility
   current QA acceptance includes saving a completed first generated non-rest workout from a Quick
-  setup-created `10K Foundation` plan and reading back the same planned workout id through
+  setup-created 10K generated plan and reading back the same planned workout id through
   `workout_logs`; Garmin/FIT provider evidence remains owned by the separate feedback upload seam
 - `src/lib/first-plan-authoring-utils.ts`
   owns the small shared first-plan authoring helper layer used by structured onboarding:
@@ -247,15 +246,11 @@
   `garmin_ai_interpretation` remains a Pro-only capability
 - authenticated users without `runner_profile` are routed into setup on `/`
 - authenticated users with a saved profile but no active `plan_cycle` now also stay honestly in setup until a canonical creation path succeeds
-- Plan Presets are now a non-mutating discovery path:
-  the setup surface can show backend-owned `10K Foundation`, `Half Marathon Balanced`, and
-  `Marathon Base` cards, each with backend-owned eligibility, duration, workout mix, metric honesty,
-  and fit copy. The setup surface imports card discovery directly from the Plan Preset action owner.
-  Card discovery does not check or mutate active-plan state, so saved-mode `Create a plan` can load
-  the same backend-owned family cards for an active manual plan. Selecting a card enters selected
-  running-plan preview/create truth; the legacy Plan Preset review/confirm seam has been removed
-  from runtime. Direct selected-plan create applies only when there is no active plan through that
-  normal creation seam; starting a generated/preset plan from an existing
+- Quick setup goal cards are now non-mutating distance-goal shortcuts:
+  the setup surface can show 10K, Half Marathon, Marathon, and Custom distance choices, then enters
+  the same backend-owned OpenAI/local-fixture-authored dated generated-plan preview/create truth.
+  Direct selected-plan create applies only when there is no active plan through that normal creation
+  seam; starting a generated plan from an existing
   `manual_user_built_plan_v1` uses the separate backend-owned reviewed transition seam in
   `src/lib/active-plan-transition-actions.ts`, not the removed Plan Preset review/confirm seam.
   That transition review is non-mutating, signs stable selected-plan plus active-plan revision
@@ -265,8 +260,8 @@
   OpenAI/local-fixture-authored dated generated-plan path for 10K, Half Marathon, Marathon, and
   Custom distance. Custom requires a valid distance before preview; accepted Custom 15K persists as
   `distance_build`, and accepted Marathon persists as `marathon` / `target_time`, not Marathon Base.
-  Deterministic selected-plan builders remain only validator/dev scaffolding or legacy discovery
-  context, not normal generated-plan product truth.
+  Deterministic selected-plan product builders and backend Plan Preset discovery are removed from
+  current product truth.
 - Manual user-built plans are now a canonical no-active-plan and saved-calendar creation path:
   `src/lib/manual-workout-authoring/*` owns draft validation, backend template registry, review
   token/checksum exactness, first manual plan confirm, and adding one reviewed workout into an
@@ -311,7 +306,12 @@
   back/Redo UI, active-plan replacement semantics expansion, QR/share/import, PDF/watch export,
   and coach/organization templates are not implemented yet.
 - visible onboarding on `/` is now split between manual setup and quick setup:
-  authenticated users without setup can create an empty manual plan from required basics, or use Quick setup for the bounded first-plan constructor plus backend-owned Plan Preset / selected running-plan review. The visible structured constructor calls `generateStructuredFirstPlanDraft` first, keeps `correction_required` inline near the form, opens a `Review your setup` modal only for `draft_ready`, and calls `confirmStructuredFirstPlanDraft` only from the modal `Yes, create plan` action
+  authenticated users without setup can create an empty manual plan from required basics, or use
+  Quick setup for the bounded first-plan constructor plus backend-owned selected distance-goal
+  review. The visible structured constructor calls `generateStructuredFirstPlanDraft` first, keeps
+  `correction_required` inline near the form, opens a `Review your setup` modal only for
+  `draft_ready`, and calls `confirmStructuredFirstPlanDraft` only from the modal
+  `Yes, create plan` action
 - structured constructor review-before-create is now the visible Quick setup onboarding path:
   `generateStructuredFirstPlanDraft` validates the same structured setup contract, attempts the non-mutating `ai-first-plan-blueprint-v1` planner with the first-plan-specific model/timeout policy, normalizes accepted blueprint output into canonical `training-plan-v2`, and returns a non-mutating `draft_failed` / `ai_first_plan_blueprint_unavailable` retry state instead of reviewing or saving deterministic `structured_authoring_v1` output when AI is missing, invalid, or timed out. The blueprint prompt/schema require OpenAI or the local QA/dev fixture to author explicit dated workouts, while backend validates fixed rest days, weekly coverage, long-run intent, goal-family identities, metric truth, and child-first workout blocks before signing a reviewed draft. Beginner/low-support plans stay easy-first without forced hard workouts, while supported performance, supported balanced half-marathon, marathon, ultra, and mountain/trail blueprints are rejected if they collapse into generic support filler or use identities from the wrong goal family. The successful draft payload includes bounded source/repair/debug metadata, safe `blueprintTrace` / `datePlacement` diagnostics when a blueprint attempt runs, and a signed reviewed-plan token. `confirmStructuredFirstPlanDraft` accepts only reviewed `ai_first_plan_blueprint_v1` canonical drafts with `ai_authored` or `repaired_ai_draft` status, blocks if an active plan already exists, revalidates the setup and structured authoring input, verifies the reviewed-plan token, validates fixed rest days without rewriting the plan, and then persists the exact reviewed canonical calendar rows through a first-plan reviewed-draft persistence seam without imported-plan weekday remapping, OpenAI calls, or regeneration.
 - Dictate-to-Plan / voice-to-plan is retired from current system truth:
@@ -321,7 +321,10 @@
   Do not describe the compact Pro `AI setup`, microphone, transcript paste, or voice setup assist as
   live until a future Product/Backend/Frontend gate reselects and rebuilds it from the current
   structured plan-authoring contract.
-- the no-plan onboarding frontend implementation now keeps orchestration in `OnboardingGate` while the structured constructor, Plan Preset / selected-plan review, manual setup, and shared onboarding form model live in focused `src/components/onboarding/*` modules so those paths share option registries and request-building helpers instead of maintaining separate local truth
+- the no-plan onboarding frontend implementation now keeps orchestration in `OnboardingGate` while
+  the structured constructor, selected distance-goal review, manual setup, and shared onboarding
+  form model live in focused `src/components/onboarding/*` modules so those paths share option
+  registries and request-building helpers instead of maintaining separate local truth
 - the backend now also has one first-pass free-text authoring seam:
   authenticated saved mode can accept one free-text request server-side, ask OpenAI for bounded
   structured authoring input, validate that output deterministically, then the saved-mode text

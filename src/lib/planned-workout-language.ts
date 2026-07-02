@@ -185,7 +185,6 @@ function resolveRunnerFacingWorkoutType({
       return "steady";
     case "long_aerobic_run":
     case "long_run_with_steady_finish":
-    case "base_endpoint_marker":
     case "cutback_long_run":
     case "taper_long_run":
     case "tenk_completion_or_checkpoint":

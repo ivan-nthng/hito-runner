@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { buildAiGeneratedRunningPlanDevFixturePreviewOptions } from "../src/lib/ai-generated-running-plan-dev-fixture";
+import { buildAiGeneratedRunningPlanAuthoringInput } from "../src/lib/ai-generated-running-plan";
 import {
-  buildReviewedRunningPlanPreview,
+  buildReviewedAiGeneratedRunningPlanPreview,
   runningPlanPreviewInputSchema,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
@@ -150,6 +152,21 @@ function validatePlanGoalIntentNormalizer() {
   });
   assert.equal(aggressive.feasibility.status, "aggressive_or_short_horizon");
 
+  const impossibleMarathon = mustNormalize({
+    rawIntent: {
+      distance: { kind: "preset", preset: "Marathon" },
+      targetDate: "2026-07-12",
+    },
+    distanceFamily: "Marathon Completion",
+    startDate: "2026-07-06",
+    horizonWeeks: 20,
+  });
+  assert.equal(impossibleMarathon.feasibility.status, "impossible_goal");
+  assert.match(
+    JSON.stringify(impossibleMarathon.feasibility.reasons),
+    /marathon.*not enough time/i,
+  );
+
   const invalid = normalizePlanGoalIntent({
     rawIntent: { targetDate: "2026-02-31" },
     distanceFamily: "10K",
@@ -158,11 +175,11 @@ function validatePlanGoalIntentNormalizer() {
 }
 
 async function validateSelectedPlanReviewAndReadback() {
-  const withoutIntent = await buildReviewedRunningPlanPreview(baseInput);
+  const withoutIntent = await buildReviewedAiFixture(baseInput);
   assert.equal(withoutIntent.ok, true);
   if (!withoutIntent.ok) throw new Error(withoutIntent.unavailable.error.message);
 
-  const withIntent = await buildReviewedRunningPlanPreview({
+  const withIntent = await buildReviewedAiFixture({
     ...baseInput,
     planGoalIntent: {
       targetFinishTime: "45:00",
@@ -224,6 +241,34 @@ function assertNoExecutablePaceOrPersonalHr(plan: TrainingPlanV2) {
 
   assert.doesNotMatch(text, /pace_min_per_km_range|pace_range_min_km|pace_seconds_per_km/);
   assert.doesNotMatch(text, /personal_hr|personal_hr_zone|measured_threshold/i);
+}
+
+async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input);
+  assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
+  if (!authoring.ok) {
+    throw new Error(authoring.message);
+  }
+
+  const aiPreview = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+    authoringInput: authoring.authoringInput,
+    today: input.startDate ?? authoring.authoringInput.schedule.startDate,
+    env: localAiGeneratedFixtureEnv(),
+  });
+  assert.notEqual(aiPreview, null, "Plan-goal intent proof must use local AI fixture.");
+
+  return buildReviewedAiGeneratedRunningPlanPreview(input, {
+    aiPreview: aiPreview ?? undefined,
+  });
+}
+
+function localAiGeneratedFixtureEnv() {
+  return {
+    OPENAI_API_KEY: "local-qa-dev-ai-generated-plan-fixture",
+    OPENAI_MODEL: "hito-local-qa-dev-ai-generated-plan-fixture",
+    LOCAL_AUTH_BYPASS_ENABLED: "true",
+    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+  };
 }
 
 main().catch((error) => {

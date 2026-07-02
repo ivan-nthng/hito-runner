@@ -19,16 +19,16 @@ export function buildBlueprintSegmentTarget({
   repairs: string[];
 }): NonNullable<Step["target"]> {
   const target: NonNullable<Step["target"]> = {
-    intensity: segmentIntensity(workout, segmentKind),
-    rpe: segmentKind === "main" ? workout.plannedRpe : Math.max(2, workout.plannedRpe - 2),
     cue: segmentCue(workout, segmentKind),
     hint: segmentHint(workout, segmentKind),
   };
+  const intensity = segmentIntensity(workout, segmentKind);
 
   if (context.paceTargetsAllowed && shouldApplyPaceTarget(workout, segmentKind)) {
     const paceTarget = findDeterministicPaceTarget(deterministicWorkout, segmentKind);
 
     if (paceTarget) {
+      target.intensity = intensity;
       target.pace_min_per_km_range = paceTarget;
     }
   } else if (

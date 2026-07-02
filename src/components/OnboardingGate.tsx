@@ -275,7 +275,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         reason: "invalid_review",
         message: confirmInput.message,
         ...(confirmInput.sourceKind ? { sourceKind: confirmInput.sourceKind } : {}),
-        ...(confirmInput.planFamily ? { planFamily: confirmInput.planFamily } : {}),
       });
       return;
     }
@@ -327,7 +326,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         reason: "persistence_failed",
         message,
         sourceKind: confirmInput.input.sourceKind,
-        planFamily: confirmInput.input.planFamily,
       });
       hitoToast.error({
         id: STRUCTURED_REVIEW_TOAST_ID,
@@ -511,16 +509,12 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                   onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
                   onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
                   onPlanGoalTargetDateChange={setPlanGoalTargetDate}
-                  onSelectPlan={(cardId) => {
-                    selectedPlanPreview.selectPlanPreview(cardId);
-                  }}
                   onRefreshPreview={() => {
                     void selectedPlanPreview.refreshPreview();
                   }}
                   onCreatePlan={() => {
                     void confirmSelectedRunningPlan();
                   }}
-                  showInlinePreviewAction={false}
                 />
               }
             />

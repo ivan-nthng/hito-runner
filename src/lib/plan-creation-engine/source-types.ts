@@ -7,7 +7,6 @@ export const RUNNING_PLAN_ENGINE_SOURCE_VERSION = "running_plan_engine_source_v1
 export const RUNNING_PLAN_DISTANCE_FAMILY_VALUES = [
   "10K",
   "Half Marathon",
-  "Marathon Base",
   "Marathon Completion",
 ] as const;
 
@@ -39,7 +38,6 @@ export const RUNNING_PLAN_WORKOUT_DAY_KIND_VALUES = [
   "intervals",
   "hills",
   "final_selected_distance_day",
-  "marathon_base_endpoint",
 ] as const;
 
 export type RunningPlanWorkoutDayKind = (typeof RUNNING_PLAN_WORKOUT_DAY_KIND_VALUES)[number];
@@ -63,7 +61,6 @@ export type RunningPlanNonEndpointWorkoutDayKind =
 
 export const RUNNING_PLAN_ENDPOINT_WORKOUT_DAY_KIND_VALUES = [
   "final_selected_distance_day",
-  "marathon_base_endpoint",
 ] as const;
 
 export type RunningPlanEndpointWorkoutDayKind =
@@ -246,9 +243,7 @@ export interface RunningPlanEndpointTemplate extends RunningPlanWorkoutDayTempla
   family: RunningPlanDistanceFamily;
   endpointGateId: string;
   endpointDistanceMeters: number | null;
-  endpointBehavior:
-    | "selected_distance_completion_or_checkpoint"
-    | "marathon_base_durability_endpoint";
+  endpointBehavior: "selected_distance_completion_or_checkpoint";
   mustNotClaimFullMarathonReadiness: boolean;
 }
 
@@ -297,7 +292,7 @@ export interface RunningPlanMetricAndHrPolicy {
 export interface RunningPlanEndpointGate {
   family: RunningPlanDistanceFamily;
   gateId: string;
-  requiredEndpointKind: "selected_distance_endpoint" | "marathon_base_endpoint";
+  requiredEndpointKind: "selected_distance_endpoint";
   requiredFinalWorkoutKinds: readonly RunningPlanWorkoutDayKind[];
   endpointDistanceMeters: number | null;
   mustNameSelectedDistanceInEndpoint: boolean;

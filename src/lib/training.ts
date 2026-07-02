@@ -25,11 +25,11 @@ import {
 import type { WorkoutFeedbackMarkerSummary } from "@/lib/workout-result-import/types";
 
 export type WorkoutType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
-export type VisibleWorkoutType = CanonicalWorkoutFamily | "quality";
+type VisibleWorkoutType = CanonicalWorkoutFamily | "quality";
 export type Status = "completed" | "partial" | "skipped" | "today" | "upcoming" | "rest";
-export type WeekStatus = "on_track" | "partially_off_track" | "needs_reset";
-export type TrainingMode = "preview" | "onboarding" | "authenticated";
-export type WorkoutOutcome = Extract<Status, "completed" | "partial" | "skipped">;
+type WeekStatus = "on_track" | "partially_off_track" | "needs_reset";
+type TrainingMode = "preview" | "onboarding" | "authenticated";
+type WorkoutOutcome = Extract<Status, "completed" | "partial" | "skipped">;
 
 export interface StepTarget {
   target_source?: string;
@@ -55,9 +55,9 @@ export interface StepTarget {
   extra?: Record<string, string | number>;
 }
 
-export type SegmentTone = "warmup" | "run" | "walk" | "work" | "recovery" | "finish" | "cooldown";
+type SegmentTone = "warmup" | "run" | "walk" | "work" | "recovery" | "finish" | "cooldown";
 
-export interface SegmentColorMeta {
+interface SegmentColorMeta {
   tone: SegmentTone;
   label: string;
   color: string;
@@ -73,14 +73,7 @@ export interface StepUnitPrescription {
   distance_km?: number;
 }
 
-export type StepRepeatChildRole =
-  | "warm_up"
-  | "run"
-  | "walk"
-  | "work"
-  | "recover"
-  | "finish"
-  | "cooldown";
+type StepRepeatChildRole = "warm_up" | "run" | "walk" | "work" | "recover" | "finish" | "cooldown";
 
 export interface StepRepeatChildPrescription {
   role: StepRepeatChildRole;
@@ -112,13 +105,6 @@ export interface Step {
   repeats?: number;
   children?: Step[];
   target?: StepTarget;
-}
-
-export type RepeatChildStepsSource = "step_children" | "prescription_children" | "none";
-
-export interface RepeatChildStepsReadback {
-  children: Step[];
-  source: RepeatChildStepsSource;
 }
 
 export interface WorkoutLog {
@@ -230,7 +216,7 @@ export interface TrainingSnapshot {
   workouts: Workout[];
 }
 
-export interface ShellSnapshot {
+interface ShellSnapshot {
   currentDate: string;
   weekStatus: WeekStatus;
   mode: TrainingMode;
@@ -419,7 +405,7 @@ export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   };
 }
 
-export function resolveWorkoutVisibleType(workout: WorkoutVisibleInput): VisibleWorkoutType | null {
+function resolveWorkoutVisibleType(workout: WorkoutVisibleInput): VisibleWorkoutType | null {
   const language = workoutPlannedLanguage(workout);
 
   return RUNNER_FACING_VISIBLE_TYPE[language.runnerFacingWorkoutType] ?? "quality";
@@ -830,19 +816,12 @@ export function repeatCountForStep(step: Step): number | null {
 }
 
 export function repeatChildSteps(step: Step): Step[] {
-  return resolveRepeatChildSteps(step).children;
-}
-
-export function resolveRepeatChildSteps(step: Step): RepeatChildStepsReadback {
   if (!isRepeatStructureStep(step)) {
-    return { children: [], source: "none" };
+    return [];
   }
 
   if (step.children?.length) {
-    return {
-      children: step.children,
-      source: "step_children",
-    };
+    return step.children;
   }
 
   const prescription = step.prescription;
@@ -854,14 +833,11 @@ export function resolveRepeatChildSteps(step: Step): RepeatChildStepsReadback {
     });
 
     if (reduced.children.length > 0) {
-      return {
-        children: reduced.children.map(repeatChildPrescriptionToStep),
-        source: reduced.source === "children" ? "prescription_children" : "none",
-      };
+      return reduced.children.map(repeatChildPrescriptionToStep);
     }
   }
 
-  return { children: [], source: "none" };
+  return [];
 }
 
 export function primaryWorkoutTarget(workout: Pick<Workout, "steps">): StepTarget | undefined {
@@ -1329,17 +1305,6 @@ function readStepGuidance(step: Step) {
 
   if (typeof guidance === "string") {
     const trimmed = guidance.trim();
-    return trimmed || null;
-  }
-
-  if (guidance && typeof guidance === "object" && "guidance" in guidance) {
-    const nestedGuidance = (guidance as { guidance?: unknown }).guidance;
-
-    if (typeof nestedGuidance !== "string") {
-      return null;
-    }
-
-    const trimmed = nestedGuidance.trim();
     return trimmed || null;
   }
 

@@ -26,7 +26,7 @@ export const RUNNING_PLAN_SOURCE_MODEL: RunningPlanEngineSourceModel = {
 } as const;
 
 export function getRunningPlanWorkoutDayTemplate(kind: RunningPlanWorkoutDayKind) {
-  if (kind === "final_selected_distance_day" || kind === "marathon_base_endpoint") {
+  if (kind === "final_selected_distance_day") {
     throw new Error(
       `Endpoint templates are family-specific; use resolveRunningPlanEndpointTemplate(...) for ${kind}.`,
     );

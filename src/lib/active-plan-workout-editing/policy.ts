@@ -80,11 +80,6 @@ const EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS = new Set([
   "structured_authoring_v1",
   "ai_first_plan_blueprint_v1",
   "ai_first_plan_envelope_v1",
-  "running_plan_engine_10k_builder_v1",
-  "running_plan_engine_half_marathon_builder_v1",
-  "running_plan_engine_marathon_base_builder_v1",
-  "running_plan_engine_marathon_completion_builder_v1",
-  "plan_preset_v1",
   "training_plan_v2_import",
   "active_plan_refresh_v1",
 ]);
@@ -166,7 +161,6 @@ export function resolveActivePlanSourceStatus(activePlan: PersistedPlanCycleRow)
   for (const key of [
     "manual_user_built_plan",
     "selected_plan_engine",
-    "plan_preset",
     "active_plan_refresh",
     "ai_first_plan_blueprint",
     "ai_first_plan_envelope",

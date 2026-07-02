@@ -833,7 +833,7 @@ function assertSupportedHalfMarathonMarathonSpecificity({
     "recreational half target-time usable benchmark specificity",
   );
 
-  const beginnerMarathonBase = buildPlan(
+  const beginnerMarathonAuthoringInput = buildPlan(
     buildRequest("marathon", {
       benchmark: { kind: "unknown" },
       goal: {
@@ -848,14 +848,14 @@ function assertSupportedHalfMarathonMarathonSpecificity({
   ).authoringInput;
   const beginnerMarathonPlan = buildStructuredAuthoringPlan(
     structuredPlanAuthoringInputSchema.parse({
-      ...beginnerMarathonBase,
+      ...beginnerMarathonAuthoringInput,
       schedule: {
-        ...beginnerMarathonBase.schedule,
+        ...beginnerMarathonAuthoringInput.schedule,
         targetDate: null,
         preparationHorizonWeeks: 16,
       },
       runnerProfile: {
-        ...beginnerMarathonBase.runnerProfile,
+        ...beginnerMarathonAuthoringInput.runnerProfile,
         experienceLevel: "returning_runner",
         baselineSessionsPerWeek: 3,
         baselineLongRunKm: null,
@@ -891,7 +891,7 @@ function assertSupportedHalfMarathonMarathonSpecificity({
     "beginner marathon target-time without benchmark should not emit numeric race pace",
   );
 
-  const recreationalMarathonBase = buildPlan(
+  const recreationalMarathonAuthoringInput = buildPlan(
     buildRequest("marathon", {
       goal: {
         goalDistance: "marathon",
@@ -904,14 +904,14 @@ function assertSupportedHalfMarathonMarathonSpecificity({
   ).authoringInput;
   const recreationalMarathonPlan = buildStructuredAuthoringPlan(
     structuredPlanAuthoringInputSchema.parse({
-      ...recreationalMarathonBase,
+      ...recreationalMarathonAuthoringInput,
       schedule: {
-        ...recreationalMarathonBase.schedule,
+        ...recreationalMarathonAuthoringInput.schedule,
         targetDate: null,
         preparationHorizonWeeks: 18,
       },
       runnerProfile: {
-        ...recreationalMarathonBase.runnerProfile,
+        ...recreationalMarathonAuthoringInput.runnerProfile,
         experienceLevel: "consistent_runner",
         baselineSessionsPerWeek: 4,
         baselineLongRunKm: null,
@@ -937,21 +937,21 @@ function assertSupportedHalfMarathonMarathonSpecificity({
 
   const experiencedMarathonPlan = buildStructuredAuthoringPlan(
     structuredPlanAuthoringInputSchema.parse({
-      ...recreationalMarathonBase,
+      ...recreationalMarathonAuthoringInput,
       schedule: {
-        ...recreationalMarathonBase.schedule,
+        ...recreationalMarathonAuthoringInput.schedule,
         targetDate: null,
         preparationHorizonWeeks: 18,
       },
       runnerProfile: {
-        ...recreationalMarathonBase.runnerProfile,
+        ...recreationalMarathonAuthoringInput.runnerProfile,
         experienceLevel: "experienced_runner",
         baselineSessionsPerWeek: 5,
         baselineLongRunKm: null,
         baselineLongRunDurationMin: 95,
       },
       currentLevel: {
-        ...recreationalMarathonBase.currentLevel,
+        ...recreationalMarathonAuthoringInput.currentLevel,
         currentTrainingLoadSummary: null,
       },
     }),

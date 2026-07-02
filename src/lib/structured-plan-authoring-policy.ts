@@ -16,6 +16,8 @@ export type SupportedSpecificityIdentity =
   | "controlled_tempo_session"
   | "time_intervals"
   | "distance_intervals"
+  | "5k_sharpening_repeats"
+  | "10k_rhythm_intervals"
   | "half_marathon_threshold_durability"
   | "marathon_steady_specificity"
   | "race_pace_session"
@@ -512,6 +514,8 @@ export function isSupportedSpecificityIdentity(identity: string | null | undefin
     identity === "controlled_tempo_session" ||
     identity === "time_intervals" ||
     identity === "distance_intervals" ||
+    identity === "5k_sharpening_repeats" ||
+    identity === "10k_rhythm_intervals" ||
     identity === "half_marathon_threshold_durability" ||
     identity === "marathon_steady_specificity" ||
     identity === "race_pace_session" ||
@@ -744,12 +748,6 @@ function resolveHalfMarathonSpecificityOptions(
   const metricTruth = hasRaceSpecificMetricSupport(normalized);
   const raceRhythm = metricTruth;
 
-  if (!metricTruth) {
-    return phase === "Taper"
-      ? ["easy_run_with_strides", "progression_run"]
-      : ["progression_run", "easy_run_with_strides"];
-  }
-
   if (phase === "Base") {
     return cadence.frequency === "weekly"
       ? ["controlled_tempo_session", "progression_run", "easy_run_with_strides"]
@@ -757,6 +755,15 @@ function resolveHalfMarathonSpecificityOptions(
   }
 
   if (phase === "Build") {
+    if (!metricTruth && cadence.frequency === "weekly" && weekNumber % 3 === 0) {
+      return [
+        "time_intervals",
+        "half_marathon_threshold_durability",
+        "controlled_tempo_session",
+        "progression_run",
+      ];
+    }
+
     return cadence.frequency === "weekly"
       ? [
           "half_marathon_threshold_durability",
@@ -768,6 +775,15 @@ function resolveHalfMarathonSpecificityOptions(
   }
 
   if (phase === "Specific") {
+    if (!metricTruth && cadence.frequency === "weekly" && weekNumber % 3 === 0) {
+      return [
+        "time_intervals",
+        "half_marathon_threshold_durability",
+        "controlled_tempo_session",
+        "progression_run",
+      ];
+    }
+
     return cadence.frequency === "weekly"
       ? [
           "half_marathon_threshold_durability",
@@ -790,6 +806,30 @@ function resolveDistanceBuildSpecificityOptions(
 
   if (distanceMeters != null && distanceMeters > 21_100) {
     return resolveMarathonSpecificityOptions(normalized, weekNumber, cadence);
+  }
+
+  if (distanceMeters != null && distanceMeters <= 5_000) {
+    if (weekNumber % 3 === 1) {
+      return ["5k_sharpening_repeats", "controlled_tempo_session", "progression_run"];
+    }
+
+    if (weekNumber % 3 === 2) {
+      return ["time_intervals", "5k_sharpening_repeats", "progression_run"];
+    }
+
+    return ["distance_intervals", "5k_sharpening_repeats", "controlled_tempo_session"];
+  }
+
+  if (distanceMeters != null && distanceMeters <= 10_000) {
+    if (weekNumber % 3 === 1) {
+      return ["easy_run_with_strides", "controlled_tempo_session", "progression_run"];
+    }
+
+    if (weekNumber % 3 === 2) {
+      return ["controlled_tempo_session", "10k_rhythm_intervals", "progression_run"];
+    }
+
+    return ["10k_rhythm_intervals", "time_intervals", "controlled_tempo_session"];
   }
 
   if (distanceMeters != null && distanceMeters > 10_000) {

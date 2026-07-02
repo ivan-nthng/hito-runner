@@ -14,102 +14,134 @@ high
 
 ## Next Recommended Role
 
-frontend
+qa
 
 ## Task
 
-Consolidate duplicated Calendar day-rendering paths with net product LOC reduction.
+Validate pre-customer generated-plan legacy purge in browser.
 
 ## Stage
 
-FRONTEND implementation / Calendar day-renderer consolidation with net LOC reduction.
+QA validation / generated-plan legacy purge browser acceptance.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: FRONTEND
+ROLE: QA
 
 Task:
-Consolidate duplicated Calendar day-rendering paths with net product LOC reduction.
+Validate pre-customer generated-plan legacy purge in browser.
 
 Stage:
-FRONTEND implementation / Calendar day-renderer consolidation with net LOC reduction.
+QA validation / generated-plan legacy purge browser acceptance.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md
 
 Context:
-The calendar Empty vocabulary cleanup is accepted. Visible calendar language now uses `Rest`,
-`No workout`, and `Rest or no-workout day`; internal `empty` may remain only as a technical state key.
-Fresh source-size proof keeps product source at `126282` lines and
-`productActiveDecomposition1500: 2`; this accepted vocabulary cleanup did not reduce product LOC.
-
-The next deletion-first source-size candidate is `src/components/Calendar.tsx` (`1776` lines). Source
-inspection shows three repeated day-rendering paths in the same file:
-- `MobileMonthList`;
-- `DayCell`;
-- `WeekStrip`.
-
-Those paths repeatedly rebuild the same manual Add/Move/Clear/Undo/feedback logic around
-`HitoCalendarDayCell`, `HitoWorkoutDayRow`, `ManualWorkoutAddMenu`, and
-`ManualWorkoutSourceAction`. This is one frontend owner and one browser validation story.
+Backend completed the pre-customer legacy purge for generated-plan and plan-authoring code. Hito has
+no customer-generated production content to preserve for the removed legacy paths. Current generated
+plan truth is the unified distance-goal AI-authored dated plan flow: presets are UI shortcuts to
+`distanceMeters`, backend reviews and persists the accepted canonical draft, and old deterministic
+generated-plan product builders / backend Plan Preset discovery seams are removed.
 
 Root cause and architecture fit:
-Visible symptom: `Calendar.tsx` remains an oversized runtime file even after vocabulary cleanup.
-Underlying cause: month cell, mobile row, and week strip rendering duplicate the same day-action
-decision tree instead of sharing one local rendering model.
-Canonical owner: FRONTEND calendar rendering/view-model consolidation. Backend capability metadata
-and mutation semantics are current truth and must stay unchanged.
+Visible symptom: legacy deterministic builder and Plan Preset compatibility paths were still present
+after the OpenAI-authored distance-goal flow became product truth.
+Underlying cause: generated-plan source truth was split between the accepted AI-authored review path
+and obsolete deterministic/preset builders.
+Canonical owner: BACKEND plan-generation/review/import/export contracts; QA now owns browser proof.
 
 Scope:
-1. Read `AGENTS.md`, `agents/frontend.agent.md`, `skills/hito-frontend-design-system/SKILL.md`,
-   this source-size plan, `docs/current-functional-map.md`, `docs/current-product.md`,
-   `docs/current-system.md`, `src/components/Calendar.tsx`,
-   `src/components/calendar/calendar-day-presentation.ts`,
-   `src/components/ui/hito-calendar-day.tsx`, and relevant manual workout action components.
-2. Use read-only subagents internally for calendar behavior-risk and Hito DS reuse review where
-   useful; integrate findings yourself.
-3. Consolidate duplicated Calendar day-action rendering inside `src/components/Calendar.tsx`.
-   Prefer deleting repeated branches and reusing a single local day render model/helper over
-   extracting code into new files.
-4. Preserve all current behavior:
-   - month grid;
-   - mobile month list;
-   - week strip;
-   - Add activity;
-   - Move workout, native drag/drop, move hover, move undo, pending states;
-   - Copy/Clear action menu;
-   - feedback marker links;
-   - tooltip behavior;
-   - Rest/no-workout presentation.
-5. Do not touch backend, Supabase, schemas, persistence, capability policy, workout generation,
-   manual constructor internals, Hito DS token policy, qa-artifacts, logs, or generated output.
-6. Expected source-size result: net product LOC reduction, preferably enough to move
-   `src/components/Calendar.tsx` below the `1500` active-decomposition threshold. Stop and report if
-   the only safe change is cosmetic extraction, a new component layer with net growth, or a behavior
-   change not covered by browser QA.
+1. Read `AGENTS.md`, `agents/qa.agent.md`, `skills/hito-qa-browser-regression/SKILL.md`, this
+   source-size plan, and the running-plan rebuild plan.
+2. Reuse the healthy managed QA server when possible; run the standard QA preflight for server
+   status, build-output integrity, and `curl -I http://127.0.0.1:3000/`.
+3. Browser-validate the current happy paths after backend cleanup:
+   - Quick setup 10K distance plan preview/create/saved calendar/workout detail;
+   - Quick setup 21.1K distance plan preview/create/saved calendar/workout detail;
+   - Quick setup 42.195K distance plan preview/create/saved calendar/workout detail;
+   - Quick setup Custom 15K preview/create/saved calendar/workout detail;
+   - manual workout authoring smoke sufficient to prove the purge did not break manual review/create;
+   - saved calendar and generated workout detail child-first repeat readback;
+   - import/export only if still exposed in the tested flow without requiring unsafe mutation.
+4. Verify runner-facing UI and persisted readback do not expose deleted legacy truth:
+   `Plan Preset`, `10K Foundation`, `Half Marathon Balanced`, `Marathon Base`,
+   `base_endpoint_marker`, `plan_preset`, `running_plan_engine_*_builder` as generated-plan
+   product truth, `repeat_unit`, `recovery_unit`, `legacy_repeat_unit`, `legacy_recovery_unit`,
+   fake executable pace, fake personal HR, or raw deterministic builder source kinds.
+5. Use disposable test accounts/fixtures and clean them back to zero app-owned residue.
+6. Do not implement fixes. If validation fails, capture artifacts and route one owner with source
+   proof.
 
 Validation:
-- `npm run metrics:lines` before and after.
-- Targeted ESLint for touched frontend files.
-- `npm run build`.
-- Browser QA for saved calendar `/` in desktop and exact `375px`.
-- Browser QA must cover month grid and week strip if both remain reachable.
-- Browser QA should cover Add activity affordance, Move workout drag/drop or explicit move action,
-  Undo move if available, Copy/Clear menu visibility where safe, feedback marker link if present,
-  no horizontal overflow, and console warning/error count `0`.
-- Console warning/error count must be `0`; no page-level horizontal overflow.
-- `npm run work:dashboard:no-admin` if plan/dashboard metadata changes.
-- Scoped `git diff --check` for touched files.
+- Desktop and exact `375px` coverage for all four goal paths.
+- Console warning/error and pageerror counts must be `0`.
+- No page-level horizontal overflow.
+- DB/readback proof for created plans and generated workout detail.
+- Disposable cleanup proof returns zero app-owned residue.
+- Durable artifact folder under `qa-artifacts/screenshots/2026-07-02/`.
 
 Stop conditions:
-- Stop if consolidation would weaken Add/Move/Clear safety, logged/evidence protection, rest/no-workout
-  presentation, same-row move semantics, tooltip/feedback routing, or backend-owned capability truth.
-- Stop if the work requires backend mutation changes, route-state rewrite, product redesign, or new
-  Hito DS primitives.
-- Stop if net product LOC reduction is not achievable without unsafe behavior change; do not ship a
-  threshold-only extraction that grows maintained source.
+- Stop if backend cleanup changed product behavior beyond the accepted distance-goal generated-plan
+  flow.
+- Stop if legacy deterministic/preset truth is still visible or persisted as current product truth.
+- Stop if cleanup would require frontend/backend fixes, Supabase schema/data mutation, live OpenAI
+  calls, or product-policy decisions.
 ```
+
+## Backend Implementation - 2026-07-02 - Generated-Plan Legacy Purge
+
+Status: backend/source validation passed; browser QA pending.
+
+Backend removed the pre-customer legacy generated-plan/preset stack instead of preserving obsolete
+compatibility for hypothetical future users. The accepted product truth is now one distance-goal
+AI-authored dated preview/review/confirm path. Preset cards are UI shortcuts into
+`planGoalIntent.distanceMeters`, not backend Plan Preset programs or deterministic product builders.
+
+Removed current runtime/proof owners include:
+
+- deterministic generated-plan product builders under `src/lib/plan-creation-engine/*-builder.ts`;
+- backend `Marathon Base` / `base_endpoint_marker` generated-plan identity/readback residue;
+- backend Plan Preset discovery/actions and `src/lib/plan-presets/*`;
+- old Plan Preset validator/proof helpers and generated-plan scenario builders;
+- obsolete `plan_preset_v1` / deterministic builder editability fixtures;
+- finalized-runtime copy support for deleted Plan Preset CSVs.
+
+Fresh source-size checkpoint after backend purge:
+
+- maintained size: `202,501` lines / `649` files;
+- product source: `120,312` lines / `325` files;
+- scripts: `37,516` lines / `69` files;
+- product active-decomposition candidates: `1`;
+- script active-decomposition candidates: `0`;
+- active markdown compression candidates: `0`;
+- dirty worktree: `99` total, `69` tracked modified, `30` tracked deleted, `0` untracked.
+
+Source-size effect versus the pre-purge baseline:
+
+- maintained lines: net about `-14,324`;
+- product source: net about `-6,011`;
+- scripts: net about `-8,370`;
+- maintained files: net `-27`.
+
+Validation passed in the backend slice:
+
+- `node --import tsx ./scripts/validate-plan-goal-intent-contract.ts`;
+- `node --import tsx ./scripts/validate-ai-generated-running-plan-creation.ts`;
+- `node --import tsx ./scripts/validate-planned-workout-language.ts`;
+- `npm run validate-manual-workout-authoring`;
+- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`;
+- targeted ESLint for touched source/script files;
+- `npm run build`;
+- `npm run metrics:lines`.
+
+Source scan after cleanup found no current `src/` or `scripts/` references for `Marathon Base`,
+`marathon_base`, `base_endpoint_marker`, `plan_preset`, `running_plan_engine_*_builder`,
+`VoiceToPlan`, or `voice_to_plan`.
+
+Next gate: QA browser acceptance for 10K, 21.1K, 42.195K, and Custom 15K generated-plan creation,
+saved calendar, workout detail, manual authoring smoke, and legacy-truth absence.
 
 ## Context
 

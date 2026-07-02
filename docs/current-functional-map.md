@@ -62,7 +62,7 @@ history/evidence protection, and explicit review/confirm boundaries.
 Current flow count:
 
 - User-facing plan creation has five supported runtime entry families:
-  no-active structured/custom first-plan review, no-active selected-plan preset review, no-active
+  no-active structured/custom first-plan review, no-active selected distance-goal review, no-active
   empty manual calendar creation, advanced JSON import/paste, and active-calendar `Add plan`
   reviewed transition for selected running-plan candidates.
 - Voice-to-plan / Dictate-to-Plan is retired from current runtime truth; it is not a visible
@@ -74,8 +74,8 @@ Current flow count:
 
 Current canonical seams:
 
-- No-active onboarding: `OnboardingGate` routes structured/custom, selected-plan presets, and empty
-  manual calendar creation through first-plan/running-plan/manual backend actions.
+- No-active onboarding: `OnboardingGate` routes structured/custom, selected distance-goal shortcuts,
+  and empty manual calendar creation through first-plan/running-plan/manual backend actions.
 - Active `Add plan`: `ActivePlanCreatePlanDialog` reviews a candidate plan through
   `active-plan-transition-actions.ts`; mutation requires explicit confirm and protects history.
 - Advanced JSON import: `UploadJsonDialog` and backend `training-plan-v2` import policy remain a
@@ -282,17 +282,16 @@ Reason:
 - Slice G2 corrected current-doc drift around the removed strict nested AI first-plan module:
   `src/lib/ai-first-plan-draft-authoring.ts` no longer exists, and strict-draft references are
   bounded negative/unsupported handling rather than a runtime or doctrine module.
-- Slice G2A removed the old Plan Preset review/confirm blocked actions from runtime:
-  `src/lib/plan-preset-actions.ts` remains required for `getPlanPresetCards(...)`, while selected
+- Slice G2A removed the old Plan Preset review/confirm blocked actions from runtime. The later
+  pre-customer legacy purge retired the remaining backend Plan Preset discovery owner; selected
   running-plan preview/confirm remains the current create/persist owner.
 - Slice G4A narrowed the active-plan export compatibility facade:
   `/api/plan/export` now imports `exportActivePlanForUser(...)` from
   `src/lib/active-plan-export-actions.ts` directly, and `training-api.ts` no longer re-exports the
   active-plan export names.
-- Slice G4B narrowed the Plan Preset card discovery compatibility facade:
-  onboarding Plan Preset UI surfaces now import `getPlanPresetCards(...)` and
-  `PlanPresetCardsActionResult` directly from `src/lib/plan-preset-actions.ts`, and
-  `training-api.ts` no longer re-exports Plan Preset card discovery.
+- Slice G4B narrowed the former Plan Preset card discovery compatibility facade. That action owner
+  was later retired during the pre-customer generated-plan legacy purge, and `training-api.ts` does
+  not re-export Plan Preset discovery.
 - Slice G4C narrowed the auth callback exchange compatibility facade:
   `/api/auth/confirm` now imports `exchangeCodeForSession(...)` directly from
   `src/lib/auth-actions.ts`, and `training-api.ts` no longer re-exports the auth callback exchange.
@@ -365,9 +364,9 @@ Reason:
   BACKEND/OPS Slice G10 for the remaining stale `scripts/author-plan-from-text.mjs` entrypoint.
 - G10 is complete: the stale `scripts/author-plan-from-text.mjs` entrypoint was deleted while the
   TS-backed `npm run author-plan-from-text` command stayed canonical.
-- G11 is complete: duplicate-space local ops residue files were deleted while canonical
-  `scripts/import-current-plan.mjs`, `scripts/validate-plan-preset-eligibility.ts`, and
-  `scripts/author-plan-from-text.ts` owners remain preserved.
+- G11 is complete: duplicate-space local ops residue files were deleted while then-current canonical
+  ops owners remained preserved. The old Plan Preset eligibility validator was later retired during
+  the pre-customer generated-plan legacy purge.
 - G12 is complete: no-caller first-plan/voice compatibility re-exports were removed from
   `training-api.ts` while canonical `src/lib/first-plan-actions.ts` ownership remains preserved.
 - G13 is complete: dashboard refresh now has first-class package-script aliases over the existing
@@ -392,9 +391,8 @@ Reason:
 - G16 is complete: deletion-only local duplicate-space residue cleanup removed the untracked
   duplicate-space files after source/import proof confirmed canonical owners are unchanged.
 - G17 is complete: untracked legacy Plan Preset builder/review residue under
-  `src/lib/plan-presets/` and `scripts/plan-presets/` was deleted after source/import proof
-  confirmed current Plan Preset truth is card discovery only and selected-plan preview/create owns
-  plan creation.
+  `src/lib/plan-presets/` and `scripts/plan-presets/` was deleted. The remaining tracked Plan Preset
+  discovery owner was later retired during the pre-customer generated-plan legacy purge.
 - G18 is complete: tracked orphan `JsonImportPanel` residue was deleted, and current JSON import
   behavior is now owned by `UploadJsonDialog`.
 - Post-G18 reassessment selected FRONTEND G19 for tracked orphan `DictateToPlanPanel` UI residue.
@@ -469,10 +467,10 @@ calls, Supabase mutation, log deletion, generated/vendor residue cleanup, and ad
 
 - Structured / AI-assisted first plan creates backend-reviewed `training-plan-v2` plans through the
   first-plan review/confirm seam.
-- Selected-distance running plans create accepted selected-plan families through backend preview,
-  review token/checksum, server-side rebuild, and active-plan persistence.
-- Plan Presets expose discovery cards for the three shipped starter families, then hand selection
-  to the selected-distance running-plan preview/create seam.
+- Selected-distance running plans create accepted distance-goal plans through backend preview,
+  review token/checksum, AI/local-fixture-authored canonical draft truth, and active-plan
+  persistence.
+- Quick setup goal cards are UI shortcuts to distance goals, not backend Plan Preset programs.
 - Manual user-built plans create `manual_user_built_plan_v1` active plans from reviewed manual
   workouts; later Add/Clear/Move edits use the same active-plan edit metadata model as other accepted
   active-plan sources without rewriting the original plan source.
@@ -488,8 +486,8 @@ calls, Supabase mutation, log deletion, generated/vendor residue cleanup, and ad
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | No-active-plan entry | Signed-in runners without an active plan see creation choices instead of silent preview assignment. | Shipped for the accepted creation choices; latest no-active-plan IA blocker is not marked accepted here without explicit QA closeout | `src/lib/route-data-actions.ts`, `src/lib/first-plan-actions.ts`, `src/lib/training-api.ts` wrappers | `src/components/OnboardingGate.tsx`, onboarding components | `runner_profiles`, `plan_cycles`, `planned_workouts` only after confirm | Changelog-backed saved-mode and onboarding history; no explicit inspected QA closeout for the `isManualProfileReady` blocker | No silent plan creation; no active-plan replacement without explicit action; do not treat unresolved IA/runtime blockers as cleanup-safe |
 | Structured first plan / AI-authored blueprint draft | Runner enters profile/goal/training context in Quick setup, reviews a backend-shaped draft, then confirms. AI may draft under backend constraints. | Shipped for the current visible structured Quick setup path; Dictate-to-Plan / voice transcript assist is retired from current product truth | `src/lib/first-plan-actions.ts`, `src/lib/structured-first-plan-onboarding.ts`, `src/lib/ai-first-plan-blueprint-*`, `src/lib/active-plan-persistence.ts` | `src/components/OnboardingGate.tsx`, `src/components/onboarding/StructuredPlanConstructor.tsx` | `runner_profiles`, `plan_cycles`, `planned_workouts` | Validators under `scripts/validate-plan-authoring-doctrine.ts`; changelog entries through 2026-06-10 | No AI direct persistence; no fake pace from target time; no fake personal HR; strict draft/envelope ops seams are not normal UI; no voice-to-plan / AI setup path unless a future Product/Backend/Frontend gate rebuilds and QA-accepts it |
-| Selected-distance plan creation | Runner can create accepted selected-distance plans after preview/review/create. | OpenAI/local-fixture-authored dated Quick setup path is accepted for 10K no-benchmark, Marathon target-time, and Custom 15K target-time; deterministic distance builders are validator/dev scaffolding or legacy discovery context, not normal generated-plan product truth | `src/lib/running-plan-engine-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/ai-generated-running-plan.ts`, `src/lib/active-plan-persistence.ts`; `src/lib/plan-creation-engine/*` remains validator/dev/legacy family policy support | `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`, onboarding selected-plan UI | `runner_profiles`, `plan_cycles`, `planned_workouts` after confirm | QA browser/readback artifact `qa-artifacts/screenshots/2026-06-30/openai-authored-dated-readback-cleanup-qa-rerun/`; generated-plan validators and child-first readback proof | Do not call AI at confirm; do not persist raw AI output; do not turn outcome pace into executable workout pace; do not treat Marathon Base as current marathon target-time truth |
-| Plan Presets | Runner can use 10K Foundation, Half Marathon Balanced, or Marathon Base cards as non-mutating discovery into selected running-plan preview/create, including saved-mode active-manual transition discovery. | Shipped as discovery; creation is owned by the running-plan engine or active-plan transition seam | `src/lib/plan-preset-actions.ts` keeps `getPlanPresetCards(...)`; selected create/review/confirm lives in running-plan engine actions/review; active-manual replacement uses `src/lib/active-plan-transition-actions.ts` | Preset cards in onboarding plus selected-plan preview dialog and future saved-mode `Create a plan` transition UI | Card discovery does not persist; selected running-plan confirm persists `runner_profiles`, `plan_cycles`, and `planned_workouts` only when no active plan exists; active manual transition archives/supersedes through reviewed confirm | Changelog 2026-06-07 history plus later selected-plan create proof; Slice G2A removed old Plan Preset review/confirm blocked actions; saved-mode card discovery no longer has an active-plan read gate | No new preset families; no Plan Preset active-plan replacement; no legacy Plan Preset review/confirm creation seam; no direct selected-plan confirm while an active plan exists |
+| Selected-distance plan creation | Runner can create accepted selected-distance plans after preview/review/create. | Current backend truth is the AI/local-fixture-authored dated Quick setup path for 10K, 21.1K, 42.195K, and Custom distance goals; post-legacy-purge browser reacceptance is pending | `src/lib/running-plan-engine-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/ai-generated-running-plan.ts`, `src/lib/active-plan-persistence.ts`; `src/lib/plan-creation-engine/*` remains shared goal/block policy support, not deterministic product-builder truth | `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`, onboarding selected-plan UI | `runner_profiles`, `plan_cycles`, `planned_workouts` after confirm | QA browser/readback artifact `qa-artifacts/screenshots/2026-06-30/openai-authored-dated-readback-cleanup-qa-rerun/` covers the pre-purge path; post-purge QA is selected in the active plans | Do not call AI at confirm; do not persist raw AI output; do not turn outcome pace into executable workout pace; do not treat Marathon Base as current marathon target-time truth |
+| Quick setup goal shortcuts | Runner can choose 10K, Half Marathon, Marathon, or Custom as non-mutating distance inputs into selected running-plan preview/create. | Shipped as UI shortcuts; backend Plan Preset discovery/program actions are retired from current runtime truth | Selected create/review/confirm lives in running-plan engine actions/review; active-manual replacement uses `src/lib/active-plan-transition-actions.ts` | Goal cards in onboarding plus selected-plan preview dialog and future saved-mode `Create a plan` transition UI | Goal shortcut selection does not persist; selected running-plan confirm persists `runner_profiles`, `plan_cycles`, and `planned_workouts` only when no active plan exists; active manual transition archives/supersedes through reviewed confirm | Generated-plan validators and post-purge QA gate | No backend Plan Preset programs; no deterministic product builders; no Plan Preset active-plan replacement; no direct selected-plan confirm while an active plan exists |
 | Active manual plan -> selected generated plan transition | Runner can be shown a backend-shaped impact review for replacing an active manual plan with a reviewed selected generated/preset plan; frontend wiring/QA remains separate. | Backend seam implemented / QA pending / not runner-facing shipped | `src/lib/active-plan-transition-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/active-plan-persistence.ts` | Future saved-mode `Create a plan` transition UI | Old `plan_cycles` row archived/superseded; new selected plan persisted as active; manual templates remain user-library rows | `scripts/validate-running-plan-engine-confirm.ts` transition proof | No silent replacement; no clear-then-create shortcut; no merge of upcoming manual workouts; no deletion of logs/evidence/comparisons/protected history |
 | Manual first create | Runner chooses `Build my plan myself`, reviews one workout, and creates a manual active plan. | Shipped | `src/lib/manual-workout-authoring/actions.ts`, `persistence.ts`, `review-exactness.ts`, `active-plan-persistence.ts` | `OnboardingGate.tsx`, shared manual controls | `runner_profiles`, `plan_cycles`, `planned_workouts` | `scripts/validate-manual-workout-authoring.ts`; browser/DB proof; changelog 2026-06-10 | Do not persist empty active manual plans silently |
 | Active-plan Add activity | Runner adds a reviewed user-authored workout to an eligible today-or-future Rest/no-workout date in an accepted active plan. | Shipped in proved manual and non-manual Add scope | `src/lib/active-plan-workout-editing/policy.ts`, `src/lib/manual-workout-authoring/active-plan-add.ts`, `actions.ts`, `review-exactness.ts` | `src/components/Calendar.tsx`, `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`, `manual-workout-authoring-utils.ts` | Existing `plan_cycles`; new `planned_workouts` rows with `active_plan_user_edit_v1` metadata | Manual browser/DB proof plus universal editability QA; changelog 2026-06-11 and 2026-06-12 | No frontend row append; no unproved source/row mutation; no universal Copy/Paste |
@@ -599,8 +597,8 @@ deleted without replacement proof:
 - `src/lib/runner-training-preferences.ts`
 - `src/lib/running-plan-engine-actions.ts`
 - `src/lib/running-plan-engine-review.ts`
-- `src/lib/plan-creation-engine/*`
-- `src/lib/plan-preset-actions.ts` for `getPlanPresetCards(...)` only
+- `src/lib/plan-creation-engine/*` for shared goal/block policy support, excluding the retired
+  deterministic product builders
 - `src/lib/manual-workout-authoring/actions.ts`
 - `src/lib/manual-workout-authoring/active-plan-add.ts`
 - `src/lib/manual-workout-authoring/saved-templates.ts`
@@ -622,11 +620,9 @@ deleted without replacement proof:
 - `src/lib/active-plan-refresh-actions.ts`
 - `src/lib/active-plan-refresh-draft.ts`
 - `scripts/validate-manual-workout-authoring.ts`
-- `scripts/validate-running-plan-engine-source.ts`
-- `scripts/validate-running-plan-engine-10k-builder.ts`
-- `scripts/validate-running-plan-engine-r6-builders.ts`
 - `scripts/validate-running-plan-engine-confirm.ts`
-- `scripts/generate-running-plan-engine-scenarios.ts`
+- `scripts/validate-ai-generated-running-plan-creation.ts`
+- `scripts/validate-planned-workout-language.ts`
 - `scripts/validate-plan-authoring-doctrine.ts` as a required proof entrypoint, even though it remains a decomposition hotspot
 - `scripts/plan-authoring-doctrine/rich-workout-import-export.ts`
 - `scripts/plan-authoring-doctrine/active-plan-refresh.ts`
@@ -653,9 +649,9 @@ or future-only:
 
 - `src/lib/training-api.ts`: required compatibility facade for many route/component wrappers, but
   Slice G4A removed the active-plan export names from this facade after moving the export route to
-  direct imports from `src/lib/active-plan-export-actions.ts`, Slice G4B removed the Plan Preset
-  card discovery re-export after moving onboarding imports to `src/lib/plan-preset-actions.ts`, and
-  Slice G4C removed the auth callback exchange re-export after moving `/api/auth/confirm` to direct
+  direct imports from `src/lib/active-plan-export-actions.ts`, Slice G4B removed the former Plan
+  Preset card discovery re-export, and Slice G4C removed the auth callback exchange re-export after
+  moving `/api/auth/confirm` to direct
   imports from `src/lib/auth-actions.ts`. Slice G4D removed the Open plan refresh/schedule-edit
   type-only compatibility re-exports after moving component type imports to
   `src/lib/active-plan-refresh-contract.ts` and
@@ -673,8 +669,9 @@ or future-only:
 - `src/lib/auth-actions.ts`: required canonical auth owner. Keep login route data, Magic Link
   request, auth callback exchange, local-auth/public-runtime availability helpers, and redirect
   semantics here; G4C changed only the route import path for `/api/auth/confirm`.
-- `src/lib/plan-preset-actions.ts`: required direct UI import owner for `getPlanPresetCards(...)`;
-  old Plan Preset review/confirm blocked actions were removed by Slice G2A.
+- Backend Plan Preset discovery/actions: retired during the pre-customer generated-plan legacy
+  purge. Quick setup goal cards are UI shortcuts into the running-plan engine review path, not a
+  separate backend program-discovery owner.
 - `scripts/validate-plan-authoring-doctrine.ts`: required proof entrypoint; Slices 12A-12G
   extracted rich import/export, active-plan refresh, AI first-plan blueprint/envelope,
   goal-family quality policy, metric-target/readback, and rich-workout draft normalizer proof
@@ -767,11 +764,10 @@ Keep these as accepted proof paths until a cleanup slice replaces them:
 
 - `node --import tsx ./scripts/validate-manual-workout-authoring.ts`
 - `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-source.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-10k-builder.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-r6-builders.ts`
+- `node --import tsx ./scripts/validate-plan-goal-intent-contract.ts`
+- `node --import tsx ./scripts/validate-ai-generated-running-plan-creation.ts`
+- `node --import tsx ./scripts/validate-planned-workout-language.ts`
 - `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
-- `node --import tsx ./scripts/generate-running-plan-engine-scenarios.ts`
 - `npm run validate-admin-capture-backlog`
 - `npm run import-admin-backlog-work-items -- --dry-run --timeout-ms 30000`
 - `npm run build` when imports, public exports, or browser-visible behavior changes
@@ -892,12 +888,11 @@ count them as current runtime owners.
     `src/components/onboarding/PlanPresetPanel 2.tsx`, and `src/components/ui/calendar 2.tsx` were
     deleted while canonical owners remain untouched.
 37. Post-G16 reassessment selected BACKEND/OPS G17 for untracked legacy Plan Preset builder/review
-    residue under `src/lib/plan-presets/` and `scripts/plan-presets/`. This is not broad Plan
-    Preset or selected-plan behavior work; current card discovery and selected-plan preview/create
-    remain preserved.
+    residue under `src/lib/plan-presets/` and `scripts/plan-presets/`. At that time selected-plan
+    preview/create remained preserved.
 38. G17 is complete: the untracked legacy Plan Preset builder/review module cluster, legacy CSV/source
-    artifacts, and dependent `scripts/plan-presets/*` proof helpers were deleted while tracked card
-    discovery owners remain untouched.
+    artifacts, and dependent proof helpers were deleted. The later pre-customer generated-plan legacy
+    purge retired the remaining tracked backend Plan Preset discovery owner.
 39. Post-G17 reassessment selected FRONTEND G18 for the tracked orphan onboarding
     `JsonImportPanel.tsx`. This is deletion-only source repair; current JSON import behavior remains
     owned by `UploadJsonDialog`.

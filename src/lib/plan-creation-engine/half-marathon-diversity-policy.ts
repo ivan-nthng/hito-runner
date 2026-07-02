@@ -201,10 +201,6 @@ function validateHalfGlobalGates(
       issues.push(`Half Marathon preview must include ${requiredKind}.`);
     }
   }
-
-  if (workoutKinds.has("marathon_base_endpoint")) {
-    issues.push("Half Marathon preview must not use marathon_base_endpoint.");
-  }
 }
 
 function validateHalfRunnerLevelGates({

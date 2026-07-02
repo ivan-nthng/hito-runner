@@ -100,11 +100,6 @@ function validateUniversalActivePlanEditabilityPolicy() {
     "structured_authoring_v1",
     "ai_first_plan_blueprint_v1",
     "ai_first_plan_envelope_v1",
-    "running_plan_engine_10k_builder_v1",
-    "running_plan_engine_half_marathon_builder_v1",
-    "running_plan_engine_marathon_base_builder_v1",
-    "running_plan_engine_marathon_completion_builder_v1",
-    "plan_preset_v1",
     "training_plan_v2_import",
     "active_plan_refresh_v1",
   ];

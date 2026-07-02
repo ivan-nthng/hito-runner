@@ -9,6 +9,10 @@ import {
   type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
 import { useSelectedPlanPresetPreviewController } from "@/components/onboarding/use-selected-plan-preset-preview-controller";
+import {
+  resolveSelectedPlanGoalPreviewGate,
+  type PlanGoalIntentDraftState,
+} from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -187,10 +191,24 @@ export function ActivePlanCreatePlanDialog({
   );
   const hasActivePlan = Boolean(snapshot?.planMeta?.id);
   const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
+  const selectedGoalId = planGoalChoice || null;
+  const planGoalDraftState: PlanGoalIntentDraftState = {
+    planGoalChoice,
+    planGoalCustomDistanceKm,
+    planGoalCustomDistanceLabel,
+    planGoalFinishTime,
+    planGoalTargetDate,
+  };
+  const selectedPlanGoalPreviewGate = resolveSelectedPlanGoalPreviewGate(
+    planGoalDraftState,
+    selectedGoalId,
+  );
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: effectiveConstructorState,
     autoLoadEnabled: open && createMode === "quick",
+    autoRefreshOpenPreview: true,
     isPresetDiscoveryReady,
+    resetOnInputChange: true,
     toastId: ACTIVE_PLAN_CREATE_TOAST_ID,
     previewReadyDescription: "Review the candidate plan before reviewing the active-plan change.",
     onResetExternalState: () => {
@@ -200,6 +218,28 @@ export function ActivePlanCreatePlanDialog({
   });
   const resetSelectedPlanPreviewState = selectedPlanPreview.resetPreviewState;
   const isBusy = selectedPlanPreview.isBusy || transitionStatus !== "idle";
+  const selectedPreviewMatchesGoal = selectedPlanPreview.selectedGoalId === selectedGoalId;
+  const selectedPreviewIsReady =
+    selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
+  const footerHint = activePlanCreateFooterHint({
+    createMode,
+    error: selectedPlanPreview.error,
+    hasActivePlan,
+    isPresetDiscoveryReady,
+    planGoalChoice,
+    previewGate: selectedPlanGoalPreviewGate,
+    previewIsOpen: selectedPlanPreview.previewOpen,
+    previewIsReady: selectedPreviewIsReady,
+    status: selectedPlanPreview.status,
+  });
+  const footerButtonDisabled =
+    isBusy ||
+    createMode !== "quick" ||
+    !hasActivePlan ||
+    !isPresetDiscoveryReady ||
+    !selectedGoalId ||
+    !selectedPlanGoalPreviewGate.ok ||
+    (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
 
   const changePlanGoalChoice = (value: StructuredConstructorState["planGoalChoice"]) => {
     setPlanGoalChoice(value);
@@ -335,6 +375,44 @@ export function ActivePlanCreatePlanDialog({
         duration: 7200,
       });
     }
+  }
+
+  function handleCreatePlanClick() {
+    if (isBusy) {
+      return;
+    }
+
+    if (createMode !== "quick") {
+      selectedPlanPreview.setError("Use Quick plan to create a reviewed generated plan.");
+      return;
+    }
+
+    if (!hasActivePlan) {
+      selectedPlanPreview.setError("Open a saved plan before creating a replacement.");
+      return;
+    }
+
+    if (!isPresetDiscoveryReady) {
+      selectedPlanPreview.setError("Add age, height, and weight before creating a plan.");
+      return;
+    }
+
+    if (!selectedGoalId) {
+      selectedPlanPreview.setError("Choose a goal before creating a generated plan.");
+      return;
+    }
+
+    if (!selectedPlanGoalPreviewGate.ok) {
+      selectedPlanPreview.setError(selectedPlanGoalPreviewGate.error);
+      return;
+    }
+
+    if (selectedPreviewIsReady) {
+      selectedPlanPreview.setPreviewOpen(true);
+      return;
+    }
+
+    selectedPlanPreview.selectPlanPreview(selectedGoalId);
   }
 
   async function confirmReviewedTransition() {
@@ -526,9 +604,6 @@ export function ActivePlanCreatePlanDialog({
                           setTransitionReviewResult(null);
                         }
                       }}
-                      onSelectPlan={(cardId) => {
-                        selectedPlanPreview.selectPlanPreview(cardId);
-                      }}
                       onRefreshPreview={() => {
                         void selectedPlanPreview.refreshPreview();
                       }}
@@ -556,6 +631,11 @@ export function ActivePlanCreatePlanDialog({
           </div>
 
           <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
+            <div className="min-w-0 flex-1">
+              <p className={footerHint.tone === "error" ? "hito-field-error" : "hito-field-helper"}>
+                {footerHint.message}
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
@@ -563,6 +643,17 @@ export function ActivePlanCreatePlanDialog({
               disabled={transitionStatus !== "idle"}
             >
               Close
+            </button>
+            <button
+              type="button"
+              className="hito-button hito-button-primary hito-button-md"
+              disabled={footerButtonDisabled}
+              aria-busy={selectedPlanPreview.status === "previewing_plan" || undefined}
+              onClick={handleCreatePlanClick}
+            >
+              {selectedPlanPreview.status === "previewing_plan"
+                ? "Creating preview..."
+                : "Create plan"}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -585,4 +676,88 @@ export function ActivePlanCreatePlanDialog({
       />
     </>
   );
+}
+
+function activePlanCreateFooterHint({
+  createMode,
+  error,
+  hasActivePlan,
+  isPresetDiscoveryReady,
+  planGoalChoice,
+  previewGate,
+  previewIsOpen,
+  previewIsReady,
+  status,
+}: {
+  createMode: CreateMode;
+  error: string | null;
+  hasActivePlan: boolean;
+  isPresetDiscoveryReady: boolean;
+  planGoalChoice: StructuredConstructorState["planGoalChoice"];
+  previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
+  previewIsOpen: boolean;
+  previewIsReady: boolean;
+  status: ReturnType<typeof useSelectedPlanPresetPreviewController>["status"];
+}): { message: string; tone: "muted" | "error" } {
+  if (error) {
+    return { message: error, tone: "error" };
+  }
+
+  if (createMode !== "quick") {
+    return {
+      message: "Use Quick plan to create a reviewed generated replacement.",
+      tone: "muted",
+    };
+  }
+
+  if (!hasActivePlan) {
+    return {
+      message: "Open a saved plan before creating a replacement.",
+      tone: "error",
+    };
+  }
+
+  if (!isPresetDiscoveryReady) {
+    return {
+      message: "Add age, height, and weight before creating a plan.",
+      tone: "muted",
+    };
+  }
+
+  if (status === "previewing_plan") {
+    return {
+      message: "Creating a reviewed preview before anything is saved.",
+      tone: "muted",
+    };
+  }
+
+  if (!planGoalChoice) {
+    return {
+      message: "Choose a goal to create a reviewed plan.",
+      tone: "muted",
+    };
+  }
+
+  if (!previewGate.ok) {
+    return { message: previewGate.error, tone: "error" };
+  }
+
+  if (previewIsOpen && previewIsReady) {
+    return {
+      message: "Review the preview, then continue in the dialog.",
+      tone: "muted",
+    };
+  }
+
+  if (previewIsReady) {
+    return {
+      message: "Preview is ready. Open it to continue.",
+      tone: "muted",
+    };
+  }
+
+  return {
+    message: "Creates a reviewed generated preview before anything is saved.",
+    tone: "muted",
+  };
 }

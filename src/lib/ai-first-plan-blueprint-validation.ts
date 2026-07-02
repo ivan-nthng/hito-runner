@@ -144,11 +144,13 @@ export function validateBlueprintShell(
   const seenDates = new Set<string>();
 
   for (const week of blueprint.weeks) {
-    if (week.plannedWorkouts.length !== context.authoringInput.availability.maxRunningDaysPerWeek) {
+    const expectedRunningDayCount = expectedAuthoredWorkoutCountForWeek(week, context);
+
+    if (week.plannedWorkouts.length !== expectedRunningDayCount) {
       issues.push({
         code: "running_day_count_mismatch",
         path: `weeks.${week.weekNumber}.plannedWorkouts`,
-        message: `Week ${week.weekNumber} has ${week.plannedWorkouts.length} authored workouts; expected ${context.authoringInput.availability.maxRunningDaysPerWeek}.`,
+        message: `Week ${week.weekNumber} has ${week.plannedWorkouts.length} authored workouts; expected ${expectedRunningDayCount}.`,
       });
     }
 
@@ -193,6 +195,19 @@ export function validateBlueprintShell(
 
       seenDates.add(date);
 
+      const targetEndpointDate = context.authoringInput.schedule.targetDate === date;
+
+      if (
+        context.authoringInput.schedule.targetDate &&
+        date > context.authoringInput.schedule.targetDate
+      ) {
+        issues.push({
+          code: "target_date_overrun",
+          path: `${date}.date`,
+          message: `Authored workout ${date} lands after target date ${context.authoringInput.schedule.targetDate}.`,
+        });
+      }
+
       if (workout.date && workout.date !== date) {
         issues.push({
           code: "date_weekday_mismatch",
@@ -209,7 +224,7 @@ export function validateBlueprintShell(
         });
       }
 
-      if (!context.runningDays.has(workout.weekday)) {
+      if (!context.runningDays.has(workout.weekday) && !targetEndpointDate) {
         issues.push({
           code: "non_running_day_violation",
           path: `${date}.weekday`,
@@ -220,7 +235,8 @@ export function validateBlueprintShell(
       if (
         isBlueprintLongRunIntent(workout) &&
         context.preferredLongRunDay &&
-        workout.weekday !== context.preferredLongRunDay
+        workout.weekday !== context.preferredLongRunDay &&
+        workout.date !== context.authoringInput.schedule.targetDate
       ) {
         issues.push({
           code: "preferred_long_run_day_violation",
@@ -307,6 +323,38 @@ function buildExpectedAuthoredWorkoutDates(context: AiFirstPlanBlueprintNormaliz
   void context;
 
   return [];
+}
+
+function expectedAuthoredWorkoutCountForWeek(
+  week: AiBlueprintWeek,
+  context: AiFirstPlanBlueprintNormalizationContext,
+) {
+  const weeklyTarget = context.authoringInput.availability.maxRunningDaysPerWeek;
+  const targetDate = context.authoringInput.schedule.targetDate;
+
+  if (!targetDate) {
+    return weeklyTarget;
+  }
+
+  const weekStart = addDaysIso(
+    context.authoringInput.schedule.startDate,
+    (week.weekNumber - 1) * 7,
+  );
+  const weekEnd = addDaysIso(weekStart, 6);
+
+  if (targetDate < weekStart || targetDate > weekEnd) {
+    return weeklyTarget;
+  }
+
+  const availableDatesThroughTarget = Array.from({ length: 7 }, (_value, offset) =>
+    addDaysIso(weekStart, offset),
+  ).filter((date) => {
+    const weekday = weekdayLong(date);
+
+    return date <= targetDate && (!context.fixedRestDays.has(weekday) || date === targetDate);
+  });
+
+  return Math.max(1, Math.min(weeklyTarget, availableDatesThroughTarget.length));
 }
 
 function formatBoundedList(values: Array<string | number>) {

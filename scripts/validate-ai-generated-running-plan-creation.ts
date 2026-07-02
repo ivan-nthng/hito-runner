@@ -22,6 +22,7 @@ import {
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
 import {
+  buildRunningPlanPersistenceMetadata,
   buildRunningPlanCanonicalPlan,
   validateRunningPlanReviewExactness,
   validateSelfContainedRunningPlanReviewToken,
@@ -48,7 +49,6 @@ const scenarios = [
       planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
     },
     expectedEndpointMeters: 10_000,
-    expectedFamily: "10K",
   },
   {
     name: "Browser-equivalent Quick setup 10K no benchmark",
@@ -70,7 +70,6 @@ const scenarios = [
       },
     },
     expectedEndpointMeters: 10_000,
-    expectedFamily: "10K",
   },
   {
     name: "10K preset with benchmark-backed specificity",
@@ -81,7 +80,6 @@ const scenarios = [
       planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
     },
     expectedEndpointMeters: 10_000,
-    expectedFamily: "10K",
     expectedRepeatRich: true,
   },
   {
@@ -92,13 +90,28 @@ const scenarios = [
       planGoalIntent: { distance: { kind: "preset", preset: "Half Marathon" } },
     },
     expectedEndpointMeters: 21_100,
-    expectedFamily: "Half Marathon",
+  },
+  {
+    name: "Half Marathon target date overrides preferred long-run day",
+    input: {
+      ...baseInput,
+      distanceFamily: "Half Marathon",
+      startDate: null,
+      planGoalIntent: {
+        distance: { kind: "preset", preset: "Half Marathon" },
+        targetDate: "2026-11-26",
+        targetFinishTime: "2:00:00",
+      },
+    },
+    expectedEndpointMeters: 21_100,
+    expectedFinalDate: "2026-11-26",
+    expectedRepeatRich: true,
   },
   {
     name: "Marathon preset target date and finish time",
     input: {
       ...baseInput,
-      distanceFamily: "Marathon Base",
+      distanceFamily: "Marathon Completion",
       planGoalIntent: {
         distance: { kind: "preset", preset: "Marathon" },
         targetDate: "2026-11-01",
@@ -106,7 +119,6 @@ const scenarios = [
       },
     },
     expectedEndpointMeters: 42_195,
-    expectedFamily: "Marathon Completion",
     expectedFinalDate: "2026-11-01",
     expectedRepeatRich: true,
   },
@@ -118,10 +130,10 @@ const scenarios = [
       planGoalIntent: {
         distance: { kind: "custom", distanceKm: 15, label: "City 15K" },
         targetDate: "2026-09-13",
+        targetFinishTime: "1:20:00",
       },
     },
     expectedEndpointMeters: 15_000,
-    expectedFamily: "Half Marathon",
     expectedFinalDate: "2026-09-13",
     expectedCustomDistance: true,
     expectedWorkoutGoalType: "distance_build",
@@ -140,7 +152,6 @@ const scenarios = [
       },
     },
     expectedEndpointMeters: 30_000,
-    expectedFamily: "Marathon Completion",
     expectedFinalDate: "2026-10-04",
     expectedCustomDistance: true,
     expectedWorkoutGoalType: "distance_build",
@@ -153,12 +164,11 @@ const scenarios = [
       distanceFamily: "10K",
       planGoalIntent: {
         distance: { kind: "preset", preset: "10K" },
-        targetDate: "2026-06-20",
+        targetDate: "2026-06-19",
         targetFinishTime: "20:00",
       },
     },
     expectedEndpointMeters: 10_000,
-    expectedFamily: "10K",
     expectedFeasibility: "aggressive_or_short_horizon",
   },
   {
@@ -168,21 +178,36 @@ const scenarios = [
       distanceFamily: "Half Marathon",
       planGoalIntent: {
         distance: { kind: "preset", preset: "Half Marathon" },
-        targetDate: "2026-07-01",
+        targetDate: "2026-07-02",
         targetFinishTime: "1:00:00",
       },
     },
     expectedEndpointMeters: 21_100,
-    expectedFamily: "Half Marathon",
     expectedFeasibility: "aggressive_or_short_horizon",
+  },
+  {
+    name: "Awkward late-week start keeps Sunday long-run preference flexible",
+    input: {
+      ...baseInput,
+      distanceFamily: "Half Marathon",
+      startDate: "2026-06-11",
+      planGoalIntent: {
+        distance: { kind: "preset", preset: "Half Marathon" },
+        targetDate: "2026-09-20",
+        targetFinishTime: "2:00:00",
+      },
+    },
+    expectedEndpointMeters: 21_100,
+    expectedFinalDate: "2026-09-20",
+    expectedRepeatRich: true,
   },
 ] as const satisfies readonly Array<{
   name: string;
   input: RunningPlanPreviewActionInput;
   expectedEndpointMeters: number;
-  expectedFamily: RunningPlanPreviewActionInput["distanceFamily"];
   expectedFinalDate?: string;
   expectedFeasibility?: "aggressive_or_short_horizon";
+  expectedPreviewOutcome?: "preview_ready" | "preview_ready_with_warnings";
   expectedCustomDistance?: boolean;
   expectedWorkoutGoalType?: string;
   expectedRepeatRich?: boolean;
@@ -200,10 +225,12 @@ async function main() {
   }
 
   await validateUnavailableDoesNotFallbackToDeterministicBuilder();
+  await validateImpossibleGoalReturnsTypedReason();
+  await validateDefaultLocalFixturePreviewPath();
 
   console.log("AI-generated running-plan creation contract checks passed.", {
     scenarios: proofs,
-    deterministicBuilders: "retained only as exported fixture/dev validators",
+    deterministicBuilders: "removed",
   });
 }
 
@@ -216,7 +243,6 @@ async function validateAiGeneratedScenario(scenario: (typeof scenarios)[number])
 
   const fixturePreviewOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
     authoringInput: resolved.authoringInput,
-    planFamily: resolved.planFamily,
     today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
     env: localDevFixtureEnv(),
   });
@@ -280,7 +306,22 @@ async function validateAiGeneratedScenario(scenario: (typeof scenarios)[number])
   });
   rmSync(ledgerArtifactRoot, { recursive: true, force: true });
   assert.equal(draft.reviewSafety.confirmCallsOpenAi, false);
-  assert.equal(draft.planFamily, scenario.expectedFamily);
+  assert.equal(
+    draft.previewOutcome,
+    scenario.expectedPreviewOutcome ??
+      (scenario.expectedFeasibility === "aggressive_or_short_horizon"
+        ? "preview_ready_with_warnings"
+        : "preview_ready"),
+    `${scenario.name} must expose the expected typed preview outcome.`,
+  );
+  if (draft.previewOutcome === "preview_ready_with_warnings") {
+    assert.ok(
+      draft.previewWarnings.length > 0,
+      `${scenario.name} warning outcome must include backend-authored warning assumptions.`,
+    );
+  } else {
+    assert.deepEqual(draft.previewWarnings, []);
+  }
   assert.equal(draft.endpointProof.endpointDistanceMeters, scenario.expectedEndpointMeters);
   if (scenario.expectedCustomDistance) {
     assert.equal(
@@ -294,6 +335,12 @@ async function validateAiGeneratedScenario(scenario: (typeof scenarios)[number])
       `${scenario.name} must not collapse the endpoint to half-marathon distance.`,
     );
   }
+  assertDistanceGoalTruth({
+    scenarioName: scenario.name,
+    canonicalPlan,
+    draft,
+    expectedEndpointMeters: scenario.expectedEndpointMeters,
+  });
   if (scenario.expectedWorkoutGoalType) {
     assertWorkoutGoalType(canonicalPlan, scenario.name, scenario.expectedWorkoutGoalType);
   }
@@ -304,11 +351,6 @@ async function validateAiGeneratedScenario(scenario: (typeof scenarios)[number])
       `${scenario.name} endpoint workout must land on the authored target date.`,
     );
   }
-  assert.notEqual(
-    finalNonRest?.source_workout_type,
-    "marathon_base_endpoint",
-    "AI-authored generated plans must not end as the old Marathon Base endpoint.",
-  );
   assert.equal(canonicalPlan.source_kind, AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
   assert.doesNotThrow(
     () => buildReviewedFirstPlanImportedSeed(canonicalPlan),
@@ -322,7 +364,7 @@ async function validateAiGeneratedScenario(scenario: (typeof scenarios)[number])
   });
   assert.equal(importedSeed.workouts.length, canonicalPlan.planned_workouts.length);
   const richness = summarizeRunnerFacingCanonicalRichness({
-    family: draft.planFamily,
+    family: qualityFamilyForDistanceMeters(scenario.expectedEndpointMeters),
     runnerLevel: draft.normalizedInputSummary.runnerLevel,
     loadContext: draft.normalizedInputSummary.loadContext,
     rows: canonicalPlan.planned_workouts,
@@ -384,6 +426,12 @@ async function validateAiGeneratedScenario(scenario: (typeof scenarios)[number])
       ? `${scenario.name} review token must validate.`
       : `${scenario.name} review token must validate: ${exactness.reason} ${exactness.message}`,
   );
+  assertDistanceGoalPersistenceMetadata({
+    scenarioName: scenario.name,
+    draft,
+    canonicalPlan,
+    expectedEndpointMeters: scenario.expectedEndpointMeters,
+  });
 
   const decoded = await validateSelfContainedRunningPlanReviewToken({
     reviewToken: draft.reviewToken,
@@ -428,7 +476,6 @@ async function validateAiGeneratedScenario(scenario: (typeof scenarios)[number])
   return {
     name: scenario.name,
     sourceKind: draft.sourceKind,
-    planFamily: draft.planFamily,
     endpointMeters: draft.endpointProof.endpointDistanceMeters,
     reviewTokenBytes: draft.reviewToken.length,
     feasibility: draft.normalizedInputSummary.planGoalIntent.feasibility.status,
@@ -452,6 +499,7 @@ async function validateUnavailableDoesNotFallbackToDeterministicBuilder() {
   assert.equal(unavailable.unavailable.sourceKind, AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
   assert.equal(unavailable.unavailable.persisted, false);
   assert.equal(unavailable.unavailable.callsOpenAi, true);
+  assert.equal(unavailable.unavailable.previewOutcome, "ai_unavailable_retryable");
   assert.match(unavailable.unavailable.error.message, /OpenAI|AI|unavailable/i);
 
   const ledgerArtifactRoot = mkdtempSync(join(tmpdir(), "hito-ai-plan-ledger-failure-"));
@@ -497,6 +545,7 @@ async function validateUnavailableDoesNotFallbackToDeterministicBuilder() {
     assert.notEqual(trace, null, "Invalid AI blueprint must still return generation trace.");
     if (!trace) throw new Error("Missing invalid AI blueprint generation trace.");
     assert.equal(trace.provider.responseId, "resp_invalid_ai_generation_ledger_validation");
+    assert.equal(invalid.unavailable.previewOutcome, "internal_validation_bug");
     assert.equal(trace.provider.kind, "openai_responses_api");
     assert.equal(trace.provider.paidProviderCall, true);
     assert.equal(trace.usage.inputTokens, 321);
@@ -528,6 +577,67 @@ async function validateUnavailableDoesNotFallbackToDeterministicBuilder() {
     assert.equal(artifact.pipeline?.finalOutcome, trace.pipeline.finalOutcome);
   } finally {
     rmSync(ledgerArtifactRoot, { recursive: true, force: true });
+  }
+}
+
+async function validateImpossibleGoalReturnsTypedReason() {
+  const impossible = await buildReviewedAiGeneratedRunningPlanPreview({
+    ...baseInput,
+    distanceFamily: "Marathon Completion",
+    planGoalIntent: {
+      distance: { kind: "preset", preset: "Marathon" },
+      targetDate: "2026-06-14",
+      targetFinishTime: "4:00:00",
+    },
+  });
+
+  assert.equal(impossible.ok, false, "Marathon in one week must not produce a reviewed draft.");
+  if (impossible.ok) {
+    throw new Error("Impossible marathon unexpectedly returned a reviewed draft.");
+  }
+
+  assert.equal(impossible.unavailable.previewOutcome, "impossible_goal_with_reason");
+  assert.equal(impossible.unavailable.error.code, "impossible_plan_goal");
+  assert.match(impossible.unavailable.error.message, /marathon.*not enough time/i);
+  assert.equal(impossible.unavailable.debug.previewActionTrace.liveOpenAiCalled, false);
+}
+
+async function validateDefaultLocalFixturePreviewPath() {
+  const previousEnv = snapshotEnv([
+    "HITO_AI_GENERATED_PLAN_DEV_FIXTURE",
+    "LOCAL_AUTH_BYPASS_ENABLED",
+    "LOCAL_AUTH_BYPASS_ACCOUNTS_FILE",
+    "VERCEL",
+    "CI",
+  ]);
+
+  try {
+    process.env.LOCAL_AUTH_BYPASS_ENABLED = "true";
+    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE = "scripts/fixtures/local-auth-users.json";
+    delete process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE;
+    delete process.env.VERCEL;
+    delete process.env.CI;
+
+    const result = await buildReviewedAiGeneratedRunningPlanPreview(scenarios[4].input);
+    assert.equal(
+      result.ok,
+      true,
+      result.ok
+        ? "Default local fixture preview path must return a reviewed draft."
+        : result.unavailable.error.message,
+    );
+    if (!result.ok) {
+      throw new Error(result.unavailable.error.message);
+    }
+
+    assert.equal(result.draft.aiGeneration.model, AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL);
+    assert.equal(
+      result.draft.aiGeneration.generationTrace?.provider.kind,
+      "local_dev_fixture",
+      "Server-action default options should use the same local fixture in local-auth QA/dev runtime.",
+    );
+  } finally {
+    restoreEnv(previousEnv);
   }
 }
 
@@ -734,6 +844,74 @@ function assertNoPersistedLegacyRepeatSignals(input: {
   );
 }
 
+function assertDistanceGoalTruth(input: {
+  scenarioName: string;
+  canonicalPlan: ReturnType<typeof buildRunningPlanCanonicalPlan>;
+  draft: {
+    normalizedInputSummary: { planGoalIntent: { distance: { distanceMeters: number } | null } };
+  };
+  expectedEndpointMeters: number;
+}) {
+  assert.equal(
+    input.canonicalPlan.goal.goal_type,
+    "distance_build",
+    `${input.scenarioName} canonical plan goal must use unified distance_build truth.`,
+  );
+  assert.equal(
+    input.draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters,
+    input.expectedEndpointMeters,
+    `${input.scenarioName} signed normalized goal intent must carry exact distanceMeters.`,
+  );
+  assertWorkoutGoalType(input.canonicalPlan, input.scenarioName, "distance_build");
+}
+
+function assertDistanceGoalPersistenceMetadata(input: {
+  scenarioName: string;
+  draft: Parameters<typeof buildRunningPlanPersistenceMetadata>[0]["draft"];
+  canonicalPlan: ReturnType<typeof buildRunningPlanCanonicalPlan>;
+  expectedEndpointMeters: number;
+}) {
+  const metadata = buildRunningPlanPersistenceMetadata({
+    draft: input.draft,
+    canonicalPlan: input.canonicalPlan,
+    reviewChecksum: input.draft.reviewChecksum,
+  });
+  const goalMetadata = metadata.goalMetadata as {
+    selected_plan_engine?: {
+      family?: string;
+      legacy_family_bucket?: string;
+      ui_distance_family?: string;
+      distance_goal?: { goal_type?: string; distance_meters?: number };
+    };
+  };
+
+  assert.equal(
+    goalMetadata.selected_plan_engine?.family,
+    undefined,
+    `${input.scenarioName} AI-generated persistence metadata must not store family as product truth.`,
+  );
+  assert.equal(
+    goalMetadata.selected_plan_engine?.legacy_family_bucket,
+    undefined,
+    `${input.scenarioName} persistence metadata must not store legacy family buckets.`,
+  );
+  assert.equal(
+    goalMetadata.selected_plan_engine?.ui_distance_family,
+    undefined,
+    `${input.scenarioName} persistence metadata must not store UI distance family buckets.`,
+  );
+  assert.equal(
+    goalMetadata.selected_plan_engine?.distance_goal?.goal_type,
+    "distance_build",
+    `${input.scenarioName} persistence metadata must expose distance_goal product truth.`,
+  );
+  assert.equal(
+    goalMetadata.selected_plan_engine?.distance_goal?.distance_meters,
+    input.expectedEndpointMeters,
+    `${input.scenarioName} persistence metadata must preserve exact distanceMeters.`,
+  );
+}
+
 function assertWorkoutGoalType(
   plan: ReturnType<typeof buildRunningPlanCanonicalPlan>,
   scenarioName: string,
@@ -799,15 +977,30 @@ function assertRepeatRichChildrenWhereSportsSafe(
   );
 }
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-|-$/g, "");
+function qualityFamilyForDistanceMeters(
+  meters: number,
+): RunningPlanPreviewActionInput["distanceFamily"] {
+  if (meters <= 10_000) return "10K";
+  if (meters <= 21_100) return "Half Marathon";
+  return "Marathon Completion";
 }
 
 function jsonStable<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function snapshotEnv(keys: readonly string[]) {
+  return Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+}
+
+function restoreEnv(snapshot: Record<string, string | undefined>) {
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (typeof value === "string") {
+      process.env[key] = value;
+    } else {
+      delete process.env[key];
+    }
+  }
 }
 
 main().catch((error) => {

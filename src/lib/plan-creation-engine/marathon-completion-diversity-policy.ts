@@ -129,12 +129,7 @@ function validateMarathonCompletionGlobalGates(
     }
   }
 
-  for (const forbiddenKind of [
-    "marathon_base_endpoint",
-    "threshold",
-    "intervals",
-    "hills",
-  ] as const) {
+  for (const forbiddenKind of ["threshold", "intervals", "hills"] as const) {
     if (workoutKinds.has(forbiddenKind)) {
       issues.push(`Marathon Completion preview must not include ${forbiddenKind}.`);
     }

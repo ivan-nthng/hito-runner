@@ -56,6 +56,11 @@ export const QA_FAILED_BLOCKED_TOKEN_RE =
 export const QA_COMPRESSION_IMAGE_EXTENSIONS = new Set([".jpeg", ".jpg", ".png"]);
 export const QA_COMPRESSION_GENERATED_VENDOR_PATH_RE =
   /(?:^|\/)(?:pw\/)?node_modules(?:\/|$)|(?:^|\/)playwright-core\/lib\/(?:server|tools)(?:\/|$)/;
+export const STALE_REPO_LOCAL_QA_RUNTIME_RETENTION = "stale_repo_local_qa_runtime_residue";
+export const STALE_REPO_LOCAL_QA_RUNTIME_PATHS = new Set([
+  "logs/qa-local-server.log",
+  "logs/qa-local-server-state.json",
+]);
 
 export const DEFAULT_TARGETS = [
   {
@@ -83,15 +88,17 @@ export const DEFAULT_TARGETS = [
   },
   {
     path: "logs/qa-local-server.log",
-    artifactKind: "qa_server_log",
+    artifactKind: "stale_repo_local_qa_server_log",
     includedInParent: "logs",
-    description: "Managed local QA server stdout/stderr log.",
+    description:
+      "Legacy repo-local QA server stdout/stderr log. Current managed QA server writes to the non-iCloud cache runtime state directory.",
   },
   {
     path: "logs/qa-local-server-state.json",
-    artifactKind: "qa_server_state",
+    artifactKind: "stale_repo_local_qa_server_state",
     includedInParent: "logs",
-    description: "Managed local QA server PID/build state.",
+    description:
+      "Legacy repo-local QA server PID/build state. Current managed QA server state lives in the non-iCloud cache runtime state directory.",
   },
   {
     path: "test-results",

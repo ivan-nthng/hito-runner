@@ -79,7 +79,7 @@ export function buildCandidateInput(
 
 export function buildTransitionBlockedResult(
   message: string,
-  input?: Pick<RunningPlanConfirmActionInput, "planFamily" | "sourceKind">,
+  input?: Pick<RunningPlanConfirmActionInput, "sourceKind">,
 ): TransitionBlocked {
   return {
     ok: false,
@@ -88,7 +88,6 @@ export function buildTransitionBlockedResult(
     reason: "invalid_review",
     message,
     sourceKind: input?.sourceKind,
-    planFamily: input?.planFamily,
   };
 }
 

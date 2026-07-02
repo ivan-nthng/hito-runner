@@ -5,7 +5,6 @@ import {
   type StructuredConstructorState,
 } from "@/components/onboarding/onboarding-form-model";
 import { isRealIsoDate, parseDurationSeconds } from "@/lib/first-plan-authoring-utils";
-import type { PlanPresetCardRequestInput } from "@/lib/plan-presets/schema";
 import type {
   PlanGoalIntentInput,
   RunningPlanDistanceFamily,
@@ -27,10 +26,57 @@ export type PlanGoalIntentDraftState = Pick<
   | "planGoalTargetDate"
 >;
 export type PlanGoalSelectionId = Exclude<PlanGoalChoice, "">;
+export type PlanGoalShortcutDiscoveryInput = {
+  profile: {
+    age: number | null;
+    weightKg: number | null;
+    heightCm: number | null;
+  };
+  benchmark: {
+    fitnessLevel: StructuredConstructorState["fitnessLevel"];
+    recent5kTime: string | null;
+  };
+  availability: {
+    runningDaysPerWeek: number | null;
+    fixedRestDays: StructuredConstructorState["fixedRestDays"] | null;
+    preferredLongRunDay: StructuredConstructorState["preferredLongRunDay"] | null;
+  };
+  goal: {
+    goalDistance: StructuredConstructorState["goalDistance"];
+    goalStyle: StructuredConstructorState["goalStyle"];
+    terrainFocus: StructuredConstructorState["terrainFocus"];
+    targetTime: string | null;
+    targetDate: string | null;
+  };
+  execution: {
+    watchAccess: StructuredConstructorState["watchAccess"];
+    guidancePreference: StructuredConstructorState["guidancePreference"];
+  };
+  strength: {
+    preference: StructuredConstructorState["strengthPreference"];
+  };
+  schedule: {
+    startDate: string | null;
+    targetDate: string | null;
+  };
+  comment: string | null;
+};
+export type PlanPresetCardsActionResult =
+  | {
+      ok: true;
+      sourceKind: "plan_goal_shortcuts_v1";
+      persisted: false;
+    }
+  | {
+      ok: false;
+      status: "blocked";
+      reason: "preset_discovery_unavailable";
+      message: string;
+    };
 
 export function buildPlanPresetCardInput(
   state: StructuredConstructorState,
-): PlanPresetCardRequestInput {
+): PlanGoalShortcutDiscoveryInput {
   const age = optionalPlanPresetNumber(state.age, { min: 13, max: 100, integer: true });
   const weightKg = optionalPlanPresetNumber(state.weightKg, { min: 30, max: 250 });
   const heightCm = optionalPlanPresetNumber(state.heightCm, { min: 120, max: 230, integer: true });
@@ -82,7 +128,7 @@ export function buildPlanPresetCardInput(
   };
 }
 
-export function buildPlanPresetCardInputKey(input: PlanPresetCardRequestInput) {
+export function buildPlanPresetCardInputKey(input: PlanGoalShortcutDiscoveryInput) {
   return JSON.stringify(input);
 }
 
@@ -292,14 +338,12 @@ export function buildRunningPlanConfirmInput(
       ok: false;
       message: string;
       sourceKind?: RunningPlanConfirmActionInput["sourceKind"];
-      planFamily?: RunningPlanConfirmActionInput["planFamily"];
     } {
   if (!draft || !previewInput || !draft.reviewToken || !draft.reviewChecksum) {
     return {
       ok: false,
       message: invalidMessage,
       sourceKind: draft?.sourceKind,
-      planFamily: draft?.planFamily,
     };
   }
 
@@ -307,7 +351,6 @@ export function buildRunningPlanConfirmInput(
     ok: true,
     input: {
       previewInput,
-      planFamily: draft.planFamily,
       sourceKind: draft.sourceKind,
       reviewToken: draft.reviewToken,
       reviewChecksum: draft.reviewChecksum,

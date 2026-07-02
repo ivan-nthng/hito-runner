@@ -350,7 +350,7 @@ export function buildWorkoutRow({
   horizonWeeks: number;
 }): RunningPlanPreviewCalendarRow {
   const template =
-    workoutDayKind === "final_selected_distance_day" || workoutDayKind === "marathon_base_endpoint"
+    workoutDayKind === "final_selected_distance_day"
       ? resolveRunningPlanEndpointTemplate(family)
       : getRunningPlanWorkoutDayTemplate(workoutDayKind);
   const segments = resolveRunningPlanPreviewSegments({
@@ -514,8 +514,7 @@ function enforceRecoveryAfterStressors({
     if (
       nextRow.workoutDayKind === "long_run" ||
       nextRow.workoutDayKind === "cutback_long_run" ||
-      nextRow.workoutDayKind === "final_selected_distance_day" ||
-      nextRow.workoutDayKind === "marathon_base_endpoint"
+      nextRow.workoutDayKind === "final_selected_distance_day"
     ) {
       continue;
     }

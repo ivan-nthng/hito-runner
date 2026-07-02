@@ -13,6 +13,5 @@ export const meters = (min: number, max = min): RunningPlanRange => ({ min, max 
 export const ALL_SUPPORTED_RUNNING_PLAN_FAMILIES: readonly RunningPlanDistanceFamily[] = [
   "10K",
   "Half Marathon",
-  "Marathon Base",
   "Marathon Completion",
 ] as const;

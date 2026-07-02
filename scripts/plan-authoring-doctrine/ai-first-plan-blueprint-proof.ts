@@ -44,7 +44,7 @@ function buildGoalFamilyCadenceAuthoringInput({
   goalDistance,
   goalStyle = "ambitious",
   targetTime = null,
-  targetDate = "2026-07-12",
+  targetDate,
   terrainFocus = "standard",
   experienceLevel = "experienced_runner",
   runningDays = ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
@@ -62,6 +62,7 @@ function buildGoalFamilyCadenceAuthoringInput({
   horizonWeeks?: number;
 }) {
   const startDate = "2026-06-01";
+  const resolvedTargetDate = targetDate ?? addDaysIso(startDate, horizonWeeks * 7 - 1);
   const baselineLongRunDurationMin =
     goalDistance === "ultra_marathon" || goalDistance === "mountain_running"
       ? 80
@@ -97,7 +98,7 @@ function buildGoalFamilyCadenceAuthoringInput({
     },
     schedule: {
       startDate,
-      targetDate,
+      targetDate: resolvedTargetDate,
       preparationHorizonWeeks: horizonWeeks,
     },
     availability: {

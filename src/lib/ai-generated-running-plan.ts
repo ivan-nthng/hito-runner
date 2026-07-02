@@ -53,6 +53,13 @@ import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
 export const AI_GENERATED_RUNNING_PLAN_SOURCE_KIND = "ai_first_plan_blueprint_v1" as const;
 export const AI_GENERATED_RUNNING_PLAN_PREVIEW_VERSION = "ai_generated_running_plan_v1" as const;
 
+export type AiGeneratedRunningPlanPreviewOutcome =
+  | "preview_ready"
+  | "preview_ready_with_warnings"
+  | "impossible_goal_with_reason"
+  | "ai_unavailable_retryable"
+  | "internal_validation_bug";
+
 export type AiGeneratedRunningPlanSourceStatus = Extract<
   AiFirstPlanDraftPreviewMetadata["status"],
   "ai_authored" | "repaired_ai_draft"
@@ -66,8 +73,12 @@ export interface AiGeneratedRunningPlanPreviewDraft {
   persisted: false;
   mutates: false;
   callsOpenAi: true;
-  planFamily: RunningPlanDistanceFamily;
   planVersion: typeof AI_GENERATED_RUNNING_PLAN_PREVIEW_VERSION;
+  previewOutcome: Extract<
+    AiGeneratedRunningPlanPreviewOutcome,
+    "preview_ready" | "preview_ready_with_warnings"
+  >;
+  previewWarnings: readonly string[];
   sourceModelVersion: typeof RUNNING_PLAN_SOURCE_MODEL.sourceVersion;
   reviewSafety: {
     persisted: false;
@@ -106,9 +117,16 @@ export type AiGeneratedRunningPlanPreviewUnavailable = {
   persisted: false;
   mutates: false;
   callsOpenAi: true;
-  planFamily: RunningPlanDistanceFamily;
+  previewOutcome: Extract<
+    AiGeneratedRunningPlanPreviewOutcome,
+    "impossible_goal_with_reason" | "ai_unavailable_retryable" | "internal_validation_bug"
+  >;
   error: {
-    code: "ai_generated_plan_unavailable" | "invalid_plan_goal_intent" | "structured_input_invalid";
+    code:
+      | "ai_generated_plan_unavailable"
+      | "impossible_plan_goal"
+      | "invalid_plan_goal_intent"
+      | "structured_input_invalid";
     message: string;
     issues: readonly string[];
   };
@@ -120,7 +138,6 @@ export type AiGeneratedRunningPlanPreviewUnavailable = {
 
 export interface AiGeneratedRunningPlanPreviewActionTrace {
   previewInputSummary: {
-    distanceFamily: RunningPlanDistanceFamily;
     runnerLevel: RunningPlanRunnerLevel;
     daysPerWeek: number | null;
     fixedRestDayCount: number;
@@ -173,7 +190,6 @@ export async function buildAiGeneratedRunningPlanPreview(
     return {
       ok: false,
       unavailable: buildUnavailable({
-        planFamily: resolveLegacyPreviewFamily(input),
         code: authoring.reason,
         message: authoring.message,
         issues: [authoring.message],
@@ -188,7 +204,6 @@ export async function buildAiGeneratedRunningPlanPreview(
     options.aiPreview ??
     buildAiGeneratedRunningPlanDevFixturePreviewOptions({
       authoringInput: authoring.authoringInput,
-      planFamily: authoring.planFamily,
       today: input.startDate,
     });
   const result = await generateAiFirstPlanDraftPreview({
@@ -203,7 +218,6 @@ export async function buildAiGeneratedRunningPlanPreview(
     return {
       ok: false,
       unavailable: buildUnavailable({
-        planFamily: authoring.planFamily,
         code:
           result.reason === "structured_input_invalid"
             ? "structured_input_invalid"
@@ -240,8 +254,15 @@ export async function buildAiGeneratedRunningPlanPreview(
       persisted: false,
       mutates: false,
       callsOpenAi: true,
-      planFamily: authoring.planFamily,
       planVersion: AI_GENERATED_RUNNING_PLAN_PREVIEW_VERSION,
+      previewOutcome:
+        authoring.planGoalIntent.feasibility.status === "aggressive_or_short_horizon"
+          ? "preview_ready_with_warnings"
+          : "preview_ready",
+      previewWarnings:
+        authoring.planGoalIntent.feasibility.status === "aggressive_or_short_horizon"
+          ? authoring.planGoalIntent.assumptions
+          : [],
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
       reviewSafety: {
         persisted: false,
@@ -298,13 +319,12 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
   | {
       ok: true;
       authoringInput: StructuredPlanAuthoringInput;
-      planFamily: RunningPlanDistanceFamily;
       planGoalIntent: NormalizedPlanGoalIntent;
       normalizedInputSummary: RunningPlanPreviewNormalizedInputSummary;
     }
   | {
       ok: false;
-      reason: "invalid_plan_goal_intent" | "structured_input_invalid";
+      reason: "impossible_plan_goal" | "invalid_plan_goal_intent" | "structured_input_invalid";
       message: string;
     } {
   const startDate = normalizeStartDate(input.startDate);
@@ -325,6 +345,17 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
     };
   }
 
+  if (intent.intent.feasibility.status === "impossible_goal") {
+    return {
+      ok: false,
+      reason: "impossible_plan_goal",
+      message:
+        intent.intent.feasibility.reasons.find((reason) =>
+          /not enough time|after the plan start date/i.test(reason),
+        ) ?? "This goal does not leave enough time to prepare safely.",
+    };
+  }
+
   const fixedRestDays = uniqueWeekdays(input.fixedRestDays ?? []);
   const availableWeekdays = deriveAvailableTrainingWeekdays(fixedRestDays);
   const preferredLongRunDay =
@@ -337,27 +368,23 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
     Math.min(daysPerWeek, availableWeekdays.length),
   );
   const benchmarkPaceTruth = normalizeBenchmarkPaceTruth(input.benchmark ?? null);
-  const planFamily = resolveLegacyPreviewFamily(input, intent.intent);
-  const goalType = resolveAuthoringGoalType(intent.intent, planFamily);
+  const inputDistanceBucket = resolveDistanceGoalInputBucket(input, intent.intent);
+  const goalType = resolveAuthoringGoalType(intent.intent);
   const targetFinishTime = intent.intent.targetFinishTime?.label ?? null;
-  const scheduleTargetDate =
-    intent.intent.feasibility.status === "aggressive_or_short_horizon"
-      ? null
-      : intent.intent.targetDate;
   const authoringInput = structuredPlanAuthoringInputSchema.safeParse({
     goal: {
       goalType,
-      goalLabel: buildGoalLabel(intent.intent, planFamily),
+      goalLabel: buildGoalLabel(intent.intent),
       goalStyle: targetFinishTime ? "target_time" : "balanced",
       targetTime: targetFinishTime,
       targetEventName: intent.intent.distance?.label
         ? `${intent.intent.distance.label} plan`
-        : `${planFamily} plan`,
+        : "Distance-goal plan",
     },
     schedule: {
       startDate,
-      targetDate: scheduleTargetDate,
-      preparationHorizonWeeks: scheduleTargetDate ? null : horizonWeeks,
+      targetDate: intent.intent.targetDate,
+      preparationHorizonWeeks: intent.intent.targetDate ? null : horizonWeeks,
     },
     runnerProfile: {
       experienceLevel: mapRunnerLevelToAuthoring(input.runnerLevel),
@@ -424,7 +451,6 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
   return {
     ok: true,
     authoringInput: parsedAuthoringInput,
-    planFamily,
     planGoalIntent: intent.intent,
     normalizedInputSummary: {
       normalizedBy: "backend_ai_generated_plan_authoring_normalizer_v1",
@@ -433,7 +459,7 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
       heightCm: input.heightCm,
       weightKg: input.weightKg,
       runnerLevel: input.runnerLevel,
-      distanceFamily: planFamily,
+      distanceFamily: inputDistanceBucket,
       daysPerWeek,
       fixedRestDays,
       preferredLongRunDay,
@@ -477,13 +503,12 @@ function distanceInputForFamily(
       return { kind: "preset", preset: "10K" };
     case "Half Marathon":
       return { kind: "preset", preset: "Half Marathon" };
-    case "Marathon Base":
     case "Marathon Completion":
       return { kind: "preset", preset: "Marathon" };
   }
 }
 
-function resolveLegacyPreviewFamily(
+function resolveDistanceGoalInputBucket(
   input: Pick<BuildRunningPlanPreviewInput, "distanceFamily">,
   intent?: NormalizedPlanGoalIntent,
 ): RunningPlanDistanceFamily {
@@ -495,30 +520,21 @@ function resolveLegacyPreviewFamily(
     return "Marathon Completion";
   }
 
-  return input.distanceFamily === "Marathon Base" ? "Marathon Completion" : input.distanceFamily;
+  return input.distanceFamily;
 }
 
 function resolveAuthoringGoalType(
   intent: NormalizedPlanGoalIntent,
-  family: RunningPlanDistanceFamily,
 ): "10k" | "half_marathon" | "marathon" | "distance_build" {
-  if (intent.distance?.kind === "custom") {
+  if (intent.distance) {
     return "distance_build";
   }
 
-  switch (family) {
-    case "10K":
-      return "10k";
-    case "Half Marathon":
-      return "half_marathon";
-    case "Marathon Base":
-    case "Marathon Completion":
-      return "marathon";
-  }
+  return "distance_build";
 }
 
-function buildGoalLabel(intent: NormalizedPlanGoalIntent, family: RunningPlanDistanceFamily) {
-  const distance = intent.distance?.label ?? family;
+function buildGoalLabel(intent: NormalizedPlanGoalIntent) {
+  const distance = intent.distance?.label ?? "Distance goal";
   const targetTime = intent.targetFinishTime?.label;
 
   return targetTime ? `${distance} in ${targetTime}` : distance;
@@ -569,7 +585,6 @@ function presetDistanceKmFromFamily(family: RunningPlanDistanceFamily) {
       return 10;
     case "Half Marathon":
       return 21.1;
-    case "Marathon Base":
     case "Marathon Completion":
       return 42.195;
   }
@@ -869,7 +884,6 @@ function normalizeWeekday(value: string, date: string): WeekdayName {
 }
 
 function buildUnavailable(input: {
-  planFamily: RunningPlanDistanceFamily;
   code: AiGeneratedRunningPlanPreviewUnavailable["error"]["code"];
   message: string;
   issues: readonly string[];
@@ -885,7 +899,7 @@ function buildUnavailable(input: {
     persisted: false,
     mutates: false,
     callsOpenAi: true,
-    planFamily: input.planFamily,
+    previewOutcome: classifyUnavailablePreviewOutcome(input),
     error: {
       code: input.code,
       message: input.message,
@@ -896,6 +910,33 @@ function buildUnavailable(input: {
       previewActionTrace: buildPreviewActionTrace(input),
     },
   };
+}
+
+function classifyUnavailablePreviewOutcome(input: {
+  code: AiGeneratedRunningPlanPreviewUnavailable["error"]["code"];
+  message: string;
+  issues: readonly string[];
+  generationTrace: AiPlanGenerationLedgerTrace | null;
+}): AiGeneratedRunningPlanPreviewUnavailable["previewOutcome"] {
+  if (input.code === "impossible_plan_goal") {
+    return "impossible_goal_with_reason";
+  }
+
+  const trace = input.generationTrace;
+  const serialized = `${input.message}\n${input.issues.join("\n")}`.toLowerCase();
+
+  if (
+    trace?.pipeline.normalizationStatus === "failed" ||
+    trace?.pipeline.normalizationStatus === "finalization_failed" ||
+    trace?.pipeline.validationIssues.length ||
+    /schema|validation|target_date_overrun|running_day_count|goal_family|repeat|canonical/i.test(
+      serialized,
+    )
+  ) {
+    return "internal_validation_bug";
+  }
+
+  return "ai_unavailable_retryable";
 }
 
 function toStablePreviewInput(input: BuildRunningPlanPreviewInput): BuildRunningPlanPreviewInput {
@@ -913,7 +954,6 @@ function buildPreviewActionTrace(input: {
 
   return {
     previewInputSummary: {
-      distanceFamily: input.input.distanceFamily,
       runnerLevel: input.input.runnerLevel,
       daysPerWeek: input.input.daysPerWeek ?? null,
       fixedRestDayCount: input.input.fixedRestDays?.length ?? 0,

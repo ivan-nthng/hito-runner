@@ -301,7 +301,7 @@ const steadyAerobicRunTemplate: RunningPlanWorkoutDayTemplate = {
   watchExecutable: true,
   primaryContract: "numeric_structure",
   targetTruthModes: ["structure_only", "editable_default_hr"],
-  allowedFamilies: ["10K", "Half Marathon", "Marathon Base", "Marathon Completion"],
+  allowedFamilies: ["10K", "Half Marathon", "Marathon Completion"],
   cueRole: "secondary_only",
   segments: [
     {
@@ -411,7 +411,7 @@ const tempoTemplate: RunningPlanWorkoutDayTemplate = {
   watchExecutable: true,
   primaryContract: "numeric_structure",
   targetTruthModes: ["structure_only", "editable_default_hr"],
-  allowedFamilies: ["10K", "Half Marathon", "Marathon Base", "Marathon Completion"],
+  allowedFamilies: ["10K", "Half Marathon", "Marathon Completion"],
   cueRole: "secondary_only",
   segments: [
     {
@@ -478,7 +478,7 @@ const thresholdTemplate: RunningPlanWorkoutDayTemplate = {
   watchExecutable: true,
   primaryContract: "numeric_structure",
   targetTruthModes: ["structure_only", "editable_default_hr"],
-  allowedFamilies: ["Half Marathon", "Marathon Base"],
+  allowedFamilies: ["Half Marathon", "Marathon Completion"],
   cueRole: "secondary_only",
   segments: [
     {

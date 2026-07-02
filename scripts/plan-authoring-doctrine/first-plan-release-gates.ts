@@ -173,8 +173,8 @@ async function assertAiFirstPlanDraftServiceContract(deps: FirstPlanReleaseGateD
     );
     assert.equal(
       countNonRestWorkouts(longHorizonResult.canonicalPlan),
-      145,
-      "OpenAI-authored long-horizon plan should preserve every authored running day",
+      countBlueprintAuthoredWorkouts(boundedLongHorizonBlueprint),
+      "OpenAI-authored long-horizon plan should preserve every dated authored running day",
     );
     assert.equal(
       longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks,
@@ -794,7 +794,7 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
     );
     assert.equal(
       countNonRestWorkouts(boundedHorizonResult.draft.canonicalPlan),
-      145,
+      countBlueprintAuthoredWorkouts(boundedHorizonBlueprint),
       "long target-date structured review should include every authored running day",
     );
     assertFixedRestDayNames(
@@ -802,9 +802,10 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
       ["Wednesday", "Saturday"],
       "long target-date low-support marathon review",
     );
-    assertWeeklyLongRunDay(
+    assertWeeklyLongRunDayWithTargetEndpoint(
       boundedHorizonResult.draft.canonicalPlan,
       "Sunday",
+      partialAuthoringInput.schedule.targetDate!,
       "long target-date low-support marathon review",
     );
     assertRecoveryFirstAfterLongRuns(
@@ -1237,6 +1238,8 @@ export function buildMinimalAiFirstPlanBlueprintForAuthoringInput(
     (weekday) => !authoringInput.availability.unavailableDays.includes(weekday),
   );
   const horizonWeeks = options.horizonWeeks ?? 2;
+  const targetDate =
+    authoringInput.schedule.targetDate ?? addDaysIso(startDate, horizonWeeks * 7 - 1);
 
   return {
     schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
@@ -1244,7 +1247,7 @@ export function buildMinimalAiFirstPlanBlueprintForAuthoringInput(
     generatedFor: "Doctrine fixture",
     goalSummary: authoringInput.goal.goalLabel,
     startDate,
-    targetDate: authoringInput.schedule.targetDate ?? addDaysIso(startDate, horizonWeeks * 7 - 1),
+    targetDate,
     preparationHorizonWeeks: horizonWeeks,
     planPreferences: {
       preferredRunningDays: authoringInput.availability.preferredRunningDays,
@@ -1266,26 +1269,35 @@ export function buildMinimalAiFirstPlanBlueprintForAuthoringInput(
       taperWeek: false,
       longRunIntent: "Keep the long run on the reviewed preferred long-run day.",
       longRunProgression: "Progress long-run durability conservatively.",
-      plannedWorkouts: runningDays.map((weekday) => {
-        const isLongRun = weekday === authoringInput.availability.preferredLongRunDay;
+      plannedWorkouts: runningDays.flatMap((weekday) => {
         const date = dateForWeekdayInSevenDayWindow(addDaysIso(startDate, weekIndex * 7), weekday);
 
-        return {
-          date,
-          weekday,
-          workoutFamily: isLongRun ? "long" : "easy",
-          workoutIdentity: isLongRun ? "long_aerobic_run" : "easy_aerobic_run",
-          calendarIconKey: isLongRun ? "long" : "easy",
-          title: isLongRun ? "Long aerobic run" : "Easy aerobic run",
-          summary: isLongRun
-            ? "Reviewable long-run durability from the AI-authored blueprint."
-            : "Reviewable easy support running from the AI-authored blueprint.",
-          plannedRpe: isLongRun ? 5 : 4,
-          estimatedFatigue: isLongRun ? "medium" : "low",
-          recoveryPriority: isLongRun ? "high" : "medium",
-          segmentIntent: isLongRun ? "long_durability" : "easy_aerobic",
-          metricIntent: "mixed_if_allowed",
-        };
+        if (weekIndex === horizonWeeks - 1 && date > targetDate) {
+          return [];
+        }
+
+        const isTargetEndpointDay = weekIndex === horizonWeeks - 1 && date === targetDate;
+        const isLongRun =
+          weekday === authoringInput.availability.preferredLongRunDay || isTargetEndpointDay;
+
+        return [
+          {
+            date,
+            weekday,
+            workoutFamily: isLongRun ? "long" : "easy",
+            workoutIdentity: isLongRun ? "long_aerobic_run" : "easy_aerobic_run",
+            calendarIconKey: isLongRun ? "long" : "easy",
+            title: isLongRun ? "Long aerobic run" : "Easy aerobic run",
+            summary: isLongRun
+              ? "Reviewable long-run durability from the AI-authored blueprint."
+              : "Reviewable easy support running from the AI-authored blueprint.",
+            plannedRpe: isLongRun ? 5 : 4,
+            estimatedFatigue: isLongRun ? "medium" : "low",
+            recoveryPriority: isLongRun ? "high" : "medium",
+            segmentIntent: isLongRun ? "long_durability" : "easy_aerobic",
+            metricIntent: "mixed_if_allowed",
+          },
+        ];
       }),
     })),
   };
@@ -1341,4 +1353,41 @@ function dateForWeekdayInSevenDayWindow(startDate: string, weekday: WeekdayName)
   }
 
   return startDate;
+}
+
+function countBlueprintAuthoredWorkouts(blueprint: AiFirstPlanBlueprint) {
+  return blueprint.weeks.reduce((total, week) => total + week.plannedWorkouts.length, 0);
+}
+
+function assertWeeklyLongRunDayWithTargetEndpoint(
+  plan: TrainingPlanV2,
+  expectedWeekday: WeekdayName,
+  targetDate: string,
+  label: string,
+) {
+  const targetWeekNumber =
+    plan.planned_workouts.find((workout) => workout.date === targetDate)?.week_number ?? null;
+  const weekNumbers = [...new Set(plan.planned_workouts.map((workout) => workout.week_number))];
+
+  for (const weekNumber of weekNumbers) {
+    const longRuns = plan.planned_workouts.filter(
+      (workout) =>
+        workout.week_number === weekNumber &&
+        (workout.workout_family === "long" || workout.workout_type === "long_run"),
+    );
+
+    assert.equal(longRuns.length, 1, `${label}: week ${weekNumber} should have one long run`);
+
+    const longRun = longRuns[0]!;
+
+    if (weekNumber === targetWeekNumber && longRun.date === targetDate) {
+      continue;
+    }
+
+    assert.equal(
+      longRun.weekday,
+      expectedWeekday,
+      `${label}: week ${weekNumber} long run should land on ${expectedWeekday}`,
+    );
+  }
 }

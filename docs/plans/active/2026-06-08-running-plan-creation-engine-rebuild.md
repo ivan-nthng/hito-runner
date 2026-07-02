@@ -14,47 +14,59 @@ high
 
 ## Next Recommended Role
 
-architect
+qa
 
 ## Task
 
-Hold running-plan rebuild after OpenAI-authored dated generated-plan acceptance.
+Validate generated-plan legacy purge in browser.
 
 ## Stage
 
-ARCHITECT holding / generated-plan canonical readback accepted.
+QA validation / generated-plan legacy purge browser acceptance.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: ARCHITECT
+ROLE: QA
 
 Task:
-Reassess the next running-plan gate only after source-size cleanup priority changes or a new provider/FIT/product-readiness blocker is selected.
+Validate generated-plan legacy purge in browser.
 
 Stage:
-ARCHITECT holding / generated-plan canonical readback accepted.
+QA validation / generated-plan legacy purge browser acceptance.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md
 
 Context:
-OpenAI-authored dated generated-plan browser/readback acceptance is now complete. QA passed 10K,
-Marathon target-time, and Custom 15K target-time preview/create/saved-calendar/workout-detail
-coverage with child-first repeat readback, no legacy repeat units, no fake executable pace/HR, clean
-desktop and 375px browser proof, and disposable cleanup to zero.
+Backend removed the pre-customer legacy generated-plan/preset stack. Current product truth is the
+unified distance-goal AI-authored dated plan flow: presets are UI shortcuts to distanceMeters,
+backend owns review/confirm/persistence, and deterministic generated-plan product builders plus
+backend Plan Preset discovery are deleted.
 
 Scope:
-- Do not route another running-plan implementation gate by momentum.
-- Reassess only if Product reselects running-plan work, provider/FIT comparison becomes the next
-  real-user-readiness gate, or fresh source/QA evidence exposes a backend-owned generated-plan
-  blocker.
-- Keep deterministic builders classified as validator/dev scaffolding, not normal product truth.
-- Preserve source-size cleanup as the immediate active execution priority unless Product changes it.
+1. Run the standard QA server/build-output preflight.
+2. Browser-validate Quick setup generated-plan preview/create/saved-calendar/workout-detail for:
+   - 10K;
+   - 21.1K / Half Marathon;
+   - 42.195K / Marathon;
+   - Custom 15K.
+3. Include desktop and exact 375px coverage.
+4. Smoke manual workout authoring enough to prove the purge did not break manual review/create.
+5. Verify generated workout detail renders child-first repeat readback and no deleted legacy truth:
+   `Plan Preset`, `10K Foundation`, `Half Marathon Balanced`, `Marathon Base`,
+   `base_endpoint_marker`, `plan_preset`, `running_plan_engine_*_builder` as current product truth,
+   `repeat_unit`, `recovery_unit`, fake executable pace, fake personal HR, or raw deterministic
+   builder source kinds.
+6. Use disposable testers/fixtures and clean them back to zero app-owned residue.
+7. Do not implement fixes; route one owner with artifacts if validation fails.
 
 Validation:
-- Source/docs audit only unless a new implementation gate is selected.
-- If docs/dashboard change, run npm run work:dashboard:no-admin and scoped git diff --check.
+- Desktop and exact 375px browser proof for all four goal paths.
+- Console warning/error and pageerror counts `0`.
+- No page-level horizontal overflow.
+- DB/readback proof for created plans and workout detail.
+- Disposable cleanup proof returns zero app-owned residue.
 ```
 
 ## Current Source Of Truth
@@ -89,8 +101,27 @@ Accepted runner-facing workout language:
 | Legacy repeat purge | `repeat_unit` / `recovery_unit` and persisted sibling `work` / `recovery` compatibility are removed from live persisted/export/readback truth after Product-authorized data discard. |
 | Quick setup all-goal create | 10K and Half no-benchmark create; Marathon is no longer a vague Marathon Base fallback; Custom requires distance and blocks/reroutes before invalid create. |
 | Generated-plan richness | Backend, Running Coach, and source/CLI QA accepted richer generated blocks over `planGoalIntent` plus child-first repeats. |
-| Browser/readback acceptance | 10K, Marathon target-time, and Custom 15K target-time preview/create/saved-calendar/workout-detail passed with clean desktop and exact 375px proof. |
+| Browser/readback acceptance | 10K, Marathon target-time, and Custom 15K target-time preview/create/saved-calendar/workout-detail passed before the pre-customer legacy purge; post-purge browser reacceptance is the current QA gate. |
 | Post-create use | Quick setup-created generated plan can open saved calendar, show child-first workout detail, log first generated non-rest workout, and read back completion. |
+
+## Pre-Customer Legacy Purge
+
+Backend removed obsolete generated-plan compatibility now that Hito has no customer-generated
+production content to preserve for those paths. Deleted or collapsed current runtime/proof owners:
+
+- deterministic generated-plan product builders;
+- backend `Marathon Base` / `base_endpoint_marker` generated-plan identity/readback residue;
+- backend Plan Preset discovery/action modules;
+- old Plan Preset validator/proof helpers and scenario generators;
+- obsolete `plan_preset_v1` / deterministic builder editability fixtures;
+- finalized-runtime support for deleted Plan Preset CSVs.
+
+Remaining current truth:
+
+- goal cards are UI shortcuts to `planGoalIntent.distanceMeters`;
+- confirm persists the reviewed AI/local-fixture-authored canonical draft and does not call AI again;
+- import/export/provider contracts stay only where the app currently uses them;
+- browser reacceptance is required before this purge is considered fully QA-closed.
 
 ## OpenAI-Authored Dated Acceptance
 
@@ -118,20 +149,14 @@ Historical caution:
 `openai-authored-dated-final-browser-acceptance-qa` is a pre-rerun failed artifact and must not be
 used as acceptance evidence.
 
-## Current Hold
+## Current Gate
 
-No new running-plan implementation gate is selected from this plan right now.
+The current gate is QA browser reacceptance after the pre-customer legacy purge. Do not select a new
+running-plan implementation or source-size cleanup batch from this plan until QA proves the four
+visible distance-goal paths still create/read back correctly.
 
-Resume only if one of these triggers appears:
-
-- Product reselects running-plan work after source-size cleanup priority changes.
-- Provider/FIT comparison becomes the next real-user-readiness gate.
-- Fresh source or QA evidence exposes a backend-owned generated-plan blocker.
-- Product asks to rebuild or remove a still-current import/export/provider compatibility boundary.
-
-Do not resume by momentum. Deterministic builders may remain only as validator/dev scaffolding or
-local fixtures, not normal product truth. Provider upload/import and provider comparison from actual
-evidence remain explicitly unaccepted by the generated-plan QA gates.
+Provider upload/import and provider comparison from actual evidence remain explicitly unaccepted by
+the generated-plan QA gates.
 
 ## Boundaries
 

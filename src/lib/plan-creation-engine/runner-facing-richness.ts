@@ -296,9 +296,10 @@ function collectFamilySignalIssues(input: {
 }) {
   const issues: string[] = [];
   const signals = new Set(input.distinctNonLongRunSignals);
+  const shortConservativeHorizon = usesShortConservativeHorizonFloor(input);
 
   if (input.family === "10K") {
-    if (!signals.has("strides")) {
+    if (!shortConservativeHorizon && !signals.has("strides")) {
       issues.push("10K runner-facing richness gate requires visible stride/turnover support.");
     }
     if (input.supportBand === "supported" && !signals.has("tempo") && !signals.has("intervals")) {
@@ -326,33 +327,6 @@ function collectFamilySignalIssues(input: {
     ) {
       issues.push(
         "Supported Half Marathon runner-facing richness gate requires visible half-specific durability, progression, or threshold support beyond generic tempo.",
-      );
-    }
-  }
-
-  if (input.family === "Marathon Base") {
-    if (!signals.has("strides") && !signals.has("steady_aerobic_run")) {
-      issues.push("Marathon Base runner-facing richness gate requires strides or steady support.");
-    }
-    if (
-      input.supportBand === "supported" &&
-      input.horizonWeeks >= 20 &&
-      !signals.has("steady_aerobic_run") &&
-      !signals.has("progression") &&
-      !signals.has("hills")
-    ) {
-      issues.push(
-        "Supported long-horizon Marathon Base runner-facing richness gate requires a steady, progression, or hill-strength bridge beyond tempo/strides.",
-      );
-    }
-    if (
-      input.supportBand === "supported" &&
-      input.horizonWeeks >= 20 &&
-      (input.bridgeSignalPlacementsInSecondThird < 1 ||
-        input.bridgeSignalPlacementsInThirdThird < 1)
-    ) {
-      issues.push(
-        "Supported long-horizon Marathon Base runner-facing richness gate requires bridge signals in both the second and third thirds.",
       );
     }
   }
@@ -389,8 +363,8 @@ function resolveSignalFloor(input: {
   let minimumPlacementsAfterMidpoint = 0;
 
   if (input.horizonWeeks <= 12) {
-    minimumPlacements = 2;
-    minimumDistinctSignals = 2;
+    minimumPlacements = input.supportBand === "beginner_or_conservative" ? 1 : 2;
+    minimumDistinctSignals = input.supportBand === "beginner_or_conservative" ? 1 : 2;
   } else if (input.horizonWeeks <= 16) {
     minimumPlacements = 3;
     minimumDistinctSignals = 2;
@@ -426,6 +400,13 @@ function resolveSignalFloor(input: {
     requiresLongRunRichnessForLowSupportDistinctTwo:
       input.supportBand === "beginner_or_conservative" && input.horizonWeeks >= 24,
   };
+}
+
+function usesShortConservativeHorizonFloor(input: {
+  supportBand: RichnessSupportBand;
+  horizonWeeks: number;
+}) {
+  return input.supportBand === "beginner_or_conservative" && input.horizonWeeks <= 12;
 }
 
 function maxAllowedIdentityDesert(input: {
@@ -539,8 +520,6 @@ function normalizeWorkoutKind(kind: string | null): {
       return { nonLongRunSignal: null, longRunSignal: "long_run" };
     case "cutback_long_run":
       return { nonLongRunSignal: null, longRunSignal: "cutback_long_run" };
-    case "marathon_base_endpoint":
-      return { nonLongRunSignal: null, longRunSignal: "base_endpoint" };
     case "final_selected_distance_day":
       return { nonLongRunSignal: null, longRunSignal: "selected_distance_endpoint" };
     default:
@@ -584,8 +563,6 @@ function normalizeCanonicalIdentity(identity: string | null): {
       return { nonLongRunSignal: null, longRunSignal: "cutback_long_run" };
     case "taper_long_run":
       return { nonLongRunSignal: null, longRunSignal: "taper_long_run" };
-    case "base_endpoint_marker":
-      return { nonLongRunSignal: null, longRunSignal: "base_endpoint" };
     case "tenk_completion_or_checkpoint":
     case "half_readiness_marker":
     case "selected_distance_completion_or_checkpoint":

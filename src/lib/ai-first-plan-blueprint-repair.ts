@@ -19,6 +19,8 @@ type SupportedCadenceIdentity =
   | "controlled_tempo_session"
   | "time_intervals"
   | "distance_intervals"
+  | "5k_sharpening_repeats"
+  | "10k_rhythm_intervals"
   | "half_marathon_threshold_durability"
   | "marathon_steady_specificity"
   | "race_pace_session";

@@ -8,7 +8,6 @@ import {
 } from "@/lib/ai-first-plan-blueprint-policy";
 import { weekdayIndex, type AuthoredWorkoutIdentity } from "@/lib/ai-first-plan-blueprint-taxonomy";
 import type { GenerateAiFirstPlanDraftPreviewOptions } from "@/lib/ai-first-plan-draft-service";
-import type { RunningPlanDistanceFamily } from "@/lib/plan-creation-engine/source-types";
 import { resolveCanonicalWorkoutModel } from "@/lib/rich-workout-model";
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring";
 import {
@@ -37,7 +36,6 @@ type AiGeneratedRunningPlanFixturePreviewOptions = Omit<
 
 export function buildAiGeneratedRunningPlanDevFixturePreviewOptions(input: {
   authoringInput: StructuredPlanAuthoringInput;
-  planFamily: RunningPlanDistanceFamily;
   today?: string | null;
   env?: RuntimeEnv;
 }): AiGeneratedRunningPlanFixturePreviewOptions | null {
@@ -75,7 +73,6 @@ export function isAiGeneratedRunningPlanDevFixtureEnabled(env = readRuntimeEnv()
 
 export function buildAiGeneratedRunningPlanDevFixtureOpenAiFetch(input: {
   authoringInput: StructuredPlanAuthoringInput;
-  planFamily: RunningPlanDistanceFamily;
   today?: string | null;
 }): typeof fetch {
   const blueprint = buildAiGeneratedRunningPlanDevFixtureBlueprint(input.authoringInput);
@@ -83,7 +80,7 @@ export function buildAiGeneratedRunningPlanDevFixtureOpenAiFetch(input: {
   return async () =>
     new Response(
       JSON.stringify({
-        id: `local-dev-ai-generated-${slugify(input.planFamily)}`,
+        id: `local-dev-ai-generated-${slugify(input.authoringInput.goal.goalLabel)}`,
         status: "completed",
         output_text: JSON.stringify(blueprint),
         usage: {
@@ -180,9 +177,21 @@ function chooseFixtureWeekdays(input: {
   weekNumber: number;
   horizonWeeks: number;
 }) {
-  const { authoringInput } = input;
+  const { authoringInput, weekNumber, horizonWeeks } = input;
+  const weekStart = addDaysIso(authoringInput.schedule.startDate, (weekNumber - 1) * 7);
   const fixedRestDays = new Set(authoringInput.availability.unavailableDays);
-  const allowedWeekdays = WEEKDAY_NAMES.filter((weekday) => !fixedRestDays.has(weekday));
+  const targetDate =
+    authoringInput.schedule.targetDate && weekNumber === horizonWeeks
+      ? authoringInput.schedule.targetDate
+      : null;
+  const targetDateWeekday = targetDate ? weekdayLong(targetDate) : null;
+  const allowedWeekdays = WEEKDAY_NAMES.filter((weekday) => {
+    const date = dateForWeekday(weekStart, weekday);
+    const fixedRestDay = fixedRestDays.has(weekday);
+    const targetEndpointDay = targetDateWeekday === weekday && date === targetDate;
+
+    return (!fixedRestDay || targetEndpointDay) && (!targetDate || date <= targetDate);
+  });
   const targetCount = Math.min(
     authoringInput.availability.maxRunningDaysPerWeek,
     allowedWeekdays.length,
@@ -191,11 +200,17 @@ function chooseFixtureWeekdays(input: {
   const specificity = chooseFixtureSpecificityIdentity(input);
   const selected = new Set<WeekdayName>();
 
-  if (specificity && specificity.weekday !== longRunDay) {
+  if (
+    specificity &&
+    specificity.weekday !== longRunDay &&
+    allowedWeekdays.includes(specificity.weekday)
+  ) {
     selected.add(specificity.weekday);
   }
 
-  selected.add(longRunDay);
+  if (allowedWeekdays.includes(longRunDay)) {
+    selected.add(longRunDay);
+  }
 
   for (const weekday of authoringInput.availability.preferredRunningDays) {
     if (selected.size >= targetCount) break;
@@ -325,7 +340,7 @@ function resolveFixtureLongRunDay(input: {
       ? weekdayLong(authoringInput.schedule.targetDate)
       : null;
 
-  if (isWeekdayName(targetDateWeekday) && !fixedRestDays.has(targetDateWeekday)) {
+  if (isWeekdayName(targetDateWeekday)) {
     return targetDateWeekday;
   }
 

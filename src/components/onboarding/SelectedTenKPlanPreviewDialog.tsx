@@ -47,26 +47,31 @@ type PreviewCalendarTone =
   | "rest"
   | "final";
 
-function planFamilyDisplayLabel(planFamily: string | null | undefined) {
-  switch (planFamily) {
-    case "10K":
-      return "10K";
-    case "Half Marathon":
-      return "Half Marathon";
-    case "Marathon Base":
-    case "Marathon Completion":
-      return "Marathon";
-    case undefined:
-    case null:
-    case "":
-      return "Selected";
-    default:
-      return planFamily;
-  }
+function previewGoalLabel(
+  draft: SelectedRunningPlanPreviewDraft | null,
+  unavailable: SelectedRunningPlanPreviewUnavailable | null,
+) {
+  return (
+    draft?.normalizedInputSummary.planGoalIntent.distance?.label ??
+    unavailable?.debug.previewActionTrace.planGoalIntentSummary.distanceLabel ??
+    "Selected"
+  );
 }
 
-function isMarathonPlanFamily(planFamily: string | null | undefined) {
-  return planFamily === "Marathon Base" || planFamily === "Marathon Completion";
+function distanceGoalMeters(draft: SelectedRunningPlanPreviewDraft) {
+  return (
+    draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ??
+    draft.endpointProof.endpointDistanceMeters ??
+    null
+  );
+}
+
+function isHalfMarathonDistanceGoal(draft: SelectedRunningPlanPreviewDraft) {
+  return distanceGoalMeters(draft) === 21_100;
+}
+
+function isMarathonDistanceGoal(draft: SelectedRunningPlanPreviewDraft) {
+  return (distanceGoalMeters(draft) ?? 0) >= 42_195;
 }
 
 interface SelectedRunningPlanPreviewDialogProps {
@@ -118,7 +123,7 @@ export function SelectedRunningPlanPreviewDialog({
               Selected plan
             </p>
             <DialogTitle className="hito-modal-title mt-2">
-              {planFamilyDisplayLabel(draft?.planFamily ?? unavailable?.planFamily)} plan preview
+              {previewGoalLabel(draft, unavailable)} plan preview
             </DialogTitle>
             <DialogDescription className="hito-body max-w-2xl">{description}</DialogDescription>
           </div>
@@ -269,7 +274,7 @@ function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPrevie
     <div className="grid gap-4">
       <div className="hito-surface-wash" data-tone="destructive">
         <p className="hito-list-row-title">
-          {planFamilyDisplayLabel(result.planFamily)} preview needs adjustment
+          {previewGoalLabel(null, result)} preview needs adjustment
         </p>
         <p className="hito-list-row-copy">{previewUnavailableCopy(result.error.message)}</p>
       </div>
@@ -312,14 +317,9 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
       (row) =>
         row.workoutDayKind !== "easy" &&
         row.workoutDayKind !== "recovery" &&
-        row.workoutDayKind !== "final_selected_distance_day" &&
-        row.workoutDayKind !== "marathon_base_endpoint",
+        row.workoutDayKind !== "final_selected_distance_day",
     ) ??
-    nonRestRows.find(
-      (row) =>
-        row.workoutDayKind !== "final_selected_distance_day" &&
-        row.workoutDayKind !== "marathon_base_endpoint",
-    ) ??
+    nonRestRows.find((row) => row.workoutDayKind !== "final_selected_distance_day") ??
     null;
   const [activeCalendarRowId, setActiveCalendarRowId] = useState<string | null>(
     endpointRow?.rowId ?? sampleRow?.rowId ?? draft.calendarRows[0]?.rowId ?? null,
@@ -336,7 +336,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
       <section className="hito-row-group">
         <div className="hito-list-row items-start">
           <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <PreviewFact label="Goal" value={planFamilyDisplayLabel(draft.planFamily)} />
+            <PreviewFact label="Goal" value={previewGoalLabel(draft, null)} />
             <PreviewFact
               label="Duration"
               value={`${rowsByWeek.length} weeks · ${draft.calendarRows.length} rows`}
@@ -409,7 +409,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
           <TooltipProvider delayDuration={120}>
             <div
               className="hito-selected-plan-calendar-weeks"
-              aria-label={`${planFamilyDisplayLabel(draft.planFamily)} preview calendar`}
+              aria-label={`${previewGoalLabel(draft, null)} preview calendar`}
             >
               {rowsByWeek.map(([weekNumber, rows]) => (
                 <div key={weekNumber} className="hito-selected-plan-calendar-week">
@@ -499,7 +499,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
         </div>
       </section>
 
-      <FamilyReadback draft={draft} rows={draft.calendarRows} />
+      <DistanceGoalReadback draft={draft} rows={draft.calendarRows} />
 
       <section className="grid gap-3">
         <div>
@@ -612,14 +612,14 @@ function EndpointProofPills({ draft }: { draft: SelectedRunningPlanPreviewDraft 
   );
 }
 
-function FamilyReadback({
+function DistanceGoalReadback({
   draft,
   rows,
 }: {
   draft: SelectedRunningPlanPreviewDraft;
   rows: readonly SelectedRunningPlanCalendarRow[];
 }) {
-  if (draft.planFamily === "Half Marathon") {
+  if (isHalfMarathonDistanceGoal(draft)) {
     const thresholdPresent = rows.some((row) => row.workoutDayKind === "threshold");
 
     return (
@@ -651,7 +651,7 @@ function FamilyReadback({
     );
   }
 
-  if (isMarathonPlanFamily(draft.planFamily)) {
+  if (isMarathonDistanceGoal(draft)) {
     const intervalsPresent = rows.some((row) => row.workoutDayKind === "intervals");
 
     return (
@@ -687,22 +687,21 @@ function FamilyReadback({
 }
 
 function finalPreviewLabel(draft: SelectedRunningPlanPreviewDraft) {
-  if (draft.planFamily === "Half Marathon") return "Half Marathon";
-  if (isMarathonPlanFamily(draft.planFamily)) return "Marathon goal";
-
-  return "10K";
+  return previewGoalLabel(draft, null);
 }
 
 function endpointProofLabel(draft: SelectedRunningPlanPreviewDraft) {
-  return isMarathonPlanFamily(draft.planFamily) ? "Marathon endpoint proof" : "Endpoint proof";
+  return draft.endpointProof.endpointMainDistanceMeters
+    ? "Distance endpoint proof"
+    : "Endpoint proof";
 }
 
 function endpointProofTitle(draft: SelectedRunningPlanPreviewDraft) {
-  if (isMarathonPlanFamily(draft.planFamily)) {
-    return "Final marathon day is a reviewed endpoint checkpoint.";
-  }
+  const meters = draft.endpointProof.endpointMainDistanceMeters;
 
-  return `Final selected-distance day ends at exactly ${draft.endpointProof.endpointMainDistanceMeters}m.`;
+  return meters
+    ? `Final selected-distance day ends at exactly ${meters}m.`
+    : "Final goal day is a reviewed endpoint checkpoint.";
 }
 
 function endpointProofCopy(draft: SelectedRunningPlanPreviewDraft) {
@@ -774,27 +773,14 @@ function goalIntentTone(
 }
 
 function expectedOutcomeTitle(draft: SelectedRunningPlanPreviewDraft) {
-  if (draft.planFamily === "Half Marathon") {
-    return "Complete a Half Marathon checkpoint day.";
-  }
-
-  if (isMarathonPlanFamily(draft.planFamily)) {
-    return "Complete a Marathon endpoint day.";
-  }
-
-  return "Complete a 10K checkpoint day.";
+  return `Complete a ${previewGoalLabel(draft, null)} checkpoint day.`;
 }
 
 function expectedOutcomeCopy(draft: SelectedRunningPlanPreviewDraft) {
-  if (draft.planFamily === "Half Marathon") {
-    return "The preview is a watch-executable Half Marathon progression, not a target-time or race-pace promise.";
-  }
-
-  if (isMarathonPlanFamily(draft.planFamily)) {
-    return "The preview is a watch-executable Marathon progression, not a target-time or race-pace promise.";
-  }
-
-  return "The preview is a watch-executable 10K progression, not a target-time or race-pace promise.";
+  return `The preview is a watch-executable ${previewGoalLabel(
+    draft,
+    null,
+  )} progression, not a target-time or race-pace promise.`;
 }
 
 function SegmentReadbackCard({
@@ -926,11 +912,6 @@ function workoutKindMeta(kind: SelectedRunningPlanCalendarRow["workoutDayKind"])
       short: "Long Run",
       glyph: "long",
     },
-    marathon_base_endpoint: {
-      label: "Long Run",
-      short: "Long Run",
-      glyph: "long",
-    },
   };
 
   if (kind === "rest") {
@@ -1021,11 +1002,7 @@ function formatCalendarDayNumber(date: string) {
 }
 
 function calendarTone(row: SelectedRunningPlanCalendarRow): PreviewCalendarTone {
-  if (
-    row.endpointDistanceMeters ||
-    row.workoutDayKind === "final_selected_distance_day" ||
-    row.workoutDayKind === "marathon_base_endpoint"
-  ) {
+  if (row.endpointDistanceMeters || row.workoutDayKind === "final_selected_distance_day") {
     return "final";
   }
 
@@ -1069,10 +1046,6 @@ function calendarTone(row: SelectedRunningPlanCalendarRow): PreviewCalendarTone 
 }
 
 function calendarEndpointReadback(row: SelectedRunningPlanCalendarRow) {
-  if (row.workoutDayKind === "marathon_base_endpoint") {
-    return "marathon endpoint";
-  }
-
   return row.endpointDistanceMeters ? `${row.endpointDistanceMeters}m endpoint` : null;
 }
 

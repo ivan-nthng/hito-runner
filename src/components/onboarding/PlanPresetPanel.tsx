@@ -5,11 +5,10 @@ import { SelectedRunningPlanPreviewDialog } from "@/components/onboarding/Select
 import {
   derivePlanGoalPaceReadback,
   type PlanGoalIntentDraftState,
-  type PlanGoalSelectionId,
+  type PlanPresetCardsActionResult,
   parsePlanGoalCustomDistanceKm,
   resolveSelectedPlanGoalPreviewGate,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
-import type { PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
 import type {
   RunningPlanConfirmActionResult,
   RunningPlanPreviewActionResult,
@@ -62,14 +61,12 @@ interface PlanPresetPanelProps {
   isPresetDiscoveryReady: boolean;
   previewOpen: boolean;
   onPreviewOpenChange: (open: boolean) => void;
-  onSelectPlan: (goalSelection: PlanGoalSelectionId) => void;
   onRefreshPreview: () => void;
   onCreatePlan: () => void;
   previewDialogDescription?: string;
   previewDialogPrimaryActionLabel?: string;
   previewDialogPrimaryActionPendingLabel?: string;
   previewDialogExtraNotice?: ReactNode;
-  showInlinePreviewAction?: boolean;
   planGoalChoice: PlanGoalChoice;
   planGoalCustomDistanceKm: string;
   planGoalCustomDistanceLabel: string;
@@ -106,14 +103,12 @@ export function PlanPresetPanel({
   onCreatePlan,
   onPreviewOpenChange,
   onRefreshPreview,
-  onSelectPlan,
   previewOpen,
   previewResult,
   previewDialogDescription,
   previewDialogExtraNotice,
   previewDialogPrimaryActionLabel,
   previewDialogPrimaryActionPendingLabel,
-  showInlinePreviewAction = true,
   planGoalChoice,
   planGoalCustomDistanceKm,
   planGoalCustomDistanceLabel,
@@ -128,18 +123,6 @@ export function PlanPresetPanel({
 }: PlanPresetPanelProps) {
   const blockedMessage = cardsResult && !cardsResult.ok ? cardsResult.message : null;
   const loadingCards = status === "loading_cards";
-  const basicsBlocked = !isPresetDiscoveryReady;
-  const draftState: PlanGoalIntentDraftState = {
-    planGoalChoice,
-    planGoalCustomDistanceKm,
-    planGoalCustomDistanceLabel,
-    planGoalFinishTime,
-    planGoalTargetDate,
-  };
-  const selectedGoalId = planGoalChoice || null;
-  const previewGate = resolveSelectedPlanGoalPreviewGate(draftState, selectedGoalId);
-  const previewDisabled = isBusy || basicsBlocked || !selectedGoalId || !previewGate.ok;
-  const previewHelper = previewGate.ok ? null : previewGate.error;
 
   return (
     <section className="hito-plan-preset-stage hito-section-divider pt-8">
@@ -190,36 +173,6 @@ export function PlanPresetPanel({
         {error || blockedMessage ? (
           <p className="hito-field-error">{error ?? blockedMessage}</p>
         ) : null}
-
-        {showInlinePreviewAction ? (
-          <div className="hito-section-divider flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="hito-list-row-title">Build one generated preview</p>
-              <p className="hito-list-row-copy">
-                Hito reviews the selected goal before anything is created.
-              </p>
-              {previewHelper ? <p className="hito-field-helper mt-2">{previewHelper}</p> : null}
-            </div>
-            <button
-              type="button"
-              className="hito-button hito-button-primary hito-button-md shrink-0"
-              disabled={previewDisabled}
-              onClick={() => {
-                if (selectedGoalId) {
-                  onSelectPlan(selectedGoalId);
-                }
-              }}
-            >
-              {previewButtonLabel({
-                basicsBlocked,
-                goalChoice: planGoalChoice,
-                loadingCards,
-                previewGate,
-                status,
-              })}
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <SelectedRunningPlanPreviewDialog
@@ -239,38 +192,6 @@ export function PlanPresetPanel({
       />
     </section>
   );
-}
-
-function previewButtonLabel({
-  basicsBlocked,
-  goalChoice,
-  loadingCards,
-  previewGate,
-  status,
-}: {
-  basicsBlocked: boolean;
-  goalChoice: PlanGoalChoice;
-  loadingCards: boolean;
-  previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
-  status: PlanPresetUiStatus;
-}) {
-  if (status === "previewing_plan") {
-    return "Building preview...";
-  }
-
-  if (loadingCards) {
-    return "Checking setup...";
-  }
-
-  if (basicsBlocked) {
-    return "Build preview";
-  }
-
-  if (!goalChoice) {
-    return "Build preview";
-  }
-
-  return "Build preview";
 }
 
 function PlanGoalIntentControls({

@@ -101,7 +101,7 @@ function TransitionReviewSummary({ review }: { review: TransitionReviewOk }) {
               label="Current schedule"
               value={`${review.currentPlan.workoutCount} rows · ${review.currentPlan.upcomingWorkoutCount} upcoming`}
             />
-            <ReviewFact label="Candidate plan" value={review.candidatePlan.planFamily} />
+            <ReviewFact label="Candidate plan" value={review.candidatePlan.goalLabel} />
             <ReviewFact label="Candidate range" value={formatDateRange(review.candidatePlan)} />
             <ReviewFact
               label="Candidate schedule"

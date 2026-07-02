@@ -7,10 +7,10 @@ import {
   buildPlanPresetCardInputKey,
   buildRunningPlanPreviewInput,
   planGoalChoiceLabel,
+  type PlanPresetCardsActionResult,
   type PlanGoalSelectionId,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
-import type { PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
 import {
   previewRunningPlanDraft,
   type RunningPlanPreviewActionInput,

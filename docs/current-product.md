@@ -58,9 +58,9 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   `Half Marathon`, `Marathon`, or `Custom`; preset cards are convenience inputs into the same
   backend-owned generated-plan preview/create path, while Custom requires a valid distance before
   preview. The old Plan Preset review/confirm creation seam has been removed from runtime.
-- Plan Presets are reusable for any no-active-plan state, not only a runner's literal first plan:
-  they never silently replace an existing active plan, and active-plan replacement/refresh from a
-  preset remains separate future work
+- Quick setup goal cards are runner-facing shortcuts into `planGoalIntent.distanceMeters`, not
+  separate backend Plan Preset programs. They never silently replace an existing active plan, and
+  active-plan replacement/refresh remains a separate reviewed flow
 - signed-in users with no active plan can also choose `Build my plan myself`: the first reviewed
   manual workout creates a `manual_user_built_plan_v1` active plan through backend review
   token/checksum confirmation, and saved manual calendars can add additional reviewed workouts on
@@ -98,8 +98,9 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   Restore UI, active-plan replacement semantics expansion, and generated-row content editing remain
   future-only
 - the Advanced custom program path remains separate and secondary for target date/time, unusual
-  constraints, injury/pain/caution, uncommon goals, and detailed comments; Plan Presets do not own
-  manual-builder behavior, and current manual-builder capabilities are described separately above
+  constraints, injury/pain/caution, uncommon goals, and detailed comments; Quick setup distance
+  shortcuts do not own manual-builder behavior, and current manual-builder capabilities are
+  described separately above
 - saved-mode accounts now use one calendar header action model: primary `Add plan` opens the
   supported plan-add/create choices, while the adjacent overflow owns safe utilities such as
   `Export JSON`, `Edit schedule`, and `Clear upcoming schedule`
@@ -135,7 +136,9 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
   `npm run import-admin-backlog-work-items` scans approved markdown task/spec/brief/plan folders and upserts bounded indexed rows into `admin_capture_items`; when docs provide canonical sections for status, type, priority, next recommended role, task, stage, and exact handoff prompt, those values drive the mirrored admin fields and copied prompt, with the first `Task` line shown as the human-readable Backlog title while source path stays metadata; older archive docs are imported conservatively with missing-metadata markers; the importer reports repo-derived mirror rows whose markdown source path no longer exists and can archive those stale mirrors only through explicit `--archive-stale`; repo-derived rows are read-only through admin mutation actions, markdown remains canonical for those repo-authored items, Supabase remains canonical for admin-created quick notes/captures, and there is still no automatic two-way sync or Codex dispatch
 - `/admin/login` now provides a dedicated owner admin sign-in page:
   local/dev admin login can still use the protected local fixture, but both local fixture and deployed/runtime admin login now create signed admin-only `hito_admin_session` access for admin surfaces; valid tester/product credentials are refused with an admin-specific error instead of creating a normal product session, redirects stay limited to sanitized admin paths, admin surfaces use explicit `/api/admin/auth/logout`, and normal `/login`, Magic Link, product local-login, and runner/product logout behavior remain separate; `/admin/analytics` admin-required states now point to this admin login path
-- onboarding keeps Manual setup and Quick setup as the visible creation paths, with structured review and Plan Preset / selected-plan review inside Quick setup, and keeps JSON import visibly demoted as an advanced fallback for existing Hito plan files
+- onboarding keeps Manual setup and Quick setup as the visible creation paths, with structured review
+  and selected distance-goal review inside Quick setup, and keeps JSON import visibly demoted as an
+  advanced fallback for existing Hito plan files
 - `/settings` now separates `Personal data` from `Training preferences` with Hito tabs; personal age/height/weight use the same editable value chips as Quick setup, the personal page shows default estimated heart-rate starting ranges when profile age supports them while clearly labelling them as non-personalized, and training preferences use the same weekday choice rhythm as plan creation to save fixed rest days, default running-days/week, and preferred long-run day as future-plan defaults only, with backend validation preventing impossible rest-day and long-run combinations
 - the backend-owned training-preference contract now uses one mapping between runner-facing names and storage truth:
   `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` map to stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day`; zero fixed rest days is valid, all seven fixed rest days is blocked, default running days must fit the available weekdays, and the default long-run fallback is Sunday, then Saturday, then the latest available weekday without being stored as an explicit preference
@@ -145,10 +148,9 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - the first OpenAI-backed text authoring slice is also backend-only for now:
   it treats the user message as intent only, asks OpenAI for bounded structured authoring input using the same expanded goal, terrain, execution-mode, and recent-benchmark contract as structured setup, validates that output, then the saved-mode text replacement action opts into a second bounded rich workout draft that must pass backend taxonomy, rest-day, segment-structure, and metric-safety normalization before persistence; default helper usage stays deterministic, and retired voice-to-plan residue is no longer a current backend action
 - setup writes one profile and creates one active plan only after manual empty-plan creation, structured constructor confirmation, or selected-plan confirmation, with JSON import retained only as an advanced fallback
-- starting a selected generated/preset plan from an existing active manual plan now has a
+- starting a selected generated plan from an existing active manual plan now has a
   backend-owned reviewed transition seam for future saved-mode `Create a plan` UI: review is
-  non-mutating, Plan Preset card discovery can load as read-only family discovery even while the
-  manual plan is active, confirm revalidates selected-plan exactness plus active-plan revision,
+  non-mutating, confirm revalidates selected-plan exactness plus active-plan revision,
   archives the old manual active plan as history, creates the selected plan as the new active plan,
   preserves manual templates/logs/evidence/comparisons, and does not merge upcoming manual workouts
   into the generated plan by default

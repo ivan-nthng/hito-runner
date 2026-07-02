@@ -35,23 +35,6 @@ export const distanceFamilyContracts: RunningPlanEngineSourceModel["supportedDis
     endpointGateId: "half_marathon_selected_distance_endpoint",
   },
   {
-    family: "Marathon Base",
-    productMeaning:
-      "Honest marathon durability and base-building block, not full race-peak preparation.",
-    finalPromise: "Explicit marathon base endpoint with honest durability language.",
-    acceptedEndpointBehaviors: [
-      "Marathon Base endpoint",
-      "durability endpoint long run",
-      "steady durability endpoint with honest base language",
-    ],
-    rejectedEndpointBehaviors: [
-      "false full-marathon race-readiness claim",
-      "fake taper-peak language",
-      "target-time implication",
-    ],
-    endpointGateId: "marathon_base_honest_endpoint",
-  },
-  {
     family: "Marathon Completion",
     productMeaning:
       "Finish-focused selected-distance full marathon completion build with a long honest runway.",
@@ -62,7 +45,6 @@ export const distanceFamilyContracts: RunningPlanEngineSourceModel["supportedDis
       "finish-focused marathon endpoint",
     ],
     rejectedEndpointBehaviors: [
-      "Marathon Base endpoint",
       "race-pace readiness",
       "target-time implication",
       "endpoint hidden only in metadata while rows stay generic",

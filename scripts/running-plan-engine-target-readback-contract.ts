@@ -184,8 +184,6 @@ export function benchmarkPaceUsefulWorkoutKinds(family: RunningPlanDistanceFamil
       return new Set(["tempo", "intervals"]);
     case "Half Marathon":
       return new Set(["tempo", "threshold", "progression"]);
-    case "Marathon Base":
-      return new Set(["steady_aerobic_run", "tempo", "threshold", "hills"]);
     case "Marathon Completion":
       return new Set(["steady_aerobic_run", "progression", "tempo"]);
   }

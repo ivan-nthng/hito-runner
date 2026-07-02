@@ -614,7 +614,7 @@ export async function validateManualMoveWorkoutContract() {
   const presetPlan = buildFakePlanCycle({
     userId,
     id: activePlan.id,
-    sourceKind: "plan_preset_v1",
+    sourceKind: "ai_first_plan_blueprint_v1",
     startDate: "2026-06-18",
     endDate: "2026-06-21",
   });
@@ -629,7 +629,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(presetMoveReview.ok, true, formatMoveReviewResult(presetMoveReview));
   if (presetMoveReview.ok) {
-    assert.equal(presetMoveReview.sourceKind, "plan_preset_v1");
+    assert.equal(presetMoveReview.sourceKind, "ai_first_plan_blueprint_v1");
     assert.equal(presetMoveReview.targetWeekday, "Monday");
     assert.equal(presetMoveReview.safety.targetWeekdayDerivedServerSide, true);
   }
@@ -651,7 +651,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(presetMoveConfirm.ok, true, formatMoveConfirmResult(presetMoveConfirm));
   if (presetMoveConfirm.ok) {
-    assert.equal(presetMoveConfirm.sourceKind, "plan_preset_v1");
+    assert.equal(presetMoveConfirm.sourceKind, "ai_first_plan_blueprint_v1");
     assert.equal(presetMoveConfirm.sourceStatus, null);
     assert.equal(presetMoveConfirm.targetWeekday, "Monday");
     assert.equal(presetMoveConfirm.safety.movedExactlyOneRow, true);
@@ -660,7 +660,7 @@ export async function validateManualMoveWorkoutContract() {
   const selectedPlan = buildFakePlanCycle({
     userId,
     id: activePlan.id,
-    sourceKind: "running_plan_engine_10k_builder_v1",
+    sourceKind: "ai_first_plan_blueprint_v1",
     startDate: "2026-06-18",
     endDate: "2026-06-21",
   });
@@ -733,7 +733,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(selectedDirectMove.ok, true, formatDirectMoveResult(selectedDirectMove));
   if (selectedDirectMove.ok) {
-    assert.equal(selectedDirectMove.sourceKind, "running_plan_engine_10k_builder_v1");
+    assert.equal(selectedDirectMove.sourceKind, "ai_first_plan_blueprint_v1");
     assert.equal(selectedDirectMove.sourceStatus, null);
     assert.equal(selectedDirectMove.plannedWorkoutId, selectedGeneratedSource.id);
     assert.equal(selectedDirectMove.targetDate, "2026-06-24");
@@ -785,7 +785,7 @@ export async function validateManualMoveWorkoutContract() {
     formatMoveReviewResult(selectedReplacementReview),
   );
   if (selectedReplacementReview.ok) {
-    assert.equal(selectedReplacementReview.sourceKind, "running_plan_engine_10k_builder_v1");
+    assert.equal(selectedReplacementReview.sourceKind, "ai_first_plan_blueprint_v1");
     assert.equal(selectedReplacementReview.sourceWorkoutId, selectedGeneratedSource.id);
     assert.equal(selectedReplacementReview.sourceWorkoutDate, selectedGeneratedSource.workout_date);
     assert.equal(selectedReplacementReview.targetDate, selectedOccupiedTarget.workout_date);
@@ -864,7 +864,7 @@ export async function validateManualMoveWorkoutContract() {
     formatMoveConfirmResult(selectedReplacementConfirm),
   );
   if (selectedReplacementConfirm.ok) {
-    assert.equal(selectedReplacementConfirm.sourceKind, "running_plan_engine_10k_builder_v1");
+    assert.equal(selectedReplacementConfirm.sourceKind, "ai_first_plan_blueprint_v1");
     assert.equal(selectedReplacementConfirm.plannedWorkoutId, selectedGeneratedSource.id);
     assert.equal(selectedReplacementConfirm.targetDayKind, "workout_day");
     assert.equal(
@@ -1175,7 +1175,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(directNonManualPlan.ok, true, formatDirectMoveResult(directNonManualPlan));
   if (directNonManualPlan.ok) {
-    assert.equal(directNonManualPlan.sourceKind, "plan_preset_v1");
+    assert.equal(directNonManualPlan.sourceKind, "ai_first_plan_blueprint_v1");
     assert.equal(directNonManualPlan.sourceStatus, null);
     assert.equal(directNonManualPlan.safety.directMutation, true);
     assert.equal(directNonManualPlan.safety.movedExactlyOneRow, true);

@@ -42,23 +42,6 @@ export const endpointGates: RunningPlanEngineSourceModel["endpointGates"] = {
       "metadata_only_endpoint",
     ],
   },
-  "Marathon Base": {
-    family: "Marathon Base",
-    gateId: "marathon_base_honest_endpoint",
-    requiredEndpointKind: "marathon_base_endpoint",
-    requiredFinalWorkoutKinds: ["marathon_base_endpoint"],
-    endpointDistanceMeters: null,
-    mustNameSelectedDistanceInEndpoint: false,
-    mustNotClaimFullMarathonReadiness: true,
-    rejectedFinalOutputs: [
-      "full_marathon_race_readiness",
-      "marathon_race_peak",
-      "target_time_endpoint",
-      "race_pace_session",
-      "rest_and_recovery",
-      "generic_support_only_final_week",
-    ],
-  },
   "Marathon Completion": {
     family: "Marathon Completion",
     gateId: "marathon_completion_selected_distance_endpoint",
@@ -68,7 +51,6 @@ export const endpointGates: RunningPlanEngineSourceModel["endpointGates"] = {
     mustNameSelectedDistanceInEndpoint: true,
     mustNotClaimFullMarathonReadiness: false,
     rejectedFinalOutputs: [
-      "marathon_base_endpoint",
       "long_aerobic_run",
       "easy_aerobic_run",
       "recovery_jog",
@@ -210,72 +192,6 @@ const halfMarathonEndpointTemplate: RunningPlanEndpointTemplate = {
   ],
 };
 
-const marathonBaseEndpointTemplate: RunningPlanEndpointTemplate = {
-  family: "Marathon Base",
-  endpointGateId: "marathon_base_honest_endpoint",
-  endpointDistanceMeters: null,
-  endpointBehavior: "marathon_base_durability_endpoint",
-  mustNotClaimFullMarathonReadiness: true,
-  kind: "marathon_base_endpoint",
-  label: "Marathon Base Endpoint",
-  watchExecutable: true,
-  primaryContract: "numeric_structure",
-  targetTruthModes: ["structure_only", "editable_default_hr"],
-  allowedFamilies: ["Marathon Base"],
-  cueRole: "secondary_only",
-  segments: [
-    {
-      id: "marathon_base_warmup",
-      order: 1,
-      segmentRole: "warmup",
-      primaryPrescription: {
-        mode: "open_warmup",
-        durationSeconds: seconds(10),
-        intensityLabel: "easy",
-      },
-      targetTruthMode: "structure_only",
-      secondaryCue: "Start patient.",
-    },
-    {
-      id: "marathon_base_main",
-      order: 2,
-      segmentRole: "main",
-      primaryPrescription: {
-        mode: "time_with_default_hr_cap",
-        durationSeconds: seconds(40, 60),
-        defaultHrZoneLabelOrCap: "editable default HR guidance",
-        intensityLabel: "durable_steady",
-      },
-      targetTruthMode: "editable_default_hr",
-      secondaryCue: "Calm durable composure.",
-    },
-    {
-      id: "marathon_base_finish",
-      order: 3,
-      segmentRole: "finish",
-      primaryPrescription: {
-        mode: "time",
-        durationSeconds: seconds(5),
-        intensityLabel: "easy_settle",
-      },
-      targetTruthMode: "structure_only",
-      secondaryCue: "Let the effort come down.",
-    },
-    {
-      id: "marathon_base_cooldown",
-      order: 4,
-      segmentRole: "cooldown",
-      primaryPrescription: {
-        mode: "open_cooldown",
-        durationSeconds: seconds(5, 10),
-        intensityLabel: "easy",
-      },
-      targetTruthMode: "structure_only",
-      secondaryCue: "Finish durable, not depleted.",
-    },
-  ],
-};
-
 const marathonCompletionEndpointTemplate: RunningPlanEndpointTemplate = {
   family: "Marathon Completion",
   endpointGateId: "marathon_completion_selected_distance_endpoint",
@@ -344,7 +260,6 @@ const marathonCompletionEndpointTemplate: RunningPlanEndpointTemplate = {
 export const endpointTemplates: RunningPlanEngineSourceModel["endpointTemplates"] = {
   "10K": tenKEndpointTemplate,
   "Half Marathon": halfMarathonEndpointTemplate,
-  "Marathon Base": marathonBaseEndpointTemplate,
   "Marathon Completion": marathonCompletionEndpointTemplate,
 } as const;
 

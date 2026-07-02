@@ -35,21 +35,6 @@ const vercelStaticDir = resolve(vercelOutputDir, "static");
 const vercelFunctionDir = resolve(vercelOutputDir, "functions/__server.func");
 const vercelNitroManifest = resolve(vercelOutputDir, "nitro.json");
 const vercelConfig = resolve(vercelOutputDir, "config.json");
-const planPresetProgramSourceDir = resolve(rootDir, "src/lib/plan-presets");
-const planPresetProgramFiles = [
-  "preset-program-scenario-matrix.csv",
-  "preset-program-load-adjustments.csv",
-  "preset-goal-contract-matrix.csv",
-];
-const localFinalizedPlanPresetProgramOutputDir = resolve(
-  localFinalizedServerDir,
-  "src/lib/plan-presets",
-);
-const localFinalizedStagingPlanPresetProgramOutputDir = resolve(
-  localFinalizedStagingServerDir,
-  "src/lib/plan-presets",
-);
-const vercelPlanPresetProgramOutputDir = resolve(vercelFunctionDir, "src/lib/plan-presets");
 
 const localRequiredOutputs = [
   outputNitroManifest,
@@ -96,8 +81,6 @@ async function finalizeLocalOutput() {
     }
   }
 
-  validatePlanPresetProgramArtifacts(localFinalizedPlanPresetProgramOutputDir);
-
   cleanupLocalFinalizeScratch();
 
   validateLocalBuildOutput({ rootDir });
@@ -105,15 +88,12 @@ async function finalizeLocalOutput() {
 
 async function finalizeVercelOutput() {
   copyDirectory(sourcePublicDir, vercelStaticDir);
-  copyPlanPresetProgramArtifacts(vercelPlanPresetProgramOutputDir);
 
   for (const outputPath of vercelRequiredOutputs) {
     if (!existsSync(outputPath)) {
       throw new Error(`Expected finalized Vercel build artifact is missing: ${outputPath}`);
     }
   }
-
-  validatePlanPresetProgramArtifacts(vercelPlanPresetProgramOutputDir);
 
   validateVercelBuildOutput({ rootDir });
 }
@@ -184,7 +164,6 @@ async function restoreLocalOutputAfterLateNitroCleanup() {
 
 function restoreLocalOutputSnapshot() {
   copyGeneratedDirectory(localFinalizeServerBackupDir, localFinalizedStagingServerDir);
-  copyPlanPresetProgramArtifacts(localFinalizedStagingPlanPresetProgramOutputDir);
   copyGeneratedDirectory(localFinalizePublicBackupDir, localFinalizedStagingPublicDir);
   copyGeneratedFile(localFinalizeNitroManifestBackup, localFinalizedStagingNitroManifest);
 }
@@ -254,26 +233,6 @@ async function cleanupGeneratedConflictResidueAfterLocalPublish() {
 
     for (const generatedRoot of generatedRoots) {
       removeGeneratedSiblingConflictsRecursively(generatedRoot);
-    }
-  }
-}
-
-function copyPlanPresetProgramArtifacts(destinationDir) {
-  for (const fileName of planPresetProgramFiles) {
-    const sourcePath = resolve(planPresetProgramSourceDir, fileName);
-    const destinationPath = resolve(destinationDir, fileName);
-
-    mkdirSync(dirname(destinationPath), { recursive: true });
-    cpSync(sourcePath, destinationPath);
-  }
-}
-
-function validatePlanPresetProgramArtifacts(destinationDir) {
-  for (const fileName of planPresetProgramFiles) {
-    const outputPath = resolve(destinationDir, fileName);
-
-    if (!existsSync(outputPath)) {
-      throw new Error(`Expected finalized Plan Preset program artifact is missing: ${outputPath}`);
     }
   }
 }

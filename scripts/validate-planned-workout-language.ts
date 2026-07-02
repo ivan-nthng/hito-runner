@@ -28,8 +28,13 @@ import {
   type TrainingPlanV2,
 } from "../src/lib/imported-plan";
 import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
+import { buildAiGeneratedRunningPlanDevFixturePreviewOptions } from "../src/lib/ai-generated-running-plan-dev-fixture";
 import {
-  buildReviewedRunningPlanPreview,
+  AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+  buildAiGeneratedRunningPlanAuthoringInput,
+} from "../src/lib/ai-generated-running-plan";
+import {
+  buildReviewedAiGeneratedRunningPlanPreview,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
 import { buildRunningPlanCanonicalPlan } from "../src/lib/running-plan-engine-review";
@@ -59,7 +64,6 @@ const ACCEPTED_BLOCK_LABELS = new Set<string>(Object.values(RUNNER_FACING_BLOCK_
 const INTERNAL_IDENTITIES = [
   "controlled_tempo_session",
   "half_marathon_threshold_durability",
-  "base_endpoint_marker",
   "tenk_completion_or_checkpoint",
 ] as const;
 
@@ -122,7 +126,7 @@ function validateManualAndGeneratedRowsUseTheSameLanguage() {
   const generatedLanguage = buildPlannedWorkoutLanguage({
     workoutType: manual.workoutType,
     sourceWorkoutType: manual.sourceWorkoutType,
-    sourceKind: "running_plan_engine_10k_builder_v1",
+    sourceKind: AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
     workoutFamily: manual.workoutFamily,
     workoutIdentity: manual.workoutIdentity,
     calendarIconKey: manual.calendarIconKey,
@@ -144,7 +148,7 @@ function validateManualAndGeneratedRowsUseTheSameLanguage() {
 }
 
 async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
-  const selectedPreview = await buildReviewedRunningPlanPreview({
+  const selectedPreview = await buildReviewedAiFixture({
     age: 36,
     heightCm: 178,
     weightKg: 74,
@@ -154,12 +158,15 @@ async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
     fixedRestDays: ["Wednesday", "Saturday"],
     preferredLongRunDay: "Sunday",
     startDate: "2026-06-23",
+    planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
   } satisfies RunningPlanPreviewActionInput);
 
   assert.equal(selectedPreview.ok, true, "selected-plan generated preview should be reviewable.");
 
   if (!selectedPreview.ok) {
-    throw new Error(`selected-plan preview rejected unexpectedly: ${selectedPreview.reason}`);
+    throw new Error(
+      `selected-plan preview rejected unexpectedly: ${selectedPreview.unavailable.error.message}`,
+    );
   }
 
   const selectedPlan = buildRunningPlanCanonicalPlan(selectedPreview.draft);
@@ -198,6 +205,25 @@ async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
     aiNormalized.canonicalPlan,
     "AI-like rich workout draft normalized plan",
   );
+}
+
+async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input);
+  assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
+  if (!authoring.ok) {
+    throw new Error(authoring.message);
+  }
+
+  const aiPreview = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+    authoringInput: authoring.authoringInput,
+    today: input.startDate ?? authoring.authoringInput.schedule.startDate,
+    env: localAiGeneratedFixtureEnv(),
+  });
+  assert.notEqual(aiPreview, null, "Planned-workout language proof must use local AI fixture.");
+
+  return buildReviewedAiGeneratedRunningPlanPreview(input, {
+    aiPreview: aiPreview ?? undefined,
+  });
 }
 
 function assertGeneratedPlanUsesUnifiedBlockContract(plan: TrainingPlanV2, label: string) {
@@ -1057,25 +1083,13 @@ function validateSourceKindIsProvenanceOnly() {
 function validateInternalIdentityLabelsStayBackendOnly() {
   const controlledTempo = languageForManualTemplate("controlled_tempo_session");
   const threshold = languageForManualTemplate("half_marathon_threshold_durability");
-  const endpoint = buildPlannedWorkoutLanguage({
-    workoutType: "long_run",
-    sourceWorkoutType: "base_endpoint_marker",
-    sourceKind: "running_plan_engine_marathon_base_builder_v1",
-    workoutFamily: "long",
-    workoutIdentity: "base_endpoint_marker",
-    calendarIconKey: "long",
-    title: "Base endpoint marker",
-    steps: [],
-  });
 
   assert.equal(controlledTempo.runnerFacingWorkoutTypeLabel, "Tempo");
   assert.equal(threshold.runnerFacingWorkoutTypeLabel, "Tempo");
-  assert.equal(endpoint.runnerFacingWorkoutTypeLabel, "Long Run");
 
   const runnerFacingText = [
     controlledTempo.runnerFacingWorkoutTypeLabel,
     threshold.runnerFacingWorkoutTypeLabel,
-    endpoint.runnerFacingWorkoutTypeLabel,
     ...controlledTempo.runnerFacingBlocks.map((block) => block.label),
     ...threshold.runnerFacingBlocks.map((block) => block.label),
   ].join(" ");
@@ -1459,6 +1473,15 @@ function buildPersistedRow({
     id,
     created_at: "2026-06-25T00:00:00.000Z",
     ...insertRow,
+  };
+}
+
+function localAiGeneratedFixtureEnv() {
+  return {
+    OPENAI_API_KEY: "local-qa-dev-ai-generated-plan-fixture",
+    OPENAI_MODEL: "hito-local-qa-dev-ai-generated-plan-fixture",
+    LOCAL_AUTH_BYPASS_ENABLED: "true",
+    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
   };
 }
 

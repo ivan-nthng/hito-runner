@@ -152,13 +152,10 @@ function buildIdentitySegmentSpecs(
           "Threshold durability warmup",
           "Start conversational and prepare for sustained half-marathon strength work.",
         ),
-        timedSpec({
-          segmentType: "tempo_block",
-          label: "Half-marathon threshold durability",
-          durationMin: split.mainMin,
-          guidance:
-            "Run a sustained controlled block that builds threshold durability without forcing target pace.",
-          targetRole: "main",
+        thresholdDurabilityRepeatSpec({
+          workout,
+          split,
+          mainMin: split.mainMin,
         }),
         cooldownSpec(
           split.cooldownMin,
@@ -532,8 +529,6 @@ function buildIdentitySegmentSpecs(
           },
           targetRole: "main",
           recoveryTarget: {
-            intensity: "easy recovery",
-            rpe: Math.max(2, workout.plannedRpe - 3),
             cue: "Recover fully enough that the next stride stays relaxed.",
           },
         },
@@ -776,8 +771,6 @@ function intervalSpecs({
       },
       targetRole: "main",
       recoveryTarget: {
-        intensity: "easy recovery",
-        rpe: Math.max(2, workout.plannedRpe - 3),
         cue: "Recover easily enough that the next repeat stays smooth.",
       },
     },
@@ -787,6 +780,51 @@ function intervalSpecs({
       "Ease down after the final repeat and finish with relaxed form.",
     ),
   ];
+}
+
+function thresholdDurabilityRepeatSpec({
+  workout,
+  split,
+  mainMin,
+}: {
+  workout: AiBlueprintWorkout;
+  split: ReturnType<typeof splitBlueprintDuration>;
+  mainMin: number;
+}): BlueprintSegmentSpec {
+  const repeatCount = thresholdDurabilityRepeatCount(mainMin);
+  const workMin = thresholdDurabilityWorkMinutes(mainMin, repeatCount);
+
+  return {
+    segmentType: "tempo_block",
+    label: `${repeatCount} controlled threshold durability reps`,
+    guidance:
+      "Repeat controlled durability blocks with easy recoveries. Keep the effort strong but repeatable, without forcing target pace.",
+    prescription: {
+      mode: "repeats",
+      repeat_count: repeatCount,
+      children: [
+        {
+          role: "work",
+          label: "Controlled durability",
+          sequence: 1,
+          prescription: { mode: "time", duration_min: workMin },
+        },
+        {
+          role: "recover",
+          label: "Easy reset",
+          sequence: 2,
+          prescription: {
+            mode: "time",
+            duration_min: Math.max(2, Math.round(split.cooldownMin / 3)),
+          },
+        },
+      ],
+    },
+    targetRole: "main",
+    recoveryTarget: {
+      cue: "Reset the effort so the next durability block remains controlled.",
+    },
+  };
 }
 
 function hillRepeatSpecs({
@@ -844,8 +882,6 @@ function hillRepeatSpecs({
       },
       targetRole: "main",
       recoveryTarget: {
-        intensity: "easy terrain recovery",
-        rpe: 3,
         cue: "Recover on safe ground and keep descents controlled.",
       },
     },
@@ -875,6 +911,14 @@ function fiveKSharpeningRepeatCount(totalDurationMin: number) {
 
 function tenKRhythmRepeatCount(totalDurationMin: number) {
   return boundedRepeatCount(totalDurationMin, 3, 6);
+}
+
+function thresholdDurabilityRepeatCount(totalDurationMin: number) {
+  return boundedRepeatCount(totalDurationMin, 3, 5);
+}
+
+function thresholdDurabilityWorkMinutes(totalDurationMin: number, repeatCount: number) {
+  return Math.max(4, Math.round((totalDurationMin * 0.75) / repeatCount));
 }
 
 function marathonSteadyRepeatCount(totalDurationMin: number) {

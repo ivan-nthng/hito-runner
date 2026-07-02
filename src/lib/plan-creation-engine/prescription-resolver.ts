@@ -438,11 +438,7 @@ function enrichLongRunSegment({
   context: PrescriptionContext;
   primaryPrescription: RunningPlanSegmentPrescription;
 }): RunningPlanWatchExecutableSegmentTemplate {
-  if (
-    context.family !== "Half Marathon" &&
-    context.family !== "Marathon Base" &&
-    context.family !== "Marathon Completion"
-  ) {
+  if (context.family !== "Half Marathon" && context.family !== "Marathon Completion") {
     return { ...segment, primaryPrescription };
   }
 
@@ -682,7 +678,7 @@ function longRunDetailVariant(context: PrescriptionContext) {
 
   if (!isHalfMarathon && composition.longRunRole === "steady_finish") {
     return {
-      mainIntensityLabel: "marathon_base_durable_easy",
+      mainIntensityLabel: "marathon_completion_durable_easy",
       mainCue: "Accumulate calm aerobic time without turning this into race prep.",
       checkpointIntensityLabel: "fueling_and_form_check",
       checkpointCue: "Check fueling, cadence, and relaxed form before the finish.",
@@ -695,7 +691,7 @@ function longRunDetailVariant(context: PrescriptionContext) {
     return {
       mainIntensityLabel: isHalfMarathon
         ? "half_marathon_aerobic_durability"
-        : "marathon_base_time_on_feet",
+        : "marathon_completion_time_on_feet",
       mainCue: isHalfMarathon
         ? "Keep the long middle calm and continuous."
         : "Use this as durable time-on-feet, not a marathon race simulation.",
@@ -721,7 +717,7 @@ function longRunDetailVariant(context: PrescriptionContext) {
     return {
       mainIntensityLabel: isHalfMarathon
         ? "half_marathon_endurance_base"
-        : "marathon_base_endurance_base",
+        : "long_run_endurance_base",
       mainCue: isHalfMarathon
         ? "Settle into patient endurance for the half-marathon build."
         : "Settle into patient base endurance without chasing distance proof.",
@@ -747,7 +743,7 @@ function longRunDetailVariant(context: PrescriptionContext) {
     return {
       mainIntensityLabel: isHalfMarathon
         ? "half_marathon_endurance_base"
-        : "marathon_base_endurance_base",
+        : "long_run_endurance_base",
       mainCue: isHalfMarathon
         ? "Keep the long run patient while the bridge builds durability."
         : "Keep the base run patient and repeatable.",
@@ -770,9 +766,7 @@ function longRunDetailVariant(context: PrescriptionContext) {
   }
 
   return {
-    mainIntensityLabel: isHalfMarathon
-      ? "half_marathon_endurance_base"
-      : "marathon_base_endurance_base",
+    mainIntensityLabel: isHalfMarathon ? "half_marathon_endurance_base" : "long_run_endurance_base",
     mainCue: isHalfMarathon
       ? "Settle into patient endurance for the half-marathon build."
       : "Settle into patient base endurance without chasing distance proof.",
@@ -878,10 +872,6 @@ function resolveSpecialDurationSeconds(
     return clampToRange(resolveCutbackLongRunDurationSeconds(context), range);
   }
 
-  if (context.segmentRole === "main" && context.workoutDayKind === "marathon_base_endpoint") {
-    return clampToRange(resolveMarathonBaseEndpointDurationSeconds(context), range);
-  }
-
   return null;
 }
 
@@ -929,7 +919,6 @@ function resolveLongRunDurationSeconds(context: PrescriptionContext) {
     {
       "10K": { start: 60, peak: 85 },
       "Half Marathon": { start: 70, peak: 115 },
-      "Marathon Base": { start: 75, peak: 120 },
       "Marathon Completion": { start: 75, peak: 205 },
     };
   const bounds = familyBounds[context.family];
@@ -958,25 +947,12 @@ function resolveCutbackLongRunDurationSeconds(context: PrescriptionContext) {
   const familyMinutes: Readonly<Record<RunningPlanDistanceFamily, number>> = {
     "10K": 50,
     "Half Marathon": 65,
-    "Marathon Base": 70,
     "Marathon Completion": 80,
   };
   const levelMinutes = context.runnerLevel === "professional_competitive" ? 5 : 0;
   const conservativeMinutes = context.loadContext === "conservative" ? -5 : 0;
 
   return minutes(familyMinutes[context.family] + levelMinutes + conservativeMinutes);
-}
-
-function resolveMarathonBaseEndpointDurationSeconds(context: PrescriptionContext) {
-  const levelMinutes: Readonly<Record<RunningPlanRunnerLevel, number>> = {
-    beginner_new_runner: 40,
-    sometimes_runs: 50,
-    runs_a_lot: 55,
-    professional_competitive: 60,
-  };
-  const conservativeMinutes = context.loadContext === "conservative" ? -5 : 0;
-
-  return minutes(levelMinutes[context.runnerLevel] + conservativeMinutes);
 }
 
 function pickRangeValue(

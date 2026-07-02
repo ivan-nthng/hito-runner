@@ -19,7 +19,6 @@ export interface RunningPlanHorizonSelection {
 const STANDARD_HORIZON_WEEKS = {
   "10K": { 3: 16, 4: 14, 5: 12 },
   "Half Marathon": { 3: 32, 4: 28, 5: 24 },
-  "Marathon Base": { 3: 40, 4: 32, 5: 24 },
 } as const satisfies Record<
   Exclude<RunningPlanDistanceFamily, "Marathon Completion">,
   Record<RunningPlanDaysPerWeek, number>
@@ -28,7 +27,6 @@ const STANDARD_HORIZON_WEEKS = {
 const CONSERVATIVE_HORIZON_WEEKS = {
   "10K": { 3: 20, 4: 18, 5: 16 },
   "Half Marathon": { 3: 36, 4: 32, 5: 28 },
-  "Marathon Base": { 3: 52, 4: 40, 5: 32 },
 } as const satisfies Record<
   Exclude<RunningPlanDistanceFamily, "Marathon Completion">,
   Record<RunningPlanDaysPerWeek, number>

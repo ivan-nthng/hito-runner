@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-07-02T01:22:41.596Z
+Generated: 2026-07-02T14:16:42.270Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -70,7 +70,7 @@ Define the portable Hito Debugger overlay and capture API contract.
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Context: `/admin/login` is a dedicated owner-admin login surface.
+Current Truth
 
 <sub><code>NEXT ROLE</code></sub>
 
@@ -85,11 +85,11 @@ Context: `/admin/login` is a dedicated owner-admin login surface.
 <code>in_progress</code>
 
 #### Task
-Hold running-plan rebuild after OpenAI-authored dated generated-plan acceptance.
+Validate generated-plan legacy purge in browser.
 
 <sub><code>STAGE</code></sub>
 
-<code>ARCHITECT holding / generated-plan canonical readback accepted.</code>
+<code>QA validation / generated-plan legacy purge browser acceptance.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
@@ -97,7 +97,7 @@ Current Source Of Truth: Workout types: Rest, Recovery, Easy, Steady, Long Run, 
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>architect</code>
+<code>qa</code>
 
 ---
 
@@ -200,19 +200,19 @@ Context: which Hito primitives are stable enough to reuse;
 <code>in_progress</code>
 
 #### Task
-Consolidate duplicated Calendar day-rendering paths with net product LOC reduction.
+Validate pre-customer generated-plan legacy purge in browser.
 
 <sub><code>STAGE</code></sub>
 
-<code>FRONTEND implementation / Calendar day-renderer consolidation with net LOC reduction.</code>
+<code>QA validation / generated-plan legacy purge browser acceptance.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Context
+Backend Implementation - 2026-07-02 - Generated-Plan Legacy Purge: backend/source validation passed; browser QA pending.
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>frontend</code>
+<code>qa</code>
 
 ## Safety Notes
 

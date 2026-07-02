@@ -77,14 +77,6 @@ export const RUNNING_PLAN_COMPOSITION_SIGNAL_VALUES = [
   "half_long_run_durability",
   "half_long_run_steady_finish",
   "half_exact_endpoint",
-  "marathon_base_turnover",
-  "marathon_base_steady_support",
-  "marathon_base_tempo_support",
-  "marathon_base_threshold_durability",
-  "marathon_base_hill_strength",
-  "marathon_base_time_on_feet",
-  "marathon_base_steady_finish",
-  "marathon_base_honest_endpoint",
   "marathon_completion_exact_endpoint",
   "marathon_completion_time_on_feet",
   "marathon_completion_long_run_durability",
@@ -311,14 +303,6 @@ function resolveDevelopmentTouch({
     });
   }
 
-  if (family === "Marathon Base" && runnerLevel === "beginner_new_runner") {
-    return resolveBeginnerMarathonBaseDevelopmentTouch({
-      loadContext,
-      weekNumber,
-      horizonWeeks,
-    });
-  }
-
   if (runnerLevel === "beginner_new_runner") {
     return null;
   }
@@ -332,12 +316,7 @@ function resolveDevelopmentTouch({
     });
   }
 
-  return resolveMarathonBaseDevelopmentTouch({
-    runnerLevel,
-    loadContext,
-    weekNumber,
-    horizonWeeks,
-  });
+  return null;
 }
 
 function resolveTenKDevelopmentTouch({
@@ -508,201 +487,6 @@ function resolveHalfMarathonDevelopmentTouch({
   }
 }
 
-function resolveMarathonBaseDevelopmentTouch({
-  runnerLevel,
-  loadContext,
-  weekNumber,
-  horizonWeeks,
-}: {
-  runnerLevel: Exclude<RunningPlanRunnerLevel, "beginner_new_runner">;
-  loadContext: RunningPlanCompositionLoadContext;
-  weekNumber: number;
-  horizonWeeks: number;
-}): RunningPlanCompositionDevelopmentTouch | null {
-  if (loadContext === "conservative") {
-    const bridgeWeeks = resolveConservativeMarathonBaseBridgeWeeks(horizonWeeks);
-    if (bridgeWeeks.includes(weekNumber)) {
-      return "steady_aerobic_run";
-    }
-
-    if (weekNumber === 2 || weekNumber === 6) {
-      return "strides";
-    }
-
-    return runnerLevel !== "sometimes_runs" && (weekNumber === 3 || weekNumber === 10)
-      ? "tempo"
-      : null;
-  }
-
-  let fixedTouch: RunningPlanCompositionDevelopmentTouch | null = null;
-  switch (weekNumber) {
-    case 2:
-      fixedTouch = "strides";
-      break;
-    case 3:
-    case 10:
-      fixedTouch = "tempo";
-      break;
-    case 6:
-      fixedTouch =
-        runnerLevel === "runs_a_lot" || runnerLevel === "professional_competitive"
-          ? "threshold"
-          : "strides";
-      break;
-    case 13:
-      fixedTouch = runnerLevel === "sometimes_runs" ? "tempo" : "hills";
-      break;
-    case 14:
-      fixedTouch = runnerLevel === "professional_competitive" ? "threshold" : null;
-      break;
-  }
-
-  if (fixedTouch) {
-    return fixedTouch;
-  }
-
-  return resolveStandardMarathonBaseBridgeWeeks(horizonWeeks).includes(weekNumber)
-    ? "steady_aerobic_run"
-    : null;
-}
-
-function resolveBeginnerMarathonBaseDevelopmentTouch({
-  loadContext,
-  weekNumber,
-  horizonWeeks,
-}: {
-  loadContext: RunningPlanCompositionLoadContext;
-  weekNumber: number;
-  horizonWeeks: number;
-}): RunningPlanCompositionDevelopmentTouch | null {
-  const bridgeWeeks = resolveBeginnerMarathonBaseBridgeWeeks({ loadContext, horizonWeeks });
-
-  if (
-    weekNumber === bridgeWeeks.earlyTurnoverWeek ||
-    weekNumber === bridgeWeeks.earlyMidTurnoverWeek ||
-    weekNumber === bridgeWeeks.middleTurnoverWeek ||
-    (bridgeWeeks.preMidTurnoverWeek !== null && weekNumber === bridgeWeeks.preMidTurnoverWeek) ||
-    weekNumber === bridgeWeeks.midTurnoverWeek ||
-    (bridgeWeeks.lateTurnoverWeek !== null && weekNumber === bridgeWeeks.lateTurnoverWeek)
-  ) {
-    return "strides";
-  }
-
-  if (
-    (bridgeWeeks.preSteadyBridgeWeek !== null && weekNumber === bridgeWeeks.preSteadyBridgeWeek) ||
-    weekNumber === bridgeWeeks.middleSteadyBridgeWeek ||
-    weekNumber === bridgeWeeks.steadyBridgeWeek ||
-    (bridgeWeeks.lateMidSteadyBridgeWeek !== null &&
-      weekNumber === bridgeWeeks.lateMidSteadyBridgeWeek) ||
-    (bridgeWeeks.lateSteadyBridgeWeek !== null && weekNumber === bridgeWeeks.lateSteadyBridgeWeek)
-  ) {
-    return "steady_aerobic_run";
-  }
-
-  return null;
-}
-
-function resolveBeginnerMarathonBaseBridgeWeeks({
-  loadContext,
-  horizonWeeks,
-}: {
-  loadContext: RunningPlanCompositionLoadContext;
-  horizonWeeks: number;
-}) {
-  return {
-    earlyTurnoverWeek: resolveSoftBridgeWeek({
-      horizonWeeks,
-      targetWeek: Math.ceil(horizonWeeks * 0.1),
-    }),
-    earlyMidTurnoverWeek: resolveSoftBridgeWeek({
-      horizonWeeks,
-      targetWeek: Math.ceil(horizonWeeks * 0.18),
-    }),
-    middleTurnoverWeek: resolveSoftBridgeWeek({
-      horizonWeeks,
-      targetWeek: Math.ceil(horizonWeeks * 0.28),
-    }),
-    preMidTurnoverWeek:
-      horizonWeeks >= 40
-        ? resolveSoftBridgeWeek({
-            horizonWeeks,
-            targetWeek: Math.ceil(horizonWeeks * 0.35),
-          })
-        : null,
-    midTurnoverWeek: resolveSoftBridgeWeek({
-      horizonWeeks,
-      targetWeek: Math.ceil(horizonWeeks * 0.42),
-    }),
-    preSteadyBridgeWeek:
-      horizonWeeks >= 40
-        ? resolveSoftBridgeWeek({
-            horizonWeeks,
-            targetWeek: Math.ceil(horizonWeeks * 0.48),
-          })
-        : null,
-    middleSteadyBridgeWeek: resolveSoftBridgeWeek({
-      horizonWeeks,
-      targetWeek: Math.ceil(horizonWeeks * 0.55),
-    }),
-    steadyBridgeWeek: resolveSoftBridgeWeek({
-      horizonWeeks,
-      targetWeek: Math.ceil(horizonWeeks * 0.62),
-    }),
-    lateMidSteadyBridgeWeek:
-      horizonWeeks >= 32
-        ? resolveSoftBridgeWeek({
-            horizonWeeks,
-            targetWeek: Math.ceil(horizonWeeks * 0.7),
-          })
-        : null,
-    lateSteadyBridgeWeek:
-      horizonWeeks >= 24
-        ? resolveSoftBridgeWeek({
-            horizonWeeks,
-            targetWeek: Math.ceil(horizonWeeks * 0.78),
-          })
-        : null,
-    lateTurnoverWeek:
-      horizonWeeks >= 32
-        ? resolveSoftBridgeWeek({
-            horizonWeeks,
-            targetWeek: Math.ceil(horizonWeeks * 0.9),
-          })
-        : null,
-  };
-}
-
-function resolveConservativeMarathonBaseBridgeWeeks(horizonWeeks: number) {
-  const bridgeTargets =
-    horizonWeeks >= 40
-      ? [0.32, 0.5, 0.68, 0.84]
-      : horizonWeeks >= 32
-        ? [0.42, 0.56, 0.68, 0.8]
-        : [0.5, 0.72];
-
-  return uniqueNumbers(
-    bridgeTargets.map((ratio) =>
-      resolveSoftBridgeWeek({
-        horizonWeeks,
-        targetWeek: Math.ceil(horizonWeeks * ratio),
-      }),
-    ),
-  );
-}
-
-function resolveStandardMarathonBaseBridgeWeeks(horizonWeeks: number) {
-  const bridgeTargets = horizonWeeks >= 24 ? [0.58, 0.72, 0.86] : [0.86];
-
-  return uniqueNumbers(
-    bridgeTargets.map((ratio) =>
-      resolveSoftBridgeWeek({
-        horizonWeeks,
-        targetWeek: Math.ceil(horizonWeeks * ratio),
-      }),
-    ),
-  );
-}
-
 function resolveSoftBridgeWeek({
   horizonWeeks,
   targetWeek,
@@ -728,10 +512,6 @@ function resolveSoftBridgeWeek({
   }
 
   return candidate;
-}
-
-function uniqueNumbers(values: readonly number[]) {
-  return [...new Set(values)];
 }
 
 function resolveLongRunRole({
@@ -963,33 +743,6 @@ function resolveFamilySignals({
     }
   }
 
-  if (family === "Marathon Base") {
-    if (developmentTouch === "strides") {
-      signals.add("marathon_base_turnover");
-    }
-    if (developmentTouch === "steady_aerobic_run") {
-      signals.add("marathon_base_steady_support");
-    }
-    if (developmentTouch === "tempo") {
-      signals.add("marathon_base_tempo_support");
-    }
-    if (developmentTouch === "threshold") {
-      signals.add("marathon_base_threshold_durability");
-    }
-    if (developmentTouch === "hills") {
-      signals.add("marathon_base_hill_strength");
-    }
-    if (longRunRole === "durability_checkpoint") {
-      signals.add("marathon_base_time_on_feet");
-    }
-    if (longRunRole === "steady_finish") {
-      signals.add("marathon_base_steady_finish");
-    }
-    if (longRunRole === "endpoint") {
-      signals.add("marathon_base_honest_endpoint");
-    }
-  }
-
   if (family === "Marathon Completion") {
     for (const signal of resolveMarathonCompletionFamilySignals({
       developmentTouch,
@@ -1019,10 +772,6 @@ function validateForbiddenWeekCombinations({
 
   if (family === "10K" && workoutKinds.includes("threshold")) {
     issues.push("10K composition grammar must not include threshold in v1.");
-  }
-
-  if (family === "Marathon Base" && workoutKinds.includes("intervals")) {
-    issues.push("Marathon Base composition grammar must not include intervals.");
   }
 
   if (family === "Marathon Completion") {
@@ -1100,26 +849,6 @@ function validateBlockWideCompositionSignals({
     !actualWorkoutKinds.has("threshold")
   ) {
     issues.push("Higher-support Half Marathon composition must include threshold durability.");
-  }
-
-  if (
-    family === "Marathon Base" &&
-    runnerLevel !== "beginner_new_runner" &&
-    loadContext === "standard" &&
-    !actualWorkoutKinds.has("tempo")
-  ) {
-    issues.push("Standard-load Marathon Base composition must include tempo support.");
-  }
-
-  if (
-    family === "Marathon Base" &&
-    runnerLevel !== "beginner_new_runner" &&
-    !expectedSignals.has("marathon_base_time_on_feet") &&
-    !expectedSignals.has("marathon_base_steady_finish")
-  ) {
-    issues.push(
-      "Marathon Base composition must include time-on-feet or steady-finish long-run durability.",
-    );
   }
 
   if (family === "Marathon Completion") {

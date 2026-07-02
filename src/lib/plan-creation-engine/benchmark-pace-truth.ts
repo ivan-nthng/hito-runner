@@ -67,7 +67,6 @@ export function buildSelectedPlanSegmentPaceTarget(input: {
     case "strides":
     case "hills":
     case "final_selected_distance_day":
-    case "marathon_base_endpoint":
       return null;
   }
 }

@@ -420,16 +420,14 @@ function segmentHasExecutableStructure(segment: {
     duration_min?: number;
     distance_km?: number;
     repeat_count?: number;
-    repeat_unit?: {
-      mode: "time" | "distance" | "none";
-      duration_min?: number;
-      distance_km?: number;
-    };
-    recovery_unit?: {
-      mode: "time" | "distance" | "none";
-      duration_min?: number;
-      distance_km?: number;
-    };
+    children?: Array<{
+      role: "warm_up" | "run" | "walk" | "work" | "recover" | "finish" | "cooldown";
+      prescription: {
+        mode: "time" | "distance" | "none";
+        duration_min?: number;
+        distance_km?: number;
+      };
+    }>;
   };
 }) {
   if (segment.segment_type === "rest") return true;
@@ -449,8 +447,13 @@ function segmentHasExecutableStructure(segment: {
   if (segment.prescription.mode === "repeats") {
     return (
       typeof segment.prescription.repeat_count === "number" &&
-      Boolean(segment.prescription.repeat_unit) &&
-      Boolean(segment.prescription.recovery_unit)
+      Boolean(segment.prescription.children?.length) &&
+      segment.prescription.children.every(
+        (child) =>
+          child.prescription.mode === "none" ||
+          typeof child.prescription.duration_min === "number" ||
+          typeof child.prescription.distance_km === "number",
+      )
     );
   }
 

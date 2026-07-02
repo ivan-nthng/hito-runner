@@ -1,10 +1,16 @@
-import type { AiFirstPlanBlueprintTraceMetadata } from "@/lib/ai-first-plan-draft-metadata";
+import type {
+  AiFirstPlanBlueprintAuthoredDateSource,
+  AiFirstPlanBlueprintTraceMetadata,
+} from "@/lib/ai-first-plan-draft-metadata";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   type AiFirstPlanBlueprint,
   type StructuredAuthoringInput,
 } from "@/lib/ai-first-plan-blueprint-schema";
-import { buildNormalizationContext } from "@/lib/ai-first-plan-blueprint-validation";
+import {
+  buildNormalizationContext,
+  type AiFirstPlanBlueprintNormalizationOptions,
+} from "@/lib/ai-first-plan-blueprint-validation";
 import { addDaysIso, weekdayLong } from "@/lib/training";
 
 export function buildAiFirstPlanBlueprintTrace({
@@ -16,6 +22,8 @@ export function buildAiFirstPlanBlueprintTrace({
   fallbackReason,
   issues,
   repairs,
+  normalizationOptions = {},
+  authoredDateSource,
 }: {
   authoringInput: StructuredAuthoringInput;
   blueprint: AiFirstPlanBlueprint | null;
@@ -25,11 +33,21 @@ export function buildAiFirstPlanBlueprintTrace({
   fallbackReason: string | null;
   issues: Array<{ code: string; message: string; path?: string }>;
   repairs: string[];
+  normalizationOptions?: AiFirstPlanBlueprintNormalizationOptions;
+  authoredDateSource?: AiFirstPlanBlueprintAuthoredDateSource;
 }): AiFirstPlanBlueprintTraceMetadata {
-  const context = buildNormalizationContext(authoringInput);
+  const context = buildNormalizationContext(authoringInput, normalizationOptions);
   const normalizedWeeks = normalizedWorkouts
     ? groupCanonicalIdentityTraceByWeek(normalizedWorkouts)
     : [];
+  const datePlacement = buildDatePlacementTrace({
+    blueprint,
+    normalizedWorkouts,
+    issues,
+    repairs,
+    context,
+    authoredDateSource,
+  });
 
   return {
     sourceKind,
@@ -50,6 +68,7 @@ export function buildAiFirstPlanBlueprintTrace({
       preferredLongRunDay: authoringInput.availability.preferredLongRunDay ?? null,
     },
     blueprintCompleteness: blueprint ? buildBlueprintCompleteness(blueprint, context) : undefined,
+    datePlacement,
     requiredCadenceSlots: [...context.requiredCadenceSlots.entries()].map(([weekNumber, slot]) => ({
       weekNumber,
       date: slot.date,
@@ -67,7 +86,7 @@ export function buildAiFirstPlanBlueprintTrace({
     repairs: repairs.map(boundedTraceText).slice(0, 12),
     normalizedCanonicalWeeks: normalizedWeeks,
     deterministicFallbackBoundary: {
-      used: sourceStatus === "deterministic_fallback",
+      used: false,
       reason: fallbackReason,
     },
     finalReviewedPlanIdentityCounts: normalizedWorkouts
@@ -80,6 +99,59 @@ export function buildAiFirstPlanBlueprintTrace({
       ? countCanonicalWorkoutField(normalizedWorkouts, "calendar_icon_key")
       : {},
     persistedIdentityCounts: null,
+  };
+}
+
+function buildDatePlacementTrace({
+  blueprint,
+  normalizedWorkouts,
+  issues,
+  repairs,
+  context,
+  authoredDateSource,
+}: {
+  blueprint: AiFirstPlanBlueprint | null;
+  normalizedWorkouts: TrainingPlanV2["planned_workouts"] | null;
+  issues: Array<{ code: string; message: string; path?: string }>;
+  repairs: readonly string[];
+  context: ReturnType<typeof buildNormalizationContext>;
+  authoredDateSource?: AiFirstPlanBlueprintAuthoredDateSource;
+}): AiFirstPlanBlueprintTraceMetadata["datePlacement"] {
+  const explicitDateCount =
+    blueprint?.weeks.reduce(
+      (count, week) =>
+        count + week.plannedWorkouts.filter((workout) => typeof workout.date === "string").length,
+      0,
+    ) ?? null;
+  const missingDateCount =
+    blueprint?.weeks.reduce(
+      (count, week) => count + week.plannedWorkouts.filter((workout) => !workout.date).length,
+      0,
+    ) ?? null;
+  const dateIssueCount = issues.filter((issue) =>
+    /date|weekday|calendar|slot|horizon/i.test(`${issue.code} ${issue.path ?? ""}`),
+  ).length;
+  const dateRepairCount = repairs.filter((repair) =>
+    /date|weekday|calendar|horizon|extended/i.test(repair),
+  ).length;
+  const validationStatus =
+    dateIssueCount > 0
+      ? "backend_rejected_date"
+      : dateRepairCount > 0
+        ? "backend_repaired_date"
+        : "backend_validated_date";
+
+  return {
+    mode: context.dateAuthorshipMode,
+    authoredDateSource: authoredDateSource ?? "openai_authored_date",
+    validationStatus,
+    explicitAuthoredWorkoutDateCount: explicitDateCount,
+    missingAuthoredWorkoutDateCount: missingDateCount,
+    backendFilledRestDayCount: normalizedWorkouts
+      ? normalizedWorkouts.filter((workout) => workout.workout_type === "rest").length
+      : null,
+    backendRepairedDateCount: dateRepairCount,
+    backendExtendedWeeks: null,
   };
 }
 

@@ -29,10 +29,10 @@
       "Every workout must have a non-empty segments array.",
       "Use segment_type values already supported by Hito: warmup, main, cooldown, recovery, rest, mobility, mobility_optional, strength, activation, drills, strides, recovery_jog, fueling, tempo_block, interval_block.",
       "For simple time or distance segments, set duration_min or distance_km directly.",
-      "For interval_block or strides, use repeat_count plus either work_distance_km, work_duration_min, work_duration_sec, or duration_min for the work unit.",
-      "For repeated tempo_block segments, use repeat_count plus work_distance_km, work_duration_min, work_duration_sec, or duration_min.",
-      "Use recovery_duration_min, recovery_duration_sec, or recovery_distance_km for explicit recovery inside repeated segments.",
-      "You may alternatively use prescription.mode = repeats with repeat_unit and recovery_unit, but do not mix conflicting representations."
+      "For interval_block, strides, or repeated tempo_block segments, prefer prescription.mode = repeats with repeat_count and children[].",
+      "Repeat children are the ordered list repeated N times. Work + Recover is one valid pattern, but Run + Walk or multi-part child sequences are also valid when supported.",
+      "Repeat set parents are structural only; child blocks own role, structure, target, and readback semantics.",
+      "Legacy flat work_distance/recovery_distance and pair-shaped repeat_unit/recovery_unit fields are retired; repeat sets must use prescription.children[]."
     ],
     "target_rules": [
       "Target is for user-facing training cues only.",
@@ -224,12 +224,35 @@
         },
         {
           "segment_type": "tempo_block",
-          "repeat_count": 2,
-          "work_duration_min": 8,
-          "recovery_duration_min": 3,
-          "target": {
-            "intensity": "controlled threshold",
-            "cue": "Strong but repeatable; do not sprint the final minutes"
+          "prescription": {
+            "mode": "repeats",
+            "repeat_count": 2,
+            "children": [
+              {
+                "role": "work",
+                "label": "Controlled tempo",
+                "prescription": {
+                  "mode": "time",
+                  "duration_min": 8
+                },
+                "target": {
+                  "intensity": "controlled threshold",
+                  "cue": "Strong but repeatable; do not sprint the final minutes"
+                }
+              },
+              {
+                "role": "recover",
+                "label": "Easy reset",
+                "prescription": {
+                  "mode": "time",
+                  "duration_min": 3
+                },
+                "target": {
+                  "intensity": "easy",
+                  "cue": "Reset posture and breathing before the next controlled block"
+                }
+              }
+            ]
           }
         },
         {

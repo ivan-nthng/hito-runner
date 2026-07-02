@@ -4,10 +4,7 @@ import {
 } from "@/lib/rich-workout-model";
 import {
   buildPromptGoalFamilyIdentityPolicy,
-  buildRequiredCadenceSlots,
   resolveAuthoringHorizonWeeks,
-  resolveGoalFamilyIdentityPolicy,
-  type GoalFamilyCadenceKind,
 } from "@/lib/ai-first-plan-blueprint-policy";
 import {
   buildAiFirstPlanBlueprintOpenAiSchema,
@@ -20,9 +17,8 @@ import {
   authoredWorkoutIdentityValues,
   metricIntentValues,
   segmentIntentValues,
-  type AuthoredWorkoutIdentity,
 } from "@/lib/ai-first-plan-blueprint-taxonomy";
-import { addDaysIso, todayIso, weekdayLong } from "@/lib/training";
+import { addDaysIso, todayIso } from "@/lib/training";
 
 export function buildAiFirstPlanBlueprintPrompt({
   authoringInput,
@@ -31,7 +27,11 @@ export function buildAiFirstPlanBlueprintPrompt({
 }: AiFirstPlanBlueprintPromptInput) {
   return {
     systemPrompt: buildAiFirstPlanBlueprintSystemPrompt(),
-    userPrompt: buildAiFirstPlanBlueprintUserPrompt({ authoringInput, today, referenceExample }),
+    userPrompt: buildAiFirstPlanBlueprintUserPrompt({
+      authoringInput,
+      today,
+      referenceExample,
+    }),
     responseSchema: buildAiFirstPlanBlueprintOpenAiSchema(
       authoringInput.availability.maxRunningDaysPerWeek,
     ),
@@ -39,23 +39,29 @@ export function buildAiFirstPlanBlueprintPrompt({
 }
 
 function buildAiFirstPlanBlueprintSystemPrompt() {
-  return [
+  const shared = [
     "You author a compact Hito Running first-plan coaching blueprint from validated structured setup truth.",
     "Return only the ai-first-plan-blueprint-v1 JSON object requested by the schema.",
-    "Your blueprint is not persisted directly. Hito backend expands it into canonical training-plan-v2 workouts and segments.",
+    "Your blueprint is not persisted directly; the backend expands it into canonical training-plan-v2 workouts and segments after validation.",
     "Use Hito workout taxonomy only: workoutFamily, workoutIdentity, and calendarIconKey must be valid schema values.",
-    "Return only authored running workouts in each week. The backend fills fixed rest days and unscheduled days.",
+    "Return only authored running workouts in each week. The backend fills rest rows for non-authored calendar days after validation.",
     "Never include rest/rest_and_recovery in plannedWorkouts. Rest days are not authored workouts.",
-    "Respect fixed rest days as hard constraints and use the requested running days/week.",
-    "Use the preferred long-run day whenever feasible and include exactly one long-run intent per week.",
+    "Respect fixed rest days as hard constraints and use the requested running days/week count.",
     "Taper and final weeks still need a reduced long-run intent, usually taper_long_run, cutback_long_run, long_aerobic_run, hike_run_endurance, mountain_long_run_time_on_feet, or ultra_time_on_feet_durability depending on the goal.",
-    "Follow the backend goal-family identity policy. Beginner/low-support plans stay mostly easy, recovery, steady, and long; supported performance, marathon, ultra, and mountain/trail plans use the required cadence slots for their specific workout identities.",
-    "Do not fill required cadence slots with generic easy, steady, recovery, or long support work unless the slot explicitly asks for a long-run specialty identity.",
+    "Follow the backend goal-family identity policy. Beginner/low-support plans stay mostly easy, recovery, steady, and long; supported performance, marathon, ultra, and mountain/trail plans need week-aware specificity without unsafe density.",
     "Keep segmentIntent compact: describe the session shape, not a full segment tree.",
     "Keep metricIntent compact. Do not output numeric HR, pace ranges, personalized zones, or metric targets.",
     "Do not output user ids, plan ids, logs, completion state, provider sync placeholders, AI verdicts, or feedback placeholders.",
     "Do not invent medical, rehab, threshold-HR, lab-tested, exact elevation, or route-matching claims.",
     "Keep review assumptions concise and honest about weak support, target-time uncertainty, conservative load, and default HR guidance.",
+  ];
+
+  return [
+    ...shared,
+    "You are the source of the dated training plan draft: choose the workout dates, weekly rhythm, progression, cutbacks, taper, and endpoint placement inside the provided constraints.",
+    "Every plannedWorkout.date must be an explicit ISO date. Do not return null dates, weekday-only slots, or an abstract weekly template.",
+    "If preferredLongRunDay is null, choose a sane long-run day and keep it consistent enough for the runner; if it is present, treat it as a hard preference.",
+    "Do not wait for the backend to schedule workouts for you. Backend may validate, canonicalize harmless labels, fill rest rows, or reject unsafe plans, but it must not silently replace your dated calendar.",
   ].join("\n");
 }
 
@@ -68,7 +74,7 @@ function buildAiFirstPlanBlueprintUserPrompt({
   today: string;
   referenceExample: unknown;
 }) {
-  return [
+  const promptParts = [
     `Today is ${today}.`,
     "Validated structured setup truth:",
     JSON.stringify(buildPromptAuthoringSummary(authoringInput)),
@@ -90,73 +96,53 @@ function buildAiFirstPlanBlueprintUserPrompt({
     "Goal-family identity policy:",
     JSON.stringify(buildPromptGoalFamilyIdentityPolicy(authoringInput)),
     "",
-    "Required authored workout slots:",
-    JSON.stringify(buildPromptRequiredWorkoutSlots(authoringInput)),
-    "Use every required slot exactly once in the matching week. Do not add extra dates, omit slots, move slots, or place authored workouts on fixed rest days.",
-    "Each week has one required long-run slot. That slot must use workoutFamily long, hike_run_endurance, mountain_long_run_time_on_feet, or ultra_time_on_feet_durability.",
-    "Required cadence slots are pre-spaced away from the long run when possible. Keep the day after a long run easy or recovery unless the backend explicitly marks that date as a required cadence slot.",
-    "If a slot includes requiredIdentityOptions, choose one of those identities for that exact slot. If mustBeQuality=true, use workoutFamily tempo, intervals, progression, or race unless the option itself is a backend long-run specialty.",
+  ];
+
+  promptParts.push(
+    "OpenAI-authored dated plan constraints:",
+    JSON.stringify(buildPromptDatedPlanConstraints(authoringInput)),
+    "Author exactly maxRunningDaysPerWeek workouts per week, each with an explicit date.",
+    "Choose dates from allowedWorkoutWeekdays only. Never author workouts on fixedRestDays.",
+    "If preferredLongRunDay is null, choose the long-run day yourself and keep the recovery rhythm safe.",
+    "Use the goal-family identity policy as coaching guidance, but do not rely on backend-provided exact cadence slots.",
+    "The final relevant workout must align with the goal distance and target/race date when targetDate is supplied.",
+  );
+
+  promptParts.push(
     "",
     "Reference-style example guidance:",
     JSON.stringify(buildReferenceStyleSummary(referenceExample)),
-  ].join("\n");
+  );
+
+  return promptParts.join("\n");
 }
 
-function buildPromptRequiredWorkoutSlots(authoringInput: StructuredAuthoringInput) {
+function buildPromptDatedPlanConstraints(authoringInput: StructuredAuthoringInput) {
   const horizonWeeks = resolveAuthoringHorizonWeeks(authoringInput);
+  const startDate = authoringInput.schedule.startDate;
+  const endDate = addDaysIso(startDate, horizonWeeks * 7 - 1);
   const fixedRestDays: Set<string> = new Set(authoringInput.availability.unavailableDays);
-  const runningDays: Set<string> = new Set(
-    authoringInput.availability.preferredRunningDays.filter((day) => !fixedRestDays.has(day)),
-  );
-  const preferredLongRunDay = authoringInput.availability.preferredLongRunDay ?? null;
-  const policy = resolveGoalFamilyIdentityPolicy(authoringInput);
-  const cadenceSlots = buildRequiredCadenceSlots(authoringInput, policy);
+  const allowedWorkoutWeekdays = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ].filter((weekday) => !fixedRestDays.has(weekday));
 
-  return Array.from({ length: horizonWeeks }, (_value, weekIndex) => {
-    const weekNumber = weekIndex + 1;
-    const weekStart = addDaysIso(authoringInput.schedule.startDate, weekIndex * 7);
-    const slots = Array.from({ length: 7 }, (_day, dayIndex) => {
-      const date = addDaysIso(weekStart, dayIndex);
-      const weekday = weekdayLong(date);
-
-      if (!runningDays.has(weekday)) {
-        return null;
-      }
-
-      return {
-        date,
-        weekday,
-        mustBeLongRun: preferredLongRunDay ? weekday === preferredLongRunDay : false,
-        mustBeQuality:
-          cadenceSlots.get(weekNumber)?.date === date &&
-          cadenceSlots.get(weekNumber)?.kind === "quality",
-        ...(cadenceSlots.get(weekNumber)?.date === date
-          ? {
-              cadenceKind: cadenceSlots.get(weekNumber)!.kind,
-              requiredIdentityOptions: cadenceSlots.get(weekNumber)!.identityOptions,
-              cadencePurpose: cadenceSlots.get(weekNumber)!.purpose,
-            }
-          : {}),
-      };
-    }).filter(
-      (
-        slot,
-      ): slot is {
-        date: string;
-        weekday: string;
-        mustBeLongRun: boolean;
-        mustBeQuality: boolean;
-        cadenceKind?: GoalFamilyCadenceKind;
-        requiredIdentityOptions?: AuthoredWorkoutIdentity[];
-        cadencePurpose?: string;
-      } => Boolean(slot),
-    );
-
-    return {
-      weekNumber,
-      slots,
-    };
-  });
+  return {
+    startDate,
+    endDate,
+    targetDate: authoringInput.schedule.targetDate ?? null,
+    preparationHorizonWeeks: horizonWeeks,
+    maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+    fixedRestDays: [...authoringInput.availability.unavailableDays],
+    allowedWorkoutWeekdays,
+    preferredLongRunDay: authoringInput.availability.preferredLongRunDay ?? null,
+    planGoalIntent: authoringInput.planGoalIntent ?? null,
+  };
 }
 
 function buildPromptAuthoringSummary(authoringInput: StructuredAuthoringInput) {
@@ -168,6 +154,7 @@ function buildPromptAuthoringSummary(authoringInput: StructuredAuthoringInput) {
     availability: authoringInput.availability,
     preferences: authoringInput.preferences,
     execution: authoringInput.execution,
+    planGoalIntent: authoringInput.planGoalIntent ?? null,
   };
 }
 

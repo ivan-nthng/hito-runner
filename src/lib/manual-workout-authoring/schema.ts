@@ -13,6 +13,8 @@ export const MANUAL_USER_BUILT_PLAN_SOURCE_KIND = "manual_user_built_plan_v1" as
 export const MANUAL_USER_BUILT_PLAN_SOURCE_STATUS = "manual_user_built_plan_created" as const;
 export const MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION = "manual_workout_review_payload_v1" as const;
 export const MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION = "manual_empty_plan_setup_v1" as const;
+export const MANUAL_WORKOUT_CONSTRUCTOR_CONTRACT_VERSION =
+  "manual_workout_constructor_contract_v1" as const;
 
 export const MANUAL_SETUP_RUNNING_LEVEL_VALUES = [
   "new_to_running",
@@ -30,6 +32,22 @@ export const MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES = [
 ] as const;
 
 export type ManualWorkoutTargetTruthMode = (typeof MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES)[number];
+
+export const MANUAL_WORKOUT_TARGET_SOURCE_VALUES = [
+  "user_entered",
+  "runner_entered",
+  "hito_generated",
+  "hito_recommended",
+  "inferred",
+  "template",
+  "benchmark",
+  "target_time",
+  "personal_hr_zone",
+  "default_estimated_hr",
+  "age_estimated",
+] as const;
+
+export type ManualWorkoutTargetSource = (typeof MANUAL_WORKOUT_TARGET_SOURCE_VALUES)[number];
 
 export const MANUAL_WORKOUT_TEMPLATE_KEY_VALUES = [
   "rest_day",
@@ -118,16 +136,19 @@ export type ManualEmptyPlanSetupInput = z.output<typeof manualEmptyPlanSetupInpu
 
 const manualWorkoutTargetInputSchema = z
   .object({
+    targetSource: z.enum(MANUAL_WORKOUT_TARGET_SOURCE_VALUES).optional(),
     intensity: z.string().trim().min(1).max(120).optional(),
     label: z.string().trim().min(1).max(120).optional(),
     sourceNote: z.string().trim().min(1).max(200).optional(),
     cue: z.string().trim().min(1).max(200).optional(),
     hint: z.string().trim().min(1).max(200).optional(),
-    rpe: z.union([z.string().trim().min(1).max(32), z.number().min(1).max(10)]).optional(),
+    rpe: z.union([z.string().trim().min(1).max(32), z.number().min(0).max(10)]).optional(),
+    paceTargetSource: z.enum(MANUAL_WORKOUT_TARGET_SOURCE_VALUES).optional(),
     pace: z.string().trim().min(1).max(80).optional(),
     paceMinPerKmRange: z.string().trim().min(1).max(80).optional(),
+    hrBpmCap: z.union([z.number().int(), z.string().trim().min(1).max(16)]).optional(),
     hrBpmRange: z.string().trim().min(1).max(80).optional(),
-    hrTargetSource: z.enum(["personal_hr_zone", "default_estimated_hr"]).optional(),
+    hrTargetSource: z.enum(MANUAL_WORKOUT_TARGET_SOURCE_VALUES).optional(),
   })
   .strict();
 
@@ -275,6 +296,102 @@ export interface ManualWorkoutReviewSummary {
   warnings: string[];
 }
 
+export type ManualWorkoutConstructorSegmentRole =
+  | "warm_up"
+  | "run"
+  | "work"
+  | "recover"
+  | "finish"
+  | "cooldown";
+
+export type ManualWorkoutConstructorSegmentStructure =
+  | {
+      kind: "duration";
+      seconds: number;
+    }
+  | {
+      kind: "distance";
+      meters: number;
+    }
+  | {
+      kind: "duration_and_distance";
+      seconds: number;
+      meters: number;
+    };
+
+export type ManualWorkoutConstructorSegmentTarget =
+  | {
+      kind: "none";
+    }
+  | {
+      kind: "effort_rpe";
+      source: "user_entered";
+      label?: string;
+      cue?: string;
+      rpe?: number;
+      sourceNote?: string;
+    }
+  | {
+      kind: "pace";
+      source: "user_entered";
+      label?: string;
+      pace?: string;
+      paceSecondsPerKm?: number;
+      paceMinPerKmRange?: string;
+      paceRangeSecondsPerKm?: {
+        min: number;
+        max: number;
+      };
+      sourceNote?: string;
+    }
+  | {
+      kind: "heart_rate";
+      source: "user_entered";
+      label?: string;
+      hrBpmCap?: number;
+      hrBpmRange?: string;
+      hrBpmRangeValues?: {
+        min: number;
+        max: number;
+      };
+      sourceNote?: string;
+    };
+
+export interface ManualWorkoutConstructorSegment {
+  kind: "segment";
+  role: ManualWorkoutConstructorSegmentRole;
+  label: string;
+  structure: ManualWorkoutConstructorSegmentStructure;
+  target: ManualWorkoutConstructorSegmentTarget;
+  guidance: string | null;
+}
+
+export interface ManualWorkoutConstructorRepeatGroup {
+  kind: "repeat";
+  label: string;
+  repeatCount: number;
+  children: ManualWorkoutConstructorSegment[];
+}
+
+export type ManualWorkoutConstructorTimelineEntry =
+  | ManualWorkoutConstructorSegment
+  | ManualWorkoutConstructorRepeatGroup;
+
+export interface ManualWorkoutConstructorMetadataNote {
+  label: string;
+  text: string;
+}
+
+export interface ManualWorkoutConstructorContract {
+  version: typeof MANUAL_WORKOUT_CONSTRUCTOR_CONTRACT_VERSION;
+  templateKey: ManualWorkoutTemplateKey;
+  workoutDate: string;
+  title: string;
+  workoutType: WorkoutType;
+  timeline: ManualWorkoutConstructorTimelineEntry[];
+  metadataNotes: ManualWorkoutConstructorMetadataNote[];
+}
+
 export interface ManualWorkoutCanonicalDraft {
   sourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
   sourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
@@ -305,6 +422,7 @@ export type ManualWorkoutDraftReviewResult =
       ok: true;
       status: "draft_ready";
       draft: ManualWorkoutCanonicalDraft;
+      constructorContract: ManualWorkoutConstructorContract;
       review: ManualWorkoutReviewSummary;
       reviewToken: string;
       reviewChecksum: string;

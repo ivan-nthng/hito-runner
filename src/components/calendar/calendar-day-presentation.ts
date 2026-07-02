@@ -13,6 +13,7 @@ import {
   type Status,
   type Workout,
 } from "@/lib/training";
+import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 import { workoutGlyphKind } from "@/lib/workout-glyph";
 
 export type CalendarDaySurfacePresentation = {
@@ -27,7 +28,7 @@ export type CalendarDaySurfacePresentation = {
 
 export const HITO_CALENDAR_REST_IDENTITY = {
   label: "Rest",
-  color: "var(--rest)",
+  color: workoutTypeColorVar("rest"),
   glyph: "rest",
 } satisfies HitoCalendarWorkoutIdentity;
 
@@ -37,7 +38,6 @@ export function buildWorkoutCalendarDayPresentation(
     feedback?: HitoCalendarFeedbackState;
     includeRestTitle?: boolean;
     stateLabel?: string | null;
-    stripLocalizedPrefix?: boolean;
     supportingText?: string | null;
     title?: string | null;
   } = {},
@@ -64,10 +64,7 @@ export function buildWorkoutCalendarDayPresentation(
   }
 
   const state = calendarDayBaseState(workout);
-  const title =
-    options.title === undefined
-      ? stripCalendarWorkoutTitle(workout.title, Boolean(options.stripLocalizedPrefix))
-      : (options.title ?? undefined);
+  const title = options.title === undefined ? workout.title : (options.title ?? undefined);
 
   return {
     feedback: options.feedback ?? "none",
@@ -156,22 +153,14 @@ export function calendarDayResultState(
 
 export function calendarWorkoutIdentity(workout: Workout): HitoCalendarWorkoutIdentity {
   const meta = workoutTypeMeta(workout);
-  const label = meta.short;
 
   if (workout.type === "rest") {
     return HITO_CALENDAR_REST_IDENTITY;
   }
 
-  if (workout.type === "long_run") {
-    return {
-      label: "Long",
-      color: meta.color,
-      glyph: workoutGlyphKind(workout),
-    };
-  }
-
   return {
-    label,
+    label: meta.label,
+    short: meta.short,
     color: meta.color,
     glyph: workoutGlyphKind(workout),
   };
@@ -194,9 +183,4 @@ export function compactCalendarWorkoutSummary(workout: Workout) {
   }
 
   return workoutTypeMeta(workout).label;
-}
-
-function stripCalendarWorkoutTitle(title: string, stripLocalizedPrefix: boolean) {
-  if (!stripLocalizedPrefix) return title;
-  return title.replace(/^(Аэробный |Лёгкий )/, "");
 }

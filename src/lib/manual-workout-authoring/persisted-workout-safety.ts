@@ -14,14 +14,30 @@ function hasUnsafeMetricTruth(value: unknown): boolean {
   }
 
   const record = value as Record<string, unknown>;
+  const targetSource = record.target_source ?? record.targetSource;
+  const hrTargetSource = record.hr_target_source ?? record.hrTargetSource;
+  const sourceIsUserEntered = targetSource === "user_entered" || targetSource === "runner_entered";
+  const hrSourceIsUserEntered =
+    hrTargetSource === undefined ||
+    hrTargetSource === "user_entered" ||
+    hrTargetSource === "runner_entered";
+  const hasPaceTarget =
+    "pace" in record || "pace_min_per_km_range" in record || "paceMinPerKmRange" in record;
+  const hasHrTarget = "hr_bpm_range" in record || "hrBpmRange" in record || "hr_bpm" in record;
+
+  if (hasPaceTarget && !sourceIsUserEntered) {
+    return true;
+  }
+
+  if (hasHrTarget && (!sourceIsUserEntered || !hrSourceIsUserEntered)) {
+    return true;
+  }
+
   if (
-    "pace" in record ||
-    "pace_min_per_km_range" in record ||
-    "paceMinPerKmRange" in record ||
-    "hr_bpm_range" in record ||
-    "hrBpmRange" in record ||
     record.hr_target_source === "personal_hr_zone" ||
-    record.hrTargetSource === "personal_hr_zone"
+    record.hrTargetSource === "personal_hr_zone" ||
+    record.hr_target_source === "default_estimated_hr" ||
+    record.hrTargetSource === "default_estimated_hr"
   ) {
     return true;
   }

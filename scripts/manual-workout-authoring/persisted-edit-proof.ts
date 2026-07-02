@@ -742,11 +742,7 @@ function assertNoFakePaceOrHr(steps: Step[], label: string) {
 }
 
 function flattenSteps(steps: Step[]): Step[] {
-  return steps.flatMap((step) => [
-    step,
-    ...(step.work ? flattenSteps([step.work]) : []),
-    ...(step.recovery ? flattenSteps([step.recovery]) : []),
-  ]);
+  return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
 }
 
 function readStepsForAssertion(value: PersistedPlannedWorkoutRow["steps"]): Step[] {

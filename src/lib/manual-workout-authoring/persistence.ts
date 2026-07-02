@@ -12,7 +12,12 @@ import {
 } from "@/lib/manual-workout-authoring/schema";
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import type { Json } from "@/lib/supabase/database";
-import type { Step, StepPrescription, StepUnitPrescription } from "@/lib/training";
+import type {
+  Step,
+  StepPrescription,
+  StepRepeatChildPrescription,
+  StepUnitPrescription,
+} from "@/lib/training";
 
 export function buildManualWorkoutUserBuiltTrainingPlan(
   draft: ManualWorkoutCanonicalDraft,
@@ -181,6 +186,7 @@ function buildManualWorkoutSegment(
 ): TrainingPlanV2["planned_workouts"][number]["segments"][number] {
   const prescription = normalizeStepPrescription(step.prescription, step);
   const segmentType = normalizeManualSegmentType(step.segment_type, prescription);
+  const target = prescription.mode === "repeats" ? undefined : step.target;
 
   return {
     segment_id: step.segment_id ?? `manual-segment-${sequence}`,
@@ -191,13 +197,7 @@ function buildManualWorkoutSegment(
     prescription,
     ...(step.duration_min ? { duration_min: step.duration_min } : {}),
     ...(step.distance_km ? { distance_km: step.distance_km } : {}),
-    ...(step.target ? { target: step.target } : {}),
-    ...(step.repeats ? { repeat_count: step.repeats } : {}),
-    ...(step.work?.distance_km ? { work_distance_km: step.work.distance_km } : {}),
-    ...(step.work?.duration_min ? { work_duration_min: step.work.duration_min } : {}),
-    ...(step.recovery?.duration_min ? { recovery_duration_min: step.recovery.duration_min } : {}),
-    ...(step.recovery?.distance_km ? { recovery_distance_km: step.recovery.distance_km } : {}),
-    ...(step.recovery?.target ? { recovery_target: step.recovery.target } : {}),
+    ...(target ? { target } : {}),
   };
 }
 
@@ -211,11 +211,8 @@ function normalizeStepPrescription(
       ...(prescription.duration_min ? { duration_min: prescription.duration_min } : {}),
       ...(prescription.distance_km ? { distance_km: prescription.distance_km } : {}),
       ...(prescription.repeat_count ? { repeat_count: prescription.repeat_count } : {}),
-      ...(prescription.repeat_unit
-        ? { repeat_unit: normalizeStepUnitPrescription(prescription.repeat_unit) }
-        : {}),
-      ...(prescription.recovery_unit
-        ? { recovery_unit: normalizeStepUnitPrescription(prescription.recovery_unit) }
+      ...(prescription.children?.length
+        ? { children: prescription.children.map(normalizeRepeatChildPrescription) }
         : {}),
     };
   }
@@ -239,11 +236,20 @@ function normalizeStepPrescription(
   };
 }
 
-function normalizeStepUnitPrescription(
-  unit: StepUnitPrescription,
-): NonNullable<
-  TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"]
->["repeat_unit"] {
+function normalizeRepeatChildPrescription(
+  child: StepRepeatChildPrescription,
+): StepRepeatChildPrescription {
+  return {
+    role: child.role,
+    ...(child.label ? { label: child.label } : {}),
+    ...(child.sequence ? { sequence: child.sequence } : {}),
+    ...(child.guidance ? { guidance: child.guidance } : {}),
+    prescription: normalizeStepUnitPrescription(child.prescription),
+    ...(child.target ? { target: child.target } : {}),
+  };
+}
+
+function normalizeStepUnitPrescription(unit: StepUnitPrescription): StepUnitPrescription {
   return {
     mode: unit.mode,
     ...(unit.duration_min ? { duration_min: unit.duration_min } : {}),
@@ -333,9 +339,7 @@ export function deriveManualTargetTruthMode(
     return "none";
   }
 
-  return draft.metricMode.hr_target_source === "default_estimated_hr"
-    ? "editable_default_hr"
-    : "structure_only";
+  return "structure_only";
 }
 
 function formatManualSetupRunningLevel(runningLevel: ManualSetupRunningLevel) {

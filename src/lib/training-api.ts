@@ -435,6 +435,7 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
       workout,
       logsByWorkoutId.get(workout.id) ?? null,
       currentDate,
+      planCycle.source_kind,
       feedbackMarkerByWorkoutId.get(workout.id) ?? null,
       resolveActivePlanWorkoutSourceEditingCapabilities({
         activePlan: planCycle,
@@ -551,6 +552,7 @@ function dbWorkoutToView(
   workout: Database["public"]["Tables"]["planned_workouts"]["Row"],
   log: Database["public"]["Tables"]["workout_logs"]["Row"] | null,
   currentDate: string,
+  sourceKind: string | null,
   feedbackMarker: Workout["feedbackMarker"],
   sourceEditing: Workout["sourceEditing"],
 ): Workout {
@@ -568,6 +570,7 @@ function dbWorkoutToView(
     ...deriveWorkoutRichModel({
       type: workout.workout_type,
       sourceWorkoutType: workout.source_workout_type,
+      sourceKind,
       workoutFamily: workout.workout_family,
       workoutIdentity: workout.workout_identity,
       calendarIconKey: workout.calendar_icon_key,

@@ -530,6 +530,18 @@ function validateNoNormalPathInputGates(inputSummary: object) {
     null,
     "Default 10K selected-plan path must remain structure-only without a benchmark.",
   );
+  const planGoalIntent = (inputSummary as { planGoalIntent?: { metricTruthPolicy?: unknown } })
+    .planGoalIntent;
+  assert.ok(planGoalIntent, "Default 10K selected-plan path should include goal intent readback.");
+  assert.deepEqual(
+    planGoalIntent.metricTruthPolicy,
+    {
+      outcomePaceIsExecutableWorkoutTarget: false,
+      segmentPaceTargetsAllowedFromGoal: false,
+      hrTargetsAllowedFromGoal: false,
+    },
+    "Plan goal intent must not unlock executable pace or HR targets.",
+  );
   assert.equal(Object.hasOwn(inputSummary, "targetTime"), false);
   assert.equal(Object.hasOwn(inputSummary, "personalHrZones"), false);
 }
@@ -701,14 +713,14 @@ function rowMinutes(row: TenKPlanCalendarRow) {
         return total + prescription.durationSecondsOrDistanceMeters.min / 60;
       case "repeat": {
         const repeatCount = prescription.repeatCount.min;
-        const workMinutes =
-          prescription.work.mode === "time" ? prescription.work.durationSeconds.min / 60 : 0;
-        const recoveryMinutes =
-          prescription.recovery.mode === "recovery_time"
-            ? prescription.recovery.recoveryDurationSeconds.min / 60
-            : 0;
+        const childMinutes = prescription.children.reduce(
+          (childTotal, child) =>
+            childTotal +
+            (child.prescription.mode === "time" ? child.prescription.durationSeconds.min / 60 : 0),
+          0,
+        );
 
-        return total + repeatCount * (workMinutes + recoveryMinutes);
+        return total + repeatCount * childMinutes;
       }
       case "distance":
       case "distance_with_default_hr_cap":

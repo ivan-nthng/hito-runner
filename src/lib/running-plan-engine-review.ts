@@ -1,5 +1,10 @@
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import {
+  AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+  isAiGeneratedRunningPlanPreviewDraft,
+  type AiGeneratedRunningPlanPreviewDraft,
+} from "@/lib/ai-generated-running-plan";
+import {
   DEFAULT_ESTIMATED_HR_SOURCE_NOTE,
   buildDefaultEstimatedHrBandReadback,
   type DefaultEstimatedHrBandKey,
@@ -24,12 +29,15 @@ import {
   type MarathonBasePlanPreviewDraft,
   type MarathonCompletionPlanPreviewDraft,
   type RunningPlanPreviewCalendarRow,
+  type RunningPlanRepeatChildPrescription,
+  type RunningPlanRepeatChildUnitPrescription,
   type RunningPlanSegmentPrescription,
   type RunningPlanWatchExecutableSegmentTemplate,
   type TenKPlanPreviewDraft,
 } from "@/lib/plan-creation-engine";
 import type { RunningPlanDistanceFamily } from "@/lib/plan-creation-engine";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
+import { plannedWorkoutRepeatChildLabel } from "@/lib/planned-workout-block-contract";
 import { trainingPlanV2Schema } from "@/lib/imported-plan";
 import type {
   CalendarIconKey,
@@ -37,17 +45,35 @@ import type {
   CanonicalWorkoutFamily,
   CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
+import {
+  base64UrlDecodeUtf8,
+  base64UrlEncodeUtf8,
+  digestSha256Hex,
+  safeTokenEqual,
+  signStableJsonPayload,
+  stableJsonEqual,
+  stableJsonStringify,
+} from "@/lib/review-token-signing";
 import type { Json } from "@/lib/supabase/database";
 import { serverEnv } from "@/lib/supabase/env";
 
 export const RUNNING_PLAN_REVIEW_CONTRACT_VERSION = "running_plan_review_v1" as const;
 export const RUNNING_PLAN_CONFIRMED_SOURCE_STATUS = "confirmed_selected_plan" as const;
+const SELF_CONTAINED_RUNNING_PLAN_REVIEW_TOKEN_PREFIX = "running-plan-review-v1";
+
+type SelfContainedRunningPlanReviewEnvelope = {
+  draft: AiGeneratedRunningPlanPreviewDraft;
+  canonicalPlan: TrainingPlanV2;
+  payload: ReturnType<typeof buildRunningPlanReviewPayload>;
+  reviewChecksum: string;
+};
 
 export type RunningPlanPreviewDraft =
   | TenKPlanPreviewDraft
   | HalfMarathonPlanPreviewDraft
   | MarathonBasePlanPreviewDraft
-  | MarathonCompletionPlanPreviewDraft;
+  | MarathonCompletionPlanPreviewDraft
+  | AiGeneratedRunningPlanPreviewDraft;
 
 export type RunningPlanReviewProof = {
   reviewToken: string;
@@ -73,7 +99,14 @@ export async function addRunningPlanReviewProof<TDraft extends RunningPlanPrevie
   const canonicalPlan = buildRunningPlanCanonicalPlan(draft);
   const reviewPayload = buildRunningPlanReviewPayload(draft, canonicalPlan);
   const reviewChecksum = await digestSha256Hex(stableJsonStringify(reviewPayload));
-  const reviewToken = await signRunningPlanReviewPayload(reviewPayload);
+  const reviewToken = isAiGeneratedRunningPlanPreviewDraft(draft)
+    ? await signSelfContainedRunningPlanReviewToken({
+        draft,
+        canonicalPlan,
+        reviewPayload,
+        reviewChecksum,
+      })
+    : await signRunningPlanReviewPayload(reviewPayload);
 
   return {
     ...draft,
@@ -104,6 +137,42 @@ export async function validateRunningPlanReviewExactness(input: {
       message: string;
     }
 > {
+  const selfContainedReview = isAiGeneratedRunningPlanPreviewDraft(input.draft)
+    ? await validateSelfContainedRunningPlanReviewToken({
+        reviewToken: input.reviewToken,
+        reviewChecksum: input.reviewChecksum,
+      })
+    : null;
+
+  if (selfContainedReview && !selfContainedReview.ok) {
+    return selfContainedReview;
+  }
+
+  if (isAiGeneratedRunningPlanPreviewDraft(input.draft)) {
+    if (!selfContainedReview || !selfContainedReview.ok) {
+      return {
+        ok: false,
+        reason: "invalid_review",
+        message:
+          "This AI-authored generated-plan review token is invalid. Refresh the preview before creating a plan.",
+      };
+    }
+
+    if (
+      !sameJson(
+        stripRunningPlanReviewProof(selfContainedReview.draft),
+        stripRunningPlanReviewProof(input.draft),
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "stale_review",
+        message:
+          "This AI-authored generated-plan review no longer matches the reviewed preview. Refresh before creating a plan.",
+      };
+    }
+  }
+
   const canonicalPlan = buildRunningPlanCanonicalPlan(input.draft);
   const richnessIssues = collectRunnerFacingCanonicalRichnessIssues({
     family: input.draft.planFamily,
@@ -159,6 +228,27 @@ export async function validateRunningPlanReviewExactness(input: {
     };
   }
 
+  if (selfContainedReview && selfContainedReview.ok) {
+    if (
+      !sameJson(selfContainedReview.canonicalPlan, canonicalPlan) ||
+      !sameJson(selfContainedReview.reviewPayload, reviewPayload)
+    ) {
+      return {
+        ok: false,
+        reason: "stale_review",
+        message:
+          "This AI-authored generated-plan review no longer matches the canonical plan. Refresh before creating a plan.",
+      };
+    }
+
+    return {
+      ok: true,
+      canonicalPlan,
+      reviewPayload,
+      reviewChecksum: expectedChecksum,
+    };
+  }
+
   const expectedToken = await signRunningPlanReviewPayload(reviewPayload);
   if (!safeTokenEqual(input.reviewToken, expectedToken)) {
     return {
@@ -178,6 +268,10 @@ export async function validateRunningPlanReviewExactness(input: {
 }
 
 export function buildRunningPlanCanonicalPlan(draft: RunningPlanPreviewDraft): TrainingPlanV2 {
+  if (isAiGeneratedRunningPlanPreviewDraft(draft)) {
+    return trainingPlanV2Schema.parse(draft.canonicalPlan);
+  }
+
   const normalizedInput = draft.normalizedInputSummary;
   const endDate = draft.calendarRows.at(-1)?.date ?? normalizedInput.startDate;
   const endpointDate = draft.endpointProof.finalDate;
@@ -284,6 +378,7 @@ export function buildRunningPlanPersistenceMetadata(input: {
     canonicalPlan.planned_workouts,
   );
   const metricPolicy = summarizeMetricPolicy(draft.calendarRows);
+  const planGoalIntent = draft.normalizedInputSummary.planGoalIntent;
 
   return {
     goalMetadata: toJson({
@@ -302,6 +397,8 @@ export function buildRunningPlanPersistenceMetadata(input: {
         row_count: canonicalPlan.planned_workouts.length,
         non_rest_row_count: nonRestRows.length,
         endpoint_proof: draft.endpointProof,
+        plan_goal_intent: planGoalIntent,
+        ai_generation: summarizeAiGenerationForPersistence(draft),
         runner_facing_richness: runnerFacingRichness,
         prescription_grammar: prescriptionGrammar,
         metric_policy: metricPolicy,
@@ -312,6 +409,7 @@ export function buildRunningPlanPersistenceMetadata(input: {
         review_contract_version: RUNNING_PLAN_REVIEW_CONTRACT_VERSION,
         review_checksum: reviewChecksum,
         normalized_input: draft.normalizedInputSummary,
+        plan_goal_intent: planGoalIntent,
         validation: draft.validation,
         composition_grammar: compositionGrammar,
       },
@@ -323,6 +421,10 @@ export function runningPlanSourceKindMatchesFamily(input: {
   family: RunningPlanDistanceFamily;
   sourceKind: string;
 }) {
+  if (input.sourceKind === AI_GENERATED_RUNNING_PLAN_SOURCE_KIND) {
+    return true;
+  }
+
   return input.sourceKind === runningPlanSourceKindForFamily(input.family);
 }
 
@@ -355,10 +457,198 @@ function buildRunningPlanReviewPayload(
   };
 }
 
+function summarizeAiGenerationForPersistence(draft: RunningPlanPreviewDraft) {
+  if (!isAiGeneratedRunningPlanPreviewDraft(draft)) {
+    return null;
+  }
+
+  const trace = draft.aiGeneration.generationTrace;
+
+  return {
+    generation_id: trace?.generationId ?? null,
+    response_id: draft.aiGeneration.responseId ?? trace?.provider.responseId ?? null,
+    model: draft.aiGeneration.model,
+    provider_kind: trace?.provider.kind ?? null,
+    paid_provider_call: trace?.provider.paidProviderCall ?? null,
+    final_outcome: trace?.pipeline.finalOutcome ?? null,
+    parse_status: trace?.pipeline.parseStatus ?? null,
+    normalization_status: trace?.pipeline.normalizationStatus ?? null,
+    input_tokens: draft.aiGeneration.debug.inputTokens ?? trace?.usage.inputTokens ?? null,
+    output_tokens: draft.aiGeneration.debug.outputTokens ?? trace?.usage.outputTokens ?? null,
+    total_tokens: draft.aiGeneration.debug.totalTokens ?? trace?.usage.totalTokens ?? null,
+    prompt_hash: trace?.request.promptHash ?? null,
+    raw_output_hash: trace?.output.rawOutputHash ?? null,
+    sanitized_summary_hash: trace?.output.sanitizedSummaryHash ?? null,
+    artifact_path: trace?.artifacts.path ?? null,
+  };
+}
+
+async function signSelfContainedRunningPlanReviewToken(
+  envelope: SelfContainedRunningPlanReviewEnvelope,
+) {
+  const encodedEnvelope = base64UrlEncodeUtf8(stableJsonStringify(envelope));
+  const signature = await signRunningPlanReviewPayload(envelope);
+
+  return `${SELF_CONTAINED_RUNNING_PLAN_REVIEW_TOKEN_PREFIX}.${encodedEnvelope}.${signature}`;
+}
+
+export async function validateSelfContainedRunningPlanReviewToken(input: {
+  reviewToken: string;
+  reviewChecksum: string;
+}): Promise<
+  | {
+      ok: true;
+      draft: AiGeneratedRunningPlanPreviewDraft;
+      canonicalPlan: TrainingPlanV2;
+      reviewPayload: ReturnType<typeof buildRunningPlanReviewPayload>;
+      reviewChecksum: string;
+    }
+  | {
+      ok: false;
+      reason: "invalid_review" | "stale_review";
+      message: string;
+    }
+> {
+  const parsed = parseSelfContainedRunningPlanReviewToken(input.reviewToken);
+
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      reason: "invalid_review",
+      message: parsed.message,
+    };
+  }
+
+  const expectedSignature = await signRunningPlanReviewPayload(parsed.envelope);
+  if (!safeTokenEqual(parsed.signature, expectedSignature)) {
+    return {
+      ok: false,
+      reason: "invalid_review",
+      message:
+        "This AI-authored generated-plan review token is invalid. Refresh the preview before creating a plan.",
+    };
+  }
+
+  if (parsed.envelope.reviewChecksum !== input.reviewChecksum) {
+    return {
+      ok: false,
+      reason: "stale_review",
+      message:
+        "This AI-authored generated-plan review checksum no longer matches the reviewed preview. Refresh before creating a plan.",
+    };
+  }
+
+  const canonicalPlan = trainingPlanV2Schema.parse(parsed.envelope.canonicalPlan);
+  const reviewPayload = buildRunningPlanReviewPayload(parsed.envelope.draft, canonicalPlan);
+  const expectedChecksum = await digestSha256Hex(stableJsonStringify(reviewPayload));
+
+  if (expectedChecksum !== input.reviewChecksum) {
+    return {
+      ok: false,
+      reason: "stale_review",
+      message:
+        "This AI-authored generated-plan review no longer matches the canonical plan. Refresh before creating a plan.",
+    };
+  }
+
+  return {
+    ok: true,
+    draft: parsed.envelope.draft,
+    canonicalPlan,
+    reviewPayload,
+    reviewChecksum: expectedChecksum,
+  };
+}
+
+function parseSelfContainedRunningPlanReviewToken(token: string):
+  | {
+      ok: true;
+      envelope: SelfContainedRunningPlanReviewEnvelope;
+      signature: string;
+    }
+  | {
+      ok: false;
+      message: string;
+    } {
+  const [prefix, encodedEnvelope, signature, ...extra] = token.split(".");
+
+  if (
+    prefix !== SELF_CONTAINED_RUNNING_PLAN_REVIEW_TOKEN_PREFIX ||
+    !encodedEnvelope ||
+    !signature ||
+    extra.length > 0
+  ) {
+    return {
+      ok: false,
+      message:
+        "This AI-authored generated-plan review token is malformed. Refresh the preview before creating a plan.",
+    };
+  }
+
+  try {
+    const envelope = JSON.parse(
+      base64UrlDecodeUtf8(encodedEnvelope),
+    ) as SelfContainedRunningPlanReviewEnvelope;
+
+    if (!isAiGeneratedRunningPlanPreviewDraft(envelope.draft)) {
+      return {
+        ok: false,
+        message:
+          "This AI-authored generated-plan review token is missing its reviewed draft. Refresh the preview before creating a plan.",
+      };
+    }
+
+    if (typeof envelope.reviewChecksum !== "string" || envelope.reviewChecksum.length !== 64) {
+      return {
+        ok: false,
+        message:
+          "This AI-authored generated-plan review token is missing its checksum. Refresh the preview before creating a plan.",
+      };
+    }
+
+    trainingPlanV2Schema.parse(envelope.canonicalPlan);
+
+    return {
+      ok: true,
+      envelope,
+      signature,
+    };
+  } catch {
+    return {
+      ok: false,
+      message:
+        "This AI-authored generated-plan review token could not be decoded. Refresh the preview before creating a plan.",
+    };
+  }
+}
+
 function canonicalPlanStablePayload(plan: TrainingPlanV2) {
   const { created_at: _createdAt, ...stablePlan } = plan;
 
   return stablePlan;
+}
+
+function stripRunningPlanReviewProof(draft: RunningPlanPreviewDraft): RunningPlanPreviewDraft {
+  const {
+    canonicalNonRestRowCount: _canonicalNonRestRowCount,
+    canonicalRowCount: _canonicalRowCount,
+    reviewChecksum: _reviewChecksum,
+    reviewContractVersion: _reviewContractVersion,
+    reviewToken: _reviewToken,
+    ...unreviewedDraft
+  } = draft as RunningPlanPreviewDraft & Partial<RunningPlanReviewProof>;
+
+  if (isAiGeneratedRunningPlanPreviewDraft(unreviewedDraft)) {
+    return {
+      ...unreviewedDraft,
+      aiGeneration: {
+        ...unreviewedDraft.aiGeneration,
+        generationTrace: null,
+      },
+    };
+  }
+
+  return unreviewedDraft as RunningPlanPreviewDraft;
 }
 
 function buildCanonicalWorkout({
@@ -375,6 +665,7 @@ function buildCanonicalWorkout({
     ? [buildRestSegment(row)]
     : row.segments.map((segment) => buildCanonicalSegment({ draft, row, segment }));
   const metricMode = buildMetricMode({ row, segments });
+  const planGoalIntent = draft.normalizedInputSummary.planGoalIntent;
 
   return {
     workout_id: row.rowId,
@@ -392,8 +683,10 @@ function buildCanonicalWorkout({
       goal_type: runningPlanGoalType(draft.planFamily),
       goal_style: "balanced",
       terrain_focus: "standard",
-      target_date: draft.planFamily === "Marathon Base" ? null : draft.endpointProof.finalDate,
-      target_time: null,
+      target_date:
+        planGoalIntent.targetDate ??
+        (draft.planFamily === "Marathon Base" ? null : draft.endpointProof.finalDate),
+      target_time: planGoalIntent.targetFinishTime?.label ?? null,
     },
     metric_mode: metricMode,
     title: row.title,
@@ -438,6 +731,31 @@ function buildCanonicalSegment({
     segment,
     benchmarkPaceTruth: draft.normalizedInputSummary.benchmarkPaceTruth,
   });
+  const segmentTarget = buildSegmentTarget({
+    row,
+    segment,
+    prescription: segment.primaryPrescription,
+    targetTruthMode: segment.targetTruthMode,
+    paceTarget,
+    runnerAge: draft.normalizedInputSummary.age,
+  });
+  const canonicalPrescription =
+    prescription.mode === "repeats" && prescription.children?.length
+      ? {
+          ...prescription,
+          children: prescription.children.map((child) => ({
+            ...child,
+            target:
+              child.role === "recover" || child.role === "walk"
+                ? {
+                    intensity: "easy recovery",
+                    rpe: 2,
+                    cue: "Recover easily enough that the next repeat stays smooth.",
+                  }
+                : segmentTarget,
+          })),
+        }
+      : prescription;
 
   return {
     segment_id: segment.id,
@@ -445,15 +763,8 @@ function buildCanonicalSegment({
     label: formatSegmentLabel(segment),
     sequence: segment.order,
     guidance: segment.secondaryCue,
-    prescription,
-    target: buildSegmentTarget({
-      row,
-      segment,
-      prescription: segment.primaryPrescription,
-      targetTruthMode: segment.targetTruthMode,
-      paceTarget,
-      runnerAge: draft.normalizedInputSummary.age,
-    }),
+    prescription: canonicalPrescription,
+    ...(canonicalPrescription.mode === "repeats" ? {} : { target: segmentTarget }),
   };
 }
 
@@ -489,8 +800,13 @@ function buildCanonicalPrescription(
       return {
         mode: "repeats",
         repeat_count: exactRangeNumber(prescription.repeatCount),
-        repeat_unit: buildRepeatUnitPrescription(prescription.work),
-        recovery_unit: buildRepeatRecoveryUnitPrescription(prescription.recovery),
+        children: prescription.children.map((child, index) => ({
+          role: child.role,
+          label: child.label ?? plannedWorkoutRepeatChildLabel(child.role),
+          sequence: index + 1,
+          ...(child.guidance ? { guidance: child.guidance } : {}),
+          prescription: buildRepeatChildUnitPrescription(child.prescription),
+        })),
       };
     case "free_run_with_cap":
       return {
@@ -828,15 +1144,31 @@ function buildMetricMode({
 function selectedPlanSegmentsContainDefaultEstimatedHrTargets(
   segments: TrainingPlanV2["planned_workouts"][number]["segments"],
 ) {
-  return segments.some((segment) => {
-    const target = segment.target as Record<string, unknown> | undefined;
+  return segments.some((segment) =>
+    collectSegmentTargets(segment).some((target) => {
+      return (
+        target?.hr_target_source === "default_estimated_hr" &&
+        typeof target.hr_bpm_range === "string" &&
+        target.hr_bpm_range.trim().length > 0
+      );
+    }),
+  );
+}
 
-    return (
-      target?.hr_target_source === "default_estimated_hr" &&
-      typeof target.hr_bpm_range === "string" &&
-      target.hr_bpm_range.trim().length > 0
-    );
-  });
+function collectSegmentTargets(
+  segment: TrainingPlanV2["planned_workouts"][number]["segments"][number],
+) {
+  const parentTarget = segment.target as Record<string, unknown> | undefined;
+  const childTargets =
+    segment.prescription?.mode === "repeats" && segment.prescription.children?.length
+      ? segment.prescription.children
+          .map((child) => child.target as Record<string, unknown> | undefined)
+          .filter((target): target is Record<string, unknown> => Boolean(target))
+      : [];
+
+  return [parentTarget, ...childTargets].filter((target): target is Record<string, unknown> =>
+    Boolean(target),
+  );
 }
 
 function buildWorkoutSummary(
@@ -880,17 +1212,7 @@ function metersRangeToKm(range: { min: number; max: number }) {
   return Number((exactRangeNumber(range) / 1000).toFixed(3));
 }
 
-function buildRepeatUnitPrescription(
-  prescription:
-    | {
-        mode: "time";
-        durationSeconds: { min: number; max: number };
-      }
-    | {
-        mode: "distance";
-        distanceMeters: { min: number; max: number };
-      },
-) {
+function buildRepeatChildUnitPrescription(prescription: RunningPlanRepeatChildUnitPrescription) {
   if (prescription.mode === "time") {
     return {
       mode: "time" as const,
@@ -904,34 +1226,10 @@ function buildRepeatUnitPrescription(
   };
 }
 
-function buildRepeatRecoveryUnitPrescription(
-  prescription:
-    | {
-        mode: "recovery_time";
-        recoveryDurationSeconds: { min: number; max: number };
-      }
-    | {
-        mode: "recovery_distance";
-        recoveryDistanceMeters: { min: number; max: number };
-      },
-) {
-  if (prescription.mode === "recovery_time") {
-    return {
-      mode: "time" as const,
-      duration_min: secondsRangeToMinutes(prescription.recoveryDurationSeconds),
-    };
-  }
-
-  return {
-    mode: "distance" as const,
-    distance_km: metersRangeToKm(prescription.recoveryDistanceMeters),
-  };
-}
-
 function prescriptionIntensityLabel(prescription: RunningPlanSegmentPrescription): string {
   switch (prescription.mode) {
     case "repeat":
-      return prescription.work.intensityLabel;
+      return primaryRepeatChild(prescription.children)?.intensityLabel ?? "controlled_repeat";
     case "recovery_time":
     case "recovery_distance":
       return prescription.intensityLabel;
@@ -940,6 +1238,14 @@ function prescriptionIntensityLabel(prescription: RunningPlanSegmentPrescription
     default:
       return prescription.intensityLabel;
   }
+}
+
+function primaryRepeatChild(
+  children: readonly RunningPlanRepeatChildPrescription[],
+): RunningPlanRepeatChildPrescription | null {
+  return (
+    children.find((child) => child.role === "work" || child.role === "run") ?? children[0] ?? null
+  );
 }
 
 function resolveRunningPlanPhase(weekNumber: number, horizonWeeks: number) {
@@ -1099,8 +1405,13 @@ function canonicalPrescriptionToDosePrescription(
     return {
       mode: "repeat",
       repeatCount: { min: repeatCount, max: repeatCount },
-      work: canonicalRepeatUnitToDoseWork(prescription.repeat_unit),
-      recovery: canonicalRepeatUnitToDoseRecovery(prescription.recovery_unit),
+      children: (prescription.children ?? []).map((child, index) => ({
+        role: child.role,
+        ...(child.label ? { label: child.label } : {}),
+        ...(child.guidance ? { guidance: child.guidance } : {}),
+        prescription: canonicalRepeatChildUnitToDoseUnit(child.prescription),
+        intensityLabel: `canonical_repeat_${child.role}_${index + 1}`,
+      })),
     };
   }
 
@@ -1112,7 +1423,7 @@ function canonicalPrescriptionToDosePrescription(
   };
 }
 
-function canonicalRepeatUnitToDoseWork(
+function canonicalRepeatChildUnitToDoseUnit(
   unit:
     | NonNullable<
         Extract<
@@ -1120,16 +1431,15 @@ function canonicalRepeatUnitToDoseWork(
             TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"]
           >,
           { mode: "repeats" }
-        >["repeat_unit"]
-      >
+        >["children"]
+      >[number]["prescription"]
     | undefined,
-): Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["work"] {
+): RunningPlanRepeatChildUnitPrescription {
   if (unit?.mode === "distance") {
     const distanceMeters = Math.round((unit.distance_km ?? 0) * 1000);
     return {
       mode: "distance",
       distanceMeters: { min: distanceMeters, max: distanceMeters },
-      intensityLabel: "canonical_repeat_distance",
     };
   }
 
@@ -1137,36 +1447,6 @@ function canonicalRepeatUnitToDoseWork(
   return {
     mode: "time",
     durationSeconds: { min: durationSeconds, max: durationSeconds },
-    intensityLabel: "canonical_repeat_time",
-  };
-}
-
-function canonicalRepeatUnitToDoseRecovery(
-  unit:
-    | NonNullable<
-        Extract<
-          NonNullable<
-            TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"]
-          >,
-          { mode: "repeats" }
-        >["recovery_unit"]
-      >
-    | undefined,
-): Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>["recovery"] {
-  if (unit?.mode === "distance") {
-    const distanceMeters = Math.round((unit.distance_km ?? 0) * 1000);
-    return {
-      mode: "recovery_distance",
-      recoveryDistanceMeters: { min: distanceMeters, max: distanceMeters },
-      intensityLabel: "canonical_recovery_distance",
-    };
-  }
-
-  const durationSeconds = Math.round((unit?.duration_min ?? 0) * 60);
-  return {
-    mode: "recovery_time",
-    recoveryDurationSeconds: { min: durationSeconds, max: durationSeconds },
-    intensityLabel: "canonical_recovery_time",
   };
 }
 
@@ -1190,75 +1470,12 @@ function uniqueStrings(values: readonly string[]) {
   return Array.from(new Set(values));
 }
 
-async function signRunningPlanReviewPayload(
-  payload: ReturnType<typeof buildRunningPlanReviewPayload>,
-) {
-  const serializedPayload = stableJsonStringify(payload);
-  const secret = serverEnv.supabaseServiceRoleKey;
-
-  if (!secret) {
-    return `sha256:${await digestSha256Hex(serializedPayload)}`;
-  }
-
-  return `hmac-sha256:${await hmacSha256Hex(secret, serializedPayload)}`;
+async function signRunningPlanReviewPayload(payload: unknown) {
+  return signStableJsonPayload(payload, serverEnv.supabaseServiceRoleKey);
 }
 
-function safeTokenEqual(left: string, right: string) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
-}
-
-async function digestSha256Hex(payload: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
-
-  return bytesToHex(digest);
-}
-
-async function hmacSha256Hex(secret: string, payload: string) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-
-  return bytesToHex(signature);
-}
-
-function bytesToHex(value: ArrayBuffer) {
-  return Array.from(new Uint8Array(value))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function stableJsonStringify(value: unknown): string {
-  return JSON.stringify(sortJsonValue(value));
-}
-
-function sortJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => sortJsonValue(entry));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-        .map(([key, nestedValue]) => [key, sortJsonValue(nestedValue)]),
-    );
-  }
-
-  return value;
+function sameJson(left: unknown, right: unknown) {
+  return stableJsonEqual(left, right);
 }
 
 function toJson(value: unknown): Json {

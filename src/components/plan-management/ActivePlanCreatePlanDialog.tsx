@@ -93,6 +93,17 @@ export function ActivePlanCreatePlanDialog({
   const [targetTime, setTargetTime] = useState(initialState.targetTime);
   const [startDate, setStartDate] = useState(initialState.startDate);
   const [targetDate, setTargetDate] = useState(initialState.targetDate);
+  const [planGoalChoice, setPlanGoalChoice] = useState<
+    StructuredConstructorState["planGoalChoice"]
+  >(initialState.planGoalChoice);
+  const [planGoalCustomDistanceKm, setPlanGoalCustomDistanceKm] = useState(
+    initialState.planGoalCustomDistanceKm,
+  );
+  const [planGoalCustomDistanceLabel, setPlanGoalCustomDistanceLabel] = useState(
+    initialState.planGoalCustomDistanceLabel,
+  );
+  const [planGoalFinishTime, setPlanGoalFinishTime] = useState(initialState.planGoalFinishTime);
+  const [planGoalTargetDate, setPlanGoalTargetDate] = useState(initialState.planGoalTargetDate);
   const [terrainFocus, setTerrainFocus] = useState<StructuredConstructorState["terrainFocus"]>(
     initialState.terrainFocus,
   );
@@ -129,6 +140,11 @@ export function ActivePlanCreatePlanDialog({
       targetTime,
       startDate,
       targetDate,
+      planGoalChoice,
+      planGoalCustomDistanceKm,
+      planGoalCustomDistanceLabel,
+      planGoalFinishTime,
+      planGoalTargetDate,
       terrainFocus,
       watchAccess: "watch_or_app",
       guidancePreference,
@@ -145,6 +161,11 @@ export function ActivePlanCreatePlanDialog({
       guidancePreference,
       heightCm,
       maxRunningDaysPerWeek,
+      planGoalCustomDistanceKm,
+      planGoalCustomDistanceLabel,
+      planGoalFinishTime,
+      planGoalChoice,
+      planGoalTargetDate,
       preferredLongRunDay,
       recent5kPace,
       recent5kTime,
@@ -180,6 +201,17 @@ export function ActivePlanCreatePlanDialog({
   const resetSelectedPlanPreviewState = selectedPlanPreview.resetPreviewState;
   const isBusy = selectedPlanPreview.isBusy || transitionStatus !== "idle";
 
+  const changePlanGoalChoice = (value: StructuredConstructorState["planGoalChoice"]) => {
+    setPlanGoalChoice(value);
+
+    if (value !== "custom") {
+      setPlanGoalCustomDistanceKm("");
+      setPlanGoalCustomDistanceLabel("");
+    }
+
+    selectedPlanPreview.clearSelectedPreview();
+  };
+
   useEffect(() => {
     if (!open) {
       previousOpenRef.current = false;
@@ -210,6 +242,11 @@ export function ActivePlanCreatePlanDialog({
     setTargetTime(initialState.targetTime);
     setStartDate(initialState.startDate);
     setTargetDate(initialState.targetDate);
+    setPlanGoalChoice(initialState.planGoalChoice);
+    setPlanGoalCustomDistanceKm(initialState.planGoalCustomDistanceKm);
+    setPlanGoalCustomDistanceLabel(initialState.planGoalCustomDistanceLabel);
+    setPlanGoalFinishTime(initialState.planGoalFinishTime);
+    setPlanGoalTargetDate(initialState.planGoalTargetDate);
     setTerrainFocus(initialState.terrainFocus);
     setGuidancePreference(initialState.guidancePreference);
     setStrengthPreference(initialState.strengthPreference);
@@ -458,9 +495,7 @@ export function ActivePlanCreatePlanDialog({
                   isBusy={isBusy || !hasActivePlan}
                   isConstructorReady={isPresetDiscoveryReady}
                   onSubmit={() => {
-                    selectedPlanPreview.setError(
-                      "Choose a plan family before reviewing the plan change.",
-                    );
+                    selectedPlanPreview.setError("Choose a goal before reviewing the plan change.");
                   }}
                   onConfirmDraft={() => undefined}
                   onBackToEdit={() => undefined}
@@ -474,16 +509,22 @@ export function ActivePlanCreatePlanDialog({
                       status={selectedPlanPreview.status}
                       isBusy={isBusy || !hasActivePlan}
                       isPresetDiscoveryReady={isPresetDiscoveryReady}
-                      selectedCardId={selectedPlanPreview.selectedCardId}
                       previewOpen={selectedPlanPreview.previewOpen}
+                      planGoalChoice={planGoalChoice}
+                      planGoalCustomDistanceKm={planGoalCustomDistanceKm}
+                      planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
+                      planGoalFinishTime={planGoalFinishTime}
+                      planGoalTargetDate={planGoalTargetDate}
+                      onPlanGoalChoiceChange={changePlanGoalChoice}
+                      onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
+                      onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
+                      onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
+                      onPlanGoalTargetDateChange={setPlanGoalTargetDate}
                       onPreviewOpenChange={(nextOpen) => {
                         selectedPlanPreview.setPreviewOpen(nextOpen);
                         if (!nextOpen) {
                           setTransitionReviewResult(null);
                         }
-                      }}
-                      onLoadCards={() => {
-                        void selectedPlanPreview.loadCards();
                       }}
                       onSelectPlan={(cardId) => {
                         selectedPlanPreview.selectPlanPreview(cardId);

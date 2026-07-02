@@ -14,9 +14,14 @@ import {
   type RunningPlanConfirmActionInput,
 } from "@/lib/running-plan-engine-actions";
 import {
+  AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+  isAiGeneratedRunningPlanPreviewDraft,
+} from "@/lib/ai-generated-running-plan";
+import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   buildRunningPlanPersistenceMetadata,
   buildRunningPlanProfilePatch,
+  validateSelfContainedRunningPlanReviewToken,
   validateRunningPlanReviewExactness,
 } from "@/lib/running-plan-engine-review";
 import type { Json } from "@/lib/supabase/database";
@@ -77,7 +82,7 @@ export type ActivePlanTransitionReviewResult =
       safety: {
         requiresExplicitConfirm: true;
         trustedClientRows: false;
-        serverRebuiltCandidate: true;
+        serverRebuiltCandidate: boolean;
         oldPlanWillBeArchived: true;
         upcomingManualWorkoutsMergeIntoCandidate: false;
       };
@@ -104,7 +109,7 @@ export type ActivePlanTransitionConfirmResult =
       safety: {
         requiresExplicitConfirm: true;
         trustedClientRows: false;
-        serverRebuiltCandidate: true;
+        serverRebuiltCandidate: boolean;
         oldPlanArchived: true;
         upcomingManualWorkoutsMerged: false;
         callsOpenAi: false;
@@ -375,7 +380,8 @@ export async function confirmActivePlanTransitionForUser(
       safety: {
         requiresExplicitConfirm: true,
         trustedClientRows: false,
-        serverRebuiltCandidate: true,
+        serverRebuiltCandidate:
+          review.candidatePlan.sourceKind !== AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
         oldPlanArchived: true,
         upcomingManualWorkoutsMerged: false,
         callsOpenAi: false,
@@ -426,40 +432,20 @@ async function buildActivePlanTransitionReview(
     });
   }
 
-  const preview = buildRunningPlanPreview(candidate.previewInput);
-  if (!preview.ok) {
+  const candidateReview =
+    candidate.sourceKind === AI_GENERATED_RUNNING_PLAN_SOURCE_KIND
+      ? await resolveAiGeneratedTransitionCandidate(candidate)
+      : await resolveDeterministicTransitionCandidate(candidate);
+
+  if (!candidateReview.ok) {
     return buildTransitionFailure({
-      reason: "preview_unavailable",
-      message: preview.unavailable.error.message,
+      reason: candidateReview.reason,
+      message: candidateReview.message,
       input: candidate,
     });
   }
 
-  if (
-    preview.draft.sourceKind !== candidate.sourceKind ||
-    preview.draft.planFamily !== candidate.planFamily
-  ) {
-    return buildTransitionFailure({
-      reason: "input_mismatch",
-      message:
-        "The selected candidate rebuilt to a different source or family. Refresh the review.",
-      input: candidate,
-    });
-  }
-
-  const exactness = await validateRunningPlanReviewExactness({
-    draft: preview.draft,
-    reviewToken: candidate.reviewToken,
-    reviewChecksum: candidate.reviewChecksum,
-  });
-
-  if (!exactness.ok) {
-    return buildTransitionFailure({
-      reason: exactness.reason,
-      message: exactness.message,
-      input: candidate,
-    });
-  }
+  const { draft, exactness } = candidateReview;
 
   const reviewDate = dependencies.today();
   const workouts = context.existingWorkouts.workouts.filter(
@@ -578,19 +564,105 @@ async function buildActivePlanTransitionReview(
     safety: {
       requiresExplicitConfirm: true,
       trustedClientRows: false,
-      serverRebuiltCandidate: true,
+      serverRebuiltCandidate: candidate.sourceKind !== AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
       oldPlanWillBeArchived: true,
       upcomingManualWorkoutsMergeIntoCandidate: false,
     },
     canonicalPlan: exactness.canonicalPlan,
-    profilePatch: buildRunningPlanProfilePatch(preview.draft),
+    profilePatch: buildRunningPlanProfilePatch(draft),
     persistenceMetadata: buildRunningPlanPersistenceMetadata({
-      draft: preview.draft,
+      draft,
       canonicalPlan: exactness.canonicalPlan,
       reviewChecksum: exactness.reviewChecksum,
     }),
     currentPlanContext: context,
     payload,
+  };
+}
+
+async function resolveDeterministicTransitionCandidate(candidate: RunningPlanConfirmActionInput) {
+  const preview = buildRunningPlanPreview(candidate.previewInput);
+  if (!preview.ok) {
+    return {
+      ok: false as const,
+      reason: "preview_unavailable" as const,
+      message: preview.unavailable.error.message,
+    };
+  }
+
+  if (
+    preview.draft.sourceKind !== candidate.sourceKind ||
+    preview.draft.planFamily !== candidate.planFamily
+  ) {
+    return {
+      ok: false as const,
+      reason: "input_mismatch" as const,
+      message:
+        "The selected candidate rebuilt to a different source or family. Refresh the review.",
+    };
+  }
+
+  const exactness = await validateRunningPlanReviewExactness({
+    draft: preview.draft,
+    reviewToken: candidate.reviewToken,
+    reviewChecksum: candidate.reviewChecksum,
+  });
+
+  if (!exactness.ok) {
+    return {
+      ok: false as const,
+      reason: exactness.reason,
+      message: exactness.message,
+    };
+  }
+
+  return {
+    ok: true as const,
+    draft: preview.draft,
+    exactness,
+  };
+}
+
+async function resolveAiGeneratedTransitionCandidate(candidate: RunningPlanConfirmActionInput) {
+  const exactness = await validateSelfContainedRunningPlanReviewToken({
+    reviewToken: candidate.reviewToken,
+    reviewChecksum: candidate.reviewChecksum,
+  });
+
+  if (!exactness.ok) {
+    return {
+      ok: false as const,
+      reason: exactness.reason,
+      message: exactness.message,
+    };
+  }
+
+  if (
+    !isAiGeneratedRunningPlanPreviewDraft(exactness.draft) ||
+    exactness.draft.sourceKind !== candidate.sourceKind ||
+    exactness.draft.planFamily !== candidate.planFamily
+  ) {
+    return {
+      ok: false as const,
+      reason: "input_mismatch" as const,
+      message:
+        "The AI-authored generated-plan candidate no longer matches the selected family or source. Refresh the review.",
+    };
+  }
+
+  if (!sameJson(candidate.previewInput, exactness.draft.previewInput)) {
+    return {
+      ok: false as const,
+      reason: "stale_review" as const,
+      message:
+        "The AI-authored generated-plan setup answers no longer match the reviewed candidate. Refresh the review.",
+    };
+  }
+
+  return {
+    ok: true as const,
+    draft: exactness.draft,
+    exactness,
   };
 }
 
@@ -784,6 +856,10 @@ async function hmacSha256Hex(secret: string, payload: string) {
 
 function stableJsonStringify(value: unknown): string {
   return JSON.stringify(sortJsonValue(value));
+}
+
+function sameJson(left: unknown, right: unknown) {
+  return stableJsonStringify(left) === stableJsonStringify(right);
 }
 
 function sortJsonValue(value: unknown): unknown {

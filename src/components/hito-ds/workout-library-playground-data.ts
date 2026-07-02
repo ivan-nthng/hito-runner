@@ -3,7 +3,13 @@ import type {
   HitoCalendarFeedbackState,
   HitoCalendarWorkoutIdentity,
 } from "@/components/ui/hito-calendar-day";
-import type { CanonicalWorkoutFamily, CanonicalWorkoutIdentity } from "@/lib/rich-workout-model";
+import { buildPlannedWorkoutLanguage } from "@/lib/planned-workout-language";
+import type {
+  CanonicalWorkoutFamily,
+  CanonicalWorkoutIdentity,
+  LegacyWorkoutType,
+} from "@/lib/rich-workout-model";
+import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 
 export type WorkoutLibraryProviderState =
   | "none"
@@ -135,7 +141,7 @@ export const FAMILY_FILTER_OPTIONS: Array<WorkoutLibraryOption<WorkoutLibraryFam
   { value: "recovery", label: "Recovery" },
   { value: "easy", label: "Easy" },
   { value: "steady", label: "Steady" },
-  { value: "long", label: "Long" },
+  { value: "long", label: "Long Run" },
   { value: "tempo", label: "Tempo" },
   { value: "intervals", label: "Intervals" },
   { value: "progression", label: "Progression" },
@@ -206,12 +212,9 @@ function fakeDate(index: number): WorkoutLibrarySpecimen["date"] {
 }
 
 function identity(
-  label: string,
-  short: string,
-  color: string,
   glyph: HitoCalendarWorkoutIdentity["glyph"],
-): HitoCalendarWorkoutIdentity {
-  return { label, short, color, glyph };
+): Pick<HitoCalendarWorkoutIdentity, "glyph"> {
+  return { glyph };
 }
 
 function segment(
@@ -228,7 +231,6 @@ const rows = [
     identity: "rest_and_recovery",
     family: "rest",
     displayLabel: "Rest and recovery",
-    calendarLabel: "Rest",
     detailTitle: "Rest and recovery day",
     purpose: "Show a true no-run day.",
     sequence: "none",
@@ -239,13 +241,12 @@ const rows = [
     resultStates: REST_RESULT_STATES,
     proves: "Rest cells and quiet detail state exist.",
     mustNotImply: "A hidden run, provider compare, or active recovery workout.",
-    workout: identity("Rest and recovery", "Rest", "var(--color-muted-foreground)", "rest"),
+    workout: identity("rest"),
   },
   {
     identity: "recovery_jog",
     family: "recovery",
     displayLabel: "Recovery jog",
-    calendarLabel: "Recovery",
     detailTitle: "Recovery jog",
     purpose: "Very light post-load aerobic reset.",
     sequence: "OP -> MAIN -> CD",
@@ -261,13 +262,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Recovery identity is distinct from easy.",
     mustNotImply: "Hard recovery, fake pace, or personal HR truth.",
-    workout: identity("Recovery jog", "Recovery", "var(--easy)", "recovery"),
+    workout: identity("recovery"),
   },
   {
     identity: "easy_aerobic_run",
     family: "easy",
     displayLabel: "Easy aerobic run",
-    calendarLabel: "Easy",
     detailTitle: "Easy aerobic run",
     purpose: "Conversational aerobic support.",
     sequence: "WU -> MAIN -> CD",
@@ -282,13 +282,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Standard easy-run anatomy and default-HR readback.",
     mustNotImply: "Target-time pace or personalized HR.",
-    workout: identity("Easy aerobic run", "Easy", "var(--easy)", "easy"),
+    workout: identity("easy"),
   },
   {
     identity: "cutback_aerobic_run",
     family: "easy",
     displayLabel: "Cutback aerobic run",
-    calendarLabel: "Cutback",
     detailTitle: "Cutback aerobic run",
     purpose: "Lighter support day in reduced-load week.",
     sequence: "WU -> MAIN -> FIN -> CD",
@@ -304,13 +303,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Cutback easy differs from generic easy.",
     mustNotImply: "Hidden intensity or volume peak.",
-    workout: identity("Cutback aerobic run", "Cutback", "var(--easy)", "easy"),
+    workout: identity("easy"),
   },
   {
     identity: "easy_run_with_strides",
     family: "easy",
     displayLabel: "Easy run with strides",
-    calendarLabel: "Strides",
     detailTitle: "Easy run with strides",
     purpose: "Neuromuscular sharpening without hard quality.",
     sequence: "WU -> SUP -> WORK -> REC -> CD",
@@ -327,13 +325,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Stride anatomy and repeat readback.",
     mustNotImply: "Formal interval session or fake pace target.",
-    workout: identity("Easy run with strides", "Strides", "var(--easy)", "quality"),
+    workout: identity("quality"),
   },
   {
     identity: "steady_aerobic_run",
     family: "steady",
     displayLabel: "Steady aerobic run",
-    calendarLabel: "Steady",
     detailTitle: "Steady aerobic run",
     purpose: "Moderate durable aerobic support.",
     sequence: "WU -> MAIN -> FIN -> CD",
@@ -349,13 +346,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Steady reads differently from easy.",
     mustNotImply: "Race-pace precision or threshold overclaim.",
-    workout: identity("Steady aerobic run", "Steady", "var(--easy)", "steady"),
+    workout: identity("steady"),
   },
   {
     identity: "marathon_steady_specificity",
     family: "steady",
     displayLabel: "Marathon steady",
-    calendarLabel: "Marathon",
     detailTitle: "Marathon steady specificity",
     purpose: "Marathon-specific durability, not tempo.",
     sequence: "WU -> MAIN -> CHK -> FIN -> CD",
@@ -372,13 +368,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Marathon-specific steady identity exists.",
     mustNotImply: "Full-race readiness, tempo hardness, or target-time pace.",
-    workout: identity("Marathon steady", "Marathon", "var(--easy)", "steady"),
+    workout: identity("steady"),
   },
   {
     identity: "long_aerobic_run",
     family: "long",
     displayLabel: "Long aerobic run",
-    calendarLabel: "Long",
     detailTitle: "Long aerobic run",
     purpose: "Core endurance and durability.",
     sequence: "OP -> MAIN -> CHK -> FIN -> CD",
@@ -395,13 +390,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Long run is not an anonymous one-block shell.",
     mustNotImply: "Race effort, hidden fast finish, or fake pace.",
-    workout: identity("Long aerobic run", "Long", "var(--long)", "long"),
+    workout: identity("long"),
   },
   {
     identity: "long_run_with_steady_finish",
     family: "long",
     displayLabel: "Long run with steady finish",
-    calendarLabel: "Long finish",
     detailTitle: "Long run with steady finish",
     purpose: "Long-run specificity with controlled closing segment.",
     sequence: "OP -> MAIN -> CHK -> FIN -> CD",
@@ -419,13 +413,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Distinct long-run finish structure.",
     mustNotImply: "Threshold finish, race simulation, or exact pace.",
-    workout: identity("Long run with steady finish", "Long finish", "var(--long)", "long"),
+    workout: identity("long"),
   },
   {
     identity: "base_endpoint_marker",
     family: "long",
     displayLabel: "Base endpoint",
-    calendarLabel: "Base end",
     detailTitle: "Base endpoint marker",
     purpose: "Honest durability closeout for base block.",
     sequence: "WU -> MAIN -> FIN -> CD",
@@ -441,13 +434,12 @@ const rows = [
     resultStates: ENDPOINT_RESULT_STATES,
     proves: "Base endpoint is visible and distinct.",
     mustNotImply: "Full-marathon readiness or selected-distance race endpoint.",
-    workout: identity("Base endpoint", "Base end", "var(--long)", "long"),
+    workout: identity("long"),
   },
   {
     identity: "cutback_long_run",
     family: "long",
     displayLabel: "Cutback long run",
-    calendarLabel: "Cutback long",
     detailTitle: "Cutback long run",
     purpose: "Lighter long-run week.",
     sequence: "OP -> MAIN -> FIN -> CD",
@@ -463,13 +455,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Cutback long is visibly different from normal long.",
     mustNotImply: "Disguised peak week.",
-    workout: identity("Cutback long run", "Cutback long", "var(--long)", "long"),
+    workout: identity("long"),
   },
   {
     identity: "taper_long_run",
     family: "long",
     displayLabel: "Taper long run",
-    calendarLabel: "Taper long",
     detailTitle: "Taper long run",
     purpose: "Reduced long-run touch during taper.",
     sequence: "OP -> MAIN -> FIN -> CD",
@@ -485,13 +476,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Taper long specimen exists.",
     mustNotImply: "Pre-race overload or peak long run.",
-    workout: identity("Taper long run", "Taper long", "var(--long)", "long"),
+    workout: identity("long"),
   },
   {
     identity: "ultra_time_on_feet_durability",
     family: "long",
     displayLabel: "Ultra durability",
-    calendarLabel: "Ultra TOF",
     detailTitle: "Ultra time-on-feet durability",
     purpose: "Prolonged endurance and fueling discipline.",
     sequence: "OP -> MAIN -> CHK -> FIN -> CD",
@@ -508,13 +498,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Ultra specimen shows time-on-feet identity.",
     mustNotImply: "Exact elevation, pace precision, or race readiness.",
-    workout: identity("Ultra durability", "Ultra TOF", "var(--long)", "long"),
+    workout: identity("long"),
   },
   {
     identity: "controlled_tempo_session",
     family: "tempo",
     displayLabel: "Controlled tempo",
-    calendarLabel: "Tempo",
     detailTitle: "Controlled tempo session",
     purpose: "Sustained controlled quality.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -530,13 +519,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Tempo session anatomy and repeat logic.",
     mustNotImply: "Precise pace prescription or personal HR.",
-    workout: identity("Controlled tempo", "Tempo", "var(--quality)", "tempo"),
+    workout: identity("tempo"),
   },
   {
     identity: "half_marathon_threshold_durability",
     family: "tempo",
     displayLabel: "Half threshold",
-    calendarLabel: "Threshold",
     detailTitle: "Half marathon threshold durability",
     purpose: "Longer sustainable half-specific work.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -552,13 +540,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Half-specific threshold specimen exists.",
     mustNotImply: "Target-time threshold pace or aggressive race simulation.",
-    workout: identity("Half threshold", "Threshold", "var(--quality)", "tempo"),
+    workout: identity("tempo"),
   },
   {
     identity: "half_readiness_marker",
     family: "tempo",
     displayLabel: "Half marker",
-    calendarLabel: "Half marker",
     detailTitle: "Half readiness marker",
     purpose: "Specimen of older half-specific checkpoint style.",
     sequence: "WU -> MAIN -> FIN -> CD",
@@ -579,13 +566,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "A legacy/readiness-style identity can be rendered honestly.",
     mustNotImply: "Exact race readiness, selected-distance endpoint, or pace truth.",
-    workout: identity("Half marker", "Half marker", "var(--quality)", "tempo"),
+    workout: identity("tempo"),
   },
   {
     identity: "distance_intervals",
     family: "intervals",
     displayLabel: "Distance intervals",
-    calendarLabel: "Intervals",
     detailTitle: "Distance intervals",
     purpose: "Repeatable distance-based quality.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -601,13 +587,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Distance-first interval anatomy.",
     mustNotImply: "Fake race pace or official provider-step fidelity.",
-    workout: identity("Distance intervals", "Intervals", "var(--quality)", "intervals"),
+    workout: identity("intervals"),
   },
   {
     identity: "time_intervals",
     family: "intervals",
     displayLabel: "Time intervals",
-    calendarLabel: "Time reps",
     detailTitle: "Time intervals",
     purpose: "Repeatable time-based quality.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -623,13 +608,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Time-first interval anatomy.",
     mustNotImply: "Benchmark-derived pace truth.",
-    workout: identity("Time intervals", "Time reps", "var(--quality)", "intervals"),
+    workout: identity("intervals"),
   },
   {
     identity: "5k_sharpening_repeats",
     family: "intervals",
     displayLabel: "5K sharpening repeats",
-    calendarLabel: "5K reps",
     detailTitle: "5K sharpening repeats",
     purpose: "Short controlled 5K-specific sharpening.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -645,13 +629,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "5K-specific repeat specimen exists.",
     mustNotImply: "Guaranteed race-pace exactness.",
-    workout: identity("5K sharpening repeats", "5K reps", "var(--quality)", "intervals"),
+    workout: identity("intervals"),
   },
   {
     identity: "10k_rhythm_intervals",
     family: "intervals",
     displayLabel: "10K rhythm intervals",
-    calendarLabel: "10K reps",
     detailTitle: "10K rhythm intervals",
     purpose: "Sustained controlled 10K rhythm.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -667,13 +650,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "10K-specific interval specimen exists.",
     mustNotImply: "Target-time 10K pace.",
-    workout: identity("10K rhythm intervals", "10K reps", "var(--quality)", "intervals"),
+    workout: identity("intervals"),
   },
   {
     identity: "quality_session",
     family: "intervals",
     displayLabel: "Quality session",
-    calendarLabel: "Quality",
     detailTitle: "Quality session",
     purpose: "Generic fallback quality specimen.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -694,13 +676,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Fallback quality can still be rich and executable.",
     mustNotImply: "That generic quality is preferable to specific identities.",
-    workout: identity("Quality session", "Quality", "var(--quality)", "quality"),
+    workout: identity("quality"),
   },
   {
     identity: "progression_run",
     family: "progression",
     displayLabel: "Progression run",
-    calendarLabel: "Progression",
     detailTitle: "Progression run",
     purpose: "Gradual rise from easy to moderate.",
     sequence: "WU -> MAIN -> FIN -> CD",
@@ -721,13 +702,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Progression is distinct from tempo and steady.",
     mustNotImply: "Race effort or exact pace ladder.",
-    workout: identity("Progression run", "Progression", "var(--quality)", "progression"),
+    workout: identity("progression"),
   },
   {
     identity: "race_pace_session",
     family: "race",
     displayLabel: "Race pace session",
-    calendarLabel: "Race pace",
     detailTitle: "Race pace session",
     purpose: "Race-rhythm specimen without fake precision.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -748,13 +728,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Race-identity can render without fake pace.",
     mustNotImply: "Exact race pace target or official race readiness.",
-    workout: identity("Race pace session", "Race pace", "var(--quality)", "race"),
+    workout: identity("race"),
   },
   {
     identity: "taper_tuneup_run",
     family: "race",
     displayLabel: "Taper tune-up",
-    calendarLabel: "Tune-up",
     detailTitle: "Taper tuneup run",
     purpose: "Light sharpening during taper.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -770,13 +749,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Tune-up identity exists and stays light.",
     mustNotImply: "Hard interval workout.",
-    workout: identity("Taper tune-up", "Tune-up", "var(--quality)", "race"),
+    workout: identity("race"),
   },
   {
     identity: "tenk_completion_or_checkpoint",
     family: "race",
     displayLabel: "Final 10K day",
-    calendarLabel: "Final 10K",
     detailTitle: "10K completion or checkpoint",
     purpose: "Selected-distance endpoint specimen.",
     sequence: "WU -> END -> FIN -> CD",
@@ -792,13 +770,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Exact 10K endpoint specimen and endpoint anatomy.",
     mustNotImply: "Target-time promise, real race result, or plan mutation.",
-    workout: identity("Final 10K day", "Final 10K", "var(--warn)", "race"),
+    workout: identity("race"),
   },
   {
     identity: "uphill_repeats",
     family: "hills",
     displayLabel: "Uphill repeats",
-    calendarLabel: "Uphill",
     detailTitle: "Uphill repeats",
     purpose: "Repeatable uphill strength.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -814,13 +791,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Uphill repeat anatomy is explicit.",
     mustNotImply: "Exact grade or elevation prescription.",
-    workout: identity("Uphill repeats", "Uphill", "var(--quality)", "hills"),
+    workout: identity("hills"),
   },
   {
     identity: "rolling_hills_session",
     family: "hills",
     displayLabel: "Rolling hills",
-    calendarLabel: "Rolling hills",
     detailTitle: "Rolling hills session",
     purpose: "Hill rhythm on rolling terrain.",
     sequence: "WU -> MAIN -> FIN -> CD",
@@ -836,13 +812,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Rolling-hills identity differs from repeats.",
     mustNotImply: "Mapped route or exact climb profile.",
-    workout: identity("Rolling hills", "Rolling hills", "var(--quality)", "hills"),
+    workout: identity("hills"),
   },
   {
     identity: "controlled_downhill_durability",
     family: "hills",
     displayLabel: "Controlled downhill",
-    calendarLabel: "Downhill",
     detailTitle: "Controlled downhill durability",
     purpose: "Careful downhill skill and durability.",
     sequence: "WU -> WORK -> REC -> CD",
@@ -858,13 +833,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Downhill-specific specimen exists.",
     mustNotImply: "Exact gradient or aggressive downhill racing.",
-    workout: identity("Controlled downhill", "Downhill", "var(--quality)", "hills"),
+    workout: identity("hills"),
   },
   {
     identity: "climbing_steady_run",
     family: "hills",
     displayLabel: "Climbing steady",
-    calendarLabel: "Climbing",
     detailTitle: "Climbing steady run",
     purpose: "Sustained uphill or rolling climb rhythm.",
     sequence: "WU -> MAIN -> FIN -> CD",
@@ -880,13 +854,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Climbing steady is distinct from repeats.",
     mustNotImply: "Exact ascent target or mountain race block.",
-    workout: identity("Climbing steady", "Climbing", "var(--quality)", "hills"),
+    workout: identity("hills"),
   },
   {
     identity: "technical_trail_easy",
     family: "trail",
     displayLabel: "Technical trail easy",
-    calendarLabel: "Trail",
     detailTitle: "Technical trail easy",
     purpose: "Easy terrain-specific movement.",
     sequence: "OP -> MAIN -> CHK -> FIN -> CD",
@@ -903,13 +876,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Trail easy identity exists.",
     mustNotImply: "Exact route, elevation, or mountain race effort.",
-    workout: identity("Technical trail easy", "Trail", "var(--long)", "trail"),
+    workout: identity("trail"),
   },
   {
     identity: "hike_run_endurance",
     family: "trail",
     displayLabel: "Hike-run endurance",
-    calendarLabel: "Hike-run",
     detailTitle: "Hike-run endurance",
     purpose: "Mixed hike/run durability.",
     sequence: "OP -> WORK -> REC -> FIN -> CD",
@@ -926,13 +898,12 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Hike-run identity is explicit.",
     mustNotImply: "Exact elevation gain or real mountain route.",
-    workout: identity("Hike-run endurance", "Hike-run", "var(--long)", "trail"),
+    workout: identity("trail"),
   },
   {
     identity: "mountain_long_run_time_on_feet",
     family: "trail",
     displayLabel: "Mountain long run",
-    calendarLabel: "Mountain long",
     detailTitle: "Mountain long run time on feet",
     purpose: "Long mountain-specific time-on-feet durability.",
     sequence: "OP -> MAIN -> CHK -> FIN -> CD",
@@ -954,15 +925,47 @@ const rows = [
     resultStates: ALL_RESULT_STATES,
     proves: "Mountain long specimen shows long-form trail identity.",
     mustNotImply: "Exact elevation, route match, or race readiness.",
-    workout: identity("Mountain long run", "Mountain long", "var(--long)", "trail"),
+    workout: identity("trail"),
   },
-] as const satisfies readonly Omit<WorkoutLibrarySpecimen, "date">[];
+] as const satisfies readonly (Omit<
+  WorkoutLibrarySpecimen,
+  "calendarLabel" | "date" | "workout"
+> & {
+  workout: Pick<HitoCalendarWorkoutIdentity, "glyph">;
+})[];
 
 export const WORKOUT_LIBRARY_SPECIMENS: readonly WorkoutLibrarySpecimen[] = rows.map(
-  (row, index) => ({
-    ...row,
-    date: fakeDate(index),
-  }),
+  (row, index) => {
+    const language = buildPlannedWorkoutLanguage({
+      workoutType: legacyWorkoutTypeForFamily(row.family),
+      workoutFamily: row.family,
+      workoutIdentity: row.identity,
+      title: row.detailTitle,
+      steps: [],
+    });
+    const runnerFacingLabel = language.runnerFacingWorkoutTypeLabel;
+
+    return {
+      ...row,
+      calendarLabel: runnerFacingLabel,
+      date: fakeDate(index),
+      workout: {
+        ...row.workout,
+        color: workoutTypeColorVar(language.runnerFacingWorkoutType),
+        label: runnerFacingLabel,
+        short: runnerFacingLabel,
+      },
+    };
+  },
 );
 
 export const WORKOUT_LIBRARY_IDENTITY_COUNT = WORKOUT_LIBRARY_SPECIMENS.length;
+
+function legacyWorkoutTypeForFamily(family: CanonicalWorkoutFamily): LegacyWorkoutType {
+  if (family === "rest") return "rest";
+  if (family === "long" || family === "race" || family === "trail") return "long_run";
+  if (family === "easy" || family === "recovery") return "easy";
+  if (family === "steady") return "steady_or_easy";
+
+  return "quality";
+}

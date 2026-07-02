@@ -521,7 +521,7 @@ function StateLabel({
 function stateLabel(state: HitoCalendarDayBaseState, dense: boolean) {
   if (state === "workout") return "Workout";
   if (state === "rest") return "Rest";
-  if (state === "empty") return dense ? "Empty" : "No workout";
+  if (state === "empty") return dense ? "Rest" : "No workout";
   return dense ? "Outside" : "Outside month";
 }
 

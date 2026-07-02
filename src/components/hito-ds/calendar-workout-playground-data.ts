@@ -3,6 +3,7 @@ import type {
   HitoCalendarFeedbackState,
   HitoCalendarWorkoutIdentity,
 } from "@/components/ui/hito-calendar-day";
+import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 
 export type BaseDateState = HitoCalendarDayBaseState;
 export type InteractionOverlay = "none" | "today" | "selected" | "focused";
@@ -15,15 +16,10 @@ export type WorkoutIdentityKey =
   | "steady"
   | "long"
   | "tempo"
-  | "threshold"
   | "intervals"
   | "progression"
-  | "race"
   | "hills"
-  | "trail"
-  | "ultra"
-  | "mountain"
-  | "quality";
+  | "run_walk";
 export type TitleStress = "short" | "normal" | "long" | "extreme";
 export type DensityMode = "normal" | "dense";
 export type FutureActionState = "none" | "add-activity" | "more-menu";
@@ -58,7 +54,7 @@ export const VIEW_MODE_OPTIONS: Array<Option<CalendarPreviewMode>> = [
 export const BASE_STATE_OPTIONS: Array<Option<BaseDateState>> = [
   { value: "workout", label: "Workout" },
   { value: "rest", label: "Rest" },
-  { value: "empty", label: "Empty" },
+  { value: "empty", label: "No workout" },
   { value: "outside-month", label: "Outside month" },
 ];
 
@@ -106,7 +102,7 @@ export const WORKOUT_IDENTITIES: Record<WorkoutIdentityKey, WorkoutIdentity> = {
     short: "Easy",
     family: "easy",
     glyph: "easy",
-    color: "var(--easy)",
+    color: workoutTypeColorVar("easy"),
     defaultTitle: "Easy aerobic run",
   },
   recovery: {
@@ -114,7 +110,7 @@ export const WORKOUT_IDENTITIES: Record<WorkoutIdentityKey, WorkoutIdentity> = {
     short: "Recovery",
     family: "easy",
     glyph: "recovery",
-    color: "var(--easy)",
+    color: workoutTypeColorVar("recovery"),
     defaultTitle: "Recovery jog",
   },
   steady: {
@@ -122,15 +118,15 @@ export const WORKOUT_IDENTITIES: Record<WorkoutIdentityKey, WorkoutIdentity> = {
     short: "Steady",
     family: "easy",
     glyph: "steady",
-    color: "var(--easy)",
+    color: workoutTypeColorVar("steady"),
     defaultTitle: "Steady aerobic run",
   },
   long: {
-    label: "Long",
-    short: "Long",
+    label: "Long Run",
+    short: "Long Run",
     family: "long",
     glyph: "long",
-    color: "var(--long)",
+    color: workoutTypeColorVar("long_run"),
     defaultTitle: "Long run",
   },
   tempo: {
@@ -138,23 +134,15 @@ export const WORKOUT_IDENTITIES: Record<WorkoutIdentityKey, WorkoutIdentity> = {
     short: "Tempo",
     family: "quality",
     glyph: "tempo",
-    color: "var(--quality)",
+    color: workoutTypeColorVar("tempo"),
     defaultTitle: "Controlled tempo session",
-  },
-  threshold: {
-    label: "Threshold",
-    short: "Tempo",
-    family: "quality",
-    glyph: "tempo",
-    color: "var(--quality)",
-    defaultTitle: "Threshold durability",
   },
   intervals: {
     label: "Intervals",
     short: "Intervals",
     family: "quality",
     glyph: "intervals",
-    color: "var(--quality)",
+    color: workoutTypeColorVar("intervals"),
     defaultTitle: "Distance intervals",
   },
   progression: {
@@ -162,56 +150,24 @@ export const WORKOUT_IDENTITIES: Record<WorkoutIdentityKey, WorkoutIdentity> = {
     short: "Progression",
     family: "quality",
     glyph: "progression",
-    color: "var(--quality)",
+    color: workoutTypeColorVar("progression"),
     defaultTitle: "Progression run",
-  },
-  race: {
-    label: "Race",
-    short: "Race",
-    family: "quality",
-    glyph: "race",
-    color: "var(--quality)",
-    defaultTitle: "Tune-up race",
   },
   hills: {
     label: "Hills",
     short: "Hills",
     family: "quality",
     glyph: "hills",
-    color: "var(--quality)",
+    color: workoutTypeColorVar("hills"),
     defaultTitle: "Uphill repeats",
   },
-  trail: {
-    label: "Trail",
-    short: "Trail",
-    family: "long",
-    glyph: "trail",
-    color: "var(--long)",
-    defaultTitle: "Technical trail easy",
-  },
-  ultra: {
-    label: "Ultra",
-    short: "Long",
-    family: "long",
-    glyph: "long",
-    color: "var(--long)",
-    defaultTitle: "Ultra time on feet",
-  },
-  mountain: {
-    label: "Mountain",
-    short: "Trail",
-    family: "long",
-    glyph: "trail",
-    color: "var(--long)",
-    defaultTitle: "Mountain long run",
-  },
-  quality: {
-    label: "Quality",
-    short: "Quality",
-    family: "quality",
-    glyph: "quality",
-    color: "var(--quality)",
-    defaultTitle: "Quality workout",
+  run_walk: {
+    label: "Run/Walk",
+    short: "Run/Walk",
+    family: "easy",
+    glyph: "recovery",
+    color: workoutTypeColorVar("run_walk"),
+    defaultTitle: "Run-walk session",
   },
 };
 
@@ -236,7 +192,7 @@ export const DENSE_GRID_DAYS: Array<Partial<CalendarPlaygroundState> & { day: nu
   { day: 6, baseState: "rest" },
   { day: 7, baseState: "workout", identity: "intervals", feedback: "feedback_ready" },
   { day: 8, baseState: "workout", identity: "hills", result: "skipped" },
-  { day: 9, baseState: "workout", identity: "trail", titleStress: "long" },
+  { day: 9, baseState: "workout", identity: "hills", titleStress: "long" },
 ];
 
 export const DEFAULT_PLAYGROUND_STATE: CalendarPlaygroundState = {

@@ -23,6 +23,10 @@ import {
   resolveRunningPlanHorizonSelection,
   type RunningPlanHorizonSelection,
 } from "@/lib/plan-creation-engine/horizon-policy";
+import {
+  normalizePlanGoalIntent,
+  type PlanGoalIntentInput,
+} from "@/lib/plan-creation-engine/plan-goal-intent";
 import { findForbiddenRunnerFacingLanguageMatches } from "@/lib/plan-creation-engine/forbidden-runner-facing-language";
 import { normalizeRunningPlanBenchmarkPaceTruth } from "@/lib/plan-creation-engine/benchmark-pace-truth";
 import {
@@ -60,6 +64,7 @@ export interface BuildTenKPlanPreviewInput {
   preferredLongRunDay?: WeekdayName | null;
   startDate?: string | null;
   benchmark?: RunningPlanBenchmarkInput | null;
+  planGoalIntent?: PlanGoalIntentInput | null;
 }
 
 export type TenKPlanCalendarWorkoutDayKind = RunningPlanWorkoutDayKind | typeof REST_DAY_KIND;
@@ -151,6 +156,7 @@ export interface TenKPlanBuilderUnavailable {
       | "invalid_runner_basics"
       | "invalid_start_date"
       | "invalid_fixed_rest_day"
+      | "invalid_plan_goal_intent"
       | "long_run_day_blocked"
       | "insufficient_available_days"
       | "builder_validation_failed";
@@ -298,6 +304,22 @@ function normalizeTenKPlanBuilderInput(input: BuildTenKPlanPreviewInput):
   }
   const loadContext = resolveLoadContext(input);
   const benchmarkPaceTruth = normalizeRunningPlanBenchmarkPaceTruth(input.benchmark);
+  const horizonSelection = resolveRunningPlanHorizonSelection({
+    family: "10K",
+    runnerLevel: input.runnerLevel,
+    loadContext,
+    daysPerWeek,
+  });
+  const planGoalIntent = normalizePlanGoalIntent({
+    rawIntent: input.planGoalIntent ?? null,
+    distanceFamily: "10K",
+    startDate,
+    horizonWeeks: horizonSelection.horizonWeeks,
+  });
+
+  if (!planGoalIntent.ok) {
+    return failure(planGoalIntent.reason, planGoalIntent.message);
+  }
 
   return {
     ok: true,
@@ -312,17 +334,13 @@ function normalizeTenKPlanBuilderInput(input: BuildTenKPlanPreviewInput):
       preferredLongRunDay: longRunResolution.longRunDay,
       startDate,
       benchmarkPaceTruth,
+      planGoalIntent: planGoalIntent.intent,
       normalizedBy: TEN_K_PLAN_BUILDER_SOURCE_KIND,
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
       longRunDaySource: longRunResolution.source,
       trainingWeekdays: trainingWeekdays.weekdays,
       loadContext,
-      horizonSelection: resolveRunningPlanHorizonSelection({
-        family: "10K",
-        runnerLevel: input.runnerLevel,
-        loadContext,
-        daysPerWeek,
-      }),
+      horizonSelection,
       beginnerDosePolicy: summarizeTenKBeginnerDosePolicy({
         runnerLevel: input.runnerLevel,
         benchmarkPaceTruth,

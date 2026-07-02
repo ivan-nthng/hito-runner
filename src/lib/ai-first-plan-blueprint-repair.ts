@@ -17,6 +17,8 @@ type SupportedCadenceIdentity =
   | "easy_run_with_strides"
   | "progression_run"
   | "controlled_tempo_session"
+  | "time_intervals"
+  | "distance_intervals"
   | "half_marathon_threshold_durability"
   | "marathon_steady_specificity"
   | "race_pace_session";
@@ -370,6 +372,34 @@ function buildSupportedCadenceBlueprintWorkout({
         estimatedFatigue: "medium",
         recoveryPriority: "medium",
         segmentIntent: "tempo_sustained",
+        metricIntent: defaultHrAllowed ? "mixed_if_allowed" : "effort_only",
+      };
+    case "time_intervals":
+      return {
+        ...workout,
+        workoutFamily: "intervals",
+        workoutIdentity: "time_intervals",
+        calendarIconKey: "intervals",
+        title: "Time intervals",
+        summary: "Controlled timed repeats with easy recoveries and no unsupported pace target.",
+        plannedRpe: Math.min(Math.max(workout.plannedRpe, 6), 7),
+        estimatedFatigue: "medium",
+        recoveryPriority: "medium",
+        segmentIntent: "interval_repeats",
+        metricIntent: defaultHrAllowed ? "mixed_if_allowed" : "effort_only",
+      };
+    case "distance_intervals":
+      return {
+        ...workout,
+        workoutFamily: "intervals",
+        workoutIdentity: "distance_intervals",
+        calendarIconKey: "intervals",
+        title: "Distance intervals",
+        summary: "Controlled distance repeats with easy recoveries and no unsupported pace target.",
+        plannedRpe: Math.min(Math.max(workout.plannedRpe, 6), 7),
+        estimatedFatigue: "medium",
+        recoveryPriority: "medium",
+        segmentIntent: "interval_repeats",
         metricIntent: defaultHrAllowed ? "mixed_if_allowed" : "effort_only",
       };
     case "progression_run":

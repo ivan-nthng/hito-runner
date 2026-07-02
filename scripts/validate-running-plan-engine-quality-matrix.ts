@@ -95,7 +95,7 @@ const fixtures: readonly MatrixFixture[] = [
   fixture("10k_target_time_pressure_diagnostic", "10K", "runs_a_lot", {
     expectedEndpointMeters: 10_000,
     expectedFinalSourceWorkoutType: "final_selected_distance_day",
-    extraInput: { targetTime: "45:00" } as unknown as Partial<RunningPlanPreviewActionInput>,
+    extraInput: { planGoalIntent: { targetFinishTime: "45:00" } },
   }),
   fixture("half_beginner_no_benchmark", "Half Marathon", "beginner_new_runner", {
     expectedEndpointMeters: 21_100,
@@ -114,7 +114,7 @@ const fixtures: readonly MatrixFixture[] = [
   fixture("half_target_time_pressure_diagnostic", "Half Marathon", "runs_a_lot", {
     expectedEndpointMeters: 21_100,
     expectedFinalSourceWorkoutType: "final_selected_distance_day",
-    extraInput: { targetTime: "1:45:00" } as unknown as Partial<RunningPlanPreviewActionInput>,
+    extraInput: { planGoalIntent: { targetFinishTime: "1:45:00" } },
   }),
   fixture("marathon_base_beginner_no_benchmark", "Marathon Base", "beginner_new_runner", {
     expectedEndpointMeters: null,
@@ -138,7 +138,7 @@ const fixtures: readonly MatrixFixture[] = [
   fixture("marathon_base_target_time_pressure_diagnostic", "Marathon Base", "runs_a_lot", {
     expectedEndpointMeters: null,
     expectedFinalSourceWorkoutType: "marathon_base_endpoint",
-    extraInput: { targetTime: "3:30:00" } as unknown as Partial<RunningPlanPreviewActionInput>,
+    extraInput: { planGoalIntent: { targetFinishTime: "3:30:00" } },
   }),
   fixture(
     "marathon_completion_beginner_no_benchmark",
@@ -171,7 +171,7 @@ const fixtures: readonly MatrixFixture[] = [
     {
       expectedEndpointMeters: 42_195,
       expectedFinalSourceWorkoutType: "final_selected_distance_day",
-      extraInput: { targetTime: "3:45:00" } as unknown as Partial<RunningPlanPreviewActionInput>,
+      extraInput: { planGoalIntent: { targetFinishTime: "3:45:00" } },
     },
   ),
 ] as const;
@@ -269,6 +269,7 @@ function validateFixture(
   validateMetricTruth(currentFixture, draft, canonicalPlan);
   validateLongRunShape(currentFixture, canonicalPlan);
   validateEarlyHardWorkGate(currentFixture, canonicalPlan);
+  validateChildFirstRepeatContract(currentFixture, canonicalPlan);
 
   if (currentFixture.lowSupportTenK) {
     const doseIssues = collectTenKBeginnerDosePolicyIssues({
@@ -286,6 +287,70 @@ function validateFixture(
       })),
     });
     assert.deepEqual(doseIssues, [], `${currentFixture.id} must satisfy low-support 10K dose.`);
+  }
+}
+
+function validateChildFirstRepeatContract(
+  currentFixture: MatrixFixture,
+  canonicalPlan: CanonicalPlan,
+) {
+  const repeatSegments = canonicalPlan.planned_workouts.flatMap((row) =>
+    row.segments
+      .filter((segment) => segment.prescription?.mode === "repeats")
+      .map((segment) => ({ row, segment })),
+  );
+  const serialized = JSON.stringify(repeatSegments);
+
+  assert.doesNotMatch(
+    serialized,
+    /"work"\s*:|"recovery"\s*:/,
+    `${currentFixture.id} generated repeat output must not serialize pair-shaped repeat work/recovery fields.`,
+  );
+
+  for (const { row, segment } of repeatSegments) {
+    assert.equal(
+      segment.target,
+      undefined,
+      `${currentFixture.id}.${row.workout_id}.${segment.segment_id} Repeat set parent must not carry a target.`,
+    );
+    assert.ok(
+      segment.prescription?.children?.length,
+      `${currentFixture.id}.${row.workout_id}.${segment.segment_id} must emit repeat children[].`,
+    );
+    assert.deepEqual(
+      segment.prescription?.children?.map((child, index) => child.sequence ?? index + 1),
+      segment.prescription?.children?.map((_, index) => index + 1),
+      `${currentFixture.id}.${row.workout_id}.${segment.segment_id} repeat children must preserve ordered sequence.`,
+    );
+  }
+
+  if (
+    currentFixture.id === "half_beginner_no_benchmark" ||
+    currentFixture.id === "marathon_completion_beginner_no_benchmark"
+  ) {
+    assert.ok(
+      repeatSegments.some(({ segment }) => childRoles(segment).join(">") === "run>walk"),
+      `${currentFixture.id} must express beginner adaptation as Run/Walk repeat children.`,
+    );
+  }
+
+  if (currentFixture.input.distanceFamily === "Marathon Base") {
+    const hillRepeat = repeatSegments.find(({ row }) => row.source_workout_type === "hills");
+    if (hillRepeat) {
+      assert.ok(
+        childRoles(hillRepeat.segment).includes("walk"),
+        `${currentFixture.id} hills must use a child-first walk/downhill recovery block.`,
+      );
+    }
+  }
+
+  const thresholdRepeat = repeatSegments.find(({ row }) => row.source_workout_type === "threshold");
+  if (thresholdRepeat) {
+    assert.deepEqual(
+      childRoles(thresholdRepeat.segment),
+      ["run", "work", "recover"],
+      `${currentFixture.id} threshold repeats must prove arbitrary ordered children beyond Work/Recover pairs.`,
+    );
   }
 }
 
@@ -430,6 +495,14 @@ function rowHasPaceTargets(row: CanonicalWorkout) {
   return JSON.stringify(row.segments).includes("pace_min_per_km_range");
 }
 
+function childRoles(segment: CanonicalWorkout["segments"][number]) {
+  if (segment.prescription?.mode !== "repeats") {
+    return [];
+  }
+
+  return (segment.prescription.children ?? []).map((child) => child.role);
+}
+
 function rowDurationMinutes(row: CanonicalWorkout) {
   return row.segments.reduce((total, segment) => {
     const prescription = segment.prescription;
@@ -443,16 +516,13 @@ function rowDurationMinutes(row: CanonicalWorkout) {
 
     if (prescription.mode === "repeats") {
       const repeatCount = prescription.repeat_count ?? 0;
-      const workMinutes =
-        prescription.repeat_unit?.mode === "time"
-          ? (prescription.repeat_unit.duration_min ?? 0)
-          : 0;
-      const recoveryMinutes =
-        prescription.recovery_unit?.mode === "time"
-          ? (prescription.recovery_unit.duration_min ?? 0)
-          : 0;
+      const repeatMinutes = (prescription.children ?? []).reduce(
+        (total, child) =>
+          total + (child.prescription.mode === "time" ? (child.prescription.duration_min ?? 0) : 0),
+        0,
+      );
 
-      return total + repeatCount * (workMinutes + recoveryMinutes);
+      return total + repeatCount * repeatMinutes;
     }
 
     return total;

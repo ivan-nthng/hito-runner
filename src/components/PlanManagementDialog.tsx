@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  CLEAR_UPCOMING_CONFIRMATION_COPY,
   PlanLifecycleControls,
   type PlanLifecycleClearStatus,
 } from "@/components/plan-management/PlanLifecycleControls";
@@ -89,6 +90,17 @@ export function PlanManagementDialog({
   const scheduleSummary = deriveScheduleEditSummary(snapshot, initialScheduleDefaults);
   const dialogTitle = getDialogTitle(mode);
   const dialogDescription = getDialogDescription(mode);
+  const isClearUpcomingMode = mode === "clear-upcoming";
+  const dialogContentClassName = isClearUpcomingMode
+    ? "hito-dialog-stable hito-product-dialog hito-product-dialog-content-fit hito-dialog-surface-product hito-dialog-size-standard"
+    : "hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-wide hito-dialog-height-workflow";
+  const dialogBodyClassName = isClearUpcomingMode
+    ? "hito-product-dialog-body"
+    : "hito-product-dialog-body-scroll-fill";
+  const dialogBodyInnerClassName = isClearUpcomingMode ? "grid gap-4" : "grid gap-6";
+  const dialogFooterClassName = isClearUpcomingMode
+    ? "hito-product-dialog-footer hito-product-dialog-footer-split sm:space-x-0"
+    : "hito-product-dialog-footer sm:space-x-0";
 
   useEffect(() => {
     if (!open) {
@@ -265,15 +277,17 @@ export function PlanManagementDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         overlayClassName="hito-dialog-overlay-stable"
-        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-wide hito-dialog-height-workflow"
+        className={dialogContentClassName}
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">{dialogTitle}</DialogTitle>
-          <DialogDescription className="hito-body max-w-lg">{dialogDescription}</DialogDescription>
+          <DialogDescription className={isClearUpcomingMode ? "sr-only" : "hito-body max-w-lg"}>
+            {isClearUpcomingMode ? CLEAR_UPCOMING_CONFIRMATION_COPY : dialogDescription}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="hito-product-dialog-body-scroll-fill">
-          <div className="grid gap-6">
+        <div className={dialogBodyClassName}>
+          <div className={dialogBodyInnerClassName}>
             <PlanSummaryHeader
               planMeta={planMeta}
               goalFallback={snapshot?.profile?.goalLabel}
@@ -315,22 +329,16 @@ export function PlanManagementDialog({
 
             {mode === "clear-upcoming" ? (
               <PlanLifecycleControls
-                planAvailable={Boolean(planMeta)}
                 isBusy={isBusy}
-                clearStatus={clearStatus}
                 clearError={clearError}
                 clearConfirmed={clearConfirmed}
-                clearDefaultOpen={mode === "clear-upcoming"}
                 onClearConfirmedChange={setClearConfirmed}
-                onClearUpcomingSchedule={() => {
-                  void submitClearUpcomingSchedule();
-                }}
               />
             ) : null}
           </div>
         </div>
 
-        <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
+        <DialogFooter className={dialogFooterClassName}>
           <button
             type="button"
             onClick={() => onOpenChange(false)}
@@ -338,6 +346,19 @@ export function PlanManagementDialog({
           >
             Close
           </button>
+          {isClearUpcomingMode ? (
+            <button
+              type="button"
+              disabled={isBusy || !planMeta || !clearConfirmed}
+              onClick={() => {
+                void submitClearUpcomingSchedule();
+              }}
+              className="hito-button hito-button-primary hito-button-md"
+              data-tone="error"
+            >
+              {clearStatus === "clearing" ? "Clearing..." : "Clear"}
+            </button>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -256,16 +256,26 @@ const stridesTemplate: RunningPlanWorkoutDayTemplate = {
       primaryPrescription: {
         mode: "repeat",
         repeatCount: { min: 4, max: 8 },
-        work: {
-          mode: "time",
-          durationSeconds: { min: 20, max: 20 },
-          intensityLabel: "quick_relaxed_stride",
-        },
-        recovery: {
-          mode: "recovery_time",
-          recoveryDurationSeconds: { min: 60, max: 60 },
-          intensityLabel: "easy_jog",
-        },
+        children: [
+          {
+            role: "work",
+            label: "Stride",
+            prescription: {
+              mode: "time",
+              durationSeconds: { min: 20, max: 20 },
+            },
+            intensityLabel: "quick_relaxed_stride",
+          },
+          {
+            role: "recover",
+            label: "Easy jog",
+            prescription: {
+              mode: "time",
+              durationSeconds: { min: 60, max: 60 },
+            },
+            intensityLabel: "easy_jog",
+          },
+        ],
       },
       targetTruthMode: "structure_only",
       secondaryCue: "Quick feet, relaxed body; reset fully after each stride.",
@@ -423,16 +433,26 @@ const tempoTemplate: RunningPlanWorkoutDayTemplate = {
       primaryPrescription: {
         mode: "repeat",
         repeatCount: { min: 2, max: 3 },
-        work: {
-          mode: "time",
-          durationSeconds: seconds(8, 12),
-          intensityLabel: "controlled_tempo",
-        },
-        recovery: {
-          mode: "recovery_time",
-          recoveryDurationSeconds: seconds(2, 3),
-          intensityLabel: "easy_jog",
-        },
+        children: [
+          {
+            role: "work",
+            label: "Tempo block",
+            prescription: {
+              mode: "time",
+              durationSeconds: seconds(8, 12),
+            },
+            intensityLabel: "controlled_tempo",
+          },
+          {
+            role: "recover",
+            label: "Easy jog",
+            prescription: {
+              mode: "time",
+              durationSeconds: seconds(2, 3),
+            },
+            intensityLabel: "easy_jog",
+          },
+        ],
       },
       targetTruthMode: "structure_only",
       secondaryCue: "Strong and smooth; recover enough to repeat cleanly.",
@@ -480,16 +500,35 @@ const thresholdTemplate: RunningPlanWorkoutDayTemplate = {
       primaryPrescription: {
         mode: "repeat",
         repeatCount: { min: 3, max: 3 },
-        work: {
-          mode: "time",
-          durationSeconds: seconds(8, 10),
-          intensityLabel: "threshold_like_controlled",
-        },
-        recovery: {
-          mode: "recovery_time",
-          recoveryDurationSeconds: seconds(3),
-          intensityLabel: "easy_jog",
-        },
+        children: [
+          {
+            role: "run",
+            label: "Settle",
+            prescription: {
+              mode: "time",
+              durationSeconds: seconds(3),
+            },
+            intensityLabel: "steady_settle",
+          },
+          {
+            role: "work",
+            label: "Threshold block",
+            prescription: {
+              mode: "time",
+              durationSeconds: seconds(6, 8),
+            },
+            intensityLabel: "threshold_like_controlled",
+          },
+          {
+            role: "recover",
+            label: "Easy jog",
+            prescription: {
+              mode: "time",
+              durationSeconds: seconds(3),
+            },
+            intensityLabel: "easy_jog",
+          },
+        ],
       },
       targetTruthMode: "structure_only",
       secondaryCue: "Strong but controlled; fully reset.",
@@ -537,16 +576,26 @@ const intervalsTemplate: RunningPlanWorkoutDayTemplate = {
       primaryPrescription: {
         mode: "repeat",
         repeatCount: { min: 4, max: 6 },
-        work: {
-          mode: "distance",
-          distanceMeters: meters(400, 1000),
-          intensityLabel: "controlled_repeat",
-        },
-        recovery: {
-          mode: "recovery_distance",
-          recoveryDistanceMeters: meters(200, 200),
-          intensityLabel: "easy_jog",
-        },
+        children: [
+          {
+            role: "work",
+            label: "Controlled repeat",
+            prescription: {
+              mode: "distance",
+              distanceMeters: meters(400, 1000),
+            },
+            intensityLabel: "controlled_repeat",
+          },
+          {
+            role: "recover",
+            label: "Easy jog",
+            prescription: {
+              mode: "distance",
+              distanceMeters: meters(200, 200),
+            },
+            intensityLabel: "easy_jog",
+          },
+        ],
       },
       targetTruthMode: "structure_only",
       secondaryCue: "Repeat the same controlled rhythm.",
@@ -594,16 +643,26 @@ const hillsTemplate: RunningPlanWorkoutDayTemplate = {
       primaryPrescription: {
         mode: "repeat",
         repeatCount: { min: 6, max: 10 },
-        work: {
-          mode: "time",
-          durationSeconds: { min: 45, max: 45 },
-          intensityLabel: "uphill_controlled",
-        },
-        recovery: {
-          mode: "recovery_time",
-          recoveryDurationSeconds: { min: 75, max: 90 },
-          intensityLabel: "walk_or_jog_down",
-        },
+        children: [
+          {
+            role: "work",
+            label: "Uphill",
+            prescription: {
+              mode: "time",
+              durationSeconds: { min: 45, max: 45 },
+            },
+            intensityLabel: "uphill_controlled",
+          },
+          {
+            role: "walk",
+            label: "Walk or jog down",
+            prescription: {
+              mode: "time",
+              durationSeconds: { min: 75, max: 90 },
+            },
+            intensityLabel: "walk_or_jog_down",
+          },
+        ],
       },
       targetTruthMode: "structure_only",
       secondaryCue: "Strong push, relaxed upper body; control the descent.",

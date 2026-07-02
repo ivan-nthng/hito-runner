@@ -1,16 +1,32 @@
 import {
   isRecent5kPaceInAcceptedRange,
   isRecent5kTimeInAcceptedRange,
+  type PlanGoalChoice,
   type StructuredConstructorState,
 } from "@/components/onboarding/onboarding-form-model";
-import type { PlanPresetCardId, PlanPresetCardRequestInput } from "@/lib/plan-presets/schema";
-import type { RunningPlanDistanceFamily, RunningPlanRunnerLevel } from "@/lib/plan-creation-engine";
+import { isRealIsoDate, parseDurationSeconds } from "@/lib/first-plan-authoring-utils";
+import type { PlanPresetCardRequestInput } from "@/lib/plan-presets/schema";
+import type {
+  PlanGoalIntentInput,
+  RunningPlanDistanceFamily,
+  RunningPlanRunnerLevel,
+} from "@/lib/plan-creation-engine";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type {
   RunningPlanConfirmActionInput,
   RunningPlanPreviewActionInput,
   RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";
+
+export type PlanGoalIntentDraftState = Pick<
+  StructuredConstructorState,
+  | "planGoalChoice"
+  | "planGoalCustomDistanceKm"
+  | "planGoalCustomDistanceLabel"
+  | "planGoalFinishTime"
+  | "planGoalTargetDate"
+>;
+export type PlanGoalSelectionId = Exclude<PlanGoalChoice, "">;
 
 export function buildPlanPresetCardInput(
   state: StructuredConstructorState,
@@ -72,7 +88,7 @@ export function buildPlanPresetCardInputKey(input: PlanPresetCardRequestInput) {
 
 export function buildRunningPlanPreviewInput(
   state: StructuredConstructorState,
-  cardId: PlanPresetCardId,
+  goalSelection: PlanGoalSelectionId,
 ): { ok: true; input: RunningPlanPreviewActionInput } | { ok: false; error: string } {
   const age = requiredNumber(state.age, {
     label: "Age",
@@ -113,6 +129,18 @@ export function buildRunningPlanPreviewInput(
     return { ok: false, error: benchmark.error };
   }
 
+  const goalGate = resolveSelectedPlanGoalPreviewGate(state, goalSelection);
+
+  if (!goalGate.ok) {
+    return { ok: false, error: goalGate.error };
+  }
+
+  const planGoalIntent = buildSelectedPlanGoalIntentInput(state, goalSelection);
+
+  if (!planGoalIntent.ok) {
+    return { ok: false, error: planGoalIntent.error };
+  }
+
   return {
     ok: true,
     input: {
@@ -120,14 +148,138 @@ export function buildRunningPlanPreviewInput(
       heightCm: heightCm.value,
       weightKg: weightKg.value,
       runnerLevel: mapRunnerLevelToPlanEngine(state.fitnessLevel),
-      distanceFamily: distanceFamilyForPresetCard(cardId),
+      distanceFamily: distanceFamilyForGoalSelection(state, goalSelection),
       daysPerWeek,
       fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
       preferredLongRunDay: state.preferredLongRunDay || null,
       startDate: state.startDate.trim() || null,
       benchmark: benchmark.input,
+      planGoalIntent: planGoalIntent.input,
     },
   };
+}
+
+export type SelectedPlanGoalPreviewGate =
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      field: "goal" | "customDistance" | "finishTime" | "targetDate";
+    };
+
+export function resolveSelectedPlanGoalPreviewGate(
+  state: PlanGoalIntentDraftState,
+  goalSelection: PlanGoalSelectionId | null,
+): SelectedPlanGoalPreviewGate {
+  const goalChoice = state.planGoalChoice;
+
+  if (!goalChoice) {
+    return {
+      ok: false,
+      field: "goal",
+      error: "Choose what you are training for before previewing.",
+    };
+  }
+
+  if (goalChoice === "custom") {
+    const customDistance = parsePlanGoalCustomDistanceKm(state.planGoalCustomDistanceKm);
+
+    if (customDistance == null) {
+      return {
+        ok: false,
+        field: "customDistance",
+        error: "Enter a distance greater than 0 and up to 500 km.",
+      };
+    }
+  }
+
+  if (goalSelection && goalChoice !== goalSelection) {
+    return {
+      ok: false,
+      field: "goal",
+      error: `Choose ${planGoalChoiceLabel(goalChoice)} before previewing this goal.`,
+    };
+  }
+
+  const targetFinishTime = state.planGoalFinishTime.trim();
+
+  if (targetFinishTime) {
+    const seconds = parseDurationSeconds(targetFinishTime);
+
+    if (seconds == null || seconds < 5 * 60 || seconds > 48 * 60 * 60) {
+      return {
+        ok: false,
+        field: "finishTime",
+        error: "Finish time should be between 5 minutes and 48 hours.",
+      };
+    }
+  }
+
+  const targetDate = state.planGoalTargetDate.trim();
+
+  if (targetDate && !isRealIsoDate(targetDate)) {
+    return {
+      ok: false,
+      field: "targetDate",
+      error: "Use a real date.",
+    };
+  }
+
+  return { ok: true };
+}
+
+export function planGoalChoiceLabel(choice: Exclude<PlanGoalChoice, "">) {
+  switch (choice) {
+    case "10k":
+      return "10K";
+    case "half_marathon":
+      return "Half Marathon";
+    case "marathon":
+      return "Marathon";
+    case "custom":
+      return "Custom";
+  }
+}
+
+export function derivePlanGoalPaceReadback(state: PlanGoalIntentDraftState) {
+  const finishSeconds = parseValidatedPlanGoalFinishTimeSeconds(state.planGoalFinishTime);
+
+  if (finishSeconds == null) {
+    return null;
+  }
+
+  const distanceKm = planGoalDistanceKmForChoice(state);
+
+  if (distanceKm == null) {
+    return null;
+  }
+
+  return formatPaceSecondsPerKm(Math.round(finishSeconds / distanceKm));
+}
+
+export function planGoalDistanceKmForChoice(state: PlanGoalIntentDraftState) {
+  switch (state.planGoalChoice) {
+    case "10k":
+      return 10;
+    case "half_marathon":
+      return 21.1;
+    case "marathon":
+      return 42.195;
+    case "custom":
+      return parsePlanGoalCustomDistanceKm(state.planGoalCustomDistanceKm);
+    case "":
+      return null;
+  }
+}
+
+export function parsePlanGoalCustomDistanceKm(value: string) {
+  const distanceKm = Number(value.trim().replace(",", "."));
+
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0 || distanceKm > 500) {
+    return null;
+  }
+
+  return distanceKm;
 }
 
 export function buildRunningPlanConfirmInput(
@@ -175,7 +327,7 @@ function buildRunningPlanBenchmarkInput(state: StructuredConstructorState):
   const hasRecent5kPace = recent5kPace.length > 0;
 
   if (hasRecent5kTime && !isRecent5kTimeInAcceptedRange(recent5kTime)) {
-    return { ok: false, error: "Use a recent 5K time between 18:00 and 55:00." };
+    return { ok: false, error: "Use a recent 5K time between 10:00 and 2:00:00." };
   }
 
   if (hasRecent5kPace && !isRecent5kPaceInAcceptedRange(recent5kPace)) {
@@ -210,15 +362,122 @@ function buildRunningPlanBenchmarkInput(state: StructuredConstructorState):
   };
 }
 
-function distanceFamilyForPresetCard(cardId: PlanPresetCardId): RunningPlanDistanceFamily {
-  switch (cardId) {
+function distanceFamilyForGoalSelection(
+  state: StructuredConstructorState,
+  goalSelection: PlanGoalSelectionId,
+): RunningPlanDistanceFamily {
+  switch (goalSelection) {
     case "10k":
       return "10K";
     case "half_marathon":
       return "Half Marathon";
     case "marathon":
-      return "Marathon Base";
+      return "Marathon Completion";
+    case "custom": {
+      const distanceKm = parsePlanGoalCustomDistanceKm(state.planGoalCustomDistanceKm);
+
+      if (distanceKm == null || distanceKm <= 10) {
+        return "10K";
+      }
+
+      if (distanceKm <= 21.1) {
+        return "Half Marathon";
+      }
+
+      return "Marathon Completion";
+    }
   }
+}
+
+function buildSelectedPlanGoalIntentInput(
+  state: StructuredConstructorState,
+  goalSelection: PlanGoalSelectionId,
+): { ok: true; input: PlanGoalIntentInput } | { ok: false; error: string } {
+  const targetFinishTime = state.planGoalFinishTime.trim();
+  const targetDate = state.planGoalTargetDate.trim();
+  const distance = selectedPlanGoalDistanceInput(state, goalSelection);
+
+  if (!distance.ok) {
+    return distance;
+  }
+
+  return {
+    ok: true,
+    input: {
+      distance: distance.input,
+      targetFinishTime: targetFinishTime || null,
+      targetDate: targetDate || null,
+    },
+  };
+}
+
+function selectedPlanGoalDistanceInput(
+  state: StructuredConstructorState,
+  goalSelection: PlanGoalSelectionId,
+): { ok: true; input: PlanGoalIntentInput["distance"] } | { ok: false; error: string } {
+  if (goalSelection !== "custom") {
+    return {
+      ok: true,
+      input: {
+        kind: "preset",
+        preset: planGoalPresetForSelection(goalSelection),
+      },
+    };
+  }
+
+  const distanceKm = parsePlanGoalCustomDistanceKm(state.planGoalCustomDistanceKm);
+
+  if (distanceKm == null) {
+    return {
+      ok: false,
+      error: "Enter a distance greater than 0 and up to 500 km.",
+    };
+  }
+
+  return {
+    ok: true,
+    input: {
+      kind: "custom",
+      distanceKm,
+      label: state.planGoalCustomDistanceLabel.trim() || null,
+    },
+  };
+}
+
+function planGoalPresetForSelection(
+  goalSelection: Exclude<PlanGoalSelectionId, "custom">,
+): "10K" | "Half Marathon" | "Marathon" {
+  switch (goalSelection) {
+    case "10k":
+      return "10K";
+    case "half_marathon":
+      return "Half Marathon";
+    case "marathon":
+      return "Marathon";
+  }
+}
+
+function parseValidatedPlanGoalFinishTimeSeconds(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const seconds = parseDurationSeconds(trimmed);
+
+  if (seconds == null || seconds < 5 * 60 || seconds > 48 * 60 * 60) {
+    return null;
+  }
+
+  return seconds;
+}
+
+function formatPaceSecondsPerKm(secondsPerKm: number) {
+  const minutes = Math.floor(secondsPerKm / 60);
+  const seconds = secondsPerKm % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}/km`;
 }
 
 function mapRunnerLevelToPlanEngine(level: RunnerFitnessLevel): RunningPlanRunnerLevel {

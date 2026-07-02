@@ -75,9 +75,14 @@ export const forbiddenOutputGates: RunningPlanEngineSourceModel["forbiddenOutput
     failureAction: "reject_before_review",
   },
   {
-    gateId: "no_target_time_normal_path",
-    description: "Target-time plans are Advanced/custom until a separate approved path exists.",
-    rejectedSignals: ["targetTime normal path", "target time unlocks pace"],
+    gateId: "no_goal_intent_as_executable_target",
+    description:
+      "Plan goal intent may carry target date, finish time, or outcome pace, but it must not become executable workout pace or HR target truth.",
+    rejectedSignals: [
+      "target time unlocks pace",
+      "outcome pace copied to segments",
+      "goal intent creates HR targets",
+    ],
     failureAction: "route_to_custom",
   },
 ] as const;

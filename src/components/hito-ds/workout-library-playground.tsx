@@ -341,7 +341,7 @@ function SelectableWorkoutRow({
         result={visual.result}
         selected={selected}
         state={visual.baseState}
-        supportingText={specimen.identity}
+        supportingText={`Internal: ${specimen.identity}`}
         title={specimen.detailTitle}
         workout={specimen.workout}
       />
@@ -369,7 +369,7 @@ function WorkoutDetailSpecimen({
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-hairline pb-4">
         <div className="min-w-0">
           <p className="hito-label">
-            {specimen.family} / {specimen.identity}
+            Internal: {specimen.family} / {specimen.identity}
           </p>
           <h3 className="hito-section-title mt-1">{specimen.detailTitle}</h3>
           <p className="hito-support-copy mt-2">{specimen.purpose}</p>

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database";
 
-export type CapabilityKey = "ai_plan_update" | "voice_to_plan" | "garmin_ai_interpretation";
+export type CapabilityKey = "ai_plan_update" | "garmin_ai_interpretation";
 
 export type RunnerTier = "basic" | "pro";
 

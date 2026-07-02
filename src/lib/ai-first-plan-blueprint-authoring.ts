@@ -21,6 +21,7 @@ import {
   buildNormalizationContext,
   failedAiBlueprintNormalization,
   resolveBlueprintWorkoutDate,
+  type AiFirstPlanBlueprintNormalizationOptions,
   validateBlueprintShell,
   validateNormalizedPlanDoctrine,
 } from "@/lib/ai-first-plan-blueprint-validation";
@@ -48,10 +49,14 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   blueprint,
   authoringInput,
   deterministicSupportAuthoringInput,
+  normalizationOptions = {},
+  useDeterministicSupport = false,
 }: {
   blueprint: unknown;
   authoringInput: StructuredAuthoringInput;
   deterministicSupportAuthoringInput?: StructuredAuthoringInput;
+  normalizationOptions?: AiFirstPlanBlueprintNormalizationOptions;
+  useDeterministicSupport?: boolean;
 }): AiFirstPlanBlueprintNormalizationResult {
   const parsedBlueprint = aiFirstPlanBlueprintSchema.safeParse(blueprint);
 
@@ -74,11 +79,12 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
         fallbackReason: "ai_first_plan_blueprint_schema_invalid",
         issues,
         repairs: [],
+        normalizationOptions,
       }),
     );
   }
 
-  const context = buildNormalizationContext(authoringInput);
+  const context = buildNormalizationContext(authoringInput, normalizationOptions);
   const issues: NormalizationIssue[] = [];
   const repairs: string[] = [];
 
@@ -99,17 +105,19 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
         fallbackReason: reason,
         issues,
         repairs,
+        normalizationOptions,
       }),
     );
   }
 
-  const deterministicPlan = buildStructuredAuthoringPlan(
-    deterministicSupportAuthoringInput ?? authoringInput,
-  );
+  const deterministicPlan = useDeterministicSupport
+    ? buildStructuredAuthoringPlan(deterministicSupportAuthoringInput ?? authoringInput)
+    : null;
   const deterministicByDate = new Map(
-    deterministicPlan.planned_workouts.map((workout) => [workout.date, workout]),
+    deterministicPlan?.planned_workouts.map((workout) => [workout.date, workout]) ?? [],
   );
-  const adaptationHorizonWeeks = deterministicPlan.preparation_horizon_weeks;
+  const adaptationHorizonWeeks =
+    deterministicPlan?.preparation_horizon_weeks ?? context.expectedHorizonWeeks;
   const blueprintWorkouts = new Map<
     string,
     { week: AiBlueprintWeek; workout: AiBlueprintWorkout }
@@ -196,6 +204,7 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
         fallbackReason: "ai_first_plan_blueprint_validation_failed",
         issues,
         repairs,
+        normalizationOptions,
       }),
     );
   }
@@ -227,9 +236,22 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
         fallbackReason: "ai_first_plan_blueprint_training_plan_v2_invalid",
         issues,
         repairs,
+        normalizationOptions,
       }),
     );
   }
+
+  const blueprintTrace = buildAiFirstPlanBlueprintTrace({
+    authoringInput,
+    blueprint: parsedBlueprint.data,
+    normalizedWorkouts: parsedPlan.data.planned_workouts,
+    sourceStatus: repairs.length > 0 ? "repaired_ai_draft" : "ai_authored",
+    sourceKind: parsedPlan.data.source_kind ?? "ai_first_plan_blueprint_v1",
+    fallbackReason: null,
+    issues: [],
+    repairs,
+    normalizationOptions,
+  });
 
   return {
     ok: true,
@@ -241,16 +263,8 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
       repairs,
       reviewAssumptions: parsedBlueprint.data.reviewAssumptions,
       metricPolicySummary: parsedBlueprint.data.metricPolicySummary,
-      blueprintTrace: buildAiFirstPlanBlueprintTrace({
-        authoringInput,
-        blueprint: parsedBlueprint.data,
-        normalizedWorkouts: parsedPlan.data.planned_workouts,
-        sourceStatus: repairs.length > 0 ? "repaired_ai_draft" : "ai_authored",
-        sourceKind: parsedPlan.data.source_kind ?? "ai_first_plan_blueprint_v1",
-        fallbackReason: null,
-        issues: [],
-        repairs,
-      }),
+      blueprintTrace,
+      datePlacement: blueprintTrace.datePlacement,
     },
   };
 }

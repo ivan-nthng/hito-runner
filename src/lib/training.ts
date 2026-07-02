@@ -1,10 +1,20 @@
-import planJson from "@/data/training-plan.json";
+import { signedOutPreviewPlanSeed } from "@/data/signed-out-preview-plan";
 import type { ActivePlanWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
 import type { BodyNote } from "@/lib/body-notes";
 import {
+  buildPlannedWorkoutLanguage,
+  type PlannedWorkoutLanguageBlock,
+  type PlannedWorkoutLanguageReadModel,
+  type RunnerFacingWorkoutType,
+} from "@/lib/planned-workout-language";
+import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
+import {
+  workoutSectionColorVar,
+  workoutTypeColorVar,
+  type WorkoutSectionColorRole,
+} from "@/lib/workout-color-tokens";
+import {
   normalizeCanonicalGoalContext,
-  normalizeCalendarIconKey,
-  normalizeWorkoutFamily,
   resolveCanonicalWorkoutModel,
   type CalendarIconKey,
   type CanonicalGoalContext,
@@ -22,13 +32,20 @@ export type TrainingMode = "preview" | "onboarding" | "authenticated";
 export type WorkoutOutcome = Extract<Status, "completed" | "partial" | "skipped">;
 
 export interface StepTarget {
+  target_source?: string;
   intensity?: string;
   hr_bpm_range?: string;
   hr_bpm?: string;
+  hr_bpm_cap?: number;
+  hr_bpm_min?: number;
+  hr_bpm_max?: number;
   hr_target_source?: string;
   label?: string;
   source_note?: string;
   pace_min_per_km_range?: string;
+  pace_seconds_per_km?: number;
+  pace_min_seconds_per_km?: number;
+  pace_max_seconds_per_km?: number;
   pace_range_min_km?: string;
   pace?: string;
   rpe?: string | number;
@@ -38,7 +55,7 @@ export interface StepTarget {
   extra?: Record<string, string | number>;
 }
 
-export type SegmentTone = "warmup" | "prep" | "work" | "recovery" | "cooldown" | "easy";
+export type SegmentTone = "warmup" | "run" | "walk" | "work" | "recovery" | "finish" | "cooldown";
 
 export interface SegmentColorMeta {
   tone: SegmentTone;
@@ -46,6 +63,7 @@ export interface SegmentColorMeta {
   color: string;
   background: string;
   border: string;
+  foreground: string;
   glow: string;
 }
 
@@ -55,13 +73,30 @@ export interface StepUnitPrescription {
   distance_km?: number;
 }
 
+export type StepRepeatChildRole =
+  | "warm_up"
+  | "run"
+  | "walk"
+  | "work"
+  | "recover"
+  | "finish"
+  | "cooldown";
+
+export interface StepRepeatChildPrescription {
+  role: StepRepeatChildRole;
+  label?: string;
+  sequence?: number;
+  guidance?: string;
+  prescription: StepUnitPrescription;
+  target?: StepTarget;
+}
+
 export interface StepPrescription {
   mode: "time" | "distance" | "repeats" | "none";
   duration_min?: number;
   distance_km?: number;
   repeat_count?: number;
-  repeat_unit?: StepUnitPrescription;
-  recovery_unit?: StepUnitPrescription;
+  children?: StepRepeatChildPrescription[];
 }
 
 export interface Step {
@@ -75,9 +110,15 @@ export interface Step {
   duration_min?: number;
   distance_km?: number;
   repeats?: number;
-  work?: Step;
-  recovery?: Step;
+  children?: Step[];
   target?: StepTarget;
+}
+
+export type RepeatChildStepsSource = "step_children" | "prescription_children" | "none";
+
+export interface RepeatChildStepsReadback {
+  children: Step[];
+  source: RepeatChildStepsSource;
 }
 
 export interface WorkoutLog {
@@ -105,6 +146,7 @@ export interface Workout {
   calendarIconKey: CalendarIconKey;
   goalContext: CanonicalGoalContext | null;
   metricMode: CanonicalMetricMode;
+  plannedWorkoutLanguage: PlannedWorkoutLanguageReadModel;
   title: string;
   notes: string | null;
   steps: Step[];
@@ -220,8 +262,6 @@ interface TemplatePlan {
   schedule: TemplateWorkout[];
 }
 
-const previewPlan = planJson as TemplatePlan;
-
 export const TYPE_META: Record<
   WorkoutType,
   { label: string; short: string; color: string; ring: string }
@@ -229,32 +269,32 @@ export const TYPE_META: Record<
   easy: {
     label: "Easy run",
     short: "Easy",
-    color: "var(--easy)",
-    ring: "rgb(from var(--easy) r g b / 0.2)",
+    color: workoutTypeColorVar("easy"),
+    ring: workoutTypeColorVar("easy", "ring"),
   },
   steady_or_easy: {
     label: "Steady",
     short: "Steady",
-    color: "var(--easy)",
-    ring: "rgb(from var(--easy) r g b / 0.2)",
+    color: workoutTypeColorVar("steady"),
+    ring: workoutTypeColorVar("steady", "ring"),
   },
   long_run: {
     label: "Long run",
     short: "Long",
-    color: "var(--long)",
-    ring: "rgb(from var(--long) r g b / 0.2)",
+    color: workoutTypeColorVar("long_run"),
+    ring: workoutTypeColorVar("long_run", "ring"),
   },
   quality: {
     label: "Quality / Intervals",
     short: "Quality",
-    color: "var(--quality)",
-    ring: "rgb(from var(--quality) r g b / 0.2)",
+    color: workoutTypeColorVar("tempo"),
+    ring: workoutTypeColorVar("tempo", "ring"),
   },
   rest: {
     label: "Rest",
     short: "Rest",
-    color: "var(--rest)",
-    ring: "rgb(from var(--rest) r g b / 0.2)",
+    color: workoutTypeColorVar("rest"),
+    ring: workoutTypeColorVar("rest", "ring"),
   },
 };
 
@@ -316,51 +356,49 @@ const VISIBLE_TYPE_META: Record<
   rest: TYPE_META.rest,
 };
 
-const WORKOUT_IDENTITY_VISIBLE_META: Partial<
-  Record<CanonicalWorkoutIdentity, { label: string; short: string; color: string; ring: string }>
-> = {
-  marathon_steady_specificity: {
-    ...TYPE_META.long_run,
-    label: "Marathon steady",
-    short: "Marathon",
-  },
-};
-
-const SOURCE_WORKOUT_VISIBLE_TYPE: Record<string, VisibleWorkoutType> = {
+const RUNNER_FACING_VISIBLE_TYPE: Record<RunnerFacingWorkoutType, VisibleWorkoutType> = {
+  rest: "rest",
   recovery: "recovery",
-  intervals: "intervals",
-  distance_intervals: "intervals",
-  time_intervals: "intervals",
-  "5k_sharpening_repeats": "intervals",
-  "10k_rhythm_intervals": "intervals",
-  tenk_completion_or_checkpoint: "race",
-  uphill_repeats: "hills",
-  tempo: "tempo",
-  controlled_tempo_session: "tempo",
-  half_marathon_threshold_durability: "tempo",
-  half_readiness_marker: "tempo",
-  marathon_steady_specificity: "steady",
-  base_endpoint_marker: "long",
+  easy: "easy",
+  steady: "steady",
+  long_run: "long",
   progression: "progression",
-  progression_run: "progression",
-  race: "race",
-  race_pace: "race",
-  tune_up: "race",
-  tuneup: "race",
-  race_tune_up: "race",
-  ultra_time_on_feet_durability: "long",
-  hike_run_endurance: "trail",
-  mountain_long_run_time_on_feet: "trail",
-  technical_trail_easy: "trail",
-  controlled_downhill_durability: "hills",
-  rolling_hills_session: "hills",
-  climbing_steady_run: "hills",
-  aerobic_strides: "easy",
-  quality_session: "quality",
+  tempo: "tempo",
+  intervals: "intervals",
+  hills: "hills",
+  run_walk: "recovery",
 };
 
 type WorkoutVisibleInput = Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType"> &
-  Partial<Pick<Workout, "workoutFamily" | "workoutIdentity" | "calendarIconKey">>;
+  Partial<
+    Pick<
+      Workout,
+      | "workoutFamily"
+      | "workoutIdentity"
+      | "calendarIconKey"
+      | "metricMode"
+      | "plannedWorkoutLanguage"
+    >
+  >;
+
+export function workoutPlannedLanguage(
+  workout: WorkoutVisibleInput,
+): PlannedWorkoutLanguageReadModel {
+  if (isPlannedWorkoutLanguageReadModel(workout.plannedWorkoutLanguage)) {
+    return workout.plannedWorkoutLanguage;
+  }
+
+  return buildPlannedWorkoutLanguage({
+    workoutType: workout.type,
+    sourceWorkoutType: workout.sourceWorkoutType,
+    workoutFamily: workout.workoutFamily,
+    workoutIdentity: workout.workoutIdentity,
+    calendarIconKey: workout.calendarIconKey,
+    metricMode: workout.metricMode,
+    title: workout.title,
+    steps: workout.steps,
+  });
+}
 
 export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   label: string;
@@ -368,152 +406,49 @@ export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   color: string;
   ring: string;
 } {
-  const base = TYPE_META[workout.type];
-  const identityMeta = resolveWorkoutVisibleMetaFromIdentity(workout.workoutIdentity);
-
-  if (identityMeta) {
-    return identityMeta;
-  }
-
+  const language = workoutPlannedLanguage(workout);
   const visibleType = resolveWorkoutVisibleType(workout);
+  const meta = visibleType ? VISIBLE_TYPE_META[visibleType] : TYPE_META[workout.type];
 
-  if (!visibleType) {
-    return base;
-  }
-
-  return VISIBLE_TYPE_META[visibleType];
-}
-
-function resolveWorkoutVisibleMetaFromIdentity(
-  workoutIdentity: CanonicalWorkoutIdentity | null | undefined,
-) {
-  return workoutIdentity ? WORKOUT_IDENTITY_VISIBLE_META[workoutIdentity] : null;
+  return {
+    ...meta,
+    color: workoutTypeColorVar(language.runnerFacingWorkoutType),
+    label: language.runnerFacingWorkoutTypeLabel,
+    ring: workoutTypeColorVar(language.runnerFacingWorkoutType, "ring"),
+    short: language.runnerFacingWorkoutTypeLabel,
+  };
 }
 
 export function resolveWorkoutVisibleType(workout: WorkoutVisibleInput): VisibleWorkoutType | null {
-  const richVisibleType = resolveVisibleTypeFromRichFields(workout);
+  const language = workoutPlannedLanguage(workout);
 
-  if (richVisibleType) {
-    return richVisibleType;
-  }
-
-  if (workout.type === "rest") {
-    return "rest";
-  }
-
-  const sourceType = normalizeWorkoutSourceType(workout.sourceWorkoutType);
-  const sourceVisibleType = sourceType ? resolveVisibleTypeFromSource(sourceType) : null;
-
-  if (sourceVisibleType) {
-    return sourceVisibleType;
-  }
-
-  if (workout.type === "long_run") {
-    return "long";
-  }
-
-  if (workout.type === "easy" || workout.type === "steady_or_easy") {
-    return "easy";
-  }
-
-  return resolveVisibleTypeFromWorkoutStructure(workout);
+  return RUNNER_FACING_VISIBLE_TYPE[language.runnerFacingWorkoutType] ?? "quality";
 }
 
-function resolveVisibleTypeFromRichFields(
-  workout: Partial<Pick<Workout, "workoutFamily" | "calendarIconKey">>,
-): CanonicalWorkoutFamily | null {
+function isPlannedWorkoutLanguageReadModel(
+  value: unknown,
+): value is PlannedWorkoutLanguageReadModel {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<PlannedWorkoutLanguageReadModel>;
+
   return (
-    normalizeCalendarIconKey(workout.calendarIconKey) ??
-    normalizeWorkoutFamily(workout.workoutFamily) ??
-    null
+    typeof candidate.runnerFacingWorkoutType === "string" &&
+    typeof candidate.runnerFacingWorkoutTypeLabel === "string" &&
+    Array.isArray(candidate.runnerFacingBlocks)
   );
 }
 
-function normalizeWorkoutSourceType(value: string | null | undefined) {
-  const normalized = value?.trim().toLowerCase();
+export function formatPlannedWorkoutBlockSummary(blocks: PlannedWorkoutLanguageBlock[]) {
+  const labels = blocks.map((block) => block.label).filter(Boolean);
 
-  if (!normalized) {
+  if (!labels.length) {
     return null;
   }
 
-  return normalized.replace(/[\s-]+/g, "_").replace(/_+/g, "_");
-}
-
-function resolveVisibleTypeFromSource(sourceType: string): VisibleWorkoutType | null {
-  const exactMatch = SOURCE_WORKOUT_VISIBLE_TYPE[sourceType];
-
-  if (exactMatch) {
-    return exactMatch;
-  }
-
-  if (/race_(pace|specific)|(?:^|_)tune_?up(?:_|$)/.test(sourceType)) {
-    return "race";
-  }
-
-  if (/progression/.test(sourceType)) {
-    return "progression";
-  }
-
-  if (/tempo|threshold/.test(sourceType)) {
-    return "tempo";
-  }
-
-  if (/hill|climb|uphill|downhill|rolling/.test(sourceType)) {
-    return "hills";
-  }
-
-  if (/trail|mountain|hike_run/.test(sourceType)) {
-    return "trail";
-  }
-
-  if (/interval|repeat/.test(sourceType)) {
-    return "intervals";
-  }
-
-  if (/long_run|time_on_feet|endurance/.test(sourceType)) {
-    return "long";
-  }
-
-  if (/recovery/.test(sourceType)) {
-    return "recovery";
-  }
-
-  if (/easy/.test(sourceType)) {
-    return "easy";
-  }
-
-  return null;
-}
-
-function resolveVisibleTypeFromWorkoutStructure(
-  workout: Pick<Workout, "title" | "steps">,
-): VisibleWorkoutType {
-  if (/\bprogression\b/i.test(workout.title)) {
-    return "progression";
-  }
-
-  if (/\b(intervals?|repeats?|reps)\b/i.test(workout.title)) {
-    return "intervals";
-  }
-
-  if (/\b(race\s*pace|tune\s*up|tune-up)\b/i.test(workout.title)) {
-    return "race";
-  }
-
-  const hasTempoIdentity =
-    /\b(tempo|threshold)\b/i.test(workout.title) ||
-    workout.steps.some(
-      (step) =>
-        step.type === "tempo" ||
-        step.segment_type === "tempo_block" ||
-        /\b(tempo|threshold)\b/i.test(step.label ?? ""),
-    );
-
-  if (hasTempoIdentity) {
-    return "tempo";
-  }
-
-  return "quality";
+  return labels.join(" -> ");
 }
 
 export const WEEK_STATUS_META: Record<WeekStatus, { label: string; helper: string }> = {
@@ -556,6 +491,7 @@ export function feedbackMarkerMeta(marker: WorkoutFeedbackMarkerSummary | null) 
 
 export function getPreviewSnapshot(): TrainingSnapshot {
   const currentDate = todayIso();
+  const previewPlan = buildSignedOutPreviewPlan(currentDate);
   const workouts = previewPlan.schedule.map((workout) => {
     const steps = normalizeExecutableStepInstructions(workout.steps);
     const richWorkout = deriveWorkoutRichModel({
@@ -604,6 +540,35 @@ export function getPreviewSnapshot(): TrainingSnapshot {
     profile: null,
     workouts,
     weekStatus: deriveWeekStatus(workouts, currentDate),
+  };
+}
+
+function buildSignedOutPreviewPlan(currentDate: string): TemplatePlan {
+  const startDate = startOfWeekIso(currentDate);
+
+  return {
+    meta: {
+      plan_name: signedOutPreviewPlanSeed.meta.planName,
+      created_for: signedOutPreviewPlanSeed.meta.createdFor,
+      created_at: startDate,
+      start_date: startDate,
+      goal: signedOutPreviewPlanSeed.meta.goal,
+    },
+    schedule: signedOutPreviewPlanSeed.workouts.map((workout) => {
+      const date = addDaysIso(startDate, workout.dayOffset);
+
+      return {
+        id: workout.id,
+        date,
+        weekday: weekdayLong(date),
+        week: workout.week,
+        phase: workout.phase,
+        type: workout.type,
+        title: workout.title,
+        notes: workout.notes,
+        steps: workout.steps,
+      };
+    }),
   };
 }
 
@@ -670,11 +635,13 @@ export function deriveWorkoutRichModel({
   calendarIconKey,
   goalContext,
   metricMode,
+  sourceKind,
   title,
   steps,
 }: {
   type: WorkoutType;
   sourceWorkoutType?: string | null;
+  sourceKind?: string | null;
   workoutFamily?: string | null;
   workoutIdentity?: string | null;
   calendarIconKey?: string | null;
@@ -684,7 +651,12 @@ export function deriveWorkoutRichModel({
   steps: Step[];
 }): Pick<
   Workout,
-  "workoutFamily" | "workoutIdentity" | "calendarIconKey" | "goalContext" | "metricMode"
+  | "workoutFamily"
+  | "workoutIdentity"
+  | "calendarIconKey"
+  | "goalContext"
+  | "metricMode"
+  | "plannedWorkoutLanguage"
 > {
   const richWorkout = resolveCanonicalWorkoutModel({
     workoutType: type,
@@ -696,6 +668,17 @@ export function deriveWorkoutRichModel({
     title,
     steps,
   });
+  const plannedWorkoutLanguage = buildPlannedWorkoutLanguage({
+    workoutType: type,
+    sourceWorkoutType,
+    sourceKind,
+    workoutFamily: richWorkout.workoutFamily,
+    workoutIdentity: richWorkout.workoutIdentity,
+    calendarIconKey: richWorkout.calendarIconKey,
+    metricMode: richWorkout.metricMode,
+    title,
+    steps,
+  });
 
   return {
     workoutFamily: richWorkout.workoutFamily,
@@ -703,6 +686,7 @@ export function deriveWorkoutRichModel({
     calendarIconKey: richWorkout.calendarIconKey,
     goalContext: normalizeCanonicalGoalContext(goalContext),
     metricMode: richWorkout.metricMode,
+    plannedWorkoutLanguage,
   };
 }
 
@@ -839,12 +823,57 @@ export function segmentColorMeta(kind: string, target?: StepTarget): SegmentColo
   return SEGMENT_COLOR_META[tone];
 }
 
+export function repeatCountForStep(step: Step): number | null {
+  const repeatCount = step.repeats ?? step.prescription?.repeat_count;
+
+  return isPositiveNumber(repeatCount) ? repeatCount : null;
+}
+
+export function repeatChildSteps(step: Step): Step[] {
+  return resolveRepeatChildSteps(step).children;
+}
+
+export function resolveRepeatChildSteps(step: Step): RepeatChildStepsReadback {
+  if (!isRepeatStructureStep(step)) {
+    return { children: [], source: "none" };
+  }
+
+  if (step.children?.length) {
+    return {
+      children: step.children,
+      source: "step_children",
+    };
+  }
+
+  const prescription = step.prescription;
+
+  if (prescription?.mode === "repeats") {
+    const reduced = reduceRepeatChildrenToChildFirst<StepTarget>({
+      children: prescription.children,
+      normalizeTarget: normalizeRepeatChildTarget,
+    });
+
+    if (reduced.children.length > 0) {
+      return {
+        children: reduced.children.map(repeatChildPrescriptionToStep),
+        source: reduced.source === "children" ? "prescription_children" : "none",
+      };
+    }
+  }
+
+  return { children: [], source: "none" };
+}
+
 export function primaryWorkoutTarget(workout: Pick<Workout, "steps">): StepTarget | undefined {
   const preferredTypes = new Set(["run", "tempo", "intervals", "work"]);
 
   for (const step of workout.steps) {
-    if (step.repeats && step.work?.target) {
-      return step.work.target;
+    const preferredChildTarget = firstPreferredStepTarget(
+      childStepsForReadback(step),
+      preferredTypes,
+    );
+    if (preferredChildTarget) {
+      return preferredChildTarget;
     }
 
     if (step.target && preferredTypes.has(step.type)) {
@@ -857,8 +886,42 @@ export function primaryWorkoutTarget(workout: Pick<Workout, "steps">): StepTarge
       return step.target;
     }
 
-    if (step.work?.target) {
-      return step.work.target;
+    const childTarget = firstAnyStepTarget(childStepsForReadback(step));
+    if (childTarget) {
+      return childTarget;
+    }
+  }
+
+  return undefined;
+}
+
+function firstPreferredStepTarget(
+  steps: Step[],
+  preferredTypes: ReadonlySet<string>,
+): StepTarget | undefined {
+  for (const step of steps) {
+    if (step.target && preferredTypes.has(step.type)) {
+      return step.target;
+    }
+
+    const childTarget = firstPreferredStepTarget(childStepsForReadback(step), preferredTypes);
+    if (childTarget) {
+      return childTarget;
+    }
+  }
+
+  return undefined;
+}
+
+function firstAnyStepTarget(steps: Step[]): StepTarget | undefined {
+  for (const step of steps) {
+    if (step.target) {
+      return step.target;
+    }
+
+    const childTarget = firstAnyStepTarget(childStepsForReadback(step));
+    if (childTarget) {
+      return childTarget;
     }
   }
 
@@ -982,19 +1045,22 @@ export function displayStepStructureEntries(
   }
 
   if (prescription?.mode === "repeats") {
-    const repeatCount = prescription.repeat_count ?? step.repeats;
+    const repeatCount = repeatCountForStep(step);
     if (isPositiveNumber(repeatCount)) {
       push("repeats", "Repeats", `${repeatCount} x`);
     }
-
-    push("work", "Work", describeStepUnitPrescription(prescription.repeat_unit));
-    push("recovery", "Recovery", describeStepUnitPrescription(prescription.recovery_unit));
+  } else if (repeatCountForStep(step)) {
+    push("repeats", "Repeats", `${repeatCountForStep(step)} x`);
   }
 
-  if (step.repeats && step.work) {
-    push("repeats", "Repeats", `${step.repeats} x`);
-    push("work", "Work", describeStepStructureUnit(step.work));
-    push("recovery", "Recovery", step.recovery ? describeStepStructureUnit(step.recovery) : null);
+  if (repeatCountForStep(step)) {
+    for (const [index, child] of repeatChildSteps(step).entries()) {
+      push(
+        `repeat_child_${index + 1}`,
+        child.label ?? repeatChildRoleLabel(stepRepeatChildRoleForStep(child)),
+        describeStepStructureUnit(child),
+      );
+    }
   }
 
   push("duration", "Duration", describeDurationStructure(step.duration_min));
@@ -1114,30 +1180,36 @@ function filterAlreadyDisplayedStructureEntries(
   );
 }
 
-function describeStepUnitPrescription(
-  unit:
-    | { mode: "time" | "distance" | "none"; duration_min?: number; distance_km?: number }
-    | undefined,
-) {
-  if (!unit || typeof unit !== "object") {
-    return null;
-  }
-
-  if (unit.mode === "time") {
-    return describeDurationStructure(unit.duration_min);
-  }
-
-  if (unit.mode === "distance") {
-    return describeDistanceStructure(unit.distance_km);
-  }
-
-  return null;
-}
-
 function describeStepStructureUnit(step: Step) {
   return (
     describeDistanceStructure(step.distance_km) ?? describeDurationStructure(step.duration_min)
   );
+}
+
+function childStepsForReadback(step: Step) {
+  return isRepeatStructureStep(step) ? repeatChildSteps(step) : (step.children ?? []);
+}
+
+function repeatChildPrescriptionToStep(child: StepRepeatChildPrescription): Step {
+  const prescription = { ...child.prescription };
+
+  return {
+    type: stepTypeForRepeatChildRole(child.role),
+    segment_type: child.role,
+    label: child.label ?? repeatChildRoleLabel(child.role),
+    sequence: child.sequence,
+    prescription,
+    ...(child.guidance ? { guidance: child.guidance } : {}),
+    ...(prescription.mode === "time" ? { duration_min: prescription.duration_min } : {}),
+    ...(prescription.mode === "distance" ? { distance_km: prescription.distance_km } : {}),
+    ...(child.target ? { target: { ...child.target } } : {}),
+  };
+}
+
+function normalizeRepeatChildTarget(target: unknown): StepTarget | undefined {
+  return target && typeof target === "object" && !Array.isArray(target)
+    ? { ...(target as StepTarget) }
+    : undefined;
 }
 
 function describeDurationStructure(durationMin: number | null | undefined) {
@@ -1165,21 +1237,21 @@ export function normalizeExecutableStepInstructions(steps: Step[]): Step[] {
 }
 
 function normalizeExecutableStepInstruction(step: Step, role?: "work" | "recovery"): Step {
+  const children = isRepeatStructureStep(step) ? repeatChildSteps(step) : (step.children ?? []);
   const normalized: Step = {
     ...step,
     ...(step.target ? { target: { ...step.target } } : {}),
-    ...(step.work ? { work: normalizeExecutableStepInstruction(step.work, "work") } : {}),
-    ...(step.recovery
-      ? {
-          recovery: isExecutableStep(step.recovery)
-            ? normalizeExecutableStepInstruction(step.recovery, "recovery")
-            : {
-                ...step.recovery,
-                ...(step.recovery.target ? { target: { ...step.recovery.target } } : {}),
-              },
-        }
+    ...(children.length > 0
+      ? { children: children.map((child) => normalizeExecutableStepInstruction(child)) }
       : {}),
   };
+
+  if (isRepeatStructureStep(normalized)) {
+    const { target: _target, ...structuralRepeat } = normalized;
+    void _target;
+
+    return structuralRepeat;
+  }
 
   if (!isExecutableStep(normalized)) {
     return normalized;
@@ -1206,6 +1278,10 @@ function normalizeExecutableStepInstruction(step: Step, role?: "work" | "recover
     guidance: guidance ?? fallbackInstruction,
     target: addHintTarget(normalized.target, fallbackInstruction),
   };
+}
+
+function isRepeatStructureStep(step: Step) {
+  return Boolean(step.repeats) || step.prescription?.mode === "repeats";
 }
 
 function isExecutableStep(step: Step) {
@@ -1300,13 +1376,13 @@ function fallbackInstructionForStep(step: Step, role?: "work" | "recovery") {
 
 export function stepPlannedDistanceKm(step: Step) {
   let total = step.distance_km ?? 0;
+  const repeatCount = repeatCountForStep(step);
+  const repeatChildren = repeatChildSteps(step);
 
-  if (step.repeats && step.work?.distance_km) {
-    total += step.repeats * step.work.distance_km;
-  }
-
-  if (step.repeats && step.recovery?.distance_km) {
-    total += step.repeats * step.recovery.distance_km;
+  if (repeatCount && repeatChildren.length) {
+    total +=
+      repeatCount * repeatChildren.reduce((sum, child) => sum + stepPlannedDistanceKm(child), 0);
+    return total;
   }
 
   return total;
@@ -1314,39 +1390,64 @@ export function stepPlannedDistanceKm(step: Step) {
 
 export function stepPlannedDurationMin(step: Step, workoutType: WorkoutType) {
   let total = step.duration_min ?? 0;
+  const repeatCount = repeatCountForStep(step);
+  const repeatChildren = repeatChildSteps(step);
 
-  if (step.repeats && step.work) {
-    const workDuration =
-      step.work.duration_min ??
-      estimateDurationFromDistanceKm(step.work.distance_km ?? 0, workoutType);
-    const recoveryDuration =
-      step.recovery?.duration_min ??
-      estimateDurationFromDistanceKm(step.recovery?.distance_km ?? 0, "easy");
-    total += step.repeats * (workDuration + recoveryDuration);
+  if (repeatCount && repeatChildren.length) {
+    total +=
+      repeatCount *
+      repeatChildren.reduce((sum, child) => sum + stepPlannedDurationMin(child, workoutType), 0);
+    return total;
   }
 
   return total;
 }
 
-function estimateDurationFromDistanceKm(distanceKm: number, workoutType: WorkoutType) {
-  if (!distanceKm) {
-    return 0;
+function repeatChildRoleLabel(role: StepRepeatChildRole) {
+  switch (role) {
+    case "warm_up":
+      return "Warm-up";
+    case "run":
+      return "Run";
+    case "walk":
+      return "Walk";
+    case "work":
+      return "Work";
+    case "recover":
+      return "Recover";
+    case "finish":
+      return "Finish";
+    case "cooldown":
+      return "Cooldown";
   }
+}
 
-  const paceMap: Record<WorkoutType, number> = {
-    easy: 7.0,
-    steady_or_easy: 6.6,
-    long_run: 6.8,
-    quality: 5.8,
-    rest: 0,
-  };
-  const pace = paceMap[workoutType];
+function stepRepeatChildRoleForStep(step: Step): StepRepeatChildRole {
+  const role = (step.segment_type ?? step.type).trim().toLowerCase();
 
-  if (!pace) {
-    return 0;
+  switch (role) {
+    case "warm_up":
+    case "warmup":
+      return "warm_up";
+    case "walk":
+      return "walk";
+    case "work":
+      return "work";
+    case "recover":
+    case "recovery":
+      return "recover";
+    case "finish":
+      return "finish";
+    case "cooldown":
+    case "cool_down":
+      return "cooldown";
+    default:
+      return "run";
   }
+}
 
-  return Math.round(distanceKm * pace);
+function stepTypeForRepeatChildRole(role: StepRepeatChildRole) {
+  return role;
 }
 
 function roundDistanceKm(distanceKm: number) {
@@ -1409,55 +1510,30 @@ function humanizeTargetValue(key: string, value: string) {
 }
 
 const SEGMENT_COLOR_META: Record<SegmentTone, SegmentColorMeta> = {
-  warmup: {
-    tone: "warmup",
-    label: "Warm-up",
-    color: "rgb(122 162 247)",
-    background: "color-mix(in oklch, rgb(122 162 247) 64%, transparent)",
-    border: "color-mix(in oklch, rgb(122 162 247) 72%, white 8%)",
-    glow: "0 0 22px rgb(122 162 247 / 0.28)",
-  },
-  prep: {
-    tone: "prep",
-    label: "Prep",
-    color: "rgb(135 196 190)",
-    background: "color-mix(in oklch, rgb(135 196 190) 62%, transparent)",
-    border: "color-mix(in oklch, rgb(135 196 190) 74%, white 8%)",
-    glow: "0 0 20px rgb(135 196 190 / 0.24)",
-  },
-  work: {
-    tone: "work",
-    label: "Work",
-    color: "rgb(239 112 101)",
-    background: "color-mix(in oklch, rgb(239 112 101) 82%, transparent)",
-    border: "color-mix(in oklch, rgb(239 112 101) 80%, white 10%)",
-    glow: "0 0 24px rgb(239 112 101 / 0.32)",
-  },
-  recovery: {
-    tone: "recovery",
-    label: "Recovery",
-    color: "rgb(148 163 184)",
-    background: "color-mix(in oklch, rgb(148 163 184) 38%, transparent)",
-    border: "color-mix(in oklch, rgb(148 163 184) 54%, white 6%)",
-    glow: "0 0 16px rgb(148 163 184 / 0.16)",
-  },
-  cooldown: {
-    tone: "cooldown",
-    label: "Cool-down",
-    color: "rgb(128 149 176)",
-    background: "color-mix(in oklch, rgb(128 149 176) 46%, transparent)",
-    border: "color-mix(in oklch, rgb(128 149 176) 58%, white 6%)",
-    glow: "0 0 18px rgb(128 149 176 / 0.18)",
-  },
-  easy: {
-    tone: "easy",
-    label: "Easy",
-    color: "rgb(112 171 201)",
-    background: "color-mix(in oklch, rgb(112 171 201) 54%, transparent)",
-    border: "color-mix(in oklch, rgb(112 171 201) 64%, white 8%)",
-    glow: "0 0 20px rgb(112 171 201 / 0.2)",
-  },
+  warmup: segmentColorRoleMeta("warmup", "warm_up", "Warm-up"),
+  run: segmentColorRoleMeta("run", "run", "Run"),
+  walk: segmentColorRoleMeta("walk", "walk", "Walk"),
+  work: segmentColorRoleMeta("work", "work", "Work"),
+  recovery: segmentColorRoleMeta("recovery", "recover", "Recover"),
+  finish: segmentColorRoleMeta("finish", "finish", "Finish"),
+  cooldown: segmentColorRoleMeta("cooldown", "cooldown", "Cooldown"),
 };
+
+function segmentColorRoleMeta(
+  tone: SegmentTone,
+  role: WorkoutSectionColorRole,
+  label: string,
+): SegmentColorMeta {
+  return {
+    tone,
+    label,
+    color: workoutSectionColorVar(role),
+    background: workoutSectionColorVar(role, "surface"),
+    border: workoutSectionColorVar(role, "border"),
+    foreground: workoutSectionColorVar(role, "foreground"),
+    glow: `0 0 22px ${workoutSectionColorVar(role, "ring")}`,
+  };
+}
 
 function segmentToneForKind(kind: string, target?: StepTarget): SegmentTone {
   const normalizedKind = kind.trim().toLowerCase().replace(/_/g, " ");
@@ -1468,15 +1544,23 @@ function segmentToneForKind(kind: string, target?: StepTarget): SegmentTone {
     return "cooldown";
   }
 
-  if (/recover|rest|walk|float/.test(normalizedKind)) {
+  if (/\bwalk\b|\bwalking\b/.test(normalizedKind)) {
+    return "walk";
+  }
+
+  if (/recover|rest|float/.test(normalizedKind)) {
     return "recovery";
+  }
+
+  if (/finish|closing|checkpoint/.test(normalizedKind)) {
+    return "finish";
   }
 
   if (
     /mobil|drill|activation|prep|stride|dynamic/.test(normalizedKind) ||
     /drill|activation/.test(cue)
   ) {
-    return "prep";
+    return "warmup";
   }
 
   if (/warm/.test(normalizedKind)) {
@@ -1490,7 +1574,7 @@ function segmentToneForKind(kind: string, target?: StepTarget): SegmentTone {
     return "work";
   }
 
-  return "easy";
+  return "run";
 }
 
 export function weeklyMileage(snapshot: TrainingSnapshot) {

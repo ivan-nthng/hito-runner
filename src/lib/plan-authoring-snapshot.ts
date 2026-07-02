@@ -8,7 +8,6 @@ export type PlanAuthoringSnapshotSource =
   | "structured_first_plan"
   | "ai_first_plan_blueprint"
   | "ai_first_plan_envelope"
-  | "voice_to_plan"
   | "text_authoring"
   | "active_plan_refresh";
 
@@ -40,10 +39,12 @@ export function buildPlanScopedStructuredAuthoringMetadata({
     targetTime ?? safeAuthoringInput.goal.targetTime ?? extractTargetTime(safeAuthoringInput),
     32,
   );
+  const planGoalIntent = safeAuthoringInput.planGoalIntent ?? null;
   const snapshot = toJson({
     schema_version: "plan-scoped-structured-authoring-v1",
     source,
     authoring_input: safeAuthoringInput,
+    ...(planGoalIntent ? { plan_goal_intent: planGoalIntent } : {}),
     ...(normalizedGoalStyle ? { goal_style: normalizedGoalStyle } : {}),
     ...(normalizedTargetTime ? { target_time: normalizedTargetTime } : {}),
     ...(metricPolicySummary
@@ -63,6 +64,7 @@ export function buildPlanScopedStructuredAuthoringMetadata({
     goalMetadata: toJson({
       ...(normalizedGoalStyle ? { goal_style: normalizedGoalStyle } : {}),
       ...(normalizedTargetTime ? { target_time: normalizedTargetTime } : {}),
+      ...(planGoalIntent ? { plan_goal_intent: planGoalIntent } : {}),
     }),
     planPreferences: toJson({
       structured_authoring_input: safeAuthoringInput,
@@ -109,9 +111,7 @@ function sanitizeStructuredAuthoringInput(
 }
 
 function isRawTransientConstraint(value: string) {
-  return /^(runner voice supplement|confirmed transcript|raw transcript|runner transcript):/i.test(
-    value.trim(),
-  );
+  return /^(confirmed transcript|raw transcript|runner transcript):/i.test(value.trim());
 }
 
 function extractTargetTime(input: StructuredAuthoringInput) {

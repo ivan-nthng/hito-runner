@@ -38,6 +38,85 @@ export interface BuildWorkoutContext {
   normalized: NormalizedStructuredInput;
 }
 
+type StructuredRepeatUnitPrescription = {
+  mode: "time" | "distance" | "none";
+  duration_min?: number;
+  distance_km?: number;
+};
+
+type StructuredRepeatChildRole = "run" | "walk" | "work" | "recover";
+type StructuredRepeatTarget = Record<string, string | number | boolean | null | undefined>;
+
+function repeatChildren({
+  work,
+  recovery,
+  workTarget,
+  recoveryTarget,
+  workRole = "work",
+  recoveryRole = "recover",
+}: {
+  work: StructuredRepeatUnitPrescription;
+  recovery: StructuredRepeatUnitPrescription;
+  workTarget?: StructuredRepeatTarget;
+  recoveryTarget?: StructuredRepeatTarget;
+  workRole?: StructuredRepeatChildRole;
+  recoveryRole?: StructuredRepeatChildRole;
+}) {
+  return [
+    {
+      role: workRole,
+      label: repeatChildLabel(workRole),
+      sequence: 1,
+      prescription: work,
+      ...(workTarget ? { target: stripDefaultEstimatedHrRepeatTarget(workTarget) } : {}),
+    },
+    ...(recovery.mode !== "none"
+      ? [
+          {
+            role: recoveryRole,
+            label: repeatChildLabel(recoveryRole),
+            sequence: 2,
+            prescription: recovery,
+            ...(recoveryTarget
+              ? { target: stripDefaultEstimatedHrRepeatTarget(recoveryTarget) }
+              : {}),
+          },
+        ]
+      : []),
+  ];
+}
+
+function stripDefaultEstimatedHrRepeatTarget<TTarget extends StructuredRepeatTarget>(
+  target: TTarget,
+) {
+  if (target.hr_target_source !== "default_estimated_hr") {
+    return target;
+  }
+
+  const { hr_bpm_range, hr_bpm, hr_target_source, source_note, label, ...safeTarget } = target;
+
+  void hr_bpm_range;
+  void hr_bpm;
+  void hr_target_source;
+  void source_note;
+  void label;
+
+  return safeTarget;
+}
+
+function repeatChildLabel(role: StructuredRepeatChildRole) {
+  switch (role) {
+    case "run":
+      return "Run";
+    case "walk":
+      return "Walk";
+    case "work":
+      return "Work";
+    case "recover":
+      return "Recover";
+  }
+}
+
 export function buildRestWorkout({
   workoutId,
   date,
@@ -435,20 +514,22 @@ export function buildAerobicStridesWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: isLimitedSharpeningSupport(normalized) ? 4 : 6,
-          repeat_unit: {
-            mode: "time" as const,
-            duration_min: 0.5,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 1.5,
-          },
+          children: repeatChildren({
+            work: {
+              mode: "time" as const,
+              duration_min: 0.5,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 1.5,
+            },
+            workTarget: {
+              intensity: "relaxed_strides",
+              cue: "Fast-feeling, light, and never sprinting.",
+            },
+            recoveryTarget: buildRepeatRecoveryTarget(normalized),
+          }),
         },
-        target: {
-          intensity: "relaxed_strides",
-          cue: "Fast-feeling, light, and never sprinting.",
-        },
-        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
     ],
   };
@@ -488,21 +569,23 @@ export function buildFiveKSharpeningWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: repeatCount,
-          repeat_unit: {
-            mode: "distance" as const,
-            distance_km: 0.2,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
+          children: repeatChildren({
+            work: {
+              mode: "distance" as const,
+              distance_km: 0.2,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            workTarget: {
+              intensity: "5k_sharpening",
+              ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
+              cue: "Controlled faster running; smooth, repeatable, and never sprinting.",
+            },
+            recoveryTarget: buildRepeatRecoveryTarget(normalized),
+          }),
         },
-        target: {
-          intensity: "5k_sharpening",
-          ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
-          cue: "Controlled faster running; smooth, repeatable, and never sprinting.",
-        },
-        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
       buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
@@ -543,21 +626,23 @@ export function buildTenKRhythmWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: repeatCount,
-          repeat_unit: {
-            mode: "time" as const,
-            duration_min: 4,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
+          children: repeatChildren({
+            work: {
+              mode: "time" as const,
+              duration_min: 4,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            workTarget: {
+              intensity: "10k_rhythm",
+              ...(paceTargets?.tempo ? { pace_min_per_km_range: paceTargets.tempo } : {}),
+              cue: "Rhythmic sustained quality, controlled rather than forced.",
+            },
+            recoveryTarget: buildRepeatRecoveryTarget(normalized),
+          }),
         },
-        target: {
-          intensity: "10k_rhythm",
-          ...(paceTargets?.tempo ? { pace_min_per_km_range: paceTargets.tempo } : {}),
-          cue: "Rhythmic sustained quality, controlled rather than forced.",
-        },
-        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
       buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
@@ -600,21 +685,23 @@ export function buildHalfMarathonThresholdWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: repeatCount,
-          repeat_unit: {
-            mode: "time" as const,
-            duration_min: blockDurationMin,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 3,
-          },
+          children: repeatChildren({
+            work: {
+              mode: "time" as const,
+              duration_min: blockDurationMin,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 3,
+            },
+            workTarget: {
+              intensity: "threshold_steady",
+              ...(tempoPaceTarget ? { pace_min_per_km_range: tempoPaceTarget } : {}),
+              cue: "Sustained and controlled, with enough restraint to finish strong.",
+            },
+            recoveryTarget: buildRepeatRecoveryTarget(normalized),
+          }),
         },
-        target: {
-          intensity: "threshold_steady",
-          ...(tempoPaceTarget ? { pace_min_per_km_range: tempoPaceTarget } : {}),
-          cue: "Sustained and controlled, with enough restraint to finish strong.",
-        },
-        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
       buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
@@ -898,22 +985,24 @@ export function buildControlledDownhillDurabilityWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: repeatCount,
-          repeat_unit: {
-            mode: "time" as const,
-            duration_min: 1,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
-        },
-        target: {
-          intensity: "controlled_downhill_durability",
-          cue: "Controlled descent skill and eccentric durability; never reckless downhill racing.",
-        },
-        recovery_target: {
-          intensity: "very_easy_recovery",
-          hint: "Walk or jog easily on flat or uphill ground before the next descent.",
+          children: repeatChildren({
+            work: {
+              mode: "time" as const,
+              duration_min: 1,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            workTarget: {
+              intensity: "controlled_downhill_durability",
+              cue: "Controlled descent skill and eccentric durability; never reckless downhill racing.",
+            },
+            recoveryTarget: {
+              intensity: "very_easy_recovery",
+              hint: "Walk or jog easily on flat or uphill ground before the next descent.",
+            },
+          }),
         },
       },
       buildCooldownSegment(workoutId, 3, 10, normalized),
@@ -1053,21 +1142,25 @@ export function buildRollingHillsWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: repeatCount,
-          repeat_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
+          children: repeatChildren({
+            work: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            workTarget: {
+              intensity: "controlled_hill_effort",
+              ...(paceTargets?.rollingHill
+                ? { pace_min_per_km_range: paceTargets.rollingHill }
+                : {}),
+              cue: "Smooth uphill form; no exact elevation target.",
+            },
+            recoveryTarget: buildRepeatRecoveryTarget(normalized),
+          }),
         },
-        target: {
-          intensity: "controlled_hill_effort",
-          ...(paceTargets?.rollingHill ? { pace_min_per_km_range: paceTargets.rollingHill } : {}),
-          cue: "Smooth uphill form; no exact elevation target.",
-        },
-        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
       buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
@@ -1108,21 +1201,23 @@ export function buildHillRepeatsWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: repeatCount,
-          repeat_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
+          children: repeatChildren({
+            work: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            workTarget: {
+              intensity: "uphill_strength",
+              ...(paceTargets?.hillRepeat ? { pace_min_per_km_range: paceTargets.hillRepeat } : {}),
+              cue: "Use effort first on climbs; pace may drift slower on steeper grades.",
+            },
+            recoveryTarget: buildRepeatRecoveryTarget(normalized),
+          }),
         },
-        target: {
-          intensity: "uphill_strength",
-          ...(paceTargets?.hillRepeat ? { pace_min_per_km_range: paceTargets.hillRepeat } : {}),
-          cue: "Use effort first on climbs; pace may drift slower on steeper grades.",
-        },
-        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
       buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
@@ -1301,21 +1396,23 @@ export function buildDistanceIntervalsWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: repeatCount,
-          repeat_unit: {
-            mode: "distance" as const,
-            distance_km: 0.4,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
+          children: repeatChildren({
+            work: {
+              mode: "distance" as const,
+              distance_km: 0.4,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            workTarget: {
+              intensity: "5k_effort",
+              ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
+              cue: "Fast but controlled, never sprinting.",
+            },
+            recoveryTarget: buildRepeatRecoveryTarget(normalized),
+          }),
         },
-        target: {
-          intensity: "5k_effort",
-          ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
-          cue: "Fast but controlled, never sprinting.",
-        },
-        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
       buildCooldownSegment(workoutId, 3, 10, normalized),
     ],
@@ -1355,21 +1452,23 @@ export function buildTimeIntervalsWorkout({
         prescription: {
           mode: "repeats" as const,
           repeat_count: repeatCount,
-          repeat_unit: {
-            mode: "time" as const,
-            duration_min: 3,
-          },
-          recovery_unit: {
-            mode: "time" as const,
-            duration_min: 2,
-          },
+          children: repeatChildren({
+            work: {
+              mode: "time" as const,
+              duration_min: 3,
+            },
+            recovery: {
+              mode: "time" as const,
+              duration_min: 2,
+            },
+            workTarget: {
+              intensity: "10k_effort",
+              ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
+              cue: "Quick, rhythmic running with controlled recovery.",
+            },
+            recoveryTarget: buildRepeatRecoveryTarget(normalized),
+          }),
         },
-        target: {
-          intensity: "10k_effort",
-          ...(paceTargets?.interval ? { pace_min_per_km_range: paceTargets.interval } : {}),
-          cue: "Quick, rhythmic running with controlled recovery.",
-        },
-        recovery_target: buildRepeatRecoveryTarget(normalized),
       },
       buildCooldownSegment(workoutId, 3, 10, normalized),
     ],

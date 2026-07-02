@@ -15,8 +15,8 @@ import { resolveTenKBeginnerDosePrescription } from "@/lib/plan-creation-engine/
 import type {
   RunningPlanDistanceFamily,
   RunningPlanRange,
-  RunningPlanRepeatRecoveryPrescription,
-  RunningPlanRepeatWorkPrescription,
+  RunningPlanRepeatChildPrescription,
+  RunningPlanRepeatChildUnitPrescription,
   RunningPlanRunnerLevel,
   RunningPlanSegmentPrescription,
   RunningPlanWatchExecutableSegmentTemplate,
@@ -94,8 +94,8 @@ export function runningPlanPrescriptionIsExact(prescription: RunningPlanSegmentP
     case "repeat":
       return (
         rangeIsExactPositive(prescription.repeatCount) &&
-        repeatWorkIsExact(prescription.work) &&
-        repeatRecoveryIsExact(prescription.recovery)
+        prescription.children.length > 0 &&
+        prescription.children.every((child) => repeatChildIsExact(child))
       );
   }
 }
@@ -144,8 +144,7 @@ function resolveSegmentPrescription(
       return {
         ...prescription,
         repeatCount: resolveRepeatCountRange(prescription.repeatCount, context),
-        work: resolveRepeatWork(prescription.work, context),
-        recovery: resolveRepeatRecovery(prescription.recovery, context),
+        children: prescription.children.map((child) => resolveRepeatChild(child, context)),
       };
   }
 }
@@ -244,12 +243,19 @@ function enrichBeginnerHalfMarathonAdaptationSegment({
   segment: RunningPlanWatchExecutableSegmentTemplate;
   primaryPrescription: RunningPlanSegmentPrescription;
 }): RunningPlanWatchExecutableSegmentTemplate {
+  const adaptationPrescription =
+    segment.segmentRole === "main"
+      ? buildRunWalkAdaptationRepeat(primaryPrescription, "beginner_run_walk_adaptation")
+      : null;
+
   return {
     ...segment,
-    primaryPrescription: withIntensityLabel(
-      primaryPrescription,
-      segment.segmentRole === "main" ? "beginner_run_walk_adaptation" : "easy_adaptation",
-    ),
+    primaryPrescription:
+      adaptationPrescription ??
+      withIntensityLabel(
+        primaryPrescription,
+        segment.segmentRole === "main" ? "beginner_run_walk_adaptation" : "easy_adaptation",
+      ),
     secondaryCue:
       segment.segmentRole === "main"
         ? "Use relaxed run-walk as needed; the goal is adaptation, not continuous pressure."
@@ -264,14 +270,21 @@ function enrichMarathonCompletionAdaptationSegment({
   segment: RunningPlanWatchExecutableSegmentTemplate;
   primaryPrescription: RunningPlanSegmentPrescription;
 }): RunningPlanWatchExecutableSegmentTemplate {
+  const adaptationPrescription =
+    segment.segmentRole === "main"
+      ? buildRunWalkAdaptationRepeat(primaryPrescription, "marathon_completion_run_walk_adaptation")
+      : null;
+
   return {
     ...segment,
-    primaryPrescription: withIntensityLabel(
-      primaryPrescription,
-      segment.segmentRole === "main"
-        ? "marathon_completion_run_walk_adaptation"
-        : "easy_adaptation",
-    ),
+    primaryPrescription:
+      adaptationPrescription ??
+      withIntensityLabel(
+        primaryPrescription,
+        segment.segmentRole === "main"
+          ? "marathon_completion_run_walk_adaptation"
+          : "easy_adaptation",
+      ),
     secondaryCue:
       segment.segmentRole === "main"
         ? "Use run-walk as needed; the goal is durable adaptation toward marathon completion."
@@ -301,13 +314,11 @@ function enrichHalfMarathonTempoSegment({
 
   return {
     ...segment,
-    primaryPrescription: {
-      ...primaryPrescription,
-      work: {
-        ...primaryPrescription.work,
-        intensityLabel: "half_marathon_durability_tempo",
-      },
-    },
+    primaryPrescription: mapRepeatChildren(primaryPrescription, (child) =>
+      child.role === "work" || child.role === "run"
+        ? { ...child, intensityLabel: "half_marathon_durability_tempo" }
+        : child,
+    ),
     secondaryCue:
       "Controlled half-marathon durability: repeat smooth blocks without chasing speed.",
   };
@@ -328,16 +339,17 @@ function enrichMarathonCompletionTempoSegment({
 
   return {
     ...segment,
-    primaryPrescription: {
-      ...primaryPrescription,
-      work: {
-        ...primaryPrescription.work,
-        intensityLabel:
-          context.runnerLevel === "professional_competitive"
-            ? "marathon_completion_controlled_tempo_support"
-            : "marathon_completion_soft_tempo_support",
-      },
-    },
+    primaryPrescription: mapRepeatChildren(primaryPrescription, (child) =>
+      child.role === "work" || child.role === "run"
+        ? {
+            ...child,
+            intensityLabel:
+              context.runnerLevel === "professional_competitive"
+                ? "marathon_completion_controlled_tempo_support"
+                : "marathon_completion_soft_tempo_support",
+          }
+        : child,
+    ),
     secondaryCue: "Controlled completion support: stay smooth, patient, and clearly submaximal.",
   };
 }
@@ -352,13 +364,11 @@ function enrichMarathonCompletionTurnoverSegment({
   if (segment.segmentRole === "work" && primaryPrescription.mode === "repeat") {
     return {
       ...segment,
-      primaryPrescription: {
-        ...primaryPrescription,
-        work: {
-          ...primaryPrescription.work,
-          intensityLabel: "marathon_completion_turnover",
-        },
-      },
+      primaryPrescription: mapRepeatChildren(primaryPrescription, (child) =>
+        child.role === "work" || child.role === "run"
+          ? { ...child, intensityLabel: "marathon_completion_turnover" }
+          : child,
+      ),
       secondaryCue: "Relaxed turnover only; stay smooth and completion-focused.",
     };
   }
@@ -500,34 +510,96 @@ function withIntensityLabel(
   return { ...prescription, intensityLabel };
 }
 
-function resolveRepeatWork(
-  work: RunningPlanRepeatWorkPrescription,
-  context: PrescriptionContext,
-): RunningPlanRepeatWorkPrescription {
-  if (work.mode === "time") {
-    return { ...work, durationSeconds: resolveDurationRange(work.durationSeconds, context) };
+function buildRunWalkAdaptationRepeat(
+  prescription: RunningPlanSegmentPrescription,
+  intensityLabel: string,
+): RunningPlanSegmentPrescription | null {
+  const durationSeconds = durationSecondsForRunWalkRepeat(prescription);
+  if (durationSeconds === null) {
+    return null;
   }
 
-  return { ...work, distanceMeters: resolveDistanceRange(work.distanceMeters, context) };
+  const repeatCount = Math.max(1, Math.round(durationSeconds / minutes(5)));
+
+  return {
+    mode: "repeat",
+    repeatCount: exactRange(repeatCount),
+    children: [
+      {
+        role: "run",
+        label: "Run",
+        prescription: {
+          mode: "time",
+          durationSeconds: exactRange(minutes(4)),
+        },
+        intensityLabel,
+      },
+      {
+        role: "walk",
+        label: "Walk",
+        prescription: {
+          mode: "time",
+          durationSeconds: exactRange(minutes(1)),
+        },
+        intensityLabel: "walk_recovery",
+      },
+    ],
+  };
 }
 
-function resolveRepeatRecovery(
-  recovery: RunningPlanRepeatRecoveryPrescription,
+function durationSecondsForRunWalkRepeat(prescription: RunningPlanSegmentPrescription) {
+  switch (prescription.mode) {
+    case "time":
+    case "open_warmup":
+    case "open_cooldown":
+    case "time_with_default_hr_cap":
+      return rangeIsExactPositive(prescription.durationSeconds)
+        ? prescription.durationSeconds.min
+        : null;
+    default:
+      return null;
+  }
+}
+
+function mapRepeatChildren(
+  prescription: Extract<RunningPlanSegmentPrescription, { mode: "repeat" }>,
+  mapper: (child: RunningPlanRepeatChildPrescription) => RunningPlanRepeatChildPrescription,
+): RunningPlanSegmentPrescription {
+  return {
+    ...prescription,
+    children: prescription.children.map(mapper),
+  };
+}
+
+function resolveRepeatChild(
+  child: RunningPlanRepeatChildPrescription,
   context: PrescriptionContext,
-): RunningPlanRepeatRecoveryPrescription {
-  if (recovery.mode === "recovery_time") {
+): RunningPlanRepeatChildPrescription {
+  return {
+    ...child,
+    prescription: resolveRepeatChildUnit(child.prescription, child.role, context),
+  };
+}
+
+function resolveRepeatChildUnit(
+  prescription: RunningPlanRepeatChildUnitPrescription,
+  role: RunningPlanRepeatChildPrescription["role"],
+  context: PrescriptionContext,
+): RunningPlanRepeatChildUnitPrescription {
+  if (prescription.mode === "time") {
+    const durationRole = role === "recover" || role === "walk" ? "recovery" : "work";
     return {
-      ...recovery,
-      recoveryDurationSeconds: resolveRecoveryDurationRange(
-        recovery.recoveryDurationSeconds,
-        context,
-      ),
+      ...prescription,
+      durationSeconds:
+        durationRole === "recovery"
+          ? resolveRecoveryDurationRange(prescription.durationSeconds, context)
+          : resolveDurationRange(prescription.durationSeconds, context),
     };
   }
 
   return {
-    ...recovery,
-    recoveryDistanceMeters: resolveDistanceRange(recovery.recoveryDistanceMeters, context),
+    ...prescription,
+    distanceMeters: resolveDistanceRange(prescription.distanceMeters, context),
   };
 }
 
@@ -979,20 +1051,12 @@ function boundedProgress(weekNumber: number, horizonWeeks: number) {
   return Math.max(0, Math.min(1, (weekNumber - 1) / (horizonWeeks - 1)));
 }
 
-function repeatWorkIsExact(work: RunningPlanRepeatWorkPrescription) {
-  if (work.mode === "time") {
-    return rangeIsExactPositive(work.durationSeconds);
+function repeatChildIsExact(child: RunningPlanRepeatChildPrescription) {
+  if (child.prescription.mode === "time") {
+    return rangeIsExactPositive(child.prescription.durationSeconds);
   }
 
-  return rangeIsExactPositive(work.distanceMeters);
-}
-
-function repeatRecoveryIsExact(recovery: RunningPlanRepeatRecoveryPrescription) {
-  if (recovery.mode === "recovery_time") {
-    return rangeIsExactPositive(recovery.recoveryDurationSeconds);
-  }
-
-  return rangeIsExactPositive(recovery.recoveryDistanceMeters);
+  return rangeIsExactPositive(child.prescription.distanceMeters);
 }
 
 function rangeIsExactPositive(range: RunningPlanRange) {

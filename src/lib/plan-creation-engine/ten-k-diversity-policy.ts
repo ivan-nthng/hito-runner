@@ -265,6 +265,11 @@ function validateRecoverySpacing(rows: readonly TenKDiversityValidationRow[], is
       continue;
     }
 
+    const daysUntilNextRun = nextRunningRow.dayNumber - row.dayNumber;
+    if (daysUntilNextRun >= 4) {
+      continue;
+    }
+
     if (nextRunningRow.workoutDayKind !== "recovery" && nextRunningRow.workoutDayKind !== "easy") {
       issues.push(
         `Next running row after ${row.rowId} must be recovery or easy, got ${nextRunningRow.workoutDayKind}.`,

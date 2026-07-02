@@ -1,10 +1,5 @@
-import {
-  resolveWorkoutVisibleType,
-  workoutTypeMeta,
-  type VisibleWorkoutType,
-  type Workout,
-  type WorkoutType,
-} from "@/lib/training";
+import { workoutPlannedLanguage, type Workout, type WorkoutType } from "@/lib/training";
+import type { CalendarIconKey } from "@/lib/rich-workout-model";
 
 export type WorkoutGlyphKind =
   | "easy"
@@ -20,7 +15,7 @@ export type WorkoutGlyphKind =
   | "quality"
   | "rest";
 
-const VISIBLE_TYPE_GLYPH: Record<VisibleWorkoutType, WorkoutGlyphKind> = {
+const CALENDAR_ICON_GLYPH: Record<CalendarIconKey, WorkoutGlyphKind> = {
   easy: "easy",
   recovery: "recovery",
   steady: "steady",
@@ -35,6 +30,10 @@ const VISIBLE_TYPE_GLYPH: Record<VisibleWorkoutType, WorkoutGlyphKind> = {
   rest: "rest",
 };
 
+export function workoutGlyphFromCalendarIconKey(iconKey: CalendarIconKey): WorkoutGlyphKind {
+  return CALENDAR_ICON_GLYPH[iconKey];
+}
+
 export function workoutGlyphKind(
   workout: Pick<
     Workout,
@@ -45,33 +44,11 @@ export function workoutGlyphKind(
     | "workoutFamily"
     | "workoutIdentity"
     | "calendarIconKey"
+    | "metricMode"
+    | "plannedWorkoutLanguage"
   >,
 ): WorkoutGlyphKind {
-  if (workout.workoutIdentity === "marathon_steady_specificity") {
-    return "steady";
-  }
-
-  const visibleType = resolveWorkoutVisibleType(workout);
-
-  if (visibleType) {
-    return VISIBLE_TYPE_GLYPH[visibleType];
-  }
-
-  const short = workoutTypeMeta(workout).short.toLowerCase();
-  if (short === "easy") return "easy";
-  if (short === "recovery") return "recovery";
-  if (short === "steady") return "steady";
-  if (short === "long") return "long";
-  if (short === "tempo") return "tempo";
-  if (short === "intervals") return "intervals";
-  if (short === "progression") return "progression";
-  if (short === "race") return "race";
-  if (short === "hills") return "hills";
-  if (short === "trail") return "trail";
-  if (short === "quality") return "quality";
-  if (short === "rest") return "rest";
-
-  return "easy";
+  return workoutGlyphFromCalendarIconKey(workoutPlannedLanguage(workout).canonical.calendarIconKey);
 }
 
 export function workoutTypeToGlyphKind(type: WorkoutType): WorkoutGlyphKind {

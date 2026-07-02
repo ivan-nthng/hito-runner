@@ -1,12 +1,7 @@
-import { addDaysIso, diffDaysIso, weekdayLong } from "@/lib/training";
+import { diffDaysIso } from "@/lib/training";
 import type { StructuredAuthoringInput } from "@/lib/ai-first-plan-blueprint-schema";
 import { type AuthoredWorkoutIdentity, weekdayIndex } from "@/lib/ai-first-plan-blueprint-taxonomy";
-import {
-  resolveSupportedIntensityCadence,
-  resolveSupportedSpecificityIdentityOptions,
-  shouldScheduleSupportedIntensityWeek,
-  shouldUseLongRunSteadyFinishAsSpecificStimulus,
-} from "@/lib/structured-plan-authoring-policy";
+import { resolveSupportedIntensityCadence } from "@/lib/structured-plan-authoring-policy";
 
 export type GoalFamilyPolicyKey =
   | "beginner_consistency"
@@ -36,14 +31,6 @@ export interface GoalFamilyIdentityPolicy {
     useLongRunSlot?: boolean;
   };
 }
-
-export type RequiredCadenceSlot = {
-  date: string;
-  weekday: string;
-  kind: GoalFamilyCadenceKind;
-  identityOptions: AuthoredWorkoutIdentity[];
-  purpose: string;
-};
 
 const supportIdentityValues = [
   "easy_aerobic_run",
@@ -380,63 +367,12 @@ export function buildPromptGoalFamilyIdentityPolicy(authoringInput: StructuredAu
   };
 }
 
-export function buildRequiredCadenceSlots(
-  authoringInput: StructuredAuthoringInput,
-  policy: GoalFamilyIdentityPolicy,
-) {
-  const slots = new Map<number, RequiredCadenceSlot>();
-
-  if (!isGoalFamilyCadencePlan(authoringInput, policy)) {
-    return slots;
-  }
-
-  const horizonWeeks = resolveAuthoringHorizonWeeks(authoringInput);
-  const fixedRestDays = new Set(authoringInput.availability.unavailableDays);
-  const runningDays = authoringInput.availability.preferredRunningDays.filter(
-    (day) => !fixedRestDays.has(day),
-  );
-  const preferredLongRunDay = authoringInput.availability.preferredLongRunDay ?? null;
-  const cadenceWeekday = chooseGoalFamilyCadenceWeekday(policy, runningDays, preferredLongRunDay);
-
-  if (!cadenceWeekday) {
-    return slots;
-  }
-
-  for (let weekIndex = 0; weekIndex < horizonWeeks; weekIndex += 1) {
-    const weekNumber = weekIndex + 1;
-
-    if (!shouldRequireGoalFamilyCadenceSlot(authoringInput, policy, weekNumber)) {
-      continue;
-    }
-
-    const weekStart = addDaysIso(authoringInput.schedule.startDate, weekIndex * 7);
-    const slotWeekday =
-      preferredLongRunDay &&
-      shouldUseLongRunSteadyFinishAsSpecificStimulus(authoringInput, weekNumber)
-        ? preferredLongRunDay
-        : cadenceWeekday;
-    const cadenceDate = Array.from({ length: 7 }, (_day, dayIndex) =>
-      addDaysIso(weekStart, dayIndex),
-    ).find((date) => weekdayLong(date) === slotWeekday);
-
-    if (cadenceDate) {
-      slots.set(weekNumber, {
-        date: cadenceDate,
-        weekday: slotWeekday,
-        kind: policy.cadence.kind,
-        identityOptions: cadenceIdentityOptionsForGoal(authoringInput, policy, weekNumber),
-        purpose: cadencePurposeForGoal(authoringInput, policy, weekNumber),
-      });
-    }
-  }
-
-  return slots;
-}
-
 export function resolveGoalFamilyIdentityPolicy(
   authoringInput: StructuredAuthoringInput,
 ): GoalFamilyIdentityPolicy {
   switch (authoringInput.goal.goalType) {
+    case "distance_build":
+      return resolveDistanceBuildIdentityPolicy(authoringInput);
     case "5k":
       return goalFamilyIdentityPolicies.five_k;
     case "10k":
@@ -453,6 +389,20 @@ export function resolveGoalFamilyIdentityPolicy(
     default:
       return goalFamilyIdentityPolicies.beginner_consistency;
   }
+}
+
+function resolveDistanceBuildIdentityPolicy(
+  authoringInput: StructuredAuthoringInput,
+): GoalFamilyIdentityPolicy {
+  const distanceMeters = authoringInput.planGoalIntent?.distance?.distanceMeters ?? null;
+
+  if (distanceMeters != null) {
+    if (distanceMeters <= 10_000) return goalFamilyIdentityPolicies.ten_k;
+    if (distanceMeters <= 21_100) return goalFamilyIdentityPolicies.half_marathon;
+    return goalFamilyIdentityPolicies.marathon;
+  }
+
+  return goalFamilyIdentityPolicies.half_marathon;
 }
 
 export function isGoalFamilyCadencePlan(
@@ -563,31 +513,6 @@ function buildPromptGoalFamilyCadencePolicy(
   return policy.cadence;
 }
 
-function shouldRequireGoalFamilyCadenceSlot(
-  authoringInput: StructuredAuthoringInput,
-  policy: GoalFamilyIdentityPolicy,
-  weekNumber: number,
-) {
-  const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput, weekNumber);
-
-  if (supportedIntensityCadence.applies) {
-    return shouldScheduleSupportedIntensityWeek(
-      authoringInput,
-      weekNumber,
-      supportedIntensityCadence,
-    );
-  }
-
-  if (isBalancedHalfMarathonCadencePlan(authoringInput, policy)) {
-    return weekNumber >= 2 && weekNumber % 2 === 0;
-  }
-
-  return (
-    policy.cadence.frequency === "weekly" ||
-    (policy.cadence.frequency === "every_two_weeks" && weekNumber % 2 === 1)
-  );
-}
-
 function chooseGoalFamilyCadenceWeekday(
   policy: GoalFamilyIdentityPolicy,
   runningDays: string[],
@@ -661,97 +586,4 @@ function cadenceWeekdayPreferenceIndex(weekday: string) {
   const index = preferenceOrder.indexOf(weekday);
 
   return index === -1 ? preferenceOrder.length : index;
-}
-
-function cadenceIdentityOptionsForGoal(
-  authoringInput: StructuredAuthoringInput,
-  policy: GoalFamilyIdentityPolicy,
-  weekNumber: number,
-) {
-  const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput, weekNumber);
-
-  if (supportedIntensityCadence.applies) {
-    const supportedOptions = resolveSupportedSpecificityIdentityOptions(
-      authoringInput,
-      weekNumber,
-      supportedIntensityCadence,
-    );
-
-    return supportedOptions.filter((identity) => policy.allowedIdentities.has(identity));
-  }
-
-  const isFinalTwoWeeks =
-    weekNumber >= Math.max(1, resolveAuthoringHorizonWeeks(authoringInput) - 1);
-
-  if (isBalancedHalfMarathonCadencePlan(authoringInput, policy)) {
-    const balancedHalfOptions: AuthoredWorkoutIdentity[] = isFinalTwoWeeks
-      ? ["taper_tuneup_run", "progression_run", "controlled_tempo_session"]
-      : ["progression_run", "controlled_tempo_session", "half_marathon_threshold_durability"];
-
-    return balancedHalfOptions.filter((identity) => policy.allowedIdentities.has(identity));
-  }
-
-  if (isFinalTwoWeeks) {
-    const taperOptions = [...policy.cutbackTaperIdentities].filter((identity) =>
-      policy.allowedIdentities.has(identity),
-    );
-
-    if (policy.cadence.kind === "specialty") {
-      return [...new Set([...taperOptions, ...policy.specialtyIdentities])];
-    }
-
-    return [...new Set([...taperOptions, ...policy.expectedQualityIdentities])];
-  }
-
-  if (policy.cadence.useLongRunSlot) {
-    return [...new Set([...policy.longRunIdentities, ...policy.specialtyIdentities])];
-  }
-
-  return [
-    ...new Set([
-      ...policy.expectedQualityIdentities,
-      ...policy.specialtyIdentities,
-      ...policy.longRunIdentities,
-    ]),
-  ].filter((identity) => policy.allowedIdentities.has(identity));
-}
-
-function cadencePurposeForGoal(
-  authoringInput: StructuredAuthoringInput,
-  policy: GoalFamilyIdentityPolicy,
-  weekNumber: number,
-) {
-  const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput, weekNumber);
-
-  if (supportedIntensityCadence.applies) {
-    return `Beginner/recreational cadence ladder: ${supportedIntensityCadence.reason}`;
-  }
-
-  const isFinalTwoWeeks =
-    weekNumber >= Math.max(1, resolveAuthoringHorizonWeeks(authoringInput) - 1);
-
-  if (isFinalTwoWeeks) {
-    return "Reduced specificity that preserves freshness while keeping the goal-family signal visible.";
-  }
-
-  switch (policy.key) {
-    case "five_k":
-      return "Controlled faster-running rhythm or short sharpening repeats.";
-    case "ten_k":
-      return "Sustained rhythm, cruise-style intervals, or controlled faster running.";
-    case "half_marathon":
-      if (isBalancedHalfMarathonCadencePlan(authoringInput, policy)) {
-        return "Moderate balanced half-marathon rhythm: progression, controlled tempo, or threshold durability without early target-time intensity.";
-      }
-
-      return "Half-marathon threshold durability, controlled tempo, or race-rhythm preparation.";
-    case "marathon":
-      return "Marathon-specific steady durability without unsupported race-pace precision.";
-    case "ultra":
-      return "Ultra time-on-feet, hike-run durability, or terrain-patient endurance.";
-    case "mountain_trail":
-      return "Trail, hill, downhill-control, climbing, or mountain time-on-feet specificity.";
-    default:
-      return "Safe goal-family cadence without adding unsupported hard-day density.";
-  }
 }

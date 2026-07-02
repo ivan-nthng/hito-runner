@@ -152,24 +152,36 @@
           "prescription": {
             "mode": "repeats",
             "repeat_count": 6,
-            "repeat_unit": {
-              "mode": "time",
-              "duration_min": 1
-            },
-            "recovery_unit": {
-              "mode": "time",
-              "duration_min": 2
-            }
-          },
-          "target": {
-            "intensity": "controlled hill effort",
-            "cue": "Drive tall, stay repeatable, avoid sprinting.",
-            "hint": "The last repeat should look like the first."
-          },
-          "recovery_target": {
-            "intensity": "very easy",
-            "cue": "Recover fully before the next climb.",
-            "hint": "Walk the steepest downhill if footing is uncertain."
+            "children": [
+              {
+                "role": "work",
+                "label": "Work",
+                "sequence": 1,
+                "prescription": {
+                  "mode": "time",
+                  "duration_min": 1
+                },
+                "target": {
+                  "intensity": "controlled hill effort",
+                  "cue": "Drive tall, stay repeatable, avoid sprinting.",
+                  "hint": "The last repeat should look like the first."
+                }
+              },
+              {
+                "role": "recover",
+                "label": "Recover",
+                "sequence": 2,
+                "prescription": {
+                  "mode": "time",
+                  "duration_min": 2
+                },
+                "target": {
+                  "intensity": "very easy",
+                  "cue": "Recover fully before the next climb.",
+                  "hint": "Walk the steepest downhill if footing is uncertain."
+                }
+              }
+            ]
           }
         },
         {

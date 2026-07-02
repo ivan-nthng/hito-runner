@@ -14,114 +14,69 @@ high
 
 ## Next Recommended Role
 
-frontend
+architect
 
 ## Task
 
-Implement Hito DS specimen workbench v2 as the shared Demo/Variants contract across `/hitoDS`,
-including real table-header interaction parity.
+Hold Hito DS after accepted workout slice visual/runtime proof.
 
 ## Stage
 
-FRONTEND implementation / Hito DS workbench v2 and interaction normalization.
+ARCHITECT holding / post-workout-slice visual/runtime closeout.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: FRONTEND
+ROLE: ARCHITECT
 
 Task:
-Implement Hito DS specimen workbench v2 as the shared Demo/Variants contract across `/hitoDS`,
-including real table-header interaction parity.
+Reassess Hito DS only when a new source-proved DS drift appears.
 
 Stage:
-FRONTEND implementation / Hito DS workbench v2 and interaction normalization.
+ARCHITECT holding / Hito DS source-of-truth reassessment.
 
 Context:
-- `/hitoDS` IA Slice 1-6 is accepted.
-- `/test-calendar` remains paused and archived as sufficient for now.
-- The remaining product/design complaint is no longer route ownership or missing sections; it is
-  inconsistent specimen grammar inside accepted DS sections.
-- Current sections still mix:
-  - oversized dark inner stage cards
-  - uneven spacing and density
-  - unclear right-panel control behavior
-  - inconsistent Demo vs Variants meaning
-  - data-table header behavior that does not yet clearly match real product table interaction
-
-Desired DS contract:
-- `Demo` and `Variants` tabs control the whole section.
-- Left side is always the main actor.
-- In `Demo`, left side shows one centered specimen in a taller, calmer stage.
-- In `Variants`, left side shows the full family without the oversized nested stage card.
-- Right side uses only Hito DS primitives and Hito colors.
-- In `Demo`, right side is a small top control block for the current entity.
-- In `Variants`, right side becomes a fuller control card with a lighter surface.
-- More air everywhere: larger gaps, calmer spacing, less border noise.
-- No custom local control grammar.
-
-Table-specific requirement:
-- `/hitoDS#data-table` must visually and behaviorally align with real product table headers.
-- Header cells must show ordinary, hover, and active states.
-- Clicking a header must expose a DS-owned dropdown/menu with sorting options.
-- Use the same DS primitives/patterns used by real tables, not a fake one-off sandbox pattern.
+The workout color-token DS implementation, manual constructor timeline adoption, and 2026-06-28
+workout-slice browser proof over the relocated local QA runtime are accepted. Frontend consumes
+backend-owned `constructorContract.timeline`; Repeat set remains structural-only with no standalone
+color token. No immediate Hito DS implementation gate remains from this chain.
 
 Canonical owner:
-Frontend DS specimen layer only. This is a cross-cutting `/hitoDS` workbench normalization slice,
-not a product runtime redesign.
+Hito DS remains the shared component/token/specimen owner. Manual target-input policy belongs to
+manual authoring Product/Architecture and Backend, not to this DS plan.
 
 Required reading:
 1. AGENTS.md
-2. agents/frontend.agent.md
-3. skills/hito-frontend-design-system/SKILL.md
+2. agents/architect.agent.md
+3. skills/hito-architecture-audit/SKILL.md
 4. docs/current-product.md
 5. docs/current-system.md
 6. docs/plans/active/2026-06-15-hito-ds-information-architecture-and-specimen-contract.md
-7. docs/plans/archive/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md
-8. src/routes/hitoDS.tsx
-9. src/components/hito-ds/playground.tsx
-10. src/components/hito-ds/specimen-previews.tsx
-11. src/components/hito-ds/dropdown-family-playground.tsx
-12. any nearby `src/components/hito-ds/*` helpers used by current sections
-13. relevant shared table/list/dropdown/button/input/tabs primitives under `src/components/ui/*`
-14. src/styles.css
+7. docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
+8. src/styles.css
+9. src/routes/hitoDS.tsx
+10. relevant source for the newly reported DS drift, if any
 
 Scope:
-1. Create one shared workbench-v2 presentation contract in the existing `/hitoDS` specimen layer.
-2. Apply it consistently to the accepted component sections, starting with Buttons and Data Table,
-   and extend through the shared workbench where safe in the same slice.
-3. Remove oversized inner dark specimen cards where they conflict with the new contract.
-4. Make `Demo` mean one centered specimen and `Variants` mean the family/system view.
-5. Increase vertical and horizontal spacing to create more air.
-6. Use only Hito DS primitives, classes, colors, row patterns, fields, toggles, tabs, dropdowns,
-   and table primitives for the right-side control panels.
-7. Ensure table headers behave like real Hito/product tables:
-   - ordinary state
-   - hover state
-   - active/open state
-   - dropdown with sort options
+1. Treat workout color-token and manual constructor timeline adoption as closed unless fresh source
+   proof shows a regression.
+2. Select a new Hito DS gate only if it has one owner, one risk class, one validation story, and a
+   source-proved shared component/token/specimen gap.
+3. Keep manual target-input policy in the manual authoring plan unless it creates a new DS display
+   contract after Product/Backend acceptance.
 
 What must not be touched:
-- Do not change product runtime calendar/workout flows.
-- Do not reopen `/test-calendar`.
-- Do not invent a second design system or custom control grammar.
-- Do not add custom colors outside Hito tokens.
-- Do not change backend, Supabase, auth, OpenAI, persistence, or Figma bridge behavior.
-- Do not broaden into route splits or a whole-site redesign.
+- Do not reopen workout color-token implementation, manual constructor timeline adoption,
+  primitive-token cleanup, or `/test-calendar` without fresh regression proof.
+- Do not route manual target-input policy through Hito DS.
 
 Validation:
-- `npm exec eslint -- src/routes/hitoDS.tsx src/components/hito-ds src/components/ui`
-- `git diff --check -- src/routes/hitoDS.tsx src/components/hito-ds src/components/ui src/styles.css docs/plans/active/2026-06-15-hito-ds-information-architecture-and-specimen-contract.md`
-- `npm run build`
-- inspect `/hitoDS` locally at desktop and `375px`
-- confirm:
-  - Demo = one centered specimen
-  - Variants = family view
-  - right controls use DS primitives only
-  - more spacing / less border noise
-  - data-table header hover/active/open states exist
-  - header click opens dropdown sort options
-  - no local section overflow
+- Source audit only unless a future DS implementation gate is selected.
+- Scoped `git diff --check` if docs change.
+
+Stop conditions:
+- Stop if the candidate belongs to Product, Backend, QA, runtime behavior, or manual target truth
+  rather than shared Hito DS ownership.
 
 Expected output:
 Use the standard role handoff format already used in this repo.
@@ -133,28 +88,28 @@ ARCHITECT / DESIGNER / FRONTEND / QA
 
 ## Last Updated
 
-2026-06-17
+2026-06-28
 
 ## Root Cause
 
 Visible symptom:
 
-- `/hitoDS#calendar-workout-playground` does not feel enough like a real product desktop day.
-- Dropdown and calendar specimens have needed local cleanup because the specimen structure was
-  confusing.
-- `/hitoDS` lacks one obvious navigation and specimen grammar.
+- Workout color roles, manual constructor timeline adoption, and the cache-runtime workout-slice
+  browser proof are accepted.
+- No immediate DS implementation gate remains from that accepted chain.
 
 Underlying cause:
 
-- Hito DS has primitives, wrappers, tokens, and some shared playground anatomy, but it does not yet
-  have a canonical page-level IA and component specimen contract.
-- Each section can choose its own demo/variant/settings layout, which lets local specimen decisions
-  drift section by section.
+- The previous DS blocker was stale route-local rendering around workout/section color and manual
+  constructor timeline readback. That blocker has been closed and visually accepted on the relocated
+  local QA runtime; future DS work needs fresh source proof of a shared component/token/specimen
+  ownership gap.
 
 Canonical owner:
 
-- Documentation/source-of-truth and Hito DS architecture first.
-- Frontend implementation second, bounded to `/hitoDS` and shared DS specimen anatomy.
+- Hito DS remains the owner for shared component/token/specimen contracts.
+- Manual target-input policy belongs to Product/Architecture and Backend manual authoring contracts,
+  not to this DS plan.
 
 ## Architecture Decision
 
@@ -1005,6 +960,89 @@ Decision:
   found.
 - Keep this broader DS IA plan active for other `/hitoDS` and shared specimen follow-up; this note
   closes only the historical rest-day chrome bug.
+
+## Workout Color-Token DS Closeout - 2026-06-26
+
+Accepted status:
+
+- FRONTEND implemented workout color as a Hito DS token contract, not as route-local hex
+  replacement.
+- `src/styles.css` now owns primitive workout scales `50..950` plus semantic workout type and
+  workout section slots.
+- `src/lib/workout-color-tokens.ts` is the shared helper/readback seam for workout type and section
+  color variables.
+- `/hitoDS` documents the accepted workout roles and section roles, including the rule that workout
+  colors describe training identity rather than CTA hierarchy.
+- Workout roles are Rest, Recovery, Easy, Steady, Long Run, Progression, Tempo, Intervals, Hills,
+  and Run/Walk.
+- Section roles are Warm-up, Run, Work, Recover, Finish, and Cooldown.
+- Repeat set remains structural-only: its children carry Work / Recover colors, and there is no
+  standalone semantic repeat color token.
+- The color contract lives in Hito DS token/rendering-view-model code. It does not change backend
+  schema, workout identities, plan engine behavior, or metric truth.
+
+QA proof:
+
+- Browser proof for the workout color-token DS implementation passed in the reported scope.
+- No runtime/backend/schema/source-of-truth conflict was found with planned-workout language or
+  manual constructor segment/repeat doctrine.
+
+Selected next gate:
+
+Closed by the accepted 2026-06-27 frontend timeline adoption. No immediate Hito DS implementation
+gate remains from this chain.
+
+Reason:
+
+- Backend already emits `manual_workout_constructor_contract_v1` with a `timeline` read model from
+  the manual draft review seam.
+- Frontend now renders that backend-shaped timeline using existing Hito DS list/status primitives and
+  accepted workout/section color-token doctrine.
+- The remaining manual-authoring question is target-input policy, which is Product/Backend contract
+  work rather than DS implementation.
+
+## Manual Constructor Timeline Adoption Closeout - 2026-06-27
+
+Accepted status:
+
+- Frontend manual Review add UI now consumes backend-owned `constructorContract.timeline`.
+- Structural repeat groups render as compact ordered groups such as `6x [Work 2 min + Recover 1 min]`
+  with child Work/Recover rows.
+- Old review bullet reconstruction and visible `Editable HR guide` copy are no longer part of the
+  accepted UI proof.
+- Repeat set remains structural-only with no standalone section color token.
+- Reported validation passed targeted ESLint, manual authoring validators, constructor contract proof,
+  build, browser desktop and exact 375px checks, clean console evidence, and disposable fixture cleanup.
+
+Decision:
+
+- Close the manual constructor timeline gate in this DS plan.
+- Do not select another DS implementation slice from this chain unless fresh source proof shows a
+  shared Hito DS ownership gap.
+
+## Workout Slice Visual And Cache Runtime QA Closeout - 2026-06-28
+
+Accepted status:
+
+- QA passed the workout-slice visual proof over the relocated managed local QA runtime.
+- The managed QA runtime is served from
+  `/Users/ivan/Library/Caches/hito-running/hito-running-4c6fe31a228f/qa-runtime`, outside the
+  iCloud workspace. `.output` remains Nitro build staging, and `logs/build-output-finalized` is not
+  the served runtime source.
+- `/hitoDS` rendered workout type colors and section role colors.
+- Repeat set remains structural-only with no standalone repeat color token.
+- A real manual Intervals constructor/review rendered timeline slices and ordered repeat children.
+- Final `qa:server:status`, build-output integrity, `curl`, log, and generated-conflict scans stayed
+  clean after browser navigation.
+
+Evidence:
+
+- [QA artifact folder](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-06-28/workout-slice-cache-runtime-acceptance-qa/>)
+
+Decision:
+
+- Close this DS visual/runtime proof. Future DS work needs fresh source proof of a shared Hito DS
+  component, token, or specimen ownership gap.
 
 ## Risks
 

@@ -10,6 +10,7 @@ import {
   getManualWorkoutTemplate,
   type ManualWorkoutTemplate,
 } from "@/lib/manual-workout-authoring/templates";
+import { validateManualWorkoutTargetInput } from "@/lib/manual-workout-authoring/target-input";
 
 export type ManualWorkoutDraftValidationResult =
   | {
@@ -97,7 +98,7 @@ function validateManualWorkoutEntries(
   if (targetTruthMode === "none") {
     issues.push({
       code: "unsafe_metric_truth",
-      message: "Non-rest manual workouts require structure_only or editable_default_hr truth.",
+      message: "Non-rest manual workouts require structure_only target truth.",
       path: ["targetTruthMode"],
     });
   }
@@ -186,7 +187,7 @@ function validateBlock(
     });
   }
 
-  validateMetricTarget(block, issues, path);
+  issues.push(...validateManualWorkoutTargetInput(block, "structure_only", path));
 
   if (NOTE_ONLY_BLOCKS.has(block.blockKey)) {
     if (!block.noteText?.trim()) {
@@ -205,34 +206,6 @@ function validateBlock(
       code: "missing_executable_structure",
       message: `${block.blockKey} requires durationSeconds or distanceMeters.`,
       path,
-    });
-  }
-}
-
-function validateMetricTarget(
-  block: ManualWorkoutBlockInput,
-  issues: ManualWorkoutDraftIssue[],
-  path: Array<string | number>,
-) {
-  if (!block.target) {
-    return;
-  }
-
-  if (block.target.pace || block.target.paceMinPerKmRange) {
-    issues.push({
-      code: "unsafe_metric_truth",
-      message:
-        "Manual workout drafts cannot include precise pace targets without validated pace truth.",
-      path: [...path, "target"],
-    });
-  }
-
-  if (block.target.hrBpmRange || block.target.hrTargetSource === "personal_hr_zone") {
-    issues.push({
-      code: "unsafe_metric_truth",
-      message:
-        "Manual workout drafts cannot include personal HR targets; default HR guidance must stay editable advisory only.",
-      path: [...path, "target"],
     });
   }
 }

@@ -1,4 +1,5 @@
 import type { Database, Json } from "@/lib/supabase/database";
+import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
 import { workoutDuration, type Step, type WorkoutType } from "@/lib/training";
 import type {
   WorkoutComparisonCompletionState,
@@ -756,22 +757,19 @@ function asPlannedComparisonStep(value: Json, index: number): PlannedComparisonS
   }
 
   const record = value as Record<string, Json | undefined>;
-  const work = asObjectRecord(record.work);
-  const recovery = asObjectRecord(record.recovery);
   const repeats = numberOrNull(record.repeats);
 
   let durationMin = numberOrNull(record.duration_min);
   let distanceKm = numberOrNull(record.distance_km);
+  const repeatChildren = plannedRepeatChildrenForComparison(record);
 
-  if (repeats && work) {
+  if (repeats && repeatChildren.length > 0) {
     durationMin =
       (durationMin ?? 0) +
-      repeats *
-        ((numberOrNull(work.duration_min) ?? 0) + (numberOrNull(recovery?.duration_min) ?? 0));
+      repeats * repeatChildren.reduce((sum, child) => sum + childDurationMin(child), 0);
     distanceKm =
       (distanceKm ?? 0) +
-      repeats *
-        ((numberOrNull(work.distance_km) ?? 0) + (numberOrNull(recovery?.distance_km) ?? 0));
+      repeats * repeatChildren.reduce((sum, child) => sum + childDistanceKm(child), 0);
   }
 
   return {
@@ -782,6 +780,43 @@ function asPlannedComparisonStep(value: Json, index: number): PlannedComparisonS
     distanceKm: distanceKm != null && distanceKm > 0 ? roundNumber(distanceKm, 2) : null,
     repeats,
   };
+}
+
+function plannedRepeatChildrenForComparison(
+  record: Record<string, Json | undefined>,
+): Record<string, unknown>[] {
+  const prescription = asObjectRecord(record.prescription);
+  const directChildren = jsonArray(record.children);
+  const prescriptionChildren = jsonArray(prescription?.children as Json | undefined);
+
+  const children =
+    directChildren.length > 0
+      ? directChildren
+      : prescriptionChildren.length > 0
+        ? prescriptionChildren
+        : [];
+
+  return reduceRepeatChildrenToChildFirst({
+    children,
+  }).children.map((child) => child as Record<string, unknown>);
+}
+
+function childDurationMin(child: Record<string, unknown>) {
+  const prescription = asObjectRecord(child.prescription as Json | undefined);
+  const durationMin =
+    numberOrNull((prescription?.duration_min as Json | undefined) ?? null) ??
+    numberOrNull(child.duration_min as Json | undefined);
+
+  return durationMin ?? 0;
+}
+
+function childDistanceKm(child: Record<string, unknown>) {
+  const prescription = asObjectRecord(child.prescription as Json | undefined);
+  const distanceKm =
+    numberOrNull((prescription?.distance_km as Json | undefined) ?? null) ??
+    numberOrNull(child.distance_km as Json | undefined);
+
+  return distanceKm ?? 0;
 }
 
 function asActualComparisonStep(value: Json): ActualComparisonStep | null {
@@ -895,6 +930,10 @@ function asObjectRecord(value: Json | undefined) {
   }
 
   return value as Record<string, Json | undefined>;
+}
+
+function jsonArray(value: Json | undefined): Json[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function stringOr(value: Json | undefined) {

@@ -6,13 +6,31 @@ export type AiFirstPlanDraftNormalizationIssue = {
   path?: string;
 };
 
+export type AiFirstPlanBlueprintDateAuthorshipMode = "openai_authored_dated_plan";
+
+export type AiFirstPlanBlueprintAuthoredDateSource =
+  | "openai_authored_date"
+  | "local_fixture_authored_date";
+
+export type AiFirstPlanBlueprintDateValidationStatus =
+  | "backend_validated_date"
+  | "backend_repaired_date"
+  | "backend_rejected_date";
+
+export interface AiFirstPlanBlueprintDatePlacementMetadata {
+  mode: AiFirstPlanBlueprintDateAuthorshipMode;
+  authoredDateSource: AiFirstPlanBlueprintAuthoredDateSource;
+  validationStatus: AiFirstPlanBlueprintDateValidationStatus;
+  explicitAuthoredWorkoutDateCount: number | null;
+  missingAuthoredWorkoutDateCount: number | null;
+  backendFilledRestDayCount: number | null;
+  backendRepairedDateCount: number;
+  backendExtendedWeeks: number | null;
+}
+
 export interface AiFirstPlanBlueprintTraceMetadata {
   sourceKind: string | null;
-  sourceStatus:
-    | "ai_authored"
-    | "repaired_ai_draft"
-    | "deterministic_fallback"
-    | "blueprint_unavailable";
+  sourceStatus: "ai_authored" | "repaired_ai_draft" | "blueprint_unavailable";
   fallbackReason: string | null;
   model: string | null;
   timeoutMs: number | null;
@@ -38,6 +56,7 @@ export interface AiFirstPlanBlueprintTraceMetadata {
     missingWeekNumbers: number[];
     firstMissingRequiredDates: string[];
   };
+  datePlacement: AiFirstPlanBlueprintDatePlacementMetadata;
   blueprintHorizonStrategy?: {
     requestedHorizonWeeks: number;
     aiAuthoredHorizonWeeks: number;
@@ -85,18 +104,23 @@ export interface AiFirstPlanBlueprintTraceMetadata {
 }
 
 export interface AiFirstPlanDraftMetadata {
-  status: "ai_authored" | "repaired_ai_draft" | "expanded_from_envelope" | "deterministic_fallback";
+  status:
+    | "ai_authored"
+    | "repaired_ai_draft"
+    | "expanded_from_envelope"
+    | "blueprint_unavailable"
+    | "envelope_unavailable";
   source:
     | "openai_ai_first_plan_draft"
     | "openai_ai_first_plan_blueprint"
-    | "openai_ai_first_plan_envelope"
-    | "deterministic_structured_generator";
+    | "openai_ai_first_plan_envelope";
   validationIssues: string[];
   repairs: string[];
   reviewAssumptions: string[];
   metricPolicySummary: string;
   blueprintTrace?: AiFirstPlanBlueprintTraceMetadata | null;
   envelopeTrace?: unknown;
+  datePlacement?: AiFirstPlanBlueprintDatePlacementMetadata;
 }
 
 export type AiFirstPlanDraftNormalizationResult =

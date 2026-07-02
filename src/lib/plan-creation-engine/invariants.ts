@@ -8,8 +8,7 @@ import {
   type RunningPlanEndpointTemplate,
   type RunningPlanEngineSourceModel,
   type RunningPlanRange,
-  type RunningPlanRepeatRecoveryPrescription,
-  type RunningPlanRepeatWorkPrescription,
+  type RunningPlanRepeatChildPrescription,
   type RunningPlanSegmentPrescription,
   type RunningPlanWorkoutDayTemplate,
 } from "@/lib/plan-creation-engine/source-types";
@@ -134,6 +133,10 @@ function validateBuilderInputContract(model: RunningPlanEngineSourceModel, issue
     if (!deliberatelyAbsentFields.includes(absentField)) {
       issues.push(`Builder input contract must explicitly mark ${absentField} as absent.`);
     }
+  }
+
+  if (!activeInputFields.includes("planGoalIntent")) {
+    issues.push("Builder input contract must expose optional normalized planGoalIntent.");
   }
 
   if (model.builderInputContract.backendDefaults.daysPerWeek !== 3) {
@@ -387,7 +390,7 @@ function validateForbiddenOutputGates(model: RunningPlanEngineSourceModel, issue
     "no_old_runner_level_labels",
     "no_5k_benchmark_normal_path_dependency",
     "no_watch_choice_gate",
-    "no_target_time_normal_path",
+    "no_goal_intent_as_executable_target",
   ];
 
   for (const gateId of requiredGateIds) {
@@ -488,26 +491,18 @@ function segmentHasNumericStructure(prescription: RunningPlanSegmentPrescription
     case "repeat":
       return (
         rangeIsPositive(prescription.repeatCount) &&
-        repeatWorkHasNumericStructure(prescription.work) &&
-        repeatRecoveryHasNumericStructure(prescription.recovery)
+        prescription.children.length > 0 &&
+        prescription.children.every((child) => repeatChildHasNumericStructure(child))
       );
   }
 }
 
-function repeatWorkHasNumericStructure(work: RunningPlanRepeatWorkPrescription) {
-  if (work.mode === "time") {
-    return rangeIsPositive(work.durationSeconds);
+function repeatChildHasNumericStructure(child: RunningPlanRepeatChildPrescription) {
+  if (child.prescription.mode === "time") {
+    return rangeIsPositive(child.prescription.durationSeconds);
   }
 
-  return rangeIsPositive(work.distanceMeters);
-}
-
-function repeatRecoveryHasNumericStructure(recovery: RunningPlanRepeatRecoveryPrescription) {
-  if (recovery.mode === "recovery_time") {
-    return rangeIsPositive(recovery.recoveryDurationSeconds);
-  }
-
-  return rangeIsPositive(recovery.recoveryDistanceMeters);
+  return rangeIsPositive(child.prescription.distanceMeters);
 }
 
 function rangeIsPositive(range: RunningPlanRange) {

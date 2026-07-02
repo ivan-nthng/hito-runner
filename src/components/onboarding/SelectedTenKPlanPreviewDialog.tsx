@@ -22,6 +22,7 @@ import type {
   RunningPlanConfirmActionResult,
   RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";
+import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 
 type SelectedRunningPlanPreviewResult = RunningPlanPreviewActionResult;
 type SelectedRunningPlanPreviewDraft = Extract<
@@ -37,13 +38,36 @@ type SelectedRunningPlanPreviewStatus = "idle" | "loading_cards" | "previewing_p
 type RunningPlanCreateStatus = "idle" | "creating";
 type PreviewCalendarTone =
   | "easy"
+  | "steady"
   | "long"
-  | "strides"
+  | "progression"
   | "tempo"
   | "intervals"
   | "hills"
   | "rest"
   | "final";
+
+function planFamilyDisplayLabel(planFamily: string | null | undefined) {
+  switch (planFamily) {
+    case "10K":
+      return "10K";
+    case "Half Marathon":
+      return "Half Marathon";
+    case "Marathon Base":
+    case "Marathon Completion":
+      return "Marathon";
+    case undefined:
+    case null:
+    case "":
+      return "Selected";
+    default:
+      return planFamily;
+  }
+}
+
+function isMarathonPlanFamily(planFamily: string | null | undefined) {
+  return planFamily === "Marathon Base" || planFamily === "Marathon Completion";
+}
 
 interface SelectedRunningPlanPreviewDialogProps {
   open: boolean;
@@ -69,7 +93,7 @@ export function SelectedRunningPlanPreviewDialog({
   onOpenChange,
   onRefresh,
   open,
-  description = "Backend-built preview from the running plan engine. Create confirms this reviewed preview server-side before anything is saved.",
+  description = "AI-authored generated-plan preview. Create confirms this reviewed preview server-side before anything is saved.",
   primaryActionLabel = "Create plan",
   primaryActionPendingLabel = "Creating plan...",
   extraNotice,
@@ -94,7 +118,7 @@ export function SelectedRunningPlanPreviewDialog({
               Selected plan
             </p>
             <DialogTitle className="hito-modal-title mt-2">
-              {draft?.planFamily ?? unavailable?.planFamily ?? "Selected"} plan preview
+              {planFamilyDisplayLabel(draft?.planFamily ?? unavailable?.planFamily)} plan preview
             </DialogTitle>
             <DialogDescription className="hito-body max-w-2xl">{description}</DialogDescription>
           </div>
@@ -135,9 +159,6 @@ export function SelectedRunningPlanPreviewDialog({
                 </span>
                 <span className="hito-status-pill" data-tone="muted">
                   Not saved yet
-                </span>
-                <span className="hito-status-pill" data-tone="muted">
-                  No OpenAI
                 </span>
               </>
             ) : null}
@@ -228,8 +249,8 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
       };
     case "unsupported_family":
       return {
-        title: "Selected family unavailable",
-        copy: "This selected-plan family is not ready to create from this preview.",
+        title: "Generated plan unavailable",
+        copy: "This reviewed generated-plan path is not ready to create from this preview.",
         helper: result.message,
         tone: "signal",
       };
@@ -248,19 +269,35 @@ function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPrevie
     <div className="grid gap-4">
       <div className="hito-surface-wash" data-tone="destructive">
         <p className="hito-list-row-title">
-          {result.planFamily} preview cannot be built from this setup
+          {planFamilyDisplayLabel(result.planFamily)} preview needs adjustment
         </p>
-        <p className="hito-list-row-copy">{result.error.message}</p>
+        <p className="hito-list-row-copy">{previewUnavailableCopy(result.error.message)}</p>
       </div>
       <div className="hito-row-group">
         <div className="hito-list-row items-start">
-          <PreviewFact label="Source kind" value={result.sourceKind} />
-          <PreviewFact label="Persistence" value="preview only · no mutation" />
-          <PreviewFact label="Reason" value={result.error.code} />
+          <PreviewFact label="Next step" value="Adjust the goal details." />
+          <PreviewFact label="Saved plan" value="Nothing has been created." />
         </div>
       </div>
     </div>
   );
+}
+
+function previewUnavailableCopy(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("invalid_plan_goal_intent") ||
+    normalized.includes("source_kind") ||
+    normalized.includes("target finish time") ||
+    normalized.includes("target outcome pace") ||
+    normalized.includes("target date") ||
+    normalized.includes("cannot promise a race date")
+  ) {
+    return "This setup cannot be previewed yet. Adjust the goal details.";
+  }
+
+  return message;
 }
 
 function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
@@ -299,7 +336,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
       <section className="hito-row-group">
         <div className="hito-list-row items-start">
           <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <PreviewFact label="Plan family" value={draft.planFamily} />
+            <PreviewFact label="Goal" value={planFamilyDisplayLabel(draft.planFamily)} />
             <PreviewFact
               label="Duration"
               value={`${rowsByWeek.length} weeks · ${draft.calendarRows.length} rows`}
@@ -334,13 +371,13 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
 
         <div className="hito-list-row items-start">
           <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <PreviewFact label="Source kind" value={draft.sourceKind} />
-            <PreviewFact label="Persistence" value="persisted false · mutates false" />
-            <PreviewFact label="AI" value="callsOpenAi false" />
-            <PreviewFact label="Validation" value="endpoint and watch-executable gates passed" />
+            <PreviewFact label="Review state" value="Preview only · not saved yet" />
+            <PreviewFact label="Validation" value="Endpoint and workout-structure checks passed" />
           </div>
         </div>
       </section>
+
+      <PlanGoalIntentReadback intent={draft.normalizedInputSummary.planGoalIntent} />
 
       <section className="grid gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -359,19 +396,20 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
         <div className="hito-selected-plan-calendar grid gap-2">
           <div className="hito-selected-plan-calendar-legend" aria-label="Calendar legend">
             <PreviewLegendItem tone="easy" label="Easy" />
-            <PreviewLegendItem tone="long" label="Long" />
-            <PreviewLegendItem tone="strides" label="Strides" />
+            <PreviewLegendItem tone="steady" label="Steady" />
+            <PreviewLegendItem tone="long" label="Long Run" />
+            <PreviewLegendItem tone="progression" label="Progression" />
             <PreviewLegendItem tone="tempo" label="Tempo" />
             <PreviewLegendItem tone="intervals" label="Intervals" />
             <PreviewLegendItem tone="hills" label="Hills" />
             <PreviewLegendItem tone="rest" label="Rest" />
-            <PreviewLegendItem tone="final" label={`Final ${finalPreviewLabel(draft)}`} />
+            <PreviewLegendItem tone="final" label="Endpoint" />
           </div>
 
           <TooltipProvider delayDuration={120}>
             <div
               className="hito-selected-plan-calendar-weeks"
-              aria-label={`${draft.planFamily} preview calendar`}
+              aria-label={`${planFamilyDisplayLabel(draft.planFamily)} preview calendar`}
             >
               {rowsByWeek.map(([weekNumber, rows]) => (
                 <div key={weekNumber} className="hito-selected-plan-calendar-week">
@@ -491,29 +529,78 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
   );
 }
 
+function PlanGoalIntentReadback({
+  intent,
+}: {
+  intent: SelectedRunningPlanPreviewDraft["normalizedInputSummary"]["planGoalIntent"];
+}) {
+  const outcomePace = intent.targetOutcomePace;
+  const derivedOutcomePace = intent.derivedOutcomePace;
+  const showSeparateDerivedOutcomePace =
+    Boolean(derivedOutcomePace) &&
+    (!outcomePace ||
+      outcomePace.source !== "derived_from_finish_time" ||
+      outcomePace.label !== derivedOutcomePace?.label);
+  const distanceLabel = intent.distance?.label ?? "Plan default";
+  const assumption = intent.assumptions.at(0);
+
+  return (
+    <section className="hito-row-group">
+      <div className="hito-list-row items-start">
+        <div className="grid flex-1 gap-3">
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="hito-label">Goal readback</p>
+              <p className="hito-list-row-title">{distanceLabel}</p>
+              <p className="hito-list-row-copy">
+                Race/result context. Any pace shown here is goal readback, not your workout pace
+                target.
+              </p>
+            </div>
+            <span className="hito-status-pill" data-tone={goalIntentTone(intent)}>
+              {goalIntentStatusLabel(intent.feasibility.status)}
+            </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <PreviewFact label="Distance" value={distanceReadback(intent)} />
+            <PreviewFact label="Race day" value={intent.targetDate ?? "Not supplied"} />
+            <PreviewFact
+              label="Finish time"
+              value={intent.targetFinishTime?.label ?? "Not supplied"}
+            />
+            <PreviewFact
+              label={outcomePaceLabel(outcomePace)}
+              value={
+                outcomePace
+                  ? `${outcomePace.label} · ${goalIntentPaceSourceLabel(outcomePace.source)}`
+                  : "Not supplied"
+              }
+            />
+            {showSeparateDerivedOutcomePace && derivedOutcomePace ? (
+              <PreviewFact
+                label="Derived pace"
+                value={`${derivedOutcomePace.label} · ${goalIntentPaceSourceLabel(
+                  derivedOutcomePace.source,
+                )}`}
+              />
+            ) : null}
+          </div>
+
+          {assumption ? <p className="hito-field-helper">{assumption}</p> : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function EndpointProofPills({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
   const exactEndpoint = draft.endpointProof.endpointMainDistanceMeters;
-
-  if (draft.planFamily === "Marathon Base") {
-    return (
-      <div className="flex flex-wrap gap-2">
-        <span className="hito-status-pill" data-tone="success">
-          marathon_base_endpoint
-        </span>
-        <span className="hito-status-pill" data-tone="muted">
-          base-building preview
-        </span>
-        <span className="hito-status-pill" data-tone="muted">
-          durability focus
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-wrap gap-2">
       <span className="hito-status-pill" data-tone="success">
-        {exactEndpoint}m endpoint
+        {exactEndpoint ? `${exactEndpoint}m endpoint` : "reviewed endpoint"}
       </span>
       <span className="hito-status-pill" data-tone="muted">
         no fake pace
@@ -564,30 +651,30 @@ function FamilyReadback({
     );
   }
 
-  if (draft.planFamily === "Marathon Base") {
+  if (isMarathonPlanFamily(draft.planFamily)) {
     const intervalsPresent = rows.some((row) => row.workoutDayKind === "intervals");
 
     return (
       <section className="hito-row-group">
         <div className="hito-list-row items-start">
           <div className="grid gap-3">
-            <p className="hito-label">Marathon Base shape</p>
+            <p className="hito-label">Marathon shape</p>
             <p className="hito-list-row-title">
-              Base-building preview with a controlled final durability checkpoint.
+              Reviewed marathon goal with controlled long-run progression.
             </p>
             <p className="hito-list-row-copy">
-              This is a base-building preview, not a selected-distance marathon race plan. It keeps
-              durability, controlled steady work, and recovery rhythm visible.
+              This generated preview keeps durability, controlled steady work, and recovery rhythm
+              visible without turning outcome pace into workout targets.
             </p>
             <div className="flex flex-wrap gap-2">
               <span className="hito-status-pill" data-tone="success">
-                marathon_base_endpoint
+                marathon endpoint
               </span>
               <span className="hito-status-pill" data-tone={intervalsPresent ? "warning" : "muted"}>
                 {intervalsPresent ? "intervals present" : "no intervals"}
               </span>
               <span className="hito-status-pill" data-tone="muted">
-                base durability
+                long-run progression
               </span>
             </div>
           </div>
@@ -601,18 +688,18 @@ function FamilyReadback({
 
 function finalPreviewLabel(draft: SelectedRunningPlanPreviewDraft) {
   if (draft.planFamily === "Half Marathon") return "Half Marathon";
-  if (draft.planFamily === "Marathon Base") return "Base endpoint";
+  if (isMarathonPlanFamily(draft.planFamily)) return "Marathon goal";
 
   return "10K";
 }
 
 function endpointProofLabel(draft: SelectedRunningPlanPreviewDraft) {
-  return draft.planFamily === "Marathon Base" ? "Base endpoint proof" : "Endpoint proof";
+  return isMarathonPlanFamily(draft.planFamily) ? "Marathon endpoint proof" : "Endpoint proof";
 }
 
 function endpointProofTitle(draft: SelectedRunningPlanPreviewDraft) {
-  if (draft.planFamily === "Marathon Base") {
-    return "Final marathon-base day is a controlled durability checkpoint.";
+  if (isMarathonPlanFamily(draft.planFamily)) {
+    return "Final marathon day is a reviewed endpoint checkpoint.";
   }
 
   return `Final selected-distance day ends at exactly ${draft.endpointProof.endpointMainDistanceMeters}m.`;
@@ -621,13 +708,69 @@ function endpointProofTitle(draft: SelectedRunningPlanPreviewDraft) {
 function endpointProofCopy(draft: SelectedRunningPlanPreviewDraft) {
   const baseCopy = `Final row ${draft.endpointProof.finalRowId} on ${
     draft.endpointProof.finalDate
-  } is the last non-rest row and carries \`${draft.endpointProof.finalWorkoutDayKind}\`.`;
-
-  if (draft.planFamily === "Marathon Base") {
-    return `${baseCopy} The runner-facing preview stays focused on base building.`;
-  }
+  } is the last non-rest row and carries reviewed endpoint structure.`;
 
   return baseCopy;
+}
+
+function distanceReadback(
+  intent: SelectedRunningPlanPreviewDraft["normalizedInputSummary"]["planGoalIntent"],
+) {
+  if (!intent.distance) {
+    return "Plan default";
+  }
+
+  return `${intent.distance.label} · ${intent.distance.distanceKm} km`;
+}
+
+function outcomePaceLabel(
+  outcomePace: SelectedRunningPlanPreviewDraft["normalizedInputSummary"]["planGoalIntent"]["targetOutcomePace"],
+) {
+  if (outcomePace?.source === "derived_from_finish_time") {
+    return "Derived race-day pace";
+  }
+
+  return "Goal pace";
+}
+
+function goalIntentPaceSourceLabel(
+  source: "derived_from_finish_time" | "runner_entered_outcome_pace",
+) {
+  switch (source) {
+    case "derived_from_finish_time":
+      return "derived from finish time";
+    case "runner_entered_outcome_pace":
+      return "goal readback";
+  }
+}
+
+function goalIntentStatusLabel(
+  status: SelectedRunningPlanPreviewDraft["normalizedInputSummary"]["planGoalIntent"]["feasibility"]["status"],
+) {
+  switch (status) {
+    case "supported":
+      return "Supported";
+    case "supported_with_assumptions":
+      return "Assumptions";
+    case "aggressive_or_short_horizon":
+      return "Aggressive";
+    case "unsupported_for_current_builder":
+      return "Needs review";
+  }
+}
+
+function goalIntentTone(
+  intent: SelectedRunningPlanPreviewDraft["normalizedInputSummary"]["planGoalIntent"],
+): "success" | "warning" | "muted" {
+  switch (intent.feasibility.status) {
+    case "supported":
+      return "success";
+    case "supported_with_assumptions":
+      return "muted";
+    case "aggressive_or_short_horizon":
+    case "unsupported_for_current_builder":
+      return "warning";
+  }
 }
 
 function expectedOutcomeTitle(draft: SelectedRunningPlanPreviewDraft) {
@@ -635,8 +778,8 @@ function expectedOutcomeTitle(draft: SelectedRunningPlanPreviewDraft) {
     return "Complete a Half Marathon checkpoint day.";
   }
 
-  if (draft.planFamily === "Marathon Base") {
-    return "Build marathon-base durability.";
+  if (isMarathonPlanFamily(draft.planFamily)) {
+    return "Complete a Marathon endpoint day.";
   }
 
   return "Complete a 10K checkpoint day.";
@@ -647,8 +790,8 @@ function expectedOutcomeCopy(draft: SelectedRunningPlanPreviewDraft) {
     return "The preview is a watch-executable Half Marathon progression, not a target-time or race-pace promise.";
   }
 
-  if (draft.planFamily === "Marathon Base") {
-    return "The preview builds durable marathon-base rhythm without presenting a selected-distance marathon plan.";
+  if (isMarathonPlanFamily(draft.planFamily)) {
+    return "The preview is a watch-executable Marathon progression, not a target-time or race-pace promise.";
   }
 
   return "The preview is a watch-executable 10K progression, not a target-time or race-pace promise.";
@@ -672,7 +815,7 @@ function SegmentReadbackCard({
           <p className="hito-label hito-label-signal">{label}</p>
           <h3 className="hito-list-row-title mt-1">{row.title}</h3>
           <p className="hito-list-row-copy">
-            {row.date} · {row.workoutDayKind}
+            {row.date} · {workoutKindMeta(row.workoutDayKind).label}
           </p>
         </div>
         <span className="hito-status-pill" data-tone="success">
@@ -749,17 +892,27 @@ function workoutKindMeta(kind: SelectedRunningPlanCalendarRow["workoutDayKind"])
       glyph: "recovery",
     },
     easy: { label: "Easy", short: "Easy", glyph: "easy" },
-    long_run: { label: "Long run", short: "Long", glyph: "long" },
+    long_run: { label: "Long Run", short: "Long Run", glyph: "long" },
     cutback_long_run: {
-      label: "Cutback long run",
-      short: "Cutback",
+      label: "Long Run",
+      short: "Long Run",
       glyph: "long",
     },
-    strides: { label: "Strides", short: "Strides", glyph: "quality" },
+    strides: { label: "Easy", short: "Easy", glyph: "easy" },
+    steady_aerobic_run: {
+      label: "Steady",
+      short: "Steady",
+      glyph: "steady",
+    },
+    progression: {
+      label: "Progression",
+      short: "Progression",
+      glyph: "progression",
+    },
     tempo: { label: "Tempo", short: "Tempo", glyph: "tempo" },
     threshold: {
-      label: "Threshold",
-      short: "Threshold",
+      label: "Tempo",
+      short: "Tempo",
       glyph: "tempo",
     },
     intervals: {
@@ -769,13 +922,13 @@ function workoutKindMeta(kind: SelectedRunningPlanCalendarRow["workoutDayKind"])
     },
     hills: { label: "Hills", short: "Hills", glyph: "hills" },
     final_selected_distance_day: {
-      label: "Final distance day",
-      short: "Final",
-      glyph: "race",
+      label: "Long Run",
+      short: "Long Run",
+      glyph: "long",
     },
     marathon_base_endpoint: {
-      label: "Marathon base",
-      short: "Base",
+      label: "Long Run",
+      short: "Long Run",
       glyph: "long",
     },
   };
@@ -843,20 +996,21 @@ function previewCalendarWorkoutIdentity(
     color: previewCalendarToneColor(tone),
     glyph: meta.glyph,
     label: meta.label,
-    short: tone === "final" ? calendarEndpointShortLabel(row) : meta.short,
+    short: meta.short,
   };
 }
 
 function previewCalendarToneColor(tone: PreviewCalendarTone) {
   const colors: Record<PreviewCalendarTone, string> = {
-    easy: "var(--easy)",
-    final: "var(--orange-500)",
-    hills: "color-mix(in oklch, var(--success) 68%, var(--easy))",
-    intervals: "var(--warn)",
-    long: "var(--long)",
-    rest: "var(--rest)",
-    strides: "var(--success)",
-    tempo: "var(--quality)",
+    easy: workoutTypeColorVar("easy"),
+    final: workoutTypeColorVar("long_run"),
+    hills: workoutTypeColorVar("hills"),
+    intervals: workoutTypeColorVar("intervals"),
+    long: workoutTypeColorVar("long_run"),
+    progression: workoutTypeColorVar("progression"),
+    rest: workoutTypeColorVar("rest"),
+    steady: workoutTypeColorVar("steady"),
+    tempo: workoutTypeColorVar("tempo"),
   };
 
   return colors[tone];
@@ -888,7 +1042,15 @@ function calendarTone(row: SelectedRunningPlanCalendarRow): PreviewCalendarTone 
   }
 
   if (row.workoutDayKind === "strides") {
-    return "strides";
+    return "easy";
+  }
+
+  if (row.workoutDayKind === "steady_aerobic_run") {
+    return "steady";
+  }
+
+  if (row.workoutDayKind === "progression") {
+    return "progression";
   }
 
   if (row.workoutDayKind === "tempo" || row.workoutDayKind === "threshold") {
@@ -906,25 +1068,9 @@ function calendarTone(row: SelectedRunningPlanCalendarRow): PreviewCalendarTone 
   return "tempo";
 }
 
-function calendarEndpointShortLabel(row: SelectedRunningPlanCalendarRow) {
-  if (row.workoutDayKind === "marathon_base_endpoint") {
-    return "Base";
-  }
-
-  if (row.endpointDistanceMeters === 21100) {
-    return "21K";
-  }
-
-  if (row.endpointDistanceMeters === 10000) {
-    return "10K";
-  }
-
-  return "Final";
-}
-
 function calendarEndpointReadback(row: SelectedRunningPlanCalendarRow) {
   if (row.workoutDayKind === "marathon_base_endpoint") {
-    return "marathon base endpoint";
+    return "marathon endpoint";
   }
 
   return row.endpointDistanceMeters ? `${row.endpointDistanceMeters}m endpoint` : null;

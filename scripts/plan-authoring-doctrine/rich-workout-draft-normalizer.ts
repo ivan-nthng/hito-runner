@@ -414,8 +414,6 @@ function buildDraftSegment(
       durationMin,
       distanceKm: null,
       repeatCount: null,
-      repeatUnit: null,
-      recoveryUnit: null,
     },
     guidance: `${label} with clear effort control and no invented metrics.`,
     target: {
@@ -458,8 +456,6 @@ function emptyDraftPrescription(mode: "none") {
     durationMin: null,
     distanceKm: null,
     repeatCount: null,
-    repeatUnit: null,
-    recoveryUnit: null,
   };
 }
 

@@ -455,14 +455,16 @@ function prescriptionDurationMinutes(prescription: RunningPlanSegmentPrescriptio
       return rangeMinutes(prescription.durationSecondsOrDistanceMeters);
     case "repeat": {
       const repeatCount = prescription.repeatCount.min;
-      const workMinutes =
-        prescription.work.mode === "time" ? rangeMinutes(prescription.work.durationSeconds) : 0;
-      const recoveryMinutes =
-        prescription.recovery.mode === "recovery_time"
-          ? rangeMinutes(prescription.recovery.recoveryDurationSeconds)
-          : 0;
+      const childMinutes = prescription.children.reduce(
+        (total, child) =>
+          total +
+          (child.prescription.mode === "time"
+            ? rangeMinutes(child.prescription.durationSeconds)
+            : 0),
+        0,
+      );
 
-      return repeatCount * (workMinutes + recoveryMinutes);
+      return repeatCount * childMinutes;
     }
     case "distance":
     case "distance_with_default_hr_cap":

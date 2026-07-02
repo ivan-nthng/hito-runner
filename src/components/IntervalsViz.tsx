@@ -1,249 +1,106 @@
-import { useState } from "react";
-import type { Workout, Step, StepTarget } from "@/lib/training";
+import type { Workout, Step } from "@/lib/training";
+import {
+  WorkoutStructureTimeline,
+  type WorkoutStructureTimelineItem,
+} from "@/components/workout-structure/WorkoutStructureTimeline";
 import {
   displayStepStructureEntries,
   displayStepTargetReadbackEntries,
   formatDurationMin,
-  segmentColorMeta,
+  repeatChildSteps,
+  repeatCountForStep,
   stepPlannedDurationMin,
+  workoutPlannedLanguage,
 } from "@/lib/training";
-import { cn } from "@/lib/utils";
+import type { PlannedWorkoutLanguageBlock } from "@/lib/planned-workout-language";
 
 /* Horizontal block timeline of workout structure. */
 export function IntervalsViz({ workout }: { workout: Workout }) {
   const blocks = expand(workout);
-  const total = blocks.reduce((s, b) => s + b.dur, 0);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const activeBlock = activeIndex == null ? null : blocks[activeIndex];
-  const activePosition = activeIndex == null ? null : blockCenterPercent(blocks, activeIndex);
-  const activeColors = activeBlock
-    ? segmentColorMeta(activeBlock.semanticKind, activeBlock.target)
-    : null;
+  const total = blocks.reduce((s, b) => s + b.weight, 0);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <span className="hito-label">Workout structure</span>
-        <span className="hito-caption font-mono-num">
-          {formatDurationMin(total)} · {blocks.length} blocks
-        </span>
-      </div>
-      <div className="relative">
-        <div className="relative z-10 flex h-12 rounded-md border border-hairline bg-background/25">
-          {blocks.map((b, i) => {
-            const colors = segmentColorMeta(b.semanticKind, b.target);
-            const isActive = activeIndex === i;
-            const hasActive = activeIndex != null;
-
-            return (
-              <button
-                key={i}
-                type="button"
-                onBlur={() => setActiveIndex(null)}
-                onClick={() => setActiveIndex(i)}
-                onFocus={() => setActiveIndex(i)}
-                onMouseEnter={() => setActiveIndex(i)}
-                onMouseLeave={() => setActiveIndex(null)}
-                onPointerEnter={() => setActiveIndex(i)}
-                onPointerLeave={() => setActiveIndex(null)}
-                className={cn(
-                  "relative min-w-0 cursor-default appearance-none overflow-hidden border-x border-background/20 p-0 transition-[flex-grow,opacity,transform] duration-200 first:rounded-l-md first:border-l-0 last:rounded-r-md last:border-r-0 hover:flex-grow-[1.2] focus-visible:z-20 focus-visible:outline-none",
-                  isActive && "z-10 -translate-y-0.5",
-                )}
-                style={{
-                  flexGrow: b.dur,
-                  flexBasis: 0,
-                  background: colors.background,
-                  borderColor: colors.border,
-                  boxShadow: isActive
-                    ? `${colors.glow}, inset 0 0 0 2px color-mix(in oklch, ${colors.color} 78%, white 10%)`
-                    : undefined,
-                  opacity: hasActive && !isActive ? 0.34 : 1,
-                }}
-                aria-label={`${b.title}, ${b.metric}`}
-              >
-                {b.dur >= 4 && (
-                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-mono-num text-background/80 mix-blend-luminosity">
-                    {b.label}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        {activeBlock && activeColors && activePosition != null && (
-          <SegmentTooltip
-            align={tooltipAlign(activeIndex ?? 0, blocks.length)}
-            block={activeBlock}
-            color={activeColors.color}
-            leftPercent={activePosition}
-            metricMode={workout.metricMode}
-          />
-        )}
-      </div>
-
-      <ol className="hito-row-group mt-5">
-        {blocks.map((b, i) => {
-          const colors = segmentColorMeta(b.semanticKind, b.target);
-          const isActive = activeIndex === i;
-          const readbackEntries = displayStepTargetReadbackEntries(b.step, workout.metricMode, {
-            limit: 2,
-            omitStructureLabels: visibleMetricStructureLabels(b.step),
-          });
-
-          return (
-            <li
-              key={i}
-              className={cn(
-                "hito-list-row justify-start gap-4 transition-colors",
-                isActive && "bg-white/[0.085]",
-              )}
-            >
-              <span className="hito-caption w-6 text-right font-mono-num">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span
-                className="h-6 w-1 rounded-full"
-                style={{
-                  background: colors.color,
-                  boxShadow: isActive ? colors.glow : undefined,
-                }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className="hito-list-row-title capitalize">{b.kind.replace("_", " ")}</span>
-                  <span className="hito-caption">{b.label}</span>
-                </div>
-                {readbackEntries.length > 0 && (
-                  <div className="hito-caption mt-0.5 space-x-3">
-                    {readbackEntries.map((entry) => (
-                      <span key={entry.key}>
-                        <span className="opacity-60">{entry.label}:</span>{" "}
-                        <span className="text-foreground/80">{entry.value}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <span className="hito-caption font-mono-num">{b.metric}</span>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+    <WorkoutStructureTimeline
+      items={blocks}
+      summary={`${formatDurationMin(total)} · ${blocks.length} blocks`}
+    />
   );
 }
 
-type Block = {
-  kind: string;
-  dur: number;
-  label: string;
-  metric: string;
-  title: string;
-  semanticKind: string;
-  target?: StepTarget;
-  step: Step;
-};
+function expand(workout: Workout): WorkoutStructureTimelineItem[] {
+  const out: WorkoutStructureTimelineItem[] = [];
+  const languageBlocks = workoutPlannedLanguage(workout).runnerFacingBlocks;
 
-function expand(workout: Workout): Block[] {
-  const out: Block[] = [];
-  for (const s of workout.steps) {
-    if (s.repeats && s.work && s.recovery) {
-      for (let i = 0; i < s.repeats; i++) {
-        const workMetric = describeStepMetric(s.work);
-        out.push({
-          kind: "work",
-          semanticKind: `work ${s.work.label ?? ""}`,
-          dur: estimateVisualDurationMin(s.work, workout.type) || 1,
-          title: s.work.label ?? `Work ${i + 1}/${s.repeats}`,
-          label:
-            s.work.distance_km != null
-              ? `${i + 1}/${s.repeats} · ${Math.round(s.work.distance_km * 1000)}m`
-              : `${i + 1}/${s.repeats}`,
-          metric: workMetric,
-          target: s.work.target,
-          step: s.work,
-        });
+  for (const [stepIndex, s] of workout.steps.entries()) {
+    const languageBlock = languageBlocks[stepIndex];
+    const repeatCount = repeatCountForStep(s);
+    const repeatChildren = repeatChildSteps(s);
 
-        const recoveryDuration = estimateVisualDurationMin(s.recovery, "easy");
-        const recoveryMetric = describeStepMetric(s.recovery);
-        if (recoveryDuration > 0 || recoveryMetric !== "—" || s.recovery.target) {
+    if (repeatCount && repeatChildren.length > 0) {
+      for (let i = 0; i < repeatCount; i++) {
+        for (const [childIndex, child] of repeatChildren.entries()) {
+          const language = repeatChildLanguage(languageBlock, childIndex);
+          const metric = describeStepMetric(child);
+          const kind = child.segment_type ?? child.type;
+          const kindLabel = language?.label ?? child.label ?? humanizeSegmentKind(kind);
+
           out.push({
-            kind: "recovery",
-            semanticKind: `recovery ${s.recovery.label ?? ""}`,
-            dur: recoveryDuration || 1,
-            title: s.recovery.label ?? "Recovery",
-            label: "rec",
-            metric: recoveryMetric,
-            target: s.recovery.target,
-            step: s.recovery,
+            id: `repeat-${stepIndex}-${i}-${childIndex}`,
+            kindLabel,
+            semanticKind: `${language?.type ?? kind} ${child.label ?? ""}`,
+            weight: estimateVisualDurationMin(child, workout.type) || 1,
+            title: `${kindLabel} ${i + 1}/${repeatCount}`,
+            detailLabel: repeatChildBlockLabel(child, i + 1, repeatCount),
+            barLabel: compactStructureBarLabel(child),
+            metric,
+            target: child.target,
+            readbackEntries: displayStepTargetReadbackEntries(child, workout.metricMode, {
+              limit: 2,
+              omitStructureLabels: visibleMetricStructureLabels(child),
+            }),
+            tooltipReadbackEntries: displayStepTargetReadbackEntries(child, workout.metricMode, {
+              limit: 3,
+              omitStructureLabels: visibleMetricStructureLabels(child),
+              supportFallbackLimit: 1,
+            }),
           });
         }
       }
     } else {
       const kind = s.type === "run" ? "run" : s.type;
+      const kindLabel = languageBlock?.label ?? humanizeSegmentKind(kind);
+
       out.push({
-        kind,
+        id: `step-${stepIndex}`,
+        kindLabel,
         semanticKind: `${kind} ${s.label ?? ""}`,
-        dur: estimateVisualDurationMin(s, workout.type) || 1,
-        title: s.label ?? humanizeSegmentKind(kind),
-        label: describeStepMetric(s),
+        weight: estimateVisualDurationMin(s, workout.type) || 1,
+        title: kindLabel,
+        detailLabel: describeStepMetric(s),
+        barLabel: compactStructureBarLabel(s),
         metric: describeStepMetric(s),
         target: s.target,
-        step: s,
+        readbackEntries: displayStepTargetReadbackEntries(s, workout.metricMode, {
+          limit: 2,
+          omitStructureLabels: visibleMetricStructureLabels(s),
+        }),
+        tooltipReadbackEntries: displayStepTargetReadbackEntries(s, workout.metricMode, {
+          limit: 3,
+          omitStructureLabels: visibleMetricStructureLabels(s),
+          supportFallbackLimit: 1,
+        }),
       });
     }
   }
   return out;
 }
 
-function SegmentTooltip({
-  block,
-  color,
-  align,
-  leftPercent,
-  metricMode,
-}: {
-  block: Block;
-  color: string;
-  align: "left" | "center" | "right";
-  leftPercent: number;
-  metricMode: Workout["metricMode"];
-}) {
-  const readbackEntries = displayStepTargetReadbackEntries(block.step, metricMode, {
-    limit: 3,
-    omitStructureLabels: visibleMetricStructureLabels(block.step),
-    supportFallbackLimit: 1,
-  });
+function repeatChildLanguage(block: PlannedWorkoutLanguageBlock | undefined, index: number) {
+  if (!block?.children.length) {
+    return null;
+  }
 
-  return (
-    <span
-      className={cn(
-        "hito-tooltip absolute top-[calc(100%+10px)] z-30 opacity-100",
-        align === "left" && "translate-x-0",
-        align === "center" && "left-1/2 -translate-x-1/2",
-        align === "right" && "-translate-x-full",
-      )}
-      style={{
-        left: `${leftPercent}%`,
-      }}
-    >
-      <span className="flex items-center gap-2 font-medium">
-        <span className="hito-tooltip-dot" style={{ background: color }} />
-        <span className="hito-tooltip-title">{block.title}</span>
-      </span>
-      <span className="hito-tooltip-meta mt-1 block font-mono-num">{block.metric}</span>
-      {readbackEntries.length > 0 && (
-        <span className="hito-tooltip-meta mt-1.5 block space-y-0.5">
-          {readbackEntries.map((entry) => (
-            <span key={entry.key} className="block">
-              <span className="opacity-65">{entry.label}:</span> <span>{entry.value}</span>
-            </span>
-          ))}
-        </span>
-      )}
-    </span>
-  );
+  return block.children[index] ?? null;
 }
 
 function visibleMetricStructureLabels(step: Step) {
@@ -261,10 +118,52 @@ function primaryVisibleStructureMetricEntry(step: Step) {
 
   return (
     entries.find((entry) => entry.key === "distance" || entry.key === "duration") ??
-    entries.find((entry) => entry.key === "work" || entry.key === "recovery") ??
+    entries.find((entry) => entry.key.startsWith("repeat_child_")) ??
     entries.find((entry) => entry.key === "repeats") ??
     null
   );
+}
+
+function repeatChildBlockLabel(child: Step, repeatIndex: number, repeatCount: number) {
+  const metric = describeStepMetric(child);
+
+  if (child.distance_km != null) {
+    return `${repeatIndex}/${repeatCount} · ${Math.round(child.distance_km * 1000)}m`;
+  }
+
+  if (metric !== "—") {
+    return `${repeatIndex}/${repeatCount} · ${metric}`;
+  }
+
+  return `${repeatIndex}/${repeatCount}`;
+}
+
+function compactStructureBarLabel(step: Step) {
+  if (step.duration_min != null && Number.isFinite(step.duration_min)) {
+    return compactDurationLabel(step.duration_min);
+  }
+
+  if (step.distance_km != null && Number.isFinite(step.distance_km)) {
+    return `${Math.round(step.distance_km * 1000)}m`;
+  }
+
+  return describeStepMetric(step);
+}
+
+function compactDurationLabel(durationMin: number) {
+  const totalSeconds = Math.max(1, Math.round(durationMin * 60));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes <= 0) {
+    return `${seconds}s`;
+  }
+
+  if (seconds === 0) {
+    return `${minutes}m`;
+  }
+
+  return `${minutes}m ${seconds}s`;
 }
 
 function estimateVisualDurationMin(step: Step, workoutType: Workout["type"]) {
@@ -295,27 +194,4 @@ function estimateVisualDurationMin(step: Step, workoutType: Workout["type"]) {
 
 function humanizeSegmentKind(kind: string) {
   return kind.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function tooltipAlign(index: number, total: number) {
-  if (index <= 1) {
-    return "left";
-  }
-
-  if (index >= total - 2) {
-    return "right";
-  }
-
-  return "center";
-}
-
-function blockCenterPercent(blocks: Block[], index: number) {
-  const total = blocks.reduce((sum, block) => sum + block.dur, 0);
-  if (!total) {
-    return 50;
-  }
-
-  const start = blocks.slice(0, index).reduce((sum, block) => sum + block.dur, 0);
-  const center = start + blocks[index].dur / 2;
-  return Math.min(96, Math.max(4, (center / total) * 100));
 }

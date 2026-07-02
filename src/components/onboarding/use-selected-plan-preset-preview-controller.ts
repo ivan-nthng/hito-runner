@@ -6,10 +6,11 @@ import {
   buildPlanPresetCardInput,
   buildPlanPresetCardInputKey,
   buildRunningPlanPreviewInput,
+  planGoalChoiceLabel,
+  type PlanGoalSelectionId,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
-import type { PlanPresetCardId } from "@/lib/plan-presets/schema";
-import { getPlanPresetCards, type PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
+import type { PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
 import {
   previewRunningPlanDraft,
   type RunningPlanPreviewActionInput,
@@ -37,13 +38,12 @@ export function useSelectedPlanPresetPreviewController({
   state,
   toastId,
 }: SelectedPlanPresetPreviewControllerOptions) {
-  const getPlanPresetCardsFn = useServerFn(getPlanPresetCards);
   const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
   const presetAutoLoadKeyRef = useRef<string | null>(null);
   const runningPlanPreviewInputKeyRef = useRef<string | null>(null);
   const [status, setStatus] = useState<PlanPresetUiStatus>("idle");
   const [cardsResult, setCardsResult] = useState<PlanPresetCardsActionResult | null>(null);
-  const [selectedCardId, setSelectedCardId] = useState<PlanPresetCardId | null>(null);
+  const [selectedGoalId, setSelectedGoalId] = useState<PlanGoalSelectionId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewResult, setPreviewResult] = useState<RunningPlanPreviewActionResult | null>(null);
@@ -62,7 +62,7 @@ export function useSelectedPlanPresetPreviewController({
   const resetPreviewState = useCallback(() => {
     setStatus("idle");
     setCardsResult(null);
-    setSelectedCardId(null);
+    setSelectedGoalId(null);
     setError(null);
     setPreviewOpen(false);
     setPreviewResult(null);
@@ -71,51 +71,67 @@ export function useSelectedPlanPresetPreviewController({
     runningPlanPreviewInputKeyRef.current = null;
   }, []);
 
+  const clearSelectedPreview = useCallback(() => {
+    setSelectedGoalId(null);
+    setError(null);
+    setPreviewOpen(false);
+    setPreviewResult(null);
+    setPreviewInput(null);
+    runningPlanPreviewInputKeyRef.current = null;
+    resetExternalState();
+  }, [resetExternalState]);
+
+  const requiredBasicsMessage =
+    "Add Age, Height, and Weight before loading or selecting a guided plan.";
+
   async function loadCards() {
     setError(null);
-    setSelectedCardId(null);
+    setSelectedGoalId(null);
     setPreviewResult(null);
     setPreviewInput(null);
     runningPlanPreviewInputKeyRef.current = null;
     resetExternalState();
 
-    try {
-      setStatus("loading_cards");
-      const result = await getPlanPresetCardsFn({
-        data: buildPlanPresetCardInput(state),
-      });
-
-      setCardsResult(result);
+    if (!isPresetDiscoveryReady) {
       setStatus("idle");
-
-      if (!result.ok) {
-        setError(result.message);
-      }
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : "Could not load plan presets.";
-      setStatus("idle");
-      setError(message);
+      setCardsResult(null);
+      setError(requiredBasicsMessage);
+      return;
     }
+
+    setStatus("idle");
+    setCardsResult(null);
   }
 
-  async function refreshPreview(cardIdOverride?: PlanPresetCardId) {
-    const cardId = cardIdOverride ?? selectedCardId;
+  async function refreshPreview(goalIdOverride?: PlanGoalSelectionId) {
+    const goalId = goalIdOverride ?? selectedGoalId;
 
-    if (!cardId) {
+    if (!isPresetDiscoveryReady) {
+      setStatus("idle");
+      setPreviewOpen(false);
+      setPreviewResult(null);
+      setPreviewInput(null);
+      runningPlanPreviewInputKeyRef.current = null;
+      resetExternalState();
+      setError(requiredBasicsMessage);
+      return;
+    }
+
+    if (!goalId) {
       setStatus("idle");
       setPreviewResult(null);
       setPreviewInput(null);
       runningPlanPreviewInputKeyRef.current = null;
       resetExternalState();
-      setError("Select a plan preset before previewing it.");
+      setError("Choose a goal before previewing it.");
       return;
     }
 
-    const inputResult = buildRunningPlanPreviewInput(state, cardId);
+    const inputResult = buildRunningPlanPreviewInput(state, goalId);
 
     if (!inputResult.ok) {
       setStatus("idle");
+      setPreviewOpen(false);
       setPreviewResult(null);
       setPreviewInput(null);
       runningPlanPreviewInputKeyRef.current = null;
@@ -146,12 +162,13 @@ export function useSelectedPlanPresetPreviewController({
 
       hitoToast.success({
         id: toastId,
-        title: `${inputResult.input.distanceFamily} preview ready`,
+        title: `${planGoalChoiceLabel(goalId)} preview ready`,
         description: previewReadyDescription,
       });
     } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : "Could not build this preview.";
+      const message = runnerSafePreviewErrorMessage(
+        submitError instanceof Error ? submitError.message : null,
+      );
       setPreviewResult(null);
       setPreviewInput(null);
       setStatus("idle");
@@ -159,14 +176,36 @@ export function useSelectedPlanPresetPreviewController({
     }
   }
 
-  function selectPlanPreview(cardId: PlanPresetCardId) {
-    setSelectedCardId(cardId);
-    setPreviewOpen(true);
+  function selectPlanPreview(goalId: PlanGoalSelectionId) {
+    if (!isPresetDiscoveryReady) {
+      setStatus("idle");
+      setSelectedGoalId(null);
+      setPreviewOpen(false);
+      setPreviewResult(null);
+      setPreviewInput(null);
+      runningPlanPreviewInputKeyRef.current = null;
+      resetExternalState();
+      setError(requiredBasicsMessage);
+      return;
+    }
+
+    setSelectedGoalId(goalId);
     setPreviewResult(null);
     setPreviewInput(null);
     runningPlanPreviewInputKeyRef.current = null;
     resetExternalState();
-    void refreshPreview(cardId);
+
+    const inputResult = buildRunningPlanPreviewInput(state, goalId);
+
+    if (!inputResult.ok) {
+      setStatus("idle");
+      setPreviewOpen(false);
+      setError(inputResult.error);
+      return;
+    }
+
+    setPreviewOpen(true);
+    void refreshPreview(goalId);
   }
 
   const autoLoadPlanPresetCards = useEffectEvent(() => {
@@ -198,11 +237,11 @@ export function useSelectedPlanPresetPreviewController({
   });
 
   useEffect(() => {
-    if (!autoRefreshOpenPreview || !selectedCardId || !previewOpen || status !== "idle") {
+    if (!autoRefreshOpenPreview || !selectedGoalId || !previewOpen || status !== "idle") {
       return;
     }
 
-    const inputResult = buildRunningPlanPreviewInput(state, selectedCardId);
+    const inputResult = buildRunningPlanPreviewInput(state, selectedGoalId);
     const inputKey = inputResult.ok ? JSON.stringify(inputResult.input) : inputResult.error;
 
     if (runningPlanPreviewInputKeyRef.current === inputKey && previewResult) {
@@ -215,7 +254,7 @@ export function useSelectedPlanPresetPreviewController({
     previewOpen,
     previewResult,
     refreshRunningPlanPreviewEffect,
-    selectedCardId,
+    selectedGoalId,
     state,
     status,
   ]);
@@ -238,13 +277,14 @@ export function useSelectedPlanPresetPreviewController({
     setError(null);
     resetExternalState();
 
-    if (!selectedCardId && !previewOpen) {
+    if (!selectedGoalId && !previewOpen) {
       setCardsResult(null);
     }
-  }, [presetDiscoveryKey, previewOpen, resetExternalState, resetOnInputChange, selectedCardId]);
+  }, [presetDiscoveryKey, previewOpen, resetExternalState, resetOnInputChange, selectedGoalId]);
 
   return {
     cardsResult,
+    clearSelectedPreview,
     error,
     isBusy: status !== "idle",
     loadCards,
@@ -253,10 +293,30 @@ export function useSelectedPlanPresetPreviewController({
     previewResult,
     refreshPreview,
     resetPreviewState,
-    selectedCardId,
+    selectedGoalId,
     selectPlanPreview,
     setError,
     setPreviewOpen,
     status,
   };
+}
+
+function runnerSafePreviewErrorMessage(message: string | null) {
+  if (!message) {
+    return "This setup cannot be previewed yet. Adjust the goal details.";
+  }
+
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("invalid_plan_goal_intent") ||
+    normalized.includes("source_kind") ||
+    normalized.includes("target finish time") ||
+    normalized.includes("target outcome pace") ||
+    normalized.includes("target date")
+  ) {
+    return "This setup cannot be previewed yet. Adjust the goal details.";
+  }
+
+  return message;
 }

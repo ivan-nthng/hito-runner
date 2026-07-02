@@ -871,13 +871,12 @@ function assertRepeatWithRecovery(steps: Step[], label: string) {
 
   assert.ok(repeatStep, `${label} should include a repeat step.`);
   assert.ok(repeatStep.repeats && repeatStep.repeats >= 2);
-  assert.ok(repeatStep.work, `${label} repeat should include work.`);
-  assert.ok(repeatStep.recovery, `${label} repeat should include recovery.`);
-  assert.ok(hasExecutableStructure(repeatStep.work), `${label} repeat work should be numeric.`);
-  assert.ok(
-    hasExecutableStructure(repeatStep.recovery),
-    `${label} repeat recovery should be numeric.`,
-  );
+  assert.equal(Object.hasOwn(repeatStep, "work"), false, `${label} must not persist work.`);
+  assert.equal(Object.hasOwn(repeatStep, "recovery"), false, `${label} must not persist recovery.`);
+  const children = repeatChildrenForProof(repeatStep);
+  assert.ok(children.length >= 2, `${label} repeat should include ordered children.`);
+  assert.ok(hasExecutableStructure(children[0]), `${label} repeat first child should be numeric.`);
+  assert.ok(hasExecutableStructure(children[1]), `${label} repeat second child should be numeric.`);
 }
 
 function assertCanonicalPersistedStridesShape(
@@ -899,21 +898,25 @@ function assertCanonicalPersistedStridesShape(
     "intervals",
     `${label} should preserve canonical imported strides repeat type.`,
   );
+  const children = repeatStep ? repeatChildrenForProof(repeatStep) : [];
   assert.equal(
-    repeatStep?.work?.type,
+    children[0]?.type,
     "work",
-    `${label} persisted strides work block should use canonical nested work type.`,
+    `${label} persisted strides first child should use canonical work type.`,
   );
   assert.equal(
-    repeatStep?.work?.segment_type,
-    undefined,
-    `${label} should prove copy reconstruction does not rely on nested stride labels.`,
-  );
-  assert.equal(
-    repeatStep?.recovery?.type,
+    children[1]?.type,
     "recovery",
-    `${label} persisted strides recovery block should stay canonical.`,
+    `${label} persisted strides second child should stay canonical recovery.`,
   );
+}
+
+function repeatChildrenForProof(step: Step): Step[] {
+  if (step.children?.length) {
+    return step.children;
+  }
+
+  return [];
 }
 
 function assertNoFakePaceOrHr(steps: Step[], label: string) {
@@ -940,19 +943,15 @@ function hasExecutableStructure(step: Step) {
     return true;
   }
 
-  if (step.repeats && step.work && step.recovery) {
-    return hasExecutableStructure(step.work) && hasExecutableStructure(step.recovery);
+  if (step.repeats && step.children?.length) {
+    return step.children.every((child) => hasExecutableStructure(child));
   }
 
   return false;
 }
 
 function flattenSteps(steps: Step[]): Step[] {
-  return steps.flatMap((step) => [
-    step,
-    ...(step.work ? flattenSteps([step.work]) : []),
-    ...(step.recovery ? flattenSteps([step.recovery]) : []),
-  ]);
+  return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
 }
 
 function formatResult(result: ManualWorkoutDraftReviewResult) {

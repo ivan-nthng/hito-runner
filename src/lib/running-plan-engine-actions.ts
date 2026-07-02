@@ -7,6 +7,18 @@ import {
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import {
+  AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+  buildAiGeneratedRunningPlanPreview,
+  isAiGeneratedRunningPlanPreviewDraft,
+  type AiGeneratedRunningPlanPreviewUnavailable,
+  type AiGeneratedRunningPlanPreviewDraft,
+  type BuildAiGeneratedRunningPlanPreviewOptions,
+} from "@/lib/ai-generated-running-plan";
+import {
+  markAiPlanGenerationPersisted,
+  markAiPlanGenerationReviewedDraftSigned,
+} from "@/lib/ai-plan-generation-ledger";
+import {
   buildHalfMarathonPlanPreviewDraft,
   buildMarathonBasePlanPreviewDraft,
   buildMarathonCompletionPlanPreviewDraft,
@@ -15,6 +27,7 @@ import {
   MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
   MARATHON_COMPLETION_PLAN_BUILDER_SOURCE_KIND,
   TEN_K_PLAN_BUILDER_SOURCE_KIND,
+  planGoalIntentInputSchema,
   type BuildRunningPlanPreviewInput,
   type HalfMarathonPlanBuilderResult,
   type HalfMarathonPlanPreviewDraft,
@@ -36,6 +49,7 @@ import {
   buildRunningPlanPersistenceMetadata,
   buildRunningPlanProfilePatch,
   runningPlanSourceKindMatchesFamily,
+  validateSelfContainedRunningPlanReviewToken,
   validateRunningPlanReviewExactness,
   type RunningPlanReviewedPreviewDraft,
 } from "@/lib/running-plan-engine-review";
@@ -74,10 +88,12 @@ export const runningPlanPreviewInputSchema = z
     preferredLongRunDay: weekdayNameSchema.optional().nullable(),
     startDate: z.string().trim().optional().nullable(),
     benchmark: runningPlanBenchmarkSchema.optional().nullable(),
+    planGoalIntent: planGoalIntentInputSchema.optional().nullable(),
   })
   .strict();
 
 export const runningPlanSourceKindSchema = z.enum([
+  AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
   TEN_K_PLAN_BUILDER_SOURCE_KIND,
   HALF_MARATHON_PLAN_BUILDER_SOURCE_KIND,
   MARATHON_BASE_PLAN_BUILDER_SOURCE_KIND,
@@ -110,10 +126,15 @@ type RunningPlanPreviewActionReadyResult =
   | {
       ok: true;
       draft: RunningPlanReviewedPreviewDraft<MarathonCompletionPlanPreviewDraft>;
+    }
+  | {
+      ok: true;
+      draft: RunningPlanReviewedPreviewDraft<AiGeneratedRunningPlanPreviewDraft>;
     };
 
 export type RunningPlanPreviewActionResult =
   | RunningPlanPreviewActionReadyResult
+  | { ok: false; unavailable: AiGeneratedRunningPlanPreviewUnavailable }
   | Extract<TenKPlanBuilderResult, { ok: false }>
   | Extract<HalfMarathonPlanBuilderResult, { ok: false }>
   | Extract<MarathonBasePlanBuilderResult, { ok: false }>
@@ -149,7 +170,7 @@ export type RunningPlanConfirmActionResult =
       safety: {
         requiresExplicitConfirm: true;
         trustedClientRows: false;
-        serverRebuiltPreview: true;
+        serverRebuiltPreview: boolean;
         callsOpenAi: false;
       };
     }
@@ -166,7 +187,7 @@ export type RunningPlanConfirmActionResult =
 export const previewRunningPlanDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => runningPlanPreviewInputSchema.parse(value))
   .handler(async ({ data }): Promise<RunningPlanPreviewActionResult> => {
-    return buildReviewedRunningPlanPreview(data);
+    return buildReviewedAiGeneratedRunningPlanPreview(data);
   });
 
 export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
@@ -222,11 +243,12 @@ export async function confirmRunningPlanDraftForUser(
   const request = parsed.data;
 
   if (
-    request.previewInput.distanceFamily !== request.planFamily ||
-    !runningPlanSourceKindMatchesFamily({
-      family: request.planFamily,
-      sourceKind: request.sourceKind,
-    })
+    request.sourceKind !== AI_GENERATED_RUNNING_PLAN_SOURCE_KIND &&
+    (request.previewInput.distanceFamily !== request.planFamily ||
+      !runningPlanSourceKindMatchesFamily({
+        family: request.planFamily,
+        sourceKind: request.sourceKind,
+      }))
   ) {
     return buildConfirmFailure({
       reason: "input_mismatch",
@@ -258,6 +280,10 @@ export async function confirmRunningPlanDraftForUser(
       sourceKind: request.sourceKind,
       planFamily: request.planFamily,
     });
+  }
+
+  if (request.sourceKind === AI_GENERATED_RUNNING_PLAN_SOURCE_KIND) {
+    return confirmReviewedAiGeneratedRunningPlanDraftForUser(userId, request);
   }
 
   const preview = buildRunningPlanPreview(request.previewInput);
@@ -353,6 +379,106 @@ export async function confirmRunningPlanDraftForUser(
   }
 }
 
+async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
+  userId: string,
+  request: RunningPlanConfirmActionInput,
+): Promise<RunningPlanConfirmActionResult> {
+  const exactness = await validateSelfContainedRunningPlanReviewToken({
+    reviewToken: request.reviewToken,
+    reviewChecksum: request.reviewChecksum,
+  });
+
+  if (!exactness.ok) {
+    return buildConfirmFailure({
+      reason: exactness.reason,
+      message: exactness.message,
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  if (
+    !isAiGeneratedRunningPlanPreviewDraft(exactness.draft) ||
+    exactness.draft.sourceKind !== request.sourceKind ||
+    exactness.draft.planFamily !== request.planFamily
+  ) {
+    return buildConfirmFailure({
+      reason: "input_mismatch",
+      message:
+        "The AI-authored generated-plan preview no longer matches the selected family or source. Refresh the preview.",
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  if (!sameJson(request.previewInput, exactness.draft.previewInput)) {
+    return buildConfirmFailure({
+      reason: "stale_review",
+      message:
+        "The AI-authored generated-plan setup answers no longer match the reviewed preview. Refresh before creating a plan.",
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+
+  try {
+    const applyResult = await createFirstPlanFromReviewedCanonicalPlanForUser(
+      userId,
+      exactness.canonicalPlan,
+      buildRunningPlanProfilePatch(exactness.draft),
+      buildRunningPlanPersistenceMetadata({
+        draft: exactness.draft,
+        canonicalPlan: exactness.canonicalPlan,
+        reviewChecksum: exactness.reviewChecksum,
+      }),
+    );
+    await markAiPlanGenerationPersisted({
+      trace: exactness.draft.aiGeneration.generationTrace,
+    });
+
+    return {
+      ok: true,
+      status: "created",
+      persisted: true,
+      sourceKind: request.sourceKind,
+      sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
+      planFamily: request.planFamily,
+      schemaVersion: exactness.canonicalPlan.schema_version,
+      effectiveStartDate: applyResult.effectiveStartDate,
+      appliedStartDate: applyResult.appliedStartDate,
+      workoutCount: applyResult.workoutCount,
+      calendarRowCount: exactness.canonicalPlan.planned_workouts.length,
+      nonRestWorkoutCount: exactness.canonicalPlan.planned_workouts.filter(
+        (workout) => workout.workout_type !== "rest",
+      ).length,
+      reviewChecksum: exactness.reviewChecksum,
+      safety: {
+        requiresExplicitConfirm: true,
+        trustedClientRows: false,
+        serverRebuiltPreview: false,
+        callsOpenAi: false,
+      },
+    };
+  } catch (error) {
+    if (error instanceof Error && /active plan/i.test(error.message)) {
+      return buildConfirmFailure({
+        reason: "active_plan_exists",
+        message:
+          "Generated plans can create a new plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
+        sourceKind: request.sourceKind,
+        planFamily: request.planFamily,
+      });
+    }
+
+    return buildConfirmFailure({
+      reason: "persistence_failed",
+      message: "The generated running plan could not be created. The current plan is unchanged.",
+      sourceKind: request.sourceKind,
+      planFamily: request.planFamily,
+    });
+  }
+}
+
 export async function buildReviewedRunningPlanPreview(
   data: RunningPlanPreviewActionInput,
 ): Promise<RunningPlanPreviewActionResult> {
@@ -365,6 +491,34 @@ export async function buildReviewedRunningPlanPreview(
   return {
     ok: true,
     draft: await addRunningPlanReviewProof(result.draft),
+  } as RunningPlanPreviewActionResult;
+}
+
+export async function buildReviewedAiGeneratedRunningPlanPreview(
+  data: RunningPlanPreviewActionInput,
+  options: BuildAiGeneratedRunningPlanPreviewOptions = {},
+): Promise<RunningPlanPreviewActionResult> {
+  const result = await buildAiGeneratedRunningPlanPreview(data, options);
+
+  if (!result.ok) {
+    return result;
+  }
+
+  const reviewedDraft = await addRunningPlanReviewProof(result.draft);
+  const generationTrace = await markAiPlanGenerationReviewedDraftSigned({
+    trace: reviewedDraft.aiGeneration.generationTrace,
+    options: options.aiPreview?.generationLedger,
+  });
+
+  return {
+    ok: true,
+    draft: {
+      ...reviewedDraft,
+      aiGeneration: {
+        ...reviewedDraft.aiGeneration,
+        generationTrace,
+      },
+    },
   } as RunningPlanPreviewActionResult;
 }
 
@@ -407,4 +561,25 @@ function buildConfirmFailure(input: {
     ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
     ...(input.planFamily ? { planFamily: input.planFamily } : {}),
   };
+}
+
+function sameJson(left: unknown, right: unknown) {
+  return JSON.stringify(sortJsonValue(left)) === JSON.stringify(sortJsonValue(right));
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortJsonValue(entry));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, nestedValue]) => nestedValue !== undefined)
+        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+        .map(([key, nestedValue]) => [key, sortJsonValue(nestedValue)]),
+    );
+  }
+
+  return value;
 }

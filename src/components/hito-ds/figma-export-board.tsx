@@ -9,6 +9,13 @@ import {
   type HitoIconName,
   type HitoIconSize,
 } from "@/components/ui/icon";
+import {
+  WORKOUT_PRIMITIVE_PALETTE_FAMILIES,
+  WORKOUT_SECTION_COLOR_ROLES,
+  WORKOUT_TYPE_COLOR_ROLES,
+  workoutSectionColorToken,
+  workoutTypeColorToken,
+} from "@/lib/workout-color-tokens";
 import { cn } from "@/lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "outlined" | "ghost";
@@ -26,7 +33,17 @@ const INPUT_VARIANTS: InputVariant[] = ["primary", "secondary"];
 const INPUT_SIZES: InputSize[] = ["xs", "sm", "md", "lg", "xl"];
 const STATUS_TONES = ["neutral", "signal", "success", "warning", "destructive", "rollout", "muted"];
 
-const RAW_COLOR_TOKENS = [
+type TokenGridItem = { name: string; token: string; note: string };
+
+const WORKOUT_RAW_COLOR_TOKENS: readonly TokenGridItem[] = WORKOUT_PRIMITIVE_PALETTE_FAMILIES.map(
+  (palette) => ({
+    name: `${palette.label} 500`,
+    token: `${palette.tokenPrefix}-500`,
+    note: `Workout primitive base ${palette.base}`,
+  }),
+);
+
+const RAW_COLOR_TOKENS: readonly TokenGridItem[] = [
   { name: "stone-950", token: "--stone-950", note: "Deepest shell background" },
   { name: "stone-900", token: "--stone-900", note: "App background" },
   { name: "stone-850", token: "--stone-850", note: "Base surface" },
@@ -40,9 +57,23 @@ const RAW_COLOR_TOKENS = [
   { name: "green-500", token: "--green-500", note: "Success" },
   { name: "orange-500", token: "--orange-500", note: "Workout accent" },
   { name: "red-500", token: "--red-500", note: "Critical destructive" },
-] as const;
+  ...WORKOUT_RAW_COLOR_TOKENS,
+];
 
-const SEMANTIC_COLOR_TOKENS = [
+const WORKOUT_SEMANTIC_COLOR_TOKENS: readonly TokenGridItem[] = [
+  ...WORKOUT_TYPE_COLOR_ROLES.map((role) => ({
+    name: `workout ${role.label}`,
+    token: workoutTypeColorToken(role.type),
+    note: `Maps to ${role.primitive}`,
+  })),
+  ...WORKOUT_SECTION_COLOR_ROLES.map((role) => ({
+    name: `section ${role.label}`,
+    token: workoutSectionColorToken(role.type),
+    note: `Maps to ${role.primitive}`,
+  })),
+];
+
+const SEMANTIC_COLOR_TOKENS: readonly TokenGridItem[] = [
   { name: "background", token: "--background", note: "Route canvas" },
   { name: "foreground", token: "--foreground", note: "Primary text" },
   { name: "surface", token: "--surface", note: "Base panel" },
@@ -54,11 +85,12 @@ const SEMANTIC_COLOR_TOKENS = [
   { name: "success", token: "--success", note: "Completed/saved" },
   { name: "warn", token: "--warn", note: "Caution" },
   { name: "destructive", token: "--destructive", note: "Delete/error" },
-  { name: "easy", token: "--easy", note: "Easy workout family" },
-  { name: "long", token: "--long", note: "Long workout family" },
-  { name: "quality", token: "--quality", note: "Quality workout family" },
-  { name: "rest", token: "--rest", note: "Rest/empty calendar" },
-] as const;
+  { name: "easy", token: "--easy", note: "Compatibility alias for workout Easy" },
+  { name: "long", token: "--long", note: "Compatibility alias for workout Long Run" },
+  { name: "quality", token: "--quality", note: "Compatibility alias for workout Tempo" },
+  { name: "rest", token: "--rest", note: "Compatibility alias for workout Rest" },
+  ...WORKOUT_SEMANTIC_COLOR_TOKENS,
+];
 
 const SPACING_TOKENS = [
   { name: "space-1", token: "--space-1", value: "0.25rem" },
@@ -298,13 +330,7 @@ function ExportSection({
   );
 }
 
-function TokenGrid({
-  title,
-  tokens,
-}: {
-  title: string;
-  tokens: ReadonlyArray<{ name: string; note: string; token: string }>;
-}) {
+function TokenGrid({ title, tokens }: { title: string; tokens: ReadonlyArray<TokenGridItem> }) {
   return (
     <div className="grid gap-3">
       <h3 className="hito-label">{title}</h3>

@@ -23,11 +23,13 @@ import type {
   RunnerProfileSummary,
   Step,
   StepPrescription,
+  StepRepeatChildPrescription,
   StepTarget,
   StepUnitPrescription,
   WorkoutType,
 } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
+import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
 
 export const FUTURE_TEMPLATE_VERSION = "training-plan-v2";
 export const FUTURE_TEMPLATE_DOWNLOAD_PATH = "/templates/hito-training-plan-v2-template.json";
@@ -71,19 +73,28 @@ export const V2_IGNORED_WORKOUT_KEYS = [
 ] as const;
 
 const targetValueSchema = z.union([z.string(), z.number()]);
+const targetSourceSchema = z.string().trim().min(1).max(80);
+const targetPositiveIntSchema = z.number().int().positive();
 const placeholderEnvelopeSchema = z.union([z.boolean(), z.record(z.string(), z.unknown())]);
 
 const v2TargetSchema = z
   .object({
+    target_source: targetSourceSchema.optional(),
     intensity: z.string().trim().min(1).optional(),
     hr_bpm_range: z.string().trim().min(1).optional(),
     hr_bpm: z.string().trim().min(1).optional(),
+    hr_bpm_cap: targetPositiveIntSchema.optional(),
+    hr_bpm_min: targetPositiveIntSchema.optional(),
+    hr_bpm_max: targetPositiveIntSchema.optional(),
     hr_target_source: z.enum(HR_TARGET_SOURCE_VALUES).optional(),
     label: z.string().trim().min(1).max(120).optional(),
     source_note: z.string().trim().min(1).max(200).optional(),
     pace_min_per_km_range: z.string().trim().min(1).optional(),
     pace_range_min_km: z.string().trim().min(1).optional(),
     pace: z.string().trim().min(1).optional(),
+    pace_seconds_per_km: targetPositiveIntSchema.optional(),
+    pace_min_seconds_per_km: targetPositiveIntSchema.optional(),
+    pace_max_seconds_per_km: targetPositiveIntSchema.optional(),
     rpe: targetValueSchema.optional(),
     cadence_spm_range: z.string().trim().min(1).optional(),
     cue: z.string().trim().min(1).optional(),
@@ -257,14 +268,34 @@ const v2UnitPrescriptionSchema = z
     }
   });
 
+const v2RepeatChildRoleSchema = z.enum([
+  "warm_up",
+  "run",
+  "walk",
+  "work",
+  "recover",
+  "finish",
+  "cooldown",
+]);
+
+const v2RepeatChildSchema = z
+  .object({
+    role: v2RepeatChildRoleSchema,
+    label: z.string().trim().min(1).max(120).optional(),
+    sequence: z.number().int().min(1).optional(),
+    guidance: z.string().trim().min(1).optional(),
+    prescription: v2UnitPrescriptionSchema,
+    target: v2TargetSchema.optional(),
+  })
+  .strict();
+
 const v2SegmentPrescriptionSchema = z
   .object({
     mode: z.enum(["time", "distance", "repeats", "none"]),
     duration_min: z.number().positive().optional(),
     distance_km: z.number().positive().optional(),
     repeat_count: z.number().int().positive().optional(),
-    repeat_unit: v2UnitPrescriptionSchema.optional(),
-    recovery_unit: v2UnitPrescriptionSchema.optional(),
+    children: z.array(v2RepeatChildSchema).min(1).max(12).optional(),
   })
   .strict()
   .superRefine((prescription, context) => {
@@ -293,11 +324,11 @@ const v2SegmentPrescriptionSchema = z
         });
       }
 
-      if (!prescription.repeat_unit) {
+      if (!prescription.children?.length) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["repeat_unit"],
-          message: "repeat prescriptions require repeat_unit.",
+          path: ["children"],
+          message: "repeat prescriptions require children[].",
         });
       }
     }
@@ -330,18 +361,24 @@ const v2SegmentSchema = z
     duration_min: z.number().positive().optional(),
     distance_km: z.number().positive().optional(),
     target: v2TargetSchema.optional(),
-    repeat_count: z.number().int().positive().optional(),
-    work_distance_km: z.number().positive().optional(),
-    work_duration_min: z.number().positive().optional(),
-    work_duration_sec: z.number().positive().optional(),
-    recovery_duration_min: z.number().positive().optional(),
-    recovery_duration_sec: z.number().positive().optional(),
-    recovery_distance_km: z.number().positive().optional(),
     recovery_target: v2TargetSchema.optional(),
   })
   .strict()
   .superRefine((segment, context) => {
     if (segment.prescription) {
+      if (
+        segment.prescription.mode === "repeats" &&
+        segment.prescription.children?.length &&
+        (segment.target || segment.recovery_target)
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["target"],
+          message:
+            "repeat prescriptions with children[] must keep targets on child blocks, not the Repeat set parent.",
+        });
+      }
+
       if (
         (segment.segment_type === "interval_block" || segment.segment_type === "strides") &&
         segment.prescription.mode !== "repeats"
@@ -368,66 +405,15 @@ const v2SegmentSchema = z
     }
 
     if (segment.segment_type === "interval_block" || segment.segment_type === "strides") {
-      if (!segment.repeat_count) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["repeat_count"],
-          message: `repeat_count is required for ${segment.segment_type} segments.`,
-        });
-      }
-
-      if (
-        !segment.work_distance_km &&
-        !segment.work_duration_min &&
-        !segment.work_duration_sec &&
-        !segment.duration_min
-      ) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["work_distance_km"],
-          message: `${segment.segment_type} segments need work_distance_km, work_duration_min, work_duration_sec, or duration_min.`,
-        });
-      }
-
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["prescription"],
+        message: `${segment.segment_type} segments require prescription.mode = repeats.`,
+      });
       return;
     }
 
     if (segment.segment_type === "rest" || segment.segment_type === "fueling") {
-      return;
-    }
-
-    if (
-      segment.segment_type === "tempo_block" &&
-      (segment.repeat_count ||
-        segment.work_distance_km ||
-        segment.work_duration_min ||
-        segment.work_duration_sec ||
-        segment.recovery_duration_min ||
-        segment.recovery_duration_sec ||
-        segment.recovery_distance_km)
-    ) {
-      if (!segment.repeat_count) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["repeat_count"],
-          message: "repeat_count is required for repeated tempo_block segments.",
-        });
-      }
-
-      if (
-        !segment.work_distance_km &&
-        !segment.work_duration_min &&
-        !segment.work_duration_sec &&
-        !segment.duration_min
-      ) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["work_distance_km"],
-          message:
-            "repeated tempo_block segments need work_distance_km, work_duration_min, work_duration_sec, or duration_min.",
-        });
-      }
-
       return;
     }
 
@@ -987,8 +973,8 @@ function normalizeV2Segment(
     segment.segment_type === "strides" ||
     (segment.segment_type === "tempo_block" && prescription.mode === "repeats")
   ) {
-    const recoveryTarget = normalizeSegmentTarget(segment.recovery_target);
     const repeatedType = segment.segment_type === "tempo_block" ? "tempo" : "intervals";
+    const repeatChildren = buildRepeatChildrenFromPrescription(prescription);
 
     return {
       segment_id: segmentId,
@@ -999,29 +985,7 @@ function normalizeV2Segment(
       prescription,
       type: repeatedType,
       repeats: prescription.repeat_count,
-      work: {
-        type: "work",
-        ...(guidanceText ? { guidance: guidanceText } : {}),
-        ...(prescription.repeat_unit?.distance_km
-          ? { distance_km: prescription.repeat_unit.distance_km }
-          : {}),
-        ...(prescription.repeat_unit?.duration_min
-          ? { duration_min: prescription.repeat_unit.duration_min }
-          : {}),
-        ...(target ? { target } : {}),
-        ...(prescription.repeat_unit ? { prescription: prescription.repeat_unit } : {}),
-      },
-      recovery: {
-        type: "recovery",
-        ...(prescription.recovery_unit?.distance_km
-          ? { distance_km: prescription.recovery_unit.distance_km }
-          : {}),
-        ...(prescription.recovery_unit?.duration_min
-          ? { duration_min: prescription.recovery_unit.duration_min }
-          : {}),
-        ...(recoveryTarget ? { target: recoveryTarget } : {}),
-        ...(prescription.recovery_unit ? { prescription: prescription.recovery_unit } : {}),
-      },
+      ...(repeatChildren.length > 0 ? { children: repeatChildren } : {}),
     };
   }
 
@@ -1039,6 +1003,70 @@ function normalizeV2Segment(
   };
 }
 
+function buildRepeatChildrenFromPrescription(prescription: StepPrescription): Step[] {
+  return (prescription.children ?? []).map((child, index) => {
+    const unit = child.prescription;
+
+    return {
+      type: repeatChildRoleToStepType(child.role),
+      segment_type: child.role,
+      sequence: child.sequence ?? index + 1,
+      label: child.label ?? repeatChildRoleLabel(child.role),
+      ...(child.guidance ? { guidance: child.guidance } : {}),
+      prescription: unit,
+      ...(unit.duration_min ? { duration_min: unit.duration_min } : {}),
+      ...(unit.distance_km ? { distance_km: unit.distance_km } : {}),
+      ...(child.target ? { target: child.target } : {}),
+    };
+  });
+}
+
+function normalizeRepeatChildrenFromPrescription(input: {
+  children?: StepRepeatChildPrescription[];
+}): StepRepeatChildPrescription[] {
+  return reduceRepeatChildrenToChildFirst<StepTarget>({
+    children: input.children,
+  }).children;
+}
+
+function repeatChildRoleToStepType(role: StepRepeatChildPrescription["role"]) {
+  switch (role) {
+    case "warm_up":
+      return "warmup";
+    case "walk":
+      return "walk";
+    case "work":
+      return "work";
+    case "recover":
+      return "recovery";
+    case "finish":
+      return "finish";
+    case "cooldown":
+      return "cooldown";
+    case "run":
+      return "run";
+  }
+}
+
+function repeatChildRoleLabel(role: StepRepeatChildPrescription["role"]) {
+  switch (role) {
+    case "warm_up":
+      return "Warm-up";
+    case "run":
+      return "Run";
+    case "walk":
+      return "Walk";
+    case "work":
+      return "Work";
+    case "recover":
+      return "Recover";
+    case "finish":
+      return "Finish";
+    case "cooldown":
+      return "Cooldown";
+  }
+}
+
 function buildSegmentPrescription(
   segment: TrainingPlanV2["planned_workouts"][number]["segments"][number],
 ): StepPrescription {
@@ -1054,58 +1082,20 @@ function buildSegmentPrescription(
       ...(segment.prescription.repeat_count
         ? { repeat_count: segment.prescription.repeat_count }
         : {}),
-      ...(segment.prescription.repeat_unit
-        ? { repeat_unit: normalizeUnitPrescription(segment.prescription.repeat_unit) }
-        : {}),
-      ...(segment.prescription.recovery_unit
-        ? { recovery_unit: normalizeUnitPrescription(segment.prescription.recovery_unit) }
-        : {}),
-    };
-  }
-
-  if (
-    segment.segment_type === "interval_block" ||
-    segment.segment_type === "strides" ||
-    (segment.segment_type === "tempo_block" && segment.repeat_count)
-  ) {
-    const workDurationMin =
-      segment.work_duration_min ??
-      (segment.work_duration_sec
-        ? Number((segment.work_duration_sec / 60).toFixed(2))
-        : undefined) ??
-      segment.duration_min;
-    const recoveryDurationMin =
-      segment.recovery_duration_min ??
-      (segment.recovery_duration_sec
-        ? Number((segment.recovery_duration_sec / 60).toFixed(2))
-        : undefined);
-
-    return {
-      mode: "repeats",
-      repeat_count: segment.repeat_count,
-      repeat_unit: segment.work_distance_km
+      ...(segment.prescription.children?.length
         ? {
-            mode: "distance",
-            distance_km: segment.work_distance_km,
+            children: normalizeRepeatChildrenFromPrescription({
+              children: segment.prescription.children,
+            }).map((child) => ({
+              role: child.role,
+              ...(child.label ? { label: child.label } : {}),
+              ...(child.sequence ? { sequence: child.sequence } : {}),
+              ...(child.guidance ? { guidance: child.guidance } : {}),
+              prescription: normalizeUnitPrescription(child.prescription),
+              ...(child.target ? { target: normalizeSegmentTarget(child.target) } : {}),
+            })),
           }
-        : {
-            mode: "time",
-            duration_min: workDurationMin,
-          },
-      recovery_unit:
-        recoveryDurationMin || segment.recovery_distance_km
-          ? segment.recovery_distance_km
-            ? {
-                mode: "distance",
-                distance_km: segment.recovery_distance_km,
-              }
-            : {
-                mode: "time",
-                duration_min: recoveryDurationMin,
-              }
-          : {
-              mode: "none",
-            },
+        : {}),
     };
   }
 
@@ -1129,7 +1119,7 @@ function buildSegmentPrescription(
 }
 
 function normalizeUnitPrescription(
-  unit: TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"]["repeat_unit"],
+  unit: StepUnitPrescription | null | undefined,
 ): StepUnitPrescription {
   if (!unit) {
     return {
@@ -1155,13 +1145,20 @@ function normalizeSegmentTarget(
 
   for (const [key, value] of Object.entries(target.extra ?? {})) {
     if (
+      key === "target_source" ||
       key === "hr_bpm" ||
       key === "hr_bpm_range" ||
+      key === "hr_bpm_cap" ||
+      key === "hr_bpm_min" ||
+      key === "hr_bpm_max" ||
       key === "hr_target_source" ||
       key === "label" ||
       key === "source_note" ||
       key === "pace_range_min_km" ||
-      key === "pace_min_per_km_range"
+      key === "pace_min_per_km_range" ||
+      key === "pace_seconds_per_km" ||
+      key === "pace_min_seconds_per_km" ||
+      key === "pace_max_seconds_per_km"
     ) {
       continue;
     }
@@ -1171,15 +1168,22 @@ function normalizeSegmentTarget(
 
   for (const [key, value] of Object.entries(target)) {
     if (
+      key === "target_source" ||
       key === "intensity" ||
       key === "hr_bpm_range" ||
       key === "hr_bpm" ||
+      key === "hr_bpm_cap" ||
+      key === "hr_bpm_min" ||
+      key === "hr_bpm_max" ||
       key === "hr_target_source" ||
       key === "label" ||
       key === "source_note" ||
       key === "pace_min_per_km_range" ||
       key === "pace_range_min_km" ||
       key === "pace" ||
+      key === "pace_seconds_per_km" ||
+      key === "pace_min_seconds_per_km" ||
+      key === "pace_max_seconds_per_km" ||
       key === "rpe" ||
       key === "cadence_spm_range" ||
       key === "cue" ||
@@ -1206,8 +1210,14 @@ function normalizeSegmentTarget(
         : undefined;
 
   return {
+    ...(typeof target.target_source === "string" ? { target_source: target.target_source } : {}),
     ...(typeof target.intensity === "string" ? { intensity: target.intensity } : {}),
-    ...(hrRange ? { hr_bpm_range: hrRange } : {}),
+    ...(typeof target.hr_bpm_range === "string" ? { hr_bpm_range: target.hr_bpm_range } : {}),
+    ...(typeof target.hr_bpm === "string" ? { hr_bpm: target.hr_bpm } : {}),
+    ...(typeof target.hr_bpm_cap === "number" ? { hr_bpm_cap: target.hr_bpm_cap } : {}),
+    ...(typeof target.hr_bpm_min === "number" ? { hr_bpm_min: target.hr_bpm_min } : {}),
+    ...(typeof target.hr_bpm_max === "number" ? { hr_bpm_max: target.hr_bpm_max } : {}),
+    ...(!target.hr_bpm_range && !target.hr_bpm && hrRange ? { hr_bpm_range: hrRange } : {}),
     ...(typeof target.hr_target_source === "string"
       ? { hr_target_source: target.hr_target_source }
       : {}),
@@ -1215,6 +1225,15 @@ function normalizeSegmentTarget(
     ...(typeof target.source_note === "string" ? { source_note: target.source_note } : {}),
     ...(paceRange ? { pace_min_per_km_range: paceRange } : {}),
     ...(typeof target.pace === "string" ? { pace: target.pace } : {}),
+    ...(typeof target.pace_seconds_per_km === "number"
+      ? { pace_seconds_per_km: target.pace_seconds_per_km }
+      : {}),
+    ...(typeof target.pace_min_seconds_per_km === "number"
+      ? { pace_min_seconds_per_km: target.pace_min_seconds_per_km }
+      : {}),
+    ...(typeof target.pace_max_seconds_per_km === "number"
+      ? { pace_max_seconds_per_km: target.pace_max_seconds_per_km }
+      : {}),
     ...(typeof target.rpe === "string" || typeof target.rpe === "number"
       ? { rpe: target.rpe }
       : {}),

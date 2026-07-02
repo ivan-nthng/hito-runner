@@ -11,6 +11,10 @@ import {
   resolveRunningPlanHorizonSelection,
   type RunningPlanHorizonSelection,
 } from "@/lib/plan-creation-engine/horizon-policy";
+import {
+  normalizePlanGoalIntent,
+  type PlanGoalIntentInput,
+} from "@/lib/plan-creation-engine/plan-goal-intent";
 import { findForbiddenRunnerFacingLanguageMatches } from "@/lib/plan-creation-engine/forbidden-runner-facing-language";
 import { normalizeRunningPlanBenchmarkPaceTruth } from "@/lib/plan-creation-engine/benchmark-pace-truth";
 import {
@@ -51,6 +55,7 @@ export interface BuildRunningPlanPreviewInput {
   preferredLongRunDay?: WeekdayName | null;
   startDate?: string | null;
   benchmark?: RunningPlanBenchmarkInput | null;
+  planGoalIntent?: PlanGoalIntentInput | null;
 }
 
 export interface RunningPlanPreviewCalendarRow {
@@ -87,6 +92,7 @@ export type RunningPlanPreviewUnavailableCode =
   | "invalid_runner_basics"
   | "invalid_start_date"
   | "invalid_fixed_rest_day"
+  | "invalid_plan_goal_intent"
   | "long_run_day_blocked"
   | "insufficient_available_days"
   | "builder_validation_failed";
@@ -184,6 +190,22 @@ export function normalizeRunningPlanPreviewInput({
     return failure(trainingWeekdays.code, trainingWeekdays.message);
   }
   const loadContext = resolveLoadContext(input);
+  const horizonSelection = resolveRunningPlanHorizonSelection({
+    family,
+    runnerLevel: input.runnerLevel,
+    loadContext,
+    daysPerWeek,
+  });
+  const planGoalIntent = normalizePlanGoalIntent({
+    rawIntent: input.planGoalIntent ?? null,
+    distanceFamily: family,
+    startDate,
+    horizonWeeks: horizonSelection.horizonWeeks,
+  });
+
+  if (!planGoalIntent.ok) {
+    return failure(planGoalIntent.reason, planGoalIntent.message);
+  }
 
   return {
     ok: true,
@@ -198,17 +220,13 @@ export function normalizeRunningPlanPreviewInput({
       preferredLongRunDay: longRunResolution.longRunDay,
       startDate,
       benchmarkPaceTruth: normalizeRunningPlanBenchmarkPaceTruth(input.benchmark),
+      planGoalIntent: planGoalIntent.intent,
       normalizedBy: sourceKind,
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
       longRunDaySource: longRunResolution.source,
       trainingWeekdays: trainingWeekdays.weekdays,
       loadContext,
-      horizonSelection: resolveRunningPlanHorizonSelection({
-        family,
-        runnerLevel: input.runnerLevel,
-        loadContext,
-        daysPerWeek,
-      }),
+      horizonSelection,
     },
   };
 }

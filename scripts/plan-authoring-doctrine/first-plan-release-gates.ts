@@ -29,18 +29,8 @@ export type DoctrineRequestBuilder = (
 ) => StructuredFirstPlanOnboardingRequestInput;
 
 export interface FirstPlanReleaseGateDependencies {
-  assertBeginnerRunWalkAdaptation: (input: {
-    plan: TrainingPlanV2;
-    adaptationWeeks: number;
-    label: string;
-  }) => void;
   assertFixedRestDays: (plan: TrainingPlanV2) => void;
   assertFixedRestDayNames: (plan: TrainingPlanV2, restDays: WeekdayName[], label: string) => void;
-  assertLowSupportMarathonExtensionRichness: (input: {
-    plan: TrainingPlanV2;
-    extensionStartWeek: number;
-    label: string;
-  }) => void;
   assertNoFakeMetricTargetRegression: (plan: TrainingPlanV2, label: string) => void;
   assertNoSingleSegmentNonRestWorkouts: (plan: TrainingPlanV2, label: string) => void;
   assertRecoveryFirstAfterLongRuns: (plan: TrainingPlanV2, label: string) => void;
@@ -151,52 +141,52 @@ async function assertAiFirstPlanDraftServiceContract(deps: FirstPlanReleaseGateD
   );
   assert.equal(
     longHorizonStrategy.aiAuthoredHorizonWeeks,
-    16,
-    "long target-date fixture should cap the AI-authored prompt horizon",
+    29,
+    "long target-date fixture should ask OpenAI for the full dated horizon",
   );
   assert.equal(
     longHorizonResult.ok,
     true,
-    "bounded long-horizon blueprint should extend into a complete reviewable plan",
+    "full long-horizon blueprint should normalize into a complete reviewable plan",
   );
 
   if (longHorizonResult.ok) {
     assert.equal(
       longHorizonResult.metadata.status,
       "repaired_ai_draft",
-      "backend-extended long-horizon blueprint should be labelled as repaired metadata",
+      "long-horizon blueprint should expose metric-policy repairs without backend scheduling",
     );
     assert.equal(
       longHorizonResult.canonicalPlan.source_kind,
       "ai_first_plan_blueprint_v1",
-      "backend-extended long-horizon plan must keep blueprint source kind",
+      "long-horizon plan must keep blueprint source kind",
     );
     assert.equal(
       longHorizonResult.canonicalPlan.preparation_horizon_weeks,
       29,
-      "backend-extended long-horizon plan should cover the requested target-date horizon",
+      "OpenAI-authored long-horizon plan should cover the requested target-date horizon",
     );
     assert.equal(
       longHorizonResult.canonicalPlan.planned_workouts.length,
       29 * 7,
-      "backend-extended long-horizon plan should include every reviewed calendar row",
+      "OpenAI-authored long-horizon plan should include every reviewed calendar row",
     );
     assert.equal(
       countNonRestWorkouts(longHorizonResult.canonicalPlan),
       145,
-      "backend-extended long-horizon plan should preserve every required running slot",
+      "OpenAI-authored long-horizon plan should preserve every authored running day",
     );
     assert.equal(
       longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks,
-      13,
-      "long-horizon trace should expose backend-extended weeks",
+      0,
+      "long-horizon trace should not expose backend-authored calendar weeks",
     );
     assert.ok(
       (longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy
-        ?.promptCharEstimateAfter ?? Number.POSITIVE_INFINITY) <
+        ?.promptCharEstimateAfter ?? 0) >=
         (longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy
           ?.promptCharEstimateBefore ?? 0),
-      "long-horizon trace should prove the capped prompt is smaller than the full prompt",
+      "long-horizon trace should preserve full-horizon prompt sizing",
     );
   }
 
@@ -321,10 +311,8 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
   deps: FirstPlanReleaseGateDependencies,
 ) {
   const {
-    assertBeginnerRunWalkAdaptation,
     assertFixedRestDays,
     assertFixedRestDayNames,
-    assertLowSupportMarathonExtensionRichness,
     assertNoFakeMetricTargetRegression,
     assertNoSingleSegmentNonRestWorkouts,
     assertRecoveryFirstAfterLongRuns,
@@ -750,13 +738,13 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
   );
   assert.equal(
     boundedHorizonStrategy.aiAuthoredHorizonWeeks,
-    16,
-    "long target-date structured first-plan scenario should cap the OpenAI prompt horizon",
+    29,
+    "long target-date structured first-plan scenario should request the full OpenAI-authored horizon",
   );
   assert.equal(
     boundedHorizonResult.ok,
     true,
-    "long target-date structured first-plan draft should review a complete backend-extended blueprint plan",
+    "long target-date structured first-plan draft should review a complete OpenAI-authored dated plan",
   );
 
   if (boundedHorizonResult.ok && boundedHorizonResult.status === "draft_ready") {
@@ -785,7 +773,7 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
     assert.equal(
       boundedHorizonResult.generation.sourceStatus,
       "repaired_ai_draft",
-      "long target-date backend extension should be visible in review metadata",
+      "long target-date metric-policy repair should be visible in review metadata",
     );
     assert.equal(
       boundedHorizonResult.generation.blueprintTrace?.blueprintHorizonStrategy
@@ -796,8 +784,8 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
     assert.equal(
       boundedHorizonResult.generation.blueprintTrace?.blueprintHorizonStrategy
         ?.backendExtendedWeeks,
-      13,
-      "structured review trace should expose backend-extended weeks",
+      0,
+      "structured review trace should not expose backend-authored calendar weeks",
     );
     assert.equal(
       boundedHorizonResult.draft.canonicalPlan.planned_workouts.length,
@@ -807,7 +795,7 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
     assert.equal(
       countNonRestWorkouts(boundedHorizonResult.draft.canonicalPlan),
       145,
-      "long target-date structured review should include every required running slot",
+      "long target-date structured review should include every authored running day",
     );
     assertFixedRestDayNames(
       boundedHorizonResult.draft.canonicalPlan,
@@ -835,16 +823,6 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
       boundedHorizonResult.draft.canonicalPlan,
       "long target-date low-support marathon review",
     );
-    assertBeginnerRunWalkAdaptation({
-      plan: boundedHorizonResult.draft.canonicalPlan,
-      adaptationWeeks: 6,
-      label: "long target-date low-support marathon review",
-    });
-    assertLowSupportMarathonExtensionRichness({
-      plan: boundedHorizonResult.draft.canonicalPlan,
-      extensionStartWeek: boundedHorizonStrategy.aiAuthoredHorizonWeeks + 1,
-      label: "long target-date low-support marathon review",
-    });
     assert.equal(
       boundedHorizonResult.generation.blueprintTrace?.requiredCadenceSlots.length,
       0,
@@ -947,8 +925,8 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
     );
     assert.equal(
       partialResult.generation.blueprintTrace?.blueprintCompleteness?.expectedWeekCount,
-      16,
-      "partial blueprint structured draft trace should include the bounded AI-authored expected week count",
+      29,
+      "partial blueprint structured draft trace should include the full AI-authored expected week count",
     );
     assert.equal(
       partialResult.generation.blueprintTrace?.blueprintCompleteness?.actualWeekCount,
@@ -962,8 +940,8 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
     );
     assert.equal(
       partialResult.generation.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks,
-      13,
-      "partial blueprint structured draft trace should expose planned backend extension boundary",
+      0,
+      "partial blueprint structured draft trace should not expose backend extension",
     );
     assert.equal(
       partialResult.generation.blueprintTrace?.deterministicFallbackBoundary.used,

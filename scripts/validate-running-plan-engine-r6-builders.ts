@@ -1218,7 +1218,7 @@ function validateWatchExecutableSegments(rows: readonly R6CalendarRow[]) {
 
       if (segment.targetTruthMode === "editable_default_hr") {
         const segmentText = JSON.stringify(segment);
-        assert.match(segmentText, /editable default/i);
+        assert.match(segmentText, /editable[_ ]default/i);
         assert.doesNotMatch(segmentText, /personal/i);
       }
     }

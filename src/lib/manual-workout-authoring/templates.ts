@@ -31,6 +31,30 @@ export interface ManualWorkoutTemplate {
   mappingGaps: string[];
 }
 
+export const VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATE_KEYS = [
+  "rest_day",
+  "recovery_jog",
+  "easy_aerobic_run",
+  "steady_aerobic_run",
+  "long_aerobic_run",
+  "progression_run",
+  "controlled_tempo_session",
+  "time_intervals",
+  "uphill_repeats",
+  "run_walk_adaptation",
+] as const satisfies readonly ManualWorkoutTemplateKey[];
+
+export const INTERNAL_SUPPORTED_MANUAL_WORKOUT_TEMPLATE_KEYS = [
+  "easy_run_with_strides",
+  "half_marathon_threshold_durability",
+  "distance_intervals",
+  "long_run_with_steady_finish",
+  "cutback_long_run",
+  "taper_long_run",
+  "rolling_hills_session",
+  "technical_trail_easy",
+] as const satisfies readonly ManualWorkoutTemplateKey[];
+
 export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
   rest_day: {
     templateKey: "rest_day",
@@ -58,8 +82,10 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     calendarIconKey: "recovery",
     workoutType: "easy",
     defaultTitle: "Recovery jog",
-    mainBlock: block("easy_run_block", { durationSeconds: 20 * 60, label: "Recovery jog" }),
+    mainBlock: block("easy_run_block", { durationSeconds: 15 * 60, label: "Recovery jog" }),
     defaultNotes: "Keep this deliberately relaxed.",
+    warmupSeconds: 5 * 60,
+    cooldownSeconds: 5 * 60,
   }),
   easy_aerobic_run: supportTemplate({
     templateKey: "easy_aerobic_run",
@@ -359,7 +385,15 @@ export function getManualWorkoutTemplate(
 }
 
 export function listManualWorkoutTemplates(): ManualWorkoutTemplate[] {
+  return listSupportedManualWorkoutTemplates();
+}
+
+export function listSupportedManualWorkoutTemplates(): ManualWorkoutTemplate[] {
   return Object.values(MANUAL_WORKOUT_TEMPLATE_REGISTRY);
+}
+
+export function listVisibleManualWorkoutStarterTemplates(): ManualWorkoutTemplate[] {
+  return VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATE_KEYS.map(getManualWorkoutTemplate);
 }
 
 function supportTemplate(input: {
@@ -371,6 +405,8 @@ function supportTemplate(input: {
   workoutType: WorkoutType;
   defaultTitle: string;
   mainBlock: ManualWorkoutBlockInput;
+  warmupSeconds?: number;
+  cooldownSeconds?: number;
   defaultNotes: string | null;
   defaultTargetTruthMode?: ManualWorkoutTargetTruthMode;
   allowedTargetTruthModes?: ManualWorkoutTargetTruthMode[];
@@ -386,14 +422,11 @@ function supportTemplate(input: {
     defaultTitle: input.defaultTitle,
     defaultNotes: input.defaultNotes,
     defaultTargetTruthMode: input.defaultTargetTruthMode ?? "structure_only",
-    allowedTargetTruthModes: input.allowedTargetTruthModes ?? [
-      "structure_only",
-      "editable_default_hr",
-    ],
+    allowedTargetTruthModes: input.allowedTargetTruthModes ?? ["structure_only"],
     defaultEntries: [
-      entry(block("warmup_block", { durationSeconds: 10 * 60 })),
+      entry(block("warmup_block", { durationSeconds: input.warmupSeconds ?? 10 * 60 })),
       entry(input.mainBlock),
-      entry(block("cooldown_block", { durationSeconds: 5 * 60 })),
+      entry(block("cooldown_block", { durationSeconds: input.cooldownSeconds ?? 5 * 60 })),
     ],
     requiresWarmupCooldown: false,
     requiresRepeatGroup: false,
@@ -467,7 +500,7 @@ function longRunTemplate(input: {
     defaultTitle: input.defaultTitle,
     defaultNotes: input.defaultNotes,
     defaultTargetTruthMode: "structure_only",
-    allowedTargetTruthModes: ["structure_only", "editable_default_hr"],
+    allowedTargetTruthModes: ["structure_only"],
     defaultEntries: [
       entry(block("warmup_block", { durationSeconds: 10 * 60, label: "Opener" })),
       entry(block("long_run_body_block", { durationSeconds: input.bodySeconds })),

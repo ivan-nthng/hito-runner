@@ -1,12 +1,14 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type { ReactNode } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { HitoDateField, HitoMaskedTimeField } from "@/components/ui/hito-date-time-input";
+import type { PlanGoalChoice } from "@/components/onboarding/onboarding-form-model";
 import { SelectedRunningPlanPreviewDialog } from "@/components/onboarding/SelectedTenKPlanPreviewDialog";
-import type {
-  PlanPresetCardId,
-  PlanPresetCardState,
-  PlanPresetCardViewModel,
-} from "@/lib/plan-presets/schema";
+import {
+  derivePlanGoalPaceReadback,
+  type PlanGoalIntentDraftState,
+  type PlanGoalSelectionId,
+  parsePlanGoalCustomDistanceKm,
+  resolveSelectedPlanGoalPreviewGate,
+} from "@/components/onboarding/selected-running-plan-flow-utils";
 import type { PlanPresetCardsActionResult } from "@/lib/plan-preset-actions";
 import type {
   RunningPlanConfirmActionResult,
@@ -17,6 +19,38 @@ import { cn } from "@/lib/utils";
 export type PlanPresetUiStatus = "idle" | "loading_cards" | "previewing_plan";
 type RunningPlanCreateStatus = "idle" | "creating";
 
+const PLAN_GOAL_CHOICES: {
+  value: Exclude<PlanGoalChoice, "">;
+  distance: string;
+  label: string;
+  copy: string;
+}[] = [
+  {
+    value: "10k",
+    distance: "10K",
+    label: "10K",
+    copy: "A compact goal for building rhythm and confidence.",
+  },
+  {
+    value: "half_marathon",
+    distance: "21K",
+    label: "Half Marathon",
+    copy: "A longer build with steady endurance and quality work.",
+  },
+  {
+    value: "marathon",
+    distance: "42K",
+    label: "Marathon",
+    copy: "A full marathon goal with reviewed load and long-run progression.",
+  },
+  {
+    value: "custom",
+    distance: "Custom",
+    label: "Custom",
+    copy: "Set your own distance and use the same generated-plan review path.",
+  },
+];
+
 interface PlanPresetPanelProps {
   cardsResult: PlanPresetCardsActionResult | null;
   confirmResult: RunningPlanConfirmActionResult | null;
@@ -26,17 +60,40 @@ interface PlanPresetPanelProps {
   status: PlanPresetUiStatus;
   isBusy: boolean;
   isPresetDiscoveryReady: boolean;
-  selectedCardId: PlanPresetCardId | null;
   previewOpen: boolean;
   onPreviewOpenChange: (open: boolean) => void;
-  onLoadCards: () => void;
-  onSelectPlan: (cardId: PlanPresetCardId) => void;
+  onSelectPlan: (goalSelection: PlanGoalSelectionId) => void;
   onRefreshPreview: () => void;
   onCreatePlan: () => void;
   previewDialogDescription?: string;
   previewDialogPrimaryActionLabel?: string;
   previewDialogPrimaryActionPendingLabel?: string;
   previewDialogExtraNotice?: ReactNode;
+  showInlinePreviewAction?: boolean;
+  planGoalChoice: PlanGoalChoice;
+  planGoalCustomDistanceKm: string;
+  planGoalCustomDistanceLabel: string;
+  planGoalFinishTime: string;
+  planGoalTargetDate: string;
+  onPlanGoalChoiceChange: (value: PlanGoalChoice) => void;
+  onPlanGoalCustomDistanceKmChange: (value: string) => void;
+  onPlanGoalCustomDistanceLabelChange: (value: string) => void;
+  onPlanGoalFinishTimeChange: (value: string) => void;
+  onPlanGoalTargetDateChange: (value: string) => void;
+}
+
+function finishTimePlaceholder(goalChoice: PlanGoalChoice) {
+  switch (goalChoice) {
+    case "10k":
+      return "45:00";
+    case "half_marathon":
+      return "1:45:00";
+    case "custom":
+      return "1:00:00";
+    case "marathon":
+    case "":
+      return "3:30:00";
+  }
 }
 
 export function PlanPresetPanel({
@@ -46,7 +103,6 @@ export function PlanPresetPanel({
   error,
   isBusy,
   isPresetDiscoveryReady,
-  onLoadCards,
   onCreatePlan,
   onPreviewOpenChange,
   onRefreshPreview,
@@ -57,50 +113,77 @@ export function PlanPresetPanel({
   previewDialogExtraNotice,
   previewDialogPrimaryActionLabel,
   previewDialogPrimaryActionPendingLabel,
-  selectedCardId,
+  showInlinePreviewAction = true,
+  planGoalChoice,
+  planGoalCustomDistanceKm,
+  planGoalCustomDistanceLabel,
+  planGoalFinishTime,
+  planGoalTargetDate,
+  onPlanGoalChoiceChange,
+  onPlanGoalCustomDistanceKmChange,
+  onPlanGoalCustomDistanceLabelChange,
+  onPlanGoalFinishTimeChange,
+  onPlanGoalTargetDateChange,
   status,
 }: PlanPresetPanelProps) {
-  const eligibility = cardsResult?.ok ? cardsResult : null;
   const blockedMessage = cardsResult && !cardsResult.ok ? cardsResult.message : null;
   const loadingCards = status === "loading_cards";
+  const basicsBlocked = !isPresetDiscoveryReady;
+  const draftState: PlanGoalIntentDraftState = {
+    planGoalChoice,
+    planGoalCustomDistanceKm,
+    planGoalCustomDistanceLabel,
+    planGoalFinishTime,
+    planGoalTargetDate,
+  };
+  const selectedGoalId = planGoalChoice || null;
+  const previewGate = resolveSelectedPlanGoalPreviewGate(draftState, selectedGoalId);
+  const previewDisabled = isBusy || basicsBlocked || !selectedGoalId || !previewGate.ok;
+  const previewHelper = previewGate.ok ? null : previewGate.error;
 
   return (
-    <section className="hito-plan-preset-stage hito-section-divider pt-6">
+    <section className="hito-plan-preset-stage hito-section-divider pt-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
           <p className="hito-micro-label" data-tone="signal">
-            Plan Presets
+            Generated plan
           </p>
-          <h2 className="hito-panel-title mt-2">Choose a guided starting point.</h2>
+          <h2 className="hito-panel-title mt-2">Choose your goal.</h2>
           <p className="hito-helper mt-2">
-            Pick a starting plan and review it before you create anything.
+            Pick one goal, then review the generated preview before anything is created.
           </p>
         </div>
-        <button
-          type="button"
-          className="hito-button hito-button-secondary hito-button-sm shrink-0"
-          disabled={isBusy}
-          onClick={onLoadCards}
-        >
-          {loadingCards ? "Loading presets..." : eligibility ? "Refresh cards" : "Load cards"}
-        </button>
       </div>
 
       <div className="mt-5 grid gap-4">
+        <PlanGoalIntentControls
+          goalChoice={planGoalChoice}
+          customDistanceKm={planGoalCustomDistanceKm}
+          customDistanceLabel={planGoalCustomDistanceLabel}
+          finishTime={planGoalFinishTime}
+          targetDate={planGoalTargetDate}
+          onGoalChoiceChange={onPlanGoalChoiceChange}
+          onCustomDistanceKmChange={onPlanGoalCustomDistanceKmChange}
+          onCustomDistanceLabelChange={onPlanGoalCustomDistanceLabelChange}
+          onFinishTimeChange={onPlanGoalFinishTimeChange}
+          onTargetDateChange={onPlanGoalTargetDateChange}
+        />
+
         {!isPresetDiscoveryReady ? (
           <div className="hito-surface-wash">
             <p className="hito-list-row-title">Add a few basics to see plan options</p>
             <p className="hito-list-row-copy">
-              Age, height, and weight help Hito show better starting plans. Weekly rhythm can stay
-              open for now.
+              Age, height, and weight help Hito show better starting plans.
             </p>
           </div>
         ) : null}
 
-        {loadingCards && !eligibility ? (
+        {loadingCards ? (
           <div className="hito-surface-wash" data-tone="signal">
-            <p className="hito-list-row-title">Loading plan options</p>
-            <p className="hito-list-row-copy">Checking which starting plans fit your setup.</p>
+            <p className="hito-list-row-title">Checking plan support</p>
+            <p className="hito-list-row-copy">
+              Hito is checking which guided previews fit your setup.
+            </p>
           </div>
         ) : null}
 
@@ -108,17 +191,33 @@ export function PlanPresetPanel({
           <p className="hito-field-error">{error ?? blockedMessage}</p>
         ) : null}
 
-        {eligibility ? (
-          <div className="hito-plan-preset-grid" aria-label="Plan preset cards">
-            {eligibility.cards.map((card) => (
-              <PlanPresetCard
-                key={card.cardId}
-                card={card}
-                selected={selectedCardId === card.cardId}
-                disabled={isBusy}
-                onSelectPlan={() => onSelectPlan(card.cardId)}
-              />
-            ))}
+        {showInlinePreviewAction ? (
+          <div className="hito-section-divider flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="hito-list-row-title">Build one generated preview</p>
+              <p className="hito-list-row-copy">
+                Hito reviews the selected goal before anything is created.
+              </p>
+              {previewHelper ? <p className="hito-field-helper mt-2">{previewHelper}</p> : null}
+            </div>
+            <button
+              type="button"
+              className="hito-button hito-button-primary hito-button-md shrink-0"
+              disabled={previewDisabled}
+              onClick={() => {
+                if (selectedGoalId) {
+                  onSelectPlan(selectedGoalId);
+                }
+              }}
+            >
+              {previewButtonLabel({
+                basicsBlocked,
+                goalChoice: planGoalChoice,
+                loadingCards,
+                previewGate,
+                status,
+              })}
+            </button>
           </div>
         ) : null}
       </div>
@@ -142,164 +241,224 @@ export function PlanPresetPanel({
   );
 }
 
-function PlanPresetCard({
-  card,
-  disabled,
-  onSelectPlan,
-  selected,
+function previewButtonLabel({
+  basicsBlocked,
+  goalChoice,
+  loadingCards,
+  previewGate,
+  status,
 }: {
-  card: PlanPresetCardViewModel;
-  disabled: boolean;
-  onSelectPlan: () => void;
-  selected: boolean;
+  basicsBlocked: boolean;
+  goalChoice: PlanGoalChoice;
+  loadingCards: boolean;
+  previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
+  status: PlanPresetUiStatus;
 }) {
-  const canSelectPlan = card.state !== "custom_fit" && card.state !== "unavailable" && !disabled;
-  const disabledReason = selectDisabledReason(card);
-  const distanceIdentity = distanceIdentityLabel(card.cardId);
-  const familyLabel = card.familyLabel ?? card.programFamily;
-  const keyWorkoutPreview = card.keyWorkoutTypes.slice(0, 3);
+  if (status === "previewing_plan") {
+    return "Building preview...";
+  }
+
+  if (loadingCards) {
+    return "Checking setup...";
+  }
+
+  if (basicsBlocked) {
+    return "Build preview";
+  }
+
+  if (!goalChoice) {
+    return "Build preview";
+  }
+
+  return "Build preview";
+}
+
+function PlanGoalIntentControls({
+  customDistanceKm,
+  customDistanceLabel,
+  finishTime,
+  goalChoice,
+  onCustomDistanceKmChange,
+  onCustomDistanceLabelChange,
+  onFinishTimeChange,
+  onGoalChoiceChange,
+  onTargetDateChange,
+  targetDate,
+}: {
+  goalChoice: PlanGoalChoice;
+  customDistanceKm: string;
+  customDistanceLabel: string;
+  finishTime: string;
+  targetDate: string;
+  onGoalChoiceChange: (value: PlanGoalChoice) => void;
+  onCustomDistanceKmChange: (value: string) => void;
+  onCustomDistanceLabelChange: (value: string) => void;
+  onFinishTimeChange: (value: string) => void;
+  onTargetDateChange: (value: string) => void;
+}) {
+  const draftState: PlanGoalIntentDraftState = {
+    planGoalChoice: goalChoice,
+    planGoalCustomDistanceKm: customDistanceKm,
+    planGoalCustomDistanceLabel: customDistanceLabel,
+    planGoalFinishTime: finishTime,
+    planGoalTargetDate: targetDate,
+  };
+  const localGate = resolveSelectedPlanGoalPreviewGate(draftState, null);
+  const localGateField = localGate.ok ? null : localGate.field;
+  const localGateError = localGate.ok ? null : localGate.error;
+  const customDistanceIsValid = parsePlanGoalCustomDistanceKm(customDistanceKm) != null;
+  const derivedPace = derivePlanGoalPaceReadback(draftState);
+  const showsPresetRefinements =
+    goalChoice === "10k" || goalChoice === "half_marathon" || goalChoice === "marathon";
+  const showsCustomRefinements = goalChoice === "custom" && customDistanceIsValid;
+  const customDistanceError =
+    goalChoice === "custom" && localGateField === "customDistance" ? localGateError : null;
+  const finishTimeError = localGateField === "finishTime" ? localGateError : null;
+  const targetDateError = localGateField === "targetDate" ? localGateError : null;
 
   return (
-    <Card
-      className={cn("hito-plan-preset-card flex min-w-0 flex-col", !canSelectPlan && "opacity-80")}
-      data-preset-card-id={card.cardId}
-      data-preset-state={card.state}
-      data-selected={selected || undefined}
-    >
-      <CardHeader className="hito-plan-preset-card-header gap-3">
-        <div className="min-w-0">
-          <p className="hito-plan-preset-distance" aria-hidden="true">
-            {distanceIdentity}
-          </p>
-          <h3 className="hito-plan-preset-family mt-2">{familyLabel}</h3>
-        </div>
-        <div className="hito-plan-preset-meta-row">
-          <span>Preview plan</span>
-          <span>{card.daysPerWeek} days/week</span>
-        </div>
-        <p className="hito-field-helper">{durationReadback()}</p>
-      </CardHeader>
+    <div className="grid gap-4">
+      <div>
+        <p className="hito-list-row-title">What are you training for?</p>
+        <p className="hito-list-row-copy">
+          Race day and finish time stay optional for every generated goal.
+        </p>
+      </div>
 
-      <CardContent className="hito-plan-preset-card-content grid flex-1 gap-4">
-        <p className="hito-body-small text-muted-foreground">{card.workoutMixSummary}</p>
-        <PlanPresetCardStateNote card={card} />
-        <div>
-          <p className="hito-label">Key workouts</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {keyWorkoutPreview.map((type) => (
-              <span key={type} className="hito-status-pill" data-tone="muted">
-                {type}
-              </span>
-            ))}
-          </div>
-        </div>
+      <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Training goal">
+        {PLAN_GOAL_CHOICES.map((choice) => (
+          <PlanGoalCard
+            key={choice.value}
+            active={goalChoice === choice.value}
+            distance={choice.distance}
+            label={choice.label}
+            copy={choice.copy}
+            onClick={() => onGoalChoiceChange(choice.value)}
+          />
+        ))}
+      </div>
 
-        <div className="mt-auto grid gap-2">
-          {canSelectPlan ? (
-            <button
-              type="button"
+      {!goalChoice ? <p className="hito-field-helper">Choose what you are training for.</p> : null}
+
+      {goalChoice === "custom" ? (
+        <div className="hito-form-two-column-grid">
+          <label className="grid gap-2">
+            <span className="hito-form-label">Custom distance</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={customDistanceKm}
+              onChange={(event) => onCustomDistanceKmChange(event.target.value)}
+              placeholder="12.5"
               className={cn(
-                "hito-button hito-button-sm w-full",
-                selected ? "hito-button-secondary" : "hito-button-primary",
+                "hito-field hito-field-primary hito-field-md",
+                customDistanceError && "hito-field-feedback-error",
               )}
-              onClick={onSelectPlan}
-            >
-              {selected ? "Preview selected" : "Select Plan"}
-            </button>
-          ) : (
-            <PlanPresetUnavailableSelectAction reason={disabledReason} />
-          )}
+            />
+            {customDistanceError ? (
+              <span className="hito-field-error">{customDistanceError}</span>
+            ) : (
+              <span className="hito-field-helper">Kilometers. For example: 12.5.</span>
+            )}
+          </label>
+          <label className="grid gap-2">
+            <span className="hito-form-label">Goal name</span>
+            <input
+              type="text"
+              autoComplete="off"
+              value={customDistanceLabel}
+              onChange={(event) => onCustomDistanceLabelChange(event.target.value)}
+              placeholder="City 12.5K"
+              className="hito-field hito-field-primary hito-field-md"
+            />
+            <span className="hito-field-helper">Optional. For example: City 12.5K.</span>
+          </label>
         </div>
-      </CardContent>
-    </Card>
+      ) : null}
+
+      {showsPresetRefinements || showsCustomRefinements ? (
+        <div className="grid gap-3">
+          <div className="hito-form-two-column-grid">
+            <HitoDateField
+              id="plan-goal-target-date"
+              label="Race day"
+              value={targetDate}
+              onChange={onTargetDateChange}
+              helper="Optional. Leave blank if you just want a normal preparation horizon."
+              error={targetDateError}
+            />
+            <HitoMaskedTimeField
+              id="plan-goal-finish-time"
+              label="Finish time"
+              value={finishTime}
+              onChange={onFinishTimeChange}
+              placeholder={finishTimePlaceholder(goalChoice)}
+              helper="Optional. Add this only if you have a result goal."
+              error={finishTimeError}
+            />
+          </div>
+          {derivedPace ? (
+            <div className="hito-surface-wash" data-tone="signal">
+              <p className="hito-list-row-title">That means about {derivedPace} on race day.</p>
+              <p className="hito-list-row-copy">
+                This is goal readback, not your workout pace target.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
-function PlanPresetCardStateNote({ card }: { card: PlanPresetCardViewModel }) {
-  const message =
-    card.postSelectionRefinement?.reason?.message ??
-    card.disabledReason?.message ??
-    card.customRoutingReason?.message ??
-    card.disabledReasonSummary ??
-    card.customReasonSummary;
-
-  if (card.state === "recommended" || card.state === "available") {
-    return (
-      <p className="hito-field-helper">Opens a full preview. Create uses the plan you reviewed.</p>
-    );
-  }
-
-  if (!message) {
-    return null;
-  }
-
+function PlanGoalCard({
+  active,
+  copy,
+  distance,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  copy: string;
+  distance: string;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <p className="hito-field-helper" data-preset-card-state={card.state}>
-      <span className="font-semibold text-foreground/85">{stateLabel(card.state)}.</span> {message}
-    </p>
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      className={cn(
+        "hito-button hito-button-md min-h-32 w-full flex-col items-start justify-between whitespace-normal p-4 text-left",
+        active ? "hito-button-primary" : "hito-button-secondary",
+      )}
+    >
+      <span className="flex w-full min-w-0 items-start justify-between gap-3">
+        <span
+          className={cn(
+            "font-display font-semibold leading-none",
+            distance === "Custom" ? "text-2xl" : "text-3xl",
+          )}
+        >
+          {distance}
+        </span>
+        {active ? (
+          <span className="hito-status-pill shrink-0" data-tone="muted">
+            Selected
+          </span>
+        ) : (
+          <span className="hito-status-pill shrink-0" data-tone="muted">
+            AI review
+          </span>
+        )}
+      </span>
+      <span className="grid min-w-0 gap-1">
+        <span className="font-semibold leading-tight">{label}</span>
+        <span className="text-xs font-medium leading-snug opacity-80">{copy}</span>
+      </span>
+    </button>
   );
-}
-
-function PlanPresetUnavailableSelectAction({ reason }: { reason: string }) {
-  return (
-    <TooltipProvider delayDuration={180}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            className="hito-button hito-button-sm hito-button-primary hito-plan-preset-disabled-cta-trigger"
-            aria-disabled="true"
-            aria-label={`Select Plan unavailable. ${reason}`}
-          >
-            Select Plan
-          </button>
-        </TooltipTrigger>
-        <TooltipContent className="hito-tooltip-width-lg" sideOffset={8}>
-          <span className="hito-tooltip-meta block">{reason}</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-function selectDisabledReason(card: PlanPresetCardViewModel) {
-  return (
-    card.disabledReason?.message ??
-    card.customRoutingReason?.message ??
-    card.disabledReasonSummary ??
-    card.customReasonSummary ??
-    "This option is not available for this setup yet."
-  );
-}
-
-function durationReadback() {
-  return "Open the preview to see the full plan and details.";
-}
-
-function distanceIdentityLabel(cardId: PlanPresetCardId) {
-  switch (cardId) {
-    case "10k":
-      return "10K";
-    case "half_marathon":
-      return "21K";
-    case "marathon":
-      return "42K";
-  }
-}
-
-function stateLabel(state: PlanPresetCardState) {
-  switch (state) {
-    case "recommended":
-      return "Available";
-    case "available":
-      return "Available";
-    case "needs_more_info":
-      return "Needs info";
-    case "not_ideal":
-      return "Not ideal";
-    case "custom_fit":
-      return "Not available in Quick setup";
-    case "unavailable":
-      return "Unavailable";
-  }
 }

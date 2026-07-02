@@ -5,7 +5,6 @@ import type {
 import { isHitoIsoDate } from "@/components/ui/hito-date-time-utils";
 import { parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
-import type { VoiceToPlanSupplement } from "@/lib/voice-to-plan-authoring";
 
 export type WeekdayName =
   | "Monday"
@@ -27,6 +26,7 @@ export type GuidancePreference = NonNullable<
 export type StrengthPreference = NonNullable<
   NonNullable<StructuredFirstPlanOnboardingInput["strength"]>["preference"]
 >;
+export type PlanGoalChoice = "" | "10k" | "half_marathon" | "marathon" | "custom";
 
 export interface StructuredConstructorState {
   age: string;
@@ -44,6 +44,11 @@ export interface StructuredConstructorState {
   targetTime: string;
   startDate: string;
   targetDate: string;
+  planGoalChoice: PlanGoalChoice;
+  planGoalCustomDistanceKm: string;
+  planGoalCustomDistanceLabel: string;
+  planGoalFinishTime: string;
+  planGoalTargetDate: string;
   terrainFocus: TerrainFocus;
   watchAccess: WatchAccess;
   guidancePreference: GuidancePreference;
@@ -252,7 +257,7 @@ export function buildStructuredInput({
 
   if (fitnessLevel === "custom") {
     if (hasRecent5kTime && !recent5kTimeValid) {
-      return { ok: false, error: "Use a recent 5K time between 18:00 and 55:00." };
+      return { ok: false, error: "Use a recent 5K time between 10:00 and 2:00:00." };
     }
 
     if (hasRecent5kPace && !recent5kPaceValid) {
@@ -263,7 +268,7 @@ export function buildStructuredInput({
       return {
         ok: false,
         error:
-          "Use a recent 5K time between 18:00 and 55:00, or pace between 2:00/km and 15:00/km.",
+          "Use a recent 5K time between 10:00 and 2:00:00, or pace between 2:00/km and 15:00/km.",
       };
     }
   }
@@ -347,98 +352,6 @@ export function buildStructuredInput({
       comment: trimmedComment || null,
     },
   };
-}
-
-export function buildVoiceSupplementFromConstructorState({
-  age,
-  weightKg,
-  heightCm,
-  fixedRestDays,
-  goalDistance,
-  goalStyle,
-  targetTime,
-  targetDate,
-  terrainFocus,
-  watchAccess,
-  guidancePreference,
-  strengthPreference,
-  recent5kTime,
-  recent5kPace,
-  comment,
-}: StructuredConstructorState): VoiceToPlanSupplement {
-  const supplement: VoiceToPlanSupplement = {
-    fixedRestDays,
-  };
-  const validAge = optionalValidNumber(age, { min: 13, max: 100, integer: true });
-  const validWeight = optionalValidNumber(weightKg, { min: 30, max: 250, increment: 0.5 });
-  const validHeight = optionalValidNumber(heightCm, { min: 120, max: 230, integer: true });
-  const trimmedTargetTime = targetTime.trim();
-  const trimmedTargetDate = targetDate.trim();
-  const trimmed5kTime = recent5kTime.trim();
-  const trimmed5kPace = recent5kPace.trim();
-  const trimmedComment = comment.trim();
-
-  if (validAge != null) {
-    supplement.age = validAge;
-  }
-
-  if (validWeight != null) {
-    supplement.weightKg = validWeight;
-  }
-
-  if (validHeight != null) {
-    supplement.heightCm = validHeight;
-  }
-
-  if (fixedRestDays.length > 0) {
-    supplement.fixedRestDays = fixedRestDays;
-  }
-
-  if (goalDistance !== "build_consistency") {
-    supplement.goalDistance = goalDistance;
-  }
-
-  if (goalStyle !== "balanced" || trimmedTargetTime) {
-    supplement.goalStyle = goalStyle;
-  }
-
-  if (trimmedTargetTime) {
-    supplement.targetTime = trimmedTargetTime;
-  }
-
-  if (trimmedTargetDate && goalStyle === "target_time") {
-    supplement.targetDate = trimmedTargetDate;
-  }
-
-  if (terrainFocus && terrainFocus !== "standard") {
-    supplement.terrainFocus = terrainFocus;
-  }
-
-  if (watchAccess !== "unknown") {
-    supplement.watchAccess = watchAccess;
-  }
-
-  if (guidancePreference !== "effort") {
-    supplement.guidancePreference = guidancePreference;
-  }
-
-  if (strengthPreference !== "none") {
-    supplement.strengthPreference = strengthPreference;
-  }
-
-  if (trimmed5kTime) {
-    supplement.recent5kTime = trimmed5kTime;
-  }
-
-  if (trimmed5kPace) {
-    supplement.recent5kPace = trimmed5kPace;
-  }
-
-  if (trimmedComment) {
-    supplement.comment = trimmedComment;
-  }
-
-  return supplement;
 }
 
 export function deriveRunningDaysPerWeek(fixedRestDays: WeekdayName[]) {
@@ -540,7 +453,7 @@ export function isPresetPrimarySetupReady({
 export function isRecent5kTimeInAcceptedRange(value: string) {
   const seconds = parseDurationSeconds(value);
 
-  return seconds != null && seconds >= 18 * 60 && seconds <= 55 * 60;
+  return seconds != null && seconds >= 10 * 60 && seconds <= 2 * 60 * 60;
 }
 
 export function isRecent5kPaceInAcceptedRange(value: string) {
@@ -613,18 +526,6 @@ export function formatTerrainFocus(terrainFocus: NonNullable<TerrainFocus>) {
     case "mountain":
       return "Mountain";
   }
-}
-
-export function voiceResultMessage(result: { message?: string; reason?: string }) {
-  if (result.message) {
-    return result.message;
-  }
-
-  if (result.reason === "capability_locked") {
-    return "Dictate-to-plan is not available for this account.";
-  }
-
-  return "Could not complete the dictated plan step yet.";
 }
 
 function requiredNumber(

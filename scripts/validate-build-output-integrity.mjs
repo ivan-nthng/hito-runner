@@ -1,11 +1,33 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
 
 const rootDir = process.cwd();
+const localGeneratedRoots = [
+  ".output",
+  "node_modules/.nitro",
+  "logs/build-output-finalized",
+  "logs/build-output-finalize-backup",
+  "logs/build-output-public-snapshot",
+];
+const vercelGeneratedRoots = [".vercel/output"];
 
 export function validateLocalBuildOutput(options = {}) {
   const validationRoot = options.rootDir ?? rootDir;
+  const qaRuntimePaths = resolveQaRuntimePaths({ rootDir: validationRoot });
+  validateNoGeneratedSiblingConflicts(validationRoot, [
+    ...localGeneratedRoots,
+    qaRuntimePaths.buildOutputRoot,
+    qaRuntimePaths.nitroBuildDir,
+    qaRuntimePaths.nitroOutputDir,
+    qaRuntimePaths.viteCacheDir,
+    qaRuntimePaths.runtimeRoot,
+    qaRuntimePaths.finalizeBackupDir,
+    qaRuntimePaths.finalizedPreviousDir,
+    qaRuntimePaths.finalizedStagingDir,
+    qaRuntimePaths.publicSnapshotDir,
+  ]);
   const runtimeOutput = resolveLocalRuntimeOutput(validationRoot);
   const requiredPaths = [
     runtimeOutput.nitroManifest,
@@ -19,13 +41,15 @@ export function validateLocalBuildOutput(options = {}) {
   const importSummary = validateRelativeMjsImports(runtimeOutput.serverDir);
   return {
     mode: "local",
-    runtimeServerRoot: relative(validationRoot, runtimeOutput.serverDir),
+    runtimeServerRoot: formatOutputPath(validationRoot, runtimeOutput.serverDir),
+    runtimeRoot: runtimeOutput.runtimeRoot,
     ...importSummary,
   };
 }
 
 export function validateVercelBuildOutput(options = {}) {
   const validationRoot = options.rootDir ?? rootDir;
+  validateNoGeneratedSiblingConflicts(validationRoot, vercelGeneratedRoots);
   const requiredPaths = [
     ".vercel/output/config.json",
     ".vercel/output/nitro.json",
@@ -45,6 +69,49 @@ export function validateVercelBuildOutput(options = {}) {
   };
 }
 
+function validateNoGeneratedSiblingConflicts(validationRoot, relativeRoots) {
+  const conflicts = [];
+
+  for (const relativeRoot of relativeRoots) {
+    const scanRoot = resolve(validationRoot, relativeRoot);
+
+    if (!existsSync(scanRoot)) {
+      continue;
+    }
+
+    scanGeneratedSiblingConflicts({ validationRoot, directory: scanRoot, conflicts });
+  }
+
+  if (conflicts.length > 0) {
+    throw new Error(
+      `Build output has generated sibling conflict artifact(s): ${conflicts
+        .slice(0, 20)
+        .join(", ")}${conflicts.length > 20 ? `, +${conflicts.length - 20} more` : ""}`,
+    );
+  }
+}
+
+function scanGeneratedSiblingConflicts({ validationRoot, directory, conflicts }) {
+  const entries = readdirSync(directory);
+
+  for (const entry of entries) {
+    const entryPath = resolve(directory, entry);
+
+    if (isGeneratedSiblingConflictName(entry)) {
+      conflicts.push(relative(validationRoot, entryPath));
+    }
+
+    const stats = lstatSync(entryPath);
+    if (stats.isDirectory() && !stats.isSymbolicLink()) {
+      scanGeneratedSiblingConflicts({ validationRoot, directory: entryPath, conflicts });
+    }
+  }
+}
+
+function isGeneratedSiblingConflictName(entryName) {
+  return / \d+(?:\.[^/.]+)?$/.test(entryName);
+}
+
 function validateRequiredPaths(validationRoot, requiredPaths) {
   const missingPaths = requiredPaths
     .map((requiredPath) => resolve(validationRoot, requiredPath))
@@ -60,27 +127,19 @@ function validateRequiredPaths(validationRoot, requiredPaths) {
 }
 
 function resolveLocalRuntimeOutput(validationRoot) {
-  const finalizedServerDir = resolve(validationRoot, "logs/build-output-finalized/server");
-  const finalizedPublicDir = resolve(validationRoot, "logs/build-output-finalized/public");
-  const finalizedNitroManifest = resolve(validationRoot, "logs/build-output-finalized/nitro.json");
-
-  if (
-    existsSync(resolve(finalizedServerDir, "index.mjs")) &&
-    existsSync(resolve(finalizedPublicDir, "favicon.svg")) &&
-    existsSync(finalizedNitroManifest)
-  ) {
-    return {
-      serverDir: finalizedServerDir,
-      publicDir: finalizedPublicDir,
-      nitroManifest: finalizedNitroManifest,
-    };
-  }
+  const qaRuntimePaths = resolveQaRuntimePaths({ rootDir: validationRoot });
 
   return {
-    serverDir: resolve(validationRoot, ".output/server"),
-    publicDir: resolve(validationRoot, ".output/public"),
-    nitroManifest: resolve(validationRoot, ".output/nitro.json"),
+    runtimeRoot: qaRuntimePaths.runtimeRoot,
+    serverDir: qaRuntimePaths.serverDir,
+    publicDir: qaRuntimePaths.publicDir,
+    nitroManifest: qaRuntimePaths.nitroManifest,
   };
+}
+
+function formatOutputPath(validationRoot, outputPath) {
+  const relativePath = relative(validationRoot, outputPath);
+  return relativePath.startsWith("..") ? outputPath : relativePath;
 }
 
 function validateRelativeMjsImports(serverRoot) {

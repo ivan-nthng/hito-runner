@@ -21,7 +21,12 @@ import {
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
 import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
-import { todayIso, type Step, type StepTarget } from "@/lib/training";
+import {
+  todayIso,
+  type Step,
+  type StepRepeatChildPrescription,
+  type StepTarget,
+} from "@/lib/training";
 
 const MANUAL_DRAFT_TITLE_MAX_LENGTH = 120;
 const MANUAL_DRAFT_NOTES_MAX_LENGTH = 1_000;
@@ -311,9 +316,10 @@ function persistedStepToEntry(
   templateKey: ManualWorkoutTemplateKey,
 ): ManualWorkoutConstructorEntryInput | null {
   if (step.repeats || step.prescription?.mode === "repeats") {
-    const workBlock = step.work ? persistedStepToBlock(step.work, templateKey, "work") : null;
-    const recoveryBlock = step.recovery
-      ? persistedStepToBlock(step.recovery, templateKey, "recovery")
+    const [workStep, recoveryStep] = repeatChildStepsForPersistedStep(step);
+    const workBlock = workStep ? persistedStepToBlock(workStep, templateKey, "work") : null;
+    const recoveryBlock = recoveryStep
+      ? persistedStepToBlock(recoveryStep, templateKey, "recovery")
       : null;
     const repeatCount = step.repeats ?? step.prescription?.repeat_count;
 
@@ -339,6 +345,72 @@ function persistedStepToEntry(
   const block = persistedStepToBlock(step, templateKey, "block");
 
   return block ? { kind: "block", block } : null;
+}
+
+function repeatChildStepsForPersistedStep(step: Step): Step[] {
+  if (step.children?.length) {
+    return step.children;
+  }
+
+  if (step.prescription?.children?.length) {
+    return step.prescription.children.map(repeatChildPrescriptionToStep);
+  }
+
+  return [];
+}
+
+function repeatChildPrescriptionToStep(child: StepRepeatChildPrescription): Step {
+  const unit = child.prescription;
+
+  return {
+    type: repeatChildStepType(child.role),
+    segment_type: child.role,
+    label: child.label ?? repeatChildLabel(child.role),
+    sequence: child.sequence,
+    guidance: child.guidance,
+    prescription: unit,
+    ...(unit.duration_min ? { duration_min: unit.duration_min } : {}),
+    ...(unit.distance_km ? { distance_km: unit.distance_km } : {}),
+    ...(child.target ? { target: child.target } : {}),
+  };
+}
+
+function repeatChildStepType(role: StepRepeatChildPrescription["role"]) {
+  switch (role) {
+    case "warm_up":
+      return "warmup";
+    case "run":
+      return "run";
+    case "walk":
+      return "walk";
+    case "work":
+      return "work";
+    case "recover":
+      return "recovery";
+    case "finish":
+      return "finish";
+    case "cooldown":
+      return "cooldown";
+  }
+}
+
+function repeatChildLabel(role: StepRepeatChildPrescription["role"]) {
+  switch (role) {
+    case "warm_up":
+      return "Warm-up";
+    case "run":
+      return "Run";
+    case "walk":
+      return "Walk";
+    case "work":
+      return "Work";
+    case "recover":
+      return "Recover";
+    case "finish":
+      return "Finish";
+    case "cooldown":
+      return "Cooldown";
+  }
 }
 
 function persistedStepToBlock(
@@ -474,7 +546,20 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
     return undefined;
   }
 
+  const isUserEnteredTarget =
+    target.target_source === "user_entered" || target.target_source === "runner_entered";
+  const paceRange = normalizeManualDraftText(
+    target.pace_min_per_km_range ?? target.pace_range_min_km,
+    MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH,
+  );
+  const pace = normalizeManualDraftText(target.pace, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH);
+  const hrBpmRange = normalizeManualDraftText(
+    target.hr_bpm_range,
+    MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH,
+  );
+  const hrBpmCap = normalizeHrBpmCap(target.hr_bpm_cap ?? target.hr_bpm);
   const sanitized: ManualWorkoutBlockInput["target"] = {
+    ...(isUserEnteredTarget ? { targetSource: "user_entered" } : {}),
     ...optionalStringField(
       "intensity",
       normalizeManualDraftText(target.intensity, MANUAL_DRAFT_TARGET_LABEL_MAX_LENGTH),
@@ -496,6 +581,13 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
       normalizeManualDraftText(target.hint, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH),
     ),
     ...(normalizeManualDraftRpe(target.rpe) ? { rpe: normalizeManualDraftRpe(target.rpe) } : {}),
+    ...(isUserEnteredTarget && pace ? { pace } : {}),
+    ...(isUserEnteredTarget && paceRange ? { paceMinPerKmRange: paceRange } : {}),
+    ...(isUserEnteredTarget && (target.hr_target_source === "user_entered" || hrBpmCap)
+      ? { hrTargetSource: "user_entered" }
+      : {}),
+    ...(isUserEnteredTarget && hrBpmCap ? { hrBpmCap } : {}),
+    ...(isUserEnteredTarget && hrBpmRange ? { hrBpmRange } : {}),
   };
 
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
@@ -520,9 +612,7 @@ function deriveTargetTruthMode(workout: PersistedPlannedWorkoutRow): ManualWorko
     return "none";
   }
 
-  return metricMode.hr_target_source === "default_estimated_hr"
-    ? "editable_default_hr"
-    : "structure_only";
+  return "structure_only";
 }
 
 function isManualWorkoutTemplateKey(value: unknown): value is ManualWorkoutTemplateKey {
@@ -559,6 +649,19 @@ function normalizeManualDraftRpe(value: StepTarget["rpe"]): StepTarget["rpe"] | 
   }
 
   return normalizeManualDraftText(value, MANUAL_DRAFT_TARGET_RPE_MAX_LENGTH);
+}
+
+function normalizeHrBpmCap(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const parsed = Number(value.trim().replace(/\s*bpm$/i, ""));
+  return Number.isInteger(parsed) ? parsed : undefined;
 }
 
 function optionalStringField<Key extends string>(key: Key, value: string | undefined) {

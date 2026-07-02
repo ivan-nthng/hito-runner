@@ -13,6 +13,15 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-06-27
+
+- Run Creation Engine: accepted manual per-segment target inputs and unified planned-workout block
+  compatibility. Manual constructor targets now support No target, runner-entered pace exact/range,
+  HR bpm cap/range, and RPE `0-10` with backend source semantics; Repeat set remains structural-only,
+  built-in templates do not seed pace/HR, JSON import/export and provider-comparison inputs preserve
+  the accepted block/target truth, and provider comparison still avoids pace/HR/RPE without
+  normalized actual evidence.
+
 ## 2026-06-20
 
 - QA / Reliability: completed one behind-the-scenes maintenance closeout across the core Hito

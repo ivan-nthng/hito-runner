@@ -322,23 +322,7 @@ function extractBlockedWeekdaysFromObject(value: unknown) {
     return [];
   }
 
-  const explicitBlocked = uniqueWeekdays(
-    EXPLICIT_BLOCKED_KEYS.flatMap((key) => readWeekdayArray(record[key])),
-  );
-
-  if (explicitBlocked.length) {
-    return explicitBlocked;
-  }
-
-  const preferredTrainingDays = uniqueWeekdays(
-    PREFERRED_TRAINING_DAY_KEYS.flatMap((key) => readWeekdayArray(record[key])),
-  );
-
-  if (!preferredTrainingDays.length || preferredTrainingDays.length >= WEEKDAY_NAMES.length) {
-    return [];
-  }
-
-  return WEEKDAY_NAMES.filter((weekday) => !preferredTrainingDays.includes(weekday));
+  return uniqueWeekdays(EXPLICIT_BLOCKED_KEYS.flatMap((key) => readWeekdayArray(record[key])));
 }
 
 function extractBlockedWeekdaysFromRunnerPreferences(value: unknown) {

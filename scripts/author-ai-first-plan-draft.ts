@@ -1272,18 +1272,21 @@ function summarizePrescription(prescription: StepPrescription | undefined) {
   }
 
   if (prescription.mode === "repeats") {
-    const repeatUnit = prescription.repeat_unit
-      ? prescription.repeat_unit.mode === "time"
-        ? `${prescription.repeat_unit.duration_min} min`
-        : `${prescription.repeat_unit.distance_km} km`
-      : "work";
-    const recoveryUnit = prescription.recovery_unit
-      ? prescription.recovery_unit.mode === "time"
-        ? `${prescription.recovery_unit.duration_min} min recovery`
-        : `${prescription.recovery_unit.distance_km} km recovery`
-      : "recovery as needed";
+    const children = (prescription.children ?? [])
+      .map((child) => {
+        if (child.prescription.mode === "time") {
+          return `${child.label ?? child.role}: ${child.prescription.duration_min} min`;
+        }
 
-    return `${prescription.repeat_count} x ${repeatUnit} / ${recoveryUnit}`;
+        if (child.prescription.mode === "distance") {
+          return `${child.label ?? child.role}: ${child.prescription.distance_km} km`;
+        }
+
+        return child.label ?? child.role;
+      })
+      .join(" + ");
+
+    return `${prescription.repeat_count} x [${children || "ordered repeat children"}]`;
   }
 
   return "none";

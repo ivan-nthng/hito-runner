@@ -6,14 +6,20 @@ import {
   type ActivePlanTransitionDependencies,
 } from "../src/lib/active-plan-transition-actions";
 import { buildActivePlanReplacementCarryForward } from "../src/lib/active-plan-replacement-carry-forward";
-import type { ExistingPlanContext } from "../src/lib/active-plan-persistence";
+import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../src/lib/manual-workout-authoring/schema";
 import {
   buildReviewedRunningPlanPreview,
+  buildReviewedAiGeneratedRunningPlanPreview,
   confirmRunningPlanDraftForUser,
   type RunningPlanConfirmActionInput,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
+import { buildAiGeneratedRunningPlanDevFixturePreviewOptions } from "../src/lib/ai-generated-running-plan-dev-fixture";
+import {
+  buildAiGeneratedRunningPlanAuthoringInput,
+  isAiGeneratedRunningPlanPreviewDraft,
+} from "../src/lib/ai-generated-running-plan";
 import {
   buildRunningPlanCanonicalPlan,
   validateRunningPlanReviewExactness,
@@ -31,69 +37,29 @@ import {
 import type { RunningPlanDistanceFamily } from "../src/lib/plan-creation-engine";
 import { resolveTenKBeginnerDosePolicyRunnerLevel } from "../src/lib/plan-creation-engine/ten-k-beginner-dose-policy";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
-import type { Database, Json } from "../src/lib/supabase/database";
-import { createAdminSupabaseClient } from "../src/lib/supabase/server";
 import {
   benchmarkPaceUsefulWorkoutKinds,
   validateRunnerFacingTargetReadbackContract,
 } from "./running-plan-engine-target-readback-contract";
-
-type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
-type PersistedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
-type DisposableCleanupProof = {
-  workoutLogsRemaining: 0;
-  planCyclesRemaining: 0;
-  plannedWorkoutsRemaining: 0;
-  runnerProfilesRemaining: 0;
-  authUserDeleted: true;
-};
-type DisposableCleanupProofCountKey = Exclude<keyof DisposableCleanupProof, "authUserDeleted">;
-type DisposableTableName = "workout_logs" | "planned_workouts" | "plan_cycles" | "runner_profiles";
-type DisposableTableRow<TableName extends DisposableTableName> =
-  Database["public"]["Tables"][TableName]["Row"];
-type DisposableCleanupSpec<TableName extends DisposableTableName = DisposableTableName> = {
-  table: TableName;
-  userColumn: Extract<keyof DisposableTableRow<TableName>, string>;
-  countColumn: Extract<keyof DisposableTableRow<TableName>, string>;
-  proofKey: DisposableCleanupProofCountKey;
-};
-
-const REQUIRE_PERSISTENCE_FLAG = "--require-persistence";
-const REMOTE_MUTATION_FLAG = "--allow-remote-disposable-supabase-mutation";
-const REMOTE_MUTATION_ENV = "HITO_RUNNING_PLAN_CONFIRM_ALLOW_REMOTE_MUTATION";
-const REMOTE_MUTATION_ENV_VALUE = "I_UNDERSTAND_THIS_MUTATES_REMOTE_DISPOSABLE_SUPABASE";
-const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-const DISPOSABLE_CLEANUP_SPECS = [
-  {
-    table: "workout_logs",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "workoutLogsRemaining",
-  },
-  {
-    table: "planned_workouts",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "plannedWorkoutsRemaining",
-  },
-  {
-    table: "plan_cycles",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "planCyclesRemaining",
-  },
-  {
-    table: "runner_profiles",
-    userColumn: "user_id",
-    countColumn: "user_id",
-    proofKey: "runnerProfilesRemaining",
-  },
-] as const satisfies readonly [
-  DisposableCleanupSpec<"workout_logs">,
-  DisposableCleanupSpec<"planned_workouts">,
-  DisposableCleanupSpec<"plan_cycles">,
-  DisposableCleanupSpec<"runner_profiles">,
-];
+import {
+  rowHasPaceTargets,
+  tamperReviewToken,
+  validateCanonicalRowsAreNumeric,
+  validateNoFakePaceOrPersonalHr,
+  validateNoPersonalHrTargets,
+} from "./running-plan-engine-confirm/assertions";
+import {
+  buildManualActivePlanContext,
+  buildPersistedWorkoutFromSeed,
+  type PersistedWorkoutRow,
+} from "./running-plan-engine-confirm/manual-transition-fixtures";
+import {
+  buildSkippedPersistenceResult,
+  formatPersistenceBlocker,
+  readCliOptions,
+  resolvePersistencePreflight,
+  validatePersistenceContract,
+} from "./running-plan-engine-confirm/persistence-proof";
 
 const baseInput = {
   age: 36,
@@ -109,6 +75,24 @@ const RECENT_5K_BENCHMARK = {
   kind: "recent_5k_time",
   recent5kTime: "25:00",
 } as const satisfies NonNullable<RunningPlanPreviewActionInput["benchmark"]>;
+
+const browserEquivalentAiQuickSetupTenKInput = {
+  age: 34,
+  heightCm: 178,
+  weightKg: 72,
+  runnerLevel: "runs_a_lot",
+  distanceFamily: "10K",
+  daysPerWeek: null,
+  fixedRestDays: [],
+  preferredLongRunDay: null,
+  startDate: null,
+  benchmark: { kind: "unknown" },
+  planGoalIntent: {
+    distance: { kind: "preset", preset: "10K" },
+    targetFinishTime: null,
+    targetDate: null,
+  },
+} as const satisfies RunningPlanPreviewActionInput;
 
 const supportedFixtures: readonly Array<{
   family: RunningPlanDistanceFamily;
@@ -164,6 +148,8 @@ const supportedFixtures: readonly Array<{
 async function main() {
   const options = readCliOptions();
   const reviewedDrafts = await validateStableReviewContract();
+  const aiGeneratedQuickSetupDraft = await validateAiGeneratedQuickSetupReviewedDraft();
+  const simplifiedQuickSetupProof = await validateSimplifiedQuickSetupTenKPreviewContract();
   const benchmarkProof = await validateBenchmarkBackedPaceTruthContract();
   await validateFailureBoundaries(reviewedDrafts[0]);
   const activeManualTransitionProof = await validateActiveManualPlanTransitionContract(
@@ -178,8 +164,13 @@ async function main() {
     throw new Error(formatPersistenceBlocker(persistencePreflight));
   }
 
+  const persistenceDrafts = [...reviewedDrafts, aiGeneratedQuickSetupDraft];
   const persistenceResults = persistencePreflight.shouldRun
-    ? await validatePersistenceContract(reviewedDrafts, persistencePreflight)
+    ? await validatePersistenceContract(
+        persistenceDrafts,
+        persistencePreflight,
+        buildPreviewInputForConfirm,
+      )
     : buildSkippedPersistenceResult(persistencePreflight);
 
   console.log("Running plan engine confirm contract checks passed.", {
@@ -190,6 +181,14 @@ async function main() {
       nonRestRows: draft.canonicalNonRestRowCount,
       reviewContractVersion: draft.reviewContractVersion,
     })),
+    aiGeneratedQuickSetup: {
+      sourceKind: aiGeneratedQuickSetupDraft.sourceKind,
+      planFamily: aiGeneratedQuickSetupDraft.planFamily,
+      rows: aiGeneratedQuickSetupDraft.canonicalRowCount,
+      nonRestRows: aiGeneratedQuickSetupDraft.canonicalNonRestRowCount,
+      reviewContractVersion: aiGeneratedQuickSetupDraft.reviewContractVersion,
+    },
+    simplifiedQuickSetup: simplifiedQuickSetupProof,
     benchmarkPaceTruth: benchmarkProof,
     activeManualTransition: activeManualTransitionProof,
     persistence: persistenceResults,
@@ -275,11 +274,170 @@ async function validateStableReviewContract() {
   return reviewedDrafts;
 }
 
+async function validateAiGeneratedQuickSetupReviewedDraft(): Promise<
+  RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>
+> {
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(
+    browserEquivalentAiQuickSetupTenKInput,
+  );
+  assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
+  if (!authoring.ok) {
+    throw new Error(authoring.message);
+  }
+
+  const fixturePreviewOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+    authoringInput: authoring.authoringInput,
+    planFamily: authoring.planFamily,
+    today:
+      browserEquivalentAiQuickSetupTenKInput.startDate ??
+      authoring.authoringInput.schedule.startDate,
+    env: localAiGeneratedFixtureEnv(),
+  });
+  assert.notEqual(
+    fixturePreviewOptions,
+    null,
+    "AI-generated Quick setup confirm proof must use the local QA/dev OpenAI-shaped fixture.",
+  );
+
+  const result = await buildReviewedAiGeneratedRunningPlanPreview(
+    browserEquivalentAiQuickSetupTenKInput,
+    {
+      aiPreview: fixturePreviewOptions ?? undefined,
+    },
+  );
+  assert.equal(
+    result.ok,
+    true,
+    result.ok
+      ? "AI-generated Quick setup 10K no-benchmark preview must be reviewed."
+      : result.unavailable.error.message,
+  );
+  if (!result.ok) {
+    throw new Error(result.unavailable.error.message);
+  }
+
+  const draft = result.draft;
+  assert.equal(isAiGeneratedRunningPlanPreviewDraft(draft), true);
+  assert.equal(draft.planFamily, "10K");
+  assert.equal(draft.endpointProof.endpointDistanceMeters, 10_000);
+  assert.equal(draft.reviewSafety.confirmCallsOpenAi, false);
+
+  const exactness = await validateRunningPlanReviewExactness({
+    draft,
+    reviewToken: draft.reviewToken,
+    reviewChecksum: draft.reviewChecksum,
+  });
+  assert.equal(
+    exactness.ok,
+    true,
+    exactness.ok ? "AI-generated Quick setup review exactness must validate." : exactness.message,
+  );
+  assert.doesNotThrow(
+    () => buildReviewedFirstPlanImportedSeed(buildRunningPlanCanonicalPlan(draft)),
+    "AI-generated Quick setup reviewed plan must pass first-plan persistence seed guards.",
+  );
+
+  return draft;
+}
+
+async function validateSimplifiedQuickSetupTenKPreviewContract() {
+  const quickSetupInput = {
+    age: 34,
+    heightCm: 178,
+    weightKg: 72,
+    runnerLevel: "runs_a_lot",
+    distanceFamily: "10K",
+    daysPerWeek: null,
+    fixedRestDays: null,
+    preferredLongRunDay: null,
+    startDate: null,
+    benchmark: { kind: "unknown" },
+    planGoalIntent: {
+      distance: { kind: "preset", preset: "10K" },
+      targetFinishTime: null,
+      targetDate: null,
+    },
+  } satisfies RunningPlanPreviewActionInput;
+  const result = await buildReviewedRunningPlanPreview(quickSetupInput);
+
+  assert.equal(
+    result.ok,
+    true,
+    "Simplified Quick setup 10K/no-benchmark payload must produce a reviewed preview.",
+  );
+  if (!result.ok) {
+    throw new Error(result.unavailable.error.message);
+  }
+
+  const draft = result.draft;
+  const canonicalPlan = buildRunningPlanCanonicalPlan(draft);
+  const finalNonRestRow = canonicalPlan.planned_workouts
+    .filter((workout) => workout.workout_type !== "rest")
+    .at(-1);
+
+  assert.equal(draft.sourceStatus, "preview_ready");
+  assert.equal(draft.persisted, false);
+  assert.equal(draft.mutates, false);
+  assert.equal(draft.callsOpenAi, false);
+  assert.equal(draft.planFamily, "10K");
+  assert.equal(draft.endpointProof.endpointDistanceMeters, 10_000);
+  assert.equal(draft.endpointProof.endpointMainDistanceMeters, 10_000);
+  assert.equal(finalNonRestRow?.source_workout_type, "final_selected_distance_day");
+  assert.equal(draft.normalizedInputSummary.planGoalIntent.distance?.label, "10K");
+  assert.equal(draft.normalizedInputSummary.planGoalIntent.targetOutcomePace, null);
+  assert.equal(
+    draft.normalizedInputSummary.planGoalIntent.metricTruthPolicy.segmentPaceTargetsAllowedFromGoal,
+    false,
+  );
+  assert.equal(
+    draft.normalizedInputSummary.planGoalIntent.metricTruthPolicy.hrTargetsAllowedFromGoal,
+    false,
+  );
+
+  validateNoFakePaceOrPersonalHr(canonicalPlan.planned_workouts);
+  validateRunnerFacingTargetReadbackContract(canonicalPlan, "Simplified Quick setup 10K fixture");
+  validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts);
+  assert.deepEqual(
+    summarizeRunnerFacingCanonicalRichness({
+      family: draft.planFamily,
+      runnerLevel: resolveRunnerLevelForConfirmQualityGates(draft),
+      loadContext: draft.normalizedInputSummary.loadContext,
+      rows: canonicalPlan.planned_workouts,
+    }).issues,
+    [],
+    "Simplified Quick setup 10K canonical rows must satisfy runner-facing richness gates.",
+  );
+  assert.deepEqual(
+    summarizeRunningPlanCanonicalPrescriptionGrammar(canonicalPlan.planned_workouts).issues,
+    [],
+    "Simplified Quick setup 10K canonical rows must satisfy prescription grammar gates.",
+  );
+
+  const exactness = await validateRunningPlanReviewExactness({
+    draft,
+    reviewToken: draft.reviewToken,
+    reviewChecksum: draft.reviewChecksum,
+  });
+  assert.equal(exactness.ok, true, "Simplified Quick setup 10K review must be confirm-safe.");
+
+  return {
+    sourceKind: draft.sourceKind,
+    planFamily: draft.planFamily,
+    rows: draft.canonicalRowCount,
+    nonRestRows: draft.canonicalNonRestRowCount,
+    endpointMeters: draft.endpointProof.endpointDistanceMeters,
+    goalPaceUnlocksExecutableTargets: false,
+    reviewExactness: "valid",
+  };
+}
+
 async function validateBenchmarkBackedPaceTruthContract() {
   const targetTimeOnlyResult = await buildReviewedRunningPlanPreview({
     ...buildFixtureInput(supportedFixtures[0]),
-    targetTime: "45:00",
-  } as unknown as RunningPlanPreviewActionInput);
+    planGoalIntent: {
+      targetFinishTime: "45:00",
+    },
+  } satisfies RunningPlanPreviewActionInput);
   assert.equal(
     targetTimeOnlyResult.ok,
     true,
@@ -288,6 +446,17 @@ async function validateBenchmarkBackedPaceTruthContract() {
   if (!targetTimeOnlyResult.ok) {
     throw new Error(targetTimeOnlyResult.unavailable.error.message);
   }
+  assert.equal(
+    targetTimeOnlyResult.draft.normalizedInputSummary.planGoalIntent.targetFinishTime?.label,
+    "45:00",
+    "Target finish time should survive as normalized plan goal intent.",
+  );
+  assert.equal(
+    targetTimeOnlyResult.draft.normalizedInputSummary.planGoalIntent.metricTruthPolicy
+      .segmentPaceTargetsAllowedFromGoal,
+    false,
+    "Target finish time must not unlock executable workout pace targets.",
+  );
   validateNoFakePaceOrPersonalHr(
     buildRunningPlanCanonicalPlan(targetTimeOnlyResult.draft).planned_workouts,
   );
@@ -909,231 +1078,6 @@ function validateLegacyPlanPresetCreateSeamIsRemoved() {
   );
 }
 
-async function validatePersistenceContract(
-  reviewedDrafts: readonly RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>[],
-  preflight: Extract<PersistencePreflight, { shouldRun: true }>,
-) {
-  const supabase = createAdminSupabaseClient();
-  const persistedFamilies: Array<{
-    family: RunningPlanDistanceFamily;
-    rows: number;
-    sourceKind: string;
-    cleanup: DisposableCleanupProof;
-  }> = [];
-
-  for (const draft of reviewedDrafts) {
-    const userId = await createDisposableUser(supabase, draft.planFamily);
-    let familyProof: Omit<(typeof persistedFamilies)[number], "cleanup"> | null = null;
-    let cleanupProof: DisposableCleanupProof | null = null;
-
-    try {
-      const result = await confirmRunningPlanDraftForUser(userId, {
-        previewInput: buildInputFromDraft(draft),
-        planFamily: draft.planFamily,
-        sourceKind: draft.sourceKind,
-        reviewToken: draft.reviewToken,
-        reviewChecksum: draft.reviewChecksum,
-      });
-      assert.equal(result.ok, true, `${draft.planFamily} confirm should persist.`);
-      if (!result.ok) throw new Error(result.message);
-
-      const persisted = await loadPersistedPlanForUser(supabase, userId);
-      assert.equal(persisted.plan.source_kind, draft.sourceKind);
-      assert.equal(persisted.workouts.length, draft.canonicalRowCount);
-      assert.equal(
-        persisted.workouts.filter((workout) => workout.workout_type !== "rest").length,
-        draft.canonicalNonRestRowCount,
-      );
-      assert.equal(
-        (persisted.plan.goal_metadata as { selected_plan_engine?: { source_status?: string } })
-          .selected_plan_engine?.source_status,
-        "confirmed_selected_plan",
-      );
-      assert.equal(
-        (persisted.plan.goal_metadata as { selected_plan_engine?: { review_checksum?: string } })
-          .selected_plan_engine?.review_checksum,
-        draft.reviewChecksum,
-      );
-      validateNoFakePaceOrPersonalHr(persisted.workouts);
-      validateNoClientRowsTrusted(persisted.workouts);
-
-      const duplicate = await confirmRunningPlanDraftForUser(userId, {
-        previewInput: buildInputFromDraft(draft),
-        planFamily: draft.planFamily,
-        sourceKind: draft.sourceKind,
-        reviewToken: draft.reviewToken,
-        reviewChecksum: draft.reviewChecksum,
-      });
-      assert.equal(duplicate.ok, false);
-      if (!duplicate.ok) {
-        assert.equal(duplicate.reason, "active_plan_exists");
-      }
-
-      familyProof = {
-        family: draft.planFamily,
-        rows: persisted.workouts.length,
-        sourceKind: draft.sourceKind,
-      };
-    } finally {
-      cleanupProof = await cleanupDisposableUser(supabase, userId);
-    }
-
-    if (familyProof && cleanupProof) {
-      persistedFamilies.push({
-        ...familyProof,
-        cleanup: cleanupProof,
-      });
-    }
-  }
-
-  return {
-    mode: preflight.mode,
-    target: preflight.target,
-    persistedFamilies,
-  };
-}
-
-function readCliOptions() {
-  const args = new Set(process.argv.slice(2));
-
-  return {
-    requirePersistence: args.has(REQUIRE_PERSISTENCE_FLAG),
-    allowRemoteDisposableSupabaseMutation:
-      args.has(REMOTE_MUTATION_FLAG) &&
-      process.env[REMOTE_MUTATION_ENV] === REMOTE_MUTATION_ENV_VALUE,
-  };
-}
-
-type PersistenceTarget = {
-  url: string;
-  hostname: string;
-  projectRef: string | null;
-  isLoopback: boolean;
-};
-
-type PersistencePreflight =
-  | {
-      mode: "no_supabase_env";
-      shouldRun: false;
-      target: null;
-      reason: string;
-      overrideHint: string;
-    }
-  | {
-      mode: "remote_supabase_blocked";
-      shouldRun: false;
-      target: PersistenceTarget;
-      reason: string;
-      overrideHint: string;
-    }
-  | {
-      mode: "local_disposable_supabase";
-      shouldRun: true;
-      target: PersistenceTarget;
-    }
-  | {
-      mode: "remote_disposable_supabase_override";
-      shouldRun: true;
-      target: PersistenceTarget;
-    };
-
-function resolvePersistencePreflight(
-  options: ReturnType<typeof readCliOptions>,
-): PersistencePreflight {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
-  const serviceKey = process.env.SUPABASE_SECRET_KEY?.trim();
-
-  if (!url || !publishableKey || !serviceKey) {
-    return {
-      mode: "no_supabase_env",
-      shouldRun: false,
-      target: null,
-      reason:
-        "Supabase persistence env is incomplete; non-mutating review exactness checks ran only.",
-      overrideHint:
-        "Start local Supabase and export NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY, then rerun with --require-persistence.",
-    };
-  }
-
-  const target = parsePersistenceTarget(url);
-  if (!target) {
-    return {
-      mode: "no_supabase_env",
-      shouldRun: false,
-      target: null,
-      reason: "NEXT_PUBLIC_SUPABASE_URL is not a valid URL; persistence proof was not attempted.",
-      overrideHint:
-        "Use a valid local Supabase URL such as http://127.0.0.1:54321 and rerun with --require-persistence.",
-    };
-  }
-
-  if (target.isLoopback) {
-    return {
-      mode: "local_disposable_supabase",
-      shouldRun: true,
-      target,
-    };
-  }
-
-  if (options.allowRemoteDisposableSupabaseMutation) {
-    return {
-      mode: "remote_disposable_supabase_override",
-      shouldRun: true,
-      target,
-    };
-  }
-
-  return {
-    mode: "remote_supabase_blocked",
-    shouldRun: false,
-    target,
-    reason:
-      "Remote Supabase mutation is blocked by default. This harness only mutates local/disposable targets unless an explicit remote-disposable override is supplied.",
-    overrideHint: `Use a local Supabase URL, or set ${REMOTE_MUTATION_ENV}=${REMOTE_MUTATION_ENV_VALUE} and pass ${REMOTE_MUTATION_FLAG} only for an approved disposable remote validation target.`,
-  };
-}
-
-function parsePersistenceTarget(url: string): PersistenceTarget | null {
-  try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
-    const projectRef = hostname.endsWith(".supabase.co")
-      ? hostname.split(".supabase.co")[0] || null
-      : null;
-
-    return {
-      url: parsed.origin,
-      hostname,
-      projectRef,
-      isLoopback: LOOPBACK_HOSTNAMES.has(hostname),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function formatPersistenceBlocker(preflight: Extract<PersistencePreflight, { shouldRun: false }>) {
-  return [
-    `Running-plan confirm persistence proof is blocked: ${preflight.reason}`,
-    preflight.target
-      ? `Target: ${preflight.target.url} (${preflight.target.projectRef ?? preflight.target.hostname}).`
-      : "Target: none.",
-    preflight.overrideHint,
-  ].join(" ");
-}
-
-function buildSkippedPersistenceResult(
-  preflight: Extract<PersistencePreflight, { shouldRun: false }>,
-) {
-  return {
-    mode: preflight.mode,
-    target: preflight.target,
-    reason: preflight.reason,
-    overrideHint: preflight.overrideHint,
-  };
-}
-
 function buildFixtureInput(fixture: {
   family: RunningPlanDistanceFamily;
   runnerLevel: RunningPlanPreviewActionInput["runnerLevel"];
@@ -1181,7 +1125,7 @@ function buildConfirmInputFromDraft(
   draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
 ): RunningPlanConfirmActionInput {
   return {
-    previewInput: buildInputFromDraft(draft),
+    previewInput: buildPreviewInputForConfirm(draft),
     planFamily: draft.planFamily,
     sourceKind: draft.sourceKind as RunningPlanConfirmActionInput["sourceKind"],
     reviewToken: draft.reviewToken,
@@ -1189,153 +1133,20 @@ function buildConfirmInputFromDraft(
   };
 }
 
-function buildManualActivePlanContext(
-  overrides: {
-    plan?: Partial<PersistedPlanCycleRow>;
-    workouts?: PersistedWorkoutRow[];
-  } = {},
-): ExistingPlanContext {
-  const plan: PersistedPlanCycleRow = {
-    created_at: "2026-06-01T10:00:00Z",
-    updated_at: "2026-06-07T10:00:00Z",
-    end_date: "2026-07-01",
-    goal_metadata: {
-      source_status: "manual_user_built_plan_created",
-    },
-    goal_summary: "Manual user-built plan",
-    id: "manual-plan-1",
-    plan_preferences: null,
-    schema_version: "training-plan-v2",
-    source_kind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    source_template: "manual_user_built_plan_v1",
-    start_date: "2026-06-01",
-    status: "active",
-    target_date: null,
-    title: "Manual Plan",
-    user_id: "transition-dry-run-user",
-    ...overrides.plan,
-  };
-  const workouts = overrides.workouts ?? [
-    buildManualPersistedWorkout({
-      id: "manual-workout-past",
-      date: "2026-06-03",
-      title: "Logged manual workout",
-      workoutType: "easy",
-      displayOrder: 0,
-    }),
-    buildManualPersistedWorkout({
-      id: "manual-workout-future-1",
-      date: "2026-06-09",
-      title: "Future manual workout",
-      workoutType: "quality",
-      displayOrder: 1,
-    }),
-    buildManualPersistedWorkout({
-      id: "manual-workout-future-2",
-      date: "2026-06-12",
-      title: "Future manual long run",
-      workoutType: "long_run",
-      displayOrder: 2,
-    }),
-  ];
+function buildPreviewInputForConfirm(
+  draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+): RunningPlanPreviewActionInput {
+  if (isAiGeneratedRunningPlanPreviewDraft(draft)) {
+    return draft.previewInput;
+  }
 
-  return {
-    activePlan: plan,
-    existingWorkouts: {
-      workouts,
-      logsByWorkoutId: new Map([
-        [
-          "manual-workout-past",
-          {
-            actual_distance_km: 6,
-            actual_duration_min: 42,
-            body_notes: null,
-            id: "manual-log-1",
-            intervals_completed: null,
-            logged_at: "2026-06-03T12:00:00Z",
-            notes: "Completed before transition.",
-            outcome: "completed",
-            planned_workout_id: "manual-workout-past",
-            rpe: 4,
-            updated_at: "2026-06-03T12:00:00Z",
-            user_id: "transition-dry-run-user",
-          },
-        ],
-      ]),
-    },
-  };
+  return buildInputFromDraft(draft);
 }
 
-function buildManualPersistedWorkout(input: {
-  id: string;
-  date: string;
-  title: string;
-  workoutType: PersistedWorkoutRow["workout_type"];
-  displayOrder: number;
-}): PersistedWorkoutRow {
+function localAiGeneratedFixtureEnv() {
   return {
-    calendar_icon_key: "run",
-    created_at: "2026-06-01T10:00:00Z",
-    display_order: input.displayOrder,
-    estimated_fatigue: null,
-    goal_context: {
-      manual_user_built_plan: true,
-    },
-    id: input.id,
-    metric_mode: {
-      executable_mode: "structure_only_executable",
-      pace_targets_allowed: false,
-      hr_targets_allowed: false,
-    },
-    notes: null,
-    phase: "Manual",
-    plan_cycle_id: "manual-plan-1",
-    planned_rpe: null,
-    recovery_priority: null,
-    source_workout_id: input.id,
-    source_workout_type: "manual_workout",
-    steps: [],
-    title: input.title,
-    user_id: "transition-dry-run-user",
-    week_number: 1,
-    weekday: "Tuesday",
-    workout_date: input.date,
-    workout_family: "easy_run",
-    workout_identity: input.id,
-    workout_type: input.workoutType,
-  };
-}
-
-function buildPersistedWorkoutFromSeed(
-  workout: ReturnType<typeof buildImportedPlanSeed>["workouts"][number],
-  index: number,
-  planCycleId: string,
-  userId: string,
-): PersistedWorkoutRow {
-  return {
-    calendar_icon_key: workout.calendarIconKey,
-    created_at: "2026-06-08T10:00:00Z",
-    display_order: index,
-    estimated_fatigue: workout.estimatedFatigue,
-    goal_context: workout.goalContext,
-    id: `selected-workout-${index + 1}`,
-    metric_mode: workout.metricMode,
-    notes: workout.notes,
-    phase: workout.phase,
-    plan_cycle_id: planCycleId,
-    planned_rpe: workout.plannedRpe,
-    recovery_priority: workout.recoveryPriority,
-    source_workout_id: workout.sourceWorkoutId,
-    source_workout_type: workout.sourceWorkoutType,
-    steps: workout.steps,
-    title: workout.title,
-    user_id: userId,
-    week_number: workout.weekNumber,
-    weekday: workout.weekday,
-    workout_date: workout.workoutDate,
-    workout_family: workout.workoutFamily,
-    workout_identity: workout.workoutIdentity,
-    workout_type: workout.workoutType,
+    LOCAL_AUTH_BYPASS_ENABLED: "true",
+    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "scripts/fixtures/local-auth-users.json",
   };
 }
 
@@ -1345,32 +1156,6 @@ function formatDurationSeconds(seconds: number) {
   const remainder = roundedSeconds % 60;
 
   return `${minutes}:${String(remainder).padStart(2, "0")}`;
-}
-
-function validateCanonicalRowsAreNumeric(
-  rows: readonly ReturnType<typeof buildRunningPlanCanonicalPlan>["planned_workouts"][number][],
-  options: { expectedMode: "structure_only" | "mixed" } = { expectedMode: "structure_only" },
-) {
-  for (const row of rows) {
-    if (row.workout_type === "rest") continue;
-
-    assert.ok(row.segments.length > 0, `${row.workout_id} must have segments.`);
-    assert.ok(row.metric_mode, `${row.workout_id} must have metric mode.`);
-    if (options.expectedMode === "structure_only" || !rowHasPaceTargets(row)) {
-      assert.equal(row.metric_mode?.executable_mode, "structure_only_executable");
-      assert.equal(row.metric_mode?.pace_targets_allowed, false);
-    }
-    assert.equal(row.metric_mode?.hr_targets_allowed, false);
-
-    for (const segment of row.segments) {
-      assert.ok(segment.prescription, `${row.workout_id}.${segment.segment_type} lacks structure.`);
-      assert.notEqual(
-        segment.prescription?.mode,
-        "none",
-        `${row.workout_id}.${segment.segment_type} must not be vague/none.`,
-      );
-    }
-  }
 }
 
 function resolveRunnerLevelForConfirmQualityGates(
@@ -1384,181 +1169,6 @@ function resolveRunnerLevelForConfirmQualityGates(
     runnerLevel: draft.normalizedInputSummary.runnerLevel,
     benchmarkPaceTruth: draft.normalizedInputSummary.benchmarkPaceTruth,
   });
-}
-
-function validateNoFakePaceOrPersonalHr(rows: readonly unknown[]) {
-  const serialized = JSON.stringify(rows);
-
-  assert.doesNotMatch(serialized, /"pace_min_per_km_range"|"pace_range_min_km"|"pace"/i);
-  assert.doesNotMatch(serialized, /race_pace_session/i);
-  validateNoPersonalHrTargets(rows);
-}
-
-function tamperReviewToken(token: string) {
-  const replacement = token.endsWith("0") ? "1" : "0";
-
-  return `${token.slice(0, -1)}${replacement}`;
-}
-
-function validateNoPersonalHrTargets(rows: readonly unknown[]) {
-  const serialized = JSON.stringify(rows);
-
-  assert.doesNotMatch(
-    serialized,
-    /personal_hr|personalized_hr|hr_zone_truth|"hr_targets_allowed":true/i,
-  );
-}
-
-function rowHasPaceTargets(
-  row: ReturnType<typeof buildRunningPlanCanonicalPlan>["planned_workouts"][number],
-) {
-  return JSON.stringify(row.segments).includes("pace_min_per_km_range");
-}
-
-function validateNoClientRowsTrusted(rows: readonly PersistedWorkoutRow[]) {
-  for (const row of rows) {
-    assert.notEqual(row.title, "client tampered row");
-  }
-}
-
-async function createDisposableUser(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  family: RunningPlanDistanceFamily,
-) {
-  const slug = family.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const email = `running-plan-confirm-${slug}-${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2)}@example.test`;
-  const created = await supabase.auth.admin.createUser({
-    email,
-    email_confirm: true,
-  });
-
-  if (created.error || !created.data.user) {
-    throw new Error(created.error?.message ?? "Disposable user creation failed.");
-  }
-
-  return created.data.user.id;
-}
-
-async function loadPersistedPlanForUser(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  userId: string,
-) {
-  const planResult = await supabase
-    .from("plan_cycles")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .single();
-
-  if (planResult.error || !planResult.data) {
-    throw new Error(planResult.error?.message ?? "Persisted active plan was not found.");
-  }
-
-  const workoutsResult = await supabase
-    .from("planned_workouts")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("plan_cycle_id", planResult.data.id)
-    .order("display_order", { ascending: true });
-
-  if (workoutsResult.error || !workoutsResult.data) {
-    throw new Error(workoutsResult.error?.message ?? "Persisted workouts were not found.");
-  }
-
-  return {
-    plan: planResult.data,
-    workouts: workoutsResult.data,
-  };
-}
-
-async function cleanupDisposableUser(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  userId: string,
-): Promise<DisposableCleanupProof> {
-  for (const spec of DISPOSABLE_CLEANUP_SPECS) {
-    await deleteRows(supabase.from(spec.table).delete().eq(spec.userColumn, userId));
-  }
-
-  const deleted = await supabase.auth.admin.deleteUser(userId);
-  if (deleted.error) {
-    throw new Error(deleted.error.message);
-  }
-
-  const remainingCounts = new Map<DisposableCleanupProofCountKey, number>(
-    await Promise.all(
-      DISPOSABLE_CLEANUP_SPECS.map(async (spec) => [
-        spec.proofKey,
-        await countRowsForUser(supabase, spec, userId),
-      ]),
-    ),
-  );
-
-  return {
-    workoutLogsRemaining: assertZeroCleanupCount(
-      remainingCounts,
-      "workoutLogsRemaining",
-      "Disposable workout logs must be cleaned up.",
-    ),
-    planCyclesRemaining: assertZeroCleanupCount(
-      remainingCounts,
-      "planCyclesRemaining",
-      "Disposable plan cycles must be cleaned up.",
-    ),
-    plannedWorkoutsRemaining: assertZeroCleanupCount(
-      remainingCounts,
-      "plannedWorkoutsRemaining",
-      "Disposable planned workouts must be cleaned up.",
-    ),
-    runnerProfilesRemaining: assertZeroCleanupCount(
-      remainingCounts,
-      "runnerProfilesRemaining",
-      "Disposable runner profile must be cleaned up.",
-    ),
-    authUserDeleted: true,
-  };
-}
-
-async function countRowsForUser<TableName extends DisposableTableName>(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  spec: DisposableCleanupSpec<TableName>,
-  userId: string,
-) {
-  const result = await supabase
-    .from(spec.table)
-    .select(spec.countColumn, { count: "exact", head: true })
-    .eq(spec.userColumn, userId);
-
-  if (result.error) {
-    throw new Error(result.error.message);
-  }
-
-  return result.count ?? 0;
-}
-
-function assertZeroCleanupCount(
-  counts: ReadonlyMap<DisposableCleanupProofCountKey, number>,
-  proofKey: DisposableCleanupProofCountKey,
-  message: string,
-): 0 {
-  const count = counts.get(proofKey) ?? 0;
-
-  assert.equal(count, 0, message);
-
-  return 0;
-}
-
-async function deleteRows(
-  query: PromiseLike<{
-    error: { message: string } | null;
-  }>,
-) {
-  const result = await query;
-
-  if (result.error) {
-    throw new Error(result.error.message);
-  }
 }
 
 main().catch((error: unknown) => {

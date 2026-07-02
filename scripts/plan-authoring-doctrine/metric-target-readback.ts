@@ -38,21 +38,33 @@ function allSegments(plan: TrainingPlanV2): SegmentRecord[] {
 }
 
 export function hasTargetKey(plan: TrainingPlanV2, key: string) {
-  return allSegments(plan).some((segment) => {
-    const target = segment.target as Record<string, unknown> | undefined;
-    const recoveryTarget = segment.recovery_target as Record<string, unknown> | undefined;
-
-    return Boolean(target?.[key] || recoveryTarget?.[key]);
-  });
+  return allSegments(plan).some((segment) =>
+    collectSegmentTargets(segment).some((target) => Boolean(target[key])),
+  );
 }
 
 function stepHasTargetKey(step: Step, key: string): boolean {
   const target = step.target as Record<string, unknown> | undefined;
 
-  return Boolean(
-    target?.[key] ||
-    (step.work && stepHasTargetKey(step.work, key)) ||
-    (step.recovery && stepHasTargetKey(step.recovery, key)),
+  return Boolean(target?.[key] || step.children?.some((child) => stepHasTargetKey(child, key)));
+}
+
+function collectSegmentTargets(segment: SegmentRecord) {
+  const target = segment.target as Record<string, unknown> | undefined;
+  const recoveryTarget = segment.recovery_target as Record<string, unknown> | undefined;
+  const childTargets = Array.isArray(
+    (segment.prescription as { children?: unknown } | undefined)?.children,
+  )
+    ? (
+        (segment.prescription as { children?: Array<{ target?: Record<string, unknown> }> })
+          .children ?? []
+      )
+        .map((child) => child.target)
+        .filter((childTarget): childTarget is Record<string, unknown> => Boolean(childTarget))
+    : [];
+
+  return [target, recoveryTarget, ...childTargets].filter(
+    (candidate): candidate is Record<string, unknown> => Boolean(candidate),
   );
 }
 
@@ -128,7 +140,7 @@ function assertStructureOnlyReadbackKeepsNumericAnatomy(plan: TrainingPlanV2, la
   assert.deepEqual(
     structurelessWorkouts,
     [],
-    `${label}: structure-only saved workout readback should keep duration/distance/repeat/work/recovery anatomy`,
+    `${label}: structure-only saved workout readback should keep duration/distance/repeat/children anatomy`,
   );
 }
 

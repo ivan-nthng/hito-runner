@@ -22,7 +22,7 @@ const nullableBoundedTextSchema = z.string().trim().min(1).max(360).nullable();
 
 const aiBlueprintWorkoutSchema = z
   .object({
-    date: isoDateSchema.nullable(),
+    date: isoDateSchema,
     weekday: z.enum(weekdayValues),
     workoutFamily: z.enum(authoredWorkoutFamilyValues),
     workoutIdentity: z.enum(authoredWorkoutIdentityValues),
@@ -168,6 +168,13 @@ const aiBlueprintWeekOpenAiSchema = {
 
 export function buildAiFirstPlanBlueprintOpenAiSchema(runningDaysPerWeek = 7) {
   const boundedRunningDaysPerWeek = Math.min(7, Math.max(1, Math.round(runningDaysPerWeek)));
+  const plannedWorkoutItemSchema = {
+    ...aiBlueprintWorkoutOpenAiSchema,
+    properties: {
+      ...aiBlueprintWorkoutOpenAiSchema.properties,
+      date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+    },
+  };
 
   return {
     ...aiFirstPlanBlueprintOpenAiSchema,
@@ -183,6 +190,7 @@ export function buildAiFirstPlanBlueprintOpenAiSchema(runningDaysPerWeek = 7) {
               ...aiBlueprintWeekOpenAiSchema.properties.plannedWorkouts,
               minItems: boundedRunningDaysPerWeek,
               maxItems: boundedRunningDaysPerWeek,
+              items: plannedWorkoutItemSchema,
             },
           },
         },

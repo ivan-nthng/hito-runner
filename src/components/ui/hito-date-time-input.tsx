@@ -162,8 +162,9 @@ export function HitoDateField({
           id={calendarId}
           data-hito-date-picker-popover
           align="start"
-          sideOffset={6}
-          collisionPadding={12}
+          side="bottom"
+          sideOffset={0}
+          avoidCollisions={false}
           onOpenAutoFocus={(event) => event.preventDefault()}
           onCloseAutoFocus={(event) => {
             event.preventDefault();

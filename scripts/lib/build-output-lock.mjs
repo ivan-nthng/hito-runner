@@ -7,13 +7,14 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
+import { resolveQaRuntimePaths } from "./qa-runtime-paths.mjs";
 
 const lockFileName = "build-output.lock.json";
 
 export function acquireBuildOutputLock({ rootDir }) {
   const lockPath = buildOutputLockPath(rootDir);
-  const ownerPid = process.ppid || process.pid;
+  const ownerPid = buildOutputLifecycleOwnerPid();
   const lock = readBuildOutputLock(lockPath);
 
   if (lock && isPidAlive(lock.ownerPid)) {
@@ -56,14 +57,30 @@ export function releaseBuildOutputLock({ rootDir }) {
     return;
   }
 
-  const currentOwnerPid = process.ppid || process.pid;
+  const currentOwnerPid = buildOutputLifecycleOwnerPid();
   if (lock.ownerPid === currentOwnerPid || !isPidAlive(lock.ownerPid)) {
     removeBuildOutputLock(lockPath);
   }
 }
 
+export function readActiveBuildOutputLock({ rootDir }) {
+  const lockPath = buildOutputLockPath(rootDir);
+  const lock = readBuildOutputLock(lockPath);
+
+  if (!lock) {
+    return null;
+  }
+
+  if (!isPidAlive(lock.ownerPid)) {
+    removeBuildOutputLock(lockPath);
+    return null;
+  }
+
+  return lock;
+}
+
 function buildOutputLockPath(rootDir) {
-  return resolve(rootDir, "logs", lockFileName);
+  return resolveQaRuntimePaths({ rootDir }).lockPath;
 }
 
 function readBuildOutputLock(lockPath) {
@@ -78,6 +95,10 @@ function readBuildOutputLock(lockPath) {
   } catch {
     return null;
   }
+}
+
+function buildOutputLifecycleOwnerPid() {
+  return process.env.npm_lifecycle_event ? process.ppid || process.pid : process.pid;
 }
 
 function removeBuildOutputLock(lockPath) {

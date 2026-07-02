@@ -1,7 +1,7 @@
 # Current Functional Map
 
 Status: canonical freeze-readiness map
-Last Updated: 2026-06-25
+Last Updated: 2026-06-27
 Owner: ARCHITECT
 
 ## Purpose
@@ -65,7 +65,8 @@ Current flow count:
   no-active structured/custom first-plan review, no-active selected-plan preset review, no-active
   empty manual calendar creation, advanced JSON import/paste, and active-calendar `Add plan`
   reviewed transition for selected running-plan candidates.
-- Backend voice-to-plan remains preserved backend truth but has no current visible onboarding caller.
+- Voice-to-plan / Dictate-to-Plan is retired from current runtime truth; it is not a visible
+  onboarding caller, entitlement capability, or first-plan backend action.
 - Workout creation has three current product meanings:
   bulk plan application into `planned_workouts`, manual calendar Add activity through the shared
   manual constructor/review/add seam, and copy/paste/reuse paths that reconstruct through the same
@@ -111,11 +112,10 @@ Cleanup candidate matrix:
   backend source-capability readback now uses only current/future/past unlogged eligibility or
   blocked, and active-plan export `source_status` reuses the shared provenance resolver. `Calendar.tsx`
   still has one stale compatibility branch to remove as a frontend consumer cleanup.
-- Frontend/Hito DS cleanup candidate:
-  runner-facing and `/hitoDS` calendar wording still leak `empty` as a visible day state. Product
-  `Calendar.tsx` already mostly maps missing workout rows to Rest/no-workout presentation, so this
-  should follow after backend metadata vocabulary cleanup as a rendering/DS specimen cleanup, not a
-  backend mutation contract change.
+- Accepted frontend/Hito DS cleanup:
+  runner-facing and `/hitoDS` calendar wording no longer expose `empty` as a visible business state.
+  Product and specimen language now uses Rest, No workout, and Rest or no-workout day, while internal
+  `empty` may remain a technical state key only.
 - Backend provenance alignment:
   export source-status readback now shares the active-plan editability provenance resolver, so manual,
   selected-plan, preset, refresh, and AI source-status metadata use one backend owner.
@@ -151,9 +151,9 @@ kind and source status are provenance/audit metadata, not separate runner-facing
 | `target_had_no_persisted_workout_row` | Keep: internal exactness | Useful to distinguish missing persisted row from explicit Rest row without exposing a runner-facing Empty state. | Keep internal only. |
 | Old missed-window source-capability vocabulary | Deleted/collapsed in backend | Current resolver uses current/future/past unlogged eligibility or blocked. | FRONTEND cleanup remains for one compatibility predicate. |
 | Export source-status resolver duplication | Collapsed in backend | Export readback now reuses active-plan provenance resolver coverage. | Preserve shared resolver. |
-| `/hitoDS` and shared calendar `empty` base state | Collapse candidate | Current product truth is Rest or Workout; `empty` is a rendering/specimen leak. | Later FRONTEND/Hito DS cleanup after backend metadata gate. |
+| `/hitoDS` and shared calendar no-workout presentation | Keep: accepted presentation cleanup | Current product truth is Rest or Workout; visible `empty` language is removed, while internal `empty` may remain technical only. | Preserve Rest / No workout / Rest or no-workout copy. |
 | Runner-facing internal proof metadata in review modals | Collapse candidate | Useful for QA/debug but noisy for runners. | Later FRONTEND cleanup; keep safety hidden or dev-only. |
-| `completeTextOnboarding` / voice-to-plan backend seam | Unknown/manual review | No visible caller, but may call OpenAI and is documented as compatibility/non-default truth. | Do not delete without separate Product/Backend decision. |
+| `completeTextOnboarding` saved-mode text replacement seam | Keep: backend non-default compatibility | No visible default route, but still documents the current free-text saved-mode replacement capability and uses the canonical structured/rich workout normalization path. | Preserve until a separate Product/Backend decision retires saved-mode text replacement. |
 | `training-api.ts` wrappers | Keep: compatibility | Route-facing server-function facade still has current wrappers. | Narrow only with fresh import map. |
 
 ## Freeze Sequencing Decision
@@ -177,7 +177,8 @@ Slice G13 made the work dashboard refresh path first-class and stale-resistant a
 no-caller first-plan/voice compatibility re-exports from `training-api.ts`, G16 removed untracked
 duplicate-space local residue, G17 removed untracked legacy Plan Preset builder/review residue, G18
 deleted tracked orphan `JsonImportPanel` residue, G19 deleted tracked orphan
-`DictateToPlanPanel` residue while preserving backend voice-to-plan truth, G20 removed the
+`DictateToPlanPanel` residue, the source-size cleanup retired the remaining non-visible
+voice-to-plan backend seam, G20 removed the
 untracked duplicate-space manual-workout backlog markdown copy, G21 accepted the final codebase size
 and dead-code teardown sweep, and G22 accepted the business-process short-path audit after folding in
 current-state/dashboard source-of-truth sync.
@@ -192,6 +193,33 @@ Reason:
   state and backend policy decide affordances.
 - Manual authoring still owns manual workout content, templates, and proved Copy/Paste; it does not
   own the general active-plan lifecycle gate for Add/Clear/Move across accepted plan sources.
+- Manual constructor review/readback now uses backend-owned `constructorContract.timeline` for
+  segment/repeat anatomy, frontend target controls are accepted, and backend v1 runner-entered
+  target support is accepted for per-segment No target, pace exact/range, HR bpm cap/range, and
+  RPE `0-10`. Unified block compatibility is accepted across manual review, persisted
+  `planned_workouts.steps`, active-plan export, `training-plan-v2` parse/import, and provider
+  comparison input. Backend `plan_goal_intent_v1` and frontend guided selected-plan readback are now
+  accepted, including distinct runner-entered outcome pace and finish-time-derived pace as
+  goal/review truth. The accepted child-first reducer covers readback/export/import/provider
+  comparison. Backend has retired old flat segment-level `training-plan-v2` repeat fields, frontend
+  runtime-visible repeat consumers now read through centralized child-first `children[]` helpers, and
+  the 2026-06-28 Product-authorized legacy repeat data purge removed the remaining persisted
+  pair-shaped repeat rows from Supabase project `dltfjwexyctmihclcjqj`. `planned_workouts.steps`,
+  import/export, provider comparison input, manual reconstruction, and the runtime seed fixture now
+  use ordered repeat `children[]`; `repeat_unit` / `recovery_unit` and persisted repeat sibling
+  `work` / `recovery` compatibility are retired. Selected-plan draft internals may still use private
+  `prescription.work` / `prescription.recovery` before review normalization, but canonical output
+  maps to `prescription.children[]`. Generated-plan richness over accepted `planGoalIntent` and
+  child-first blocks is backend / Running Coach / source-CLI-QA accepted with fresh 2026-06-28
+  scenario artifacts. Quick setup browser/readback proof is now accepted for the OpenAI/local-fixture
+  authored dated generated-plan path: 10K no-benchmark, Marathon target date/finish time, and Custom
+  15K target date/finish time all preview/create saved plans with child-first repeats. Custom 15K
+  persists as `distance_build`, Marathon persists as `marathon` / `target_time`, and neither path
+  falls back to Marathon Base as current product truth. Generated-plan create-and-use browser proof
+  is also accepted through first generated non-rest workout logging and saved completed-state
+  readback. Garmin/FIT provider upload and deterministic planned-vs-actual comparison remain a
+  separate later QA gate.
+  Generated/default HR and fake/manual-inferred pace remain blocked.
 - Running-plan universal runner-facing richness and executable prescription grammar is accepted;
   the old flat generated-plan quality blocker should no longer pause cleanup.
 - Cleanup Slices 12A-12G and 13A-13I reduced proof-infrastructure hotspots without changing runtime
@@ -249,8 +277,7 @@ Reason:
   no-overflow, backend seam preservation, disposable cleanup, and no fake pace/personal HR signals.
 - Slice G2 found that broad runtime deletion is not safe yet:
   `src/lib/training-api.ts`, `src/lib/active-plan-schedule-edit-preview.ts`,
-  `scripts/validate-active-plan-schedule-edit-preview.ts`, `src/lib/voice-to-plan-authoring.ts`,
-  and `src/lib/imported-plan.ts` all still map to current backend seams, validation proof, or
+  `scripts/validate-active-plan-schedule-edit-preview.ts`, and `src/lib/imported-plan.ts` all still map to current backend seams, validation proof, or
   compatibility-owned route imports.
 - Slice G2 corrected current-doc drift around the removed strict nested AI first-plan module:
   `src/lib/ai-first-plan-draft-authoring.ts` no longer exists, and strict-draft references are
@@ -371,11 +398,10 @@ Reason:
 - G18 is complete: tracked orphan `JsonImportPanel` residue was deleted, and current JSON import
   behavior is now owned by `UploadJsonDialog`.
 - Post-G18 reassessment selected FRONTEND G19 for tracked orphan `DictateToPlanPanel` UI residue.
-  Fresh source proof found no live source/package/script caller outside the file itself, while
-  backend `voice-to-plan` truth remains a non-default backend seam and is not selected for deletion.
-- G19 is complete: tracked orphan `DictateToPlanPanel` residue was deleted, and backend
-  voice-to-plan truth remains owned by first-plan actions, voice-to-plan authoring, entitlements,
-  onboarding form-model types, plan-authoring snapshot mapping, and doctrine validation.
+  Fresh source proof found no live source/package/script caller outside the file itself.
+- G19 is complete: tracked orphan `DictateToPlanPanel` residue was deleted. The later source-size
+  cleanup also retired the non-visible backend voice-to-plan seam, entitlement capability, and
+  validator proof branch.
 - Post-G19 reassessment selected ARCHITECT G20 for untracked duplicate-space manual-workout backlog
   markdown cleanup after admin-mirror proof.
 - G20 is complete: the untracked duplicate-space manual-workout backlog markdown copy was deleted,
@@ -461,8 +487,8 @@ calls, Supabase mutation, log deletion, generated/vendor residue cleanup, and ad
 | Flow | Runner-facing capability | Status | Backend owner/seam | Frontend owner/surface | Persisted entities | Proof status | Future-only boundaries |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | No-active-plan entry | Signed-in runners without an active plan see creation choices instead of silent preview assignment. | Shipped for the accepted creation choices; latest no-active-plan IA blocker is not marked accepted here without explicit QA closeout | `src/lib/route-data-actions.ts`, `src/lib/first-plan-actions.ts`, `src/lib/training-api.ts` wrappers | `src/components/OnboardingGate.tsx`, onboarding components | `runner_profiles`, `plan_cycles`, `planned_workouts` only after confirm | Changelog-backed saved-mode and onboarding history; no explicit inspected QA closeout for the `isManualProfileReady` blocker | No silent plan creation; no active-plan replacement without explicit action; do not treat unresolved IA/runtime blockers as cleanup-safe |
-| Structured first plan / AI-authored blueprint draft | Runner enters profile/goal/training context in Quick setup, reviews a backend-shaped draft, then confirms. AI may draft under backend constraints. | Shipped for the current visible structured Quick setup path; Dictate-to-Plan / voice transcript assist is not a visible onboarding UI flow | `src/lib/first-plan-actions.ts`, `src/lib/structured-first-plan-onboarding.ts`, `src/lib/ai-first-plan-blueprint-*`, `src/lib/active-plan-persistence.ts` | `src/components/OnboardingGate.tsx`, `src/components/onboarding/StructuredPlanConstructor.tsx` | `runner_profiles`, `plan_cycles`, `planned_workouts` | Validators under `scripts/validate-plan-authoring-doctrine.ts`; changelog entries through 2026-06-10 | No AI direct persistence; no fake pace from target time; no fake personal HR; strict draft/envelope ops seams are not normal UI; no visible voice-to-plan / AI setup caller until a frontend and QA gate accepts it |
-| Selected-distance plan creation | Runner can create accepted selected-distance plans after preview/review/create. | 10K, Half Marathon, and Marathon Base create accepted; Marathon Completion backend preview/review/confirm artifacts accepted, with runner-facing selected-option exposure still separate | `src/lib/running-plan-engine-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/plan-creation-engine/*`, `src/lib/active-plan-persistence.ts` | `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`, onboarding selected-plan UI | `runner_profiles`, `plan_cycles`, `planned_workouts` after confirm | `scripts/validate-running-plan-engine-*`, `scripts/generate-running-plan-engine-scenarios.ts`, R8 browser/DB proof, universal richness/prescription QA + Running Coach acceptance | Do not treat Marathon Completion selected-option UI exposure as shipped unless a product/UI gate accepts it; do not turn Marathon Base into completion |
+| Structured first plan / AI-authored blueprint draft | Runner enters profile/goal/training context in Quick setup, reviews a backend-shaped draft, then confirms. AI may draft under backend constraints. | Shipped for the current visible structured Quick setup path; Dictate-to-Plan / voice transcript assist is retired from current product truth | `src/lib/first-plan-actions.ts`, `src/lib/structured-first-plan-onboarding.ts`, `src/lib/ai-first-plan-blueprint-*`, `src/lib/active-plan-persistence.ts` | `src/components/OnboardingGate.tsx`, `src/components/onboarding/StructuredPlanConstructor.tsx` | `runner_profiles`, `plan_cycles`, `planned_workouts` | Validators under `scripts/validate-plan-authoring-doctrine.ts`; changelog entries through 2026-06-10 | No AI direct persistence; no fake pace from target time; no fake personal HR; strict draft/envelope ops seams are not normal UI; no voice-to-plan / AI setup path unless a future Product/Backend/Frontend gate rebuilds and QA-accepts it |
+| Selected-distance plan creation | Runner can create accepted selected-distance plans after preview/review/create. | OpenAI/local-fixture-authored dated Quick setup path is accepted for 10K no-benchmark, Marathon target-time, and Custom 15K target-time; deterministic distance builders are validator/dev scaffolding or legacy discovery context, not normal generated-plan product truth | `src/lib/running-plan-engine-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/ai-generated-running-plan.ts`, `src/lib/active-plan-persistence.ts`; `src/lib/plan-creation-engine/*` remains validator/dev/legacy family policy support | `src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx`, onboarding selected-plan UI | `runner_profiles`, `plan_cycles`, `planned_workouts` after confirm | QA browser/readback artifact `qa-artifacts/screenshots/2026-06-30/openai-authored-dated-readback-cleanup-qa-rerun/`; generated-plan validators and child-first readback proof | Do not call AI at confirm; do not persist raw AI output; do not turn outcome pace into executable workout pace; do not treat Marathon Base as current marathon target-time truth |
 | Plan Presets | Runner can use 10K Foundation, Half Marathon Balanced, or Marathon Base cards as non-mutating discovery into selected running-plan preview/create, including saved-mode active-manual transition discovery. | Shipped as discovery; creation is owned by the running-plan engine or active-plan transition seam | `src/lib/plan-preset-actions.ts` keeps `getPlanPresetCards(...)`; selected create/review/confirm lives in running-plan engine actions/review; active-manual replacement uses `src/lib/active-plan-transition-actions.ts` | Preset cards in onboarding plus selected-plan preview dialog and future saved-mode `Create a plan` transition UI | Card discovery does not persist; selected running-plan confirm persists `runner_profiles`, `plan_cycles`, and `planned_workouts` only when no active plan exists; active manual transition archives/supersedes through reviewed confirm | Changelog 2026-06-07 history plus later selected-plan create proof; Slice G2A removed old Plan Preset review/confirm blocked actions; saved-mode card discovery no longer has an active-plan read gate | No new preset families; no Plan Preset active-plan replacement; no legacy Plan Preset review/confirm creation seam; no direct selected-plan confirm while an active plan exists |
 | Active manual plan -> selected generated plan transition | Runner can be shown a backend-shaped impact review for replacing an active manual plan with a reviewed selected generated/preset plan; frontend wiring/QA remains separate. | Backend seam implemented / QA pending / not runner-facing shipped | `src/lib/active-plan-transition-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/active-plan-persistence.ts` | Future saved-mode `Create a plan` transition UI | Old `plan_cycles` row archived/superseded; new selected plan persisted as active; manual templates remain user-library rows | `scripts/validate-running-plan-engine-confirm.ts` transition proof | No silent replacement; no clear-then-create shortcut; no merge of upcoming manual workouts; no deletion of logs/evidence/comparisons/protected history |
 | Manual first create | Runner chooses `Build my plan myself`, reviews one workout, and creates a manual active plan. | Shipped | `src/lib/manual-workout-authoring/actions.ts`, `persistence.ts`, `review-exactness.ts`, `active-plan-persistence.ts` | `OnboardingGate.tsx`, shared manual controls | `runner_profiles`, `plan_cycles`, `planned_workouts` | `scripts/validate-manual-workout-authoring.ts`; browser/DB proof; changelog 2026-06-10 | Do not persist empty active manual plans silently |
@@ -542,7 +568,6 @@ Largest counted source/doc/script hotspots:
 | [AI first-plan blueprint proof](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/scripts/plan-authoring-doctrine/ai-first-plan-blueprint-proof.ts) | `1844` | focused proof owner; keep |
 | [repo work-item importer](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/scripts/import-repo-work-items-to-admin-backlog.ts) | `1798` | admin mirror tooling; keep |
 | [manual authoring controls](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/manual-workout/ManualWorkoutAuthoringControls.tsx) | `1694` | required runtime UI; decompose later only with browser QA scope |
-| [voice-to-plan authoring](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/voice-to-plan-authoring.ts) | `1685` | backend non-default authoring path with no current visible onboarding caller; keep until Product selects replacement/deletion |
 | [active-plan schedule edit preview](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-schedule-edit-preview.ts) | `1591` | current docs/UI imports still reference it; keep |
 
 Stable cleanup burndown:
@@ -879,11 +904,10 @@ count them as current runtime owners.
 40. G18 is complete: tracked orphan `JsonImportPanel` residue was deleted while current JSON import
     behavior remains owned by `UploadJsonDialog`.
 41. Post-G18 reassessment selected FRONTEND G19 for tracked orphan `DictateToPlanPanel.tsx` UI
-    residue. This is deletion-only source cleanup; backend `voice-to-plan` truth remains a
-    non-default backend seam and must not be deleted or changed.
-42. G19 is complete: tracked orphan `DictateToPlanPanel.tsx` residue was deleted while backend
-    voice-to-plan truth remains owned by first-plan actions, voice-to-plan authoring, entitlements,
-    onboarding form-model types, plan-authoring snapshot mapping, and doctrine proof.
+    residue. This was deletion-only source cleanup for the old UI panel.
+42. G19 is complete: tracked orphan `DictateToPlanPanel.tsx` residue was deleted. Later source-size
+    cleanup retired the remaining non-visible backend voice-to-plan seam instead of preserving it as
+    current truth.
 43. Post-G19 reassessment selected ARCHITECT G20 for the untracked duplicate-space manual-workout
     backlog markdown copy. This is docs/admin-mirror source-of-truth hygiene only.
 44. G20 is complete: the untracked duplicate-space manual-workout backlog markdown copy was deleted

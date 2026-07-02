@@ -94,16 +94,22 @@ export {
   type ManualWorkoutSavedTemplateView,
 } from "@/lib/manual-workout-authoring/saved-templates";
 export { buildManualWorkoutUserBuiltTrainingPlan } from "@/lib/manual-workout-authoring/persistence";
+export { buildManualWorkoutConstructorContract } from "@/lib/manual-workout-authoring/constructor-contract";
 export {
   getManualWorkoutTemplate,
+  listSupportedManualWorkoutTemplates,
+  listVisibleManualWorkoutStarterTemplates,
   listManualWorkoutTemplates,
+  INTERNAL_SUPPORTED_MANUAL_WORKOUT_TEMPLATE_KEYS,
   MANUAL_WORKOUT_TEMPLATE_MAPPING_GAPS,
   MANUAL_WORKOUT_TEMPLATE_REGISTRY,
+  VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATE_KEYS,
   type ManualWorkoutTemplate,
 } from "@/lib/manual-workout-authoring/templates";
 export {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS,
+  MANUAL_WORKOUT_CONSTRUCTOR_CONTRACT_VERSION,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
   MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
@@ -112,6 +118,7 @@ export {
   MANUAL_WORKOUT_BLOCK_KEY_VALUES,
   MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES,
   MANUAL_WORKOUT_TARGET_TRUTH_MODE_VALUES,
+  MANUAL_WORKOUT_TARGET_SOURCE_VALUES,
   MANUAL_WORKOUT_TEMPLATE_KEY_VALUES,
   manualWorkoutAddToActivePlanInputSchema,
   manualEmptyPlanSetupInputSchema,
@@ -130,6 +137,14 @@ export {
   type ManualWorkoutConfirmInput,
   type ManualWorkoutConfirmResult,
   type ManualWorkoutConstructorEntryInput,
+  type ManualWorkoutConstructorContract,
+  type ManualWorkoutConstructorMetadataNote,
+  type ManualWorkoutConstructorRepeatGroup,
+  type ManualWorkoutConstructorSegment,
+  type ManualWorkoutConstructorSegmentRole,
+  type ManualWorkoutConstructorSegmentStructure,
+  type ManualWorkoutConstructorSegmentTarget,
+  type ManualWorkoutConstructorTimelineEntry,
   type ManualWorkoutDraftConflict,
   type ManualWorkoutDraftContext,
   type ManualWorkoutDraftInput,
@@ -138,6 +153,7 @@ export {
   type ManualWorkoutRepeatGroupInput,
   type ManualWorkoutRepeatSafetyKind,
   type ManualWorkoutReviewSummary,
+  type ManualWorkoutTargetSource,
   type ManualWorkoutTargetTruthMode,
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";

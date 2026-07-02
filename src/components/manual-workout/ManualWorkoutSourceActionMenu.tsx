@@ -26,6 +26,7 @@ import type { ManualWorkoutDeleteClearReviewResult } from "@/lib/manual-workout-
 import {
   formatManualDraftStructure,
   formatReadableDate,
+  manualTemplateRunnerLabelFromKey,
   targetTruthModeLabel,
 } from "@/components/manual-workout/manual-workout-authoring-utils";
 
@@ -92,7 +93,7 @@ export function ManualWorkoutSourceActionMenu({
     hitoToast.success({
       id: MANUAL_COPY_PASTE_TOAST_ID,
       title: "Workout copied",
-      description: `${title} is ready to paste into an empty future day.`,
+      description: `${title} is ready to paste into a Rest or no-workout day.`,
     });
   };
 
@@ -368,7 +369,7 @@ function ManualDeleteClearReadyDialog({
                 <p className="hito-list-row-copy">{formatDeleteClearWorkoutSummary(result)}</p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
-                {result.templateKey.replaceAll("_", " ")}
+                {manualTemplateRunnerLabelFromKey(result.templateKey)}
               </span>
             </div>
 

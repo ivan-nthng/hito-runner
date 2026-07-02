@@ -10,6 +10,7 @@ import {
   workoutDuration,
   type Step,
   type StepPrescription,
+  type StepRepeatChildPrescription,
   type StepUnitPrescription,
   type StepTarget,
   type WorkoutType,
@@ -21,6 +22,8 @@ import type {
   CanonicalWorkoutFamily,
   CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
+import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
+import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
 import { resolveActivePlanSourceStatus } from "@/lib/active-plan-workout-editing/policy";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
@@ -63,6 +66,7 @@ export interface ActivePlanExportWorkout {
   calendarIconKey: CalendarIconKey;
   goalContext: CanonicalGoalContext | null;
   metricMode: CanonicalMetricMode;
+  plannedWorkoutLanguage: PlannedWorkoutLanguageReadModel;
   title: string;
   notes: string | null;
   steps: Step[];
@@ -93,7 +97,7 @@ export function buildActivePlanExportPayload(args: {
         left.display_order - right.display_order ||
         left.title.localeCompare(right.title),
     )
-    .map((workout) => workoutRowToExportWorkout(workout));
+    .map((workout) => workoutRowToExportWorkout(workout, args.planCycle.source_kind));
 
   const firstWorkoutDate = orderedWorkouts[0]?.date ?? args.planCycle.start_date;
   const lastWorkoutDate = orderedWorkouts.at(-1)?.date ?? args.planCycle.end_date;
@@ -179,12 +183,13 @@ export function renderPlanExportMarkdown(payload: ActivePlanExportPayload) {
     }
 
     lines.push(`### ${formatDate(workout.date)} - ${workout.title}`);
-    lines.push(`- Type: ${humanizeWorkoutType(workout.sourceWorkoutType ?? workout.workoutType)}`);
+    lines.push(`- Type: ${workout.plannedWorkoutLanguage.runnerFacingWorkoutTypeLabel}`);
 
     if (workout.workoutType !== "rest") {
-      lines.push(
-        `- Focus: ${humanizeWorkoutType(workout.workoutFamily)} · ${humanizeWorkoutType(workout.workoutIdentity)}`,
-      );
+      const blocks = formatRunnerFacingBlockLine(workout.plannedWorkoutLanguage.runnerFacingBlocks);
+      if (blocks) {
+        lines.push(`- Blocks: ${blocks}`);
+      }
     }
 
     const metrics = formatWorkoutMetrics(workout);
@@ -275,7 +280,10 @@ function workoutToTrainingPlanV2Segments(workout: ActivePlanExportWorkout) {
   ];
 }
 
-function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanExportWorkout {
+function workoutRowToExportWorkout(
+  row: PersistedPlannedWorkoutRow,
+  sourceKind: string | null,
+): ActivePlanExportWorkout {
   const steps = Array.isArray(row.steps) ? (row.steps as unknown as Step[]) : [];
   const workout = {
     steps,
@@ -285,6 +293,7 @@ function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanE
   const richWorkout = deriveWorkoutRichModel({
     type: row.workout_type,
     sourceWorkoutType: row.source_workout_type,
+    sourceKind,
     workoutFamily: row.workout_family,
     workoutIdentity: row.workout_identity,
     calendarIconKey: row.calendar_icon_key,
@@ -307,6 +316,7 @@ function workoutRowToExportWorkout(row: PersistedPlannedWorkoutRow): ActivePlanE
     calendarIconKey: richWorkout.calendarIconKey,
     goalContext: richWorkout.goalContext,
     metricMode: richWorkout.metricMode,
+    plannedWorkoutLanguage: richWorkout.plannedWorkoutLanguage,
     title: row.title,
     notes: row.notes,
     steps,
@@ -392,8 +402,10 @@ function explicitWorkoutDistanceKm(steps: Step[]) {
 }
 
 function stepToTrainingPlanV2Segment(step: Step, index: number) {
-  const target = exportTarget(step.target);
   const prescription = buildStepExportPrescription(step);
+  const isRepeatSegment = prescription?.mode === "repeats";
+  const usesRepeatChildren = isRepeatSegment && Boolean(prescription.children?.length);
+  const target = usesRepeatChildren ? null : exportTarget(step.target);
   const segmentType = toExportSegmentType(step.segment_type ?? step.type, Boolean(prescription));
   const segment = {
     segment_id: step.segment_id ?? `segment-${index + 1}`,
@@ -422,23 +434,17 @@ function buildStepExportPrescription(step: Step) {
     return exportPrescription(step.prescription);
   }
 
-  if (!step.repeats || !step.work) {
-    return null;
+  if (step.repeats && step.children?.length) {
+    return {
+      mode: "repeats",
+      repeat_count: step.repeats,
+      children: step.children
+        .map((child, index) => stepToRepeatChildPrescription(child, index))
+        .filter((child): child is StepRepeatChildPrescription => child != null),
+    };
   }
 
-  const repeatUnit = stepToUnitPrescription(step.work);
-  if (!repeatUnit) {
-    return null;
-  }
-
-  const recoveryUnit = step.recovery ? stepToUnitPrescription(step.recovery) : null;
-
-  return {
-    mode: "repeats",
-    repeat_count: step.repeats,
-    repeat_unit: repeatUnit,
-    ...(recoveryUnit ? { recovery_unit: recoveryUnit } : {}),
-  };
+  return null;
 }
 
 function exportPrescription(prescription: StepPrescription) {
@@ -447,9 +453,49 @@ function exportPrescription(prescription: StepPrescription) {
     ...(prescription.duration_min ? { duration_min: prescription.duration_min } : {}),
     ...(prescription.distance_km ? { distance_km: prescription.distance_km } : {}),
     ...(prescription.repeat_count ? { repeat_count: prescription.repeat_count } : {}),
-    ...(prescription.repeat_unit ? { repeat_unit: prescription.repeat_unit } : {}),
-    ...(prescription.recovery_unit ? { recovery_unit: prescription.recovery_unit } : {}),
+    ...(prescription.mode === "repeats"
+      ? { children: repeatPrescriptionChildrenForExport(prescription) }
+      : {}),
   };
+}
+
+function repeatPrescriptionChildrenForExport(
+  prescription: StepPrescription,
+): StepRepeatChildPrescription[] {
+  return reduceRepeatChildrenToChildFirst<StepTarget>({
+    children: prescription.children,
+  }).children;
+}
+
+function stepToRepeatChildPrescription(
+  step: Step,
+  index: number,
+): StepRepeatChildPrescription | null {
+  const prescription = stepToUnitPrescription(step);
+  if (!prescription) {
+    return null;
+  }
+
+  return {
+    role: stepToRepeatChildRole(step),
+    ...(stringValue(step.label) ? { label: stringValue(step.label) } : {}),
+    sequence: step.sequence ?? index + 1,
+    ...(stringValue(step.guidance) ? { guidance: stringValue(step.guidance) } : {}),
+    prescription,
+    ...(step.target ? { target: step.target } : {}),
+  };
+}
+
+function stepToRepeatChildRole(step: Step): StepRepeatChildPrescription["role"] {
+  const type = `${step.segment_type ?? ""} ${step.type ?? ""} ${step.label ?? ""}`.toLowerCase();
+
+  if (/warm/.test(type)) return "warm_up";
+  if (/\bwalk\b/.test(type)) return "walk";
+  if (/recover|recovery/.test(type)) return "recover";
+  if (/finish|closing/.test(type)) return "finish";
+  if (/cool/.test(type)) return "cooldown";
+  if (/work|interval|tempo|hill|stride/.test(type)) return "work";
+  return "run";
 }
 
 function stepToUnitPrescription(step: Step): StepUnitPrescription | null {
@@ -498,13 +544,21 @@ function exportTarget(target: StepTarget | undefined) {
     }
   };
 
+  push("target_source", target.target_source);
   push("intensity", target.intensity);
-  push("hr_bpm_range", target.hr_bpm_range ?? target.hr_bpm);
+  push("hr_bpm_range", target.hr_bpm_range);
+  push("hr_bpm", target.hr_bpm);
+  push("hr_bpm_cap", target.hr_bpm_cap);
+  push("hr_bpm_min", target.hr_bpm_min);
+  push("hr_bpm_max", target.hr_bpm_max);
   push("hr_target_source", target.hr_target_source);
   push("label", target.label);
   push("source_note", target.source_note);
   push("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
   push("pace", target.pace);
+  push("pace_seconds_per_km", target.pace_seconds_per_km);
+  push("pace_min_seconds_per_km", target.pace_min_seconds_per_km);
+  push("pace_max_seconds_per_km", target.pace_max_seconds_per_km);
   push("rpe", target.rpe);
   push("cadence_spm_range", target.cadence_spm_range);
   push("cue", target.cue);
@@ -544,13 +598,20 @@ function stringValue(value: unknown) {
 
 function buildWorkoutSummary(workout: ActivePlanExportWorkout) {
   const metrics = formatWorkoutMetrics(workout);
-  const type = humanizeWorkoutType(workout.sourceWorkoutType ?? workout.workoutType);
+  const type = workout.plannedWorkoutLanguage.runnerFacingWorkoutTypeLabel;
 
   if (metrics) {
     return `${metrics} ${type.toLowerCase()}.`;
   }
 
   return workout.workoutType === "rest" ? "Rest and recovery." : type;
+}
+
+function formatRunnerFacingBlockLine(
+  blocks: ActivePlanExportWorkout["plannedWorkoutLanguage"]["runnerFacingBlocks"],
+) {
+  const labels = blocks.map((block) => block.label).filter(Boolean);
+  return labels.length > 0 ? labels.join(" -> ") : null;
 }
 
 function formatWorkoutMetrics(workout: ActivePlanExportWorkout) {
@@ -659,14 +720,6 @@ function toExportSegmentType(value: string | undefined, hasRepeatPrescription = 
   }
 
   return "main";
-}
-
-function humanizeWorkoutType(value: string) {
-  return value
-    .split(/[_-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function slugify(value: string) {

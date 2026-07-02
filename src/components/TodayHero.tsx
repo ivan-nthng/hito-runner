@@ -12,6 +12,8 @@ import {
   formatPrescriptionDistanceKm,
   findWorkout,
   primaryWorkoutTarget,
+  repeatChildSteps,
+  repeatCountForStep,
   type TrainingSnapshot,
   workoutTypeMeta,
   workoutDistanceKm,
@@ -303,14 +305,21 @@ function summarizeUpcomingWorkout(
     return formatDurationMin(duration);
   }
 
-  const intervalStep = workout.steps.find((step) => step.repeats && step.work);
+  const intervalStep = workout.steps.find(
+    (step) => repeatCountForStep(step) && repeatChildSteps(step).length > 0,
+  );
+  const repeatCount = intervalStep ? repeatCountForStep(intervalStep) : null;
+  const repeatChild = intervalStep
+    ? (repeatChildSteps(intervalStep).find((child) => child.distance_km || child.duration_min) ??
+      repeatChildSteps(intervalStep)[0])
+    : null;
 
-  if (intervalStep?.repeats && intervalStep.work?.distance_km) {
-    return `${intervalStep.repeats} x ${formatPrescriptionDistanceKm(intervalStep.work.distance_km)}`;
+  if (repeatCount && repeatChild?.distance_km) {
+    return `${repeatCount} x ${formatPrescriptionDistanceKm(repeatChild.distance_km)}`;
   }
 
-  if (intervalStep?.repeats && intervalStep.work?.duration_min) {
-    return `${intervalStep.repeats} x ${formatDurationMin(intervalStep.work.duration_min, "segment")}`;
+  if (repeatCount && repeatChild?.duration_min) {
+    return `${repeatCount} x ${formatDurationMin(repeatChild.duration_min, "segment")}`;
   }
 
   return workoutTypeMeta(workout).label;

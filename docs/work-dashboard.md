@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-06-25T04:24:06.520Z
+Generated: 2026-07-02T01:22:41.596Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -85,15 +85,15 @@ Context: `/admin/login` is a dedicated owner-admin login surface.
 <code>in_progress</code>
 
 #### Task
-Hold running-plan expansion after accepted benchmark-backed pace truth and archived simplification strike.
+Hold running-plan rebuild after OpenAI-authored dated generated-plan acceptance.
 
 <sub><code>STAGE</code></sub>
 
-<code>ARCHITECT holding / post-benchmark-truth and post-cleanup sequencing.</code>
+<code>ARCHITECT holding / generated-plan canonical readback accepted.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Benchmark-Backed Pace Truth Closeout — 2026-06-17: Accepted / backend seam, frontend wiring, and runner-facing QA proof all passed.
+Current Source Of Truth: Workout types: Rest, Recovery, Easy, Steady, Long Run, Progression, Tempo, Intervals, Hills,
 
 <sub><code>NEXT ROLE</code></sub>
 
@@ -108,19 +108,19 @@ Benchmark-Backed Pace Truth Closeout — 2026-06-17: Accepted / backend seam, fr
 <code>in_progress</code>
 
 #### Task
-Remove stale frontend sourceEditing compatibility branch after backend metadata cleanup.
+Repair manual workout template behavior around editable structure defaults, user targets, saved templates, and per-user built-in template visibility.
 
 <sub><code>STAGE</code></sub>
 
-<code>FRONTEND behavior-preserving consumer cleanup / active-plan capability vocabulary simplification.</code>
+<code>BACKEND implementation / manual template contract correction.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Queued High-Priority Gate After Calendar Stabilization: Current calendar stabilization remains first; taxonomy reconciliation is queued only after that
+Current Source Of Truth: Backend owns manual workout registry truth, review/confirm, validation, persistence, saved
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>frontend</code>
+<code>backend</code>
 
 ---
 
@@ -131,19 +131,19 @@ Queued High-Priority Gate After Calendar Stabilization: Current calendar stabili
 <code>in_progress</code>
 
 #### Task
-Implement Hito DS specimen workbench v2 as the shared Demo/Variants contract across `/hitoDS`, including real table-header interaction parity.
+Hold Hito DS after accepted workout slice visual/runtime proof.
 
 <sub><code>STAGE</code></sub>
 
-<code>FRONTEND implementation / Hito DS workbench v2 and interaction normalization.</code>
+<code>ARCHITECT holding / post-workout-slice visual/runtime closeout.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Root Cause: `/hitoDS#calendar-workout-playground` does not feel enough like a real product desktop day.
+Root Cause: Workout color roles, manual constructor timeline adoption, and the cache-runtime workout-slice
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>frontend</code>
+<code>architect</code>
 
 ---
 
@@ -162,11 +162,57 @@ Hold docs/artifact cleanup after QA-passed E13/E14 manual-workout QA image compr
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-E14 Closeout — Manual-Workout QA Image Compression Apply Validation: passed / E13 rollback-protected image apply accepted by QA; cleanup track holding.
+Current Source Of Truth: Local gitignored `qa-artifacts/` is disposable by default only through the approved pragmatic TTL
 
 <sub><code>NEXT ROLE</code></sub>
 
 <code>architect</code>
+
+---
+
+### 6. [Hito DS External Reuse And Theme Contract](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-29-hito-ds-external-reuse-and-theme-contract.md>)
+
+<sub><code>STATUS</code></sub>
+
+<code>backlog</code>
+
+#### Task
+Define and implement a safe external reuse layer for Hito DS so other projects can use Hito primitives and tokens without destabilizing the Hito product.
+
+<sub><code>STAGE</code></sub>
+
+<code>ARCHITECT plan / external reusable themeable Hito DS contract.</code>
+
+<sub><code>LAST VISIBLE NOTE</code></sub>
+
+Context: which Hito primitives are stable enough to reuse;
+
+<sub><code>NEXT ROLE</code></sub>
+
+<code>architect</code>
+
+---
+
+### 7. [Hito Source-Size Governance And Cleanup Plan](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md>)
+
+<sub><code>STATUS</code></sub>
+
+<code>in_progress</code>
+
+#### Task
+Consolidate duplicated Calendar day-rendering paths with net product LOC reduction.
+
+<sub><code>STAGE</code></sub>
+
+<code>FRONTEND implementation / Calendar day-renderer consolidation with net LOC reduction.</code>
+
+<sub><code>LAST VISIBLE NOTE</code></sub>
+
+Context
+
+<sub><code>NEXT ROLE</code></sub>
+
+<code>frontend</code>
 
 ## Safety Notes
 

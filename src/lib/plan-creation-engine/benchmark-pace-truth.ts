@@ -73,15 +73,35 @@ export function buildSelectedPlanSegmentPaceTarget(input: {
 }
 
 export function selectedPlanSegmentsContainPaceTargets(
-  segments: readonly { target?: Record<string, unknown> | null }[],
+  segments: readonly {
+    target?: Record<string, unknown> | null;
+    prescription?: {
+      children?: readonly { target?: Record<string, unknown> | null }[];
+    } | null;
+  }[],
 ) {
-  return segments.some((segment) => {
-    const target = segment.target;
-    return (
-      typeof target?.pace_min_per_km_range === "string" &&
-      target.pace_min_per_km_range.trim().length > 0
-    );
-  });
+  return segments.some((segment) =>
+    collectSegmentTargets(segment).some((target) => {
+      return (
+        typeof target.pace_min_per_km_range === "string" &&
+        target.pace_min_per_km_range.trim().length > 0
+      );
+    }),
+  );
+}
+
+function collectSegmentTargets(segment: {
+  target?: Record<string, unknown> | null;
+  prescription?: {
+    children?: readonly { target?: Record<string, unknown> | null }[];
+  } | null;
+}) {
+  const childTargets =
+    segment.prescription?.children
+      ?.map((child) => child.target)
+      .filter((target): target is Record<string, unknown> => Boolean(target)) ?? [];
+
+  return [...(segment.target ? [segment.target] : []), ...childTargets];
 }
 
 function buildBenchmarkPaceTruth(input: {

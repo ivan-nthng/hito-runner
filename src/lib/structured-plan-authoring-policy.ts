@@ -14,6 +14,8 @@ export type SupportedSpecificityIdentity =
   | "easy_run_with_strides"
   | "progression_run"
   | "controlled_tempo_session"
+  | "time_intervals"
+  | "distance_intervals"
   | "half_marathon_threshold_durability"
   | "marathon_steady_specificity"
   | "race_pace_session"
@@ -329,7 +331,7 @@ export function resolveSupportedIntensityCadence(
   ) {
     return supportedIntensityCadence(
       "every_two_weeks",
-      chooseSupportedIntensityWorkoutKind(normalized, "every_two_weeks", hasBenchmark),
+      chooseSupportedIntensityWorkoutKind(normalized, "every_two_weeks", hasBenchmark, weekNumber),
       "Balanced half-marathon support uses moderate specificity every two weeks, not target-time cadence.",
     );
   }
@@ -342,14 +344,14 @@ export function resolveSupportedIntensityCadence(
   ) {
     return supportedIntensityCadence(
       "weekly",
-      chooseSupportedIntensityWorkoutKind(normalized, "weekly", hasBenchmark),
+      chooseSupportedIntensityWorkoutKind(normalized, "weekly", hasBenchmark, weekNumber),
       "Recreational support evidence allows one moderate touch per week.",
     );
   }
 
   return supportedIntensityCadence(
     "every_two_weeks",
-    chooseSupportedIntensityWorkoutKind(normalized, "every_two_weeks", hasBenchmark),
+    chooseSupportedIntensityWorkoutKind(normalized, "every_two_weeks", hasBenchmark, weekNumber),
     "Beginner/recreational support evidence allows one moderate touch every two weeks.",
   );
 }
@@ -483,6 +485,8 @@ export function resolveSupportedSpecificityIdentityOptions(
   }
 
   switch (normalized.goal.goalType) {
+    case "distance_build":
+      return resolveDistanceBuildSpecificityOptions(normalized, weekNumber, cadence);
     case "half_marathon":
       return resolveHalfMarathonSpecificityOptions(normalized, weekNumber, cadence);
     case "marathon":
@@ -506,6 +510,8 @@ export function isSupportedSpecificityIdentity(identity: string | null | undefin
     identity === "easy_run_with_strides" ||
     identity === "progression_run" ||
     identity === "controlled_tempo_session" ||
+    identity === "time_intervals" ||
+    identity === "distance_intervals" ||
     identity === "half_marathon_threshold_durability" ||
     identity === "marathon_steady_specificity" ||
     identity === "race_pace_session" ||
@@ -698,6 +704,7 @@ function chooseSupportedIntensityWorkoutKind(
   normalized: StructuredPlanAuthoringInput,
   frequency: Exclude<SupportedIntensityCadenceFrequency, "none">,
   hasBenchmark: boolean,
+  weekNumber?: number,
 ): SupportedIntensityWorkoutKind {
   if (frequency === "every_two_weeks") {
     return hasBenchmark && normalized.runnerProfile.experienceLevel === "consistent_runner"
@@ -705,8 +712,19 @@ function chooseSupportedIntensityWorkoutKind(
       : "strides";
   }
 
+  if (normalized.goal.goalType === "10k" && weekNumber != null && weekNumber % 3 === 0) {
+    return "strides";
+  }
+
+  if (normalized.goal.goalType === "marathon" && !hasBenchmark && weekNumber != null) {
+    return weekNumber % 4 === 2 ? "tempo" : "progression";
+  }
+
   if (
-    hasBenchmark &&
+    (hasBenchmark ||
+      (normalized.goal.goalType === "10k" &&
+        (normalized.runnerProfile.experienceLevel === "consistent_runner" ||
+          normalized.runnerProfile.experienceLevel === "experienced_runner"))) &&
     (normalized.goal.goalType === "half_marathon" ||
       normalized.goal.goalType === "10k" ||
       normalized.goal.goalType === "marathon")
@@ -763,6 +781,38 @@ function resolveHalfMarathonSpecificityOptions(
   return ["progression_run", "easy_run_with_strides"];
 }
 
+function resolveDistanceBuildSpecificityOptions(
+  normalized: StructuredPlanAuthoringInput,
+  weekNumber: number,
+  cadence: SupportedIntensityCadencePolicy,
+): readonly SupportedSpecificityIdentity[] {
+  const distanceMeters = normalized.planGoalIntent?.distance?.distanceMeters ?? null;
+
+  if (distanceMeters != null && distanceMeters > 21_100) {
+    return resolveMarathonSpecificityOptions(normalized, weekNumber, cadence);
+  }
+
+  if (distanceMeters != null && distanceMeters > 10_000) {
+    const phase = phaseForWeek(weekNumber, resolveStructuredHorizonWeeks(normalized));
+
+    if (phase === "Taper") {
+      return ["progression_run", "easy_run_with_strides"];
+    }
+
+    if (weekNumber % 3 === 1) {
+      return ["time_intervals", "progression_run", "controlled_tempo_session"];
+    }
+
+    if (weekNumber % 3 === 2) {
+      return ["half_marathon_threshold_durability", "time_intervals", "progression_run"];
+    }
+
+    return ["controlled_tempo_session", "progression_run", "time_intervals"];
+  }
+
+  return supportedSpecificityOptionsForWorkoutKind(cadence.workoutKind);
+}
+
 function resolveMarathonSpecificityOptions(
   normalized: StructuredPlanAuthoringInput,
   weekNumber: number,
@@ -780,18 +830,28 @@ function resolveMarathonSpecificityOptions(
       return ["controlled_tempo_session", "marathon_steady_specificity"];
     }
 
-    return cadence.frequency === "weekly" && hasUsableRecent5kBenchmark(normalized)
-      ? ["marathon_steady_specificity", "controlled_tempo_session"]
-      : ["marathon_steady_specificity"];
+    if (cadence.frequency === "weekly") {
+      if (weekNumber % 4 === 2) {
+        return ["controlled_tempo_session", "marathon_steady_specificity", "progression_run"];
+      }
+
+      if (weekNumber % 4 === 3) {
+        return ["progression_run", "marathon_steady_specificity", "controlled_tempo_session"];
+      }
+
+      return ["marathon_steady_specificity", "progression_run", "controlled_tempo_session"];
+    }
+
+    return ["marathon_steady_specificity", "progression_run"];
   }
 
   if (phase === "Specific") {
     return [
       "marathon_steady_specificity",
+      ...(weekNumber % 4 === 3 ? (["progression_run"] as const) : []),
       ...(raceRhythm ? (["race_pace_session"] as const) : []),
-      ...(cadence.frequency === "weekly" && hasUsableRecent5kBenchmark(normalized)
-        ? (["controlled_tempo_session"] as const)
-        : []),
+      ...(cadence.frequency === "weekly" ? (["controlled_tempo_session"] as const) : []),
+      ...(weekNumber % 4 === 3 ? [] : (["progression_run"] as const)),
     ];
   }
 

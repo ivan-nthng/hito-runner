@@ -103,6 +103,55 @@ export async function validateManualSavedTemplateContract() {
     assertRepeatWithRecovery(reconstructed.review.draft.steps, "saved-template review");
   }
 
+  const userEnteredTargetInput: ManualWorkoutDraftInput = {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-18",
+    title: "Pace target I chose",
+    entries: [
+      {
+        kind: "block",
+        block: {
+          blockKey: "easy_run_block",
+          durationSeconds: 30 * 60,
+          target: { paceMinPerKmRange: "5:10-5:25/km" },
+        },
+      },
+    ],
+  };
+  const userEnteredTargetReviewed = assertReady(
+    "saved template runner-entered target source review",
+    userEnteredTargetInput,
+  );
+  const userEnteredTargetSave = await saveManualWorkoutSavedTemplateForUser(
+    userId,
+    {
+      displayName: "My pace target",
+      iconKey: "easy",
+      ...buildConfirmInput(userEnteredTargetInput, userEnteredTargetReviewed),
+    },
+    { repository },
+  );
+  assertSavedTemplateSaved(userEnteredTargetSave, "saved runner-entered target template");
+  if (userEnteredTargetSave.ok) {
+    const targetReconstructed = await reviewManualWorkoutSavedTemplateForUser(
+      userId,
+      {
+        templateId: userEnteredTargetSave.template.id,
+        workoutDate: "2026-06-26",
+      },
+      { repository },
+    );
+
+    assert.equal(targetReconstructed.ok, true, JSON.stringify(targetReconstructed, null, 2));
+    if (targetReconstructed.ok) {
+      assertUserEnteredTargetInSteps(
+        targetReconstructed.review.draft.steps,
+        "pace_min_per_km_range",
+        "saved-template runner-entered pace target",
+      );
+    }
+  }
+
   const crossUser = await reviewManualWorkoutSavedTemplateForUser(
     otherUserId,
     {
@@ -152,7 +201,7 @@ export async function validateManualSavedTemplateContract() {
             block: {
               blockKey: "easy_run_block",
               durationSeconds: 30 * 60,
-              target: { paceMinPerKmRange: "4:55-5:05/km" },
+              target: { paceTargetSource: "hito_generated", paceMinPerKmRange: "4:55-5:05/km" },
             },
           },
         ],
@@ -308,12 +357,12 @@ function assertRepeatWithRecovery(steps: Step[], label: string) {
 
   assert.ok(repeatStep, `${label} should include a repeat step.`);
   assert.ok(repeatStep.repeats && repeatStep.repeats >= 2);
-  assert.ok(repeatStep.work, `${label} repeat should include work.`);
-  assert.ok(repeatStep.recovery, `${label} repeat should include recovery.`);
-  assert.ok(hasExecutableStructure(repeatStep.work), `${label} repeat work should be numeric.`);
+  assert.equal(Object.hasOwn(repeatStep, "work"), false, `${label} must not persist work.`);
+  assert.equal(Object.hasOwn(repeatStep, "recovery"), false, `${label} must not persist recovery.`);
+  assert.ok(repeatStep.children?.length, `${label} repeat should include ordered children.`);
   assert.ok(
-    hasExecutableStructure(repeatStep.recovery),
-    `${label} repeat recovery should be numeric.`,
+    repeatStep.children.every((child) => hasExecutableStructure(child)),
+    `${label} repeat children should be numeric.`,
   );
 }
 
@@ -332,16 +381,33 @@ function assertNoFakePaceOrHrInSerialized(value: unknown, label: string) {
   );
 }
 
+function assertUserEnteredTargetInSteps(
+  steps: Step[],
+  key: "pace_min_per_km_range" | "hr_bpm_range" | "hr_bpm" | "rpe",
+  label: string,
+) {
+  const target = flattenSteps(steps)
+    .flatMap((step) => (step.target ? [step.target] : []))
+    .find((candidate) => key in candidate);
+
+  assert.ok(target, `${label} should preserve ${key}.`);
+  assert.equal(target.target_source, "user_entered", `${label} should preserve source.`);
+}
+
 function hasExecutableStructure(step: Step) {
   if (step.duration_min || step.distance_km) {
     return true;
   }
 
-  if (step.repeats && step.work && step.recovery) {
-    return hasExecutableStructure(step.work) && hasExecutableStructure(step.recovery);
+  if (step.repeats && step.children?.length) {
+    return step.children.every((child) => hasExecutableStructure(child));
   }
 
   return false;
+}
+
+function flattenSteps(steps: Step[]): Step[] {
+  return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
 }
 
 function formatResult(result: ManualWorkoutDraftReviewResult) {

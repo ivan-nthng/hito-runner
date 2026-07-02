@@ -28,6 +28,7 @@ import {
   validateManualWorkoutDisposablePersistenceProof,
 } from "./manual-workout-authoring/persistence-proof";
 import { validateManualActivePlanAddWorkoutContract } from "./manual-workout-authoring/active-plan-add-proof";
+import { validateManualConstructorSegmentTargetContract } from "./manual-workout-authoring/constructor-contract-proof";
 import { validateManualCopyPasteContract } from "./manual-workout-authoring/copy-paste-proof";
 import { validateManualDeleteClearContract } from "./manual-workout-authoring/delete-clear-proof";
 import { validateManualEmptyActivePlanCreationContract } from "./manual-workout-authoring/empty-plan-proof";
@@ -37,11 +38,15 @@ import { validateManualMoveWorkoutContract } from "./manual-workout-authoring/mo
 import { validateManualPersistedFutureWorkoutEditContract } from "./manual-workout-authoring/persisted-edit-proof";
 import { validateManualSavedTemplateContract } from "./manual-workout-authoring/saved-template-proof";
 import { validateManualSourceEditingCapabilityReadback } from "./manual-workout-authoring/source-capability-proof";
+import { validateManualTemplateDefaultSkeletons } from "./manual-workout-authoring/template-defaults-proof";
 
 async function main() {
   const options = readManualPersistenceCliOptions();
   validateAcceptedFixtures();
+  validateManualUserEnteredTargetFixtures();
   validateRejectedFixtures();
+  validateManualConstructorSegmentTargetContract();
+  validateManualTemplateDefaultSkeletons();
   validateManualDateOnlyLabels();
   validateUniversalActivePlanEditabilityPolicy();
   validateManualSourceEditingCapabilityReadback();
@@ -225,6 +230,128 @@ function validateAcceptedFixtures() {
   assertRepeatWithRecovery(runWalk.draft.steps, "run-walk");
 }
 
+function validateManualUserEnteredTargetFixtures() {
+  const paceExact = assertReady("runner-entered exact pace", {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-16",
+    entries: [
+      {
+        kind: "block",
+        block: {
+          blockKey: "easy_run_block",
+          durationSeconds: 30 * 60,
+          target: { targetSource: "user_entered", pace: "5:20/km" },
+        },
+      },
+    ],
+  });
+  assert.equal(paceExact.draft.metricMode.executable_mode, "pace_executable");
+  assert.equal(paceExact.draft.metricMode.pace_targets_allowed, true);
+  assertManualUserEnteredTarget(paceExact.draft.steps, "pace", "runner-entered exact pace");
+  assert.equal(
+    paceExact.constructorContract.timeline[0]?.kind === "segment"
+      ? paceExact.constructorContract.timeline[0].target.kind
+      : null,
+    "pace",
+  );
+
+  const paceRange = assertReady("runner-entered pace range", {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-16",
+    entries: [
+      {
+        kind: "block",
+        block: {
+          blockKey: "easy_run_block",
+          durationSeconds: 30 * 60,
+          target: { paceMinPerKmRange: "5:10-5:25/km" },
+        },
+      },
+    ],
+  });
+  assertManualUserEnteredTarget(paceRange.draft.steps, "pace_min_per_km_range", "pace range");
+
+  const hrCap = assertReady("runner-entered HR cap", {
+    templateKey: "steady_aerobic_run",
+    workoutDate: "2026-06-17",
+    entries: [
+      {
+        kind: "block",
+        block: {
+          blockKey: "steady_run_block",
+          durationSeconds: 35 * 60,
+          target: { hrBpmCap: 155 },
+        },
+      },
+    ],
+  });
+  assert.equal(hrCap.draft.metricMode.executable_mode, "hr_executable");
+  assert.equal(hrCap.draft.metricMode.hr_targets_allowed, true);
+  assert.equal(hrCap.draft.metricMode.hr_target_source, "user_entered");
+  assertManualUserEnteredTarget(hrCap.draft.steps, "hr_bpm", "HR cap");
+
+  const hrRange = assertReady("runner-entered HR range", {
+    templateKey: "steady_aerobic_run",
+    workoutDate: "2026-06-17",
+    entries: [
+      {
+        kind: "block",
+        block: {
+          blockKey: "steady_run_block",
+          durationSeconds: 35 * 60,
+          target: { hrTargetSource: "user_entered", hrBpmRange: "145-155 bpm" },
+        },
+      },
+    ],
+  });
+  assertManualUserEnteredTarget(hrRange.draft.steps, "hr_bpm_range", "HR range");
+
+  const rpeLow = assertReady("runner-entered RPE zero", {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-18",
+    entries: [
+      {
+        kind: "block",
+        block: {
+          blockKey: "easy_run_block",
+          durationSeconds: 20 * 60,
+          target: { rpe: 0, cue: "Keep this restorative." },
+        },
+      },
+    ],
+  });
+  assertManualUserEnteredTarget(rpeLow.draft.steps, "rpe", "RPE zero");
+
+  const rpeHigh = assertReady("runner-entered RPE ten", {
+    templateKey: "controlled_tempo_session",
+    workoutDate: "2026-06-18",
+    entries: [
+      {
+        kind: "block",
+        block: { blockKey: "warmup_block", durationSeconds: 10 * 60 },
+      },
+      {
+        kind: "repeat_group",
+        group: {
+          repeatCount: 3,
+          safetyKind: "tempo_repeats",
+          workBlock: {
+            blockKey: "tempo_block",
+            durationSeconds: 5 * 60,
+            target: { rpe: 10, label: "Runner-entered hard effort" },
+          },
+          recoveryBlock: { blockKey: "interval_recovery_block", durationSeconds: 2 * 60 },
+        },
+      },
+      {
+        kind: "block",
+        block: { blockKey: "cooldown_block", durationSeconds: 10 * 60 },
+      },
+    ],
+  });
+  assertManualUserEnteredTarget(rpeHigh.draft.steps, "rpe", "RPE ten");
+}
+
 function validateRejectedFixtures() {
   assertRejected(
     "nested repeat",
@@ -275,7 +402,7 @@ function validateRejectedFixtures() {
   );
 
   assertRejected(
-    "fake precise pace",
+    "generated pace source",
     {
       templateKey: "easy_aerobic_run",
       workoutDate: "2026-06-16",
@@ -285,7 +412,26 @@ function validateRejectedFixtures() {
           block: {
             blockKey: "easy_run_block",
             durationSeconds: 30 * 60,
-            target: { paceMinPerKmRange: "5:10-5:25/km" },
+            target: { paceTargetSource: "hito_generated", paceMinPerKmRange: "5:10-5:25/km" },
+          },
+        },
+      ],
+    },
+    "unsafe_metric_truth",
+  );
+
+  assertRejected(
+    "inferred pace source",
+    {
+      templateKey: "easy_aerobic_run",
+      workoutDate: "2026-06-16",
+      entries: [
+        {
+          kind: "block",
+          block: {
+            blockKey: "easy_run_block",
+            durationSeconds: 30 * 60,
+            target: { paceTargetSource: "inferred", pace: "5:10/km" },
           },
         },
       ],
@@ -310,6 +456,44 @@ function validateRejectedFixtures() {
       ],
     },
     "unsafe_metric_truth",
+  );
+
+  assertRejected(
+    "default estimated HR target source",
+    {
+      templateKey: "easy_aerobic_run",
+      workoutDate: "2026-06-16",
+      entries: [
+        {
+          kind: "block",
+          block: {
+            blockKey: "easy_run_block",
+            durationSeconds: 30 * 60,
+            target: { hrTargetSource: "default_estimated_hr", hrBpmRange: "145-155" },
+          },
+        },
+      ],
+    },
+    "unsafe_metric_truth",
+  );
+
+  assertRejected(
+    "out of range RPE",
+    {
+      templateKey: "easy_aerobic_run",
+      workoutDate: "2026-06-16",
+      entries: [
+        {
+          kind: "block",
+          block: {
+            blockKey: "easy_run_block",
+            durationSeconds: 30 * 60,
+            target: { rpe: "11" },
+          },
+        },
+      ],
+    },
+    "invalid_input",
   );
 
   assertRejected(
@@ -581,12 +765,16 @@ function assertRepeatWithRecovery(steps: Step[], label: string) {
 
   assert.ok(repeatStep, `${label} should include a repeat step.`);
   assert.ok(repeatStep.repeats && repeatStep.repeats >= 2);
-  assert.ok(repeatStep.work, `${label} repeat should include work.`);
-  assert.ok(repeatStep.recovery, `${label} repeat should include recovery.`);
-  assert.ok(hasExecutableStructure(repeatStep.work), `${label} repeat work should be numeric.`);
+  assert.equal(Object.hasOwn(repeatStep, "work"), false, `${label} should not persist work.`);
+  assert.equal(
+    Object.hasOwn(repeatStep, "recovery"),
+    false,
+    `${label} should not persist recovery.`,
+  );
+  assert.ok(repeatStep.children?.length, `${label} repeat should include ordered children.`);
   assert.ok(
-    hasExecutableStructure(repeatStep.recovery),
-    `${label} repeat recovery should be numeric.`,
+    repeatStep.children.every((child) => hasExecutableStructure(child)),
+    `${label} repeat children should be numeric.`,
   );
 }
 
@@ -609,20 +797,22 @@ function assertCanonicalPersistedStridesShape(
     "intervals",
     `${label} should preserve canonical imported strides repeat type.`,
   );
+  const [workChild, recoveryChild] = repeatStep?.children ?? [];
+
   assert.equal(
-    repeatStep?.work?.type,
+    Object.hasOwn(repeatStep ?? {}, "work"),
+    false,
+    `${label} should not persist legacy nested work block.`,
+  );
+  assert.equal(
+    workChild?.type,
     "work",
-    `${label} persisted strides work block should use canonical nested work type.`,
+    `${label} persisted strides work block should use canonical child work type.`,
   );
   assert.equal(
-    repeatStep?.work?.segment_type,
-    undefined,
-    `${label} should prove copy reconstruction does not rely on nested stride labels.`,
-  );
-  assert.equal(
-    repeatStep?.recovery?.type,
+    recoveryChild?.type,
     "recovery",
-    `${label} persisted strides recovery block should stay canonical.`,
+    `${label} persisted strides recovery child should stay canonical.`,
   );
 }
 
@@ -645,24 +835,44 @@ function assertNoFakePaceOrHr(steps: Step[], label: string) {
   }
 }
 
+function assertManualUserEnteredTarget(
+  steps: Step[],
+  key: "pace" | "pace_min_per_km_range" | "hr_bpm" | "hr_bpm_range" | "rpe",
+  label: string,
+) {
+  const allTargets = flattenSteps(steps).flatMap((step) => (step.target ? [step.target] : []));
+  const target = allTargets.find((candidate) => key in candidate);
+
+  assert.ok(target, `${label} should include ${key}.`);
+  assert.equal(
+    target.target_source,
+    "user_entered",
+    `${label} target should preserve user-entered source semantics.`,
+  );
+
+  if (key === "hr_bpm" || key === "hr_bpm_range") {
+    assert.equal(
+      target.hr_target_source,
+      "user_entered",
+      `${label} HR target should preserve user-entered HR source semantics.`,
+    );
+  }
+}
+
 function hasExecutableStructure(step: Step) {
   if (step.duration_min || step.distance_km) {
     return true;
   }
 
-  if (step.repeats && step.work && step.recovery) {
-    return hasExecutableStructure(step.work) && hasExecutableStructure(step.recovery);
+  if (step.repeats && step.children?.length) {
+    return step.children.every((child) => hasExecutableStructure(child));
   }
 
   return false;
 }
 
 function flattenSteps(steps: Step[]): Step[] {
-  return steps.flatMap((step) => [
-    step,
-    ...(step.work ? flattenSteps([step.work]) : []),
-    ...(step.recovery ? flattenSteps([step.recovery]) : []),
-  ]);
+  return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
 }
 
 function readStepsForAssertion(value: PersistedPlannedWorkoutRow["steps"]): Step[] {

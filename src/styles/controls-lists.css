@@ -1,0 +1,986 @@
+@layer components {
+  .hito-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    line-height: 1;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      opacity 160ms ease,
+      transform 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .hito-button:hover,
+  .hito-button[data-demo-state="hover"] {
+    transform: translateY(-1px);
+  }
+
+  .hito-button:active,
+  .hito-button[data-demo-state="active"] {
+    transform: translateY(0);
+  }
+
+  .hito-button:focus-visible,
+  .hito-button[data-demo-state="focus"] {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 24%, transparent);
+  }
+
+  .hito-button:disabled,
+  .hito-button[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.58;
+    transform: none;
+  }
+
+  .hito-button-xs {
+    min-height: 1.75rem;
+    border-radius: var(--radius-sm);
+    padding: 0 0.5rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.01em;
+  }
+
+  .hito-button-sm {
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.01em;
+  }
+
+  .hito-button-md {
+    min-height: 2.5rem;
+    padding: 0 0.875rem;
+    font-size: 0.875rem;
+  }
+
+  .hito-button-lg {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    font-size: 0.875rem;
+  }
+
+  .hito-button-xl {
+    min-height: 3.25rem;
+    padding: 0 1.25rem;
+    font-size: 0.9375rem;
+  }
+
+  .hito-button-primary {
+    background: var(--color-signal);
+    color: var(--color-signal-foreground);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-signal) 18%, transparent);
+  }
+
+  .hito-button-primary:hover {
+    background: color-mix(in oklch, var(--color-signal) 90%, white);
+  }
+
+  .hito-button-primary:active,
+  .hito-button-primary[data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-signal) 82%, black);
+  }
+
+  .hito-button-primary[data-tone="success"] {
+    background: var(--color-success);
+    color: var(--color-success-foreground);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-success) 22%, transparent);
+  }
+
+  .hito-button-primary[data-tone="success"]:hover {
+    background: color-mix(in oklch, var(--color-success) 88%, white);
+  }
+
+  .hito-button-primary[data-tone="success"]:active,
+  .hito-button-primary[data-tone="success"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-success) 82%, black);
+  }
+
+  .hito-button-primary[data-tone="error"] {
+    background: var(--color-destructive);
+    color: var(--color-destructive-foreground);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-destructive) 22%, transparent);
+  }
+
+  .hito-button-primary[data-tone="error"]:hover {
+    background: color-mix(in oklch, var(--color-destructive) 88%, white);
+  }
+
+  .hito-button-primary[data-tone="error"]:active,
+  .hito-button-primary[data-tone="error"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-destructive) 82%, black);
+  }
+
+  .hito-button-secondary {
+    border: 1px solid transparent;
+    background: color-mix(in oklch, var(--color-muted) 42%, transparent);
+    color: color-mix(in oklch, var(--color-foreground) 92%, transparent);
+  }
+
+  .hito-button-secondary:hover {
+    background: color-mix(in oklch, var(--color-muted) 52%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-button-secondary:active,
+  .hito-button-secondary[data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-muted) 60%, transparent);
+  }
+
+  .hito-button-secondary[data-tone="success"] {
+    background: color-mix(in oklch, var(--color-success) 14%, transparent);
+    color: color-mix(in oklch, var(--color-success) 84%, var(--color-foreground));
+  }
+
+  .hito-button-secondary[data-tone="success"]:hover {
+    background: color-mix(in oklch, var(--color-success) 20%, transparent);
+    color: color-mix(in oklch, var(--color-success) 72%, var(--color-foreground));
+  }
+
+  .hito-button-secondary[data-tone="success"]:active,
+  .hito-button-secondary[data-tone="success"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-success) 26%, transparent);
+  }
+
+  .hito-button-secondary[data-tone="error"] {
+    background: color-mix(in oklch, var(--color-destructive) 13%, transparent);
+    color: color-mix(in oklch, var(--color-destructive) 86%, var(--color-foreground));
+  }
+
+  .hito-button-secondary[data-tone="error"]:hover {
+    background: color-mix(in oklch, var(--color-destructive) 19%, transparent);
+    color: color-mix(in oklch, var(--color-destructive) 74%, var(--color-foreground));
+  }
+
+  .hito-button-secondary[data-tone="error"]:active,
+  .hito-button-secondary[data-tone="error"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-destructive) 25%, transparent);
+  }
+
+  .hito-button-outlined {
+    border: 1px solid color-mix(in oklch, var(--color-foreground) 16%, transparent);
+    background: transparent;
+    color: color-mix(in oklch, var(--color-foreground) 88%, transparent);
+  }
+
+  .hito-button-outlined:hover {
+    border-color: color-mix(in oklch, var(--color-foreground) 26%, transparent);
+    background: color-mix(in oklch, var(--color-foreground) 6%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-button-outlined:active,
+  .hito-button-outlined[data-demo-state="active"] {
+    border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
+    background: color-mix(in oklch, var(--color-foreground) 9%, transparent);
+  }
+
+  .hito-button-outlined[data-tone="success"] {
+    border-color: color-mix(in oklch, var(--color-success) 38%, transparent);
+    color: var(--color-success);
+  }
+
+  .hito-button-outlined[data-tone="success"]:hover {
+    border-color: color-mix(in oklch, var(--color-success) 52%, transparent);
+    background: color-mix(in oklch, var(--color-success) 10%, transparent);
+    color: color-mix(in oklch, var(--color-success) 78%, var(--color-foreground));
+  }
+
+  .hito-button-outlined[data-tone="success"]:active,
+  .hito-button-outlined[data-tone="success"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-success) 15%, transparent);
+  }
+
+  .hito-button-outlined[data-tone="error"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 42%, transparent);
+    color: var(--color-destructive);
+  }
+
+  .hito-button-outlined[data-tone="error"]:hover {
+    border-color: color-mix(in oklch, var(--color-destructive) 56%, transparent);
+    background: color-mix(in oklch, var(--color-destructive) 10%, transparent);
+    color: color-mix(in oklch, var(--color-destructive) 80%, var(--color-foreground));
+  }
+
+  .hito-button-outlined[data-tone="error"]:active,
+  .hito-button-outlined[data-tone="error"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-destructive) 15%, transparent);
+  }
+
+  .hito-button-ghost {
+    background: transparent;
+    color: var(--color-muted-foreground);
+  }
+
+  .hito-button-ghost:hover {
+    background: color-mix(in oklch, var(--color-foreground) 7%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-button-ghost:active,
+  .hito-button-ghost[data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-foreground) 10%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-button-ghost[data-tone="success"] {
+    color: var(--color-success);
+  }
+
+  .hito-button-ghost[data-tone="success"]:hover {
+    background: color-mix(in oklch, var(--color-success) 10%, transparent);
+    color: color-mix(in oklch, var(--color-success) 78%, var(--color-foreground));
+  }
+
+  .hito-button-ghost[data-tone="success"]:active,
+  .hito-button-ghost[data-tone="success"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-success) 15%, transparent);
+  }
+
+  .hito-button-ghost[data-tone="error"] {
+    color: var(--color-destructive);
+  }
+
+  .hito-button-ghost[data-tone="error"]:hover {
+    background: color-mix(in oklch, var(--color-destructive) 10%, transparent);
+    color: color-mix(in oklch, var(--color-destructive) 80%, var(--color-foreground));
+  }
+
+  .hito-button-ghost[data-tone="error"]:active,
+  .hito-button-ghost[data-tone="error"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-destructive) 15%, transparent);
+  }
+
+  .hito-tabs,
+  .hito-tab-list {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: flex-end;
+    gap: 1.25rem;
+    border-bottom: 1px solid var(--color-hairline);
+    background: transparent;
+  }
+
+  .hito-tabs-simple {
+    align-items: flex-end;
+    gap: 1.25rem;
+    border-bottom: 1px solid var(--color-hairline);
+    background: transparent;
+  }
+
+  .hito-tabs-enclosed,
+  .hito-tab-list-open {
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--color-background) 72%, black 18%),
+        color-mix(in oklch, var(--color-background) 58%, black 24%)
+      ),
+      color-mix(in oklch, var(--color-background) 42%, black 18%);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, var(--color-foreground) 5%, transparent),
+      inset 0 14px 28px color-mix(in oklch, black 18%, transparent);
+    padding: 0.25rem;
+  }
+
+  .hito-tab {
+    position: relative;
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    margin-bottom: -1px;
+    border-bottom: 1px solid transparent;
+    padding: 0 0 0.625rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--color-muted-foreground);
+    white-space: nowrap;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      color 160ms ease,
+      opacity 160ms ease;
+  }
+
+  .hito-tab:hover,
+  .hito-tab[data-demo-state="hover"] {
+    color: var(--color-foreground);
+  }
+
+  .hito-tab[data-active="true"],
+  .hito-tab[aria-selected="true"] {
+    border-color: var(--color-signal);
+    color: var(--color-foreground);
+  }
+
+  .hito-tab:focus-visible,
+  .hito-tab[data-demo-state="focus"] {
+    outline: none;
+    color: var(--color-foreground);
+    box-shadow: 0 2px 0 color-mix(in oklch, var(--color-signal) 50%, transparent);
+  }
+
+  .hito-tab:disabled,
+  .hito-tab[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .hito-tabs-enclosed .hito-tab,
+  .hito-tab-list-open .hito-tab {
+    min-height: 2rem;
+    margin-bottom: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    padding: 0 0.75rem;
+  }
+
+  .hito-tabs-enclosed .hito-tab:hover,
+  .hito-tabs-enclosed .hito-tab[data-demo-state="hover"],
+  .hito-tab-list-open .hito-tab:hover,
+  .hito-tab-list-open .hito-tab[data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-foreground) 6%, transparent);
+  }
+
+  .hito-tabs-enclosed .hito-tab[data-active="true"],
+  .hito-tabs-enclosed .hito-tab[aria-selected="true"],
+  .hito-tab-list-open .hito-tab[data-active="true"] {
+    border-color: transparent;
+    background: color-mix(in oklch, var(--color-foreground) 10%, transparent);
+    box-shadow:
+      0 1px 0 color-mix(in oklch, var(--color-foreground) 7%, transparent),
+      0 8px 18px color-mix(in oklch, black 12%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-tabs-enclosed .hito-tab[data-active="true"]:hover,
+  .hito-tabs-enclosed .hito-tab[aria-selected="true"]:hover {
+    background: color-mix(in oklch, var(--color-foreground) 12%, transparent);
+  }
+
+  .hito-tabs-enclosed .hito-tab:focus-visible,
+  .hito-tabs-enclosed .hito-tab[data-demo-state="focus"],
+  .hito-tab-list-open .hito-tab:focus-visible,
+  .hito-tab-list-open .hito-tab[data-demo-state="focus"] {
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--color-signal) 45%, transparent),
+      0 0 0 4px color-mix(in oklch, var(--color-signal) 14%, transparent);
+  }
+
+  .hito-tab-icon {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+  }
+
+  .hito-tab-badge {
+    display: inline-flex;
+    min-width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
+    padding: 0 0.35rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in oklch, var(--color-foreground) 72%, transparent);
+  }
+
+  .hito-tab-badge[data-variant="count"] {
+    font-size: 0.6875rem;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .hito-tab-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: var(--color-signal);
+  }
+
+  .hito-control-label {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-radius: var(--radius-md);
+    color: color-mix(in oklch, var(--color-foreground) 86%, transparent);
+    font-size: 0.875rem;
+    line-height: 1.45;
+    cursor: pointer;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease,
+      opacity 160ms ease;
+  }
+
+  .hito-control-label-sm {
+    min-height: 2rem;
+    padding-block: 0.375rem;
+  }
+
+  .hito-control-label-md {
+    min-height: 2.5rem;
+    padding-block: 0.5rem;
+  }
+
+  .hito-control-label:hover {
+    color: var(--color-foreground);
+  }
+
+  .hito-control-label:has(.hito-checkbox:focus-visible),
+  .hito-control-label:has(.hito-radio:focus-visible) {
+    color: var(--color-foreground);
+  }
+
+  .hito-control-label:has(.hito-checkbox:disabled),
+  .hito-control-label:has(.hito-radio:disabled),
+  .hito-control-label[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .hito-checkbox,
+  .hito-radio {
+    appearance: none;
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-content: center;
+    border: 1px solid color-mix(in oklch, var(--color-foreground) 22%, transparent);
+    background-color: color-mix(in oklch, var(--color-background) 58%, transparent);
+    color: var(--color-signal-foreground);
+    cursor: pointer;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      opacity 160ms ease;
+  }
+
+  .hito-checkbox {
+    border-radius: 0.25rem;
+  }
+
+  .hito-radio {
+    border-radius: 999px;
+  }
+
+  .hito-checkbox-sm,
+  .hito-radio-sm {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.0625rem;
+  }
+
+  .hito-checkbox-sm {
+    border-radius: 0.25rem;
+  }
+
+  .hito-checkbox-md,
+  .hito-radio-md {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0.125rem;
+  }
+
+  .hito-checkbox-md {
+    border-radius: 0.3125rem;
+  }
+
+  .hito-checkbox:hover:not(:disabled),
+  .hito-checkbox[data-demo-state="hover"],
+  .hito-radio:hover:not(:disabled),
+  .hito-radio[data-demo-state="hover"] {
+    border-color: color-mix(in oklch, var(--color-foreground) 36%, transparent);
+    background-color: color-mix(in oklch, var(--color-foreground) 6%, transparent);
+  }
+
+  .hito-checkbox:active:not(:disabled),
+  .hito-radio:active:not(:disabled) {
+    background-color: color-mix(in oklch, var(--color-foreground) 9%, transparent);
+  }
+
+  input.hito-checkbox:checked {
+    border-color: var(--color-signal);
+    background-color: var(--color-signal);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.5 8.25L6.65 11L12.75 4.75' stroke='%23201814' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 90% 90%;
+  }
+
+  .hito-checkbox:checked,
+  .hito-checkbox[data-state="checked"] {
+    border-color: var(--color-signal);
+    background-color: var(--color-signal);
+    color: var(--color-signal-foreground);
+  }
+
+  input.hito-checkbox[data-state="checked"] {
+    border-color: var(--color-signal) !important;
+    background-color: var(--color-signal) !important;
+  }
+
+  .hito-checkbox-checked {
+    border-color: var(--color-signal) !important;
+    background-color: var(--color-signal) !important;
+  }
+
+  input.hito-checkbox:checked,
+  input.hito-checkbox[data-state="checked"],
+  input.hito-checkbox.hito-checkbox-checked {
+    transition:
+      box-shadow 160ms ease,
+      opacity 160ms ease;
+  }
+
+  .hito-checkbox:checked:hover:not(:disabled),
+  .hito-checkbox[data-state="checked"]:hover:not(:disabled),
+  .hito-checkbox[data-demo-state="checked-hover"] {
+    border-color: color-mix(in oklch, var(--color-signal) 86%, var(--color-foreground));
+    background-color: color-mix(in oklch, var(--color-signal) 88%, var(--color-foreground));
+  }
+
+  input.hito-radio:checked {
+    border-color: var(--color-signal);
+    background-color: color-mix(in oklch, var(--color-signal) 15%, transparent);
+    background-image: radial-gradient(circle, var(--color-signal) 0 38%, transparent 42% 100%);
+  }
+
+  .hito-radio:checked,
+  .hito-radio[data-state="checked"] {
+    border-color: var(--color-signal);
+    background-color: color-mix(in oklch, var(--color-signal) 15%, transparent);
+  }
+
+  input.hito-radio[data-state="checked"] {
+    border-color: var(--color-signal) !important;
+    background-color: color-mix(in oklch, var(--color-signal) 15%, transparent) !important;
+  }
+
+  .hito-radio:checked:hover:not(:disabled),
+  .hito-radio[data-state="checked"]:hover:not(:disabled),
+  .hito-radio[data-demo-state="checked-hover"] {
+    border-color: color-mix(in oklch, var(--color-signal) 86%, var(--color-foreground));
+    background-color: color-mix(in oklch, var(--color-signal) 20%, transparent);
+  }
+
+  .hito-checkbox:focus-visible,
+  .hito-checkbox[data-demo-state="focus"],
+  .hito-radio:focus-visible,
+  .hito-radio[data-demo-state="focus"] {
+    outline: none;
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--color-background) 88%, transparent),
+      0 0 0 4px color-mix(in oklch, var(--color-signal) 24%, transparent);
+  }
+
+  .hito-checkbox:disabled,
+  .hito-checkbox[aria-disabled="true"],
+  .hito-radio:disabled,
+  .hito-radio[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .hito-checkbox:disabled:checked,
+  .hito-checkbox[data-state="checked"][aria-disabled="true"],
+  .hito-radio:disabled:checked,
+  .hito-radio[data-state="checked"][aria-disabled="true"] {
+    border-color: color-mix(in oklch, var(--color-signal) 48%, transparent);
+    background-color: color-mix(in oklch, var(--color-signal) 34%, transparent);
+  }
+
+  .hito-checkbox[aria-invalid="true"],
+  .hito-checkbox[data-invalid="true"],
+  .hito-radio[aria-invalid="true"],
+  .hito-radio[data-invalid="true"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 68%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-destructive) 13%, transparent);
+  }
+
+  .hito-choice-toggle-group {
+    display: flex;
+    max-width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .hito-choice-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-lg);
+    background: color-mix(in oklch, var(--color-foreground) 7%, transparent);
+    color: color-mix(in oklch, var(--color-foreground) 74%, transparent);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      color 160ms ease,
+      opacity 160ms ease;
+  }
+
+  .hito-choice-toggle-xs {
+    min-height: 1.75rem;
+    border-radius: var(--radius-sm);
+    padding: 0 0.5rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.01em;
+  }
+
+  .hito-choice-toggle-sm {
+    min-height: 2rem;
+    border-radius: var(--radius-md);
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.01em;
+  }
+
+  .hito-choice-toggle-md {
+    min-height: 2.5rem;
+    border-radius: var(--radius-md);
+    padding: 0 0.875rem;
+    font-size: 0.875rem;
+  }
+
+  .hito-choice-toggle-lg {
+    min-height: 2.75rem;
+    border-radius: var(--radius-md);
+    padding: 0 1rem;
+    font-size: 0.875rem;
+  }
+
+  .hito-choice-toggle-xl {
+    min-height: 3.25rem;
+    border-radius: var(--radius-md);
+    padding: 0 1.25rem;
+    font-size: 0.9375rem;
+  }
+
+  .hito-choice-toggle-accent {
+    min-height: 4rem;
+    align-items: flex-start;
+    border-radius: var(--radius-xl);
+    padding: 1rem 1.125rem;
+    font-size: 0.9375rem;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  .hito-choice-toggle:hover,
+  .hito-choice-toggle[data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-foreground) 10%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-choice-toggle:active {
+    background: color-mix(in oklch, var(--color-foreground) 13%, transparent);
+  }
+
+  .hito-choice-toggle[data-selected="true"],
+  .hito-choice-toggle[aria-checked="true"],
+  .hito-choice-toggle[aria-pressed="true"] {
+    border-color: color-mix(in oklch, var(--color-signal) 40%, transparent);
+    background: color-mix(in oklch, var(--color-signal) 16%, transparent);
+    color: color-mix(in oklch, var(--color-signal) 72%, var(--color-foreground));
+  }
+
+  .hito-choice-toggle[data-selected="true"]:hover,
+  .hito-choice-toggle[aria-checked="true"]:hover,
+  .hito-choice-toggle[aria-pressed="true"]:hover,
+  .hito-choice-toggle[data-demo-state="selected-hover"] {
+    background: color-mix(in oklch, var(--color-signal) 21%, transparent);
+    color: color-mix(in oklch, var(--color-signal) 64%, var(--color-foreground));
+  }
+
+  .hito-choice-toggle:focus-visible,
+  .hito-choice-toggle[data-demo-state="focus"] {
+    outline: none;
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--color-signal) 42%, transparent),
+      0 0 0 4px color-mix(in oklch, var(--color-signal) 15%, transparent);
+  }
+
+  .hito-choice-toggle:disabled,
+  .hito-choice-toggle[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .hito-choice-toggle[data-selected="true"]:disabled,
+  .hito-choice-toggle[aria-checked="true"][aria-disabled="true"],
+  .hito-choice-toggle[aria-pressed="true"][aria-disabled="true"] {
+    border-color: color-mix(in oklch, var(--color-signal) 28%, transparent);
+    background: color-mix(in oklch, var(--color-signal) 10%, transparent);
+  }
+
+  .hito-choice-toggle[aria-invalid="true"],
+  .hito-choice-toggle[data-invalid="true"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 60%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-destructive) 12%, transparent);
+  }
+
+  .hito-row-group {
+    overflow: hidden;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-background) 42%, transparent);
+  }
+
+  .hito-backlog-list {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .hito-backlog-list > article {
+    border-top: 1px solid var(--color-hairline);
+    transition: background-color 160ms ease;
+  }
+
+  .hito-backlog-list > article:first-child {
+    border-top: 0;
+  }
+
+  .hito-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .hito-list-row-signal {
+    background: color-mix(in oklch, var(--color-signal) 3%, transparent);
+  }
+
+  .hito-list-row-muted {
+    background: color-mix(in oklch, var(--color-surface) 30%, transparent);
+  }
+
+  .hito-backlog-list .hito-list-row {
+    border-top: 0;
+    border-radius: 0;
+    padding: 0.95rem 0;
+    background: transparent;
+    transition: color 160ms ease;
+  }
+
+  .hito-backlog-row-summary {
+    min-width: min(24rem, 100%);
+  }
+
+  .hito-backlog-row-metadata {
+    flex: 0 1 auto;
+  }
+
+  .hito-backlog-row-action {
+    flex: 0 0 auto;
+  }
+
+  .hito-backlog-list > article:hover,
+  .hito-backlog-list > article:focus-within,
+  .hito-backlog-list > article[data-expanded="true"] {
+    background: color-mix(in oklch, var(--color-foreground) 3.5%, transparent);
+  }
+
+  .hito-list-row:first-child {
+    border-top: 0;
+  }
+
+  .hito-list-row-title {
+    font-size: 0.875rem;
+    line-height: 1.35;
+    color: color-mix(in oklch, var(--color-foreground) 90%, transparent);
+  }
+
+  .hito-list-row-copy {
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-muted-foreground);
+  }
+
+  .hito-backlog-detail {
+    border-top: 0;
+    background: transparent;
+    padding: 0.25rem 0 1rem;
+    min-width: 0;
+    animation: hito-backlog-detail-rise 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    transform-origin: top;
+  }
+
+  .hito-backlog-detail pre {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .hito-metadata-tag {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    gap: 0.35rem;
+    border: 1px solid color-mix(in oklch, var(--color-muted-foreground) 14%, transparent);
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklch, var(--color-foreground) 4%, transparent);
+    padding: 0.225rem 0.45rem;
+    color: color-mix(in oklch, var(--color-muted-foreground) 88%, transparent);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1.1;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .hito-metadata-tag[data-interactive="true"] {
+    cursor: pointer;
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .hito-metadata-tag[data-interactive="true"]:hover {
+    border-color: color-mix(in oklch, var(--color-foreground) 22%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-metadata-tag[data-interactive="true"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
+  }
+
+  .hito-metadata-tag[data-readonly="true"] {
+    cursor: default;
+    position: relative;
+  }
+
+  .hito-metadata-tag[data-readonly="true"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-muted-foreground) 16%, transparent);
+  }
+
+  .hito-metadata-tag[data-tone="success"] {
+    border-color: color-mix(in oklch, var(--color-success) 22%, transparent);
+    background: color-mix(in oklch, var(--color-success) 7%, transparent);
+    color: var(--color-success);
+  }
+
+  .hito-metadata-tag[data-tone="warning"] {
+    border-color: color-mix(in oklch, var(--color-warn) 24%, transparent);
+    background: color-mix(in oklch, var(--color-warn) 7%, transparent);
+    color: var(--color-warn);
+  }
+
+  .hito-metadata-tag[data-tone="destructive"],
+  .hito-metadata-tag[data-tone="error"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 24%, transparent);
+    background: color-mix(in oklch, var(--color-destructive) 7%, transparent);
+    color: var(--color-destructive);
+  }
+
+  .hito-metadata-tag[data-tone="signal"],
+  .hito-metadata-tag[data-tone="rollout"] {
+    border-color: color-mix(in oklch, var(--color-signal) 18%, transparent);
+    background: color-mix(in oklch, var(--color-signal) 6%, transparent);
+    color: color-mix(in oklch, var(--color-signal) 72%, var(--color-muted-foreground));
+  }
+
+  .hito-metadata-tag[data-tone="muted"] {
+    border-color: color-mix(in oklch, var(--color-muted-foreground) 12%, transparent);
+    background: color-mix(in oklch, var(--color-muted-foreground) 4%, transparent);
+    color: color-mix(in oklch, var(--color-muted-foreground) 82%, transparent);
+  }
+
+  @media (max-width: 767px) {
+    .hito-backlog-list .hito-list-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+      gap: 0.65rem 0.75rem;
+    }
+
+    .hito-backlog-row-summary {
+      grid-column: 1 / -1;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .hito-backlog-row-metadata {
+      grid-column: 1 / 2;
+      grid-row: 2;
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    .hito-backlog-row-action {
+      grid-column: 2;
+      grid-row: 2;
+      justify-self: end;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .hito-backlog-row-metadata {
+      grid-column: 1 / -1;
+    }
+
+    .hito-backlog-row-action {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      justify-self: start;
+    }
+  }
+
+  @keyframes hito-backlog-detail-rise {
+    from {
+      opacity: 0;
+      clip-path: inset(0 0 100% 0);
+      transform: translateY(-0.25rem);
+    }
+
+    to {
+      opacity: 1;
+      clip-path: inset(0 0 0 0);
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hito-backlog-detail {
+      animation: none;
+    }
+  }
+}

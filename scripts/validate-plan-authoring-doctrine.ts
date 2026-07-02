@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import {
   buildStructuredFirstPlanAuthoringInput,
   buildStructuredFirstPlanDraftReview,
@@ -55,7 +54,6 @@ import {
   type StructuredPlanAuthoringInput,
 } from "../src/lib/structured-plan-authoring";
 import { addDaysIso, diffDaysIso, weekdayLong } from "../src/lib/training";
-import { parseVoiceToPlanConfirmRequest } from "../src/lib/voice-to-plan-authoring";
 import type { WeekdayName } from "../src/lib/weekday-rest-invariants";
 import type { TrainingPlanV2 } from "../src/lib/imported-plan";
 
@@ -189,9 +187,28 @@ function longRunDistances(plan: TrainingPlanV2) {
 }
 
 function targetKeys(segment: SegmentRecord) {
-  const target = segment.target as Record<string, unknown> | undefined;
+  return collectSegmentTargets(segment).flatMap((target) =>
+    Object.keys(target).filter((key) => target[key] != null),
+  );
+}
 
-  return target ? Object.keys(target).filter((key) => target[key] != null) : [];
+function collectSegmentTargets(segment: SegmentRecord) {
+  const target = segment.target as Record<string, unknown> | undefined;
+  const recoveryTarget = segment.recovery_target as Record<string, unknown> | undefined;
+  const childTargets = Array.isArray(
+    (segment.prescription as { children?: unknown } | undefined)?.children,
+  )
+    ? (
+        (segment.prescription as { children?: Array<{ target?: Record<string, unknown> }> })
+          .children ?? []
+      )
+        .map((child) => child.target)
+        .filter((childTarget): childTarget is Record<string, unknown> => Boolean(childTarget))
+    : [];
+
+  return [target, recoveryTarget, ...childTargets].filter(
+    (candidate): candidate is Record<string, unknown> => Boolean(candidate),
+  );
 }
 
 function workoutDurationMin(workout: TrainingPlanV2["planned_workouts"][number]) {
@@ -481,77 +498,6 @@ function workoutIdentityLabel(workout: TrainingPlanV2["planned_workouts"][number
   return workout.workout_identity ?? workout.source_workout_type ?? workout.workout_type;
 }
 
-function assertLowSupportMarathonExtensionRichness({
-  plan,
-  extensionStartWeek,
-  label,
-}: {
-  plan: TrainingPlanV2;
-  extensionStartWeek: number;
-  label: string;
-}) {
-  const extensionWeeks = weekIdentitySequences(plan, extensionStartWeek);
-
-  assert.ok(extensionWeeks.length > 0, `${label}: expected backend-extended weeks`);
-  assert.ok(
-    extensionWeeks.some((week) => week.identities.includes("easy_run_with_strides")),
-    `${label}: extension should include gentle strides support when safely placed`,
-  );
-  assert.ok(
-    extensionWeeks.some((week) => week.identities.includes("cutback_aerobic_run")),
-    `${label}: extension should include cutback aerobic support in lower-load weeks`,
-  );
-  assert.ok(
-    extensionWeeks.some((week) => week.identities.includes("long_run_with_steady_finish")),
-    `${label}: extension should include safe long-run steady-finish variation`,
-  );
-  assert.ok(
-    extensionWeeks.some((week) => week.identities.includes("cutback_long_run")),
-    `${label}: extension should preserve cutback long-run archetypes`,
-  );
-  assert.ok(
-    extensionWeeks.some((week) => week.identities.includes("taper_long_run")),
-    `${label}: extension should preserve taper long-run archetypes`,
-  );
-
-  const uniqueSequences = new Set(extensionWeeks.map((week) => week.identities.join(" > ")));
-  assert.ok(
-    uniqueSequences.size >= 4,
-    `${label}: extension should use multiple safe week archetypes; saw ${Array.from(
-      uniqueSequences,
-    ).join(" | ")}`,
-  );
-  assert.ok(
-    longestRepeatedSequenceRun(extensionWeeks) <= 3,
-    `${label}: extension should not repeat the exact same non-rest identity sequence for too many consecutive weeks`,
-  );
-
-  const hardQualityIdentities = new Set([
-    "time_intervals",
-    "distance_intervals",
-    "5k_sharpening_repeats",
-    "10k_rhythm_intervals",
-    "controlled_tempo_session",
-    "half_marathon_threshold_durability",
-    "race_pace_session",
-    "marathon_steady_specificity",
-    "progression_run",
-    "rolling_hills_session",
-    "hill_repeats",
-  ]);
-  const hardQualityViolations = extensionWeeks.flatMap((week) =>
-    week.identities
-      .filter((identity) => hardQualityIdentities.has(identity))
-      .map((identity) => `week ${week.weekNumber}:${identity}`),
-  );
-
-  assert.deepEqual(
-    hardQualityViolations,
-    [],
-    `${label}: low-support marathon extension should not add hard intervals, tempo, hills, or marathon-specific quality by default`,
-  );
-}
-
 function assertBeginnerRunWalkAdaptation({
   plan,
   adaptationWeeks,
@@ -606,9 +552,9 @@ function assertBeginnerRunWalkAdaptation({
 
 function hasRunWalkAdaptationMarker(workout: TrainingPlanV2["planned_workouts"][number]) {
   return (workout.segments as SegmentRecord[]).some((segment) => {
-    const target = segment.target as Record<string, unknown> | undefined;
-
-    return target?.intensity === "run_walk_adaptation";
+    return collectSegmentTargets(segment).some(
+      (target) => target.intensity === "run_walk_adaptation",
+    );
   });
 }
 
@@ -842,47 +788,37 @@ function assertRichWorkoutContract(plan: TrainingPlanV2, label: string) {
       );
     }
     if (hasTargetKey({ ...plan, planned_workouts: [workout] }, "hr_bpm_range")) {
-      const hasDefaultEstimatedHrTargets = workout.segments.some((segment) => {
-        const target = segment.target as Record<string, unknown> | undefined;
-        const recoveryTarget = segment.recovery_target as Record<string, unknown> | undefined;
+      const hrTargetEntries = (workout.segments as SegmentRecord[]).flatMap((segment) =>
+        collectSegmentTargets(segment).map((target) => ({
+          target,
+          segment,
+          targetKind: "target" as const,
+        })),
+      );
+      const defaultEstimatedHrEntries = hrTargetEntries.filter(
+        (entry) =>
+          entry.target.hr_target_source === "default_estimated_hr" &&
+          typeof entry.target.hr_bpm_range === "string",
+      );
 
-        return [target, recoveryTarget].some(
-          (candidate) =>
-            candidate?.hr_target_source === "default_estimated_hr" &&
-            typeof candidate.hr_bpm_range === "string",
-        );
-      });
-
-      if (hasDefaultEstimatedHrTargets) {
-        const defaultEstimatedHrOffenders = (workout.segments as SegmentRecord[]).flatMap(
-          (segment) => {
-            const target = segment.target as Record<string, unknown> | undefined;
-            const recoveryTarget = segment.recovery_target as Record<string, unknown> | undefined;
-
-            return [
-              { target, targetKind: "target" as const },
-              { target: recoveryTarget, targetKind: "recovery_target" as const },
-            ]
-              .filter(
-                (entry) =>
-                  entry.target?.hr_target_source === "default_estimated_hr" &&
-                  typeof entry.target.hr_bpm_range === "string" &&
-                  !allowsDefaultEstimatedHrTarget({
-                    sourceWorkoutType: workout.source_workout_type,
-                    workoutType: workout.workout_type,
-                    segmentType: String(segment.segment_type ?? ""),
-                    segmentId: String(segment.segment_id ?? ""),
-                    targetKind: entry.targetKind,
-                  }),
-              )
-              .map(
-                (entry) =>
-                  `${workout.workout_id}.${String(segment.segment_type ?? "unknown")}.${
-                    entry.targetKind
-                  }`,
-              );
-          },
-        );
+      if (defaultEstimatedHrEntries.length > 0) {
+        const defaultEstimatedHrOffenders = defaultEstimatedHrEntries
+          .filter(
+            (entry) =>
+              !allowsDefaultEstimatedHrTarget({
+                sourceWorkoutType: workout.source_workout_type,
+                workoutType: workout.workout_type,
+                segmentType: String(entry.segment.segment_type ?? ""),
+                segmentId: String(entry.segment.segment_id ?? ""),
+                targetKind: entry.targetKind,
+              }),
+          )
+          .map(
+            (entry) =>
+              `${workout.workout_id}.${String(entry.segment.segment_type ?? "unknown")}.${
+                entry.targetKind
+              }`,
+          );
 
         assert.deepEqual(
           defaultEstimatedHrOffenders,
@@ -900,13 +836,31 @@ function assertRichWorkoutContract(plan: TrainingPlanV2, label: string) {
           `${label}: default estimated HR targets should preserve source metadata`,
         );
         continue;
-      }
+      } else {
+        const executableHrOffenders = hrTargetEntries
+          .filter(
+            (entry) =>
+              entry.target.hr_target_source !== "personal_hr_zone" &&
+              typeof entry.target.hr_bpm_range === "string",
+          )
+          .map(
+            (entry) =>
+              `${workout.workout_id}.${String(entry.segment.segment_type ?? "unknown")}.${
+                entry.targetKind
+              }`,
+          );
 
-      assert.equal(
-        workout.metric_mode.hr_targets_allowed,
-        true,
-        `${label}: emitted HR targets require HR-enabled metric mode`,
-      );
+        assert.deepEqual(
+          executableHrOffenders,
+          [],
+          `${label}: executable HR targets require personal HR-zone truth`,
+        );
+        assert.equal(
+          workout.metric_mode.hr_targets_allowed,
+          true,
+          `${label}: emitted HR targets require HR-enabled metric mode`,
+        );
+      }
     }
   }
 }
@@ -1015,10 +969,8 @@ assertAiFirstPlanBlueprintEnvelopeContracts({
   assertWeeklyLongRunDay,
 });
 await assertFirstPlanReleaseGateContracts({
-  assertBeginnerRunWalkAdaptation,
   assertFixedRestDays,
   assertFixedRestDayNames,
-  assertLowSupportMarathonExtensionRichness,
   assertNoFakeMetricTargetRegression,
   assertNoSingleSegmentNonRestWorkouts,
   assertRecoveryFirstAfterLongRuns,
@@ -1393,47 +1345,5 @@ assertActivePlanRefreshDraftReviewContracts({
   planWithoutGeneratedTimestamp,
   sourceWorkoutTypes,
 });
-
-{
-  const { authoringInput, plan } = buildPlan(buildRequest("ultra_marathon"));
-  const parsedVoiceConfirm = parseVoiceToPlanConfirmRequest({
-    draft: {
-      authoringInput,
-      canonicalPlan: plan,
-    },
-    supplement: {
-      age: 34,
-      weightKg: 72,
-      heightCm: 178,
-      fixedRestDays: [...fixedRestDays],
-      runningDaysPerWeek: 5,
-      goalDistance: "ultra_marathon",
-      goalStyle: "balanced",
-      terrainFocus: "mountain",
-      watchAccess: "watch_or_app",
-      guidancePreference: "pace",
-    },
-  });
-
-  assert.equal(
-    parsedVoiceConfirm.ok,
-    true,
-    "voice confirm should accept expanded structured goal contract",
-  );
-
-  if (parsedVoiceConfirm.ok) {
-    assert.deepEqual(
-      planWithoutGeneratedTimestamp(parsedVoiceConfirm.canonicalPlan),
-      planWithoutGeneratedTimestamp(buildStructuredAuthoringPlan(authoringInput)),
-      "voice confirm should rebuild deterministic canonical plan truth from authoring input",
-    );
-  }
-
-  assert.match(
-    readFileSync("src/lib/voice-to-plan-authoring.ts", "utf8"),
-    /enableRichWorkoutDraft:\s*false/,
-    "voice draft generation should explicitly keep rich workout drafts disabled for Slice 4A",
-  );
-}
 
 console.log("Plan authoring doctrine fixtures passed.");

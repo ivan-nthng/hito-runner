@@ -46,17 +46,6 @@ const richDraftUnitPrescriptionSchema = z
   })
   .strict();
 
-const richDraftSegmentPrescriptionSchema = z
-  .object({
-    mode: z.enum(["time", "distance", "repeats", "none"]),
-    durationMin: z.number().positive().nullable(),
-    distanceKm: z.number().positive().nullable(),
-    repeatCount: z.number().int().positive().nullable(),
-    repeatUnit: richDraftUnitPrescriptionSchema.nullable(),
-    recoveryUnit: richDraftUnitPrescriptionSchema.nullable(),
-  })
-  .strict();
-
 const richDraftTargetSchema = z
   .object({
     intensity: nullableBoundedTextSchema,
@@ -67,6 +56,37 @@ const richDraftTargetSchema = z
     pace: nullableBoundedTextSchema,
     hrBpmRange: nullableBoundedTextSchema,
     hrBpm: nullableBoundedTextSchema,
+  })
+  .strict();
+
+const richDraftRepeatChildRoleSchema = z.enum([
+  "warm_up",
+  "run",
+  "walk",
+  "work",
+  "recover",
+  "finish",
+  "cooldown",
+]);
+
+const richDraftRepeatChildSchema = z
+  .object({
+    role: richDraftRepeatChildRoleSchema,
+    label: nullableBoundedTextSchema.optional(),
+    sequence: z.number().int().min(1).nullable().optional(),
+    guidance: nullableBoundedTextSchema.optional(),
+    prescription: richDraftUnitPrescriptionSchema,
+    target: richDraftTargetSchema.optional(),
+  })
+  .strict();
+
+const richDraftSegmentPrescriptionSchema = z
+  .object({
+    mode: z.enum(["time", "distance", "repeats", "none"]),
+    durationMin: z.number().positive().nullable(),
+    distanceKm: z.number().positive().nullable(),
+    repeatCount: z.number().int().positive().nullable(),
+    children: z.array(richDraftRepeatChildSchema).min(1).max(12).nullable().optional(),
   })
   .strict();
 
@@ -147,6 +167,8 @@ type CanonicalWorkout = TrainingPlanV2["planned_workouts"][number];
 type CanonicalSegment = CanonicalWorkout["segments"][number];
 type DraftWorkout = RichWorkoutDraft["workouts"][number];
 type DraftSegment = DraftWorkout["segments"][number];
+type DraftUnitPrescription = z.output<typeof richDraftUnitPrescriptionSchema>;
+type DraftRepeatChild = z.output<typeof richDraftRepeatChildSchema>;
 
 const MAIN_LIKE_SEGMENT_TYPES = new Set(["main", "tempo_block", "interval_block", "strides"]);
 
@@ -354,6 +376,8 @@ function normalizeDraftSegment(
 ): CanonicalSegment {
   const baseSegment = findBaseSegmentForDraft(baseWorkout, segment, index);
   const prescription = normalizeDraftPrescription(segment, baseSegment);
+  const repeatHasChildren =
+    prescription.mode === "repeats" && Boolean(prescription.children?.length);
 
   return {
     segment_id: `${baseWorkout.workout_id}_seg_${index + 1}`,
@@ -363,7 +387,9 @@ function normalizeDraftSegment(
     guidance: segment.guidance,
     prescription,
     ...durationDistanceFromPrescription(prescription),
-    target: normalizeDraftTarget(segment.target, baseSegment?.target ?? null, metricMode),
+    ...(repeatHasChildren
+      ? {}
+      : { target: normalizeDraftTarget(segment.target, baseSegment?.target ?? null, metricMode) }),
   };
 }
 
@@ -396,7 +422,9 @@ function normalizeDraftPrescription(
   }
 
   if (prescription.mode === "repeats") {
-    if (!prescription.repeatCount || !prescription.repeatUnit) {
+    const repeatChildren = normalizeDraftRepeatChildren(prescription.children);
+
+    if (!prescription.repeatCount || repeatChildren.length === 0) {
       throw new RichDraftNormalizationError("rich_draft_invalid_repeat_prescription", [
         `${segment.segmentId} has an incomplete repeat prescription.`,
       ]);
@@ -405,10 +433,7 @@ function normalizeDraftPrescription(
     return {
       mode: "repeats",
       repeat_count: prescription.repeatCount,
-      repeat_unit: normalizeDraftUnitPrescription(prescription.repeatUnit),
-      ...(prescription.recoveryUnit
-        ? { recovery_unit: normalizeDraftUnitPrescription(prescription.recoveryUnit) }
-        : {}),
+      children: repeatChildren,
     };
   }
 
@@ -422,8 +447,8 @@ function normalizeDraftPrescription(
 }
 
 function normalizeDraftUnitPrescription(
-  unit: NonNullable<DraftSegment["prescription"]["repeatUnit"]>,
-): NonNullable<NonNullable<CanonicalSegment["prescription"]>["repeat_unit"]> {
+  unit: DraftUnitPrescription,
+): NonNullable<NonNullable<CanonicalSegment["prescription"]>["children"]>[number]["prescription"] {
   if (unit.mode === "time" && unit.durationMin) {
     return {
       mode: "time",
@@ -442,9 +467,33 @@ function normalizeDraftUnitPrescription(
     return { mode: "none" };
   }
 
-  throw new RichDraftNormalizationError("rich_draft_invalid_repeat_unit", [
-    "Repeat units need durationMin or distanceKm when mode is time or distance.",
+  throw new RichDraftNormalizationError("rich_draft_invalid_repeat_child_prescription", [
+    "Repeat child prescriptions need durationMin or distanceKm when mode is time or distance.",
   ]);
+}
+
+function normalizeDraftRepeatChildren(children: DraftRepeatChild[] | null | undefined) {
+  return (children ?? []).map((child, index) => ({
+    role: child.role,
+    ...(child.label ? { label: child.label } : {}),
+    sequence: child.sequence ?? index + 1,
+    ...(child.guidance ? { guidance: child.guidance } : {}),
+    prescription: normalizeDraftUnitPrescription(child.prescription),
+    target: normalizeDraftTarget(child.target ?? emptyDraftTargetForRepeatChild(), null, null),
+  }));
+}
+
+function emptyDraftTargetForRepeatChild(): DraftSegment["target"] {
+  return {
+    intensity: null,
+    rpe: null,
+    cue: null,
+    hint: null,
+    paceMinPerKmRange: null,
+    pace: null,
+    hrBpmRange: null,
+    hrBpm: null,
+  };
 }
 
 function durationDistanceFromPrescription(
@@ -642,20 +691,6 @@ const richDraftUnitPrescriptionOpenAiSchema = {
   },
 } as const;
 
-const richDraftSegmentPrescriptionOpenAiSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["mode", "durationMin", "distanceKm", "repeatCount", "repeatUnit", "recoveryUnit"],
-  properties: {
-    mode: { type: "string", enum: ["time", "distance", "repeats", "none"] },
-    durationMin: { type: ["number", "null"] },
-    distanceKm: { type: ["number", "null"] },
-    repeatCount: { type: ["integer", "null"] },
-    repeatUnit: richDraftUnitPrescriptionOpenAiSchema,
-    recoveryUnit: richDraftUnitPrescriptionOpenAiSchema,
-  },
-} as const;
-
 const richDraftTargetOpenAiSchema = {
   type: "object",
   additionalProperties: false,
@@ -669,6 +704,40 @@ const richDraftTargetOpenAiSchema = {
     pace: { type: ["string", "null"], maxLength: 280 },
     hrBpmRange: { type: ["string", "null"], maxLength: 280 },
     hrBpm: { type: ["string", "null"], maxLength: 280 },
+  },
+} as const;
+
+const richDraftRepeatChildOpenAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["role", "label", "sequence", "guidance", "prescription", "target"],
+  properties: {
+    role: {
+      type: "string",
+      enum: ["warm_up", "run", "walk", "work", "recover", "finish", "cooldown"],
+    },
+    label: { type: ["string", "null"], maxLength: 280 },
+    sequence: { type: ["integer", "null"] },
+    guidance: { type: ["string", "null"], maxLength: 280 },
+    prescription: richDraftUnitPrescriptionOpenAiSchema,
+    target: richDraftTargetOpenAiSchema,
+  },
+} as const;
+
+const richDraftSegmentPrescriptionOpenAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["mode", "durationMin", "distanceKm", "repeatCount", "children"],
+  properties: {
+    mode: { type: "string", enum: ["time", "distance", "repeats", "none"] },
+    durationMin: { type: ["number", "null"] },
+    distanceKm: { type: ["number", "null"] },
+    repeatCount: { type: ["integer", "null"] },
+    children: {
+      type: ["array", "null"],
+      maxItems: 12,
+      items: richDraftRepeatChildOpenAiSchema,
+    },
   },
 } as const;
 

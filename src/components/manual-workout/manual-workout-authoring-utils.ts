@@ -1,59 +1,24 @@
 import { hitoDateFromIso } from "@/components/ui/hito-date-time-utils";
+import { buildPlannedWorkoutLanguage } from "@/lib/planned-workout-language";
 import { formatDistanceMeters, formatDurationMin } from "@/lib/training";
 import {
   listManualWorkoutTemplates,
+  listVisibleManualWorkoutStarterTemplates,
   type ManualWorkoutTemplate,
 } from "@/lib/manual-workout-authoring/templates";
+import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
+import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
 import type {
   ManualWorkoutBlockInput,
   ManualWorkoutConstructorEntryInput,
   ManualWorkoutDraftInput,
   ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
-import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
-
-const MANUAL_TEMPLATE_GROUPS: Array<{
-  id: string;
-  label: string;
-  match: (template: ManualWorkoutTemplate) => boolean;
-}> = [
-  {
-    id: "rest-recovery",
-    label: "Rest and recovery",
-    match: (template) => template.workoutType === "rest" || template.workoutFamily === "recovery",
-  },
-  {
-    id: "easy",
-    label: "Easy aerobic",
-    match: (template) =>
-      template.workoutFamily === "easy" ||
-      template.workoutFamily === "steady" ||
-      template.workoutFamily === "progression",
-  },
-  {
-    id: "long",
-    label: "Long run",
-    match: (template) => template.workoutFamily === "long",
-  },
-  {
-    id: "quality",
-    label: "Quality",
-    match: (template) =>
-      template.workoutFamily === "tempo" || template.workoutFamily === "intervals",
-  },
-  {
-    id: "terrain",
-    label: "Hills and terrain",
-    match: (template) => template.workoutFamily === "hills" || template.workoutFamily === "trail",
-  },
-  {
-    id: "adaptation",
-    label: "Adaptation",
-    match: (template) => template.templateKey === "run_walk_adaptation",
-  },
-];
+import type { WorkoutSegmentLike } from "@/lib/rich-workout-model";
+import { workoutGlyphFromCalendarIconKey, type WorkoutGlyphKind } from "@/lib/workout-glyph";
 
 export const MANUAL_WORKOUT_TEMPLATES = listManualWorkoutTemplates();
+export const VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATES = listVisibleManualWorkoutStarterTemplates();
 
 export function buildManualDraftInput({
   activePlanId,
@@ -125,31 +90,41 @@ function cloneManualWorkoutBlock(block: ManualWorkoutBlockInput): ManualWorkoutB
   };
 }
 
-export function groupManualTemplates() {
-  const grouped = MANUAL_TEMPLATE_GROUPS.map((group) => ({
-    ...group,
-    templates: MANUAL_WORKOUT_TEMPLATES.filter(group.match),
-  })).filter((group) => group.templates.length > 0);
-  const groupedKeys = new Set(
-    grouped.flatMap((group) => group.templates.map((template) => template.templateKey)),
-  );
-  const remaining = MANUAL_WORKOUT_TEMPLATES.filter(
-    (template) => !groupedKeys.has(template.templateKey),
-  );
-
-  return remaining.length
-    ? [
-        ...grouped,
-        { id: "other", label: "Other templates", match: () => false, templates: remaining },
-      ]
-    : grouped;
-}
-
 export function getDefaultManualWorkoutTemplate(templateKey: ManualWorkoutTemplate["templateKey"]) {
   return (
     MANUAL_WORKOUT_TEMPLATES.find((template) => template.templateKey === templateKey) ??
     MANUAL_WORKOUT_TEMPLATES[0]!
   );
+}
+
+export function templateRunnerFacingLanguage(
+  template: ManualWorkoutTemplate,
+): PlannedWorkoutLanguageReadModel {
+  return buildPlannedWorkoutLanguage({
+    workoutType: template.workoutType,
+    sourceWorkoutType: template.templateKey,
+    workoutFamily: template.workoutFamily,
+    workoutIdentity: template.workoutIdentity,
+    calendarIconKey: template.calendarIconKey,
+    title: template.defaultTitle,
+    steps: manualWorkoutEntriesToLanguageSteps(template.defaultEntries),
+  });
+}
+
+export function templateRunnerFacingLabel(template: ManualWorkoutTemplate) {
+  return templateRunnerFacingLanguage(template).runnerFacingWorkoutTypeLabel;
+}
+
+export function templateOptionDisplayLabel(template: ManualWorkoutTemplate) {
+  const runnerLabel = templateRunnerFacingLabel(template);
+
+  return template.label === runnerLabel ? runnerLabel : `${runnerLabel} · ${template.label}`;
+}
+
+export function manualTemplateRunnerLabelFromKey(templateKey: string) {
+  const template = MANUAL_WORKOUT_TEMPLATES.find((item) => item.templateKey === templateKey);
+
+  return template ? templateRunnerFacingLabel(template) : "Workout";
 }
 
 export function formatReadableDate(iso: string) {
@@ -162,45 +137,36 @@ export function formatReadableDate(iso: string) {
   }).format(date);
 }
 
-export function templateShortLabel(template: ManualWorkoutTemplate) {
-  if (template.workoutType === "rest") return "Rest";
-  if (template.workoutFamily === "long") return "Long";
-  if (template.workoutFamily === "tempo") return "Tempo";
-  if (template.workoutFamily === "intervals") return "Intervals";
-  if (template.workoutFamily === "hills") return "Hills";
-  if (template.workoutFamily === "trail") return "Trail";
-  if (template.workoutFamily === "recovery") return "Recovery";
-  if (template.workoutFamily === "steady") return "Steady";
-  if (template.workoutFamily === "progression") return "Progression";
-  return "Easy";
+export function workoutToneColor(template: ManualWorkoutTemplate) {
+  return workoutTypeColorVar(
+    templateRunnerFacingLanguage(template).runnerFacingWorkoutType,
+    "base",
+  );
 }
 
-export function workoutToneColor(template: ManualWorkoutTemplate) {
-  if (template.workoutType === "rest") return "var(--color-muted-foreground)";
-  if (template.workoutFamily === "long") return "var(--color-signal)";
-  if (
-    template.workoutFamily === "tempo" ||
-    template.workoutFamily === "intervals" ||
-    template.workoutFamily === "hills"
-  ) {
-    return "var(--color-warning)";
-  }
-  if (template.workoutFamily === "trail") return "var(--color-success)";
-  if (template.workoutFamily === "recovery") return "var(--color-info)";
-  return "var(--color-foreground)";
+export function templateWorkoutColorIndicatorStyle(template: ManualWorkoutTemplate) {
+  const type = templateRunnerFacingLanguage(template).runnerFacingWorkoutType;
+
+  return {
+    background: workoutTypeColorVar(type, "base"),
+    borderColor: workoutTypeColorVar(type, "border"),
+    boxShadow: `0 0 0 2px ${workoutTypeColorVar(type, "ring")}`,
+  };
 }
 
 export function templateWorkoutIdentity(template: ManualWorkoutTemplate) {
+  const runnerLabel = templateRunnerFacingLabel(template);
+
   return {
     color: workoutToneColor(template),
-    glyph: template.calendarIconKey as WorkoutGlyphKind,
-    label: template.label,
-    short: templateShortLabel(template),
+    glyph: templateIconKind(template),
+    label: runnerLabel,
+    short: runnerLabel,
   };
 }
 
 export function templateIconKind(template: ManualWorkoutTemplate | null | undefined) {
-  return (template?.calendarIconKey ?? "easy") as WorkoutGlyphKind;
+  return workoutGlyphFromCalendarIconKey(template?.calendarIconKey ?? "easy") as WorkoutGlyphKind;
 }
 
 export function templateIconTone(template: ManualWorkoutTemplate | null | undefined) {
@@ -208,21 +174,16 @@ export function templateIconTone(template: ManualWorkoutTemplate | null | undefi
 }
 
 export function targetTruthModeLabel(mode: ManualWorkoutTargetTruthMode | string) {
-  if (mode === "editable_default_hr") return "Editable HR guide";
   if (mode === "none") return "Rest / no run";
   return "Structure-first guidance";
 }
 
 export function targetTruthModeCopy(mode: ManualWorkoutTargetTruthMode) {
-  if (mode === "editable_default_hr") {
-    return "Use the workout structure plus an editable HR suggestion. It is guidance, not a personal HR zone.";
-  }
-
   if (mode === "none") {
     return "Use this for rest or no-run days. Hito will not create a running target.";
   }
 
-  return "Follow the duration, distance, repeat, work, and recovery structure. Hito will not invent pace or personal HR targets.";
+  return "Follow the reviewed workout structure. Hito will not invent pace or personal heart-rate targets.";
 }
 
 export function formatManualDraftStructure(totalDurationMin: number, totalDistanceKm: number) {
@@ -242,4 +203,36 @@ export function formatManualDraftStructure(totalDurationMin: number, totalDistan
 function parseIsoDateAsLocalCalendarDay(iso: string) {
   const [year = "1970", month = "01", day = "01"] = iso.split("-");
   return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
+function manualWorkoutEntriesToLanguageSteps(
+  entries: ManualWorkoutConstructorEntryInput[],
+): WorkoutSegmentLike[] {
+  return entries.map((entryValue) => {
+    if (entryValue.kind === "repeat_group") {
+      return {
+        type: "repeats",
+        segment_type: "repeat_group",
+        label: entryValue.group.groupLabel ?? null,
+        repeat_count: entryValue.group.repeatCount,
+        work: manualWorkoutBlockToLanguageStep(entryValue.group.workBlock),
+        recovery: entryValue.group.recoveryBlock
+          ? manualWorkoutBlockToLanguageStep(entryValue.group.recoveryBlock)
+          : null,
+      };
+    }
+
+    return manualWorkoutBlockToLanguageStep(entryValue.block);
+  });
+}
+
+function manualWorkoutBlockToLanguageStep(block: ManualWorkoutBlockInput): WorkoutSegmentLike {
+  return {
+    type: block.blockKey,
+    segment_type: block.blockKey,
+    label: block.label ?? null,
+    duration_min: block.durationSeconds ? block.durationSeconds / 60 : null,
+    distance_km: block.distanceMeters ? block.distanceMeters / 1000 : null,
+    target: block.target ?? null,
+  };
 }

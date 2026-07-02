@@ -1037,7 +1037,7 @@ function summarizeLongRunDetailVariety(rows: readonly RunningPlanPreviewCalendar
 function prescriptionLabels(segment: RunningPlanPreviewCalendarRow["segments"][number]) {
   const prescription = segment.primaryPrescription;
   if (prescription.mode === "repeat") {
-    return [prescription.work.intensityLabel, prescription.recovery.intensityLabel];
+    return prescription.children.map((child) => child.intensityLabel);
   }
 
   return [prescription.intensityLabel];

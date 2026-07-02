@@ -188,21 +188,33 @@ export function buildRunWalkAdaptationSegments({
       prescription: {
         mode: "repeats" as const,
         repeat_count: repeatCount,
-        repeat_unit: {
-          mode: "time" as const,
-          duration_min: runMin,
-        },
-        recovery_unit: {
-          mode: "time" as const,
-          duration_min: walkMin,
-        },
+        children: [
+          {
+            role: "run" as const,
+            label: "Run",
+            sequence: 1,
+            prescription: {
+              mode: "time" as const,
+              duration_min: runMin,
+            },
+            target: stripDefaultEstimatedHrRepeatTarget({
+              ...easyTarget,
+              intensity: "run_walk_adaptation",
+              cue: "Run portions stay conversational; walk breaks are part of the plan.",
+            }),
+          },
+          {
+            role: "walk" as const,
+            label: "Walk",
+            sequence: 2,
+            prescription: {
+              mode: "time" as const,
+              duration_min: walkMin,
+            },
+            target: buildRepeatRecoveryTarget(normalized),
+          },
+        ],
       },
-      target: {
-        ...easyTarget,
-        intensity: "run_walk_adaptation",
-        cue: "Run portions stay conversational; walk breaks are part of the plan.",
-      },
-      recovery_target: buildRepeatRecoveryTarget(normalized),
     },
     {
       segment_id: `${workoutId}_seg_3`,
@@ -222,6 +234,24 @@ export function buildRunWalkAdaptationSegments({
       },
     },
   ];
+}
+
+function stripDefaultEstimatedHrRepeatTarget<
+  TTarget extends Record<string, string | number | boolean | null | undefined>,
+>(target: TTarget) {
+  if (target.hr_target_source !== "default_estimated_hr") {
+    return target;
+  }
+
+  const { hr_bpm_range, hr_bpm, hr_target_source, source_note, label, ...safeTarget } = target;
+
+  void hr_bpm_range;
+  void hr_bpm;
+  void hr_target_source;
+  void source_note;
+  void label;
+
+  return safeTarget;
 }
 
 export function buildSteadyRunSegments({

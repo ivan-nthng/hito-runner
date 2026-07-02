@@ -3,23 +3,29 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
+import { readActiveBuildOutputLock } from "./lib/build-output-lock.mjs";
+import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
+import { validateLocalBuildOutput } from "./validate-build-output-integrity.mjs";
 
 const rootDir = process.cwd();
+const qaRuntimePaths = resolveQaRuntimePaths({ rootDir });
 const host = "127.0.0.1";
 const port = 3000;
 const healthUrl = `http://${host}:${port}/`;
-const logsDir = resolve(rootDir, "logs");
-const statePath = resolve(logsDir, "qa-local-server-state.json");
-const logPath = resolve(logsDir, "qa-local-server.log");
-const finalizedOutputDir = resolve(rootDir, "logs/build-output-finalized");
+const logsDir = qaRuntimePaths.stateDir;
+const statePath = qaRuntimePaths.statePath;
+const logPath = qaRuntimePaths.logPath;
+const finalizedOutputDir = qaRuntimePaths.runtimeRoot;
 const finalizedServerDir = resolve(finalizedOutputDir, "server");
 const finalizedPublicDir = resolve(finalizedOutputDir, "public");
 const serverEntry = resolve(finalizedServerDir, "index.mjs");
@@ -30,6 +36,20 @@ const requiredBuildArtifacts = [
   nitroManifest,
   resolve(publicDir, "favicon.svg"),
   resolve(publicDir, "templates/hito-training-plan-v2-template.json"),
+];
+const recoverableGeneratedConflictRoots = [
+  resolve(rootDir, ".output"),
+  resolve(rootDir, "node_modules/.nitro"),
+  resolve(rootDir, "logs/build-output-finalized"),
+  qaRuntimePaths.buildOutputRoot,
+  qaRuntimePaths.nitroBuildDir,
+  qaRuntimePaths.nitroOutputDir,
+  qaRuntimePaths.viteCacheDir,
+  qaRuntimePaths.runtimeRoot,
+  qaRuntimePaths.finalizeBackupDir,
+  qaRuntimePaths.finalizedPreviousDir,
+  qaRuntimePaths.finalizedStagingDir,
+  qaRuntimePaths.publicSnapshotDir,
 ];
 const serveCommandLabel = "npm run serve:local";
 const staleBuildGraceMs = 1000;
@@ -75,13 +95,13 @@ async function statusCommand() {
 
 async function startCommand() {
   ensureLogsDir();
+  ensureBuildOutputLifecycleIsIdle();
   await ensureBuildOutput();
+  ensureBuildOutputLifecycleIsIdle();
 
   const currentBuild = readBuildFingerprint();
   if (!currentBuild) {
-    throw new Error(
-      "Build output is missing after build. Expected logs/build-output-finalized/server/index.mjs.",
-    );
+    throw new Error(`Build output is missing after build. Expected ${serverEntry}.`);
   }
 
   const status = await resolveServerStatus();
@@ -95,6 +115,7 @@ async function startCommand() {
       host,
       port,
       buildFingerprint: currentBuild,
+      runtimeRoot: finalizedOutputDir,
     });
     console.log(`[qa-local-server] Reusing current built QA server on ${healthUrl}`);
     printStatus(await resolveServerStatus());
@@ -135,6 +156,7 @@ async function startCommand() {
     host,
     port,
     buildFingerprint: currentBuild,
+    runtimeRoot: finalizedOutputDir,
   });
 
   console.log(`[qa-local-server] Started canonical built QA server on ${healthUrl}`);
@@ -175,11 +197,11 @@ async function stopCommand(options = {}) {
 }
 
 async function ensureBuildOutput() {
-  if (hasCompleteBuildOutput()) {
+  if (hasUsableBuildOutput()) {
     return;
   }
 
-  console.log("[qa-local-server] Build output is missing; running npm run build.");
+  console.log("[qa-local-server] Build output is missing or broken; running npm run build.");
   const result = spawnSync("npm", ["run", "build"], {
     cwd: rootDir,
     stdio: "inherit",
@@ -189,6 +211,13 @@ async function ensureBuildOutput() {
   if (result.status !== 0) {
     throw new Error(`npm run build failed with exit code ${result.status ?? "unknown"}.`);
   }
+
+  const integrity = readBuildIntegrity();
+  if (integrity.status !== "present") {
+    throw new Error(
+      `Build output is not usable after npm run build: ${integrity.error ?? integrity.status}.`,
+    );
+  }
 }
 
 async function resolveServerStatus() {
@@ -196,37 +225,42 @@ async function resolveServerStatus() {
   const pids = listeningPids();
   const serverPid = resolveServerPid(pids, state);
   const commandLine = serverPid ? processCommand(serverPid) : null;
-  const compatibleServer = serverPid ? isCompatibleServerCommand(commandLine) : false;
+  const currentRuntimeServer = serverPid ? isCompatibleServerCommand(commandLine) : false;
+  const legacyRuntimeServer = serverPid ? isLegacyWorkspaceRuntimeCommand(commandLine) : false;
+  const compatibleServer = currentRuntimeServer || legacyRuntimeServer;
   const healthy = serverPid ? await isHealthy() : false;
-  const buildFingerprint = readBuildFingerprint();
-  const buildStatus = buildFingerprint ? "present" : "missing";
+  const buildIntegrity = readBuildIntegrity();
+  const buildFingerprint = buildIntegrity.status === "present" ? readBuildFingerprint() : null;
+  const buildStatus = buildIntegrity.status;
   const processStartMs = serverPid ? processStartedAtMs(serverPid) : null;
   const processIsOlderThanBuild =
     Boolean(processStartMs && buildFingerprint) &&
     processStartMs < buildFingerprint.indexMtimeMs - staleBuildGraceMs;
-  const stateMatchesBuild =
-    Boolean(state?.buildFingerprint && buildFingerprint) &&
-    stableJson(state?.buildFingerprint) === stableJson(buildFingerprint);
   const serverStatus = !serverPid
     ? "stopped"
     : !compatibleServer
       ? "unmanaged"
-      : !healthy
-        ? "unhealthy"
-        : !buildFingerprint
-          ? "stale"
-          : stateMatchesBuild || !processIsOlderThanBuild
-            ? "current"
-            : "stale";
+      : !currentRuntimeServer
+        ? "stale"
+        : !healthy
+          ? "unhealthy"
+          : buildStatus !== "present" || !buildFingerprint
+            ? "stale"
+            : processIsOlderThanBuild
+              ? "stale"
+              : "current";
 
   return {
     state,
     pids,
     serverPid,
     commandLine,
+    currentRuntimeServer,
+    legacyRuntimeServer,
     compatibleServer,
     healthy,
     buildStatus,
+    buildIntegrity,
     buildFingerprint,
     processStartMs,
     serverStatus,
@@ -238,7 +272,7 @@ function resolveServerPid(pids, state) {
     return state.serverPid;
   }
 
-  return pids.find((pid) => isCompatibleServerCommand(processCommand(pid))) ?? pids[0] ?? null;
+  return pids.find((pid) => isManagedServerCommand(processCommand(pid))) ?? pids[0] ?? null;
 }
 
 async function waitForHealthyServer() {
@@ -347,10 +381,23 @@ function processStartedAtMs(pid) {
 function isCompatibleServerCommand(commandLine) {
   return Boolean(
     commandLine &&
+    (commandLine.includes("scripts/serve-local-qa-runtime.mjs") ||
+      commandLine.includes(serverEntry)) &&
+    commandLine.includes("--port 3000"),
+  );
+}
+
+function isLegacyWorkspaceRuntimeCommand(commandLine) {
+  return Boolean(
+    commandLine &&
     (commandLine.includes("logs/build-output-finalized/server/index.mjs") ||
       commandLine.includes(".output/server/index.mjs")) &&
     commandLine.includes("--port 3000"),
   );
+}
+
+function isManagedServerCommand(commandLine) {
+  return isCompatibleServerCommand(commandLine) || isLegacyWorkspaceRuntimeCommand(commandLine);
 }
 
 function readBuildFingerprint() {
@@ -375,6 +422,91 @@ function hasCompleteBuildOutput() {
   return requiredBuildArtifacts.every((artifactPath) => existsSync(artifactPath));
 }
 
+function hasUsableBuildOutput() {
+  return readBuildIntegrity().status === "present";
+}
+
+function readBuildIntegrity() {
+  const activeBuildLock = readActiveBuildOutputLock({ rootDir });
+
+  if (activeBuildLock) {
+    return {
+      status: "locked",
+      summary: null,
+      error: `Build output lifecycle is already running (owner pid ${activeBuildLock.ownerPid}, acquired at ${activeBuildLock.acquiredAt}).`,
+    };
+  }
+
+  if (!hasCompleteBuildOutput()) {
+    return {
+      status: "missing",
+      summary: null,
+      error: null,
+    };
+  }
+
+  try {
+    cleanupRecoverableGeneratedSiblingConflicts();
+
+    return {
+      status: "present",
+      summary: validateLocalBuildOutput({ rootDir }),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      status: "broken",
+      summary: null,
+      error: formatError(error),
+    };
+  }
+}
+
+function cleanupRecoverableGeneratedSiblingConflicts() {
+  for (const generatedRoot of recoverableGeneratedConflictRoots) {
+    cleanupGeneratedSiblingConflictsRecursively(generatedRoot);
+  }
+}
+
+function cleanupGeneratedSiblingConflictsRecursively(path) {
+  if (!existsSync(path)) {
+    return;
+  }
+
+  for (const entry of readdirSync(path)) {
+    const entryPath = resolve(path, entry);
+
+    if (isGeneratedSiblingConflictName(entry)) {
+      rmSync(entryPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 8,
+        retryDelay: 125,
+      });
+      continue;
+    }
+
+    const stats = lstatSync(entryPath);
+    if (stats.isDirectory() && !stats.isSymbolicLink()) {
+      cleanupGeneratedSiblingConflictsRecursively(entryPath);
+    }
+  }
+}
+
+function isGeneratedSiblingConflictName(entryName) {
+  return / \d+(?:\.[^/.]+)?$/.test(entryName);
+}
+
+function ensureBuildOutputLifecycleIsIdle() {
+  const activeBuildLock = readActiveBuildOutputLock({ rootDir });
+
+  if (activeBuildLock) {
+    throw new Error(
+      `Build output lifecycle is already running (owner pid ${activeBuildLock.ownerPid}, acquired at ${activeBuildLock.acquiredAt}). Wait for it to finish before starting the QA server.`,
+    );
+  }
+}
+
 function readState() {
   try {
     if (!existsSync(statePath)) {
@@ -395,6 +527,7 @@ function readState() {
         parsed.buildFingerprint && typeof parsed.buildFingerprint === "object"
           ? parsed.buildFingerprint
           : null,
+      runtimeRoot: typeof parsed.runtimeRoot === "string" ? parsed.runtimeRoot : null,
     };
   } catch {
     return null;
@@ -450,8 +583,13 @@ function printStatus(status) {
     `compatible: ${status.compatibleServer}`,
     `healthy: ${status.healthy}`,
     `build: ${status.buildStatus}`,
+    `runtime: ${finalizedOutputDir}`,
     `log: ${logPath}`,
   ];
+
+  if (status.buildIntegrity?.error) {
+    lines.push(`buildError: ${status.buildIntegrity.error}`);
+  }
 
   if (status.commandLine) {
     lines.push(`command: ${status.commandLine}`);
@@ -470,12 +608,9 @@ Commands:
   stop     Stop only the managed/compatible built QA server
 
 Local state:
+  runtime: ${finalizedOutputDir}
   ${statePath}
   ${logPath}`);
-}
-
-function stableJson(value) {
-  return JSON.stringify(value);
 }
 
 function delay(ms) {

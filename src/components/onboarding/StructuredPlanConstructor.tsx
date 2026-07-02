@@ -22,7 +22,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { RecentFiveKBenchmarkFields, TrainingPreferenceFields } from "./TrainingPreferenceFields";
+import { TrainingPreferenceFields } from "./TrainingPreferenceFields";
+import { QuickSetupPlanSetupSections } from "./QuickSetupPlanSetupSections";
+import { OptionButton, OptionGrid } from "./onboarding-choice-controls";
 import {
   GUIDANCE_PREFERENCE_OPTIONS,
   GOAL_DISTANCE_OPTIONS,
@@ -91,6 +93,14 @@ interface StructuredPlanConstructorProps {
   planPresetPanel?: ReactNode | ((actions: { openAdvancedCustom: () => void }) => ReactNode);
   onUseAdvancedSetup?: () => void;
   onUseQuickSetup?: () => void;
+  quickSetupSections?: {
+    includeBaseline?: boolean;
+    includeRunningLevel?: boolean;
+    includeTrainingSetup?: boolean;
+    includeScheduleRhythm?: boolean;
+    firstSectionNumber?: number;
+    firstSectionHasDivider?: boolean;
+  };
 }
 
 export function StructuredPlanConstructor({
@@ -109,6 +119,7 @@ export function StructuredPlanConstructor({
   planPresetPanel,
   onUseAdvancedSetup,
   onUseQuickSetup,
+  quickSetupSections,
 }: StructuredPlanConstructorProps) {
   const isAdvancedMode = mode === "advanced";
   const showsTargetFields = state.goalStyle === "target_time";
@@ -128,7 +139,7 @@ export function StructuredPlanConstructor({
     <form
       ref={formRef}
       noValidate
-      className="mt-6 grid gap-6 pb-28"
+      className={cn("mt-6 grid pb-28", isAdvancedMode ? "gap-6" : "gap-8")}
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (!isConstructorReady || isBusy || isDraftReady) {
@@ -139,147 +150,134 @@ export function StructuredPlanConstructor({
       }}
     >
       <>
-        <ConstructorSection
-          eyebrow="01"
-          title="Basic setup"
-          body={
-            isAdvancedMode
-              ? "Start with the basics, then add the details you need below."
-              : "Start with the basics, then choose a guided plan to review."
-          }
-          divider={false}
-        >
-          <div className="hito-editable-value-chip-group">
-            <EditableValueChip
-              fieldKey="age"
-              label="Age"
-              value={state.age}
-              setValue={setState.setAge}
-              activeEditableKey={activeEditableKey}
-              setActiveEditableKey={setActiveEditableKey}
-              placeholder="34"
-              min={13}
-              max={100}
-              step={1}
-              inputMode="numeric"
-            />
-            <EditableValueChip
-              fieldKey="heightCm"
-              label="Height"
-              value={state.heightCm}
-              setValue={setState.setHeightCm}
-              activeEditableKey={activeEditableKey}
-              setActiveEditableKey={setActiveEditableKey}
-              placeholder="178"
-              min={120}
-              max={230}
-              step={1}
-              inputMode="numeric"
-            />
-            <EditableValueChip
-              fieldKey="weightKg"
-              label="Weight"
-              value={state.weightKg}
-              setValue={setState.setWeightKg}
-              activeEditableKey={activeEditableKey}
-              setActiveEditableKey={setActiveEditableKey}
-              placeholder="72"
-              min={30}
-              max={250}
-              step={0.5}
-              inputMode="decimal"
-              unit="kg"
-            />
-          </div>
-
-          <Field
-            label="Running level"
-            helper="Choose the closest current level. You can refine details after the plan exists."
+        {!isAdvancedMode ? (
+          <QuickSetupPlanSetupSections state={state} setState={setState} {...quickSetupSections} />
+        ) : (
+          <ConstructorSection
+            eyebrow="01"
+            title="Basic setup"
+            body="Start with the basics, then add the details you need below."
+            divider={false}
           >
-            <OptionGrid label="Running level">
-              {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
-                <OptionButton
-                  key={option.value}
-                  active={primaryFitnessLevel === option.value}
-                  icon={fitnessLevelIcon(option.value)}
-                  label={option.label}
-                  copy={option.copy}
-                  onClick={() => {
-                    setState.setFitnessLevel(option.value);
-                    setState.setRecent5kTime("");
-                    setState.setRecent5kPace("");
-                  }}
-                />
-              ))}
-            </OptionGrid>
-          </Field>
-
-          {!isAdvancedMode ? (
-            <Field
-              label="Fitness benchmark"
-              helper="Optional. A recent 5K lets Hito show backend-backed pace targets in selected-plan previews when supported."
-            >
-              <RecentFiveKBenchmarkFields
-                recent5kTime={state.recent5kTime}
-                onRecent5kTimeChange={setState.setRecent5kTime}
-                recent5kPace={state.recent5kPace}
-                onRecent5kPaceChange={setState.setRecent5kPace}
+            <div className="hito-editable-value-chip-group">
+              <EditableValueChip
+                fieldKey="age"
+                label="Age"
+                value={state.age}
+                setValue={setState.setAge}
+                activeEditableKey={activeEditableKey}
+                setActiveEditableKey={setActiveEditableKey}
+                placeholder="34"
+                min={13}
+                max={100}
+                step={1}
+                inputMode="numeric"
               />
+              <EditableValueChip
+                fieldKey="heightCm"
+                label="Height"
+                value={state.heightCm}
+                setValue={setState.setHeightCm}
+                activeEditableKey={activeEditableKey}
+                setActiveEditableKey={setActiveEditableKey}
+                placeholder="178"
+                min={120}
+                max={230}
+                step={1}
+                inputMode="numeric"
+              />
+              <EditableValueChip
+                fieldKey="weightKg"
+                label="Weight"
+                value={state.weightKg}
+                setValue={setState.setWeightKg}
+                activeEditableKey={activeEditableKey}
+                setActiveEditableKey={setActiveEditableKey}
+                placeholder="72"
+                min={30}
+                max={250}
+                step={0.5}
+                inputMode="decimal"
+                unit="kg"
+              />
+            </div>
+
+            <Field
+              label="Running level"
+              helper="Choose the closest current level. You can refine details after the plan exists."
+            >
+              <OptionGrid label="Running level">
+                {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
+                  <OptionButton
+                    key={option.value}
+                    active={primaryFitnessLevel === option.value}
+                    icon={fitnessLevelIcon(option.value)}
+                    label={option.label}
+                    copy={option.copy}
+                    onClick={() => {
+                      setState.setFitnessLevel(option.value);
+                      setState.setRecent5kTime("");
+                      setState.setRecent5kPace("");
+                    }}
+                  />
+                ))}
+              </OptionGrid>
             </Field>
-          ) : null}
 
-          <Field
-            label="Available running days per week"
-            helper="Optional. Add this now if you want a more tailored starting point."
-          >
-            <OptionGrid label="Available running days per week">
-              {PRESET_RUNNING_DAY_OPTIONS.map((option) => (
-                <OptionButton
-                  key={option.value}
-                  active={state.maxRunningDaysPerWeek === option.value}
-                  label={option.label}
-                  copy={option.copy}
-                  onClick={() => setState.setMaxRunningDaysPerWeek(option.value)}
-                />
-              ))}
-            </OptionGrid>
-          </Field>
+            <Field
+              label="Available running days per week"
+              helper="Optional. Add this now if you want a more tailored starting point."
+            >
+              <OptionGrid label="Available running days per week">
+                {PRESET_RUNNING_DAY_OPTIONS.map((option) => (
+                  <OptionButton
+                    key={option.value}
+                    active={state.maxRunningDaysPerWeek === option.value}
+                    label={option.label}
+                    copy={option.copy}
+                    onClick={() => setState.setMaxRunningDaysPerWeek(option.value)}
+                  />
+                ))}
+              </OptionGrid>
+            </Field>
 
-          <HitoEditableDateChip
-            label="Plan Start Date"
-            value={state.startDate}
-            onChange={setState.setStartDate}
-            helper="Optional. Leave this open to use Hito's default start date."
-          />
-          <input type="hidden" name="schedule.startDate" value={state.startDate} />
+            <HitoEditableDateChip
+              label="Plan Start Date"
+              value={state.startDate}
+              onChange={setState.setStartDate}
+              helper="Optional. Leave this open to use Hito's default start date."
+            />
+            <input type="hidden" name="schedule.startDate" value={state.startDate} />
 
-          <div className="hito-row-group">
-            <div className="hito-list-row items-start">
-              <div className="grid gap-4">
-                <div>
-                  <p className="hito-label">Schedule rhythm</p>
-                  <p className="hito-list-row-copy">
-                    Optional. Add schedule preferences now, or choose a plan first and refine later.
-                  </p>
+            <div className="hito-row-group">
+              <div className="hito-list-row items-start">
+                <div className="grid gap-4">
+                  <div>
+                    <p className="hito-label">Schedule rhythm</p>
+                    <p className="hito-list-row-copy">
+                      Optional. Add schedule preferences now, or choose a plan first and refine
+                      later.
+                    </p>
+                  </div>
+                  <TrainingPreferenceFields
+                    fixedRestDays={state.fixedRestDays}
+                    onFixedRestDaysChange={setState.setFixedRestDays}
+                    restDaysAnswered={state.restDaysAnswered}
+                    onRestDaysAnsweredChange={setState.setRestDaysAnswered}
+                    maxRunningDaysPerWeek={state.maxRunningDaysPerWeek}
+                    onMaxRunningDaysPerWeekChange={setState.setMaxRunningDaysPerWeek}
+                    preferredLongRunDay={state.preferredLongRunDay}
+                    onPreferredLongRunDayChange={setState.setPreferredLongRunDay}
+                    preferredLongRunMode="default-sunday"
+                    showRunningDays={false}
+                    fixedRestDaysHelper="Optional. Protect days you want to keep free."
+                    preferredLongRunHelper="Optional. Leave this open if you do not have a preferred day."
+                  />
                 </div>
-                <TrainingPreferenceFields
-                  fixedRestDays={state.fixedRestDays}
-                  onFixedRestDaysChange={setState.setFixedRestDays}
-                  restDaysAnswered={state.restDaysAnswered}
-                  onRestDaysAnsweredChange={setState.setRestDaysAnswered}
-                  maxRunningDaysPerWeek={state.maxRunningDaysPerWeek}
-                  onMaxRunningDaysPerWeekChange={setState.setMaxRunningDaysPerWeek}
-                  preferredLongRunDay={state.preferredLongRunDay}
-                  onPreferredLongRunDayChange={setState.setPreferredLongRunDay}
-                  preferredLongRunMode="default-sunday"
-                  showRunningDays={false}
-                  fixedRestDaysHelper="Optional. Protect days you want to keep free."
-                  preferredLongRunHelper="Optional. Leave this open if you do not have a preferred day."
-                />
               </div>
             </div>
-          </div>
-        </ConstructorSection>
+          </ConstructorSection>
+        )}
 
         {!isAdvancedMode
           ? typeof planPresetPanel === "function"
@@ -304,7 +302,7 @@ export function StructuredPlanConstructor({
                     disabled={isBusy}
                     onClick={onUseQuickSetup}
                   >
-                    Back to Quick setup
+                    Back to simple setup
                   </button>
                 ) : null}
               </div>
@@ -313,7 +311,7 @@ export function StructuredPlanConstructor({
             <ConstructorSection
               eyebrow="A1"
               title="Schedule constraints"
-              body="Add schedule details when Quick setup is not the right fit."
+              body="Add schedule details when the simple setup is not the right fit."
             >
               <TrainingPreferenceFields
                 fixedRestDays={state.fixedRestDays}
@@ -798,51 +796,6 @@ const PRESET_RUNNING_DAY_OPTIONS: { value: string; label: string; copy: string }
   { value: "4", label: "4 days", copy: "Balanced rhythm" },
   { value: "5", label: "5 days", copy: "More durable base" },
 ];
-
-export function OptionGrid({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <div className="hito-onboarding-option-grid" role="radiogroup" aria-label={label}>
-      {children}
-    </div>
-  );
-}
-
-export function OptionButton({
-  active,
-  icon,
-  label,
-  copy,
-  onClick,
-}: {
-  active: boolean;
-  icon?: HitoIconName;
-  label: string;
-  copy?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={active}
-      onClick={onClick}
-      className={cn(
-        "hito-button hito-button-sm hito-onboarding-option-button",
-        active ? "hito-button-primary" : "hito-button-secondary",
-      )}
-    >
-      {icon ? (
-        <span className="hito-onboarding-option-icon" aria-hidden="true">
-          <Icon name={icon} size="sm" />
-        </span>
-      ) : null}
-      <span className="min-w-0">
-        <span className="hito-onboarding-option-title block">{label}</span>
-        {copy ? <span className="hito-onboarding-option-copy mt-1 block">{copy}</span> : null}
-      </span>
-    </button>
-  );
-}
 
 function fitnessLevelIcon(value: RunnerFitnessLevel): HitoIconName {
   switch (value) {

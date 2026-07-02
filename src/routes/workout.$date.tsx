@@ -19,14 +19,18 @@ import {
   displayStepTargetReadbackEntries,
   displayTargetSupportEntries,
   displayWorkoutStructureEntries,
+  formatPlannedWorkoutBlockSummary,
   formatDistanceKm,
   formatDate,
   formatDurationMin,
   primaryWorkoutTarget,
+  repeatChildSteps,
+  repeatCountForStep,
   WEEK_STATUS_META,
   type TrainingSnapshot,
   type Workout,
   weekOf,
+  workoutPlannedLanguage,
   workoutTypeMeta,
   workoutDistanceKm,
   workoutDuration,
@@ -34,6 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
 import { getWorkoutRouteData } from "@/lib/training-api";
+import type { PlannedWorkoutLanguageBlock } from "@/lib/planned-workout-language";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 
 export const Route = createFileRoute("/workout/$date")({
@@ -124,7 +129,7 @@ function WorkoutPage() {
     : displayWorkoutStructureEntries(workout).slice(0, 2);
   const targetSupportEntries = displayTargetSupportEntries(primaryTarget);
   const executionSummary = workoutExecutionSummary(workout);
-  const identityRows = workoutIdentityRows(workout, meta.label);
+  const identityRows = workoutIdentityRows(workout);
   const goalRows = workoutGoalRows(workout);
   const metricRows = workoutMetricRows(workout);
   const phase = `${workout.phase} · week ${workout.week}`;
@@ -272,7 +277,7 @@ function WorkoutPage() {
               )}
 
               {!isRestDay && (
-                <SidebarSection title="Workout identity">
+                <SidebarSection title="Workout type">
                   <div className="space-y-3">
                     {identityRows.map((row) => (
                       <ReadbackRow key={row.label} label={row.label} value={row.value} />
@@ -878,15 +883,14 @@ function loadFor(workout: Workout) {
   return Math.min(95, Math.round(duration * (multiplier[workout.type] ?? 1) * 0.6)).toString();
 }
 
-function workoutIdentityRows(
-  workout: Workout,
-  familyLabel: string,
-): Array<{ label: string; value: string }> {
+function workoutIdentityRows(workout: Workout): Array<{ label: string; value: string }> {
+  const language = workoutPlannedLanguage(workout);
+  const blockSummary = formatPlannedWorkoutBlockSummary(language.runnerFacingBlocks);
+
   return [
-    { label: "Family", value: familyLabel },
-    { label: "Identity", value: humanizeSnakeCase(workout.workoutIdentity) },
-    { label: "Calendar icon", value: humanizeSnakeCase(workout.calendarIconKey) },
-  ];
+    { label: "Type", value: language.runnerFacingWorkoutTypeLabel },
+    blockSummary ? { label: "Blocks", value: blockSummary } : null,
+  ].filter((row): row is { label: string; value: string } => row != null);
 }
 
 function workoutGoalRows(workout: Workout): Array<{ label: string; value: string }> {
@@ -966,8 +970,15 @@ type SegmentInstructionReadback = {
 };
 
 function segmentInstructionReadbacks(workout: Workout): SegmentInstructionReadback[] {
+  const languageBlocks = workoutPlannedLanguage(workout).runnerFacingBlocks;
   const readbacks = workout.steps.flatMap((step, stepIndex) =>
-    segmentInstructionReadbacksForStep(step, workout.metricMode, `${stepIndex}`, stepIndex + 1),
+    segmentInstructionReadbacksForStep(
+      step,
+      workout.metricMode,
+      `${stepIndex}`,
+      stepIndex + 1,
+      languageBlocks[stepIndex],
+    ),
   );
 
   return readbacks.map((readback, index) => ({ ...readback, index: index + 1 }));
@@ -978,25 +989,41 @@ function segmentInstructionReadbacksForStep(
   metricMode: Workout["metricMode"],
   key: string,
   displayIndex: number,
+  languageBlock?: PlannedWorkoutLanguageBlock,
 ): SegmentInstructionReadback[] {
-  if (step.repeats && step.work) {
-    const parent = buildSegmentInstructionReadback(step, metricMode, key, displayIndex);
-    const children = [
-      buildSegmentInstructionReadback(step.work, metricMode, `${key}-work`, displayIndex),
-      step.recovery
-        ? buildSegmentInstructionReadback(
-            step.recovery,
-            metricMode,
-            `${key}-recovery`,
-            displayIndex,
-          )
-        : null,
-    ].filter((item): item is SegmentInstructionReadback => item != null);
+  const repeatCount = repeatCountForStep(step);
+  const repeatChildren = repeatChildSteps(step);
+
+  if (repeatCount && repeatChildren.length > 0) {
+    const parent = buildSegmentInstructionReadback(
+      step,
+      metricMode,
+      key,
+      displayIndex,
+      languageBlock,
+    );
+    const children = repeatChildren
+      .map((child, index) =>
+        buildSegmentInstructionReadback(
+          child,
+          metricMode,
+          `${key}-child-${index + 1}`,
+          displayIndex,
+          repeatChildLanguage(languageBlock, index),
+        ),
+      )
+      .filter((item): item is SegmentInstructionReadback => item != null);
 
     return [parent, ...children].filter((item): item is SegmentInstructionReadback => item != null);
   }
 
-  const readback = buildSegmentInstructionReadback(step, metricMode, key, displayIndex);
+  const readback = buildSegmentInstructionReadback(
+    step,
+    metricMode,
+    key,
+    displayIndex,
+    languageBlock,
+  );
 
   return readback ? [readback] : [];
 }
@@ -1006,6 +1033,7 @@ function buildSegmentInstructionReadback(
   metricMode: Workout["metricMode"],
   key: string,
   displayIndex: number,
+  languageBlock?: PlannedWorkoutLanguageBlock | null,
 ): SegmentInstructionReadback | null {
   const entries = dedupeReadbackEntries(
     [
@@ -1030,9 +1058,20 @@ function buildSegmentInstructionReadback(
   return {
     key,
     index: displayIndex,
-    label: step.label?.trim() || humanizeSnakeCase(step.segment_type || step.type || "Segment"),
+    label:
+      languageBlock?.label ||
+      step.label?.trim() ||
+      humanizeSnakeCase(step.segment_type || step.type || "Segment"),
     entries,
   };
+}
+
+function repeatChildLanguage(block: PlannedWorkoutLanguageBlock | undefined, index: number) {
+  if (!block?.children.length) {
+    return null;
+  }
+
+  return block.children[index] ?? null;
 }
 
 function dedupeReadbackEntries(entries: Array<{ label: string; value: string }>) {

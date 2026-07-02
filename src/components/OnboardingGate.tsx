@@ -1,20 +1,13 @@
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { EditableValueChip } from "@/components/ui/editable-value-chip";
-import { type HitoIconName } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
+import { Icon } from "@/components/ui/icon";
 import { PlanPresetPanel } from "@/components/onboarding/PlanPresetPanel";
+import { QuickSetupPlanSetupSections } from "@/components/onboarding/QuickSetupPlanSetupSections";
+import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPlanConstructor";
 import {
-  OptionButton,
-  OptionGrid,
-  StructuredPlanConstructor,
-} from "@/components/onboarding/StructuredPlanConstructor";
-import {
-  buildStructuredInput,
   isPresetPrimarySetupReady,
-  isStructuredConstructorReady,
   normalizePresetPrimaryFitnessLevel,
-  PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS,
   resolveTerrainFocus,
   type GoalDistance,
   type GoalStyle,
@@ -25,31 +18,23 @@ import {
 } from "@/components/onboarding/onboarding-form-model";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type { UserSettingsSummary } from "@/lib/user-settings-actions";
-import type { StructuredFirstPlanDraftResult } from "@/lib/first-plan-actions";
-import {
-  confirmStructuredFirstPlanDraft,
-  generateStructuredFirstPlanDraft,
-} from "@/lib/first-plan-actions";
 import type { RunningPlanConfirmActionResult } from "@/lib/running-plan-engine-actions";
 import { confirmRunningPlanDraft } from "@/lib/running-plan-engine-actions";
 import { createEmptyManualActivePlan } from "@/lib/manual-workout-authoring";
 import type { ManualEmptyPlanSetupInput } from "@/lib/manual-workout-authoring/schema";
-import { buildRunningPlanConfirmInput } from "@/components/onboarding/selected-running-plan-flow-utils";
+import {
+  buildRunningPlanConfirmInput,
+  resolveSelectedPlanGoalPreviewGate,
+} from "@/components/onboarding/selected-running-plan-flow-utils";
 import { useSelectedPlanPresetPreviewController } from "@/components/onboarding/use-selected-plan-preset-preview-controller";
 
-type ConstructorStatus = "idle" | "reviewing" | "creating" | "finishing";
 type ManualCreateStatus = "idle" | "creating";
-type SetupMode = "manual" | "quick";
-type ManualProfileEditableKey = "age" | "heightCm" | "weightKg";
 
 const STRUCTURED_REVIEW_TOAST_ID = "onboarding-structured-review";
-const STRUCTURED_REVIEW_TIMEOUT_MS = 300_000;
 const MANUAL_CREATE_TOAST_ID = "manual-empty-plan-create";
 
 export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSummary | null }) {
   const createEmptyManualActivePlanFn = useServerFn(createEmptyManualActivePlan);
-  const generateStructuredFirstPlanDraftFn = useServerFn(generateStructuredFirstPlanDraft);
-  const confirmStructuredFirstPlanDraftFn = useServerFn(confirmStructuredFirstPlanDraft);
   const confirmRunningPlanDraftFn = useServerFn(confirmRunningPlanDraft);
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
   const runningPlanCreateInFlightRef = useRef(false);
@@ -82,26 +67,26 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [targetTime, setTargetTime] = useState("");
   const [startDate, setStartDate] = useState("");
   const [targetDate, setTargetDate] = useState("");
+  const [planGoalChoice, setPlanGoalChoice] =
+    useState<StructuredConstructorState["planGoalChoice"]>("");
+  const [planGoalCustomDistanceKm, setPlanGoalCustomDistanceKm] = useState("");
+  const [planGoalCustomDistanceLabel, setPlanGoalCustomDistanceLabel] = useState("");
+  const [planGoalFinishTime, setPlanGoalFinishTime] = useState("");
+  const [planGoalTargetDate, setPlanGoalTargetDate] = useState("");
   const [terrainFocus, setTerrainFocus] = useState<TerrainFocus>("standard");
   const watchAccess: StructuredConstructorState["watchAccess"] = "watch_or_app";
   const [guidancePreference, setGuidancePreference] =
     useState<StructuredConstructorState["guidancePreference"]>("effort");
   const [strengthPreference, setStrengthPreference] = useState<StrengthPreference>("none");
   const [comment, setComment] = useState("");
-  const [constructorStatus, setConstructorStatus] = useState<ConstructorStatus>("idle");
   const [manualCreateStatus, setManualCreateStatus] = useState<ManualCreateStatus>("idle");
   const [manualCreateError, setManualCreateError] = useState<string | null>(null);
-  const [structuredDraftResult, setStructuredDraftResult] =
-    useState<StructuredFirstPlanDraftResult | null>(null);
-  const [constructorError, setConstructorError] = useState<string | null>(null);
   const [runningPlanConfirmResult, setRunningPlanConfirmResult] =
     useState<RunningPlanConfirmActionResult | null>(null);
   const [runningPlanCreateStatus, setRunningPlanCreateStatus] = useState<"idle" | "creating">(
     "idle",
   );
-  const [setupMode, setSetupMode] = useState<SetupMode>("manual");
-  const [activeManualEditableKey, setActiveManualEditableKey] =
-    useState<ManualProfileEditableKey | null>(null);
+  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
 
   const constructorState: StructuredConstructorState = useMemo(
     () => ({
@@ -120,6 +105,11 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       targetTime,
       startDate,
       targetDate,
+      planGoalChoice,
+      planGoalCustomDistanceKm,
+      planGoalCustomDistanceLabel,
+      planGoalFinishTime,
+      planGoalTargetDate,
       terrainFocus,
       watchAccess,
       guidancePreference,
@@ -136,6 +126,11 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       guidancePreference,
       heightCm,
       maxRunningDaysPerWeek,
+      planGoalCustomDistanceKm,
+      planGoalCustomDistanceLabel,
+      planGoalFinishTime,
+      planGoalChoice,
+      planGoalTargetDate,
       preferredLongRunDay,
       recent5kPace,
       recent5kTime,
@@ -156,13 +151,11 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }),
     [constructorState, goalDistance, terrainFocus],
   );
-  const isConstructorReady = isStructuredConstructorReady(constructorState);
   const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
-  const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(fitnessLevel);
   const isManualSetupReady = isManualProfileReady(constructorState);
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: effectiveConstructorState,
-    autoLoadEnabled: setupMode === "quick",
+    autoLoadEnabled: advancedSettingsOpen,
     isPresetDiscoveryReady,
     toastId: STRUCTURED_REVIEW_TOAST_ID,
     previewReadyDescription: "Review the backend-shaped calendar before creating the plan.",
@@ -172,7 +165,85 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   });
   const isPresetBusy = selectedPlanPreview.isBusy || runningPlanCreateStatus !== "idle";
   const isManualCreateBusy = manualCreateStatus !== "idle";
-  const isBusy = constructorStatus !== "idle" || isPresetBusy || isManualCreateBusy;
+  const isBusy = isPresetBusy || isManualCreateBusy;
+  const selectedGoalId = planGoalChoice || null;
+  const selectedPlanGoalPreviewGate = resolveSelectedPlanGoalPreviewGate(
+    {
+      planGoalChoice,
+      planGoalCustomDistanceKm,
+      planGoalCustomDistanceLabel,
+      planGoalFinishTime,
+      planGoalTargetDate,
+    },
+    selectedGoalId,
+  );
+  const selectedPreviewMatchesGoal = selectedPlanPreview.selectedGoalId === selectedGoalId;
+  const selectedPreviewIsReady =
+    selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
+  const generatedCreateDisabled =
+    isBusy ||
+    !isPresetDiscoveryReady ||
+    !selectedGoalId ||
+    !selectedPlanGoalPreviewGate.ok ||
+    (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
+  const footerButtonDisabled = advancedSettingsOpen
+    ? generatedCreateDisabled
+    : isBusy || !isManualSetupReady;
+  const footerHint = advancedSettingsOpen
+    ? generatedCreateFooterHint({
+        error: selectedPlanPreview.error,
+        isPresetDiscoveryReady,
+        planGoalChoice,
+        previewGate: selectedPlanGoalPreviewGate,
+        previewIsOpen: selectedPlanPreview.previewOpen,
+        previewIsReady: selectedPreviewIsReady,
+        status: selectedPlanPreview.status,
+      })
+    : manualCreateFooterHint({
+        error: manualCreateError,
+        isManualSetupReady,
+        status: manualCreateStatus,
+      });
+
+  const changePlanGoalChoice = (value: StructuredConstructorState["planGoalChoice"]) => {
+    setPlanGoalChoice(value);
+
+    if (value !== "custom") {
+      setPlanGoalCustomDistanceKm("");
+      setPlanGoalCustomDistanceLabel("");
+    }
+
+    selectedPlanPreview.clearSelectedPreview();
+  };
+
+  const toggleAdvancedSettings = () => {
+    const nextOpen = !advancedSettingsOpen;
+
+    if (!nextOpen) {
+      selectedPlanPreview.setPreviewOpen(false);
+      hitoToast.dismiss(STRUCTURED_REVIEW_TOAST_ID);
+    }
+
+    setAdvancedSettingsOpen(nextOpen);
+  };
+
+  const handleCreatePlanClick = () => {
+    if (!advancedSettingsOpen) {
+      void createManualPlan();
+      return;
+    }
+
+    if (!selectedGoalId) {
+      return;
+    }
+
+    if (selectedPreviewIsReady) {
+      selectedPlanPreview.setPreviewOpen(true);
+      return;
+    }
+
+    selectedPlanPreview.selectPlanPreview(selectedGoalId);
+  };
 
   const openSavedHome = () => {
     window.location.assign("/");
@@ -181,72 +252,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   useEffect(() => {
     setManualCreateError(null);
   }, [age, fitnessLevel, heightCm, weightKg]);
-
-  const clearStructuredReview = () => {
-    setStructuredDraftResult(null);
-    setConstructorError(null);
-    hitoToast.dismiss(STRUCTURED_REVIEW_TOAST_ID);
-  };
-
-  const submitStructuredReview = async () => {
-    setConstructorError(null);
-    setStructuredDraftResult(null);
-
-    try {
-      const inputResult = buildStructuredInput(effectiveConstructorState);
-
-      if (!inputResult.ok) {
-        setConstructorError(inputResult.error);
-        return;
-      }
-
-      setConstructorStatus("reviewing");
-      hitoToast.working({
-        id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Reviewing plan",
-        description: "Hito is preparing your full plan review before anything is created.",
-      });
-
-      const result = await withStructuredReviewTimeout(() =>
-        generateStructuredFirstPlanDraftFn({
-          data: inputResult.input,
-        }),
-      );
-
-      setStructuredDraftResult(result);
-      setConstructorStatus("idle");
-
-      if (!result.ok || result.status === "correction_required") {
-        const message = structuredDraftResultMessage(result);
-        setConstructorError(message);
-        window.requestAnimationFrame(() =>
-          structuredFormRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }),
-        );
-        hitoToast.error({
-          id: STRUCTURED_REVIEW_TOAST_ID,
-          title: result.ok ? "Setup needs correction" : "Review failed",
-          description: message,
-        });
-        return;
-      }
-
-      hitoToast.success({
-        id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Plan ready",
-        description: "Review your full plan before confirming.",
-      });
-    } catch (submitError) {
-      const message =
-        submitError instanceof Error ? submitError.message : "Could not review the setup.";
-      setConstructorStatus("idle");
-      setConstructorError(message);
-      hitoToast.error({
-        id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Review failed",
-        description: message,
-      });
-    }
-  };
 
   const confirmSelectedRunningPlan = async () => {
     if (runningPlanCreateInFlightRef.current) {
@@ -393,204 +398,20 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }
   };
 
-  const confirmStructuredPlan = async () => {
-    if (!structuredDraftResult?.ok || structuredDraftResult.status !== "draft_ready") {
-      setConstructorError("Generate a ready review before creating the plan.");
-      return;
-    }
-
-    setConstructorStatus("creating");
-    setConstructorError(null);
-    hitoToast.working({
-      id: STRUCTURED_REVIEW_TOAST_ID,
-      title: "Creating plan",
-      description: "Hito is creating the active plan from the reviewed plan.",
-    });
-
-    try {
-      const result = await confirmStructuredFirstPlanDraftFn({
-        data: {
-          draft: structuredDraftResult.draft,
-        },
-      });
-
-      if (!result.ok) {
-        setConstructorStatus("idle");
-        setConstructorError(resultFailureMessage(result));
-        hitoToast.error({
-          id: STRUCTURED_REVIEW_TOAST_ID,
-          title: "Plan not created",
-          description: resultFailureMessage(result),
-        });
-        return;
-      }
-
-      setConstructorStatus("finishing");
-      hitoToast.success({
-        id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Plan created",
-        description: "Opening your saved plan now.",
-        duration: 2600,
-      });
-      openSavedHome();
-    } catch (submitError) {
-      setConstructorStatus("idle");
-      const message =
-        submitError instanceof Error ? submitError.message : "Could not create the plan.";
-      setConstructorError(message);
-      hitoToast.error({
-        id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Plan not created",
-        description: message,
-      });
-    }
-  };
-
   return (
-    <section className="hito-surface hito-onboarding-surface" data-mode={setupMode}>
+    <section className="hito-onboarding-surface">
       <div className="max-w-3xl">
         <p className="hito-micro-label" data-tone="signal">
           Create a plan
         </p>
         <h1 className="hito-page-title mt-3">Choose how to start your plan.</h1>
         <p className="hito-body mt-4 text-muted-foreground">
-          Start from an empty manual calendar, or choose a guided plan to review.
+          Add the basics once, then open an empty calendar or expand generated-plan settings.
         </p>
       </div>
 
-      <div className="mt-7">
-        <div className="hito-tabs hito-tabs-simple" role="tablist" aria-label="Setup mode">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={setupMode === "manual"}
-            className="hito-tab"
-            data-active={setupMode === "manual"}
-            disabled={isBusy}
-            onClick={() => setSetupMode("manual")}
-          >
-            Manual setup
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={setupMode === "quick"}
-            className="hito-tab"
-            data-active={setupMode === "quick"}
-            disabled={isBusy}
-            onClick={() => setSetupMode("quick")}
-          >
-            Quick setup
-          </button>
-        </div>
-      </div>
-
-      {setupMode === "manual" ? (
-        <div className="mt-6 grid gap-6">
-          <section className="hito-form-section-grid">
-            <div>
-              <p className="hito-micro-label">01</p>
-              <h2 className="hito-panel-title mt-2">Manual setup</h2>
-              <p className="hito-helper mt-2">
-                Add the basics, then open your saved empty calendar.
-              </p>
-            </div>
-            <div className="grid gap-4">
-              <div className="hito-editable-value-chip-group">
-                <EditableValueChip
-                  fieldKey="age"
-                  label="Age"
-                  value={age}
-                  setValue={setAge}
-                  activeEditableKey={activeManualEditableKey}
-                  setActiveEditableKey={setActiveManualEditableKey}
-                  placeholder="34"
-                  min={13}
-                  max={100}
-                  step={1}
-                  inputMode="numeric"
-                />
-                <EditableValueChip
-                  fieldKey="heightCm"
-                  label="Height"
-                  value={heightCm}
-                  setValue={setHeightCm}
-                  activeEditableKey={activeManualEditableKey}
-                  setActiveEditableKey={setActiveManualEditableKey}
-                  placeholder="178"
-                  min={120}
-                  max={230}
-                  step={1}
-                  inputMode="numeric"
-                />
-                <EditableValueChip
-                  fieldKey="weightKg"
-                  label="Weight"
-                  value={weightKg}
-                  setValue={setWeightKg}
-                  activeEditableKey={activeManualEditableKey}
-                  setActiveEditableKey={setActiveManualEditableKey}
-                  placeholder="72"
-                  min={30}
-                  max={250}
-                  step={0.5}
-                  inputMode="decimal"
-                  unit="kg"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <span className="hito-form-label">Running level</span>
-                <OptionGrid label="Running level">
-                  {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
-                    <OptionButton
-                      key={option.value}
-                      active={primaryFitnessLevel === option.value}
-                      icon={manualFitnessLevelIcon(option.value)}
-                      label={option.label}
-                      copy={option.copy}
-                      onClick={() => {
-                        setFitnessLevel(option.value);
-                        setRecent5kTime("");
-                        setRecent5kPace("");
-                      }}
-                    />
-                  ))}
-                </OptionGrid>
-                <span className="hito-field-helper">
-                  Hito creates the calendar now. You can add reviewed activities from the saved
-                  plan.
-                </span>
-              </div>
-
-              <div className="hito-section-divider flex flex-col gap-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  {manualCreateError ? (
-                    <p className="hito-field-error">{manualCreateError}</p>
-                  ) : (
-                    <p className="hito-field-helper">
-                      Creates an empty manual plan with no fake workouts or generated rows.
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="hito-button hito-button-primary hito-button-lg shrink-0"
-                  disabled={isBusy || !isManualSetupReady}
-                  onClick={() => void createManualPlan()}
-                >
-                  {manualCreateStatus === "creating" ? "Creating plan..." : "Create your plan"}
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {setupMode === "quick" ? (
-        <StructuredPlanConstructor
-          mode="quick"
-          formRef={structuredFormRef}
+      <div className="mt-8 grid gap-8 pb-40 md:pb-32">
+        <QuickSetupPlanSetupSections
           state={constructorState}
           setState={{
             setAge,
@@ -603,61 +424,229 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             setRestDaysAnswered,
             setMaxRunningDaysPerWeek,
             setPreferredLongRunDay,
-            setGoalDistance,
-            setGoalStyle,
-            setTargetTime,
             setStartDate,
-            setTargetDate,
-            setTerrainFocus,
-            setGuidancePreference,
-            setStrengthPreference,
-            setComment,
           }}
-          constructorStatus={constructorStatus}
-          draftResult={structuredDraftResult}
-          constructorError={constructorError}
-          isBusy={isBusy}
-          isConstructorReady={isConstructorReady}
-          onSubmit={() => {
-            void submitStructuredReview();
-          }}
-          onConfirmDraft={() => {
-            void confirmStructuredPlan();
-          }}
-          onBackToEdit={() => {
-            clearStructuredReview();
-          }}
-          planPresetPanel={
-            <PlanPresetPanel
-              cardsResult={selectedPlanPreview.cardsResult}
-              confirmResult={runningPlanConfirmResult}
-              previewResult={selectedPlanPreview.previewResult}
-              createStatus={runningPlanCreateStatus}
-              error={selectedPlanPreview.error}
-              status={selectedPlanPreview.status}
-              isBusy={isBusy}
-              isPresetDiscoveryReady={isPresetDiscoveryReady}
-              selectedCardId={selectedPlanPreview.selectedCardId}
-              previewOpen={selectedPlanPreview.previewOpen}
-              onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
-              onLoadCards={() => {
-                void selectedPlanPreview.loadCards();
-              }}
-              onSelectPlan={(cardId) => {
-                selectedPlanPreview.selectPlanPreview(cardId);
-              }}
-              onRefreshPreview={() => {
-                void selectedPlanPreview.refreshPreview();
-              }}
-              onCreatePlan={() => {
-                void confirmSelectedRunningPlan();
-              }}
-            />
-          }
+          includeTrainingSetup={false}
+          includeScheduleRhythm={false}
         />
-      ) : null}
+
+        <div className="flex justify-center">
+          <button
+            type="button"
+            className="hito-button hito-button-ghost hito-button-md"
+            aria-expanded={advancedSettingsOpen}
+            aria-controls="advanced-generated-plan-setup"
+            disabled={isBusy}
+            onClick={toggleAdvancedSettings}
+          >
+            <span>Advanced settings</span>
+            <Icon name={advancedSettingsOpen ? "chevron-up" : "chevron-down"} size="xs" />
+          </button>
+        </div>
+
+        {advancedSettingsOpen ? (
+          <div id="advanced-generated-plan-setup">
+            <StructuredPlanConstructor
+              mode="quick"
+              formRef={structuredFormRef}
+              state={constructorState}
+              setState={{
+                setAge,
+                setWeightKg,
+                setHeightCm,
+                setFitnessLevel,
+                setRecent5kTime,
+                setRecent5kPace,
+                setFixedRestDays,
+                setRestDaysAnswered,
+                setMaxRunningDaysPerWeek,
+                setPreferredLongRunDay,
+                setGoalDistance,
+                setGoalStyle,
+                setTargetTime,
+                setStartDate,
+                setTargetDate,
+                setTerrainFocus,
+                setGuidancePreference,
+                setStrengthPreference,
+                setComment,
+              }}
+              constructorStatus="idle"
+              draftResult={null}
+              constructorError={null}
+              isBusy={isBusy}
+              isConstructorReady={isPresetDiscoveryReady}
+              onSubmit={() => {
+                selectedPlanPreview.setError("Choose a goal before building a generated preview.");
+              }}
+              onConfirmDraft={() => undefined}
+              onBackToEdit={() => undefined}
+              quickSetupSections={{
+                includeBaseline: false,
+                includeRunningLevel: false,
+                includeTrainingSetup: true,
+                includeScheduleRhythm: true,
+                firstSectionNumber: 4,
+                firstSectionHasDivider: false,
+              }}
+              planPresetPanel={
+                <PlanPresetPanel
+                  cardsResult={selectedPlanPreview.cardsResult}
+                  confirmResult={runningPlanConfirmResult}
+                  previewResult={selectedPlanPreview.previewResult}
+                  createStatus={runningPlanCreateStatus}
+                  error={selectedPlanPreview.error}
+                  status={selectedPlanPreview.status}
+                  isBusy={isBusy}
+                  isPresetDiscoveryReady={isPresetDiscoveryReady}
+                  previewOpen={selectedPlanPreview.previewOpen}
+                  onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
+                  planGoalChoice={planGoalChoice}
+                  planGoalCustomDistanceKm={planGoalCustomDistanceKm}
+                  planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
+                  planGoalFinishTime={planGoalFinishTime}
+                  planGoalTargetDate={planGoalTargetDate}
+                  onPlanGoalChoiceChange={changePlanGoalChoice}
+                  onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
+                  onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
+                  onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
+                  onPlanGoalTargetDateChange={setPlanGoalTargetDate}
+                  onSelectPlan={(cardId) => {
+                    selectedPlanPreview.selectPlanPreview(cardId);
+                  }}
+                  onRefreshPreview={() => {
+                    void selectedPlanPreview.refreshPreview();
+                  }}
+                  onCreatePlan={() => {
+                    void confirmSelectedRunningPlan();
+                  }}
+                  showInlinePreviewAction={false}
+                />
+              }
+            />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="hito-onboarding-submit-footer">
+        <div className="hito-onboarding-submit-footer-inner">
+          <div className="min-w-0">
+            <p className={footerHint.tone === "error" ? "hito-field-error" : "hito-field-helper"}>
+              {footerHint.message}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="hito-button hito-button-primary hito-button-lg shrink-0"
+            disabled={footerButtonDisabled}
+            aria-busy={isBusy || undefined}
+            onClick={handleCreatePlanClick}
+          >
+            Create plan
+          </button>
+        </div>
+      </div>
     </section>
   );
+}
+
+function manualCreateFooterHint({
+  error,
+  isManualSetupReady,
+  status,
+}: {
+  error: string | null;
+  isManualSetupReady: boolean;
+  status: ManualCreateStatus;
+}): { message: string; tone: "error" | "neutral" } {
+  if (error) {
+    return { message: error, tone: "error" };
+  }
+
+  if (!isManualSetupReady) {
+    return {
+      message: "Add age, height, and weight to create a plan.",
+      tone: "neutral",
+    };
+  }
+
+  if (status === "creating") {
+    return {
+      message: "Creating an empty manual plan now.",
+      tone: "neutral",
+    };
+  }
+
+  return {
+    message: "Creates an empty manual plan. No fake workouts will be added.",
+    tone: "neutral",
+  };
+}
+
+function generatedCreateFooterHint({
+  error,
+  isPresetDiscoveryReady,
+  planGoalChoice,
+  previewGate,
+  previewIsOpen,
+  previewIsReady,
+  status,
+}: {
+  error: string | null;
+  isPresetDiscoveryReady: boolean;
+  planGoalChoice: StructuredConstructorState["planGoalChoice"];
+  previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
+  previewIsOpen: boolean;
+  previewIsReady: boolean;
+  status: ReturnType<typeof useSelectedPlanPresetPreviewController>["status"];
+}): { message: string; tone: "error" | "neutral" } {
+  if (error) {
+    return { message: error, tone: "error" };
+  }
+
+  if (!isPresetDiscoveryReady) {
+    return {
+      message: "Add age, height, and weight before creating a plan.",
+      tone: "neutral",
+    };
+  }
+
+  if (status === "previewing_plan") {
+    return {
+      message: "Building a reviewed preview before anything is saved.",
+      tone: "neutral",
+    };
+  }
+
+  if (previewIsOpen && previewIsReady) {
+    return {
+      message: "Review the preview, then confirm in the dialog.",
+      tone: "neutral",
+    };
+  }
+
+  if (previewIsReady) {
+    return {
+      message: "Review the generated preview, then confirm it.",
+      tone: "neutral",
+    };
+  }
+
+  if (!planGoalChoice) {
+    return {
+      message: "Choose a goal to build a reviewed preview.",
+      tone: "neutral",
+    };
+  }
+
+  if (!previewGate.ok) {
+    return { message: previewGate.error, tone: "neutral" };
+  }
+
+  return {
+    message: "Builds a reviewed generated-plan preview before anything is saved.",
+    tone: "neutral",
+  };
 }
 
 function isManualProfileReady(state: StructuredConstructorState) {
@@ -733,68 +722,4 @@ function requiredManualNumber(
   }
 
   return { ok: true, value: parsed };
-}
-
-function manualFitnessLevelIcon(value: RunnerFitnessLevel): HitoIconName {
-  switch (value) {
-    case "new_to_running":
-      return "sparkles";
-    case "beginner":
-      return "activity";
-    case "running_regularly":
-      return "check-circle";
-    case "performance_focused":
-      return "watch";
-    case "custom":
-      return "edit";
-  }
-}
-
-function withStructuredReviewTimeout<T>(run: () => Promise<T>) {
-  return new Promise<T>((resolve, reject) => {
-    const timeoutId = window.setTimeout(() => {
-      reject(
-        new Error(
-          "The review is taking longer than expected. No plan was created. Try Review plan again.",
-        ),
-      );
-    }, STRUCTURED_REVIEW_TIMEOUT_MS);
-
-    Promise.resolve()
-      .then(run)
-      .then(
-        (value) => {
-          window.clearTimeout(timeoutId);
-          resolve(value);
-        },
-        (error: unknown) => {
-          window.clearTimeout(timeoutId);
-          reject(error);
-        },
-      );
-  });
-}
-
-function resultFailureMessage(result: { status?: string; message?: string }) {
-  if (result.message) {
-    return result.message;
-  }
-
-  if (result.status === "blocked_by_history") {
-    return "This plan would conflict with saved history. Adjust the setup and try again.";
-  }
-
-  return "Could not apply that plan yet. Check the setup answers and try again.";
-}
-
-function structuredDraftResultMessage(result: StructuredFirstPlanDraftResult) {
-  if (!result.ok) {
-    return result.message;
-  }
-
-  if (result.status === "correction_required") {
-    return result.correction.message;
-  }
-
-  return "Review the plan before creating it.";
 }

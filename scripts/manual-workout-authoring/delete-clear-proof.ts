@@ -865,12 +865,12 @@ function assertRepeatWithRecovery(steps: Step[], label: string) {
 
   assert.ok(repeatStep, `${label} should include a repeat step.`);
   assert.ok(repeatStep.repeats && repeatStep.repeats >= 2);
-  assert.ok(repeatStep.work, `${label} repeat should include work.`);
-  assert.ok(repeatStep.recovery, `${label} repeat should include recovery.`);
-  assert.ok(hasExecutableStructure(repeatStep.work), `${label} repeat work should be numeric.`);
+  assert.equal(Object.hasOwn(repeatStep, "work"), false, `${label} must not persist work.`);
+  assert.equal(Object.hasOwn(repeatStep, "recovery"), false, `${label} must not persist recovery.`);
+  assert.ok(repeatStep.children?.length, `${label} repeat should include ordered children.`);
   assert.ok(
-    hasExecutableStructure(repeatStep.recovery),
-    `${label} repeat recovery should be numeric.`,
+    repeatStep.children.every((child) => hasExecutableStructure(child)),
+    `${label} repeat children should be numeric.`,
   );
 }
 
@@ -898,19 +898,15 @@ function hasExecutableStructure(step: Step) {
     return true;
   }
 
-  if (step.repeats && step.work && step.recovery) {
-    return hasExecutableStructure(step.work) && hasExecutableStructure(step.recovery);
+  if (step.repeats && step.children?.length) {
+    return step.children.every((child) => hasExecutableStructure(child));
   }
 
   return false;
 }
 
 function flattenSteps(steps: Step[]): Step[] {
-  return steps.flatMap((step) => [
-    step,
-    ...(step.work ? flattenSteps([step.work]) : []),
-    ...(step.recovery ? flattenSteps([step.recovery]) : []),
-  ]);
+  return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
 }
 
 function formatResult(result: ManualWorkoutDraftReviewResult) {

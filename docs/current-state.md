@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-06-20
+2026-06-28
 
 ## Where We Are Now
 
@@ -122,7 +122,7 @@ Active
 - The plan-authoring quality backend refinement has been hardened beyond the original slice 3:
   structured authoring accepts generation-only execution mode, uses an executable-mode resolver so numeric pace targets require execution support plus usable recent 5K truth, personal HR zones remain the only executable HR target truth, target time alone does not create pace targets, age-estimated HR remains advisory/readback-only, allowed non-pace/non-HR workouts use `structure_only_executable` numeric duration/distance/repeat/recovery anatomy instead of vague effort-only happy-path output, emits exact generated workout identity plus cutback/long-run steady-finish structure inside valid `training-plan-v2` workout data, and now adds goal-family long-run floors/peaks/ceilings, taper reductions aligned to the `Taper` phase boundary, Base/Build/Specific/Taper workout selection, runner-fit safety adjustments, target-time honesty assumptions for weak or aggressive benchmark support, long-distance review assumptions for low-support marathon/ultra/mountain contexts, mountain/trail-specific technical terrain/controlled descent/hike-run/time-on-feet doctrine without exact elevation prescriptions, sharper 5K/10K/half/marathon/ultra workout identities without changing hard-day frequency, a beginner/low-support `build_consistency` cap that keeps those plans out of tempo, interval, and race-like tune-up identities, richer opener/main/finish support-run structure for normal longer easy/steady/cutback/taper/long days, safe recovery/cutback identity variation for conservative low-support balanced plans, bounded plan-scoped authoring snapshots so refresh can preserve target-time, benchmark, execution-mode, rest-day, and metric-policy truth instead of degrading to legacy reconstruction, and rich canonical workout fields/mapping plus additive saved-mode persistence, import/export/template roundtrip, calendar/glyph rendering adoption, and workout/readback helpers that foreground backend-shaped executable target entries while keeping cues, focus, RPE, source copy, default/age-estimated HR, and legacy effort/cue-only rows secondary or legacy-readable.
 - The first OpenAI rich-workout draft backend slice is implemented behind text authoring only:
-  after the existing OpenAI structured-intent extraction validates, the saved-mode text replacement action can explicitly request a separate rich workout draft, but `src/lib/rich-workout-draft-authoring.ts` must normalize it back into canonical `training-plan-v2` by validating taxonomy values, fixed rest/rest-day boundaries, warmup/main/cooldown structure, and metric gates; default `generateCanonicalPlanFromText` usage stays deterministic, voice-to-plan remains a separate backend seam with no current visible onboarding caller, and malformed or unavailable rich drafts fall back to the deterministic structured generator with bounded fallback metadata instead of persisting raw AI output.
+  after the existing OpenAI structured-intent extraction validates, the saved-mode text replacement action can explicitly request a separate rich workout draft, but `src/lib/rich-workout-draft-authoring.ts` must normalize it back into canonical `training-plan-v2` by validating taxonomy values, fixed rest/rest-day boundaries, warmup/main/cooldown structure, and metric gates; default `generateCanonicalPlanFromText` usage stays deterministic, the old voice-to-plan seam is retired, and malformed or unavailable rich drafts fall back to the deterministic structured generator with bounded fallback metadata instead of persisting raw AI output.
 - The historical strict nested AI first-plan foundation has been removed from source:
   no `src/lib/ai-first-plan-draft-authoring.ts` module remains. `ai-first-plan-draft-v1` now appears
   only as bounded unsupported/negative-proof handling, while current AI first-plan preview work uses
@@ -178,18 +178,15 @@ Active
 - The bounded Garmin AI interpretation slice is now implemented:
   saved-mode workout detail now persists one `workout_ai_insights` row linked to the latest deterministic comparison, generated only from planned workout truth, normalized Garmin actual metrics, deterministic comparison payload, current week context, next-workout summary, and optional workout-scoped body-note context; the dedicated `Feedback` surface now reads that bounded AI interpretation back separately from the deterministic facts.
 - The first Basic/Pro entitlement backend foundation slice is now implemented:
-  additive `runner_entitlements` and `runner_capability_usage` tables exist for backend-owned tier and metered usage truth, missing entitlement rows resolve to effective `Pro`, explicit Basic can enforce one lifetime included `ai_plan_update`, and `voice_to_plan` plus `garmin_ai_interpretation` are Pro-only capability keys without adding billing or pricing UI.
+  additive `runner_entitlements` and `runner_capability_usage` tables exist for backend-owned tier and metered usage truth, missing entitlement rows resolve to effective `Pro`, explicit Basic can enforce one lifetime included `ai_plan_update`, `garmin_ai_interpretation` remains a Pro-only capability key, and the old `voice_to_plan` capability key is retired from current product truth.
   `proposeActivePlanRefresh` now checks and records `ai_plan_update` usage only after successful proposal generation, apply does not increment usage, and Garmin upload/parse/deterministic comparison remain available when only AI interpretation is locked.
   The linked Supabase project has now received the entitlement migration, and local generated database types are aligned with that linked schema.
-- The first backend voice-to-plan authoring seam is implemented, but it is not visible in current onboarding:
-  authenticated callers can submit a bounded confirmed transcript to `generateVoiceToPlanDraft`, the backend checks `voice_to_plan` entitlement, validates essential planning sufficiency, returns `clarification_required` with missing fields/questions when needed, or returns `draft_ready` with runner-understanding and plan-shape review data.
-  Transcript review remains non-mutating; `confirmVoiceToPlanDraft` is now the explicit first-plan creation seam and rechecks entitlement, blocks when an active plan already exists, persists the canonical structured plan plus profile basics only after confirmation, and still avoids raw audio handling, transcript profile persistence, usage counting, or silent plan replacement.
-- The compact Dictate-to-Plan Pro assist is not accepted as a current visible UI:
-  the old `DictateToPlanPanel` UI residue is deleted, and the backend draft/confirm actions remain
-  available, but source proof shows no current caller from `OnboardingGate`; the no-plan surface
-  currently shows Manual setup and Quick setup with structured review plus Plan Preset /
-  selected-plan paths. Do not treat `AI setup` transcript UI as shipped until a future frontend gate
-  wires it and QA accepts it.
+- Dictate-to-Plan / voice-to-plan is retired from current product truth:
+  the old `DictateToPlanPanel` UI residue, `src/lib/voice-to-plan-authoring.ts`,
+  `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and the `voice_to_plan` entitlement
+  capability are removed. The no-plan surface currently shows Manual setup and Quick setup with
+  structured review plus Plan Preset / selected-plan paths. Do not treat transcript-based plan
+  creation as shipped unless a future Product/Backend/Frontend gate rebuilds it and QA accepts it.
 - The no-plan onboarding frontend ownership has been refactored without changing product behavior:
   `OnboardingGate` now orchestrates state and server actions while focused onboarding modules own the structured constructor UI, Plan Preset / selected-plan review, manual setup, and shared constructor form model.
 - The first backend ownership slice from the first-plan constructor architecture audit is now implemented:
@@ -240,6 +237,44 @@ Active
   markdown parsing, date/month/year grouping, source-derived count and last-updated helpers, highlight classification, and milestone title derivation now live in `src/lib/changelog-utils.ts`, while `src/routes/changelog.tsx` keeps the public route shell, tabs, timeline rendering, and inline markdown rendering.
 - The first Hito DS foundations cleanup slice is now implemented:
   `src/styles.css` now defines a small raw color primitive layer underneath the existing semantic product tokens, exposes compact spacing primitives through CSS and Tailwind aliases, and `/hitoDS#foundations` documents color through Semantic Colors and Primitive tabs, with semantic token/recipe copy actions, primitive hex-copy swatches, alpha/gradient recipes kept in semantic context, typography families, semantic tone rules, workout-color boundaries, and spacing rhythm before any runner-facing screen migration.
+- The workout color-token DS contract is now implemented:
+  workout colors are Hito DS tokens and shared helpers rather than route-local hex values; accepted workout roles and section roles are documented on `/hitoDS`, while Repeat set stays structural-only with no standalone semantic color token.
+- Manual constructor timeline adoption and target controls are now accepted:
+  Review add consumes backend-owned `constructorContract.timeline`, renders structural Repeat set groups
+  with ordered children, removes old reconstructed review bullets/`Editable HR guide` copy from the
+  accepted UI proof, and supports per-segment No target, runner-entered pace exact/range,
+  runner-entered HR bpm cap/range, and runner-entered RPE `0-10`. Backend unified block
+  compatibility is accepted across manual review, persisted `planned_workouts.steps`, active-plan
+  export, `training-plan-v2` parse/import, and provider comparison input. Default/age-estimated HR
+  as personal truth, fake personal zones, generated manual pace, power, cadence, grade/elevation,
+  route, and terrain targets still remain unsupported. Generated/AI repeat children are
+  backend-validator-passed and the 2026-06-28 workout-slice visual/runtime QA proof passed over the
+  relocated non-iCloud cache runtime. The accepted child-first reducer now covers planned-workout
+  language, training readback, import/export, rich-workout executable checks, and provider
+  comparison. Backend `plan_goal_intent_v1` and frontend guided selected-plan readback are now
+  accepted: Quick setup can carry preset/custom goal distance, finish time, outcome pace, race day,
+  and distinct finish-time-derived pace as backend-shaped goal/review truth. Backend flat repeat
+  compatibility retirement is accepted: old segment-level `work_*` / `recovery_*` fields now reject
+  and canonical output emits ordered `children[]`. FRONTEND child-first repeat consumer migration is
+  also accepted. The 2026-06-28 Product-authorized BACKEND purge removed the remaining persisted
+  pair-shaped repeat data from Supabase project `dltfjwexyctmihclcjqj`; post-delete readback found
+  `0` legacy repeat rows. `planned_workouts.steps`, import/export, provider comparison input, manual
+  reconstruction, and the runtime seed fixture now use ordered repeat `children[]`, and
+  `repeat_unit` / `recovery_unit` plus persisted repeat sibling `work` / `recovery` compatibility are
+  retired. Generated-plan richness over accepted `planGoalIntent` and child-first blocks is now
+  accepted at backend, Running Coach, and source/CLI/artifact QA layers: fresh 2026-06-28 scenario
+  and coach-review artifacts under the historical 2026-06-09 folders scanned `644` JSON files and
+  found `0` repeat-unit, parent-repeat-target, missing-children, nested-repeat, fake-pace,
+  fake-personal-HR, exact hill/elevation, or planGoalIntent executable-policy violations. Quick
+  setup browser/readback proof is now accepted for the OpenAI/local-fixture authored dated
+  generated-plan path: 10K no-benchmark, Marathon target date/finish time, and Custom 15K target
+  date/finish time all preview/create saved plans with child-first repeats. Custom 15K persists as
+  `distance_build`, Marathon persists as `marathon` / `target_time`, and neither path falls back to
+  Marathon Base as current product truth. Generated-plan create-and-use browser proof is also
+  accepted through first generated non-rest workout logging: `10K Foundation` saved calendar
+  readback, child-first repeat-rich workout detail, one completed `workout_logs` row tied to the
+  same planned workout id, desktop/mobile clean console, and disposable cleanup to zero. Garmin/FIT
+  provider upload/comparison remains a separate later QA gate.
 - The second Hito DS foundations cleanup slice is now implemented:
   workout-detail route chrome now uses existing Hito surface, row-group, hairline, tab-badge, micro-label, body-small, and technical-mono primitives instead of local radial/linear gradients, white-alpha borders, bespoke radius values, and tiny text recipes in `src/routes/workout.$date.tsx` and the Garmin upload/interval controls in `CompletionPanel`.
 - The third Hito DS foundations cleanup slice is now started with a bounded calendar surface migration:
@@ -296,8 +331,10 @@ Active
   `PlanManagementDialog` and `UploadJsonDialog` import `completeOnboarding` /
   `completeTextOnboarding` from that canonical owner directly, and `training-api.ts` no longer keeps
   those plan-replacement compatibility names.
-- The backend voice-to-plan review assumption clarity follow-up is implemented:
-  when an obvious dictated goal-style cue differs from the reviewed draft style, such as balanced becoming relaxed, the backend adds an explicit runner-facing assumption rather than forcing the requested style or silently hiding the change; the real frontend-shaped request path now compares transcript style cues before constructor supplement defaults, so the dictated cue cannot be masked by structured state.
+- The old backend voice-to-plan review-assumption follow-up is historical only:
+  that transcript-specific draft/confirm seam was retired with the non-visible voice-to-plan backend
+  cleanup. Current visible setup uses structured/OpenAI-authored plan creation and backend-shaped
+  review, not transcript-specific runner-understanding readback.
 - The first immediate Garmin UX cleanup slice is now implemented:
   workout-detail `Feedback` now uses one calmer divided hierarchy with plain-language `Upload Garmin file`, `Plan vs run`, and `Recommendation` framing; `Log result` now includes one lightweight path into `Feedback` for deeper review; and `/integrations` no longer contradicts the live Garmin path with stale `Preview / View status / Not connected` placeholder language.
 - The next post-cleanup Garmin entry slice is now implemented:
@@ -416,7 +453,7 @@ Active
 - The Calendar viewport/mobile layout fix is now implemented:
   desktop month cells keep their seven-column grid, hover/focus tooltips now clamp to the visible viewport instead of overflowing near screen edges, and narrow month view renders as a vertical day list preserving workout links, glyphs, status, today/completed treatment, and feedback markers.
 - The workout-type glyph semantics slice is now implemented:
-  month cells and the shared workout glyph renderer now prefer backend-owned rich `calendarIconKey` and `workoutFamily` truth before legacy compact fallback, use distinct tiny one-color glyphs for Easy, Recovery, Steady, Long, Tempo, Intervals, Progression, Race, Hills, Trail, legacy Quality, and Rest, and preserve the existing easy, long, quality, and rest color families while avoiding any new Strength/OFP calendar type.
+  month cells and the shared workout glyph renderer now prefer backend-owned `plannedWorkoutLanguage`, `calendarIconKey`, and `workoutFamily` truth before legacy compact fallback; primary runner-facing labels stay within Rest, Recovery, Easy, Steady, Long Run, Progression, Tempo, Intervals, Hills, and Run/Walk, while exact identities such as cutback, threshold, trail, race, or source/template keys remain secondary/internal compatibility truth.
 - Workout detail rest days are now intentionally sparse and the right-side detail context is grouped into one tighter frame instead of multiple bordered cards.
 - The first workout-page refinement pass is now implemented:
   the three-block page structure remains intact, saved result states now surface as check, dash, or cross markers near workout identity and in the right-side context, `Week Status` is progress-driven, `Log result` stays focused on manual completion truth, and the dedicated `Feedback` tab now owns the Garmin FIT/ZIP evidence seam with screenshot still clearly later-only.
@@ -478,7 +515,7 @@ Active
 - The structured segment target personalization follow-up is now implemented:
   recent 5K time or pace supplied through structured first-plan onboarding now becomes internal authoring pace truth, generated running segments receive broad `pace_min_per_km_range` targets for warmup, easy, long, steady, tempo, interval work, recovery, cooldown, and hill-oriented work where appropriate, target time alone stays goal context rather than pace truth, and executable HR targets require personal HR-zone truth rather than age-estimated defaults.
 - The first plan-authoring quality refinement backend slice is now implemented:
-  structured first-plan onboarding and the shared structured authoring input now accept bounded execution-mode context (`watchAccess` plus `guidancePreference`), treat missing/no/unknown execution support as bounded correction for primary structured generation, and pass voice-to-plan structured supplements through the same contract without changing persistence, rest-day invariants, or the existing voice draft/confirm boundary.
+  structured first-plan onboarding and the shared structured authoring input now accept bounded execution-mode context (`watchAccess` plus `guidancePreference`), treat missing/no/unknown execution support as bounded correction for primary structured generation, and preserve the same persistence and rest-day invariants without a separate voice draft/confirm boundary.
 - The second plan-authoring quality refinement backend slice is now implemented:
   generated structured plans now use one executable-mode resolver before emitting numeric workout targets: pace ranges require execution support plus usable recent 5K benchmark truth; no-watch and unknown execution support correct before normal primary generation; allowed support workouts without pace/HR truth use `structure_only_executable` numeric anatomy; and heart-rate targets require `personal_hr_zone` truth while age-only HR remains advisory/readback-only.
 - The first structured plan-authoring backend slice is now implemented:

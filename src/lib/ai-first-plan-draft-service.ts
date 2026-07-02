@@ -1,25 +1,32 @@
 import type {
+  AiFirstPlanBlueprintAuthoredDateSource,
+  AiFirstPlanBlueprintDatePlacementMetadata,
   AiFirstPlanBlueprintTraceMetadata,
   AiFirstPlanDraftMetadata,
   AiFirstPlanDraftNormalizationResult,
 } from "@/lib/ai-first-plan-draft-metadata";
-import type { NormalizationIssue } from "@/lib/ai-first-plan-blueprint-schema";
 import {
   buildAiFirstPlanBlueprintTrace,
   buildAiFirstPlanBlueprintPrompt,
   normalizeAiFirstPlanBlueprintToTrainingPlan,
 } from "@/lib/ai-first-plan-blueprint-authoring";
 import {
-  attachBlueprintHorizonTrace,
   buildAiFirstPlanBlueprintHorizonTrace,
-  extendAiFirstPlanBlueprintPlanToRequestedHorizon,
   resolveAiFirstPlanBlueprintHorizonStrategy,
   type AiFirstPlanBlueprintHorizonStrategy,
   type AiFirstPlanBlueprintHorizonTraceMetadata,
 } from "@/lib/ai-first-plan-blueprint-horizon";
+import { resolveAuthoringHorizonWeeks } from "@/lib/ai-first-plan-blueprint-policy";
 import { buildAiFirstPlanEnvelopePrompt } from "@/lib/ai-first-plan-envelope-prompt";
 import { expandAiFirstPlanEnvelopeToTrainingPlan } from "@/lib/ai-first-plan-envelope-expand";
 import { buildAiFirstPlanEnvelopeTrace } from "@/lib/ai-first-plan-envelope-trace";
+import {
+  attachOutputToAiPlanGenerationLedgerTrace,
+  createAiPlanGenerationLedgerTrace,
+  updateAiPlanGenerationLedgerTrace,
+  type AiPlanGenerationLedgerOptions,
+  type AiPlanGenerationLedgerTrace,
+} from "@/lib/ai-plan-generation-ledger";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import { serverEnv } from "@/lib/supabase/env";
 import {
@@ -27,10 +34,7 @@ import {
   parseStructuredFirstPlanOnboardingInput,
   type StructuredFirstPlanAuthoringInput,
 } from "@/lib/structured-first-plan-onboarding";
-import {
-  buildStructuredAuthoringPlan,
-  structuredPlanAuthoringInputSchema,
-} from "@/lib/structured-plan-authoring";
+import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_PLAN_MODEL = "gpt-5";
@@ -73,8 +77,9 @@ export interface GenerateAiFirstPlanDraftPreviewOptions {
   apiKey?: string | null;
   model?: string | null;
   contractMode?: AiFirstPlanGenerationContract;
-  allowDeterministicFallback?: boolean;
   fetchImpl?: typeof fetch;
+  generationLedger?: AiPlanGenerationLedgerOptions;
+  blueprintEnforcePreferredLongRunDay?: boolean;
 }
 
 export interface AiFirstPlanDraftPreviewMetadata extends AiFirstPlanDraftMetadata {
@@ -83,6 +88,7 @@ export interface AiFirstPlanDraftPreviewMetadata extends AiFirstPlanDraftMetadat
   responseId: string | null;
   elapsedMs: number;
   validationIssueCount: number;
+  generationTrace: AiPlanGenerationLedgerTrace | null;
   debug: AiFirstPlanDraftDebugMetadata;
 }
 
@@ -125,6 +131,7 @@ export interface AiFirstPlanDraftUnavailableMetadata {
   elapsedMs: number;
   validationIssues: string[];
   validationIssueCount: number;
+  generationTrace: AiPlanGenerationLedgerTrace | null;
   debug: AiFirstPlanDraftDebugMetadata;
   blueprintTrace?: AiFirstPlanBlueprintTraceMetadata | null;
   envelopeTrace?: unknown;
@@ -172,8 +179,9 @@ export async function generateAiFirstPlanDraftPreview({
   apiKey = serverEnv.openAiApiKey,
   model = serverEnv.openAiPlanModel ?? DEFAULT_OPENAI_PLAN_MODEL,
   contractMode = DEFAULT_AI_FIRST_PLAN_CONTRACT,
-  allowDeterministicFallback,
   fetchImpl = globalThis.fetch,
+  generationLedger,
+  blueprintEnforcePreferredLongRunDay,
 }: GenerateAiFirstPlanDraftPreviewOptions): Promise<AiFirstPlanDraftPreviewResult> {
   const authoringInputResult = resolveStructuredAuthoringInput(input, inputKind);
 
@@ -183,32 +191,33 @@ export async function generateAiFirstPlanDraftPreview({
 
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
-  const useDeterministicFallback = allowDeterministicFallback ?? false;
   const blueprintHorizonStrategy =
     contractMode === "blueprint"
       ? resolveAiFirstPlanBlueprintHorizonStrategy({
           authoringInput,
           today,
           referenceExample,
+          maxAuthoredWeeks: resolveAuthoringHorizonWeeks(authoringInput),
         })
       : null;
   const openAiAuthoringInput = blueprintHorizonStrategy?.openAiAuthoringInput ?? authoringInput;
+  let latestGenerationTrace: AiPlanGenerationLedgerTrace | null = null;
 
   if (!apiKey) {
-    return fallbackOrUnavailable({
+    return unavailableAiFirstPlanDraft({
       authoringInput,
       reason: "openai_not_configured",
       issues: ["OpenAI is not configured for AI-authored first-plan drafting."],
       model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
       responseId: null,
       startedAt,
-      allowDeterministicFallback: useDeterministicFallback,
       debug: buildNotStartedDebug({
         timeoutMs,
         maxOutputTokens,
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
         contractMode,
       }),
+      generationTrace: null,
       blueprintHorizonStrategy,
     });
   }
@@ -224,24 +233,41 @@ export async function generateAiFirstPlanDraftPreview({
       maxOutputTokens,
       contractMode,
       fetchImpl,
+      generationLedger,
     });
+    latestGenerationTrace = response.generationTrace;
     const rawOutput = extractStructuredOutputText(response.body, response.debug);
     const responseDebug = {
       ...response.debug,
       outputTextChars: rawOutput.length,
     };
     const parsedOutput = safeParseJson(rawOutput);
+    latestGenerationTrace = await attachOutputToAiPlanGenerationLedgerTrace({
+      trace: latestGenerationTrace,
+      rawOutput,
+      parsedOutput,
+      options: generationLedger,
+    });
 
     if (!parsedOutput) {
-      return fallbackOrUnavailable({
+      latestGenerationTrace = await recordAiPlanGenerationUnavailable({
+        trace: latestGenerationTrace,
+        reason: "ai_first_plan_draft_non_json_output",
+        issues: ["OpenAI returned a non-JSON AI first-plan draft payload."],
+        parseStatus: "non_json",
+        normalizationStatus: "not_started",
+        options: generationLedger,
+      });
+
+      return unavailableAiFirstPlanDraft({
         authoringInput,
         reason: "ai_first_plan_draft_non_json_output",
         issues: ["OpenAI returned a non-JSON AI first-plan draft payload."],
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-        responseId: response.body.id ?? null,
+        responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
         startedAt,
-        allowDeterministicFallback: useDeterministicFallback,
         debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
+        generationTrace: latestGenerationTrace,
         blueprintHorizonStrategy,
       });
     }
@@ -253,47 +279,79 @@ export async function generateAiFirstPlanDraftPreview({
       openAiAuthoringInput,
       blueprintHorizonStrategy,
       responseDebug,
+      blueprintEnforcePreferredLongRunDay,
     });
 
     if (!normalized.ok) {
-      return fallbackOrUnavailable({
+      latestGenerationTrace = await recordAiPlanGenerationUnavailable({
+        trace: latestGenerationTrace,
+        reason: normalized.reason,
+        issues: normalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
+        parseStatus: "parsed_json",
+        normalizationStatus: "failed",
+        repairs: normalized.fallback.repairs,
+        options: generationLedger,
+      });
+
+      return unavailableAiFirstPlanDraft({
         authoringInput,
         reason: normalized.reason,
         issues: normalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-        responseId: response.body.id ?? null,
+        responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
         startedAt,
         fallbackMetadata: normalized.fallback,
-        allowDeterministicFallback: useDeterministicFallback,
         debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
+        generationTrace: latestGenerationTrace,
         blueprintHorizonStrategy,
       });
     }
 
-    const finalized =
-      contractMode === "blueprint" && blueprintHorizonStrategy
-        ? finalizeBlueprintHorizonPlan({
-            normalized,
-            authoringInput,
-            blueprintHorizonStrategy,
-            responseDebug,
-          })
-        : normalized;
+    const finalized = normalized;
 
     if (!finalized.ok) {
-      return fallbackOrUnavailable({
+      latestGenerationTrace = await recordAiPlanGenerationUnavailable({
+        trace: latestGenerationTrace,
+        reason: finalized.reason,
+        issues: finalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
+        parseStatus: "parsed_json",
+        normalizationStatus: "finalization_failed",
+        repairs: finalized.fallbackMetadata.repairs,
+        options: generationLedger,
+      });
+
+      return unavailableAiFirstPlanDraft({
         authoringInput,
         reason: finalized.reason,
         issues: finalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-        responseId: response.body.id ?? null,
+        responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
         startedAt,
         fallbackMetadata: finalized.fallbackMetadata,
-        allowDeterministicFallback: useDeterministicFallback,
         debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
+        generationTrace: latestGenerationTrace,
         blueprintHorizonStrategy,
       });
     }
+
+    latestGenerationTrace = await updateAiPlanGenerationLedgerTrace(
+      latestGenerationTrace,
+      {
+        pipeline: {
+          parseStatus: "parsed_json",
+          normalizationStatus: "normalized",
+          repairs: finalized.metadata.repairs,
+          validationIssues: finalized.metadata.validationIssues,
+          canonicalRowCount: finalized.canonicalPlan.planned_workouts.length,
+          runningWorkoutCount: finalized.canonicalPlan.planned_workouts.filter(
+            (workout) => workout.workout_type !== "rest",
+          ).length,
+          finalOutcome: "canonical_draft_ready",
+          unavailableReason: null,
+        },
+      },
+      generationLedger,
+    );
 
     return {
       ok: true,
@@ -306,6 +364,7 @@ export async function generateAiFirstPlanDraftPreview({
         responseId: response.body.id ?? null,
         elapsedMs: Date.now() - startedAt,
         validationIssueCount: finalized.metadata.validationIssues.length,
+        generationTrace: latestGenerationTrace,
         debug: { ...responseDebug, requestPhase: "normalized" },
         blueprintTrace:
           contractMode === "blueprint"
@@ -313,7 +372,7 @@ export async function generateAiFirstPlanDraftPreview({
                 trace: finalized.metadata.blueprintTrace ?? null,
                 authoringInput,
                 canonicalPlan: finalized.canonicalPlan,
-                sourceStatus: finalized.metadata.status,
+                sourceStatus: toBlueprintTraceSourceStatus(finalized.metadata.status),
                 fallbackReason: null,
                 issues: finalized.metadata.validationIssues,
                 repairs: finalized.metadata.repairs,
@@ -325,22 +384,57 @@ export async function generateAiFirstPlanDraftPreview({
                   promptCharEstimateAfter: responseDebug.promptCharEstimate,
                   finalWorkoutCount: finalized.canonicalPlan.planned_workouts.length,
                 }),
+                authoredDateSource: resolveAuthoredDateSource(latestGenerationTrace),
               })
             : (finalized.metadata.blueprintTrace ?? null),
         envelopeTrace: finalized.metadata.envelopeTrace ?? null,
+        datePlacement: withHorizonDatePlacement({
+          datePlacement: finalized.metadata.datePlacement ?? null,
+          strategy: blueprintHorizonStrategy,
+          authoredDateSource: resolveAuthoredDateSource(latestGenerationTrace),
+        }),
       },
     };
   } catch (error) {
     const fallbackReason = classifyAiFirstPlanDraftError(error, contractMode);
+    const errorGenerationTrace = generationTraceFromError(error) ?? latestGenerationTrace;
+    const fallbackParseStatus =
+      error instanceof AiFirstPlanDraftServiceError &&
+      error.reason === "ai_first_plan_draft_empty_output"
+        ? "empty_output"
+        : "not_started";
+    const fallbackFinalOutcome =
+      fallbackReason.includes("timed_out") ||
+      errorGenerationTrace?.pipeline.finalOutcome === "timeout"
+        ? "timeout"
+        : errorGenerationTrace?.pipeline.finalOutcome === "provider_error"
+          ? "provider_error"
+          : "unavailable";
+    latestGenerationTrace = await recordAiPlanGenerationUnavailable({
+      trace: errorGenerationTrace,
+      reason: fallbackReason,
+      issues: [boundedErrorMessage(error, fallbackReason)],
+      parseStatus:
+        errorGenerationTrace?.pipeline.parseStatus &&
+        errorGenerationTrace.pipeline.parseStatus !== "not_started"
+          ? errorGenerationTrace.pipeline.parseStatus
+          : fallbackParseStatus,
+      normalizationStatus:
+        errorGenerationTrace?.pipeline.normalizationStatus &&
+        errorGenerationTrace.pipeline.normalizationStatus !== "not_started"
+          ? errorGenerationTrace.pipeline.normalizationStatus
+          : "not_started",
+      finalOutcome: fallbackFinalOutcome,
+      options: generationLedger,
+    });
 
-    return fallbackOrUnavailable({
+    return unavailableAiFirstPlanDraft({
       authoringInput,
       reason: fallbackReason,
       issues: [boundedErrorMessage(error, fallbackReason)],
       model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-      responseId: null,
+      responseId: latestGenerationTrace?.provider.responseId ?? null,
       startedAt,
-      allowDeterministicFallback: useDeterministicFallback,
       debug:
         error instanceof AiFirstPlanDraftServiceError
           ? error.debug
@@ -350,6 +444,7 @@ export async function generateAiFirstPlanDraftPreview({
               model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
               contractMode,
             }),
+      generationTrace: latestGenerationTrace,
       blueprintHorizonStrategy,
     });
   }
@@ -401,6 +496,7 @@ function normalizeOpenAiFirstPlanContractOutput({
   openAiAuthoringInput,
   blueprintHorizonStrategy,
   responseDebug,
+  blueprintEnforcePreferredLongRunDay,
 }: {
   contractMode: AiFirstPlanGenerationContract;
   parsedOutput: unknown;
@@ -408,15 +504,17 @@ function normalizeOpenAiFirstPlanContractOutput({
   openAiAuthoringInput: StructuredFirstPlanAuthoringInput;
   blueprintHorizonStrategy: AiFirstPlanBlueprintHorizonStrategy | null;
   responseDebug: AiFirstPlanDraftDebugMetadata;
+  blueprintEnforcePreferredLongRunDay?: boolean;
 }): AiFirstPlanDraftNormalizationResult {
   if (contractMode === "blueprint") {
     return normalizeAiFirstPlanBlueprintToTrainingPlan({
       blueprint: parsedOutput,
       authoringInput: openAiAuthoringInput,
-      deterministicSupportAuthoringInput:
-        blueprintHorizonStrategy && blueprintHorizonStrategy.backendExtendedWeeks > 0
-          ? authoringInput
-          : undefined,
+      deterministicSupportAuthoringInput: undefined,
+      normalizationOptions: {
+        enforcePreferredLongRunDay: blueprintEnforcePreferredLongRunDay,
+      },
+      useDeterministicSupport: false,
     });
   }
 
@@ -507,71 +605,6 @@ function buildAiFirstPlanEnvelopeServiceSizeComparison({
   };
 }
 
-function finalizeBlueprintHorizonPlan({
-  normalized,
-  authoringInput,
-  blueprintHorizonStrategy,
-  responseDebug,
-}: {
-  normalized: Extract<AiFirstPlanDraftNormalizationResult, { ok: true }>;
-  authoringInput: StructuredFirstPlanAuthoringInput;
-  blueprintHorizonStrategy: AiFirstPlanBlueprintHorizonStrategy;
-  responseDebug: AiFirstPlanDraftDebugMetadata;
-}):
-  | {
-      ok: true;
-      canonicalPlan: TrainingPlanV2;
-      metadata: AiFirstPlanDraftMetadata;
-    }
-  | {
-      ok: false;
-      reason: string;
-      issues: NormalizationIssue[];
-      fallbackMetadata: AiFirstPlanDraftMetadata;
-    } {
-  const extended = extendAiFirstPlanBlueprintPlanToRequestedHorizon({
-    canonicalPlan: normalized.canonicalPlan,
-    fullAuthoringInput: authoringInput,
-    strategy: blueprintHorizonStrategy,
-  });
-
-  if (!extended.ok) {
-    return {
-      ok: false,
-      reason: extended.reason,
-      issues: extended.issues,
-      fallbackMetadata: {
-        ...normalized.metadata,
-        blueprintTrace: attachBlueprintHorizonTrace({
-          trace: normalized.metadata.blueprintTrace ?? null,
-          strategy: blueprintHorizonStrategy,
-          promptCharEstimateAfter: responseDebug.promptCharEstimate,
-          finalWorkoutCount: null,
-        }),
-      },
-    };
-  }
-
-  const repairs = [...normalized.metadata.repairs, ...extended.repairs];
-  const status = repairs.length > 0 ? "repaired_ai_draft" : normalized.metadata.status;
-
-  return {
-    ok: true,
-    canonicalPlan: extended.canonicalPlan,
-    metadata: {
-      ...normalized.metadata,
-      status,
-      repairs,
-      blueprintTrace: attachBlueprintHorizonTrace({
-        trace: normalized.metadata.blueprintTrace ?? null,
-        strategy: blueprintHorizonStrategy,
-        promptCharEstimateAfter: responseDebug.promptCharEstimate,
-        finalWorkoutCount: extended.canonicalPlan.planned_workouts.length,
-      }),
-    },
-  };
-}
-
 async function requestOpenAiFirstPlanDraft({
   apiKey,
   model,
@@ -582,6 +615,7 @@ async function requestOpenAiFirstPlanDraft({
   maxOutputTokens,
   contractMode,
   fetchImpl,
+  generationLedger,
 }: {
   apiKey: string;
   model: string;
@@ -592,6 +626,7 @@ async function requestOpenAiFirstPlanDraft({
   maxOutputTokens: number;
   contractMode: AiFirstPlanGenerationContract;
   fetchImpl: typeof fetch;
+  generationLedger?: AiPlanGenerationLedgerOptions;
 }) {
   const prompt = buildOpenAiFirstPlanContractPrompt({
     contractMode,
@@ -614,6 +649,20 @@ async function requestOpenAiFirstPlanDraft({
     openAiElapsedMs: null,
     contractMode,
   });
+  let generationTrace = await createAiPlanGenerationLedgerTrace({
+    providerKind: resolveAiPlanGenerationProviderKind({ apiKey, model }),
+    model,
+    contractMode,
+    responseSchemaMode: responseSchemaModeForContract(contractMode),
+    systemPrompt: prompt.systemPrompt,
+    userPrompt: prompt.userPrompt,
+    responseSchema: prompt.responseSchema,
+    timeoutMs,
+    maxOutputTokens,
+  });
+  generationTrace =
+    (await updateAiPlanGenerationLedgerTrace(generationTrace, {}, generationLedger)) ??
+    generationTrace;
   const request = async () => {
     try {
       const response = await fetchImpl(OPENAI_RESPONSES_URL, {
@@ -672,16 +721,54 @@ async function requestOpenAiFirstPlanDraft({
         outputTokens: normalizeTokenCount(body.usage?.output_tokens),
         totalTokens: normalizeTokenCount(body.usage?.total_tokens),
       };
+      generationTrace =
+        (await updateAiPlanGenerationLedgerTrace(
+          generationTrace,
+          {
+            provider: {
+              responseId: body.id ?? null,
+              responseStatus: typeof body.status === "string" ? body.status : null,
+              responseIncompleteReason:
+                typeof body.incomplete_details?.reason === "string"
+                  ? body.incomplete_details.reason
+                  : null,
+            },
+            usage: {
+              inputTokens: normalizeTokenCount(body.usage?.input_tokens),
+              outputTokens: normalizeTokenCount(body.usage?.output_tokens),
+              totalTokens: normalizeTokenCount(body.usage?.total_tokens),
+            },
+            pipeline: {
+              finalOutcome: "response_received",
+            },
+          },
+          generationLedger,
+        )) ?? generationTrace;
 
       if (!response.ok) {
+        generationTrace =
+          (await updateAiPlanGenerationLedgerTrace(
+            generationTrace,
+            {
+              pipeline: {
+                ...generationTrace.pipeline,
+                finalOutcome: "provider_error",
+                unavailableReason: `${contractPrefix(contractMode)}_request_failed`,
+                validationIssues: [extractOpenAiError(body)],
+              },
+            },
+            generationLedger,
+          )) ?? generationTrace;
+
         throw new AiFirstPlanDraftServiceError(
           `${contractPrefix(contractMode)}_request_failed`,
           [extractOpenAiError(body)],
           { ...responseDebug, requestPhase: "request_failed" },
+          generationTrace,
         );
       }
 
-      return { body, debug: responseDebug };
+      return { body, debug: responseDebug, generationTrace };
     } catch (error) {
       if (error instanceof AiFirstPlanDraftServiceError) {
         throw error;
@@ -696,6 +783,7 @@ async function requestOpenAiFirstPlanDraft({
           abortFired,
           openAiElapsedMs: Date.now() - requestStartedAt,
         },
+        generationTrace,
       );
     }
   };
@@ -713,6 +801,7 @@ async function requestOpenAiFirstPlanDraft({
         abortFired: true,
         openAiElapsedMs: Date.now() - requestStartedAt,
       },
+      generationTrace,
     );
   });
 }
@@ -856,34 +945,52 @@ function supportsReasoningEffort(model: string) {
   return normalized.startsWith("gpt-5") || normalized.startsWith("o");
 }
 
-function fallbackOrUnavailable({
-  allowDeterministicFallback,
-  ...args
+function resolveAiPlanGenerationProviderKind({ apiKey, model }: { apiKey: string; model: string }) {
+  return apiKey === "local-qa-dev-ai-generated-plan-fixture" ||
+    model === "hito-local-qa-dev-ai-generated-plan-fixture"
+    ? "local_dev_fixture"
+    : "openai_responses_api";
+}
+
+async function recordAiPlanGenerationUnavailable({
+  trace,
+  reason,
+  issues,
+  parseStatus,
+  normalizationStatus,
+  finalOutcome = "unavailable",
+  repairs = [],
+  options,
 }: {
-  allowDeterministicFallback: boolean;
-  authoringInput: StructuredFirstPlanAuthoringInput;
+  trace: AiPlanGenerationLedgerTrace | null;
   reason: string;
   issues: string[];
-  model: string;
-  responseId: string | null;
-  startedAt: number;
-  fallbackMetadata?: AiFirstPlanDraftMetadata;
-  debug: AiFirstPlanDraftDebugMetadata;
-  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonStrategy | null;
-}):
-  | Extract<AiFirstPlanDraftPreviewResult, { ok: true }>
-  | Extract<
-      AiFirstPlanDraftPreviewResult,
-      {
-        ok: false;
-        reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
-      }
-    > {
-  if (allowDeterministicFallback) {
-    return deterministicFallback(args);
-  }
+  parseStatus: AiPlanGenerationLedgerTrace["pipeline"]["parseStatus"];
+  normalizationStatus: AiPlanGenerationLedgerTrace["pipeline"]["normalizationStatus"];
+  finalOutcome?: AiPlanGenerationLedgerTrace["pipeline"]["finalOutcome"];
+  repairs?: readonly string[];
+  options?: AiPlanGenerationLedgerOptions;
+}) {
+  return updateAiPlanGenerationLedgerTrace(
+    trace,
+    {
+      pipeline: {
+        parseStatus,
+        normalizationStatus,
+        repairs,
+        validationIssues: issues,
+        canonicalRowCount: null,
+        runningWorkoutCount: null,
+        finalOutcome,
+        unavailableReason: reason,
+      },
+    },
+    options,
+  );
+}
 
-  return unavailableAiFirstPlanDraft(args);
+function generationTraceFromError(error: unknown) {
+  return error instanceof AiFirstPlanDraftServiceError ? error.generationTrace : null;
 }
 
 function unavailableAiFirstPlanDraft({
@@ -895,6 +1002,7 @@ function unavailableAiFirstPlanDraft({
   startedAt,
   fallbackMetadata,
   debug,
+  generationTrace,
   blueprintHorizonStrategy,
 }: {
   authoringInput: StructuredFirstPlanAuthoringInput;
@@ -905,6 +1013,7 @@ function unavailableAiFirstPlanDraft({
   startedAt: number;
   fallbackMetadata?: AiFirstPlanDraftMetadata;
   debug: AiFirstPlanDraftDebugMetadata;
+  generationTrace?: AiPlanGenerationLedgerTrace | null;
   blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonStrategy | null;
 }): Extract<
   AiFirstPlanDraftPreviewResult,
@@ -956,6 +1065,7 @@ function unavailableAiFirstPlanDraft({
       elapsedMs,
       validationIssues,
       validationIssueCount: validationIssues.length,
+      generationTrace: generationTrace ?? null,
       debug,
       blueprintTrace,
       envelopeTrace: isEnvelope ? (fallbackMetadata?.envelopeTrace ?? null) : undefined,
@@ -988,84 +1098,6 @@ function unavailableReasonForContract(contractMode: AiFirstPlanGenerationContrac
     case "envelope":
       return "ai_first_plan_envelope_unavailable" as const;
   }
-}
-
-function deterministicFallback({
-  authoringInput,
-  reason,
-  issues,
-  model,
-  responseId,
-  startedAt,
-  fallbackMetadata,
-  debug,
-  blueprintHorizonStrategy,
-}: {
-  authoringInput: StructuredFirstPlanAuthoringInput;
-  reason: string;
-  issues: string[];
-  model: string;
-  responseId: string | null;
-  startedAt: number;
-  fallbackMetadata?: AiFirstPlanDraftMetadata;
-  debug: AiFirstPlanDraftDebugMetadata;
-  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonStrategy | null;
-}): Extract<AiFirstPlanDraftPreviewResult, { ok: true }> {
-  const canonicalPlan = buildStructuredAuthoringPlan(authoringInput);
-  const validationIssues = issues
-    .map((issue) => issue.trim())
-    .filter(Boolean)
-    .slice(0, 12);
-  const elapsedMs = Date.now() - startedAt;
-  const fallbackTrace =
-    debug.contractMode === "blueprint"
-      ? enrichAiFirstPlanBlueprintTrace({
-          trace: fallbackMetadata?.blueprintTrace ?? null,
-          authoringInput,
-          canonicalPlan,
-          sourceStatus: "deterministic_fallback",
-          fallbackReason: reason,
-          issues: validationIssues,
-          repairs: fallbackMetadata?.repairs ?? [],
-          model,
-          elapsedMs,
-          debug,
-          blueprintHorizonStrategy: buildAiFirstPlanBlueprintHorizonTrace({
-            strategy: blueprintHorizonStrategy ?? null,
-            promptCharEstimateAfter: debug.promptCharEstimate,
-            finalWorkoutCount: canonicalPlan.planned_workouts.length,
-          }),
-        })
-      : (fallbackMetadata?.blueprintTrace ?? null);
-
-  return {
-    ok: true,
-    authoringInput,
-    canonicalPlan,
-    metadata: {
-      ...(fallbackMetadata ?? {
-        status: "deterministic_fallback" as const,
-        source: "deterministic_structured_generator" as const,
-        validationIssues,
-        repairs: [],
-        reviewAssumptions: [
-          "Hito used the deterministic structured generator because AI first-plan drafting did not return a valid reviewed draft.",
-        ],
-        metricPolicySummary:
-          "Deterministic fallback preserves existing pace, default-HR, fixed-rest-day, and effort-safety gates.",
-      }),
-      status: "deterministic_fallback",
-      source: "deterministic_structured_generator",
-      fallbackReason: reason,
-      validationIssues,
-      model,
-      responseId,
-      elapsedMs,
-      validationIssueCount: validationIssues.length,
-      debug,
-      blueprintTrace: fallbackTrace,
-    },
-  };
 }
 
 function buildUnavailableBlueprintTrace({
@@ -1132,11 +1164,12 @@ function enrichAiFirstPlanBlueprintTrace({
   elapsedMs,
   debug,
   blueprintHorizonStrategy,
+  authoredDateSource,
 }: {
   trace: AiFirstPlanDraftPreviewMetadata["blueprintTrace"];
   authoringInput: StructuredFirstPlanAuthoringInput;
   canonicalPlan: TrainingPlanV2;
-  sourceStatus: AiFirstPlanDraftPreviewMetadata["status"];
+  sourceStatus: AiFirstPlanBlueprintTraceMetadata["sourceStatus"];
   fallbackReason: string | null;
   issues: string[];
   repairs: string[];
@@ -1144,6 +1177,7 @@ function enrichAiFirstPlanBlueprintTrace({
   elapsedMs: number;
   debug: AiFirstPlanDraftDebugMetadata;
   blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonTraceMetadata;
+  authoredDateSource?: AiFirstPlanBlueprintAuthoredDateSource;
 }) {
   const baseTrace =
     trace ??
@@ -1156,6 +1190,7 @@ function enrichAiFirstPlanBlueprintTrace({
       fallbackReason,
       issues: issuesToTraceIssues(issues, fallbackReason ?? "unknown"),
       repairs,
+      authoredDateSource,
     });
 
   return {
@@ -1167,9 +1202,15 @@ function enrichAiFirstPlanBlueprintTrace({
     timeoutMs: debug.timeoutMs,
     elapsedMs,
     deterministicFallbackBoundary: {
-      used: sourceStatus === "deterministic_fallback",
+      used: false,
       reason: fallbackReason,
     },
+    datePlacement:
+      withHorizonDatePlacement({
+        datePlacement: baseTrace.datePlacement,
+        strategy: blueprintHorizonStrategy,
+        authoredDateSource,
+      }) ?? baseTrace.datePlacement,
     normalizedCanonicalWeeks: groupCanonicalIdentityTraceByWeek(canonicalPlan.planned_workouts),
     finalReviewedPlanIdentityCounts: countCanonicalWorkoutField(
       canonicalPlan.planned_workouts,
@@ -1185,6 +1226,48 @@ function enrichAiFirstPlanBlueprintTrace({
     ),
     ...(blueprintHorizonStrategy ? { blueprintHorizonStrategy } : {}),
   };
+}
+
+function toBlueprintTraceSourceStatus(
+  status: AiFirstPlanDraftPreviewMetadata["status"],
+): AiFirstPlanBlueprintTraceMetadata["sourceStatus"] {
+  switch (status) {
+    case "ai_authored":
+    case "repaired_ai_draft":
+      return status;
+    case "expanded_from_envelope":
+    case "blueprint_unavailable":
+    case "envelope_unavailable":
+      return "blueprint_unavailable";
+  }
+}
+
+function withHorizonDatePlacement({
+  datePlacement,
+  strategy,
+  authoredDateSource,
+}: {
+  datePlacement: AiFirstPlanBlueprintDatePlacementMetadata | null;
+  strategy?: AiFirstPlanBlueprintHorizonStrategy | AiFirstPlanBlueprintHorizonTraceMetadata | null;
+  authoredDateSource?: AiFirstPlanBlueprintAuthoredDateSource;
+}): AiFirstPlanBlueprintDatePlacementMetadata | undefined {
+  if (!datePlacement) {
+    return undefined;
+  }
+
+  return {
+    ...datePlacement,
+    ...(authoredDateSource ? { authoredDateSource } : {}),
+    backendExtendedWeeks: strategy?.backendExtendedWeeks ?? datePlacement.backendExtendedWeeks,
+  };
+}
+
+function resolveAuthoredDateSource(
+  trace: AiPlanGenerationLedgerTrace | null,
+): AiFirstPlanBlueprintAuthoredDateSource {
+  return trace?.provider.kind === "local_dev_fixture"
+    ? "local_fixture_authored_date"
+    : "openai_authored_date";
 }
 
 function groupCanonicalIdentityTraceByWeek(workouts: TrainingPlanV2["planned_workouts"]) {
@@ -1330,6 +1413,7 @@ class AiFirstPlanDraftServiceError extends Error {
     readonly reason: string,
     readonly issues: string[],
     readonly debug: AiFirstPlanDraftDebugMetadata,
+    readonly generationTrace: AiPlanGenerationLedgerTrace | null = null,
   ) {
     super(`${reason}: ${issues.slice(0, 3).join(" | ")}`);
   }

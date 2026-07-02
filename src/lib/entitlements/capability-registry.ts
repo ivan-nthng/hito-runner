@@ -2,7 +2,6 @@ import type { CapabilityKey, RunnerTier } from "@/lib/entitlements/types";
 
 export const CAPABILITY_KEYS = [
   "ai_plan_update",
-  "voice_to_plan",
   "garmin_ai_interpretation",
 ] as const satisfies readonly CapabilityKey[];
 
@@ -29,15 +28,6 @@ export const CAPABILITY_REGISTRY: Record<CapabilityKey, CapabilityPolicy> = {
       model: "metered_included",
       limit: 1,
       periodKey: "lifetime",
-    },
-    pro: {
-      model: "unlimited",
-    },
-  },
-  voice_to_plan: {
-    capabilityKey: "voice_to_plan",
-    basic: {
-      model: "pro_only",
     },
     pro: {
       model: "unlimited",

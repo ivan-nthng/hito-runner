@@ -5,14 +5,45 @@ import { nitro } from "nitro/vite";
 import type { PluginOption } from "vite";
 import { cpSync, existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  ensureQaBuildOutputNodeModulesLink,
+  resolveQaRuntimePaths,
+} from "./scripts/lib/qa-runtime-paths.mjs";
+
+const rootDir = process.cwd();
+const qaRuntimePaths = resolveQaRuntimePaths({ rootDir });
+const isVercelBuild = process.env.VERCEL === "1" || process.env.NOW_BUILDER === "1";
+const useLocalGeneratedBuildRoot = !isVercelBuild;
+
+if (useLocalGeneratedBuildRoot) {
+  ensureQaBuildOutputNodeModulesLink({ rootDir });
+}
 
 const isDevServerCommand =
   process.env.npm_lifecycle_event === "dev" ||
   process.argv.some((argument) => argument === "dev" || argument === "serve");
 
-const nitroPublicOutputDir = resolve(process.cwd(), ".output/public");
-const clientPublicSnapshotDir = resolve(process.cwd(), "logs/build-output-public-snapshot");
-const sourcePublicDir = resolve(process.cwd(), "public");
+const nitroPublicOutputDir = useLocalGeneratedBuildRoot
+  ? qaRuntimePaths.nitroPublicDir
+  : resolve(rootDir, ".output/public");
+const clientPublicSnapshotDir = qaRuntimePaths.publicSnapshotDir;
+const sourcePublicDir = resolve(rootDir, "public");
+const localNitroConfig = useLocalGeneratedBuildRoot
+  ? {
+      buildDir: qaRuntimePaths.nitroBuildDir,
+      output: isDevServerCommand
+        ? {
+            dir: qaRuntimePaths.nitroDevOutputDir,
+            publicDir: qaRuntimePaths.nitroDevPublicDir,
+            serverDir: qaRuntimePaths.nitroDevServerDir,
+          }
+        : {
+            dir: qaRuntimePaths.nitroOutputDir,
+            publicDir: qaRuntimePaths.nitroPublicDir,
+            serverDir: qaRuntimePaths.nitroServerDir,
+          },
+    }
+  : undefined;
 
 function hitoNitroPublicAssetsVirtualRestore(): PluginOption {
   return {
@@ -73,7 +104,7 @@ function hitoNitroServiceOutputLifecycle(): PluginOption {
     configEnvironment(name, config) {
       if (
         name !== "ssr" ||
-        !config.build?.outDir?.includes("node_modules/.nitro/vite/services/ssr")
+        resolve(config.build?.outDir ?? "") !== qaRuntimePaths.nitroSsrServiceDir
       ) {
         return;
       }
@@ -113,15 +144,8 @@ export default defineConfig({
     hitoNitroPublicAssetsRestore(),
   ],
   vite: {
-    nitro: isDevServerCommand
-      ? {
-          output: {
-            dir: "node_modules/.nitro/dev-output",
-            publicDir: "node_modules/.nitro/dev-output/public",
-            serverDir: "node_modules/.nitro/dev-output/server",
-          },
-        }
-      : undefined,
+    cacheDir: useLocalGeneratedBuildRoot ? qaRuntimePaths.viteCacheDir : undefined,
+    nitro: localNitroConfig,
     build: {
       emptyOutDir: false,
     },

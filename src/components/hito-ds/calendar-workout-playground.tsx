@@ -217,7 +217,7 @@ function CalendarDemoStage({
               result={state.result}
               selected={state.overlay === "selected"}
               state={state.baseState}
-              stateLabel={state.baseState === "empty" ? "Empty day" : undefined}
+              stateLabel={state.baseState === "empty" ? "No workout" : undefined}
               supportingText={supportCopy}
               title={titleForState}
               today={state.overlay === "today"}
@@ -240,7 +240,7 @@ function CalendarDemoStage({
             result={state.result}
             selected={state.overlay === "selected"}
             state={state.baseState}
-            stateLabel={state.baseState === "empty" ? "Empty day" : undefined}
+            stateLabel={state.baseState === "empty" ? "No workout" : undefined}
             supportingText={supportCopy}
             title={titleForState}
             today={state.overlay === "today"}
@@ -303,7 +303,7 @@ function CalendarVariantsStage({
                 result={variant.state.result}
                 selected={variant.state.overlay === "selected"}
                 state={variant.state.baseState}
-                stateLabel={variant.state.baseState === "empty" ? "Empty day" : undefined}
+                stateLabel={variant.state.baseState === "empty" ? "No workout" : undefined}
                 supportingText={getSpecimenSupportCopy(variant.state)}
                 title={getNonWorkoutAwareTitle(variant.state, variant.workout, variant.title)}
                 today={variant.state.overlay === "today"}
@@ -328,7 +328,7 @@ function CalendarVariantsStage({
             result={variant.state.result}
             selected={variant.state.overlay === "selected"}
             state={variant.state.baseState}
-            stateLabel={variant.state.baseState === "empty" ? "Empty day" : undefined}
+            stateLabel={variant.state.baseState === "empty" ? "No workout" : undefined}
             supportingText={getSpecimenSupportCopy(variant.state)}
             title={getNonWorkoutAwareTitle(variant.state, variant.workout, variant.title)}
             today={variant.state.overlay === "today"}
@@ -418,7 +418,7 @@ function getSpecimenSupportCopy(state: CalendarPlaygroundState) {
   }
 
   if (state.baseState === "rest") return "Calm editable rest state";
-  if (state.baseState === "empty") return "Empty authorable day";
+  if (state.baseState === "empty") return "No-workout authorable day";
   return "Outside the current month";
 }
 

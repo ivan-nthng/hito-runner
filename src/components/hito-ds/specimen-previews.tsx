@@ -316,6 +316,7 @@ export function ModalWindowPreview({
   const contentClassName = cn(
     "hito-dialog-stable hito-product-dialog hito-dialog-surface-product",
     sizeClassNameByMode[sizeMode],
+    bodyMode === "content-fit" && "hito-product-dialog-content-fit",
     bodyMode === "scroll-fill" && heightClassNameByMode[sizeMode],
   );
 

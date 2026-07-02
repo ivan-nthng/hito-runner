@@ -24,6 +24,16 @@ import {
 
 type SegmentRecord = Record<string, unknown>;
 
+const RETIRED_FLAT_REPEAT_FIELD_KEYS = new Set([
+  "repeat_count",
+  "work_distance_km",
+  "work_duration_min",
+  "work_duration_sec",
+  "recovery_duration_min",
+  "recovery_duration_sec",
+  "recovery_distance_km",
+]);
+
 export type DoctrineRequestBuilder = (
   goalDistance: StructuredFirstPlanOnboardingRequestInput["goal"]["goalDistance"],
   overrides?: Partial<StructuredFirstPlanOnboardingRequestInput>,
@@ -243,8 +253,18 @@ function assertRichImportExportRoundtrip({
   const markdown = renderPlanExportMarkdown(exportPayload);
   assert.match(
     markdown,
-    /Focus: Tempo · Half Marathon Threshold Durability|Focus: Intervals ·/,
-    "Markdown export should mention exact rich focus without replacing segment detail",
+    /- Type: (Tempo|Intervals|Long Run|Easy|Steady)/,
+    "Markdown export should use runner-facing workout type labels from the language read model",
+  );
+  assert.match(
+    markdown,
+    /- Blocks: (Warm-up|Run|Work|Recover|Finish|Cooldown|Repeat set)/,
+    "Markdown export should include runner-facing block labels without replacing segment detail",
+  );
+  assert.doesNotMatch(
+    markdown,
+    /Focus: .*Half Marathon Threshold Durability|Focus: .*Controlled Tempo Session/,
+    "Markdown export should not use internal workout identities as the primary runner-facing focus label",
   );
 
   const template = JSON.parse(
@@ -303,7 +323,14 @@ function assertRichImportExportRoundtrip({
   const referenceFixture = readAiFirstPlanReferenceFixture();
 
   if (referenceFixture) {
-    const parsedReference = importedPlanSchema.parse(referenceFixture);
+    const parsedReferenceResult = importedPlanSchema.safeParse(referenceFixture);
+
+    if (!parsedReferenceResult.success) {
+      assertRetiredFlatRepeatFixtureRejection(parsedReferenceResult.error.issues);
+      return;
+    }
+
+    const parsedReference = parsedReferenceResult.data;
     const referenceSeed = buildImportedPlanSeed(parsedReference);
     const referenceIdentities = new Set(
       referenceSeed.workouts.map((workout) => workout.workoutIdentity),
@@ -330,6 +357,17 @@ function assertRichImportExportRoundtrip({
       "reference-style imports should not collapse clear interval/race-rhythm rows to generic quality_session",
     );
   }
+}
+
+function assertRetiredFlatRepeatFixtureRejection(issues: readonly { keys?: string[] }[]) {
+  const rejectedRetiredKeys = issues.flatMap((issue) =>
+    (issue.keys ?? []).filter((key) => RETIRED_FLAT_REPEAT_FIELD_KEYS.has(key)),
+  );
+
+  assert.ok(
+    rejectedRetiredKeys.length > 0,
+    "optional AI first-plan reference fixture should parse or fail only on retired flat repeat fields",
+  );
 }
 
 function assertRichSavedModeQaFixture() {

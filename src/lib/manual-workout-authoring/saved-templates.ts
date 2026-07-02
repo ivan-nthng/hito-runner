@@ -518,7 +518,7 @@ function buildDraftInputFromSavedTemplate(
     workoutDate: input.workoutDate,
     title: input.title ?? template.displayName,
     notes: input.notes !== undefined ? input.notes : template.draftPayload.sourceNotes,
-    targetTruthMode: template.draftPayload.targetTruthMode,
+    targetTruthMode: normalizeSavedTemplateTargetTruthMode(template.draftPayload.targetTruthMode),
     entries: template.draftPayload.entries,
     ...(input.context ? { context: input.context } : {}),
   };
@@ -601,12 +601,20 @@ function rowToSavedTemplateView(
       sourceReviewChecksum: row.source_review_checksum,
       sourceWorkoutIdentity: row.source_workout_identity as CanonicalWorkoutIdentity,
       sourceWorkoutFamily: row.source_workout_family as CanonicalWorkoutFamily,
-      targetTruthMode: row.target_truth_mode as ManualWorkoutTargetTruthMode,
+      targetTruthMode: normalizeSavedTemplateTargetTruthMode(row.target_truth_mode),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       draftPayload: payload.data as ManualWorkoutSavedTemplateDraftPayload,
     },
   };
+}
+
+function normalizeSavedTemplateTargetTruthMode(value: unknown): ManualWorkoutTargetTruthMode {
+  if (value === "none") {
+    return "none";
+  }
+
+  return "structure_only";
 }
 
 async function getCurrentPersistedUserId() {

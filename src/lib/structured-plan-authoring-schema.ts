@@ -5,6 +5,10 @@ import {
   FIRST_PLAN_GOAL_STYLE_VALUES,
   FIRST_PLAN_WATCH_ACCESS_VALUES,
 } from "@/lib/first-plan-authoring-utils";
+import {
+  normalizedPlanGoalIntentSchema,
+  type NormalizedPlanGoalIntent,
+} from "@/lib/plan-creation-engine/plan-goal-intent";
 import type { CanonicalExecutableMode, HrTargetSource } from "@/lib/rich-workout-model";
 import { diffDaysIso, todayIso } from "@/lib/training";
 
@@ -158,6 +162,7 @@ export const structuredPlanAuthoringInputSchema = z
         indoorTreadmillOk: false,
       }),
     execution: executionModeSchema,
+    planGoalIntent: normalizedPlanGoalIntentSchema.optional().nullable(),
   })
   .superRefine((value, context) => {
     if (!value.schedule.targetDate && !value.schedule.preparationHorizonWeeks) {
@@ -185,7 +190,11 @@ export type StructuredPlanAuthoringInput = z.infer<typeof structuredPlanAuthorin
 
 export type StructuredWeekday = (typeof weekdayValues)[number];
 
-export interface NormalizedStructuredInput extends StructuredPlanAuthoringInput {
+export interface NormalizedStructuredInput extends Omit<
+  StructuredPlanAuthoringInput,
+  "planGoalIntent"
+> {
+  planGoalIntent: NormalizedPlanGoalIntent;
   schedule: StructuredPlanAuthoringInput["schedule"] & {
     horizonWeeks: number;
     endDate: string;

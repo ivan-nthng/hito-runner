@@ -17,6 +17,11 @@ import {
 } from "@/lib/first-plan-authoring-utils";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import {
+  buildStructuredPlanGoalIntentInput,
+  distanceFamilyForStructuredGoalType,
+  normalizePlanGoalIntent,
+} from "@/lib/plan-creation-engine/plan-goal-intent";
+import {
   deriveAvailableTrainingWeekdays,
   derivePreferredLongRunDayFallback,
   FITNESS_LEVEL_VALUES,
@@ -332,6 +337,26 @@ export function buildStructuredFirstPlanAuthoringInput(
     input.goal.goalStyle === "target_time"
       ? (input.schedule?.targetDate ?? input.goal.targetDate ?? null)
       : null;
+  const preparationHorizonWeeks = targetDate ? null : defaultHorizonWeeks(input.goal.goalDistance);
+  const planGoalIntent = normalizePlanGoalIntent({
+    rawIntent: buildStructuredPlanGoalIntentInput({
+      goal: {
+        goalType: input.goal.goalDistance,
+        targetTime: input.goal.goalStyle === "target_time" ? (input.goal.targetTime ?? null) : null,
+      },
+      schedule: {
+        targetDate,
+      },
+    }),
+    distanceFamily: distanceFamilyForStructuredGoalType(input.goal.goalDistance),
+    startDate,
+    horizonWeeks: preparationHorizonWeeks,
+  });
+
+  if (!planGoalIntent.ok) {
+    throw new Error(planGoalIntent.message);
+  }
+
   const authoringInput = {
     goal: {
       goalType: input.goal.goalDistance,
@@ -346,7 +371,7 @@ export function buildStructuredFirstPlanAuthoringInput(
     schedule: {
       startDate,
       targetDate,
-      preparationHorizonWeeks: targetDate ? null : defaultHorizonWeeks(input.goal.goalDistance),
+      preparationHorizonWeeks,
     },
     runnerProfile: {
       experienceLevel: inferExperienceLevel(input),
@@ -379,6 +404,7 @@ export function buildStructuredFirstPlanAuthoringInput(
       notes: buildPlanNotes(input),
     },
     execution,
+    planGoalIntent: planGoalIntent.intent,
   } satisfies z.input<typeof structuredPlanAuthoringInputSchema>;
 
   return structuredPlanAuthoringInputSchema.parse(authoringInput);

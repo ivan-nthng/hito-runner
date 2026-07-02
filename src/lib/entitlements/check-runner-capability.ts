@@ -130,8 +130,6 @@ function buildCapabilityLockedMessage(capabilityKey: CapabilityKey) {
   switch (capabilityKey) {
     case "ai_plan_update":
       return "The included Basic plan update has already been used. Pro is required for more AI plan updates.";
-    case "voice_to_plan":
-      return "Voice-to-plan is a Pro capability.";
     case "garmin_ai_interpretation":
       return "Garmin upload and factual comparison are still available. AI interpretation is a Pro capability.";
   }

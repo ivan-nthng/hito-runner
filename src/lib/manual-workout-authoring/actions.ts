@@ -14,6 +14,7 @@ import {
   buildManualWorkoutUserBuiltTrainingPlan,
   deriveManualTargetTruthMode,
 } from "@/lib/manual-workout-authoring/persistence";
+import { buildManualWorkoutConstructorContract } from "@/lib/manual-workout-authoring/constructor-contract";
 import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
 import {
   addReviewedManualWorkoutToActivePlanForUser,
@@ -136,6 +137,12 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
     targetTruthMode: validation.targetTruthMode,
     entries: validation.entries,
   });
+  const constructorContract = buildManualWorkoutConstructorContract({
+    parsedInput: parsed.data,
+    template: validation.template,
+    targetTruthMode: validation.targetTruthMode,
+    entries: validation.entries,
+  });
   const exactnessPayload = buildManualWorkoutReviewExactnessPayload(normalized.draft);
   const reviewChecksum = stableManualWorkoutChecksum64Hex(exactnessPayload);
 
@@ -143,6 +150,7 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
     ok: true,
     status: "draft_ready",
     draft: normalized.draft,
+    constructorContract,
     review: {
       headline: `${normalized.draft.title} is ready for review.`,
       bullets: [

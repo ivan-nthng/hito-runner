@@ -81,6 +81,10 @@ function validateBuilderInputBoundary() {
     activeFieldNames.includes("benchmarkPaceTruth"),
     "Optional benchmark-backed pace truth must be represented without being required.",
   );
+  assert.ok(
+    activeFieldNames.includes("planGoalIntent"),
+    "Optional planGoalIntent must be represented without becoming a direct targetTime input.",
+  );
 
   assert.ok(!activeFieldNames.includes("watchAccess"), "Watch access must not be a normal input.");
   assert.ok(
@@ -99,7 +103,7 @@ function validateBuilderInputBoundary() {
   );
   assert.ok(
     deliberatelyAbsentFields.includes("targetTime"),
-    "Target-time absence must be explicit.",
+    "Direct targetTime absence must be explicit.",
   );
   assert.ok(
     deliberatelyAbsentFields.includes("personalHrZones"),
@@ -123,6 +127,7 @@ function validateWatchExecutableTemplates() {
         segmentPrescriptionIsNumeric(segment.primaryPrescription),
         `${kind}.${segment.id} lacks numeric structure.`,
       );
+      assertChildFirstRepeatPrescription(kind, segment.id, segment.primaryPrescription);
     }
   }
 
@@ -245,7 +250,7 @@ function validateForbiddenOutputGates() {
   assert.ok(gateIds.includes("no_old_runner_level_labels"));
   assert.ok(gateIds.includes("no_5k_benchmark_normal_path_dependency"));
   assert.ok(gateIds.includes("no_watch_choice_gate"));
-  assert.ok(gateIds.includes("no_target_time_normal_path"));
+  assert.ok(gateIds.includes("no_goal_intent_as_executable_target"));
 }
 
 function validateCompositionGrammarContract() {
@@ -440,13 +445,43 @@ function segmentPrescriptionIsNumeric(prescription: RunningPlanSegmentPrescripti
     case "repeat":
       return (
         rangeIsUsable(prescription.repeatCount) &&
-        (prescription.work.mode === "time"
-          ? rangeIsUsable(prescription.work.durationSeconds)
-          : rangeIsUsable(prescription.work.distanceMeters)) &&
-        (prescription.recovery.mode === "recovery_time"
-          ? rangeIsUsable(prescription.recovery.recoveryDurationSeconds)
-          : rangeIsUsable(prescription.recovery.recoveryDistanceMeters))
+        prescription.children.length > 0 &&
+        prescription.children.every((child) =>
+          child.prescription.mode === "time"
+            ? rangeIsUsable(child.prescription.durationSeconds)
+            : rangeIsUsable(child.prescription.distanceMeters),
+        )
       );
+  }
+}
+
+function assertChildFirstRepeatPrescription(
+  kind: string,
+  segmentId: string,
+  prescription: RunningPlanSegmentPrescription,
+) {
+  if (prescription.mode !== "repeat") {
+    return;
+  }
+
+  const record = prescription as Record<string, unknown>;
+  assert.equal(
+    "work" in record,
+    false,
+    `${kind}.${segmentId} must not use private repeat.work; use children[].`,
+  );
+  assert.equal(
+    "recovery" in record,
+    false,
+    `${kind}.${segmentId} must not use private repeat.recovery; use children[].`,
+  );
+  assert.ok(prescription.children.length >= 2, `${kind}.${segmentId} repeat needs child blocks.`);
+  for (const [index, child] of prescription.children.entries()) {
+    assert.ok(child.role, `${kind}.${segmentId}.children[${index}] must keep a role.`);
+    assert.ok(
+      child.intensityLabel,
+      `${kind}.${segmentId}.children[${index}] must keep child intensity semantics.`,
+    );
   }
 }
 

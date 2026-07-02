@@ -351,6 +351,7 @@ function buildRichWorkoutDraftUserPrompt({
     "Use the deterministic skeleton as hard truth. Do not add, remove, move, or reorder workouts.",
     "For short recovery runs under 35 minutes, keep structure simple only if the skeleton is already simple.",
     "For normal non-rest workouts, include distinct warmup/main/cooldown segments with useful guidance.",
+    "For repeated sets, prefer prescription.children as the ordered list repeated N times; Work + Recover is only one possible child sequence.",
     "",
     "Original runner text:",
     authoringText.trim(),

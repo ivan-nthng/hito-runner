@@ -392,11 +392,25 @@ function resolveTenKDevelopmentTouch({
     return weekNumber === 3 || weekNumber === 7 || weekNumber === lateReminderWeek ? "tempo" : null;
   }
 
-  const lateRefreshWeek = resolveSoftBridgeWeek({
-    horizonWeeks,
-    targetWeek: Math.ceil(horizonWeeks * 0.82),
-  });
-  if (weekNumber === lateRefreshWeek) {
+  if (weekNumber === resolveRunningPlanTaperWeek(horizonWeeks)) {
+    return "strides";
+  }
+
+  const bridgeWeeks =
+    horizonWeeks >= 14
+      ? [0.62, 0.76].map((ratio) =>
+          resolveSoftBridgeWeek({
+            horizonWeeks,
+            targetWeek: Math.ceil(horizonWeeks * ratio),
+          }),
+        )
+      : [
+          resolveSoftBridgeWeek({
+            horizonWeeks,
+            targetWeek: Math.ceil(horizonWeeks * 0.82),
+          }),
+        ];
+  if (bridgeWeeks.includes(weekNumber)) {
     return "tempo";
   }
 

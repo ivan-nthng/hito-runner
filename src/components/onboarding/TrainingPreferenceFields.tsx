@@ -29,6 +29,7 @@ interface TrainingPreferenceFieldsProps {
   onRecent5kPaceChange?: (value: string) => void;
   showFitnessBenchmark?: boolean;
   fixedRestDaysHelper?: string;
+  runningDaysLabel?: string;
   maxRunningDaysHelper?: string;
   preferredLongRunHelper?: string;
   showRunningDays?: boolean;
@@ -52,6 +53,7 @@ export function TrainingPreferenceFields({
   onRecent5kPaceChange,
   showFitnessBenchmark = false,
   fixedRestDaysHelper,
+  runningDaysLabel,
   maxRunningDaysHelper,
   preferredLongRunHelper,
   showRunningDays = true,
@@ -131,40 +133,13 @@ export function TrainingPreferenceFields({
       </TrainingPreferenceField>
 
       {restDaysAnswered && showRunningDays ? (
-        <TrainingPreferenceField
-          label="Default running days per week"
-          helper={
-            maxRunningDaysHelper ??
-            `Choose 1-${allowedRunningDayCount} running day${
-              allowedRunningDayCount === 1 ? "" : "s"
-            } per week.`
-          }
-        >
-          <div
-            className="hito-choice-toggle-group"
-            role="radiogroup"
-            aria-label="Default running days per week"
-          >
-            {Array.from({ length: allowedRunningDayCount }, (_, index) => index + 1).map(
-              (count) => {
-                const active = selectedRunningDays === count;
-                return (
-                  <button
-                    key={count}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    className="hito-choice-toggle hito-choice-toggle-sm"
-                    data-selected={active}
-                    onClick={() => onMaxRunningDaysPerWeekChange(String(count))}
-                  >
-                    {count}
-                  </button>
-                );
-              },
-            )}
-          </div>
-        </TrainingPreferenceField>
+        <RunningDaysPreferenceField
+          fixedRestDays={fixedRestDays}
+          maxRunningDaysPerWeek={maxRunningDaysPerWeek}
+          onMaxRunningDaysPerWeekChange={onMaxRunningDaysPerWeekChange}
+          label={runningDaysLabel}
+          helper={maxRunningDaysHelper}
+        />
       ) : null}
 
       {canShowPreferredLongRunDay ? (
@@ -267,6 +242,54 @@ export function TrainingPreferenceFields({
   );
 }
 
+export function RunningDaysPreferenceField({
+  fixedRestDays,
+  helper,
+  label = "Default running days per week",
+  maxRunningDaysPerWeek,
+  onMaxRunningDaysPerWeekChange,
+}: {
+  fixedRestDays: WeekdayName[];
+  helper?: string;
+  label?: string;
+  maxRunningDaysPerWeek: string;
+  onMaxRunningDaysPerWeekChange: (value: string) => void;
+}) {
+  const allowedRunningDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
+  const selectedRunningDays = Number.parseInt(maxRunningDaysPerWeek, 10);
+
+  return (
+    <TrainingPreferenceField
+      label={label}
+      helper={
+        helper ??
+        `Choose 1-${allowedRunningDayCount} running day${
+          allowedRunningDayCount === 1 ? "" : "s"
+        } per week.`
+      }
+    >
+      <div className="hito-choice-toggle-group" role="radiogroup" aria-label={label}>
+        {Array.from({ length: allowedRunningDayCount }, (_, index) => index + 1).map((count) => {
+          const active = selectedRunningDays === count;
+          return (
+            <button
+              key={count}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              className="hito-choice-toggle hito-choice-toggle-sm"
+              data-selected={active}
+              onClick={() => onMaxRunningDaysPerWeekChange(String(count))}
+            >
+              {count}
+            </button>
+          );
+        })}
+      </div>
+    </TrainingPreferenceField>
+  );
+}
+
 export function RecentFiveKBenchmarkFields({
   className,
   required = false,
@@ -294,7 +317,7 @@ export function RecentFiveKBenchmarkFields({
       ? "hito-field-error"
       : "hito-field-helper";
   const helperText = timeInvalid
-    ? "Use a recent 5K time between 18:00 and 55:00."
+    ? "Use a recent 5K time between 10:00 and 2:00:00."
     : paceInvalid
       ? "Use a recent 5K pace between 2:00/km and 15:00/km."
       : missingRequiredBenchmark

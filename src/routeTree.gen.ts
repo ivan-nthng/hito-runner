@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TestCalendarRouteImport } from './routes/test-calendar'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ProgressRouteImport } from './routes/progress'
 import { Route as LoginRouteImport } from './routes/login'
@@ -37,11 +36,6 @@ import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
 import { Route as ApiAdminAuthLogoutRouteImport } from './routes/api.admin.auth.logout'
 import { Route as ApiAdminAuthLoginRouteImport } from './routes/api.admin.auth.login'
 
-const TestCalendarRoute = TestCalendarRouteImport.update({
-  id: '/test-calendar',
-  path: '/test-calendar',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -183,7 +177,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
-  '/test-calendar': typeof TestCalendarRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
@@ -212,7 +205,6 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
-  '/test-calendar': typeof TestCalendarRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
@@ -242,7 +234,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/progress': typeof ProgressRoute
   '/settings': typeof SettingsRoute
-  '/test-calendar': typeof TestCalendarRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
@@ -273,7 +264,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
-    | '/test-calendar'
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
@@ -302,7 +292,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
-    | '/test-calendar'
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
@@ -331,7 +320,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/progress'
     | '/settings'
-    | '/test-calendar'
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
@@ -361,7 +349,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProgressRoute: typeof ProgressRoute
   SettingsRoute: typeof SettingsRoute
-  TestCalendarRoute: typeof TestCalendarRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminCaptureRoute: typeof AdminCaptureRoute
   AdminLoginRoute: typeof AdminLoginRoute
@@ -383,13 +370,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/test-calendar': {
-      id: '/test-calendar'
-      path: '/test-calendar'
-      fullPath: '/test-calendar'
-      preLoaderRoute: typeof TestCalendarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -585,7 +565,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProgressRoute: ProgressRoute,
   SettingsRoute: SettingsRoute,
-  TestCalendarRoute: TestCalendarRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminCaptureRoute: AdminCaptureRoute,
   AdminLoginRoute: AdminLoginRoute,

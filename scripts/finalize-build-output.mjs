@@ -1,36 +1,35 @@
-import {
-  cpSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readdirSync,
-  readlinkSync,
-  renameSync,
-  rmSync,
-  symlinkSync,
-} from "node:fs";
-import { basename, dirname, relative, resolve } from "node:path";
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import {
   validateLocalBuildOutput,
   validateVercelBuildOutput,
 } from "./validate-build-output-integrity.mjs";
 import { releaseBuildOutputLock } from "./lib/build-output-lock.mjs";
+import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
 
 const rootDir = process.cwd();
+const qaRuntimePaths = resolveQaRuntimePaths({ rootDir });
 
-const stagedPublicDir = resolve(rootDir, "node_modules/.nitro/vite/public");
+const stagedNitroDir = qaRuntimePaths.nitroBuildDir;
+const stagedPublicDir = qaRuntimePaths.nitroStagedPublicDir;
 const sourcePublicDir = resolve(rootDir, "public");
-const outputPublicDir = resolve(rootDir, ".output/public");
-const outputServerDir = resolve(rootDir, ".output/server");
-const outputNitroManifest = resolve(rootDir, ".output/nitro.json");
-const localFinalizeBackupDir = resolve(rootDir, "logs/build-output-finalize-backup");
+const outputPublicDir = qaRuntimePaths.nitroPublicDir;
+const outputServerDir = qaRuntimePaths.nitroServerDir;
+const outputNitroManifest = qaRuntimePaths.nitroOutputManifest;
+const localFinalizeBackupDir = qaRuntimePaths.finalizeBackupDir;
 const localFinalizeServerBackupDir = resolve(localFinalizeBackupDir, "server");
 const localFinalizePublicBackupDir = resolve(localFinalizeBackupDir, "public");
-const localFinalizedOutputDir = resolve(rootDir, "logs/build-output-finalized");
+const localFinalizeNitroManifestBackup = resolve(localFinalizeBackupDir, "nitro.json");
+const localFinalizedOutputDir = qaRuntimePaths.runtimeRoot;
 const localFinalizedServerDir = resolve(localFinalizedOutputDir, "server");
 const localFinalizedPublicDir = resolve(localFinalizedOutputDir, "public");
 const localFinalizedNitroManifest = resolve(localFinalizedOutputDir, "nitro.json");
-const clientPublicSnapshotDir = resolve(rootDir, "logs/build-output-public-snapshot");
+const localFinalizedPreviousDir = qaRuntimePaths.finalizedPreviousDir;
+const localFinalizedStagingDir = qaRuntimePaths.finalizedStagingDir;
+const localFinalizedStagingServerDir = resolve(localFinalizedStagingDir, "server");
+const localFinalizedStagingPublicDir = resolve(localFinalizedStagingDir, "public");
+const localFinalizedStagingNitroManifest = resolve(localFinalizedStagingDir, "nitro.json");
+const clientPublicSnapshotDir = qaRuntimePaths.publicSnapshotDir;
 const vercelOutputDir = resolve(rootDir, ".vercel/output");
 const vercelStaticDir = resolve(vercelOutputDir, "static");
 const vercelFunctionDir = resolve(vercelOutputDir, "functions/__server.func");
@@ -42,14 +41,18 @@ const planPresetProgramFiles = [
   "preset-program-load-adjustments.csv",
   "preset-goal-contract-matrix.csv",
 ];
-const localPlanPresetProgramOutputDir = resolve(outputServerDir, "src/lib/plan-presets");
 const localFinalizedPlanPresetProgramOutputDir = resolve(
   localFinalizedServerDir,
+  "src/lib/plan-presets",
+);
+const localFinalizedStagingPlanPresetProgramOutputDir = resolve(
+  localFinalizedStagingServerDir,
   "src/lib/plan-presets",
 );
 const vercelPlanPresetProgramOutputDir = resolve(vercelFunctionDir, "src/lib/plan-presets");
 
 const localRequiredOutputs = [
+  outputNitroManifest,
   resolve(outputPublicDir, "favicon.svg"),
   resolve(outputPublicDir, "templates/hito-training-plan-v2-template.json"),
   resolve(outputServerDir, "index.mjs"),
@@ -84,6 +87,8 @@ function shouldFinalizeVercelOutput() {
 async function finalizeLocalOutput() {
   snapshotLocalOutputForLateNitroCleanup();
   await restoreLocalOutputAfterLateNitroCleanup();
+  publishLocalFinalizedOutput();
+  await cleanupGeneratedConflictResidueAfterLocalPublish();
 
   for (const outputPath of localRequiredOutputs) {
     if (!existsSync(outputPath)) {
@@ -91,7 +96,9 @@ async function finalizeLocalOutput() {
     }
   }
 
-  validatePlanPresetProgramArtifacts(localPlanPresetProgramOutputDir);
+  validatePlanPresetProgramArtifacts(localFinalizedPlanPresetProgramOutputDir);
+
+  cleanupLocalFinalizeScratch();
 
   validateLocalBuildOutput({ rootDir });
 }
@@ -148,24 +155,18 @@ function shouldCopyGeneratedBuildPath(sourcePath) {
   const entryName = basename(sourcePath);
   // Local sync can resurrect duplicate generated dirs such as "assets 2";
   // keep the canonical sibling as the only finalized build artifact.
-  const canonicalEntryName = entryName.replace(/ \d+$/, "");
-
-  if (canonicalEntryName === entryName) {
-    return true;
-  }
-
-  return !existsSync(resolve(dirname(sourcePath), canonicalEntryName));
+  return canonicalGeneratedSiblingName(entryName) === entryName;
 }
 
 function snapshotLocalOutputForLateNitroCleanup() {
   removeGeneratedPath(localFinalizeBackupDir);
   removeGeneratedSiblingConflicts(localFinalizeBackupDir);
-  removeGeneratedPath(localFinalizedOutputDir);
-  removeGeneratedSiblingConflicts(localFinalizedOutputDir);
+  removeGeneratedPath(localFinalizedStagingDir);
+  removeGeneratedSiblingConflicts(localFinalizedStagingDir);
 
   copyGeneratedDirectory(outputServerDir, localFinalizeServerBackupDir);
   copyGeneratedDirectory(outputPublicDir, localFinalizePublicBackupDir);
-  copyGeneratedFile(outputNitroManifest, localFinalizedNitroManifest);
+  copyGeneratedFile(outputNitroManifest, localFinalizeNitroManifestBackup);
 }
 
 async function restoreLocalOutputAfterLateNitroCleanup() {
@@ -182,35 +183,78 @@ async function restoreLocalOutputAfterLateNitroCleanup() {
 }
 
 function restoreLocalOutputSnapshot() {
-  copyGeneratedDirectory(localFinalizeServerBackupDir, localFinalizedServerDir);
-  copyPlanPresetProgramArtifacts(localFinalizedPlanPresetProgramOutputDir);
-  copyGeneratedDirectory(localFinalizePublicBackupDir, localFinalizedPublicDir);
-  linkLocalOutputDirectory(localFinalizedServerDir, outputServerDir);
-  linkLocalOutputDirectory(localFinalizedPublicDir, outputPublicDir);
+  copyGeneratedDirectory(localFinalizeServerBackupDir, localFinalizedStagingServerDir);
+  copyPlanPresetProgramArtifacts(localFinalizedStagingPlanPresetProgramOutputDir);
+  copyGeneratedDirectory(localFinalizePublicBackupDir, localFinalizedStagingPublicDir);
+  copyGeneratedFile(localFinalizeNitroManifestBackup, localFinalizedStagingNitroManifest);
 }
 
 function restoreLocalPublicOutput() {
-  copyGeneratedDirectory(clientPublicSnapshotDir, localFinalizedPublicDir);
-  copyGeneratedDirectory(stagedPublicDir, localFinalizedPublicDir);
-  copyDirectory(sourcePublicDir, localFinalizedPublicDir);
-  linkLocalOutputDirectory(localFinalizedPublicDir, outputPublicDir);
+  copyGeneratedDirectory(clientPublicSnapshotDir, localFinalizedStagingPublicDir);
+  copyGeneratedDirectory(stagedPublicDir, localFinalizedStagingPublicDir);
+  copyDirectory(sourcePublicDir, localFinalizedStagingPublicDir);
 }
 
-function linkLocalOutputDirectory(sourceDir, outputPath) {
-  if (!existsSync(sourceDir)) {
-    return;
+function publishLocalFinalizedOutput() {
+  const stagedRequiredOutputs = [
+    localFinalizedStagingNitroManifest,
+    resolve(localFinalizedStagingPublicDir, "favicon.svg"),
+    resolve(localFinalizedStagingPublicDir, "templates/hito-training-plan-v2-template.json"),
+    resolve(localFinalizedStagingServerDir, "index.mjs"),
+  ];
+
+  for (const outputPath of stagedRequiredOutputs) {
+    if (!existsSync(outputPath)) {
+      throw new Error(`Expected staged finalized Nitro build artifact is missing: ${outputPath}`);
+    }
   }
 
-  const linkTarget = relative(dirname(outputPath), sourceDir);
+  replaceGeneratedDirectory({
+    destinationDir: localFinalizedOutputDir,
+    previousDir: localFinalizedPreviousDir,
+    stagedDir: localFinalizedStagingDir,
+  });
+}
 
-  removeGeneratedPath(outputPath);
-  removeGeneratedSiblingConflicts(outputPath);
-  mkdirSync(dirname(outputPath), { recursive: true });
-  symlinkSync(linkTarget, outputPath, "dir");
-  canonicalizeGeneratedSymlink({ outputPath, linkTarget });
+function cleanupLocalFinalizeScratch() {
+  const scratchDirs = [
+    localFinalizeBackupDir,
+    localFinalizedPreviousDir,
+    localFinalizedStagingDir,
+    clientPublicSnapshotDir,
+  ];
 
-  if (!existsSync(outputPath)) {
-    throw new Error(`Expected finalized local build output link is missing: ${outputPath}`);
+  for (const scratchDir of scratchDirs) {
+    removeGeneratedPath(scratchDir);
+    removeGeneratedSiblingConflicts(scratchDir);
+  }
+}
+
+async function cleanupGeneratedConflictResidueAfterLocalPublish() {
+  const settleWindowsMs = [0, 250, 750, 1500];
+  const generatedRoots = [
+    resolve(rootDir, ".output"),
+    stagedNitroDir,
+    qaRuntimePaths.nitroOutputDir,
+    qaRuntimePaths.buildOutputRoot,
+    qaRuntimePaths.viteCacheDir,
+    localFinalizedOutputDir,
+    localFinalizeBackupDir,
+    localFinalizedPreviousDir,
+    localFinalizedStagingDir,
+    clientPublicSnapshotDir,
+  ];
+
+  for (const settleMs of settleWindowsMs) {
+    if (settleMs > 0) {
+      await new Promise((resolvePromise) => {
+        setTimeout(resolvePromise, settleMs);
+      });
+    }
+
+    for (const generatedRoot of generatedRoots) {
+      removeGeneratedSiblingConflictsRecursively(generatedRoot);
+    }
   }
 }
 
@@ -249,43 +293,75 @@ function removeGeneratedSiblingConflicts(path) {
   }
 }
 
-function canonicalizeGeneratedSymlink({ outputPath, linkTarget }) {
-  if (existsSync(outputPath)) {
+function removeGeneratedSiblingConflictsRecursively(path) {
+  if (!existsSync(path)) {
     return;
   }
 
-  const conflictPath = generatedSiblingConflictPaths(outputPath).find((candidatePath) =>
-    symlinkPointsTo(candidatePath, linkTarget),
-  );
+  for (const entry of readdirSync(path)) {
+    const entryPath = resolve(path, entry);
 
-  if (conflictPath) {
-    renameSync(conflictPath, outputPath);
+    if (isGeneratedSiblingConflictName(entry)) {
+      removeGeneratedPath(entryPath);
+      continue;
+    }
+
+    const stats = lstatSync(entryPath);
+    if (stats.isDirectory() && !stats.isSymbolicLink()) {
+      removeGeneratedSiblingConflictsRecursively(entryPath);
+    }
+  }
+}
+
+function replaceGeneratedDirectory({ destinationDir, previousDir, stagedDir }) {
+  removeGeneratedPath(previousDir);
+  removeGeneratedSiblingConflicts(previousDir);
+  removeGeneratedSiblingConflicts(destinationDir);
+
+  const hadDestination = existsSync(destinationDir);
+
+  try {
+    if (hadDestination) {
+      renameSync(destinationDir, previousDir);
+    }
+
+    renameSync(stagedDir, destinationDir);
+    removeGeneratedPath(previousDir);
+    removeGeneratedSiblingConflicts(destinationDir);
+  } catch (error) {
+    if (!existsSync(destinationDir) && existsSync(previousDir)) {
+      renameSync(previousDir, destinationDir);
+    }
+
+    throw error;
   }
 }
 
 function generatedSiblingConflictPaths(path) {
   const parentDir = dirname(path);
-  const entryName = basename(path);
+  const canonicalName = basename(path);
 
   if (!existsSync(parentDir)) {
     return [];
   }
 
-  const conflictPattern = new RegExp(`^${escapeRegExp(entryName)} \\d+$`);
-
   return readdirSync(parentDir)
-    .filter((entry) => conflictPattern.test(entry))
+    .filter(
+      (entry) => entry !== canonicalName && canonicalGeneratedSiblingName(entry) === canonicalName,
+    )
     .map((entry) => resolve(parentDir, entry));
 }
 
-function symlinkPointsTo(path, linkTarget) {
-  try {
-    return lstatSync(path).isSymbolicLink() && readlinkSync(path) === linkTarget;
-  } catch {
-    return false;
+function canonicalGeneratedSiblingName(entryName) {
+  const extensionConflict = /^(.*) \d+(\.[^/.]+)$/.exec(entryName);
+  if (extensionConflict) {
+    return `${extensionConflict[1]}${extensionConflict[2]}`;
   }
+
+  const bareConflict = /^(.*) \d+$/.exec(entryName);
+  return bareConflict ? bareConflict[1] : entryName;
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function isGeneratedSiblingConflictName(entryName) {
+  return canonicalGeneratedSiblingName(entryName) !== entryName;
 }

@@ -55,6 +55,17 @@ export {
   type RunnerFacingRichnessSummary,
 } from "@/lib/plan-creation-engine/runner-facing-richness";
 export {
+  buildStructuredPlanGoalIntentInput,
+  distanceFamilyForStructuredGoalType,
+  normalizePlanGoalIntent,
+  normalizedPlanGoalIntentSchema,
+  planGoalIntentInputSchema,
+  PLAN_GOAL_INTENT_CONTRACT_VERSION,
+  PLAN_GOAL_INTENT_PRESET_DISTANCE_VALUES,
+  type NormalizedPlanGoalIntent,
+  type PlanGoalIntentInput,
+} from "@/lib/plan-creation-engine/plan-goal-intent";
+export {
   assertRunningPlanSourceModel,
   collectRunningPlanSourceModelIssues,
   summarizeRunningPlanSourceModel,

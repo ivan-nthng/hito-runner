@@ -126,9 +126,9 @@ function collectCanonicalTargetIssues({
   context: string;
 }) {
   const issues: Array<{ kind: PrescriptionIssueKind; message: string }> = [];
-  const target = segment.target;
+  const targets = collectCanonicalTargets(segment);
 
-  if (!target) {
+  if (targets.length === 0) {
     issues.push({
       kind: "vague_effort_only_target",
       message: `${context} lacks an executable target object.`,
@@ -136,71 +136,86 @@ function collectCanonicalTargetIssues({
     return issues;
   }
 
-  const labelText = `${target.label ?? ""} ${target.source_note ?? ""}`.toLowerCase();
-  if (/structure[-_ ]?only|hito default|internal/.test(labelText)) {
-    issues.push({
-      kind: "internal_target_label",
-      message: `${context} exposes internal target language.`,
-    });
-  }
+  targets.forEach((target, index) => {
+    const targetContext = targets.length === 1 ? context : `${context}.target_${index + 1}`;
+    const labelText = `${target.label ?? ""} ${target.source_note ?? ""}`.toLowerCase();
+    if (/structure[-_ ]?only|hito default|internal/.test(labelText)) {
+      issues.push({
+        kind: "internal_target_label",
+        message: `${targetContext} exposes internal target language.`,
+      });
+    }
 
-  if (hasPaceTarget(target) && row.metric_mode?.pace_targets_allowed !== true) {
-    issues.push({
-      kind: "fake_pace_target",
-      message: `${context} exposes a pace target without selected-plan pace truth.`,
-    });
-  }
+    if (hasPaceTarget(target) && row.metric_mode?.pace_targets_allowed !== true) {
+      issues.push({
+        kind: "fake_pace_target",
+        message: `${targetContext} exposes a pace target without selected-plan pace truth.`,
+      });
+    }
 
-  if (
-    row.workout_identity === "race_pace_session" &&
-    row.metric_mode?.pace_targets_allowed === false
-  ) {
-    issues.push({
-      kind: "fake_pace_target",
-      message: `${context} exposes race-pace identity while metric policy disallows pace targets.`,
-    });
-  }
+    if (
+      row.workout_identity === "race_pace_session" &&
+      row.metric_mode?.pace_targets_allowed === false
+    ) {
+      issues.push({
+        kind: "fake_pace_target",
+        message: `${targetContext} exposes race-pace identity while metric policy disallows pace targets.`,
+      });
+    }
 
-  if (hasPersonalHrTarget(target)) {
-    issues.push({
-      kind: "fake_personal_hr_target",
-      message: `${context} exposes personal HR target truth without personal zones.`,
-    });
-  }
+    if (hasPersonalHrTarget(target)) {
+      issues.push({
+        kind: "fake_personal_hr_target",
+        message: `${targetContext} exposes personal HR target truth without personal zones.`,
+      });
+    }
 
-  const hasHonestIntensityTarget =
-    hasPaceTarget(target) ||
-    hasNonEmptyString(target.rpe) ||
-    hasNonEmptyString(target.cadence_spm_range) ||
-    hasNonEmptyString(target.hr_target_source);
-  const hasOnlyIntensity = hasNonEmptyString(target.intensity) && !hasHonestIntensityTarget;
+    const hasHonestIntensityTarget =
+      hasPaceTarget(target) ||
+      hasRpeTarget(target) ||
+      hasNonEmptyString(target.cadence_spm_range) ||
+      hasNonEmptyString(target.hr_target_source);
+    const hasOnlyIntensity = hasNonEmptyString(target.intensity) && !hasHonestIntensityTarget;
 
-  if (hasOnlyIntensity) {
-    issues.push({
-      kind: "vague_effort_only_target",
-      message: `${context} exposes vague effort text as the only target.`,
-    });
-  }
+    if (hasOnlyIntensity) {
+      issues.push({
+        kind: "vague_effort_only_target",
+        message: `${targetContext} exposes vague effort text as the only target.`,
+      });
+    }
 
-  if (row.metric_mode?.pace_targets_allowed === false && hasPaceTarget(target)) {
-    issues.push({
-      kind: "fake_pace_target",
-      message: `${context} exposes pace target while metric policy disallows pace targets.`,
-    });
-  }
+    if (row.metric_mode?.pace_targets_allowed === false && hasPaceTarget(target)) {
+      issues.push({
+        kind: "fake_pace_target",
+        message: `${targetContext} exposes pace target while metric policy disallows pace targets.`,
+      });
+    }
 
-  if (
-    row.metric_mode?.hr_targets_allowed === false &&
-    hasHrRangeTarget(target) &&
-    target.hr_target_source !== "default_estimated_hr"
-  ) {
-    issues.push({
-      kind: "fake_personal_hr_target",
-      message: `${context} exposes HR range while metric policy disallows HR targets.`,
-    });
-  }
+    if (
+      row.metric_mode?.hr_targets_allowed === false &&
+      hasHrRangeTarget(target) &&
+      target.hr_target_source !== "default_estimated_hr"
+    ) {
+      issues.push({
+        kind: "fake_personal_hr_target",
+        message: `${targetContext} exposes HR range while metric policy disallows HR targets.`,
+      });
+    }
+  });
 
   return issues;
+}
+
+function collectCanonicalTargets(segment: CanonicalSegment) {
+  const parentTarget = segment.target ? [segment.target] : [];
+  const childTargets =
+    segment.prescription?.mode === "repeats" && segment.prescription.children?.length
+      ? segment.prescription.children
+          .map((child) => child.target)
+          .filter((target): target is NonNullable<CanonicalSegment["target"]> => Boolean(target))
+      : [];
+
+  return [...parentTarget, ...childTargets];
 }
 
 function previewPrescriptionDurations(prescription: RunningPlanSegmentPrescription) {
@@ -225,22 +240,13 @@ function previewPrescriptionDurations(prescription: RunningPlanSegmentPrescripti
         },
       ];
     case "repeat":
-      return [
-        {
-          path: "repeat.work.durationSeconds",
-          seconds:
-            prescription.work.mode === "time"
-              ? exactRangeValue(prescription.work.durationSeconds)
-              : null,
-        },
-        {
-          path: "repeat.recovery.recoveryDurationSeconds",
-          seconds:
-            prescription.recovery.mode === "recovery_time"
-              ? exactRangeValue(prescription.recovery.recoveryDurationSeconds)
-              : null,
-        },
-      ];
+      return prescription.children.map((child, index) => ({
+        path: `repeat.children.${index}.durationSeconds`,
+        seconds:
+          child.prescription.mode === "time"
+            ? exactRangeValue(child.prescription.durationSeconds)
+            : null,
+      }));
     case "distance":
     case "distance_with_default_hr_cap":
     case "recovery_distance":
@@ -259,16 +265,14 @@ function canonicalPrescriptionDurations(segment: CanonicalSegment) {
   }
 
   if (prescription.mode === "repeats") {
-    return [
-      {
-        path: "prescription.repeat_unit.duration_min",
-        durationMin: prescription.repeat_unit?.duration_min ?? null,
-      },
-      {
-        path: "prescription.recovery_unit.duration_min",
-        durationMin: prescription.recovery_unit?.duration_min ?? null,
-      },
-    ];
+    if (prescription.children?.length) {
+      return prescription.children.map((child, index) => ({
+        path: `prescription.children.${index}.duration_min`,
+        durationMin: child.prescription.duration_min ?? null,
+      }));
+    }
+
+    return [];
   }
 
   return [];
@@ -318,6 +322,12 @@ function hasPersonalHrTarget(target: Record<string, unknown>) {
   return (
     target.hr_target_source === "personal_hr_zone" ||
     (hasHrRangeTarget(target) && target.hr_target_source !== "default_estimated_hr")
+  );
+}
+
+function hasRpeTarget(target: Record<string, unknown>) {
+  return (
+    hasNonEmptyString(target.rpe) || (typeof target.rpe === "number" && Number.isFinite(target.rpe))
   );
 }
 

@@ -1,4 +1,6 @@
 import type { WeekdayName } from "@/lib/weekday-rest-invariants";
+import type { NormalizedPlanGoalIntent } from "@/lib/plan-creation-engine/plan-goal-intent";
+import type { PlannedWorkoutRepeatChildRole } from "@/lib/planned-workout-block-contract";
 
 export const RUNNING_PLAN_ENGINE_SOURCE_VERSION = "running_plan_engine_source_v1" as const;
 
@@ -105,6 +107,7 @@ export interface RunningPlanBuilderInput {
   preferredLongRunDay: WeekdayName | null;
   startDate: string;
   benchmarkPaceTruth: RunningPlanBenchmarkPaceTruth | null;
+  planGoalIntent: NormalizedPlanGoalIntent;
 }
 
 export type RunningPlanBenchmarkInput =
@@ -174,8 +177,7 @@ export type RunningPlanSegmentPrescription =
   | {
       mode: Extract<RunningPlanSegmentMode, "repeat">;
       repeatCount: RunningPlanRange;
-      work: RunningPlanRepeatWorkPrescription;
-      recovery: RunningPlanRepeatRecoveryPrescription;
+      children: readonly RunningPlanRepeatChildPrescription[];
     }
   | {
       mode: Extract<RunningPlanSegmentMode, "recovery_time">;
@@ -194,29 +196,23 @@ export type RunningPlanSegmentPrescription =
       intensityLabel: string;
     };
 
-export type RunningPlanRepeatWorkPrescription =
+export type RunningPlanRepeatChildUnitPrescription =
   | {
       mode: "time";
       durationSeconds: RunningPlanRange;
-      intensityLabel: string;
     }
   | {
       mode: "distance";
       distanceMeters: RunningPlanRange;
-      intensityLabel: string;
     };
 
-export type RunningPlanRepeatRecoveryPrescription =
-  | {
-      mode: "recovery_time";
-      recoveryDurationSeconds: RunningPlanRange;
-      intensityLabel: string;
-    }
-  | {
-      mode: "recovery_distance";
-      recoveryDistanceMeters: RunningPlanRange;
-      intensityLabel: string;
-    };
+export interface RunningPlanRepeatChildPrescription {
+  role: PlannedWorkoutRepeatChildRole;
+  label?: string;
+  guidance?: string;
+  prescription: RunningPlanRepeatChildUnitPrescription;
+  intensityLabel: string;
+}
 
 export interface RunningPlanWatchExecutableSegmentTemplate {
   id: string;

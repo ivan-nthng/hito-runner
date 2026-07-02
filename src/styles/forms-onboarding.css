@@ -1,0 +1,987 @@
+@layer components {
+  .hito-field {
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+    background: color-mix(in oklch, var(--color-background) 62%, transparent);
+    color: var(--color-foreground);
+    width: 100%;
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .hito-field-primary {
+    border-color: var(--color-hairline);
+    background: color-mix(in oklch, var(--color-background) 62%, transparent);
+  }
+
+  .hito-field-secondary {
+    border-color: transparent;
+    background: color-mix(in oklch, var(--color-muted) 54%, transparent);
+  }
+
+  .hito-field::placeholder {
+    color: color-mix(in oklch, var(--color-muted-foreground) 72%, transparent);
+  }
+
+  .hito-field:hover:not(:disabled):not([readonly]),
+  .hito-field[data-demo-state="hover"] {
+    border-color: color-mix(in oklch, var(--color-foreground) 20%, transparent);
+    background: color-mix(in oklch, var(--color-background) 72%, transparent);
+  }
+
+  .hito-field-secondary:hover:not(:disabled):not([readonly]),
+  .hito-field-secondary[data-demo-state="hover"] {
+    border-color: transparent;
+    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
+  }
+
+  .hito-field:focus,
+  .hito-field[data-demo-state="focus"] {
+    border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
+    outline: none;
+  }
+
+  .hito-field-secondary:focus,
+  .hito-field-secondary[data-demo-state="focus"] {
+    border-color: transparent;
+    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
+  }
+
+  .hito-field-feedback-error,
+  .hito-field-feedback-error:hover:not(:disabled):not([readonly]),
+  .hito-field-feedback-error[data-demo-state="hover"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 46%, transparent);
+    background: color-mix(in oklch, var(--color-destructive) 7%, var(--color-background));
+  }
+
+  .hito-field-feedback-error:focus,
+  .hito-field-feedback-error[data-demo-state="focus"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 58%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent);
+    outline: none;
+  }
+
+  .hito-field-feedback-success,
+  .hito-field-feedback-success:hover:not(:disabled):not([readonly]),
+  .hito-field-feedback-success[data-demo-state="hover"] {
+    border-color: color-mix(in oklch, var(--color-success) 44%, transparent);
+    background: color-mix(in oklch, var(--color-success) 7%, var(--color-background));
+  }
+
+  .hito-field-feedback-success:focus,
+  .hito-field-feedback-success[data-demo-state="focus"] {
+    border-color: color-mix(in oklch, var(--color-success) 56%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-success) 16%, transparent);
+    outline: none;
+  }
+
+  .hito-field:disabled,
+  .hito-field[readonly],
+  .hito-field[data-demo-state="disabled"],
+  .hito-field[data-demo-state="readonly"] {
+    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
+    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+    cursor: default;
+  }
+
+  .hito-field:-webkit-autofill {
+    -webkit-text-fill-color: var(--color-foreground);
+    caret-color: var(--color-foreground);
+    box-shadow: 0 0 0 1000px color-mix(in oklch, var(--color-background) 74%, transparent) inset;
+  }
+
+  .hito-field[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .hito-field[type="number"]::-webkit-inner-spin-button,
+  .hito-field[type="number"]::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+  }
+
+  .hito-onboarding-surface {
+    max-width: 64rem;
+    margin-inline: auto;
+    padding-block-end: 2.5rem;
+  }
+
+  .hito-onboarding-surface[data-mode="quick"] {
+    padding-block-end: 0;
+  }
+
+  .hito-onboarding-submit-footer {
+    position: fixed;
+    right: 1rem;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: 1rem;
+    z-index: 30;
+    margin-inline: auto;
+    max-width: 64rem;
+    pointer-events: none;
+  }
+
+  .hito-onboarding-submit-footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: 1.5rem;
+    background: color-mix(in oklch, var(--color-background) 90%, transparent);
+    padding: 0.75rem;
+    box-shadow: 0 18px 56px color-mix(in oklch, var(--color-foreground) 14%, transparent);
+    backdrop-filter: blur(18px);
+    pointer-events: auto;
+  }
+
+  @media (min-width: 640px) {
+    .hito-onboarding-submit-footer-inner {
+      padding: 0.875rem 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .hito-onboarding-surface {
+      padding-block-end: 2.5rem;
+    }
+
+    .hito-onboarding-surface[data-mode="quick"] {
+      padding-block-end: 0;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .hito-onboarding-surface {
+      padding-block-end: calc(var(--hito-mobile-bottom-nav-height) + 2rem);
+    }
+
+    .hito-onboarding-surface[data-mode="quick"] {
+      padding-block-end: 0;
+    }
+
+    .hito-onboarding-submit-footer {
+      bottom: calc(
+        var(--hito-mobile-bottom-nav-height) + max(0.75rem, env(safe-area-inset-bottom))
+      );
+    }
+  }
+
+  .hito-plan-preset-stage {
+    min-width: 0;
+  }
+
+  .hito-selected-plan-calendar {
+    min-width: 0;
+  }
+
+  .hito-selected-plan-calendar-legend {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.75rem;
+    color: color-mix(in oklch, var(--color-foreground) 66%, transparent);
+    font-size: 0.72rem;
+    font-weight: 650;
+  }
+
+  .hito-selected-plan-calendar-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .hito-selected-plan-calendar-legend-swatch {
+    width: 0.6rem;
+    height: 0.6rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: var(--hito-selected-plan-calendar-tone, var(--color-muted-foreground));
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-background) 35%, transparent);
+  }
+
+  .hito-selected-plan-calendar-detail {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 0.75rem;
+  }
+
+  .hito-selected-plan-calendar-detail > * {
+    min-width: 0;
+  }
+
+  .hito-selected-plan-calendar-weeks {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: 0.85rem 1rem;
+  }
+
+  .hito-selected-plan-calendar-week {
+    display: grid;
+    align-content: start;
+    gap: 0.42rem;
+    min-width: 0;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 0.55rem;
+  }
+
+  .hito-selected-plan-calendar-week-grid {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(7, minmax(2.2rem, 1fr));
+    gap: 0.25rem;
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="easy"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-easy-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="steady"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-steady-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="long"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-long-run-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="strides"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-easy-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="progression"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-progression-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="tempo"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-tempo-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="intervals"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-intervals-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="hills"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-hills-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="rest"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-rest-base);
+  }
+
+  .hito-selected-plan-calendar [data-preview-tone="final"] {
+    --hito-selected-plan-calendar-tone: var(--hito-workout-type-long-run-base);
+  }
+
+  .hito-selected-plan-segment-card {
+    min-width: 0;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+    background: color-mix(in oklch, var(--color-surface-elevated) 58%, transparent);
+    padding: 1rem;
+  }
+
+  .hito-selected-plan-segment-row {
+    display: grid;
+    min-width: 0;
+    gap: 0.25rem;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 0.65rem;
+  }
+
+  .hito-selected-plan-segment-row:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .hito-selected-plan-segment-row > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .hito-manual-workout-editor-surface {
+    display: grid;
+    gap: 0.75rem;
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-surface) 25%, transparent);
+    padding: 1rem;
+  }
+
+  .hito-manual-workout-editor-surface-muted {
+    display: grid;
+    gap: 0.75rem;
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-background) 25%, transparent);
+    padding: 1rem;
+  }
+
+  .hito-manual-workout-title-field {
+    min-width: var(--hito-manual-workout-title-min-width);
+  }
+
+  .hito-manual-workout-guidance-row {
+    border: 0;
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-surface) 25%, transparent);
+  }
+
+  .hito-manual-workout-step-card {
+    border-radius: var(--radius-2xl);
+    background: color-mix(in oklch, var(--color-surface) 25%, transparent);
+    padding: 1rem;
+    transition: background-color 160ms ease;
+  }
+
+  .hito-manual-workout-step-card:hover,
+  .hito-manual-workout-step-card:focus-within {
+    background: color-mix(in oklch, var(--color-surface) 35%, transparent);
+  }
+
+  .hito-manual-workout-step-summary {
+    min-width: var(--hito-manual-workout-step-summary-min-width);
+  }
+
+  .hito-manual-workout-repeat-settings-grid,
+  .hito-manual-workout-field-grid {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .hito-manual-workout-block-fields {
+    display: grid;
+    gap: 0.75rem;
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-background) 35%, transparent);
+    padding: 0.75rem;
+  }
+
+  .hito-manual-workout-menu-add {
+    width: var(--hito-manual-workout-menu-width-add);
+    padding: 0.5rem;
+  }
+
+  .hito-manual-workout-menu-step {
+    width: var(--hito-manual-workout-menu-width-step);
+    padding: 0.5rem;
+  }
+
+  .hito-manual-workout-menu-template {
+    width: var(--hito-manual-workout-menu-width-template);
+    max-height: var(--hito-manual-workout-menu-max-height-template);
+    overflow-y: auto;
+    padding: 0.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .hito-manual-workout-repeat-settings-grid {
+      grid-template-columns: minmax(0, 1fr) 9rem minmax(10rem, 0.75fr);
+    }
+
+    .hito-manual-workout-field-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 560px) {
+    .hito-selected-plan-calendar-detail {
+      flex-direction: column;
+    }
+
+    .hito-selected-plan-calendar-week {
+      gap: 0.45rem;
+    }
+
+    .hito-selected-plan-calendar-week-grid {
+      gap: 0.28rem;
+    }
+  }
+
+  .hito-onboarding-option-button {
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0.65rem;
+    min-height: 4rem;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .hito-onboarding-option-grid {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .hito-onboarding-option-row-button {
+    width: 100%;
+    min-height: 3.5rem;
+    justify-content: space-between;
+    text-align: left;
+    white-space: normal;
+  }
+
+  @media (min-width: 640px) {
+    .hito-onboarding-option-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .hito-onboarding-option-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .hito-onboarding-option-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 999px;
+    background: color-mix(in oklch, currentColor 10%, transparent);
+  }
+
+  .hito-onboarding-option-title {
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .hito-onboarding-option-copy {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: normal;
+    text-transform: none;
+    opacity: 0.78;
+  }
+
+  .hito-field-xs {
+    min-height: 1.75rem;
+    border-radius: var(--radius-sm);
+    padding: 0 0.5rem;
+    font-size: 0.6875rem;
+  }
+
+  .hito-field-sm {
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .hito-field-md {
+    min-height: 2.5rem;
+    padding: 0 0.875rem;
+    font-size: 0.875rem;
+  }
+
+  .hito-field-lg {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    font-size: 0.875rem;
+  }
+
+  .hito-field-xl {
+    min-height: 3.25rem;
+    padding: 0 1.125rem;
+    font-size: 0.9375rem;
+  }
+
+  .hito-field-has-left-icon {
+    padding-left: 2.25rem;
+  }
+
+  .hito-field-has-right-icon {
+    padding-right: 2.25rem;
+  }
+
+  .hito-field-xs.hito-field-has-left-icon {
+    padding-left: 1.875rem;
+  }
+
+  .hito-field-xs.hito-field-has-right-icon {
+    padding-right: 1.875rem;
+  }
+
+  .hito-field-sm.hito-field-has-left-icon {
+    padding-left: 2rem;
+  }
+
+  .hito-field-sm.hito-field-has-right-icon {
+    padding-right: 2rem;
+  }
+
+  .hito-date-field-control {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hito-date-field-control .hito-field {
+    cursor: text;
+  }
+
+  .hito-date-field-control .hito-field[data-state="open"] {
+    border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
+    outline: none;
+  }
+
+  .hito-date-field-icon {
+    position: absolute;
+    top: 50%;
+    right: 0.875rem;
+    display: grid;
+    width: 1rem;
+    height: 1rem;
+    place-items: center;
+    color: color-mix(in oklch, var(--color-muted-foreground) 84%, transparent);
+    transform: translateY(-50%);
+    transition: color 160ms ease;
+    pointer-events: none;
+  }
+
+  .hito-date-field-control:hover .hito-date-field-icon,
+  .hito-date-field-control .hito-field:focus + .hito-date-field-icon,
+  .hito-date-field-control .hito-field[data-state="open"] + .hito-date-field-icon {
+    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+  }
+
+  .hito-date-field-control .hito-field:disabled + .hito-date-field-icon {
+    color: color-mix(in oklch, var(--color-muted-foreground) 42%, transparent);
+  }
+
+  .hito-date-picker-popover {
+    position: relative;
+    z-index: 80 !important;
+    opacity: 1 !important;
+    max-width: calc(100vw - 1.5rem);
+    overflow: hidden;
+    border-color: var(--color-hairline);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-popover) 96%, var(--color-background));
+    color: var(--color-popover-foreground);
+    box-shadow: 0 18px 56px color-mix(in oklch, black 28%, transparent);
+    backdrop-filter: blur(18px);
+  }
+
+  .hito-date-picker-calendar {
+    width: min(20rem, calc(100vw - 1.5rem));
+    background: transparent;
+    padding: 0.75rem;
+  }
+
+  .hito-date-picker-calendar .rdp-months,
+  .hito-date-picker-calendar .rdp-month {
+    width: 100%;
+  }
+
+  .hito-date-picker-calendar .rdp-month_caption {
+    color: var(--color-foreground);
+    font-size: 0.8125rem;
+    font-weight: 500;
+  }
+
+  .hito-date-picker-calendar .rdp-button_previous,
+  .hito-date-picker-calendar .rdp-button_next {
+    border-radius: var(--radius-md);
+    color: color-mix(in oklch, var(--color-foreground) 72%, transparent);
+  }
+
+  .hito-date-picker-calendar .rdp-button_previous:hover,
+  .hito-date-picker-calendar .rdp-button_next:hover,
+  .hito-date-picker-calendar .rdp-button_previous:focus-visible,
+  .hito-date-picker-calendar .rdp-button_next:focus-visible {
+    background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-date-picker-calendar .rdp-weekday {
+    color: color-mix(in oklch, var(--color-muted-foreground) 78%, transparent);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .hito-date-picker-calendar .rdp-day button {
+    border-radius: var(--radius-md);
+    color: color-mix(in oklch, var(--color-foreground) 86%, transparent);
+  }
+
+  .hito-date-picker-calendar .rdp-day button:hover {
+    background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-date-picker-calendar .rdp-day button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 24%, transparent);
+  }
+
+  .hito-date-picker-calendar .rdp-today button:not([data-selected-single="true"]) {
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-signal) 42%, transparent);
+    color: color-mix(in oklch, var(--color-signal) 78%, var(--color-foreground));
+  }
+
+  .hito-date-picker-calendar button[data-selected-single="true"] {
+    background: var(--color-signal) !important;
+    color: var(--color-signal-foreground) !important;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
+  }
+
+  .hito-date-picker-calendar .rdp-outside button {
+    color: color-mix(in oklch, var(--color-muted-foreground) 52%, transparent);
+  }
+
+  .hito-date-picker-calendar .rdp-disabled button,
+  .hito-date-picker-calendar button:disabled {
+    background: transparent !important;
+    color: color-mix(in oklch, var(--color-muted-foreground) 38%, transparent) !important;
+    box-shadow: none !important;
+    cursor: not-allowed;
+  }
+
+  .hito-textarea-md {
+    min-height: 10rem;
+    padding: 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.55;
+  }
+
+  .hito-textarea-lg {
+    min-height: 15rem;
+    padding: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  .hito-field-helper {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--color-muted-foreground);
+  }
+
+  .hito-field-error {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--color-destructive);
+  }
+
+  .hito-field-success {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--color-success);
+  }
+
+  .hito-editable-value-chip-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .hito-editable-value-chip-frame {
+    display: inline-flex;
+    min-width: 0;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .hito-editable-value-chip-frame[data-state="editing"] {
+    flex: 0 1 auto;
+  }
+
+  .hito-editable-value-chip {
+    display: inline-flex;
+    height: 2.25rem;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 0.45rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: color-mix(in oklch, var(--color-muted) 48%, transparent);
+    padding: 0 0.85rem;
+    color: color-mix(in oklch, var(--color-foreground) 88%, transparent);
+    font-size: 0.8125rem;
+    text-align: left;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease,
+      box-shadow 160ms ease,
+      transform 160ms ease;
+  }
+
+  .hito-editable-value-chip:hover,
+  .hito-editable-value-chip:focus-visible {
+    background: color-mix(in oklch, var(--color-muted) 66%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-editable-value-chip:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 20%, transparent);
+  }
+
+  .hito-editable-value-chip:active {
+    transform: translateY(1px);
+  }
+
+  .hito-editable-value-chip[data-state="empty"] {
+    padding-left: 0.75rem;
+    color: color-mix(in oklch, var(--color-foreground) 82%, transparent);
+  }
+
+  .hito-editable-value-chip-icon {
+    flex: 0 0 auto;
+    color: color-mix(in oklch, currentColor 82%, transparent);
+  }
+
+  .hito-editable-value-chip-content {
+    display: inline-flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .hito-editable-value-chip-label {
+    flex: 0 0 auto;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    line-height: 1;
+    text-transform: uppercase;
+    color: color-mix(in oklch, var(--color-muted-foreground) 94%, transparent);
+  }
+
+  .hito-editable-value-chip-text {
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hito-editable-value-chip-edit-icon {
+    margin-left: 0.125rem;
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+
+  .hito-editable-value-chip:hover .hito-editable-value-chip-edit-icon,
+  .hito-editable-value-chip:focus-visible .hito-editable-value-chip-edit-icon {
+    opacity: 0.72;
+  }
+
+  .hito-editable-value-chip-input-shell {
+    position: relative;
+    display: inline-flex;
+    min-width: 0;
+    width: min(12rem, calc(100vw - 7rem));
+    flex: 0 1 auto;
+    align-items: center;
+  }
+
+  .hito-editable-value-chip-input {
+    height: 2.25rem;
+    min-width: 0;
+    width: 100%;
+    flex: 1 1 auto;
+    border: 1px solid color-mix(in oklch, var(--color-signal) 76%, transparent);
+    border-radius: var(--radius-md);
+    background: color-mix(in oklch, var(--color-muted) 58%, transparent);
+    padding: 0 2.25rem 0 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-foreground);
+    caret-color: var(--color-signal);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-signal) 26%, transparent);
+  }
+
+  .hito-editable-value-chip-input::placeholder {
+    color: color-mix(in oklch, var(--color-muted-foreground) 64%, transparent);
+  }
+
+  .hito-editable-value-chip-input:focus {
+    outline: none;
+  }
+
+  .hito-editable-value-chip-clear {
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    display: inline-grid;
+    width: 1.35rem;
+    height: 1.35rem;
+    place-items: center;
+    border-radius: var(--radius-sm);
+    color: var(--color-muted-foreground);
+    transform: translateY(-50%);
+    transition:
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .hito-editable-value-chip-clear:hover,
+  .hito-editable-value-chip-clear:focus-visible {
+    background: color-mix(in oklch, var(--color-foreground) 9%, transparent);
+    color: var(--color-foreground);
+    outline: none;
+  }
+
+  .hito-editable-value-chip-action {
+    display: inline-grid;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    transition:
+      background-color 160ms ease,
+      color 160ms ease,
+      box-shadow 160ms ease,
+      transform 160ms ease;
+  }
+
+  .hito-editable-value-chip-action:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 20%, transparent);
+  }
+
+  .hito-editable-value-chip-action:active {
+    transform: translateY(1px);
+  }
+
+  .hito-editable-value-chip-action[data-action="save"] {
+    background: var(--color-success);
+    color: color-mix(in oklch, var(--color-success) 8%, white);
+  }
+
+  .hito-editable-value-chip-action[data-action="save"]:hover {
+    background: color-mix(in oklch, var(--color-success) 88%, white);
+  }
+
+  .hito-editable-value-chip-action[data-action="cancel"] {
+    background: color-mix(in oklch, var(--color-muted) 58%, transparent);
+    color: var(--color-muted-foreground);
+  }
+
+  .hito-editable-value-chip-action[data-action="cancel"]:hover {
+    background: color-mix(in oklch, var(--color-muted) 72%, transparent);
+    color: var(--color-foreground);
+  }
+
+  .hito-disclosure {
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 0.875rem;
+  }
+
+  .hito-disclosure-summary {
+    display: flex;
+    cursor: pointer;
+    list-style: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-radius: var(--radius-md);
+    color: var(--color-muted-foreground);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  .hito-disclosure-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .hito-disclosure-summary:hover {
+    color: var(--color-foreground);
+  }
+
+  .hito-disclosure-summary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
+  }
+
+  .hito-disclosure-chevron {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    transition: transform 160ms ease;
+  }
+
+  .hito-disclosure[open] .hito-disclosure-chevron {
+    transform: rotate(180deg);
+  }
+
+  .hito-disclosure-body {
+    display: grid;
+    gap: 0.875rem;
+    padding-top: 0.875rem;
+  }
+
+  .hito-plan-schedule-edit,
+  .hito-plan-schedule-edit .hito-disclosure-body,
+  .hito-plan-schedule-edit .hito-row-group,
+  .hito-plan-schedule-edit .hito-list-row,
+  .hito-plan-schedule-edit .hito-choice-toggle-group {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .hito-plan-schedule-edit .hito-list-row > :first-child {
+    min-width: 0;
+  }
+
+  .hito-plan-schedule-edit .hito-list-row-copy,
+  .hito-plan-schedule-edit .hito-body-small,
+  .hito-plan-schedule-edit .hito-field-helper {
+    overflow-wrap: anywhere;
+  }
+
+  .hito-plan-schedule-edit .hito-list-row .hito-status-pill,
+  .hito-plan-schedule-edit .hito-list-row .hito-button {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+
+  @media (max-width: 480px) {
+    .hito-plan-schedule-edit .hito-list-row {
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .hito-plan-schedule-edit .hito-list-row > :first-child {
+      flex: 1 1 100%;
+    }
+
+    .hito-plan-schedule-edit .hito-choice-toggle-group {
+      gap: 0.45rem;
+    }
+
+    .hito-plan-schedule-edit .hito-choice-toggle-sm {
+      padding-inline: 0.625rem;
+    }
+  }
+}

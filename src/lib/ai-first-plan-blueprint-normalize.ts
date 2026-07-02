@@ -21,7 +21,7 @@ import {
   type CanonicalMetricGuidance,
   type CanonicalMetricModeJson,
 } from "@/lib/rich-workout-model";
-import { normalizeExecutableStepInstructions, type Step } from "@/lib/training";
+import type { StepTarget } from "@/lib/training";
 import { shouldUseBeginnerRunWalkAdaptation } from "@/lib/structured-plan-authoring-policy";
 
 export type BuildBlueprintWorkoutSegments = (input: {
@@ -88,18 +88,16 @@ export function normalizeBlueprintWorkout({
       adaptationHorizonWeeks,
     ) &&
     hasRunWalkAdaptationSegments(deterministicWorkout);
-  const rawSegments = normalizeExecutableStepInstructions(
-    buildWorkoutSegments({
-      workout: canonicalWorkout,
-      date,
-      weekNumber: week.weekNumber,
-      adaptationHorizonWeeks,
-      totalDurationMin,
-      context,
-      deterministicWorkout,
-      repairs,
-    }) as unknown as Step[],
-  ) as unknown as CanonicalSegment[];
+  const rawSegments = buildWorkoutSegments({
+    workout: canonicalWorkout,
+    date,
+    weekNumber: week.weekNumber,
+    adaptationHorizonWeeks,
+    totalDurationMin,
+    context,
+    deterministicWorkout,
+    repairs,
+  });
   const segments = stripDisallowedDefaultEstimatedHrTargetsFromSegments(rawSegments, {
     sourceWorkoutType: resolved.workoutIdentity,
     workoutType: canonicalFamilyToLegacyWorkoutType(
@@ -151,10 +149,24 @@ export function normalizeBlueprintWorkout({
 
 function hasRunWalkAdaptationSegments(workout: CanonicalWorkout) {
   return workout.segments.some((segment) => {
-    const target = segment.target as Record<string, unknown> | undefined;
-
-    return target?.intensity === "run_walk_adaptation";
+    return collectSegmentTargets(segment).some(
+      (target) => target.intensity === "run_walk_adaptation",
+    );
   });
+}
+
+function collectSegmentTargets(segment: CanonicalSegment) {
+  const parentTarget = segment.target as Record<string, unknown> | undefined;
+  const childTargets =
+    segment.prescription?.mode === "repeats" && segment.prescription.children?.length
+      ? segment.prescription.children
+          .map((child) => child.target as Record<string, unknown> | undefined)
+          .filter((target): target is Record<string, unknown> => Boolean(target))
+      : [];
+
+  return [parentTarget, ...childTargets].filter((target): target is Record<string, unknown> =>
+    Boolean(target),
+  );
 }
 
 export function buildRestWorkout({
@@ -300,16 +312,19 @@ export function phaseForWeek(blueprint: AiFirstPlanBlueprint, weekNumber: number
 }
 
 function buildWorkoutMetricMode(segments: CanonicalSegment[]): CanonicalMetricModeJson {
-  const hasPace = segments.some((segment) => targetHasMetric(segment.target, "pace"));
-  const hasPersonalHr = segments.some(
-    (segment) =>
-      targetHasMetric(segment.target, "hr") &&
-      segment.target?.hr_target_source === "personal_hr_zone",
+  const hasPace = segments.some((segment) =>
+    collectSegmentTargets(segment).some((target) => targetHasMetric(target, "pace")),
   );
-  const hasDefaultEstimatedHr = segments.some(
-    (segment) =>
-      targetHasMetric(segment.target, "hr") &&
-      segment.target?.hr_target_source === "default_estimated_hr",
+  const hasPersonalHr = segments.some((segment) =>
+    collectSegmentTargets(segment).some(
+      (target) => targetHasMetric(target, "hr") && target.hr_target_source === "personal_hr_zone",
+    ),
+  );
+  const hasDefaultEstimatedHr = segments.some((segment) =>
+    collectSegmentTargets(segment).some(
+      (target) =>
+        targetHasMetric(target, "hr") && target.hr_target_source === "default_estimated_hr",
+    ),
   );
   const executableMode =
     hasPace && hasPersonalHr
@@ -356,7 +371,7 @@ function buildWorkoutMetricMode(segments: CanonicalSegment[]): CanonicalMetricMo
   });
 }
 
-function targetHasMetric(target: Step["target"] | undefined, metric: "pace" | "hr") {
+function targetHasMetric(target: StepTarget | undefined, metric: "pace" | "hr") {
   if (!target) {
     return false;
   }
@@ -398,23 +413,49 @@ function estimateBlueprintWorkoutDurationMin(
     : 0;
 
   if (deterministicDuration > 0) {
+    const roundedDeterministicDuration = roundDeviceFriendlyDurationMin(deterministicDuration);
+
     if (workout.workoutIdentity === "cutback_long_run") {
-      return Math.max(35, Math.round(deterministicDuration * 0.75));
+      return roundDeviceFriendlyDurationMin(Math.max(35, roundedDeterministicDuration * 0.75));
     }
 
     if (workout.workoutIdentity === "taper_long_run") {
-      return Math.max(30, Math.round(deterministicDuration * 0.65));
+      return roundDeviceFriendlyDurationMin(Math.max(30, roundedDeterministicDuration * 0.65));
     }
 
     if (workout.workoutIdentity === "ultra_time_on_feet_durability") {
-      return Math.max(50, Math.round(deterministicDuration * 0.9));
+      return roundDeviceFriendlyDurationMin(Math.max(50, roundedDeterministicDuration * 0.9));
     }
 
     if (workout.workoutIdentity === "hike_run_endurance") {
-      return Math.max(45, Math.round(deterministicDuration * 0.9));
+      return roundDeviceFriendlyDurationMin(Math.max(45, roundedDeterministicDuration * 0.9));
     }
 
-    return deterministicDuration;
+    return roundedDeterministicDuration;
+  }
+
+  switch (workout.workoutIdentity) {
+    case "taper_long_run":
+      return 45;
+    case "cutback_long_run":
+      return 55;
+    case "long_run_with_steady_finish":
+      return 80;
+    case "ultra_time_on_feet_durability":
+      return 95;
+    case "hike_run_endurance":
+    case "mountain_long_run_time_on_feet":
+      return 85;
+    case "marathon_steady_specificity":
+    case "half_marathon_threshold_durability":
+      return 55;
+    case "10k_rhythm_intervals":
+    case "controlled_tempo_session":
+    case "progression_run":
+    case "easy_run_with_strides":
+      return 45;
+    case "recovery_jog":
+      return 30;
   }
 
   switch (workout.workoutFamily) {
@@ -432,6 +473,10 @@ function estimateBlueprintWorkoutDurationMin(
     default:
       return 40;
   }
+}
+
+function roundDeviceFriendlyDurationMin(value: number) {
+  return Math.max(1, Math.round(value));
 }
 
 function estimateCanonicalWorkoutDurationMin(workout: CanonicalWorkout) {

@@ -77,6 +77,13 @@ export const builderInputContract: RunningPlanEngineSourceModel["builderInputCon
       purpose:
         "Optional recent 5K benchmark truth can unlock broad pace ranges; absence keeps the plan structure-only.",
     },
+    {
+      field: "planGoalIntent",
+      required: false,
+      source: "runner_input",
+      purpose:
+        "Optional race/date/finish-time/outcome-pace intent is normalized for review/readback and never unlocks executable workout pace or HR targets by itself.",
+    },
   ],
   backendDefaults: {
     daysPerWeek: 3,
@@ -94,7 +101,13 @@ export const builderInputContract: RunningPlanEngineSourceModel["builderInputCon
     },
     {
       field: "targetTime",
-      reason: "Target-time requests route to Advanced/custom and do not unlock pace truth.",
+      reason:
+        "Direct targetTime is not a builder input; target finish time is accepted only inside planGoalIntent and does not unlock pace truth.",
+    },
+    {
+      field: "targetOutcomePaceAsWorkoutTarget",
+      reason:
+        "Outcome pace can be goal intent readback, but segment pace targets still require benchmark-backed or user-entered target truth.",
     },
     {
       field: "personalHrZones",

@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import {
-  applyImportedPlanForUser,
-  createFirstPlanFromReviewedCanonicalPlanForUser,
-} from "@/lib/active-plan-persistence";
+import { createFirstPlanFromReviewedCanonicalPlanForUser } from "@/lib/active-plan-persistence";
 import type {
   AiFirstPlanGenerationContract,
   AiFirstPlanDraftDebugMetadata,
@@ -11,7 +8,6 @@ import type {
   AiFirstPlanDraftUnavailableMetadata,
   GenerateAiFirstPlanDraftPreviewOptions,
 } from "@/lib/ai-first-plan-draft-service";
-import type { CapabilityLockedResponse } from "@/lib/entitlements/types";
 import { importedPlanSchema, type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   buildStructuredFirstPlanAuthoringInput,
@@ -30,13 +26,16 @@ import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-author
 import { buildPlanScopedStructuredAuthoringMetadata } from "@/lib/plan-authoring-snapshot";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { serverEnv } from "@/lib/supabase/env";
+import {
+  digestSha256Hex,
+  safeTokenEqual,
+  signStableJsonPayload,
+  stableJsonStringify,
+} from "@/lib/review-token-signing";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
-import type { VoiceToPlanDraftResult } from "@/lib/voice-to-plan-authoring";
 
 const structuredFirstPlanDraftInputSchema = z.unknown();
 const structuredFirstPlanConfirmInputSchema = z.unknown();
-const voiceToPlanInputSchema = z.unknown();
-const voiceToPlanConfirmInputSchema = z.unknown();
 const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MODEL = "gpt-4.1-mini";
 const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_TIMEOUT_MS = 240_000;
 const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MAX_OUTPUT_TOKENS = 32_000;
@@ -128,6 +127,23 @@ const structuredFirstPlanBlueprintTraceSchema = z
         promptCharEstimateBefore: z.number().int().nonnegative().nullable(),
         promptCharEstimateAfter: z.number().int().nonnegative().nullable(),
         finalWorkoutCount: z.number().int().nonnegative().nullable(),
+      })
+      .strict()
+      .optional(),
+    datePlacement: z
+      .object({
+        mode: z.literal("openai_authored_dated_plan"),
+        authoredDateSource: z.enum(["openai_authored_date", "local_fixture_authored_date"]),
+        validationStatus: z.enum([
+          "backend_validated_date",
+          "backend_repaired_date",
+          "backend_rejected_date",
+        ]),
+        explicitAuthoredWorkoutDateCount: z.number().int().nonnegative().nullable(),
+        missingAuthoredWorkoutDateCount: z.number().int().nonnegative().nullable(),
+        backendFilledRestDayCount: z.number().int().nonnegative().nullable(),
+        backendRepairedDateCount: z.number().int().nonnegative(),
+        backendExtendedWeeks: z.number().int().nonnegative().nullable(),
       })
       .strict()
       .optional(),
@@ -337,32 +353,6 @@ export type ConfirmStructuredFirstPlanDraftResult =
       message: string;
     };
 
-export type ConfirmVoiceToPlanDraftResult =
-  | CapabilityLockedResponse
-  | {
-      ok: true;
-      status: "created";
-      effectiveStartDate: string;
-      appliedStartDate: string;
-      normalizedFromStartDate: string | null;
-      firstDayResolution: FirstDayResolution | null;
-      workoutCount: number;
-      schemaVersion: string;
-      sourceKind: string | undefined;
-      onboardingContract: "voice_to_plan_v1";
-      safety: {
-        requiresExplicitApply: false;
-        doesNotMutatePlan: false;
-        rawTranscriptPersisted: false;
-      };
-    }
-  | {
-      ok: false;
-      status: "blocked";
-      reason: "invalid_draft" | "active_plan_exists" | "apply_blocked";
-      message: string;
-    };
-
 export const generateStructuredFirstPlanDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => structuredFirstPlanDraftInputSchema.parse(value))
   .handler(async ({ data }): Promise<StructuredFirstPlanDraftResult> => {
@@ -377,102 +367,6 @@ export const confirmStructuredFirstPlanDraft = createServerFn({ method: "POST" }
     const userId = await requirePersistedUserIdForCurrentRequest();
 
     return confirmStructuredFirstPlanDraftForUser(userId, data);
-  });
-
-export const generateVoiceToPlanDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => voiceToPlanInputSchema.parse(value))
-  .handler(async ({ data }): Promise<VoiceToPlanDraftResult> => {
-    const userId = await requirePersistedUserIdForCurrentRequest();
-    const { generateVoiceToPlanDraftForUser } = await import("@/lib/voice-to-plan-authoring");
-
-    return generateVoiceToPlanDraftForUser({
-      userId,
-      request: data,
-    });
-  });
-
-export const confirmVoiceToPlanDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => voiceToPlanConfirmInputSchema.parse(value))
-  .handler(async ({ data }): Promise<ConfirmVoiceToPlanDraftResult> => {
-    const userId = await requirePersistedUserIdForCurrentRequest();
-    const { checkRunnerCapability, capabilityLockedResponse } =
-      await import("@/lib/entitlements/check-runner-capability");
-    const capabilityCheck = await checkRunnerCapability({
-      userId,
-      capabilityKey: "voice_to_plan",
-    });
-
-    if (!capabilityCheck.allowed) {
-      return capabilityLockedResponse(capabilityCheck);
-    }
-
-    if (await hasActivePlanForUser(userId)) {
-      return {
-        ok: false,
-        status: "blocked",
-        reason: "active_plan_exists",
-        message:
-          "Voice-to-plan can create a first plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
-      };
-    }
-
-    const { parseVoiceToPlanConfirmRequest } = await import("@/lib/voice-to-plan-authoring");
-    const parsed = parseVoiceToPlanConfirmRequest(data);
-
-    if (!parsed.ok) {
-      return {
-        ok: false,
-        status: "blocked",
-        reason: parsed.reason,
-        message: parsed.message,
-      };
-    }
-
-    try {
-      const applyResult = await applyImportedPlanForUser(
-        userId,
-        parsed.canonicalPlan,
-        null,
-        null,
-        parsed.profilePatch,
-        buildPlanScopedStructuredAuthoringMetadata({
-          source: "voice_to_plan",
-          authoringInput: parsed.authoringInput,
-          goalStyle: parsed.request.supplement.goalStyle ?? null,
-          targetTime: parsed.request.supplement.targetTime ?? null,
-        }),
-      );
-
-      if (!applyResult.ok) {
-        return {
-          ok: false,
-          status: "blocked",
-          reason: "apply_blocked",
-          message: "This voice draft needs review before it can create a plan.",
-        };
-      }
-
-      return {
-        ...applyResult,
-        status: "created",
-        schemaVersion: parsed.canonicalPlan.schema_version,
-        sourceKind: parsed.canonicalPlan.source_kind,
-        onboardingContract: "voice_to_plan_v1",
-        safety: {
-          requiresExplicitApply: false,
-          doesNotMutatePlan: false,
-          rawTranscriptPersisted: false,
-        },
-      };
-    } catch {
-      return {
-        ok: false,
-        status: "blocked",
-        reason: "invalid_draft",
-        message:
-          "This voice draft is no longer valid. Generate a fresh review before creating a plan.",
-      };
-    }
   });
 
 export async function generateStructuredFirstPlanDraftForUser(
@@ -775,7 +669,6 @@ async function generateFirstPlanStructuredDraft(
     input: authoringInput,
     inputKind: "structured_authoring",
     contractMode,
-    allowDeterministicFallback: false,
     ...(aiPreviewOptions ?? {}),
   });
 
@@ -792,7 +685,7 @@ async function generateFirstPlanStructuredDraft(
     sourceStatus: result.metadata.status,
   });
 
-  if (!supportedSource.ok || result.metadata.status === "deterministic_fallback") {
+  if (!supportedSource.ok) {
     const sourceKind =
       contractMode === "envelope" ? "ai_first_plan_envelope_v1" : "ai_first_plan_blueprint_v1";
     const sourceStatus =
@@ -1221,6 +1114,7 @@ function summarizeStructuredFirstPlanAuthoringInput(
       goalStyle: authoringInput.goal.goalStyle,
       targetTimePresent: Boolean(authoringInput.goal.targetTime),
     },
+    planGoalIntent: authoringInput.planGoalIntent ?? null,
     schedule: {
       startDate: authoringInput.schedule.startDate,
       targetDate: authoringInput.schedule.targetDate ?? null,
@@ -1340,8 +1234,6 @@ function sourceKindFromGenerationSource(source: AiFirstPlanDraftPreviewMetadata[
       return "ai_first_plan_envelope_v1";
     case "openai_ai_first_plan_draft":
       return "unsupported_ai_first_plan_draft_v1";
-    case "deterministic_structured_generator":
-      return "structured_authoring_v1";
   }
 }
 
@@ -1391,14 +1283,9 @@ function sameJson(left: unknown, right: unknown) {
 async function signStructuredFirstPlanDraft(
   draft: z.output<typeof structuredFirstPlanDraftPayloadSchema>,
 ) {
-  const payload = stableJsonStringify({ ...draft, draftToken: "" });
   const secret = serverEnv.supabaseServiceRoleKey ?? serverEnv.openAiApiKey;
 
-  if (!secret) {
-    return `sha256:${await digestSha256Hex(payload)}`;
-  }
-
-  return `hmac-sha256:${await hmacSha256Hex(secret, payload)}`;
+  return signStableJsonPayload({ ...draft, draftToken: "" }, secret);
 }
 
 async function isStructuredFirstPlanDraftSignatureValid(
@@ -1407,65 +1294,6 @@ async function isStructuredFirstPlanDraftSignatureValid(
   const expected = await signStructuredFirstPlanDraft({ ...draft, draftToken: "" });
 
   return safeTokenEqual(draft.draftToken, expected);
-}
-
-function safeTokenEqual(left: string, right: string) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
-}
-
-async function digestSha256Hex(payload: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
-
-  return bytesToHex(digest);
-}
-
-async function hmacSha256Hex(secret: string, payload: string) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-
-  return bytesToHex(signature);
-}
-
-function bytesToHex(value: ArrayBuffer) {
-  return Array.from(new Uint8Array(value))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function stableJsonStringify(value: unknown): string {
-  return JSON.stringify(sortJsonValue(value));
-}
-
-function sortJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => sortJsonValue(entry));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-        .map(([key, nestedValue]) => [key, sortJsonValue(nestedValue)]),
-    );
-  }
-
-  return value;
 }
 
 async function hasActivePlanForUser(userId: string) {

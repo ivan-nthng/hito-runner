@@ -226,7 +226,6 @@ async function generateAcceptedBlueprint({
       input: authoringInput,
       inputKind: "structured_authoring",
       contractMode: "blueprint",
-      allowDeterministicFallback: false,
       model: config.model,
       timeoutMs: config.timeoutMs,
       maxOutputTokens: config.maxOutputTokens,

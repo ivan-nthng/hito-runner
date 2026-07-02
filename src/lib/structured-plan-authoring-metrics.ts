@@ -22,12 +22,6 @@ export function buildGeneratedWorkoutMetricMode(
     duration_min?: number | null;
     distance_km?: number | null;
     repeat_count?: number | null;
-    work_distance_km?: number | null;
-    work_duration_min?: number | null;
-    work_duration_sec?: number | null;
-    recovery_distance_km?: number | null;
-    recovery_duration_min?: number | null;
-    recovery_duration_sec?: number | null;
   }>,
 ) {
   const metricMode = resolveStructuredMetricMode(normalized);

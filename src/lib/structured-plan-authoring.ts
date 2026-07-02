@@ -27,6 +27,12 @@ import {
   type StructuredPlanAuthoringInput,
 } from "@/lib/structured-plan-authoring-schema";
 import {
+  buildStructuredPlanGoalIntentInput,
+  distanceFamilyForStructuredGoalType,
+  normalizePlanGoalIntent,
+  type NormalizedPlanGoalIntent,
+} from "@/lib/plan-creation-engine/plan-goal-intent";
+import {
   buildLongRunWorkout,
   buildQualityWorkout,
 } from "@/lib/structured-plan-authoring-sequencing";
@@ -199,9 +205,14 @@ export function normalizeStructuredPlanAuthoringInput(
   const horizonWeeks =
     parsed.schedule.preparationHorizonWeeks ??
     Math.max(1, Math.ceil((diffDaysIso(endDate, parsed.schedule.startDate) + 1) / 7));
+  const planGoalIntent = resolveStructuredPlanGoalIntent({
+    parsed,
+    horizonWeeks,
+  });
 
   return {
     ...parsed,
+    planGoalIntent,
     schedule: {
       ...parsed.schedule,
       horizonWeeks,
@@ -216,6 +227,31 @@ export function normalizeStructuredPlanAuthoringInput(
       steadyDay,
     },
   };
+}
+
+function resolveStructuredPlanGoalIntent(input: {
+  parsed: StructuredPlanAuthoringInput;
+  horizonWeeks: number;
+}): NormalizedPlanGoalIntent {
+  if (input.parsed.planGoalIntent) {
+    return input.parsed.planGoalIntent;
+  }
+
+  const result = normalizePlanGoalIntent({
+    rawIntent: buildStructuredPlanGoalIntentInput({
+      goal: input.parsed.goal,
+      schedule: input.parsed.schedule,
+    }),
+    distanceFamily: distanceFamilyForStructuredGoalType(input.parsed.goal.goalType),
+    startDate: input.parsed.schedule.startDate,
+    horizonWeeks: input.horizonWeeks,
+  });
+
+  if (!result.ok) {
+    throw new Error(result.message);
+  }
+
+  return result.intent;
 }
 
 function chooseRecoverySafeSteadyDay({

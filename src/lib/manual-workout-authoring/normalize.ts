@@ -1,4 +1,5 @@
 import {
+  deriveCanonicalMetricMode,
   resolveCanonicalWorkoutModel,
   toCanonicalMetricModeJson,
   type CanonicalMetricMode,
@@ -9,6 +10,7 @@ import {
   stepPlannedDurationMin,
   weekdayLong,
   type Step,
+  type StepRepeatChildPrescription,
   type StepTarget,
   type StepUnitPrescription,
 } from "@/lib/training";
@@ -22,6 +24,10 @@ import {
   type ManualWorkoutTargetTruthMode,
   type ParsedManualWorkoutDraftInput,
 } from "@/lib/manual-workout-authoring/schema";
+import {
+  manualWorkoutTargetToStepTarget,
+  resolveManualWorkoutTargetInput,
+} from "@/lib/manual-workout-authoring/target-input";
 import type { ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import { isManualWorkoutNoteOnlyBlock } from "@/lib/manual-workout-authoring/validator";
 
@@ -44,7 +50,7 @@ export function normalizeManualWorkoutDraft(input: {
           entryToSteps(entryValue, targetTruthMode, index + 1),
         );
   const steps = normalizeExecutableStepInstructions(rawSteps);
-  const metricMode = buildManualWorkoutMetricMode(template, targetTruthMode);
+  const metricMode = buildManualWorkoutMetricMode(template, targetTruthMode, steps);
   const richWorkout = resolveCanonicalWorkoutModel({
     workoutType: template.workoutType,
     sourceWorkoutType: template.workoutIdentity,
@@ -136,7 +142,7 @@ function repeatGroupToStep(
   targetTruthMode: ManualWorkoutTargetTruthMode,
   sequence: number,
 ): Step {
-  const repeatUnit = blockToUnitPrescription(group.workBlock);
+  const workUnit = blockToUnitPrescription(group.workBlock);
   const recoveryUnit = group.recoveryBlock
     ? blockToUnitPrescription(group.recoveryBlock)
     : ({ mode: "none" } satisfies StepUnitPrescription);
@@ -153,6 +159,29 @@ function repeatGroupToStep(
       )
     : undefined;
 
+  const children: StepRepeatChildPrescription[] = [
+    {
+      role: repeatRoleForBlock(group.workBlock.blockKey),
+      label: group.workBlock.label ?? defaultLabelForBlock(group.workBlock.blockKey),
+      sequence: 1,
+      guidance: group.workBlock.noteText ?? defaultGuidanceForBlock(group.workBlock),
+      prescription: workUnit,
+      ...(workTarget ? { target: workTarget } : {}),
+    },
+    ...(group.recoveryBlock && recoveryUnit.mode !== "none"
+      ? [
+          {
+            role: repeatRoleForBlock(group.recoveryBlock.blockKey),
+            label: group.recoveryBlock.label ?? defaultLabelForBlock(group.recoveryBlock.blockKey),
+            sequence: 2,
+            guidance: group.recoveryBlock.noteText ?? defaultGuidanceForBlock(group.recoveryBlock),
+            prescription: recoveryUnit,
+            ...(recoveryTarget ? { target: recoveryTarget } : {}),
+          } satisfies StepRepeatChildPrescription,
+        ]
+      : []),
+  ];
+
   return {
     type: repeatStepType(group.safetyKind),
     segment_id: `manual-segment-${sequence}`,
@@ -162,33 +191,71 @@ function repeatGroupToStep(
     prescription: {
       mode: "repeats",
       repeat_count: group.repeatCount,
-      repeat_unit: repeatUnit,
-      recovery_unit: recoveryUnit,
+      children,
     },
     repeats: group.repeatCount,
-    work: {
-      type: "work",
-      segment_type: segmentTypeForBlock(group.workBlock.blockKey),
-      label: group.workBlock.label ?? defaultLabelForBlock(group.workBlock.blockKey),
-      prescription: repeatUnit,
-      ...(repeatUnit.duration_min ? { duration_min: repeatUnit.duration_min } : {}),
-      ...(repeatUnit.distance_km ? { distance_km: repeatUnit.distance_km } : {}),
-      ...(workTarget ? { target: workTarget } : {}),
-      guidance: group.workBlock.noteText ?? defaultGuidanceForBlock(group.workBlock),
-    },
-    recovery: {
-      type: "recovery",
-      segment_type: group.recoveryBlock
-        ? segmentTypeForBlock(group.recoveryBlock.blockKey)
-        : "recovery",
-      label: group.recoveryBlock?.label ?? "Recovery",
-      prescription: recoveryUnit,
-      ...(recoveryUnit.duration_min ? { duration_min: recoveryUnit.duration_min } : {}),
-      ...(recoveryUnit.distance_km ? { distance_km: recoveryUnit.distance_km } : {}),
-      ...(recoveryTarget ? { target: recoveryTarget } : {}),
-      guidance: group.recoveryBlock?.noteText ?? "Recover easily before the next repeat.",
-    },
+    children: children.map((child) => ({
+      type: repeatChildStepType(child.role),
+      segment_type: child.role,
+      sequence: child.sequence,
+      label: child.label,
+      prescription: child.prescription,
+      ...(child.prescription.duration_min ? { duration_min: child.prescription.duration_min } : {}),
+      ...(child.prescription.distance_km ? { distance_km: child.prescription.distance_km } : {}),
+      ...(child.target ? { target: child.target } : {}),
+      guidance: child.guidance,
+    })),
   };
+}
+
+function repeatRoleForBlock(
+  blockKey: ManualWorkoutBlockInput["blockKey"],
+): StepRepeatChildPrescription["role"] {
+  switch (blockKey) {
+    case "warmup_block":
+      return "warm_up";
+    case "walk_break_block":
+    case "rest_walk_jog_recovery_block":
+      return "walk";
+    case "recovery_block":
+    case "interval_recovery_block":
+      return "recover";
+    case "cooldown_block":
+      return "cooldown";
+    case "finish_block":
+      return "finish";
+    case "steady_run_block":
+    case "easy_run_block":
+      return "run";
+    case "tempo_block":
+    case "threshold_block":
+    case "interval_work_block":
+    case "hill_work_block":
+    case "downhill_control_block":
+    case "strides_block":
+      return "work";
+    default:
+      return "run";
+  }
+}
+
+function repeatChildStepType(role: StepRepeatChildPrescription["role"]) {
+  switch (role) {
+    case "warm_up":
+      return "warmup";
+    case "recover":
+      return "recovery";
+    case "cooldown":
+      return "cooldown";
+    case "finish":
+      return "finish";
+    case "walk":
+      return "walk";
+    case "work":
+      return "work";
+    case "run":
+      return "run";
+  }
 }
 
 function blockToUnitPrescription(block: ManualWorkoutBlockInput): StepUnitPrescription {
@@ -216,42 +283,19 @@ function buildTarget(
   targetTruthMode: ManualWorkoutTargetTruthMode,
   fallbackHint: string,
 ): StepTarget {
-  const target = block.target;
-  const normalized: StepTarget = {
-    ...(target?.intensity ? { intensity: target.intensity } : {}),
-    ...(target?.label ? { label: target.label } : {}),
-    ...(target?.sourceNote ? { source_note: target.sourceNote } : {}),
-    ...(target?.cue ? { cue: target.cue } : {}),
-    ...(target?.hint ? { hint: target.hint } : {}),
-    ...(target?.rpe ? { rpe: target.rpe } : {}),
-  };
+  const resolved = resolveManualWorkoutTargetInput(block, targetTruthMode);
 
-  if (targetTruthMode === "editable_default_hr") {
-    return {
-      label: normalized.label ?? "Editable default HR guidance",
-      source_note:
-        normalized.source_note ??
-        "Default HR guidance is advisory and editable; it is not personal HR-zone truth.",
-      hint: normalized.hint ?? fallbackHint,
-      ...(normalized.intensity ? { intensity: normalized.intensity } : {}),
-      ...(normalized.cue ? { cue: normalized.cue } : {}),
-      ...(normalized.rpe ? { rpe: normalized.rpe } : {}),
-    };
+  if (!resolved.ok) {
+    return { hint: fallbackHint };
   }
 
-  return {
-    hint: normalized.hint ?? fallbackHint,
-    ...(normalized.intensity ? { intensity: normalized.intensity } : {}),
-    ...(normalized.label ? { label: normalized.label } : {}),
-    ...(normalized.source_note ? { source_note: normalized.source_note } : {}),
-    ...(normalized.cue ? { cue: normalized.cue } : {}),
-    ...(normalized.rpe ? { rpe: normalized.rpe } : {}),
-  };
+  return manualWorkoutTargetToStepTarget(resolved.target, fallbackHint);
 }
 
 function buildManualWorkoutMetricMode(
   template: ManualWorkoutTemplate,
   targetTruthMode: ManualWorkoutTargetTruthMode,
+  steps: Step[],
 ): CanonicalMetricMode {
   if (template.workoutType === "rest" || targetTruthMode === "none") {
     return {
@@ -266,32 +310,7 @@ function buildManualWorkoutMetricMode(
     };
   }
 
-  if (targetTruthMode === "editable_default_hr") {
-    return {
-      guidance: "mixed",
-      executableMode: "structure_only_executable",
-      paceTargetsAllowed: false,
-      hrTargetsAllowed: false,
-      hrTargetSource: "default_estimated_hr",
-      hrTargetLabel: "Editable default HR guidance",
-      hrTargetSourceNote:
-        "Default HR guidance is advisory and editable; it is not personal HR-zone truth.",
-      reason:
-        "Manual workout uses executable structure with editable default HR guidance only; no pace or personal HR truth is claimed.",
-    };
-  }
-
-  return {
-    guidance: "effort",
-    executableMode: "structure_only_executable",
-    paceTargetsAllowed: false,
-    hrTargetsAllowed: false,
-    hrTargetSource: "effort_only",
-    hrTargetLabel: null,
-    hrTargetSourceNote: null,
-    reason:
-      "Manual workout uses executable duration, distance, repeat, work, and recovery structure without pace or HR targets.",
-  };
+  return deriveCanonicalMetricMode(steps);
 }
 
 function stepTypeForBlock(blockKey: ManualWorkoutBlockInput["blockKey"]) {

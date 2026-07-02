@@ -10,7 +10,7 @@ import {
 import { slugify } from "@/lib/ai-first-plan-blueprint-normalize";
 import type { AiFirstPlanBlueprintNormalizationContext } from "@/lib/ai-first-plan-blueprint-validation";
 import { shouldUseBeginnerRunWalkAdaptation } from "@/lib/structured-plan-authoring-policy";
-import type { Step, StepPrescription } from "@/lib/training";
+import type { Step, StepPrescription, StepUnitPrescription } from "@/lib/training";
 
 export function buildWorkoutSegments({
   workout,
@@ -72,10 +72,24 @@ function isRunWalkAdaptableIdentity(workoutIdentity: string) {
 
 function hasRunWalkAdaptationSegments(workout: CanonicalWorkout) {
   return workout.segments.some((segment) => {
-    const target = segment.target as Record<string, unknown> | undefined;
-
-    return target?.intensity === "run_walk_adaptation";
+    return collectSegmentTargets(segment).some(
+      (target) => target.intensity === "run_walk_adaptation",
+    );
   });
+}
+
+function collectSegmentTargets(segment: CanonicalSegment) {
+  const parentTarget = segment.target as Record<string, unknown> | undefined;
+  const childTargets =
+    segment.prescription?.mode === "repeats" && segment.prescription.children?.length
+      ? segment.prescription.children
+          .map((child) => child.target as Record<string, unknown> | undefined)
+          .filter((target): target is Record<string, unknown> => Boolean(target))
+      : [];
+
+  return [parentTarget, ...childTargets].filter((target): target is Record<string, unknown> =>
+    Boolean(target),
+  );
 }
 
 function cloneDeterministicRunWalkSegments({
@@ -160,7 +174,7 @@ function buildIdentitySegmentSpecs(
         guidance:
           "Keep the reps quick and coordinated. The goal is rhythm and repeatability, not an all-out finish.",
         repeatCount: fiveKSharpeningRepeatCount(totalDurationMin),
-        repeatUnit: { mode: "distance", distance_km: 0.2 },
+        workUnit: { mode: "distance", distance_km: 0.2 },
         recoveryMin: 2,
         warmupLabel: "5K sharpening warmup",
         cooldownLabel: "5K sharpening cooldown",
@@ -173,7 +187,7 @@ function buildIdentitySegmentSpecs(
         guidance:
           "Settle into a strong but controlled rhythm. Each rep should feel sustainable enough to repeat.",
         repeatCount: tenKRhythmRepeatCount(totalDurationMin),
-        repeatUnit: { mode: "time", duration_min: 4 },
+        workUnit: { mode: "time", duration_min: 4 },
         recoveryMin: 2,
         warmupLabel: "10K rhythm warmup",
         cooldownLabel: "10K rhythm cooldown",
@@ -186,7 +200,7 @@ function buildIdentitySegmentSpecs(
         guidance:
           "Run each timed repeat with clean, repeatable form, then recover easily before the next one.",
         repeatCount: timeIntervalRepeatCount(totalDurationMin),
-        repeatUnit: { mode: "time", duration_min: 3 },
+        workUnit: { mode: "time", duration_min: 3 },
         recoveryMin: 2,
         warmupLabel: "Interval warmup",
         cooldownLabel: "Interval cooldown",
@@ -199,7 +213,7 @@ function buildIdentitySegmentSpecs(
         guidance:
           "Keep every distance repeat fast but controlled; stop short of sprinting so the set stays repeatable.",
         repeatCount: distanceIntervalRepeatCount(totalDurationMin),
-        repeatUnit: { mode: "distance", distance_km: 0.4 },
+        workUnit: { mode: "distance", distance_km: 0.4 },
         recoveryMin: 2,
         warmupLabel: "Distance-interval warmup",
         cooldownLabel: "Distance-interval cooldown",
@@ -370,16 +384,17 @@ function buildIdentitySegmentSpecs(
         finishGuidance: "Finish feeling fresh, with no late push.",
       });
     case "marathon_steady_specificity":
-      return enduranceSpecs({
+      return intervalSpecs({
+        workout,
         split,
+        label: `${marathonSteadyRepeatCount(totalDurationMin)} marathon-steady repeats`,
+        guidance:
+          "Repeat controlled marathon-steady blocks with easy running between them. Keep this effort-based unless backend metric gates allow more.",
+        repeatCount: marathonSteadyRepeatCount(totalDurationMin),
+        workUnit: { mode: "time", duration_min: 8 },
+        recoveryMin: 2,
         warmupLabel: "Marathon-steady warmup",
-        warmupGuidance:
-          "Start easy and let the rhythm settle before the marathon-specific steady work.",
-        mainLabel: "Controlled marathon-steady running",
-        mainGuidance:
-          "Hold a sustainable steady rhythm for marathon-aerobic durability. If pace is not allowed, keep this effort-based and patient.",
-        finishLabel: "Marathon-steady cooldown",
-        finishGuidance: "Ease down before stopping and protect the next day's recovery.",
+        cooldownLabel: "Marathon-steady cooldown",
       });
     case "race_pace_session":
       return enduranceSpecs({
@@ -477,6 +492,57 @@ function buildIdentitySegmentSpecs(
         finishLabel: "Composed steady finish",
         finishGuidance: "Ease down gradually and finish with relaxed form.",
       });
+    case "easy_run_with_strides":
+      return [
+        warmupSpec(
+          split.warmupMin,
+          "Stride-session opening",
+          "Start easy and let form loosen before the relaxed strides.",
+        ),
+        timedSpec({
+          segmentType: "main",
+          label: "Easy aerobic body",
+          durationMin: Math.max(10, split.mainMin - 8),
+          guidance:
+            "Keep this aerobic and conversational. The strides are form reminders, not a workout race.",
+          targetRole: "main",
+        }),
+        {
+          segmentType: "strides",
+          label: "Relaxed stride set",
+          guidance:
+            "Repeat relaxed stride efforts with easy recovery. Keep every stride smooth and stop short of sprinting.",
+          prescription: {
+            mode: "repeats",
+            repeat_count: 4,
+            children: [
+              {
+                role: "work",
+                label: "Relaxed stride",
+                sequence: 1,
+                prescription: { mode: "distance", distance_km: 0.1 },
+              },
+              {
+                role: "recover",
+                label: "Easy recovery",
+                sequence: 2,
+                prescription: { mode: "time", duration_min: 1.5 },
+              },
+            ],
+          },
+          targetRole: "main",
+          recoveryTarget: {
+            intensity: "easy recovery",
+            rpe: Math.max(2, workout.plannedRpe - 3),
+            cue: "Recover fully enough that the next stride stays relaxed.",
+          },
+        },
+        cooldownSpec(
+          split.cooldownMin,
+          "Stride-session cooldown",
+          "Finish easy and relaxed; do not add extra fast running.",
+        ),
+      ];
     case "easy_aerobic_run":
       return enduranceSpecs({
         split,
@@ -518,10 +584,37 @@ function buildBlueprintSegment({
   deterministicWorkout: CanonicalWorkout | null;
   repairs: string[];
 }): CanonicalSegment {
-  const prescription = spec.prescription ?? {
+  const basePrescription = spec.prescription ?? {
     mode: "time" as const,
     duration_min: spec.durationMin ?? 1,
   };
+  const segmentTarget =
+    spec.segmentType === "fueling"
+      ? {
+          cue: "Keep the checkpoint practical and effort-controlled; do not chase metrics here.",
+          hint: "Use familiar fueling or hydration habits only.",
+        }
+      : buildBlueprintSegmentTarget({
+          workout,
+          segmentKind: spec.targetRole,
+          context,
+          deterministicWorkout,
+          repairs,
+        });
+  const prescription =
+    basePrescription.mode === "repeats" && basePrescription.children?.length
+      ? {
+          ...basePrescription,
+          children: basePrescription.children.map((child) => ({
+            ...child,
+            target:
+              child.target ??
+              (child.role === "recover" || child.role === "walk"
+                ? spec.recoveryTarget
+                : segmentTarget),
+          })),
+        }
+      : basePrescription;
   const durationMin = prescription.mode === "time" ? prescription.duration_min : undefined;
   const distanceKm = prescription.mode === "distance" ? prescription.distance_km : undefined;
 
@@ -534,20 +627,10 @@ function buildBlueprintSegment({
     ...(distanceKm ? { distance_km: distanceKm } : {}),
     guidance: spec.guidance,
     prescription,
-    target:
-      spec.segmentType === "fueling"
-        ? {
-            cue: "Keep the checkpoint practical and effort-controlled; do not chase metrics here.",
-            hint: "Use familiar fueling or hydration habits only.",
-          }
-        : buildBlueprintSegmentTarget({
-            workout,
-            segmentKind: spec.targetRole,
-            context,
-            deterministicWorkout,
-            repairs,
-          }),
-    ...(spec.recoveryTarget ? { recovery_target: spec.recoveryTarget } : {}),
+    ...(prescription.mode === "repeats" ? {} : { target: segmentTarget }),
+    ...(prescription.mode !== "repeats" && spec.recoveryTarget
+      ? { recovery_target: spec.recoveryTarget }
+      : {}),
   } as CanonicalSegment;
 }
 
@@ -645,7 +728,7 @@ function intervalSpecs({
   label,
   guidance,
   repeatCount,
-  repeatUnit,
+  workUnit,
   recoveryMin,
   warmupLabel,
   cooldownLabel,
@@ -655,7 +738,7 @@ function intervalSpecs({
   label: string;
   guidance: string;
   repeatCount: number;
-  repeatUnit: NonNullable<StepPrescription["repeat_unit"]>;
+  workUnit: StepUnitPrescription;
   recoveryMin: number;
   warmupLabel: string;
   cooldownLabel: string;
@@ -673,11 +756,23 @@ function intervalSpecs({
       prescription: {
         mode: "repeats",
         repeat_count: repeatCount,
-        repeat_unit: repeatUnit,
-        recovery_unit: {
-          mode: "time",
-          duration_min: recoveryMin,
-        },
+        children: [
+          {
+            role: "work",
+            label: "Work",
+            sequence: 1,
+            prescription: workUnit,
+          },
+          {
+            role: "recover",
+            label: "Recover",
+            sequence: 2,
+            prescription: {
+              mode: "time",
+              duration_min: recoveryMin,
+            },
+          },
+        ],
       },
       targetRole: "main",
       recoveryTarget: {
@@ -726,14 +821,26 @@ function hillRepeatSpecs({
       prescription: {
         mode: "repeats",
         repeat_count: repeatCount,
-        repeat_unit: {
-          mode: "time",
-          duration_min: repeatMin,
-        },
-        recovery_unit: {
-          mode: "time",
-          duration_min: recoveryMin,
-        },
+        children: [
+          {
+            role: "work",
+            label: "Work",
+            sequence: 1,
+            prescription: {
+              mode: "time",
+              duration_min: repeatMin,
+            },
+          },
+          {
+            role: "recover",
+            label: "Recover",
+            sequence: 2,
+            prescription: {
+              mode: "time",
+              duration_min: recoveryMin,
+            },
+          },
+        ],
       },
       targetRole: "main",
       recoveryTarget: {
@@ -768,6 +875,10 @@ function fiveKSharpeningRepeatCount(totalDurationMin: number) {
 
 function tenKRhythmRepeatCount(totalDurationMin: number) {
   return boundedRepeatCount(totalDurationMin, 3, 6);
+}
+
+function marathonSteadyRepeatCount(totalDurationMin: number) {
+  return boundedRepeatCount(totalDurationMin, 3, 5);
 }
 
 function downhillDurabilityRepeatCount(totalDurationMin: number) {

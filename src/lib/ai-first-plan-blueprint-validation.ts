@@ -1,6 +1,5 @@
 import type { AiFirstPlanBlueprintTraceMetadata } from "@/lib/ai-first-plan-draft-metadata";
 import {
-  buildRequiredCadenceSlots,
   isGoalFamilyCadencePlan,
   resolveAuthoringHorizonWeeks,
   resolveGoalFamilyIdentityPolicy,
@@ -17,11 +16,11 @@ import type {
 import {
   type AuthoredWorkoutFamily,
   hardWorkoutFamilies,
+  weekdayValues,
   weekdayIndex,
 } from "@/lib/ai-first-plan-blueprint-taxonomy";
 import {
   hasRaceSpecificMetricSupport,
-  isSupportedModerateIntensityIdentity,
   isSupportedSpecificityIdentity,
   resolveSupportedIntensityCadence,
   shouldUseLongRunSteadyFinishAsSpecificStimulus,
@@ -29,12 +28,18 @@ import {
 } from "@/lib/structured-plan-authoring-policy";
 import { addDaysIso, weekdayLong, type StepPrescription } from "@/lib/training";
 
-export function buildNormalizationContext(authoringInput: StructuredAuthoringInput) {
+export interface AiFirstPlanBlueprintNormalizationOptions {
+  enforcePreferredLongRunDay?: boolean;
+}
+
+export function buildNormalizationContext(
+  authoringInput: StructuredAuthoringInput,
+  options: AiFirstPlanBlueprintNormalizationOptions = {},
+) {
   const expectedHorizonWeeks = resolveAuthoringHorizonWeeks(authoringInput);
+  const enforcePreferredLongRunDay = options.enforcePreferredLongRunDay ?? false;
   const fixedRestDays: Set<string> = new Set(authoringInput.availability.unavailableDays);
-  const runningDays: Set<string> = new Set(
-    authoringInput.availability.preferredRunningDays.filter((day) => !fixedRestDays.has(day)),
-  );
+  const runningDays: Set<string> = new Set(weekdayValues.filter((day) => !fixedRestDays.has(day)));
   const paceTargetsAllowed = Boolean(
     authoringInput.execution.watchAccess === "watch_or_app" &&
     (authoringInput.execution.guidancePreference === "pace" ||
@@ -64,7 +69,12 @@ export function buildNormalizationContext(authoringInput: StructuredAuthoringInp
     lowSupportBuildConsistency,
     goalFamilyPolicy,
     goalFamilyCadencePlan,
-    requiredCadenceSlots: buildRequiredCadenceSlots(authoringInput, goalFamilyPolicy),
+    dateAuthorshipMode: "openai_authored_dated_plan" as const,
+    authoredWorkoutDatesRequired: true,
+    preferredLongRunDay: enforcePreferredLongRunDay
+      ? (authoringInput.availability.preferredLongRunDay ?? null)
+      : null,
+    requiredCadenceSlots: new Map(),
   };
 }
 
@@ -131,16 +141,6 @@ export function validateBlueprintShell(
     });
   }
 
-  if (completeness.firstMissingRequiredDates.length > 0) {
-    issues.push({
-      code: "incomplete_blueprint_required_slots",
-      path: "weeks.plannedWorkouts",
-      message: `Blueprint authored ${completeness.actualAuthoredWorkoutCount} of ${completeness.expectedRequiredSlotCount} required workout slot(s); first missing dates: ${formatBoundedList(
-        completeness.firstMissingRequiredDates,
-      )}.`,
-    });
-  }
-
   const seenDates = new Set<string>();
 
   for (const week of blueprint.weeks) {
@@ -161,9 +161,17 @@ export function validateBlueprintShell(
     }
 
     validateHardDayDensity(week, context, issues);
-    validateGoalFamilyCadenceWeek(week, context, issues);
 
     for (const workout of week.plannedWorkouts) {
+      if (!workout.date) {
+        issues.push({
+          code: "missing_explicit_workout_date",
+          path: `weeks.${week.weekNumber}.plannedWorkouts.date`,
+          message:
+            "OpenAI-authored generated plans must include an explicit ISO date for every authored workout.",
+        });
+      }
+
       const date = resolveBlueprintWorkoutDate(workout, week, context);
 
       if (!date) {
@@ -211,13 +219,13 @@ export function validateBlueprintShell(
 
       if (
         isBlueprintLongRunIntent(workout) &&
-        context.authoringInput.availability.preferredLongRunDay &&
-        workout.weekday !== context.authoringInput.availability.preferredLongRunDay
+        context.preferredLongRunDay &&
+        workout.weekday !== context.preferredLongRunDay
       ) {
         issues.push({
           code: "preferred_long_run_day_violation",
           path: `${date}.weekday`,
-          message: `Long runs should land on ${context.authoringInput.availability.preferredLongRunDay}.`,
+          message: `Long runs should land on ${context.preferredLongRunDay}.`,
         });
       }
 
@@ -296,9 +304,9 @@ function buildBlueprintCompleteness(
 }
 
 function buildExpectedAuthoredWorkoutDates(context: AiFirstPlanBlueprintNormalizationContext) {
-  return Array.from({ length: context.expectedHorizonWeeks * 7 }, (_value, offset) =>
-    addDaysIso(context.authoringInput.schedule.startDate, offset),
-  ).filter((date) => context.runningDays.has(weekdayLong(date)));
+  void context;
+
+  return [];
 }
 
 function formatBoundedList(values: Array<string | number>) {
@@ -342,51 +350,6 @@ function validateHardDayDensity(
   }
 }
 
-function validateGoalFamilyCadenceWeek(
-  week: AiBlueprintWeek,
-  context: AiFirstPlanBlueprintNormalizationContext,
-  issues: NormalizationIssue[],
-) {
-  if (!context.goalFamilyCadencePlan) {
-    return;
-  }
-
-  const requiredCadenceSlot = context.requiredCadenceSlots.get(week.weekNumber);
-
-  if (!requiredCadenceSlot) {
-    return;
-  }
-
-  const cadenceWorkout = week.plannedWorkouts.find((workout) => {
-    const date = resolveBlueprintWorkoutDate(workout, week, context);
-
-    return date === requiredCadenceSlot.date;
-  });
-
-  const supportedIntensityCadence = resolveSupportedIntensityCadence(
-    context.authoringInput,
-    week.weekNumber,
-  );
-  const cadenceCanBeRepaired =
-    supportedIntensityCadence.applies &&
-    cadenceWorkout &&
-    (isSupportedModerateIntensityIdentity(cadenceWorkout.workoutIdentity) ||
-      (requiredCadenceSlot.identityOptions.includes("long_run_with_steady_finish") &&
-        isBlueprintLongRunIntent(cadenceWorkout)));
-
-  if (
-    !cadenceWorkout ||
-    (!cadenceCanBeRepaired &&
-      !requiredCadenceSlot.identityOptions.includes(cadenceWorkout.workoutIdentity))
-  ) {
-    issues.push({
-      code: "missing_required_goal_family_cadence",
-      path: `weeks.${week.weekNumber}.plannedWorkouts`,
-      message: `Week ${week.weekNumber} must use the required ${requiredCadenceSlot.weekday} slot for ${context.goalFamilyPolicy.label} ${requiredCadenceSlot.kind} work.`,
-    });
-  }
-}
-
 function validateGoalFamilyCadence(
   blueprint: AiFirstPlanBlueprint,
   context: AiFirstPlanBlueprintNormalizationContext,
@@ -403,12 +366,22 @@ function validateGoalFamilyCadence(
       )
       .map((week) => week.weekNumber),
   );
+  const cadenceExemptWeeks = new Set(
+    blueprint.weeks
+      .filter((week) => week.cutbackWeek || week.taperWeek)
+      .map((week) => week.weekNumber),
+  );
 
-  if (context.requiredCadenceSlots.size > 0) {
+  const supportedIntensityCadence = resolveSupportedIntensityCadence(context.authoringInput);
+  const cadenceFrequency = supportedIntensityCadence.applies
+    ? supportedIntensityCadence.frequency
+    : context.goalFamilyPolicy.cadence.frequency;
+
+  if (cadenceFrequency === "none") {
     return;
   }
 
-  const step = context.goalFamilyPolicy.cadence.frequency === "weekly" ? 1 : 2;
+  const step = cadenceFrequency === "weekly" ? 1 : 2;
   const cadenceLabel =
     context.goalFamilyPolicy.cadence.kind === "quality"
       ? "quality, rhythm, or tune-up"
@@ -416,6 +389,12 @@ function validateGoalFamilyCadence(
 
   for (let weekNumber = 1; weekNumber <= context.expectedHorizonWeeks; weekNumber += step) {
     const nextWeekNumber = step === 1 ? weekNumber : weekNumber + 1;
+    const cadenceWindowExempt =
+      cadenceExemptWeeks.has(weekNumber) && (step === 1 || cadenceExemptWeeks.has(nextWeekNumber));
+
+    if (cadenceWindowExempt) {
+      continue;
+    }
 
     if (!cadenceWeeks.has(weekNumber) && !cadenceWeeks.has(nextWeekNumber)) {
       issues.push({
@@ -723,11 +702,28 @@ function estimateCanonicalWorkoutLoad(workout: CanonicalWorkout) {
       return total + prescription.duration_min / 6;
     }
 
-    if (prescription?.mode === "repeats" && prescription.repeat_count && prescription.repeat_unit) {
+    if (prescription?.mode === "repeats" && prescription.repeat_count) {
+      if (prescription.children?.length) {
+        return (
+          total +
+          prescription.children.reduce(
+            (sum, child) => sum + estimateUnitDurationMin(child.prescription),
+            0,
+          ) *
+            prescription.repeat_count
+        );
+      }
+
+      if (!prescription.children?.length) {
+        return total;
+      }
+
       return (
         total +
-        (estimateUnitDurationMin(prescription.repeat_unit) +
-          (prescription.recovery_unit ? estimateUnitDurationMin(prescription.recovery_unit) : 0)) *
+        prescription.children.reduce(
+          (sum, child) => sum + estimateUnitDurationMin(child.prescription),
+          0,
+        ) *
           prescription.repeat_count
       );
     }
@@ -736,7 +732,9 @@ function estimateCanonicalWorkoutLoad(workout: CanonicalWorkout) {
   }, 0);
 }
 
-function estimateUnitDurationMin(unit: NonNullable<StepPrescription["repeat_unit"]>) {
+function estimateUnitDurationMin(
+  unit: NonNullable<NonNullable<StepPrescription["children"]>[number]["prescription"]>,
+) {
   if (unit.mode === "time" && unit.duration_min) {
     return unit.duration_min / 6;
   }
@@ -770,16 +768,17 @@ export function failedAiBlueprintNormalization(
     reason,
     issues,
     fallback: {
-      status: "deterministic_fallback",
-      source: "deterministic_structured_generator",
+      status: "blueprint_unavailable",
+      source: "openai_ai_first_plan_blueprint",
       validationIssues: issues.map((issue) => issue.message).slice(0, 12),
       repairs: [],
       reviewAssumptions: [
-        "Hito should use the deterministic structured generator because the AI-authored blueprint did not pass backend validation.",
+        "Hito rejected this AI-authored blueprint before review because it did not pass backend validation.",
       ],
       metricPolicySummary:
-        "Deterministic fallback preserves existing pace, default-HR, fixed-rest-day, and effort-safety gates.",
+        "Rejected AI blueprint produced no reviewed draft; existing pace, HR, fixed-rest-day, and effort-safety gates remain enforced.",
       blueprintTrace: blueprintTrace ?? null,
+      datePlacement: blueprintTrace?.datePlacement,
     },
   };
 }

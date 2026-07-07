@@ -21,12 +21,15 @@ import {
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
 import {
+  addRunningPlanReviewProof,
   buildRunningPlanCanonicalPlan,
   validateRunningPlanReviewExactness,
   type RunningPlanPreviewDraft,
   type RunningPlanReviewedPreviewDraft,
 } from "../src/lib/running-plan-engine-review";
+import { startOfWeekIso } from "../src/lib/training";
 import {
+  assertSelectedDistanceEndpointProof,
   tamperReviewToken,
   validateCanonicalRowsAreNumeric,
   validateNoFakePaceOrPersonalHr,
@@ -58,6 +61,28 @@ const scenarios = [
       ...baseInput,
       distanceFamily: "10K",
       planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+    },
+    expectedEndpointMeters: 10_000,
+  },
+  {
+    name: "Browser-serialized Beginner 10K distance goal",
+    input: {
+      ...baseInput,
+      age: 34,
+      heightCm: 178,
+      weightKg: 72,
+      runnerLevel: "sometimes_runs",
+      distanceFamily: "10K",
+      daysPerWeek: 5,
+      fixedRestDays: [],
+      preferredLongRunDay: null,
+      startDate: "2026-07-04",
+      benchmark: { kind: "unknown" },
+      planGoalIntent: {
+        distance: { kind: "preset", preset: "10K" },
+        targetDate: "2026-10-04",
+        targetFinishTime: "1:10:00",
+      },
     },
     expectedEndpointMeters: 10_000,
   },
@@ -110,7 +135,30 @@ async function main() {
     reviewedDrafts.push(await validateAiGeneratedDistanceGoalScenario(scenario));
   }
 
-  await validateFailureBoundaries(reviewedDrafts[0]);
+  const longRunRichnessDraft = reviewedDrafts.find(
+    (draft) => draft.endpointProof.endpointDistanceMeters === 21_100,
+  );
+  const marathonDraft = reviewedDrafts.find(
+    (draft) => draft.endpointProof.endpointDistanceMeters === 42_195,
+  );
+  assert.notEqual(
+    longRunRichnessDraft,
+    undefined,
+    "Confirm validator must include a non-10K draft for runner-facing richness mutation proof.",
+  );
+  if (!longRunRichnessDraft) {
+    throw new Error("Missing non-10K draft for runner-facing richness mutation proof.");
+  }
+  assert.notEqual(
+    marathonDraft,
+    undefined,
+    "Confirm validator must include a marathon draft for race-week load mutation proof.",
+  );
+  if (!marathonDraft) {
+    throw new Error("Missing marathon draft for race-week load mutation proof.");
+  }
+
+  await validateFailureBoundaries(reviewedDrafts[0], longRunRichnessDraft, marathonDraft);
   const activeManualTransitionProof = await validateActiveManualPlanTransitionContract(
     reviewedDrafts[0],
   );
@@ -138,6 +186,12 @@ async function validateAiGeneratedDistanceGoalScenario(scenario: (typeof scenari
   assert.equal(draft.mutates, false);
   assert.equal(draft.reviewSafety.confirmCallsOpenAi, false);
   assert.equal(draft.endpointProof.endpointDistanceMeters, scenario.expectedEndpointMeters);
+  assertSelectedDistanceEndpointProof({
+    scenarioName: scenario.name,
+    canonicalPlan,
+    draft,
+    expectedEndpointMeters: scenario.expectedEndpointMeters,
+  });
   assert.equal(canonicalPlan.source_kind, AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
   assert.equal(importedSeed.workouts.length, canonicalPlan.planned_workouts.length);
   assert.doesNotMatch(JSON.stringify(canonicalPlan), /repeat_unit|recovery_unit/);
@@ -185,6 +239,8 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
 
 async function validateFailureBoundaries(
   reviewedDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+  longRunRichnessDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+  marathonDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
 ) {
   const changedStartDraft = await buildReviewedAiFixture({
     ...reviewedDraft.previewInput,
@@ -210,6 +266,9 @@ async function validateFailureBoundaries(
     assert.equal(invalidTokenExactness.reason, "invalid_review");
   }
 
+  await validateFlatLongRunProgressionReviewIsRejected(longRunRichnessDraft);
+  await validateMarathonRaceWeekLoadReviewIsRejected(marathonDraft);
+
   const legacySourceKindPayload = await confirmRunningPlanDraftForUser("dry-run-user", {
     previewInput: reviewedDraft.previewInput,
     sourceKind: "unsupported_legacy_source_kind",
@@ -232,6 +291,136 @@ async function validateFailureBoundaries(
   if (!clientRowsPayload.ok) {
     assert.equal(clientRowsPayload.reason, "invalid_review");
   }
+}
+
+async function validateMarathonRaceWeekLoadReviewIsRejected(
+  reviewedDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+) {
+  const canonicalPlan = buildRunningPlanCanonicalPlan(reviewedDraft);
+  const endpoint = canonicalPlan.planned_workouts.find(
+    (workout) => workout.source_workout_type === "final_selected_distance_day",
+  );
+  assert.notEqual(endpoint, undefined, "Marathon exactness proof must include endpoint row.");
+  if (!endpoint) {
+    throw new Error("Missing marathon endpoint row.");
+  }
+
+  const raceWeekStart = startOfWeekIso(endpoint.date);
+  const raceWeekRows = canonicalPlan.planned_workouts.filter(
+    (workout) =>
+      workout.workout_type !== "rest" &&
+      workout !== endpoint &&
+      workout.date >= raceWeekStart &&
+      workout.date < endpoint.date,
+  );
+  assert.ok(
+    raceWeekRows.length >= 3,
+    "Marathon race-week load exactness proof needs enough pre-endpoint rows to overload.",
+  );
+
+  const overloadedPlan = {
+    ...canonicalPlan,
+    planned_workouts: canonicalPlan.planned_workouts.map((workout) =>
+      raceWeekRows.includes(workout)
+        ? {
+            ...workout,
+            segments: workout.segments.map((segment) => ({
+              ...segment,
+              prescription: {
+                mode: "time" as const,
+                duration_min: Math.round((22 / Math.max(1, workout.segments.length)) * 10) / 10,
+              },
+            })),
+          }
+        : workout,
+    ),
+  };
+  const overloadedDraft = await addRunningPlanReviewProof({
+    ...stripReviewProof(reviewedDraft),
+    canonicalPlan: overloadedPlan,
+  });
+  const exactness = await validateRunningPlanReviewExactness({
+    draft: overloadedDraft,
+    reviewToken: overloadedDraft.reviewToken,
+    reviewChecksum: overloadedDraft.reviewChecksum,
+  });
+
+  assert.equal(
+    exactness.ok,
+    false,
+    "A signed generated-plan review with overloaded marathon race week must not validate.",
+  );
+  if (!exactness.ok) {
+    assert.equal(exactness.reason, "invalid_review");
+    assert.match(exactness.message, /marathon_race_week_load|runner-facing richness/i);
+  }
+}
+
+async function validateFlatLongRunProgressionReviewIsRejected(
+  reviewedDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+) {
+  const canonicalPlan = buildRunningPlanCanonicalPlan(reviewedDraft);
+  const flatLongRunPlan = {
+    ...canonicalPlan,
+    planned_workouts: canonicalPlan.planned_workouts.map((workout) =>
+      isPreEndpointBuildLongRun(workout)
+        ? {
+            ...workout,
+            segments: workout.segments.map((segment) => ({
+              ...segment,
+              prescription: {
+                mode: "time" as const,
+                duration_min: Math.round((75 / Math.max(1, workout.segments.length)) * 10) / 10,
+              },
+            })),
+          }
+        : workout,
+    ),
+  };
+  const flatDraft = await addRunningPlanReviewProof({
+    ...stripReviewProof(reviewedDraft),
+    canonicalPlan: flatLongRunPlan,
+  });
+  const exactness = await validateRunningPlanReviewExactness({
+    draft: flatDraft,
+    reviewToken: flatDraft.reviewToken,
+    reviewChecksum: flatDraft.reviewChecksum,
+  });
+
+  assert.equal(
+    exactness.ok,
+    false,
+    "A signed generated-plan review with flat pre-endpoint long-run progression must not validate.",
+  );
+  if (!exactness.ok) {
+    assert.equal(exactness.reason, "invalid_review");
+    assert.match(exactness.message, /runner-facing richness/i);
+  }
+}
+
+function isPreEndpointBuildLongRun(
+  workout: ReturnType<typeof buildRunningPlanCanonicalPlan>["planned_workouts"][number],
+) {
+  return (
+    workout.workout_type === "long_run" &&
+    workout.source_workout_type !== "final_selected_distance_day" &&
+    workout.source_workout_type !== "taper_long_run"
+  );
+}
+
+function stripReviewProof(
+  draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+): RunningPlanPreviewDraft {
+  const {
+    canonicalNonRestRowCount: _canonicalNonRestRowCount,
+    canonicalRowCount: _canonicalRowCount,
+    reviewChecksum: _reviewChecksum,
+    reviewContractVersion: _reviewContractVersion,
+    reviewToken: _reviewToken,
+    ...unreviewedDraft
+  } = draft;
+
+  return unreviewedDraft;
 }
 
 async function validateActiveManualPlanTransitionContract(

@@ -19,9 +19,10 @@ import {
   structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
 } from "../../src/lib/structured-plan-authoring";
-import { addDaysIso, diffDaysIso, weekdayLong } from "../../src/lib/training";
+import { addDaysIso, diffDaysIso } from "../../src/lib/training";
 import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
 import type { WeekdayName } from "../../src/lib/weekday-rest-invariants";
+import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./ai-first-plan-blueprint-fixtures";
 
 export type DoctrineRequestBuilder = (
   goalDistance: StructuredFirstPlanOnboardingRequestInput["goal"]["goalDistance"],
@@ -367,7 +368,11 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
     },
   });
 
-  assert.equal(aiResult.ok, true, "structured first-plan draft should return a bounded result");
+  assert.equal(
+    aiResult.ok,
+    true,
+    `structured first-plan draft should return a bounded result: ${JSON.stringify(aiResult)}`,
+  );
   assert.equal(aiResult.status, "draft_ready", "structured first-plan draft should be ready");
 
   if (aiResult.ok && aiResult.status === "draft_ready") {
@@ -744,7 +749,11 @@ async function assertStructuredFirstPlanDraftBlueprintReviewContract(
   assert.equal(
     boundedHorizonResult.ok,
     true,
-    "long target-date structured first-plan draft should review a complete OpenAI-authored dated plan",
+    boundedHorizonResult.ok
+      ? "long target-date structured first-plan draft should review a complete OpenAI-authored dated plan"
+      : `long target-date structured first-plan draft should review a complete OpenAI-authored dated plan: ${JSON.stringify(
+          boundedHorizonResult,
+        )}`,
   );
 
   if (boundedHorizonResult.ok && boundedHorizonResult.status === "draft_ready") {
@@ -1229,80 +1238,6 @@ function buildReviewedFirstPlanExactnessFixture(): TrainingPlanV2 {
   };
 }
 
-export function buildMinimalAiFirstPlanBlueprintForAuthoringInput(
-  authoringInput: ReturnType<typeof buildStructuredFirstPlanAuthoringInput>,
-  options: { horizonWeeks?: number } = {},
-): AiFirstPlanBlueprint {
-  const startDate = authoringInput.schedule.startDate;
-  const runningDays = authoringInput.availability.preferredRunningDays.filter(
-    (weekday) => !authoringInput.availability.unavailableDays.includes(weekday),
-  );
-  const horizonWeeks = options.horizonWeeks ?? 2;
-  const targetDate =
-    authoringInput.schedule.targetDate ?? addDaysIso(startDate, horizonWeeks * 7 - 1);
-
-  return {
-    schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
-    planName: "AI blueprint first-plan review fixture",
-    generatedFor: "Doctrine fixture",
-    goalSummary: authoringInput.goal.goalLabel,
-    startDate,
-    targetDate,
-    preparationHorizonWeeks: horizonWeeks,
-    planPreferences: {
-      preferredRunningDays: authoringInput.availability.preferredRunningDays,
-      fixedRestDays: authoringInput.availability.unavailableDays,
-      preferredLongRunDay: authoringInput.availability.preferredLongRunDay,
-      maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
-    },
-    reviewAssumptions: [
-      "Backend expands compact workout intent into canonical segments and metric truth.",
-    ],
-    metricPolicySummary:
-      "AI supplies metric intent only; backend applies pace and personal HR truth gates.",
-    weeks: Array.from({ length: horizonWeeks }, (_value, weekIndex) => ({
-      weekNumber: weekIndex + 1,
-      phase: weekIndex === 0 ? "Base" : "Build",
-      theme: weekIndex === 0 ? "Set rhythm" : "Progress durability",
-      microcycleIntent: "Keep the compact AI-authored week simple but reviewable.",
-      cutbackWeek: false,
-      taperWeek: false,
-      longRunIntent: "Keep the long run on the reviewed preferred long-run day.",
-      longRunProgression: "Progress long-run durability conservatively.",
-      plannedWorkouts: runningDays.flatMap((weekday) => {
-        const date = dateForWeekdayInSevenDayWindow(addDaysIso(startDate, weekIndex * 7), weekday);
-
-        if (weekIndex === horizonWeeks - 1 && date > targetDate) {
-          return [];
-        }
-
-        const isTargetEndpointDay = weekIndex === horizonWeeks - 1 && date === targetDate;
-        const isLongRun =
-          weekday === authoringInput.availability.preferredLongRunDay || isTargetEndpointDay;
-
-        return [
-          {
-            date,
-            weekday,
-            workoutFamily: isLongRun ? "long" : "easy",
-            workoutIdentity: isLongRun ? "long_aerobic_run" : "easy_aerobic_run",
-            calendarIconKey: isLongRun ? "long" : "easy",
-            title: isLongRun ? "Long aerobic run" : "Easy aerobic run",
-            summary: isLongRun
-              ? "Reviewable long-run durability from the AI-authored blueprint."
-              : "Reviewable easy support running from the AI-authored blueprint.",
-            plannedRpe: isLongRun ? 5 : 4,
-            estimatedFatigue: isLongRun ? "medium" : "low",
-            recoveryPriority: isLongRun ? "high" : "medium",
-            segmentIntent: isLongRun ? "long_durability" : "easy_aerobic",
-            metricIntent: "mixed_if_allowed",
-          },
-        ];
-      }),
-    })),
-  };
-}
-
 function forceFirstPostLongRunBlueprintWorkoutToSteady(blueprint: AiFirstPlanBlueprint) {
   const entries = blueprint.weeks
     .flatMap((week) => week.plannedWorkouts.map((workout) => ({ week, workout })))
@@ -1313,6 +1248,10 @@ function forceFirstPostLongRunBlueprintWorkoutToSteady(blueprint: AiFirstPlanBlu
     const longRunEntry = entries[index]!;
 
     if (longRunEntry.workout.workoutFamily !== "long") {
+      continue;
+    }
+
+    if (longRunEntry.week.weekNumber <= 4) {
       continue;
     }
 
@@ -1343,18 +1282,6 @@ function forceFirstPostLongRunBlueprintWorkoutToSteady(blueprint: AiFirstPlanBlu
   return null;
 }
 
-function dateForWeekdayInSevenDayWindow(startDate: string, weekday: WeekdayName) {
-  for (let offset = 0; offset < 7; offset += 1) {
-    const date = addDaysIso(startDate, offset);
-
-    if (weekdayLong(date) === weekday) {
-      return date;
-    }
-  }
-
-  return startDate;
-}
-
 function countBlueprintAuthoredWorkouts(blueprint: AiFirstPlanBlueprint) {
   return blueprint.weeks.reduce((total, week) => total + week.plannedWorkouts.length, 0);
 }
@@ -1375,10 +1302,24 @@ function assertWeeklyLongRunDayWithTargetEndpoint(
         workout.week_number === weekNumber &&
         (workout.workout_family === "long" || workout.workout_type === "long_run"),
     );
+    const endpointRows =
+      weekNumber === targetWeekNumber
+        ? plan.planned_workouts.filter(
+            (workout) =>
+              workout.week_number === weekNumber &&
+              workout.date === targetDate &&
+              workout.source_workout_type === "final_selected_distance_day",
+          )
+        : [];
+    const longRunEquivalents = longRuns.length > 0 ? longRuns : endpointRows;
 
-    assert.equal(longRuns.length, 1, `${label}: week ${weekNumber} should have one long run`);
+    assert.equal(
+      longRunEquivalents.length,
+      1,
+      `${label}: week ${weekNumber} should have one long run or selected-distance endpoint`,
+    );
 
-    const longRun = longRuns[0]!;
+    const longRun = longRunEquivalents[0]!;
 
     if (weekNumber === targetWeekNumber && longRun.date === targetDate) {
       continue;

@@ -304,7 +304,7 @@ function validatePreferredLongRunDay(
       issues.push({
         code: "envelope_missing_weekly_long_run",
         path: `weeks.${weekNumber}`,
-        message: `Week ${weekNumber} must include a backend-expanded long-run row.`,
+        message: `Week ${weekNumber} must include a canonical long-run row.`,
       });
       continue;
     }

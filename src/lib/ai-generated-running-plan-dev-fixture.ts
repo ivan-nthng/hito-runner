@@ -2,6 +2,7 @@ import {
   AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
   type AiFirstPlanBlueprint,
 } from "@/lib/ai-first-plan-blueprint-authoring";
+import { buildAiBlueprintWorkoutSections } from "@/lib/ai-first-plan-blueprint-section-templates";
 import {
   resolveAuthoringHorizonWeeks,
   resolveGoalFamilyIdentityPolicy,
@@ -12,12 +13,14 @@ import { resolveCanonicalWorkoutModel } from "@/lib/rich-workout-model";
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring";
 import {
   phaseForWeek,
+  hasRaceSpecificMetricSupport,
   resolveSupportedIntensityCadence,
   resolveSupportedSpecificityIdentityOptions,
   shouldScheduleSupportedIntensityWeek,
+  shouldUseConservativeNoBenchmarkLongDistanceAdaptation,
   shouldUseLongRunSteadyFinishAsSpecificStimulus,
 } from "@/lib/structured-plan-authoring-policy";
-import { addDaysIso, weekdayLong } from "@/lib/training";
+import { addDaysIso, diffDaysIso, startOfWeekIso, weekdayLong } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
 
 export const AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV =
@@ -148,14 +151,25 @@ function buildFixtureWeek(input: {
   const specificity = chooseFixtureSpecificityIdentity(input);
   const plannedWorkouts = authoredWeekdays.map((weekday) => {
     const date = dateForWeekday(weekStart, weekday);
-    const identity =
+    const plannedIdentity =
       weekday === longRunDay
         ? chooseFixtureLongRunIdentity({ ...input, phase })
         : specificity?.weekday === weekday
           ? specificity.identity
           : chooseFixtureSupportIdentity({ ...input, weekday, phase });
+    const identity = isMarathonRaceWeekPreEndpointDate(authoringInput, date)
+      ? "recovery_jog"
+      : plannedIdentity;
 
-    return buildFixtureBlueprintWorkout({ date, weekday, identity, phase, authoringInput });
+    return buildFixtureBlueprintWorkout({
+      date,
+      weekday,
+      identity,
+      phase,
+      authoringInput,
+      weekNumber,
+      horizonWeeks,
+    });
   });
 
   return {
@@ -192,10 +206,13 @@ function chooseFixtureWeekdays(input: {
 
     return (!fixedRestDay || targetEndpointDay) && (!targetDate || date <= targetDate);
   });
-  const targetCount = Math.min(
-    authoringInput.availability.maxRunningDaysPerWeek,
-    allowedWeekdays.length,
-  );
+  const targetCount = resolveFixtureTargetCount({
+    authoringInput,
+    weekNumber,
+    horizonWeeks,
+    targetDate: Boolean(targetDate),
+    allowedWeekdayCount: allowedWeekdays.length,
+  });
   const longRunDay = resolveFixtureLongRunDay(input);
   const specificity = chooseFixtureSpecificityIdentity(input);
   const selected = new Set<WeekdayName>();
@@ -210,6 +227,23 @@ function chooseFixtureWeekdays(input: {
 
   if (allowedWeekdays.includes(longRunDay)) {
     selected.add(longRunDay);
+  }
+
+  if (isConservativeNoBenchmarkEarlyPhase(authoringInput, weekNumber)) {
+    const dayAfterLongRun = offsetWeekday(longRunDay, 1);
+    for (const weekday of uniqueWeekdays([
+      ...authoringInput.availability.preferredRunningDays,
+      ...allowedWeekdays,
+    ])) {
+      if (selected.size >= targetCount) break;
+      if (
+        allowedWeekdays.includes(weekday) &&
+        weekday !== dayAfterLongRun &&
+        !wouldCreateConservativeEarlyStreak({ weekStart, selected, weekday })
+      ) {
+        selected.add(weekday);
+      }
+    }
   }
 
   for (const weekday of authoringInput.availability.preferredRunningDays) {
@@ -227,12 +261,106 @@ function chooseFixtureWeekdays(input: {
   return [...selected].sort((left, right) => weekdayIndex(left) - weekdayIndex(right));
 }
 
+function wouldCreateConservativeEarlyStreak(input: {
+  weekStart: string;
+  selected: ReadonlySet<WeekdayName>;
+  weekday: WeekdayName;
+}) {
+  const dates = [...input.selected, input.weekday]
+    .map((weekday) => dateForWeekday(input.weekStart, weekday))
+    .sort();
+  let current = 0;
+  let previousDate: string | null = null;
+
+  for (const date of dates) {
+    current = previousDate && diffDaysIso(date, previousDate) === 1 ? current + 1 : 1;
+    previousDate = date;
+
+    if (current > 2) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function uniqueWeekdays(values: readonly WeekdayName[]) {
+  return Array.from(new Set(values));
+}
+
+function resolveFixtureTargetCount(input: {
+  authoringInput: StructuredPlanAuthoringInput;
+  weekNumber: number;
+  horizonWeeks: number;
+  targetDate: boolean;
+  allowedWeekdayCount: number;
+}) {
+  const { authoringInput, weekNumber } = input;
+  let targetCount =
+    input.targetDate && isMarathonDistanceGoal(authoringInput) && input.allowedWeekdayCount <= 2
+      ? 2
+      : authoringInput.availability.maxRunningDaysPerWeek;
+
+  if (isConservativeNoBenchmarkEarlyPhase(authoringInput, weekNumber)) {
+    const distanceMeters = authoringInput.planGoalIntent?.distance?.distanceMeters ?? 10_000;
+    const maxEarlyCount =
+      distanceMeters <= 10_000 && authoringInput.runnerProfile.experienceLevel === "new_runner"
+        ? 3
+        : 4;
+    targetCount = Math.min(targetCount, maxEarlyCount);
+  }
+
+  return Math.min(targetCount, input.allowedWeekdayCount);
+}
+
+function isMarathonDistanceGoal(authoringInput: StructuredPlanAuthoringInput) {
+  const distanceMeters = authoringInput.planGoalIntent?.distance?.distanceMeters ?? null;
+
+  return authoringInput.goal.goalType === "marathon" || (distanceMeters ?? 0) >= 42_195;
+}
+
+function isMarathonRaceWeekPreEndpointDate(
+  authoringInput: StructuredPlanAuthoringInput,
+  date: string,
+) {
+  if (!authoringInput.schedule.targetDate || !isMarathonDistanceGoal(authoringInput)) {
+    return false;
+  }
+
+  const raceWeekStart = startOfWeekIso(authoringInput.schedule.targetDate);
+
+  return date >= raceWeekStart && date < authoringInput.schedule.targetDate;
+}
+
 function chooseFixtureSpecificityIdentity(input: {
   authoringInput: StructuredPlanAuthoringInput;
   weekNumber: number;
   horizonWeeks: number;
 }): { weekday: WeekdayName; identity: AuthoredWorkoutIdentity } | null {
   const { authoringInput, weekNumber } = input;
+
+  if (
+    weekNumber === input.horizonWeeks ||
+    phaseForWeek(weekNumber, input.horizonWeeks) === "Taper"
+  ) {
+    return null;
+  }
+
+  if (shouldUseConservativeNoBenchmarkLongDistanceAdaptation(authoringInput, weekNumber)) {
+    return null;
+  }
+
+  if (shouldUseLowSupportTenKMicroStrides(authoringInput, weekNumber)) {
+    const weekday = chooseFixtureSpecificityWeekday({
+      authoringInput,
+      longRunDay: resolveFixtureLongRunDay(input),
+      weekStart: addDaysIso(authoringInput.schedule.startDate, (weekNumber - 1) * 7),
+      minDaysAfterLongRun: 3,
+    });
+
+    return weekday ? { weekday, identity: "easy_run_with_strides" } : null;
+  }
+
   const cadence = resolveSupportedIntensityCadence(authoringInput, weekNumber);
   const supportedOptions = resolveSupportedSpecificityIdentityOptions(
     authoringInput,
@@ -270,8 +398,15 @@ function chooseGoalFamilyCadenceIdentityOptions(
   weekNumber: number,
 ): AuthoredWorkoutIdentity[] {
   const policy = resolveGoalFamilyIdentityPolicy(authoringInput);
+  const cadence = resolveSupportedIntensityCadence(authoringInput, weekNumber);
 
-  if (policy.cadence.frequency === "none") {
+  if (
+    shouldUseConservativeNoBenchmarkLongDistanceAdaptation(authoringInput, weekNumber) ||
+    policy.cadence.frequency === "none" ||
+    !cadence.applies ||
+    cadence.frequency === "none" ||
+    !shouldScheduleSupportedIntensityWeek(authoringInput, weekNumber, cadence)
+  ) {
     return [];
   }
 
@@ -279,7 +414,19 @@ function chooseGoalFamilyCadenceIdentityOptions(
     return [];
   }
 
-  return [
+  const supportedOptions = new Set<AuthoredWorkoutIdentity>(
+    resolveSupportedSpecificityIdentityOptions(
+      authoringInput,
+      weekNumber,
+      cadence,
+    ) as readonly AuthoredWorkoutIdentity[],
+  );
+  if (supportedOptions.size === 0) {
+    return [];
+  }
+
+  return uniqueIdentities([
+    ...supportedOptions,
     ...policy.expectedQualityIdentities,
     ...policy.specialtyIdentities,
     ...(authoringInput.goal.goalType === "marathon" ||
@@ -287,13 +434,18 @@ function chooseGoalFamilyCadenceIdentityOptions(
       ? (["progression_run"] as const)
       : []),
     ...policy.longRunIdentities,
-  ].filter(
+  ]).filter(
     (identity) =>
       policy.allowedIdentities.has(identity) &&
+      supportedOptions.has(identity) &&
       identity !== "long_aerobic_run" &&
       identity !== "cutback_long_run" &&
       identity !== "taper_long_run",
   );
+}
+
+function uniqueIdentities(values: readonly AuthoredWorkoutIdentity[]) {
+  return Array.from(new Set(values));
 }
 
 function chooseFixtureSpecificityOption(input: {
@@ -313,6 +465,8 @@ function chooseFixtureSpecificityOption(input: {
 function chooseFixtureSpecificityWeekday(input: {
   authoringInput: StructuredPlanAuthoringInput;
   longRunDay: WeekdayName;
+  weekStart?: string;
+  minDaysAfterLongRun?: number;
 }) {
   const fixedRestDays = new Set(input.authoringInput.availability.unavailableDays);
   const allowedWeekdays = WEEKDAY_NAMES.filter(
@@ -324,8 +478,33 @@ function chooseFixtureSpecificityWeekday(input: {
   ]);
 
   return (
-    allowedWeekdays.find((weekday) => !adjacentToLongRun.has(weekday)) ?? allowedWeekdays[0] ?? null
+    allowedWeekdays.find(
+      (weekday) =>
+        !adjacentToLongRun.has(weekday) && satisfiesMinimumDaysAfterLongRun(input, weekday),
+    ) ??
+    allowedWeekdays.find((weekday) => !adjacentToLongRun.has(weekday)) ??
+    allowedWeekdays[0] ??
+    null
   );
+}
+
+function satisfiesMinimumDaysAfterLongRun(
+  input: {
+    longRunDay: WeekdayName;
+    weekStart?: string;
+    minDaysAfterLongRun?: number;
+  },
+  weekday: WeekdayName,
+) {
+  if (!input.weekStart || !input.minDaysAfterLongRun) {
+    return true;
+  }
+
+  const longRunDate = dateForWeekday(input.weekStart, input.longRunDay);
+  const candidateDate = dateForWeekday(input.weekStart, weekday);
+  const gapDays = diffDaysIso(candidateDate, longRunDate);
+
+  return gapDays < 0 || gapDays >= input.minDaysAfterLongRun;
 }
 
 function resolveFixtureLongRunDay(input: {
@@ -344,6 +523,10 @@ function resolveFixtureLongRunDay(input: {
     return targetDateWeekday;
   }
 
+  if (!authoringInput.schedule.targetDate && weekNumber === horizonWeeks) {
+    return latestAllowedWorkoutWeekday(input) ?? "Sunday";
+  }
+
   const preferred = authoringInput.availability.preferredLongRunDay;
   if (preferred && !fixedRestDays.has(preferred)) {
     return preferred;
@@ -356,6 +539,18 @@ function resolveFixtureLongRunDay(input: {
   );
 }
 
+function latestAllowedWorkoutWeekday(input: {
+  authoringInput: StructuredPlanAuthoringInput;
+  weekNumber: number;
+}) {
+  const weekStart = addDaysIso(input.authoringInput.schedule.startDate, (input.weekNumber - 1) * 7);
+  const fixedRestDays = new Set(input.authoringInput.availability.unavailableDays);
+
+  return WEEKDAY_NAMES.filter((weekday) => !fixedRestDays.has(weekday))
+    .map((weekday) => ({ weekday, date: dateForWeekday(weekStart, weekday) }))
+    .sort((left, right) => right.date.localeCompare(left.date))[0]?.weekday;
+}
+
 function chooseFixtureLongRunIdentity(input: {
   authoringInput: StructuredPlanAuthoringInput;
   weekNumber: number;
@@ -363,6 +558,10 @@ function chooseFixtureLongRunIdentity(input: {
   phase: BlueprintWeek["phase"];
 }): AuthoredWorkoutIdentity {
   const cadence = resolveSupportedIntensityCadence(input.authoringInput, input.weekNumber);
+
+  if (input.weekNumber === input.horizonWeeks) {
+    return "selected_distance_completion_or_checkpoint";
+  }
 
   if (input.phase === "Taper" || input.weekNumber === input.horizonWeeks) {
     return "taper_long_run";
@@ -396,12 +595,16 @@ function chooseFixtureSupportIdentity(input: {
       (distanceMeters != null && distanceMeters > 10_000)) &&
     input.weekNumber > Math.floor(input.horizonWeeks / 2);
 
-  if (needsLateBridge && input.weekday !== resolveFixtureLongRunDay(input)) {
-    return "steady_aerobic_run";
-  }
-
   if (input.phase === "Taper") {
     return "recovery_jog";
+  }
+
+  if (isConservativeNoBenchmarkEarlyPhase(input.authoringInput, input.weekNumber)) {
+    return input.weekNumber > 1 && input.weekNumber % 4 === 0 ? "recovery_jog" : "easy_aerobic_run";
+  }
+
+  if (needsLateBridge && input.weekday !== resolveFixtureLongRunDay(input)) {
+    return "steady_aerobic_run";
   }
 
   if (input.weekNumber > 1 && input.weekNumber % 4 === 0) {
@@ -411,12 +614,56 @@ function chooseFixtureSupportIdentity(input: {
   return input.weekNumber % 3 === 0 ? "steady_aerobic_run" : "easy_aerobic_run";
 }
 
+function isConservativeNoBenchmarkEarlyPhase(
+  authoringInput: StructuredPlanAuthoringInput,
+  weekNumber: number,
+) {
+  return weekNumber <= 4 && isConservativeNoBenchmarkAuthoring(authoringInput);
+}
+
+function shouldUseLowSupportTenKMicroStrides(
+  authoringInput: StructuredPlanAuthoringInput,
+  weekNumber: number,
+) {
+  const distanceMeters = authoringInput.planGoalIntent?.distance?.distanceMeters ?? null;
+
+  return Boolean(
+    weekNumber === 2 &&
+    distanceMeters != null &&
+    distanceMeters <= 10_000 &&
+    !authoringInput.currentLevel.recent5kPaceSecondsPerKm &&
+    authoringInput.runnerProfile.experienceLevel === "new_runner",
+  );
+}
+
+function isConservativeNoBenchmarkAuthoring(authoringInput: StructuredPlanAuthoringInput) {
+  const noBenchmark = !authoringInput.currentLevel.recent5kPaceSecondsPerKm;
+  const feasibilityStatus = authoringInput.planGoalIntent?.feasibility?.status ?? null;
+  const targetTimeIntent = Boolean(
+    authoringInput.goal.targetTime ||
+    authoringInput.planGoalIntent?.targetFinishTime ||
+    authoringInput.planGoalIntent?.targetOutcomePace,
+  );
+
+  return (
+    noBenchmark &&
+    (authoringInput.runnerProfile.experienceLevel === "new_runner" ||
+      authoringInput.runnerProfile.experienceLevel === "returning_runner" ||
+      feasibilityStatus === "aggressive_or_short_horizon" ||
+      targetTimeIntent)
+  );
+}
+
 function fixtureFamilyRichnessIdentity(
   authoringInput: StructuredPlanAuthoringInput,
   weekNumber: number,
 ): AuthoredWorkoutIdentity | null {
   const distanceMeters = authoringInput.planGoalIntent?.distance?.distanceMeters ?? null;
   const goalType = authoringInput.goal.goalType;
+
+  if (shouldUseConservativeNoBenchmarkLongDistanceAdaptation(authoringInput, weekNumber)) {
+    return null;
+  }
 
   if (weekNumber <= 2) {
     return null;
@@ -439,7 +686,9 @@ function fixtureFamilyRichnessIdentity(
     goalType === "distance_build" ||
     (distanceMeters != null && distanceMeters > 21_100)
   ) {
-    if (weekNumber % 3 === 1) return "race_pace_session";
+    if (weekNumber % 3 === 1) {
+      return hasRaceSpecificMetricSupport(authoringInput) ? "race_pace_session" : "progression_run";
+    }
     if (weekNumber % 3 === 2) return "controlled_tempo_session";
     return "marathon_steady_specificity";
   }
@@ -453,12 +702,27 @@ function buildFixtureBlueprintWorkout(input: {
   identity: AuthoredWorkoutIdentity;
   phase: BlueprintWeek["phase"];
   authoringInput: StructuredPlanAuthoringInput;
+  weekNumber?: number;
+  horizonWeeks?: number;
 }): BlueprintWorkout {
   const title = fixtureTitleForIdentity(input.identity);
   const resolved = resolveCanonicalWorkoutModel({
     workoutType: "easy",
     workoutIdentity: input.identity,
     title,
+  });
+  const sections = buildAiBlueprintWorkoutSections({
+    workoutIdentity: resolved.workoutIdentity,
+    workoutFamily: resolved.workoutFamily,
+    plannedRpe: plannedRpeForFamily(resolved.workoutFamily),
+    distanceMeters: input.authoringInput.planGoalIntent?.distance?.distanceMeters ?? null,
+    weekNumber: input.weekNumber ?? null,
+    horizonWeeks: input.horizonWeeks ?? null,
+    lowSupportTenKBeginner: shouldUseLowSupportTenKBeginnerSections({
+      authoringInput: input.authoringInput,
+      weekNumber: input.weekNumber,
+      horizonWeeks: input.horizonWeeks,
+    }),
   });
 
   return {
@@ -477,7 +741,65 @@ function buildFixtureBlueprintWorkout(input: {
         : "medium",
     segmentIntent: segmentIntentForFamily(resolved.workoutFamily),
     metricIntent: "effort_only",
+    sections:
+      input.identity === "recovery_jog" &&
+      isMarathonRaceWeekPreEndpointDate(input.authoringInput, input.date)
+        ? shortenRaceWeekRecoverySections(sections)
+        : sections,
   };
+}
+
+function shortenRaceWeekRecoverySections(sections: BlueprintWorkout["sections"]) {
+  const minutesByKind = new Map([
+    ["warm_up", 2],
+    ["run", 6],
+    ["cooldown", 2],
+  ]);
+
+  return sections.map((section) => {
+    if (section.prescription.mode !== "time") {
+      return section;
+    }
+
+    const duration = minutesByKind.get(section.kind);
+
+    if (!duration) {
+      return section;
+    }
+
+    return {
+      ...section,
+      prescription: {
+        ...section.prescription,
+        duration_min: duration,
+      },
+    };
+  });
+}
+
+function shouldUseLowSupportTenKBeginnerSections({
+  authoringInput,
+}: {
+  authoringInput: StructuredPlanAuthoringInput;
+  weekNumber?: number;
+  horizonWeeks?: number;
+}) {
+  const distanceMeters = authoringInput.planGoalIntent?.distance?.distanceMeters ?? null;
+  const noBenchmarkOutcomeIntent = Boolean(
+    !authoringInput.currentLevel.recent5kPaceSecondsPerKm &&
+    (authoringInput.goal.targetTime ||
+      authoringInput.planGoalIntent?.targetFinishTime ||
+      authoringInput.planGoalIntent?.targetOutcomePace),
+  );
+
+  return Boolean(
+    distanceMeters != null &&
+    distanceMeters <= 10_000 &&
+    !authoringInput.currentLevel.recent5kPaceSecondsPerKm &&
+    (authoringInput.runnerProfile.experienceLevel === "new_runner" ||
+      authoringInput.runnerProfile.baselineSessionsPerWeek <= 4 ||
+      noBenchmarkOutcomeIntent),
+  );
 }
 
 function fixtureTitleForIdentity(identity: AuthoredWorkoutIdentity) {
@@ -514,6 +836,8 @@ function fixtureTitleForIdentity(identity: AuthoredWorkoutIdentity) {
       return "5K sharpening repeats";
     case "10k_rhythm_intervals":
       return "10K rhythm intervals";
+    case "selected_distance_completion_or_checkpoint":
+      return "Selected distance day";
     case "progression_run":
       return "Progression run";
     case "race_pace_session":

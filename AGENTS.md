@@ -45,10 +45,11 @@ contains the fuller implementation discipline.
 - This orchestration ban does not revoke explicit non-code documentation authority granted by role
   files or skills to Product, Backlog Manager, Designer, QA, Running Coach, or other roles when the
   current task is actually addressed to that role.
-- A normal/default chat turn is orchestration unless the task is explicitly addressed to a role
-  with `ROLE: <ROLE>` or the user explicitly assigns that role to the current agent. The
-  orchestration agent must not silently self-promote into `ARCHITECT`, `BACKEND`, `FRONTEND`, or
-  `QA` execution because that is the fastest path to doing another role's work.
+- A normal/default chat turn is orchestration unless the user explicitly assigns that role to the
+  current agent in plain language. A pasted or attached `ROLE: <ROLE>` prompt is a handoff artifact,
+  not permission for this orchestration agent to become that role or execute the prompt locally.
+  The orchestration agent must not silently self-promote into `ARCHITECT`, `BACKEND`, `FRONTEND`,
+  `QA`, or any other execution role because that is the fastest path to doing another role's work.
 - If the user asks this agent to "fix", "build", "change", "remove", "validate", "run", "QA", or "check" product work, the response must be a handoff prompt for the correct role, not direct execution.
 - Even tiny or obvious changes must not be implemented directly. No "just one quick patch" exception exists.
 - This agent is limited to:

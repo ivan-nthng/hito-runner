@@ -14,85 +14,75 @@ high
 
 ## Next Recommended Role
 
-qa
+designer
 
 ## Task
 
-Validate pre-customer generated-plan legacy purge in browser.
+Define the Hito inline editable text/editor pattern after workout-document readback acceptance.
 
 ## Stage
 
-QA validation / generated-plan legacy purge browser acceptance.
+DESIGNER audit / Hito inline editable text pattern contract.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: QA
+ROLE: DESIGNER
 
 Task:
-Validate pre-customer generated-plan legacy purge in browser.
+Define the Hito inline editable text/editor pattern after workout-document readback acceptance.
 
 Stage:
-QA validation / generated-plan legacy purge browser acceptance.
+DESIGNER audit / Hito inline editable text pattern contract.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md
 
 Context:
-Backend completed the pre-customer legacy purge for generated-plan and plan-authoring code. Hito has
-no customer-generated production content to preserve for the removed legacy paths. Current generated
-plan truth is the unified distance-goal AI-authored dated plan flow: presets are UI shortcuts to
-`distanceMeters`, backend reviews and persists the accepted canonical draft, and old deterministic
-generated-plan product builders / backend Plan Preset discovery seams are removed.
-
-Root cause and architecture fit:
-Visible symptom: legacy deterministic builder and Plan Preset compatibility paths were still present
-after the OpenAI-authored distance-goal flow became product truth.
-Underlying cause: generated-plan source truth was split between the accepted AI-authored review path
-and obsolete deterministic/preset builders.
-Canonical owner: BACKEND plan-generation/review/import/export contracts; QA now owns browser proof.
+Generated-plan backend/product readiness, source-size hygiene, and the first generated-plan
+workout-document readback polish are accepted. The accepted UX polish introduced compact generated
+workout-document readback and a safe editable-heading pilot in editable manual context; generated
+rows remain read-only. Source-size cleanup is not the owner of the next slice. The next right gate is
+a shared Hito inline editable text/editor design contract so future surfaces do not create
+route-local inline editors.
 
 Scope:
-1. Read `AGENTS.md`, `agents/qa.agent.md`, `skills/hito-qa-browser-regression/SKILL.md`, this
-   source-size plan, and the running-plan rebuild plan.
-2. Reuse the healthy managed QA server when possible; run the standard QA preflight for server
-   status, build-output integrity, and `curl -I http://127.0.0.1:3000/`.
-3. Browser-validate the current happy paths after backend cleanup:
-   - Quick setup 10K distance plan preview/create/saved calendar/workout detail;
-   - Quick setup 21.1K distance plan preview/create/saved calendar/workout detail;
-   - Quick setup 42.195K distance plan preview/create/saved calendar/workout detail;
-   - Quick setup Custom 15K preview/create/saved calendar/workout detail;
-   - manual workout authoring smoke sufficient to prove the purge did not break manual review/create;
-   - saved calendar and generated workout detail child-first repeat readback;
-   - import/export only if still exposed in the tested flow without requiring unsafe mutation.
-4. Verify runner-facing UI and persisted readback do not expose deleted legacy truth:
-   `Plan Preset`, `10K Foundation`, `Half Marathon Balanced`, `Marathon Base`,
-   `base_endpoint_marker`, `plan_preset`, `running_plan_engine_*_builder` as generated-plan
-   product truth, `repeat_unit`, `recovery_unit`, `legacy_repeat_unit`, `legacy_recovery_unit`,
-   fake executable pace, fake personal HR, or raw deterministic builder source kinds.
-5. Use disposable test accounts/fixtures and clean them back to zero app-owned residue.
-6. Do not implement fixes. If validation fails, capture artifacts and route one owner with source
-   proof.
+1. Read `AGENTS.md`, `agents/designer.agent.md`, relevant design/Hito DS skills, this source-size
+   plan, the running-plan rebuild plan, the generated-plan UX spec, current product/system/functional
+   docs, and the accepted QA artifact:
+   /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-07-07/generated-plan-workout-document-readback-polish-qa/
+2. Define the shared Hito inline editable text/editor pattern: normal/read, hover, focus-visible,
+   edit, disabled/read-only, validation/error if needed, mobile/touch discoverability, keyboard
+   behavior, labels, and save/cancel expectations.
+3. Define v1 allowed contexts and explicit exclusions. Editable manual workout/title/template-like
+   contexts are candidates; generated preview/detail rows remain read-only unless backend capability
+   metadata later allows editing.
+4. Keep backend/source-size truth fixed: do not change generation semantics, proof helpers,
+   validators, metrics tooling, source-size cleanup, Supabase, OpenAI, or persisted data.
+5. Select one smallest design-ready FRONTEND implementation batch if the design findings are
+   implementation-ready.
 
 Validation:
-- Desktop and exact `375px` coverage for all four goal paths.
-- Console warning/error and pageerror counts must be `0`.
-- No page-level horizontal overflow.
-- DB/readback proof for created plans and generated workout detail.
-- Disposable cleanup proof returns zero app-owned residue.
-- Durable artifact folder under `qa-artifacts/screenshots/2026-07-02/`.
+- Design/source/artifact review only; no code edits and no browser QA unless explicitly needed for
+  design inspection.
+- If a design/spec doc is updated, run scoped `git diff --check`.
 
 Stop conditions:
-- Stop if backend cleanup changed product behavior beyond the accepted distance-goal generated-plan
-  flow.
-- Stop if legacy deterministic/preset truth is still visible or persisted as current product truth.
-- Stop if cleanup would require frontend/backend fixes, Supabase schema/data mutation, live OpenAI
-  calls, or product-policy decisions.
+- Stop if recommendations require generated workout content editing, backend plan semantics,
+  generated-plan validator changes, source-size/tooling changes, Supabase/schema/data mutation, live
+  OpenAI calls, provider/FIT comparison acceptance, or a broad redesign.
 ```
+
+## Designer Gate Sync - 2026-07-07 - Workout-Document Polish Accepted
+
+The generated-plan workout-document readback polish is QA-accepted under the running-plan plan. This
+source-size plan no longer routes the old generated-plan design pass; the shared inline editable
+text/editor pattern is the next design/front-end gate, and source-size cleanup stays out of that
+slice.
 
 ## Backend Implementation - 2026-07-02 - Generated-Plan Legacy Purge
 
-Status: backend/source validation passed; browser QA pending.
+Status: accepted after backend/source validation, browser/readback QA, and post-acceptance cleanup.
 
 Backend removed the pre-customer legacy generated-plan/preset stack instead of preserving obsolete
 compatibility for hypothetical future users. The accepted product truth is now one distance-goal
@@ -140,8 +130,37 @@ Source scan after cleanup found no current `src/` or `scripts/` references for `
 `marathon_base`, `base_endpoint_marker`, `plan_preset`, `running_plan_engine_*_builder`,
 `VoiceToPlan`, or `voice_to_plan`.
 
-Next gate: QA browser acceptance for 10K, 21.1K, 42.195K, and Custom 15K generated-plan creation,
-saved calendar, workout detail, manual authoring smoke, and legacy-truth absence.
+QA accepted generated-plan creation/readback for 10K, 21.1K, 42.195K, and Custom 15K, including
+manual authoring smoke and legacy-truth absence.
+
+## Source-Size Checkpoint - 2026-07-07 - Generated-Plan Validator Cleanup
+
+Status: accepted; next gate is product/design, not another backend cleanup.
+
+Post-acceptance cleanup reduced `scripts/validate-ai-generated-running-plan-creation.ts` from
+`2651` to `1370` lines and extracted repeated proof helpers into tracked
+`scripts/ai-generated-running-plan-proof-helpers.ts` (`1330` lines). The extracted helper is
+intentional indexed source, not an untracked residue blocker.
+
+Fresh source-size snapshot:
+
+- maintained size: `207,579` lines / `653` files;
+- product source: `123,143` lines / `328` files;
+- scripts: `39,762` lines / `70` files;
+- product active-decomposition candidates: `1`;
+- script active-decomposition candidates: `0`;
+- active markdown compression candidates: `0`;
+- dirty worktree: `44` total, `39` tracked modified, `5` tracked added, `1` tracked deleted,
+  `0` untracked.
+
+Accepted behavior preserved: W1-W4 conservative adaptation, selected-distance endpoint exactness,
+child-first repeats, no fake executable pace/HR, no parent repeat targets, no `repeat_unit` /
+`recovery_unit`, impossible/aggressive typed outcomes, review/confirm exactness, and manual
+authoring smoke.
+
+Accepted QA artifact:
+
+`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-07-06/generated-plan-early-phase-dosing-qa/`
 
 ## Context
 

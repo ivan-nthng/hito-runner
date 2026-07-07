@@ -100,17 +100,15 @@ Active
   successful plan creation now automatically opens a fresh saved-mode home request instead of leaving users stuck in the setup pending state.
 - The structured first-plan onboarding frontend slice is now implemented:
   the normal no-plan setup surface collects required age/weight/height, a bounded 5K benchmark or unknown state, fixed rest days through a compact weekday selector, compact execution preference, goal distance/style with ultra marathon and mountain running options, target time/date only for target-time goals, terrain only for marathon/ultra while mountain running implies mountain context, strength/mobility preference, and one optional `Comment`, then calls `generateStructuredFirstPlanDraft`; the review action stays in a sticky footer and remains disabled until required answers are complete, ready drafts show backend-owned runner/profile, goal, availability/rest-day, horizon, workout-mix, metric-policy, assumption, and safety copy, and only the explicit `Yes, create plan` action calls `confirmStructuredFirstPlanDraft`.
-- The Plan Preset card slice is implemented and QA-passed as discovery, while creation now routes
-  through selected running-plan preview/create:
-  no-active-plan setup exposes backend-owned Plan Preset cards for `10K Foundation`,
-  `Half Marathon Balanced`, and `Marathon Base`, with backend-shaped eligibility, duration, workout
-  mix, metric honesty, and fit summaries. The legacy Plan Preset review/confirm seam has been
-  removed from runtime; onboarding now imports card discovery directly from
-  `src/lib/plan-preset-actions.ts` instead of through `training-api.ts`; selecting a card opens the
-  running-plan engine preview and backend-owned confirm/persist path. Preset active-plan
-  replacement/refresh and additional preset families remain future backlog work; manual user-built
-  plan creation and manual calendar actions live in the separate manual builder track, while
-  edit/recurrence remain future-only.
+- The old Plan Preset card/discovery product path is retired from current runtime truth. Quick setup
+  now exposes goal shortcuts for 10K, Half Marathon, Marathon, and Custom distance as convenience
+  inputs into the same backend-owned distance-goal generated-plan preview/create path. Backend
+  validation, normalization, review token/checksum, and confirm/persist semantics own the generated
+  plan; deterministic Plan Preset programs, Marathon Base fallback truth, and backend Plan Preset
+  discovery/review/confirm actions are removed. The 2026-07-06 browser/readback QA accepted 10K,
+  21.1K, 42.195K, and Custom 15K creation through saved calendar and workout detail with W1-W4
+  conservative adaptation, exact selected-distance endpoints, child-first repeats, no fake pace/HR,
+  no legacy repeat truth, and disposable cleanup to zero.
 - Universal active-plan Add/Clear/Move editability is accepted in the proved scope:
   saved calendars now use backend-shaped capability metadata and
   `active_plan_user_edit_v1` audit metadata for eligible today-or-future Add plus row-state Clear
@@ -185,10 +183,12 @@ Active
   the old `DictateToPlanPanel` UI residue, `src/lib/voice-to-plan-authoring.ts`,
   `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and the `voice_to_plan` entitlement
   capability are removed. The no-plan surface currently shows Manual setup and Quick setup with
-  structured review plus Plan Preset / selected-plan paths. Do not treat transcript-based plan
+  structured review plus selected distance-goal review/create. Do not treat transcript-based plan
   creation as shipped unless a future Product/Backend/Frontend gate rebuilds it and QA accepts it.
 - The no-plan onboarding frontend ownership has been refactored without changing product behavior:
-  `OnboardingGate` now orchestrates state and server actions while focused onboarding modules own the structured constructor UI, Plan Preset / selected-plan review, manual setup, and shared constructor form model.
+  `OnboardingGate` now orchestrates state and server actions while focused onboarding modules own the
+  structured constructor UI, selected distance-goal review, manual setup, and shared constructor form
+  model.
 - The first backend ownership slice from the first-plan constructor architecture audit is now implemented:
   `src/lib/first-plan-actions.ts` owns the structured first-plan action plus voice draft/confirm actions, while `training-api.ts` keeps compatibility re-exports so existing product imports still compile; no generation, entitlement, fixed rest-day, persistence, or review/confirm behavior was intentionally changed.
 - The second backend ownership slice from the first-plan constructor architecture audit is now implemented:
@@ -199,10 +199,9 @@ Active
   active-plan export action ownership lives in `src/lib/active-plan-export-actions.ts`, the export
   API route imports that canonical owner directly, and `training-api.ts` no longer keeps
   `exportActivePlan` / `exportActivePlanForUser` compatibility re-exports.
-- The Plan Preset card facade narrowing slice is now implemented:
-  Plan Preset card discovery remains owned by `src/lib/plan-preset-actions.ts`, onboarding imports
-  that owner directly, and `training-api.ts` no longer keeps Plan Preset card discovery
-  compatibility re-exports.
+- Historical only: the former Plan Preset card facade narrowing slice was superseded by the
+  pre-customer generated-plan legacy purge. Current Quick setup goal cards are distance shortcuts,
+  not backend Plan Preset discovery programs.
 - The auth callback exchange facade narrowing slice is now implemented:
   `/api/auth/confirm` imports `exchangeCodeForSession` directly from `src/lib/auth-actions.ts`, and
   `training-api.ts` no longer keeps the auth callback exchange compatibility re-export.
@@ -267,14 +266,17 @@ Active
   found `0` repeat-unit, parent-repeat-target, missing-children, nested-repeat, fake-pace,
   fake-personal-HR, exact hill/elevation, or planGoalIntent executable-policy violations. Quick
   setup browser/readback proof is now accepted for the OpenAI/local-fixture authored dated
-  generated-plan path: 10K no-benchmark, Marathon target date/finish time, and Custom 15K target
-  date/finish time all preview/create saved plans with child-first repeats. Custom 15K persists as
-  `distance_build`, Marathon persists as `marathon` / `target_time`, and neither path falls back to
-  Marathon Base as current product truth. Generated-plan create-and-use browser proof is also
-  accepted through first generated non-rest workout logging: `10K Foundation` saved calendar
-  readback, child-first repeat-rich workout detail, one completed `workout_logs` row tied to the
-  same planned workout id, desktop/mobile clean console, and disposable cleanup to zero. Garmin/FIT
-  provider upload/comparison remains a separate later QA gate.
+  generated-plan path: 10K, 21.1K, 42.195K, and Custom 15K all preview/create saved plans with
+  child-first repeats and W1-W4 conservative adaptation. Custom 15K persists as `distance_build`,
+  Marathon persists as `marathon` / `target_time`, and neither path falls back to Marathon Base as
+  current product truth. Generated-plan create-and-use browser proof is also accepted through first
+  generated non-rest workout logging, child-first repeat-rich workout detail, one completed
+  `workout_logs` row tied to the same planned workout id, desktop/mobile clean console, and
+  disposable cleanup to zero. The 2026-07-07 workout-document readback polish is also accepted:
+  generated preview/detail surfaces now use compact structure-strip/row readback and demote
+  proof/debug language, generated rows remain read-only, and the editable-heading pilot is limited to
+  editable manual constructor context. Garmin/FIT provider upload/comparison remains a separate later
+  QA gate.
 - The second Hito DS foundations cleanup slice is now implemented:
   workout-detail route chrome now uses existing Hito surface, row-group, hairline, tab-badge, micro-label, body-small, and technical-mono primitives instead of local radial/linear gradients, white-alpha borders, bespoke radius values, and tiny text recipes in `src/routes/workout.$date.tsx` and the Garmin upload/interval controls in `CompletionPanel`.
 - The third Hito DS foundations cleanup slice is now started with a bounded calendar surface migration:

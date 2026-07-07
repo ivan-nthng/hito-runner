@@ -11,7 +11,10 @@ import {
   isLimitedSharpeningSupport,
   phaseForWeek,
   resolveSupportedIntensityCadence,
+  resolveSupportedSpecificityIdentityOptions,
   shouldAvoidQuality,
+  shouldScheduleSupportedIntensityWeek,
+  type SupportedSpecificityIdentity,
 } from "@/lib/structured-plan-authoring-policy";
 import {
   normalizeStructuredPlanAuthoringInput,
@@ -21,6 +24,9 @@ import type { TrainingPhase } from "@/lib/structured-plan-authoring-schema";
 import {
   buildFiveKSharpeningWorkout,
   buildHalfMarathonThresholdWorkout,
+  buildAerobicStridesWorkout,
+  buildProgressionWorkout,
+  buildTempoWorkout,
   buildTenKRhythmWorkout,
   type BuildWorkoutContext,
 } from "@/lib/structured-plan-authoring-workouts";
@@ -126,6 +132,37 @@ export function applyAiFirstPlanEnvelopeSpecificity({
   trace.declaredCandidateWeekCount = candidateWeeks.length;
 
   for (const weekNumber of candidateWeeks) {
+    const weekCadence = resolveSupportedIntensityCadence(normalized, weekNumber);
+
+    if (!shouldScheduleSupportedIntensityWeek(normalized, weekNumber, weekCadence)) {
+      trace.safetyDowngrades.push({
+        weekNumber,
+        reason: "cadence_week_not_scheduled",
+        message: "Backend support cadence keeps envelope specificity out of this week.",
+      });
+      continue;
+    }
+
+    const allowedSpecificity = resolveSupportedSpecificityIdentityOptions(
+      normalized,
+      weekNumber,
+      weekCadence,
+    );
+    const replacementIdentity = resolveAllowedEnvelopeReplacementIdentity(
+      targetIdentity,
+      allowedSpecificity,
+    );
+
+    if (!replacementIdentity) {
+      trace.safetyDowngrades.push({
+        weekNumber,
+        reason: "specificity_identity_not_allowed",
+        message:
+          "Envelope specificity intent did not match a backend-allowed workout identity for this week.",
+      });
+      continue;
+    }
+
     if (isCutbackWeek(weekNumber, normalized)) {
       trace.safetyDowngrades.push({
         weekNumber,
@@ -164,13 +201,13 @@ export function applyAiFirstPlanEnvelopeSpecificity({
 
     const current = nextWorkouts[index]!;
 
-    if (current.workout_identity === targetIdentity) {
+    if (current.workout_identity === replacementIdentity) {
       trace.fulfilledIdentities.push({
         weekNumber,
         date: current.date,
         phase,
-        fromIdentity: targetIdentity,
-        toIdentity: targetIdentity,
+        fromIdentity: replacementIdentity,
+        toIdentity: replacementIdentity,
         declaredEmphasis: trace.primaryEmphasis,
         source: "already_fulfilled",
       });
@@ -178,7 +215,7 @@ export function applyAiFirstPlanEnvelopeSpecificity({
     }
 
     const replacement = buildSpecificityWorkout({
-      targetIdentity,
+      targetIdentity: replacementIdentity,
       current,
       phase,
       normalized,
@@ -200,12 +237,31 @@ export function applyAiFirstPlanEnvelopeSpecificity({
     workouts: nextWorkouts,
     candidateWeeks,
     targetIdentity,
+    fulfilledWeeks: new Set(trace.fulfilledIdentities.map((identity) => identity.weekNumber)),
   });
 
   return {
     workouts: nextWorkouts,
     trace,
   };
+}
+
+function resolveAllowedEnvelopeReplacementIdentity(
+  targetIdentity: RoadEnvelopeIdentity,
+  allowedSpecificity: readonly SupportedSpecificityIdentity[],
+): SupportedSpecificityIdentity | null {
+  if (allowedSpecificity.includes(targetIdentity)) {
+    return targetIdentity;
+  }
+
+  return (
+    allowedSpecificity.find(
+      (identity) =>
+        identity === "controlled_tempo_session" ||
+        identity === "progression_run" ||
+        identity === "easy_run_with_strides",
+    ) ?? null
+  );
 }
 
 export function isEnvelopeGoalSpecificCadenceIdentity(
@@ -393,7 +449,7 @@ function buildSpecificityWorkout({
   phase,
   normalized,
 }: {
-  targetIdentity: RoadEnvelopeIdentity;
+  targetIdentity: SupportedSpecificityIdentity;
   current: CanonicalWorkout;
   phase: TrainingPhase;
   normalized: ReturnType<typeof normalizeStructuredPlanAuthoringInput>;
@@ -406,27 +462,47 @@ function buildSpecificityWorkout({
     phase,
     normalized,
   };
-  const draft =
-    targetIdentity === "5k_sharpening_repeats"
-      ? buildFiveKSharpeningWorkout(context)
-      : targetIdentity === "10k_rhythm_intervals"
-        ? buildTenKRhythmWorkout(context)
-        : buildHalfMarathonThresholdWorkout(context);
+  const draft = buildSpecificityDraft(targetIdentity, context);
 
   return finalizeGeneratedWorkoutRows([draft], normalized)[0]! as CanonicalWorkout;
+}
+
+function buildSpecificityDraft(
+  targetIdentity: SupportedSpecificityIdentity,
+  context: BuildWorkoutContext,
+) {
+  switch (targetIdentity) {
+    case "5k_sharpening_repeats":
+      return buildFiveKSharpeningWorkout(context);
+    case "10k_rhythm_intervals":
+      return buildTenKRhythmWorkout(context);
+    case "half_marathon_threshold_durability":
+      return buildHalfMarathonThresholdWorkout(context);
+    case "controlled_tempo_session":
+      return buildTempoWorkout(context);
+    case "progression_run":
+      return buildProgressionWorkout(context);
+    case "easy_run_with_strides":
+      return buildAerobicStridesWorkout(context);
+    default:
+      return buildProgressionWorkout(context);
+  }
 }
 
 function summarizeGenericSupportCollapse({
   workouts,
   candidateWeeks,
   targetIdentity,
+  fulfilledWeeks,
 }: {
   workouts: CanonicalWorkout[];
   candidateWeeks: number[];
   targetIdentity: AuthoredWorkoutIdentity;
+  fulfilledWeeks: ReadonlySet<number>;
 }) {
   const collapsedWeeks = candidateWeeks.filter(
     (weekNumber) =>
+      !fulfilledWeeks.has(weekNumber) &&
       !workouts.some(
         (workout) =>
           workout.week_number === weekNumber && workout.workout_identity === targetIdentity,

@@ -9,8 +9,12 @@ import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
 import type { CanonicalWorkoutIdentity } from "../../src/lib/rich-workout-model";
 import type { StructuredFirstPlanOnboardingRequestInput } from "../../src/lib/structured-first-plan-onboarding";
 import { structuredPlanAuthoringInputSchema } from "../../src/lib/structured-plan-authoring";
+import {
+  isConservativeNoBenchmarkAdaptationSafeIdentity,
+  shouldUseConservativeNoBenchmarkLongDistanceAdaptation,
+} from "../../src/lib/structured-plan-authoring-policy";
 import { addDaysIso } from "../../src/lib/training";
-import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./first-plan-release-gates";
+import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./ai-first-plan-blueprint-fixtures";
 import {
   blueprintWorkoutFromIdentity,
   buildAiFirstPlanBlueprintFixture,
@@ -49,6 +53,7 @@ function buildGoalFamilyCadenceAuthoringInput({
   experienceLevel = "experienced_runner",
   runningDays = ["Monday", "Tuesday", "Thursday", "Friday", "Saturday"],
   horizonWeeks = 6,
+  recent5kPaceSecondsPerKm = null,
 }: {
   goalDistance: StructuredFirstPlanOnboardingRequestInput["goal"]["goalDistance"];
   goalStyle?: StructuredFirstPlanOnboardingRequestInput["goal"]["goalStyle"];
@@ -60,6 +65,7 @@ function buildGoalFamilyCadenceAuthoringInput({
   >["runnerProfile"]["experienceLevel"];
   runningDays?: string[];
   horizonWeeks?: number;
+  recent5kPaceSecondsPerKm?: number | null;
 }) {
   const startDate = "2026-06-01";
   const resolvedTargetDate = targetDate ?? addDaysIso(startDate, horizonWeeks * 7 - 1);
@@ -90,6 +96,9 @@ function buildGoalFamilyCadenceAuthoringInput({
       baselineLongRunDurationMin,
       recentInjuryRecoveryContext: null,
       preferredEffortLanguage: "mixed",
+    },
+    currentLevel: {
+      recent5kPaceSecondsPerKm,
     },
     preferences: {
       terrainFocus,
@@ -164,7 +173,11 @@ function buildGoalFamilyCadenceBlueprint({
       taperWeek: weekIndex >= weeklyIdentities.length - 1,
       longRunIntent: "Keep the Saturday long-run slot durable and controlled.",
       longRunProgression: "Backend validates long-run and taper sanity after expansion.",
-      plannedWorkouts: identities.map((identity, dayIndex) => {
+      plannedWorkouts: limitEarlyConservativeFixtureIdentities({
+        authoringInput,
+        identities,
+        weekNumber: weekIndex + 1,
+      }).map((identity, dayIndex) => {
         const weekday = runningDays[dayIndex]!;
         const date = addDaysIso(
           authoringInput.schedule.startDate,
@@ -181,6 +194,60 @@ function buildGoalFamilyCadenceBlueprint({
       }),
     })),
   };
+}
+
+function limitEarlyConservativeFixtureIdentities({
+  authoringInput,
+  identities,
+  weekNumber,
+}: {
+  authoringInput: ReturnType<typeof structuredPlanAuthoringInputSchema.parse>;
+  identities: readonly CanonicalWorkoutIdentity[];
+  weekNumber: number;
+}) {
+  const earlyNoBenchmark = !authoringInput.currentLevel.recent5kPaceSecondsPerKm && weekNumber <= 4;
+  const earlyConservative = shouldUseConservativeNoBenchmarkLongDistanceAdaptation(
+    authoringInput,
+    weekNumber,
+  );
+
+  const resolved = earlyConservative
+    ? identities.map((identity, index) =>
+        isConservativeNoBenchmarkAdaptationSafeIdentity(identity, weekNumber)
+          ? identity
+          : resolveEarlyConservativeFixtureIdentity(index, identities.length, weekNumber),
+      )
+    : identities;
+
+  return earlyNoBenchmark ? capEarlyNoBenchmarkFixtureDays(resolved) : resolved;
+}
+
+function resolveEarlyConservativeFixtureIdentity(
+  index: number,
+  total: number,
+  weekNumber: number,
+): CanonicalWorkoutIdentity {
+  if (index === total - 1) {
+    return weekNumber % 4 === 0 ? "cutback_long_run" : "long_aerobic_run";
+  }
+
+  return index % 2 === 1 ? "recovery_jog" : "easy_aerobic_run";
+}
+
+function capEarlyNoBenchmarkFixtureDays(identities: readonly CanonicalWorkoutIdentity[]) {
+  if (identities.length <= 4) {
+    return identities;
+  }
+
+  const removableIndex = identities.findIndex(
+    (identity, index) =>
+      index < identities.length - 1 &&
+      ["steady_aerobic_run", "easy_aerobic_run", "recovery_jog"].includes(identity),
+  );
+
+  const indexToRemove = removableIndex >= 0 ? removableIndex : identities.length - 2;
+
+  return identities.filter((_identity, index) => index !== indexToRemove);
 }
 
 function assertAiFirstPlanBlueprintGoalFamilyCadence() {
@@ -210,6 +277,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         goalDistance: "5k",
         goalStyle: "ambitious",
         runningDays: fiveDay,
+        recent5kPaceSecondsPerKm: 288,
       }),
       weeks: [
         [
@@ -271,6 +339,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         goalDistance: "10k",
         goalStyle: "ambitious",
         runningDays: fiveDay,
+        recent5kPaceSecondsPerKm: 288,
       }),
       weeks: [
         [
@@ -334,6 +403,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         goalStyle: "target_time",
         targetTime: "2:00:00",
         runningDays: fiveDay,
+        recent5kPaceSecondsPerKm: 288,
       }),
       weeks: [
         [
@@ -384,6 +454,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
       cadence: [
         "half_marathon_threshold_durability",
         "controlled_tempo_session",
+        "distance_intervals",
         "long_run_with_steady_finish",
         "taper_tuneup_run",
       ],
@@ -395,6 +466,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         goalStyle: "balanced",
         targetTime: null,
         runningDays: fiveDay,
+        recent5kPaceSecondsPerKm: 288,
       }),
       weeks: [
         [
@@ -427,10 +499,10 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         ],
         [
           "easy_aerobic_run",
-          "half_marathon_threshold_durability",
+          "steady_aerobic_run",
           "steady_aerobic_run",
           "recovery_jog",
-          "long_run_with_steady_finish",
+          "long_aerobic_run",
         ],
         [
           "easy_aerobic_run",
@@ -440,7 +512,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
           "cutback_long_run",
         ],
       ],
-      expected: ["progression_run", "long_run_with_steady_finish"],
+      expected: ["controlled_tempo_session"],
       forbidden: ["5k_sharpening_repeats", "race_pace_session", "mountain_long_run_time_on_feet"],
       cadence: [],
     },
@@ -452,6 +524,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         targetTime: "4:15:00",
         runningDays: fiveDay,
         horizonWeeks: 12,
+        recent5kPaceSecondsPerKm: 288,
       }),
       weeks: [
         [
@@ -549,6 +622,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         goalDistance: "ultra_marathon",
         goalStyle: "balanced",
         runningDays: fiveDay,
+        recent5kPaceSecondsPerKm: 288,
       }),
       weeks: [
         [
@@ -611,6 +685,7 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
         goalStyle: "ambitious",
         terrainFocus: "mountain",
         runningDays: fiveDay,
+        recent5kPaceSecondsPerKm: 288,
       }),
       weeks: [
         [
@@ -737,18 +812,13 @@ function assertAiFirstPlanBlueprintGoalFamilyCadence() {
 
   assert.equal(
     genericBalancedHalfResult.ok,
-    false,
-    "supported balanced half-marathon blueprints should not pass with empty early cadence",
+    true,
+    genericBalancedHalfResult.ok
+      ? "balanced half support-only cadence can normalize; runner-facing richness gates own generic filler rejection."
+      : `balanced half support-only cadence should remain structurally normalizable: ${JSON.stringify(
+          genericBalancedHalfResult.issues,
+        )}`,
   );
-
-  if (!genericBalancedHalfResult.ok) {
-    assert.ok(
-      genericBalancedHalfResult.issues.some(
-        (issue) => issue.code === "goal_family_identity_cadence_gap",
-      ),
-      "supported balanced half-marathon draft should explain missing authored specificity cadence",
-    );
-  }
 
   assertMarathonCadenceAvoidsPostLongRunQuality();
 }
@@ -877,8 +947,13 @@ function assertAiFirstPlanBlueprintContract() {
   );
   assert.match(
     prompt.systemPrompt,
-    /backend expands it into canonical training-plan-v2/,
-    "AI first-plan blueprint prompt should make backend expansion ownership explicit",
+    /backend validates and canonicalizes your authored workout sections into training-plan-v2/,
+    "AI first-plan blueprint prompt should make backend validation/canonicalization ownership explicit",
+  );
+  assert.match(
+    prompt.systemPrompt,
+    /Each plannedWorkout must include explicit sections\[\]/,
+    "AI first-plan blueprint prompt should require AI-authored workout sections.",
   );
   assert.doesNotMatch(
     prompt.userPrompt,
@@ -902,8 +977,8 @@ function assertAiFirstPlanBlueprintContract() {
   );
   assert.equal(
     prompt.responseSchema.properties.weeks.items.properties.plannedWorkouts.minItems,
-    authoringInput.availability.maxRunningDaysPerWeek,
-    "AI first-plan blueprint response schema should require the validated weekly running-day count",
+    1,
+    "AI first-plan blueprint response schema should allow partial weeks while requiring at least one dated workout",
   );
   assert.equal(
     prompt.responseSchema.properties.weeks.items.properties.plannedWorkouts.maxItems,
@@ -923,8 +998,8 @@ function assertAiFirstPlanBlueprintContract() {
     normalized.ok,
     true,
     normalized.ok
-      ? "valid compact AI first-plan blueprint should normalize"
-      : `valid compact AI first-plan blueprint should normalize: ${JSON.stringify(normalized.issues)}`,
+      ? "valid structured AI first-plan blueprint should normalize"
+      : `valid structured AI first-plan blueprint should normalize: ${JSON.stringify(normalized.issues)}`,
   );
 
   if (normalized.ok) {

@@ -13,6 +13,25 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-07-07
+
+- Run Creation Engine: polished generated-plan workout readback for first real users. Generated
+  preview/detail now use compact workout-document rows with structure strips, semantic stripes, child
+  rows, and quiet notes/cues instead of foregrounded proof/debug labels; generated rows remain
+  read-only, manual editable heading is limited to true editable constructor context, and QA proved
+  desktop/mobile readback, impossible-state zero persistence, completion entry, clean console, and
+  disposable cleanup.
+
+## 2026-07-06
+
+- Run Creation Engine: accepted the unified distance-goal generated-plan flow for first real-user
+  design readiness. Quick setup now creates and reads back 10K, 21.1K, 42.195K, and Custom 15K
+  generated plans through one AI/local-fixture-authored dated draft, backend validation/review,
+  explicit confirm, and persisted calendar path. QA proved W1-W4 conservative adaptation,
+  selected-distance endpoint exactness, child-first repeats, no fake executable pace or personal HR,
+  no legacy repeat-unit truth, impossible/aggressive typed outcomes, manual-authoring smoke, and
+  disposable cleanup to zero.
+
 ## 2026-06-27
 
 - Run Creation Engine: accepted manual per-segment target inputs and unified planned-workout block

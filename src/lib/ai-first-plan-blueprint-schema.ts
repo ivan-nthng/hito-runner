@@ -14,11 +14,163 @@ import {
   weekdayValues,
 } from "@/lib/ai-first-plan-blueprint-taxonomy";
 
-export const AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION = "ai-first-plan-blueprint-v1";
+export const AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION = "ai-first-plan-blueprint-v2";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const boundedTextSchema = z.string().trim().min(1).max(360);
 const nullableBoundedTextSchema = z.string().trim().min(1).max(360).nullable();
+const nullableShortTextSchema = z.string().trim().min(1).max(160).nullable();
+
+const aiBlueprintSectionKindValues = [
+  "warm_up",
+  "run",
+  "walk",
+  "work",
+  "recover",
+  "finish",
+  "cooldown",
+  "repeat",
+] as const;
+const aiBlueprintRepeatChildKindValues = [
+  "warm_up",
+  "run",
+  "walk",
+  "work",
+  "recover",
+  "finish",
+  "cooldown",
+] as const;
+const aiBlueprintPrescriptionModeValues = ["time", "distance", "none", "repeats"] as const;
+const aiBlueprintUnitPrescriptionModeValues = ["time", "distance", "none"] as const;
+
+const aiBlueprintSectionTargetSchema = z
+  .object({
+    intensity: nullableShortTextSchema,
+    cue: nullableBoundedTextSchema,
+    hint: nullableBoundedTextSchema,
+    rpe: z.number().int().min(1).max(10).nullable(),
+  })
+  .strict();
+
+const aiBlueprintUnitPrescriptionSchema = z
+  .object({
+    mode: z.enum(aiBlueprintUnitPrescriptionModeValues),
+    duration_min: z.number().positive().nullable(),
+    distance_km: z.number().positive().nullable(),
+  })
+  .strict()
+  .superRefine((prescription, context) => {
+    if (prescription.mode === "time" && !prescription.duration_min) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["duration_min"],
+        message: "time section prescriptions require duration_min.",
+      });
+    }
+
+    if (prescription.mode === "distance" && !prescription.distance_km) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["distance_km"],
+        message: "distance section prescriptions require distance_km.",
+      });
+    }
+  });
+
+const aiBlueprintRepeatChildSchema = z
+  .object({
+    kind: z.enum(aiBlueprintRepeatChildKindValues),
+    label: z.string().trim().min(1).max(120),
+    guidance: boundedTextSchema,
+    purpose: nullableBoundedTextSchema,
+    prescription: aiBlueprintUnitPrescriptionSchema,
+    target: aiBlueprintSectionTargetSchema.nullable(),
+  })
+  .strict();
+
+const aiBlueprintSectionPrescriptionSchema = z
+  .object({
+    mode: z.enum(aiBlueprintPrescriptionModeValues),
+    duration_min: z.number().positive().nullable(),
+    distance_km: z.number().positive().nullable(),
+    repeat_count: z.number().int().positive().nullable(),
+    children: z.array(aiBlueprintRepeatChildSchema).min(1).max(12).nullable(),
+  })
+  .strict()
+  .superRefine((prescription, context) => {
+    if (prescription.mode === "time" && !prescription.duration_min) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["duration_min"],
+        message: "time section prescriptions require duration_min.",
+      });
+    }
+
+    if (prescription.mode === "distance" && !prescription.distance_km) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["distance_km"],
+        message: "distance section prescriptions require distance_km.",
+      });
+    }
+
+    if (prescription.mode === "repeats") {
+      if (!prescription.repeat_count) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["repeat_count"],
+          message: "repeat section prescriptions require repeat_count.",
+        });
+      }
+
+      if (!prescription.children?.length) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["children"],
+          message: "repeat section prescriptions require child sections.",
+        });
+      }
+    }
+  });
+
+const aiBlueprintSectionSchema = z
+  .object({
+    kind: z.enum(aiBlueprintSectionKindValues),
+    label: z.string().trim().min(1).max(120),
+    guidance: boundedTextSchema,
+    purpose: nullableBoundedTextSchema,
+    prescription: aiBlueprintSectionPrescriptionSchema,
+    target: aiBlueprintSectionTargetSchema.nullable(),
+  })
+  .strict()
+  .superRefine((section, context) => {
+    if (section.kind === "repeat") {
+      if (section.prescription.mode !== "repeats") {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["prescription", "mode"],
+          message: "repeat sections require prescription.mode = repeats.",
+        });
+      }
+
+      if (section.target) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["target"],
+          message: "repeat section parents cannot carry target truth.",
+        });
+      }
+      return;
+    }
+
+    if (section.prescription.mode === "repeats") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["prescription", "mode"],
+        message: "only repeat sections can use prescription.mode = repeats.",
+      });
+    }
+  });
 
 const aiBlueprintWorkoutSchema = z
   .object({
@@ -34,6 +186,7 @@ const aiBlueprintWorkoutSchema = z
     recoveryPriority: z.enum(recoveryPriorityValues),
     segmentIntent: z.enum(segmentIntentValues),
     metricIntent: z.enum(metricIntentValues),
+    sections: z.array(aiBlueprintSectionSchema).min(1).max(8),
   })
   .strict();
 
@@ -78,6 +231,10 @@ export type AiFirstPlanBlueprint = z.output<typeof aiFirstPlanBlueprintSchema>;
 export type StructuredAuthoringInput = z.output<typeof structuredPlanAuthoringInputSchema>;
 export type AiBlueprintWeek = AiFirstPlanBlueprint["weeks"][number];
 export type AiBlueprintWorkout = AiBlueprintWeek["plannedWorkouts"][number];
+export type AiBlueprintSection = AiBlueprintWorkout["sections"][number];
+export type AiBlueprintRepeatChild = NonNullable<
+  AiBlueprintSection["prescription"]["children"]
+>[number];
 export type CanonicalWorkout = TrainingPlanV2["planned_workouts"][number];
 export type CanonicalSegment = CanonicalWorkout["segments"][number];
 export type NormalizationIssue = { code: string; message: string; path?: string };
@@ -101,6 +258,84 @@ export interface AiFirstPlanBlueprintPromptInput {
   referenceExample?: unknown;
 }
 
+const aiBlueprintSectionTargetOpenAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["intensity", "cue", "hint", "rpe"],
+  properties: {
+    intensity: { type: ["string", "null"], maxLength: 160 },
+    cue: { type: ["string", "null"], maxLength: 360 },
+    hint: { type: ["string", "null"], maxLength: 360 },
+    rpe: { type: ["integer", "null"], minimum: 1, maximum: 10 },
+  },
+} as const;
+
+const aiBlueprintUnitPrescriptionOpenAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["mode", "duration_min", "distance_km"],
+  properties: {
+    mode: { type: "string", enum: [...aiBlueprintUnitPrescriptionModeValues] },
+    duration_min: { type: ["number", "null"], exclusiveMinimum: 0 },
+    distance_km: { type: ["number", "null"], exclusiveMinimum: 0 },
+  },
+} as const;
+
+const aiBlueprintRepeatChildOpenAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["kind", "label", "guidance", "purpose", "prescription", "target"],
+  properties: {
+    kind: { type: "string", enum: [...aiBlueprintRepeatChildKindValues] },
+    label: { type: "string", maxLength: 120 },
+    guidance: { type: "string", maxLength: 360 },
+    purpose: { type: ["string", "null"], maxLength: 360 },
+    prescription: aiBlueprintUnitPrescriptionOpenAiSchema,
+    target: {
+      anyOf: [aiBlueprintSectionTargetOpenAiSchema, { type: "null" }],
+    },
+  },
+} as const;
+
+const aiBlueprintSectionPrescriptionOpenAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["mode", "duration_min", "distance_km", "repeat_count", "children"],
+  properties: {
+    mode: { type: "string", enum: [...aiBlueprintPrescriptionModeValues] },
+    duration_min: { type: ["number", "null"], exclusiveMinimum: 0 },
+    distance_km: { type: ["number", "null"], exclusiveMinimum: 0 },
+    repeat_count: { type: ["integer", "null"], minimum: 1 },
+    children: {
+      anyOf: [
+        {
+          type: "array",
+          minItems: 1,
+          maxItems: 12,
+          items: aiBlueprintRepeatChildOpenAiSchema,
+        },
+        { type: "null" },
+      ],
+    },
+  },
+} as const;
+
+const aiBlueprintSectionOpenAiSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["kind", "label", "guidance", "purpose", "prescription", "target"],
+  properties: {
+    kind: { type: "string", enum: [...aiBlueprintSectionKindValues] },
+    label: { type: "string", maxLength: 120 },
+    guidance: { type: "string", maxLength: 360 },
+    purpose: { type: ["string", "null"], maxLength: 360 },
+    prescription: aiBlueprintSectionPrescriptionOpenAiSchema,
+    target: {
+      anyOf: [aiBlueprintSectionTargetOpenAiSchema, { type: "null" }],
+    },
+  },
+} as const;
+
 const aiBlueprintWorkoutOpenAiSchema = {
   type: "object",
   additionalProperties: false,
@@ -117,6 +352,7 @@ const aiBlueprintWorkoutOpenAiSchema = {
     "recoveryPriority",
     "segmentIntent",
     "metricIntent",
+    "sections",
   ],
   properties: {
     date: { type: ["string", "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
@@ -131,6 +367,12 @@ const aiBlueprintWorkoutOpenAiSchema = {
     recoveryPriority: { type: "string", enum: [...recoveryPriorityValues] },
     segmentIntent: { type: "string", enum: [...segmentIntentValues] },
     metricIntent: { type: "string", enum: [...metricIntentValues] },
+    sections: {
+      type: "array",
+      minItems: 1,
+      maxItems: 8,
+      items: aiBlueprintSectionOpenAiSchema,
+    },
   },
 } as const;
 
@@ -188,7 +430,7 @@ export function buildAiFirstPlanBlueprintOpenAiSchema(runningDaysPerWeek = 7) {
             ...aiBlueprintWeekOpenAiSchema.properties,
             plannedWorkouts: {
               ...aiBlueprintWeekOpenAiSchema.properties.plannedWorkouts,
-              minItems: boundedRunningDaysPerWeek,
+              minItems: 1,
               maxItems: boundedRunningDaysPerWeek,
               items: plannedWorkoutItemSchema,
             },

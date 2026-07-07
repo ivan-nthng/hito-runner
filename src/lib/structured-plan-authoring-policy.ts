@@ -118,6 +118,31 @@ export function shouldUseBeginnerRunWalkAdaptation(
   return weekNumber <= beginnerRunWalkAdaptationWeekCount(normalized, horizonWeeksOverride);
 }
 
+export function shouldUseConservativeNoBenchmarkLongDistanceAdaptation(
+  normalized: StructuredPlanAuthoringInput,
+  weekNumber: number,
+) {
+  return (
+    weekNumber <= 4 &&
+    isLongDistanceGoal(normalized) &&
+    isConservativeNoBenchmarkSupport(normalized)
+  );
+}
+
+export function isConservativeNoBenchmarkAdaptationSafeIdentity(
+  identity: string | null | undefined,
+  weekNumber: number,
+) {
+  return (
+    identity === "easy_aerobic_run" ||
+    identity === "recovery_jog" ||
+    identity === "cutback_aerobic_run" ||
+    identity === "long_aerobic_run" ||
+    identity === "cutback_long_run" ||
+    (weekNumber >= 2 && identity === "easy_run_with_strides")
+  );
+}
+
 export function beginnerRunWalkAdaptationWeekCount(
   normalized: StructuredPlanAuthoringInput,
   horizonWeeksOverride?: number,
@@ -174,6 +199,11 @@ export function shouldUseGentleStridesSupport({
   }
 
   if (!isSafeLowSupportMarathonVariationWeekday(normalized, weekday)) {
+    return false;
+  }
+
+  const cadence = resolveSupportedIntensityCadence(normalized, weekNumber);
+  if (cadence.applies) {
     return false;
   }
 
@@ -278,6 +308,17 @@ export function resolveSupportedIntensityCadence(
     );
   }
 
+  if (
+    weekNumber &&
+    shouldUseConservativeNoBenchmarkLongDistanceAdaptation(normalized, weekNumber)
+  ) {
+    return supportedIntensityCadence(
+      "none",
+      "none",
+      "No-benchmark long-distance goals keep Weeks 1-4 adaptation/base-only before specificity.",
+    );
+  }
+
   if (weekNumber && shouldUseBeginnerRunWalkAdaptation(normalized, weekNumber)) {
     return supportedIntensityCadence(
       "none",
@@ -302,7 +343,13 @@ export function resolveSupportedIntensityCadence(
     );
   }
 
-  if (!hasStableLongRunDurability(normalized)) {
+  const hasBenchmark = hasUsableRecent5kBenchmark(normalized);
+  const conservativeNoBenchmarkTargetIntent =
+    !hasBenchmark &&
+    hasTargetOutcomeIntent(normalized) &&
+    normalized.availability.maxRunningDaysPerWeek >= 4;
+
+  if (!hasStableLongRunDurability(normalized) && !conservativeNoBenchmarkTargetIntent) {
     return supportedIntensityCadence(
       "none",
       "none",
@@ -318,7 +365,9 @@ export function resolveSupportedIntensityCadence(
     );
   }
 
-  const hasBenchmark = hasUsableRecent5kBenchmark(normalized);
+  const aggressiveNoBenchmarkGoalIntent =
+    !hasBenchmark &&
+    normalized.planGoalIntent?.feasibility?.status === "aggressive_or_short_horizon";
   const longRunHeavyLowSupport =
     isLongRunHeavyGoal(normalized) &&
     !hasBenchmark &&
@@ -335,6 +384,22 @@ export function resolveSupportedIntensityCadence(
       "every_two_weeks",
       chooseSupportedIntensityWorkoutKind(normalized, "every_two_weeks", hasBenchmark, weekNumber),
       "Balanced half-marathon support uses moderate specificity every two weeks, not target-time cadence.",
+    );
+  }
+
+  if (aggressiveNoBenchmarkGoalIntent) {
+    return supportedIntensityCadence(
+      "every_two_weeks",
+      chooseSupportedIntensityWorkoutKind(normalized, "every_two_weeks", hasBenchmark, weekNumber),
+      "Aggressive target-time intent without benchmark support uses conservative every-two-weeks specificity.",
+    );
+  }
+
+  if (conservativeNoBenchmarkTargetIntent) {
+    return supportedIntensityCadence(
+      "every_two_weeks",
+      chooseSupportedIntensityWorkoutKind(normalized, "every_two_weeks", hasBenchmark, weekNumber),
+      "No-benchmark target intent uses conservative progression cadence after the base adaptation window.",
     );
   }
 
@@ -489,6 +554,10 @@ export function resolveSupportedSpecificityIdentityOptions(
   switch (normalized.goal.goalType) {
     case "distance_build":
       return resolveDistanceBuildSpecificityOptions(normalized, weekNumber, cadence);
+    case "5k":
+      return resolveFiveKSpecificityOptions(normalized, weekNumber, cadence);
+    case "10k":
+      return resolveTenKSpecificityOptions(normalized, weekNumber, cadence);
     case "half_marathon":
       return resolveHalfMarathonSpecificityOptions(normalized, weekNumber, cadence);
     case "marathon":
@@ -589,6 +658,14 @@ export function hasTargetTimePressure(normalized: StructuredPlanAuthoringInput) 
 
   return normalized.constraints.hardConstraints.some((constraint) =>
     /target time/i.test(constraint),
+  );
+}
+
+function hasTargetOutcomeIntent(normalized: StructuredPlanAuthoringInput) {
+  return Boolean(
+    hasTargetTimePressure(normalized) ||
+    normalized.planGoalIntent?.targetFinishTime ||
+    normalized.planGoalIntent?.targetOutcomePace,
   );
 }
 
@@ -739,6 +816,36 @@ function chooseSupportedIntensityWorkoutKind(
   return "progression";
 }
 
+function resolveFiveKSpecificityOptions(
+  normalized: StructuredPlanAuthoringInput,
+  weekNumber: number,
+  cadence: SupportedIntensityCadencePolicy,
+): readonly SupportedSpecificityIdentity[] {
+  const metricTruth = hasRaceSpecificMetricSupport(normalized);
+  const phase = phaseForWeek(weekNumber, resolveStructuredHorizonWeeks(normalized));
+
+  if (!metricTruth || phase === "Base") {
+    return supportedSpecificityOptionsForWorkoutKind(cadence.workoutKind);
+  }
+
+  return ["5k_sharpening_repeats", "controlled_tempo_session", "progression_run"];
+}
+
+function resolveTenKSpecificityOptions(
+  normalized: StructuredPlanAuthoringInput,
+  weekNumber: number,
+  cadence: SupportedIntensityCadencePolicy,
+): readonly SupportedSpecificityIdentity[] {
+  const metricTruth = hasRaceSpecificMetricSupport(normalized);
+  const phase = phaseForWeek(weekNumber, resolveStructuredHorizonWeeks(normalized));
+
+  if (!metricTruth || phase === "Base") {
+    return supportedSpecificityOptionsForWorkoutKind(cadence.workoutKind);
+  }
+
+  return ["10k_rhythm_intervals", "controlled_tempo_session", "progression_run"];
+}
+
 function resolveHalfMarathonSpecificityOptions(
   normalized: StructuredPlanAuthoringInput,
   weekNumber: number,
@@ -749,12 +856,20 @@ function resolveHalfMarathonSpecificityOptions(
   const raceRhythm = metricTruth;
 
   if (phase === "Base") {
+    if (!metricTruth) {
+      return ["progression_run", "controlled_tempo_session", "easy_run_with_strides"];
+    }
+
     return cadence.frequency === "weekly"
       ? ["controlled_tempo_session", "progression_run", "easy_run_with_strides"]
       : ["progression_run", "controlled_tempo_session", "easy_run_with_strides"];
   }
 
   if (phase === "Build") {
+    if (!metricTruth) {
+      return ["progression_run", "controlled_tempo_session", "easy_run_with_strides"];
+    }
+
     if (!metricTruth && cadence.frequency === "weekly" && weekNumber % 3 === 0) {
       return [
         "time_intervals",
@@ -775,6 +890,10 @@ function resolveHalfMarathonSpecificityOptions(
   }
 
   if (phase === "Specific") {
+    if (!metricTruth) {
+      return ["progression_run", "controlled_tempo_session", "easy_run_with_strides"];
+    }
+
     if (!metricTruth && cadence.frequency === "weekly" && weekNumber % 3 === 0) {
       return [
         "time_intervals",
@@ -821,6 +940,12 @@ function resolveDistanceBuildSpecificityOptions(
   }
 
   if (distanceMeters != null && distanceMeters <= 10_000) {
+    const metricTruth = hasRaceSpecificMetricSupport(normalized);
+
+    if (!metricTruth) {
+      return ["progression_run", "controlled_tempo_session", "easy_run_with_strides"];
+    }
+
     if (weekNumber % 3 === 1) {
       return ["easy_run_with_strides", "controlled_tempo_session", "progression_run"];
     }
@@ -834,9 +959,14 @@ function resolveDistanceBuildSpecificityOptions(
 
   if (distanceMeters != null && distanceMeters > 10_000) {
     const phase = phaseForWeek(weekNumber, resolveStructuredHorizonWeeks(normalized));
+    const metricTruth = hasRaceSpecificMetricSupport(normalized);
 
     if (phase === "Taper") {
       return ["progression_run", "easy_run_with_strides"];
+    }
+
+    if (!metricTruth && distanceMeters <= 21_100) {
+      return ["progression_run", "controlled_tempo_session", "easy_run_with_strides"];
     }
 
     if (weekNumber % 3 === 1) {
@@ -860,6 +990,15 @@ function resolveMarathonSpecificityOptions(
 ): readonly SupportedSpecificityIdentity[] {
   const phase = phaseForWeek(weekNumber, resolveStructuredHorizonWeeks(normalized));
   const raceRhythm = hasRaceSpecificMetricSupport(normalized);
+  const hasBenchmark = hasUsableRecent5kBenchmark(normalized);
+
+  if (!hasBenchmark && phase === "Base") {
+    return ["easy_run_with_strides", "progression_run"];
+  }
+
+  if (!hasBenchmark && weekNumber < 6) {
+    return ["progression_run", "easy_run_with_strides"];
+  }
 
   if (phase === "Build") {
     if (
@@ -914,6 +1053,10 @@ function supportedSpecificityOptionsForWorkoutKind(
 }
 
 function firstSupportedIntensityWeek(normalized: StructuredPlanAuthoringInput) {
+  if (isLongDistanceGoal(normalized) && isConservativeNoBenchmarkSupport(normalized)) {
+    return 5;
+  }
+
   if (isBeginnerRunWalkAdaptationCandidate(normalized)) {
     return beginnerRunWalkAdaptationWeekCount(normalized) + 1;
   }
@@ -923,11 +1066,11 @@ function firstSupportedIntensityWeek(normalized: StructuredPlanAuthoringInput) {
     normalized.goal.goalStyle === "balanced" &&
     !normalized.goal.targetTime
   ) {
-    return 2;
+    return 3;
   }
 
   if (!hasUsableRecent5kBenchmark(normalized)) {
-    return 2;
+    return hasTargetOutcomeIntent(normalized) ? 3 : 2;
   }
 
   if (
@@ -1042,6 +1185,28 @@ function chooseSafeModerateIntensityWeekday({
 
 function isLongRunHeavyGoal(normalized: StructuredPlanAuthoringInput) {
   return ["marathon", "ultra_marathon", "mountain_running"].includes(normalized.goal.goalType);
+}
+
+function isLongDistanceGoal(normalized: StructuredPlanAuthoringInput) {
+  const distanceMeters = normalized.planGoalIntent?.distance?.distanceMeters ?? null;
+
+  return (
+    normalized.goal.goalType === "half_marathon" ||
+    normalized.goal.goalType === "marathon" ||
+    (distanceMeters != null && distanceMeters > 10_000)
+  );
+}
+
+function isConservativeNoBenchmarkSupport(normalized: StructuredPlanAuthoringInput) {
+  return (
+    !hasUsableRecent5kBenchmark(normalized) &&
+    (normalized.runnerProfile.experienceLevel === "new_runner" ||
+      normalized.runnerProfile.experienceLevel === "returning_runner" ||
+      normalized.runnerProfile.baselineSessionsPerWeek <= 3 ||
+      normalized.availability.maxRunningDaysPerWeek <= 3 ||
+      normalized.planGoalIntent?.feasibility?.status === "aggressive_or_short_horizon" ||
+      hasTargetOutcomeIntent(normalized))
+  );
 }
 
 export function compareWeekdays(left: StructuredWeekday, right: StructuredWeekday) {

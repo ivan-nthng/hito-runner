@@ -15,12 +15,13 @@ import {
   isHighAmbitionPlan,
   isLimitedSharpeningSupport,
   isMountainSpecificPlan,
+  shouldAddLongRunSteadyFinish,
   resolveSupportedIntensityCadence,
   resolveSupportedSpecificityIdentityOptions,
   roundToFive,
   roundToTenth,
-  shouldAddLongRunSteadyFinish,
   shouldScheduleSupportedIntensityWeek,
+  shouldUseLongRunSteadyFinishAsSpecificStimulus,
   shouldUseBeginnerRunWalkAdaptation,
   shouldUseBaseStrides,
   shouldUseProgressionSpecificity,
@@ -77,7 +78,7 @@ export function buildLongRunWorkout({
   const cutback = isCutbackWeek(weekNumber, normalized);
   const taper = phase === "Taper";
   const mountainSpecific = isMountainSpecificPlan(normalized);
-  const hasSteadyFinish = !mountainSpecific && shouldAddLongRunSteadyFinish(normalized, weekNumber);
+  const hasSteadyFinish = !mountainSpecific && shouldUseLongRunSteadyFinish(normalized, weekNumber);
   const runWalkAdaptation = shouldUseBeginnerRunWalkAdaptation(normalized, weekNumber);
   const title = cutback
     ? "Cutback long run"
@@ -130,6 +131,22 @@ export function buildLongRunWorkout({
       weekNumber,
     }),
   };
+}
+
+function shouldUseLongRunSteadyFinish(normalized: NormalizedStructuredInput, weekNumber: number) {
+  const hasBenchmark = Boolean(getRecent5kPaceSecondsPerKm(normalized));
+
+  if (hasBenchmark) {
+    return shouldAddLongRunSteadyFinish(normalized, weekNumber);
+  }
+
+  const cadence = resolveSupportedIntensityCadence(normalized, weekNumber);
+
+  if (!cadence.applies) {
+    return shouldAddLongRunSteadyFinish(normalized, weekNumber);
+  }
+
+  return shouldUseLongRunSteadyFinishAsSpecificStimulus(normalized, weekNumber, cadence);
 }
 
 function buildLongRunSummary(

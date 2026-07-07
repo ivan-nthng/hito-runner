@@ -5,6 +5,7 @@ import {
 } from "@/lib/ai-generated-running-plan";
 import {
   collectTenKBeginnerDosePolicyIssues,
+  normalizeTenKBeginnerDoseWorkoutDayKind,
   resolveTenKBeginnerDosePolicyRunnerLevel,
 } from "@/lib/plan-creation-engine/ten-k-beginner-dose-policy";
 import {
@@ -13,8 +14,11 @@ import {
   resolveRunningPlanCompositionWeek,
   collectRunnerFacingCanonicalRichnessIssues,
   collectRunningPlanCanonicalPrescriptionGrammarIssues,
+  collectSelectedDistanceEndpointIssues,
+  resolveSelectedDistanceQualityFamily,
   summarizeRunnerFacingCanonicalRichness,
   summarizeRunningPlanCanonicalPrescriptionGrammar,
+  selectedDistanceEndpointMainDistanceMeters,
   type RunningPlanPreviewCalendarRow,
   type RunningPlanRepeatChildUnitPrescription,
   type RunningPlanSegmentPrescription,
@@ -124,6 +128,16 @@ export async function validateRunningPlanReviewExactness(input: {
   }
 
   const canonicalPlan = buildRunningPlanCanonicalPlan(input.draft);
+  const endpointIssues = collectDistanceGoalEndpointExactnessIssues(input.draft, canonicalPlan);
+  if (endpointIssues.length > 0) {
+    return {
+      ok: false,
+      reason: "invalid_review",
+      message:
+        "This selected-plan review no longer satisfies Hito's selected-distance endpoint contract. Refresh the preview before creating a plan.",
+    };
+  }
+
   const richnessIssues = collectRunnerFacingCanonicalRichnessIssues({
     family: resolveDistanceGoalQualityFamily(input.draft),
     runnerLevel: resolveRunnerLevelForCanonicalQualityGates(input.draft),
@@ -135,8 +149,7 @@ export async function validateRunningPlanReviewExactness(input: {
     return {
       ok: false,
       reason: "invalid_review",
-      message:
-        "This selected-plan review no longer satisfies Hito's runner-facing richness gates. Refresh the preview before creating a plan.",
+      message: `This selected-plan review no longer satisfies Hito's runner-facing richness gates: ${richnessIssues[0]} Refresh the preview before creating a plan.`,
     };
   }
 
@@ -152,18 +165,20 @@ export async function validateRunningPlanReviewExactness(input: {
     };
   }
 
-  const beginnerDoseIssues = collectTenKBeginnerDosePolicyIssues({
-    runnerLevel: input.draft.normalizedInputSummary.runnerLevel,
-    benchmarkPaceTruth: input.draft.normalizedInputSummary.benchmarkPaceTruth,
-    rows: canonicalPlan.planned_workouts.map(canonicalWorkoutToTenKDoseValidationRow),
-  });
-  if (beginnerDoseIssues.length > 0) {
-    return {
-      ok: false,
-      reason: "invalid_review",
-      message:
-        "This selected-plan review no longer satisfies Hito's beginner 10K dose policy. Refresh the preview before creating a plan.",
-    };
+  if (resolveDistanceGoalQualityFamily(input.draft) === "10K") {
+    const beginnerDoseIssues = collectTenKBeginnerDosePolicyIssues({
+      runnerLevel: input.draft.normalizedInputSummary.runnerLevel,
+      benchmarkPaceTruth: input.draft.normalizedInputSummary.benchmarkPaceTruth,
+      rows: canonicalPlan.planned_workouts.map(canonicalWorkoutToTenKDoseValidationRow),
+    });
+    if (beginnerDoseIssues.length > 0) {
+      return {
+        ok: false,
+        reason: "invalid_review",
+        message:
+          "This selected-plan review no longer satisfies Hito's beginner 10K dose policy. Refresh the preview before creating a plan.",
+      };
+    }
   }
 
   const reviewPayload = buildRunningPlanReviewPayload(input.draft, canonicalPlan);
@@ -586,24 +601,27 @@ function resolveDistanceGoalQualityFamily(
     draft.endpointProof.endpointDistanceMeters ??
     null;
 
-  if (meters != null) {
-    if (meters <= 10_000) return "10K";
-    if (meters <= 21_100) return "Half Marathon";
-    return "Marathon Completion";
-  }
-
-  const inputFamily = draft.normalizedInputSummary.distanceFamily;
-  return inputFamily;
+  return resolveSelectedDistanceQualityFamily({
+    distanceMeters: meters,
+    fallbackFamily: draft.normalizedInputSummary.distanceFamily,
+  });
 }
 
-function canonicalWorkoutToTenKDoseValidationRow(row: TrainingPlanV2["planned_workouts"][number]) {
+export function canonicalWorkoutToTenKDoseValidationRow(
+  row: TrainingPlanV2["planned_workouts"][number],
+) {
   return {
     rowId: row.workout_id,
+    date: row.date,
     weekNumber: row.week_number,
     isRestDay: row.workout_type === "rest",
-    workoutDayKind: (row.source_workout_type ??
-      "rest") as RunningPlanPreviewCalendarRow["workoutDayKind"],
-    endpointDistanceMeters: canonicalEndpointDistanceMeters(row),
+    workoutDayKind: normalizeTenKBeginnerDoseWorkoutDayKind(
+      row.source_workout_type ?? row.workout_identity ?? row.workout_type,
+    ),
+    endpointDistanceMeters: selectedDistanceEndpointMainDistanceMeters({
+      endpointKind: row.source_workout_type,
+      segments: row.segments,
+    }),
     segments: row.segments.map((segment) => ({
       primaryPrescription: canonicalPrescriptionToDosePrescription(segment.prescription),
     })),
@@ -680,16 +698,31 @@ function canonicalRepeatChildUnitToDoseUnit(
   };
 }
 
-function canonicalEndpointDistanceMeters(row: TrainingPlanV2["planned_workouts"][number]) {
-  if (row.source_workout_type !== "final_selected_distance_day") {
-    return null;
-  }
+function collectDistanceGoalEndpointExactnessIssues(
+  draft: RunningPlanPreviewDraft,
+  canonicalPlan: TrainingPlanV2,
+) {
+  const distanceMeters =
+    draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ??
+    draft.endpointProof.endpointDistanceMeters ??
+    null;
 
-  const mainDistanceKm = row.segments
-    .map((segment) => segment.prescription)
-    .find((prescription) => prescription?.mode === "distance")?.distance_km;
-
-  return typeof mainDistanceKm === "number" ? Math.round(mainDistanceKm * 1000) : null;
+  return collectSelectedDistanceEndpointIssues({
+    rows: canonicalPlan.planned_workouts.map((workout) => ({
+      id: workout.workout_id,
+      date: workout.date,
+      isRest: workout.workout_type === "rest",
+      endpointKind: workout.source_workout_type,
+      endpointIdentity: workout.workout_identity,
+      endpointDistanceMeters: selectedDistanceEndpointMainDistanceMeters({
+        endpointKind: workout.source_workout_type,
+        segments: workout.segments,
+      }),
+    })),
+    expectedDistanceMeters: distanceMeters,
+    targetDate: draft.normalizedInputSummary.planGoalIntent.targetDate,
+    proof: draft.endpointProof,
+  }).map((issue) => issue.code);
 }
 
 function maxWeekNumber(rows: readonly RunningPlanPreviewCalendarRow[]) {

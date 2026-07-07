@@ -73,6 +73,7 @@ export interface RunningPlanPreviewCalendarRow {
   cueRole: "secondary_only" | null;
   segments: readonly RunningPlanEndpointTemplate["segments"];
   endpointGateId: string | null;
+  endpointIdentity?: string | null;
   endpointDistanceMeters: number | null;
 }
 
@@ -101,7 +102,6 @@ export interface RunningPlanPreviewValidationStatus {
   ok: boolean;
   issues: readonly string[];
   forbiddenOutputGateIdsChecked: readonly string[];
-  rejectedOldBehaviorSignalsChecked: readonly string[];
 }
 
 export interface NormalizeRunningPlanPreviewInputOptions {

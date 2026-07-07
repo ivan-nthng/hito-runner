@@ -18,7 +18,6 @@ export function validateRunnerFacingTargetReadbackContract(
   label: string,
 ) {
   const importedSeed = buildImportedPlanSeed(canonicalPlan);
-  const readbackForbiddenPattern = /\bRPE\b/i;
 
   for (const row of canonicalPlan.planned_workouts) {
     const rowHasPace = rowHasPaceTargets(row);
@@ -30,21 +29,26 @@ export function validateRunnerFacingTargetReadbackContract(
         }
 
         const targetRecord = target as Record<string, unknown>;
-        assert.equal(
-          "rpe" in targetRecord,
-          false,
-          `${label}: ${row.workout_id}.${segment.segment_type} generated target must not carry RPE target metadata.`,
-        );
-
-        for (const key of ["intensity", "label"]) {
-          const value = targetRecord[key];
-          if (typeof value === "string") {
-            assert.doesNotMatch(
-              value,
-              readbackForbiddenPattern,
-              `${label}: ${row.workout_id}.${segment.segment_type}.${key} must not contain RPE wording.`,
-            );
-          }
+        if ("rpe" in targetRecord) {
+          assert.equal(
+            targetRecord.target_source,
+            "ai_authored_effort_guidance",
+            `${label}: ${row.workout_id}.${segment.segment_type} generated RPE must stay AI-authored effort guidance.`,
+          );
+          assert.equal(
+            targetRecord.hr_target_source,
+            "effort_only",
+            `${label}: ${row.workout_id}.${segment.segment_type} generated RPE must not become HR truth.`,
+          );
+          assert.equal(
+            typeof targetRecord.rpe,
+            "number",
+            `${label}: ${row.workout_id}.${segment.segment_type} generated RPE must be numeric advisory effort.`,
+          );
+          assert.ok(
+            Number(targetRecord.rpe) >= 1 && Number(targetRecord.rpe) <= 10,
+            `${label}: ${row.workout_id}.${segment.segment_type} generated RPE must stay within 1-10.`,
+          );
         }
       }
 
@@ -121,11 +125,13 @@ export function validateRunnerFacingTargetReadbackContract(
         "rpe",
         `${label}: ${workout.workoutDate} must not expose RPE as an executable target entry.`,
       );
-      assert.doesNotMatch(
-        `${entry.label}: ${entry.value}`,
-        readbackForbiddenPattern,
-        `${label}: ${workout.workoutDate} runner-facing target readback must not contain RPE wording.`,
-      );
+      if (!hasPaceTruth) {
+        assert.doesNotMatch(
+          `${entry.label}: ${entry.value}`,
+          /\b\d{2,3}\s*-\s*\d{2,3}\s*bpm|pace|\/km/i,
+          `${label}: ${workout.workoutDate} structure-only runner-facing readback must not expose fake pace or HR.`,
+        );
+      }
     }
 
     if (hasPaceTruth) {

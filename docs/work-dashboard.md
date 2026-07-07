@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-07-02T14:16:42.270Z
+Generated: 2026-07-07T14:45:05.280Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -85,11 +85,11 @@ Current Truth
 <code>in_progress</code>
 
 #### Task
-Validate generated-plan legacy purge in browser.
+Define the Hito inline editable text/editor pattern after workout-document readback acceptance.
 
 <sub><code>STAGE</code></sub>
 
-<code>QA validation / generated-plan legacy purge browser acceptance.</code>
+<code>DESIGNER audit / Hito inline editable text pattern contract.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
@@ -97,7 +97,7 @@ Current Source Of Truth: Workout types: Rest, Recovery, Easy, Steady, Long Run, 
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>qa</code>
+<code>designer</code>
 
 ---
 
@@ -200,19 +200,19 @@ Context: which Hito primitives are stable enough to reuse;
 <code>in_progress</code>
 
 #### Task
-Validate pre-customer generated-plan legacy purge in browser.
+Define the Hito inline editable text/editor pattern after workout-document readback acceptance.
 
 <sub><code>STAGE</code></sub>
 
-<code>QA validation / generated-plan legacy purge browser acceptance.</code>
+<code>DESIGNER audit / Hito inline editable text pattern contract.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Backend Implementation - 2026-07-02 - Generated-Plan Legacy Purge: backend/source validation passed; browser QA pending.
+Designer Gate Sync - 2026-07-07 - Workout-Document Polish Accepted
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>qa</code>
+<code>designer</code>
 
 ## Safety Notes
 

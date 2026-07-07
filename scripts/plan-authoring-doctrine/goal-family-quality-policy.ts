@@ -11,7 +11,7 @@ import {
   type StructuredPlanAuthoringInput,
 } from "../../src/lib/structured-plan-authoring";
 import type { WeekdayName } from "../../src/lib/weekday-rest-invariants";
-import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./first-plan-release-gates";
+import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./ai-first-plan-blueprint-fixtures";
 
 const fixedRestDays = ["Wednesday", "Sunday"] as const;
 
@@ -683,11 +683,30 @@ function assertBeginnerRecreationalSupportedIntensityCadence({
     { horizonWeeks: 8 },
   );
 
+  for (const week of overAuthoredBlueprint.weeks.filter((candidate) => candidate.weekNumber <= 4)) {
+    while (week.plannedWorkouts.length > 4) {
+      const removableIndex = week.plannedWorkouts.findIndex(
+        (workout) =>
+          workout.workoutFamily !== "long" &&
+          workout.workoutIdentity !== "selected_distance_completion_or_checkpoint" &&
+          workout.weekday !== "Tuesday",
+      );
+
+      assert.notEqual(removableIndex, -1, "early fixture week must have a removable support row");
+      week.plannedWorkouts.splice(removableIndex, 1);
+    }
+  }
+
   for (const week of overAuthoredBlueprint.weeks) {
     let changedOneWorkout = false;
 
     for (const workout of week.plannedWorkouts) {
-      if (changedOneWorkout || workout.workoutFamily === "long" || workout.weekday !== "Tuesday") {
+      if (
+        changedOneWorkout ||
+        workout.workoutFamily === "long" ||
+        workout.workoutIdentity === "selected_distance_completion_or_checkpoint" ||
+        workout.weekday !== "Tuesday"
+      ) {
         continue;
       }
 
@@ -705,35 +724,22 @@ function assertBeginnerRecreationalSupportedIntensityCadence({
     }
   }
 
-  const repairedBlueprint = normalizeAiFirstPlanBlueprintToTrainingPlan({
+  const rejectedBlueprint = normalizeAiFirstPlanBlueprintToTrainingPlan({
     blueprint: overAuthoredBlueprint,
     authoringInput: blueprintAuthoringInput,
   });
 
   assert.equal(
-    repairedBlueprint.ok,
-    true,
-    repairedBlueprint.ok
-      ? "beginner over-authored blueprint should normalize after bounded cadence repair"
-      : `beginner over-authored blueprint should repair: ${JSON.stringify(
-          repairedBlueprint.issues,
-        )}`,
+    rejectedBlueprint.ok,
+    false,
+    "beginner over-authored W1-W4 specificity should reject before review signing.",
   );
 
-  if (repairedBlueprint.ok) {
-    assertNoIntervalsOrRacePace(
-      repairedBlueprint.canonicalPlan,
-      "beginner over-authored blueprint repair",
-    );
-    assertModerateTouchCadenceAtMostEveryTwoWeeks(
-      repairedBlueprint.canonicalPlan,
-      "beginner over-authored blueprint repair",
-    );
-    assert.ok(
-      repairedBlueprint.metadata.repairs.some((repair) =>
-        repair.includes("supported-intensity cadence changed"),
-      ),
-      "beginner over-authored blueprint should expose bounded cadence repair metadata",
+  if (!rejectedBlueprint.ok) {
+    assert.match(
+      JSON.stringify(rejectedBlueprint.issues),
+      /conservative_no_benchmark_early_specificity/,
+      "beginner over-authored blueprint rejection should name the adaptation-phase policy.",
     );
   }
 }

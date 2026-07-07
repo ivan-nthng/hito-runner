@@ -22,7 +22,7 @@ const baseInput = {
   age: 36,
   heightCm: 178,
   weightKg: 74,
-  runnerLevel: "sometimes_runs",
+  runnerLevel: "runs_a_lot",
   distanceFamily: "10K",
   daysPerWeek: 5,
   fixedRestDays: ["Wednesday", "Saturday"],

@@ -5,6 +5,8 @@ import {
   resolveGoalFamilyIdentityPolicy,
 } from "@/lib/ai-first-plan-blueprint-policy";
 import type {
+  AiBlueprintRepeatChild,
+  AiBlueprintSection,
   AiBlueprintWeek,
   AiBlueprintWorkout,
   AiFirstPlanBlueprint,
@@ -21,12 +23,22 @@ import {
 } from "@/lib/ai-first-plan-blueprint-taxonomy";
 import {
   hasRaceSpecificMetricSupport,
+  isConservativeNoBenchmarkAdaptationSafeIdentity,
   isSupportedSpecificityIdentity,
   resolveSupportedIntensityCadence,
+  resolveSupportedSpecificityIdentityOptions,
+  shouldScheduleSupportedIntensityWeek,
+  shouldUseConservativeNoBenchmarkLongDistanceAdaptation,
   shouldUseLongRunSteadyFinishAsSpecificStimulus,
   shouldUseRecoveryFirstAfterLongRun,
 } from "@/lib/structured-plan-authoring-policy";
-import { addDaysIso, weekdayLong, type StepPrescription } from "@/lib/training";
+import {
+  collectSelectedDistanceEndpointIssues,
+  selectedDistanceEndpointMainDistanceMeters,
+  SELECTED_DISTANCE_ENDPOINT_IDENTITY,
+  SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND,
+} from "@/lib/plan-creation-engine/selected-distance-endpoint";
+import { addDaysIso, diffDaysIso, weekdayLong, type StepPrescription } from "@/lib/training";
 
 export interface AiFirstPlanBlueprintNormalizationOptions {
   enforcePreferredLongRunDay?: boolean;
@@ -144,13 +156,16 @@ export function validateBlueprintShell(
   const seenDates = new Set<string>();
 
   for (const week of blueprint.weeks) {
-    const expectedRunningDayCount = expectedAuthoredWorkoutCountForWeek(week, context);
+    const expectedRunningDayCount = expectedAuthoredWorkoutCountRangeForWeek(week, context);
 
-    if (week.plannedWorkouts.length !== expectedRunningDayCount) {
+    if (
+      week.plannedWorkouts.length < expectedRunningDayCount.min ||
+      week.plannedWorkouts.length > expectedRunningDayCount.max
+    ) {
       issues.push({
         code: "running_day_count_mismatch",
         path: `weeks.${week.weekNumber}.plannedWorkouts`,
-        message: `Week ${week.weekNumber} has ${week.plannedWorkouts.length} authored workouts; expected ${expectedRunningDayCount}.`,
+        message: `Week ${week.weekNumber} has ${week.plannedWorkouts.length} authored workouts; expected ${expectedRunningDayCount.min === expectedRunningDayCount.max ? expectedRunningDayCount.max : `${expectedRunningDayCount.min}-${expectedRunningDayCount.max}`}.`,
       });
     }
 
@@ -196,6 +211,13 @@ export function validateBlueprintShell(
       seenDates.add(date);
 
       const targetEndpointDate = context.authoringInput.schedule.targetDate === date;
+      validateSelectedDistanceEndpointSignal({
+        workout,
+        date,
+        targetEndpointDate,
+        context,
+        issues,
+      });
 
       if (
         context.authoringInput.schedule.targetDate &&
@@ -235,6 +257,7 @@ export function validateBlueprintShell(
       if (
         isBlueprintLongRunIntent(workout) &&
         context.preferredLongRunDay &&
+        workout.workoutIdentity !== "selected_distance_completion_or_checkpoint" &&
         workout.weekday !== context.preferredLongRunDay &&
         workout.date !== context.authoringInput.schedule.targetDate
       ) {
@@ -246,6 +269,13 @@ export function validateBlueprintShell(
       }
 
       validateGoalFamilyWorkoutIdentity(workout, date, context, issues);
+      validateConservativeNoBenchmarkEarlyAdaptationWorkout(
+        workout,
+        date,
+        week.weekNumber,
+        context,
+        issues,
+      );
 
       if (
         context.lowSupportBuildConsistency &&
@@ -275,10 +305,253 @@ export function validateBlueprintShell(
             "Blueprint contains exact elevation, medical, rehab, unsupported metric precision, or physiological truth claims.",
         });
       }
+
+      validateBlueprintWorkoutTargetContract({
+        workout,
+        date,
+        context,
+        issues,
+      });
     }
   }
 
   validateGoalFamilyCadence(blueprint, context, issues);
+}
+
+function validateConservativeNoBenchmarkEarlyAdaptationWorkout(
+  workout: AiBlueprintWorkout,
+  date: string,
+  weekNumber: number,
+  context: AiFirstPlanBlueprintNormalizationContext,
+  issues: NormalizationIssue[],
+) {
+  if (
+    !shouldUseConservativeNoBenchmarkLongDistanceAdaptation(context.authoringInput, weekNumber) ||
+    isConservativeNoBenchmarkAdaptationSafeIdentity(workout.workoutIdentity, weekNumber)
+  ) {
+    return;
+  }
+
+  issues.push({
+    code: "conservative_no_benchmark_early_specificity",
+    path: `${date}.workoutIdentity`,
+    message: `Week ${weekNumber} conservative/no-benchmark long-distance adaptation must stay easy, recovery, long-aerobic, cutback, or relaxed-stride only; ${workout.workoutIdentity} is too specific too early.`,
+  });
+}
+
+function validateBlueprintWorkoutTargetContract({
+  workout,
+  date,
+  context,
+  issues,
+}: {
+  workout: AiBlueprintWorkout;
+  date: string;
+  context: AiFirstPlanBlueprintNormalizationContext;
+  issues: NormalizationIssue[];
+}) {
+  for (const [sectionIndex, section] of workout.sections.entries()) {
+    const sectionPath = `${date}.sections.${sectionIndex + 1}`;
+
+    if (section.kind === "repeat") {
+      validateRepeatChildTargets({ section, path: sectionPath, issues });
+      continue;
+    }
+
+    if (!hasMeaningfulEffortTarget(section.target)) {
+      issues.push({
+        code: "ai_authored_section_target_missing",
+        path: `${sectionPath}.target`,
+        message: `${section.label} must include AI-authored section target guidance such as effort, RPE, cue, or hint.`,
+      });
+    }
+  }
+
+  if (workout.workoutIdentity !== SELECTED_DISTANCE_ENDPOINT_IDENTITY) {
+    return;
+  }
+
+  const expectedDistanceMeters = context.authoringInput.planGoalIntent?.distance?.distanceMeters;
+  validateSelectedDistanceEndpointDynamics({ workout, date, expectedDistanceMeters, issues });
+}
+
+function validateRepeatChildTargets({
+  section,
+  path,
+  issues,
+}: {
+  section: AiBlueprintSection;
+  path: string;
+  issues: NormalizationIssue[];
+}) {
+  const children = section.prescription.children ?? [];
+
+  for (const [childIndex, child] of children.entries()) {
+    if (!hasMeaningfulEffortTarget(child.target)) {
+      issues.push({
+        code: "ai_authored_repeat_child_target_missing",
+        path: `${path}.children.${childIndex + 1}.target`,
+        message: `${child.label} must include child-owned target guidance such as effort, RPE, cue, or hint.`,
+      });
+    }
+  }
+}
+
+function validateSelectedDistanceEndpointDynamics({
+  workout,
+  date,
+  expectedDistanceMeters,
+  issues,
+}: {
+  workout: AiBlueprintWorkout;
+  date: string;
+  expectedDistanceMeters: number | null | undefined;
+  issues: NormalizationIssue[];
+}) {
+  if (!expectedDistanceMeters) {
+    return;
+  }
+
+  const hasWarmup = workout.sections.some(
+    (section) => section.kind === "warm_up" && section.prescription.mode !== "none",
+  );
+  const hasCooldownOrWalkDown = workout.sections.some(
+    (section) =>
+      section.prescription.mode !== "none" &&
+      (section.kind === "cooldown" ||
+        /cool[- ]?down|walk[- ]?down/i.test(`${section.label} ${section.guidance}`)),
+  );
+  const nestedDistanceChildren = collectNestedEndpointDistanceChildren(workout.sections);
+
+  if (!hasWarmup) {
+    issues.push({
+      code: "selected_distance_endpoint_missing_warmup",
+      path: `${date}.sections`,
+      message:
+        "Selected-distance endpoints must include an authored warm-up or opening support section before the exact distance block.",
+    });
+  }
+
+  if (!hasCooldownOrWalkDown) {
+    issues.push({
+      code: "selected_distance_endpoint_missing_cooldown",
+      path: `${date}.sections`,
+      message:
+        "Selected-distance endpoints must include cooldown or walk-down support after the exact distance block.",
+    });
+  }
+
+  if (nestedDistanceChildren.length < 3) {
+    issues.push({
+      code: "selected_distance_endpoint_not_nested_dynamic",
+      path: `${date}.sections`,
+      message:
+        "Selected-distance endpoints must use a structural main-work section with ordered child distance dynamics, not only flat distance sections or one anonymous block.",
+    });
+    return;
+  }
+
+  if (
+    isFormulaicTwentySixtyTwentySplit(nestedDistanceChildren.map((child) => child.distanceMeters))
+  ) {
+    issues.push({
+      code: "selected_distance_endpoint_formulaic_split",
+      path: `${date}.sections`,
+      message:
+        "Selected-distance endpoint dynamics must be coach-authored, not a fixed 20/60/20 arithmetic split.",
+    });
+  }
+
+  if (!hasMeaningfulEndpointGuidanceVariation(nestedDistanceChildren)) {
+    issues.push({
+      code: "selected_distance_endpoint_flat_target_guidance",
+      path: `${date}.sections`,
+      message:
+        "Selected-distance endpoint child sections must vary coaching cues, effort, or RPE across opening, body, and finish dynamics.",
+    });
+  }
+}
+
+function collectNestedEndpointDistanceChildren(sections: readonly AiBlueprintSection[]) {
+  const children: {
+    child: AiBlueprintRepeatChild;
+    distanceMeters: number;
+  }[] = [];
+
+  for (const section of sections) {
+    if (section.kind !== "repeat" || section.prescription.mode !== "repeats") {
+      continue;
+    }
+
+    const repeatCount = section.prescription.repeat_count ?? 1;
+    for (const child of section.prescription.children ?? []) {
+      if (child.prescription.mode !== "distance" || !child.prescription.distance_km) {
+        continue;
+      }
+
+      children.push({
+        child,
+        distanceMeters: Math.round(child.prescription.distance_km * 1000 * repeatCount),
+      });
+    }
+  }
+
+  return children;
+}
+
+function isFormulaicTwentySixtyTwentySplit(distanceMeters: readonly number[]) {
+  if (distanceMeters.length < 3) {
+    return false;
+  }
+
+  const total = distanceMeters.reduce((sum, meters) => sum + meters, 0);
+  if (total <= 0) {
+    return false;
+  }
+
+  const opening = distanceMeters[0] ?? 0;
+  const finish = distanceMeters.at(-1) ?? 0;
+  const body = total - opening - finish;
+
+  return (
+    Math.abs(opening / total - 0.2) < 0.015 &&
+    Math.abs(body / total - 0.6) < 0.015 &&
+    Math.abs(finish / total - 0.2) < 0.015
+  );
+}
+
+function hasMeaningfulEndpointGuidanceVariation(
+  children: readonly { child: AiBlueprintRepeatChild; distanceMeters: number }[],
+) {
+  const fingerprints = new Set(
+    children.map(({ child }) =>
+      normalizeGuidanceFingerprint(
+        [
+          child.guidance,
+          child.target?.intensity,
+          child.target?.cue,
+          child.target?.hint,
+          child.target?.rpe,
+        ].join("|"),
+      ),
+    ),
+  );
+
+  return fingerprints.size >= 2;
+}
+
+function normalizeGuidanceFingerprint(value: string) {
+  return value.toLowerCase().replaceAll(/\s+/g, " ").trim();
+}
+
+function hasMeaningfulEffortTarget(
+  target: AiBlueprintSection["target"] | AiBlueprintRepeatChild["target"],
+) {
+  if (!target) {
+    return false;
+  }
+
+  return Boolean(target.intensity || target.cue || target.hint || typeof target.rpe === "number");
 }
 
 function buildBlueprintCompleteness(
@@ -325,15 +598,16 @@ function buildExpectedAuthoredWorkoutDates(context: AiFirstPlanBlueprintNormaliz
   return [];
 }
 
-function expectedAuthoredWorkoutCountForWeek(
+function expectedAuthoredWorkoutCountRangeForWeek(
   week: AiBlueprintWeek,
   context: AiFirstPlanBlueprintNormalizationContext,
 ) {
   const weeklyTarget = context.authoringInput.availability.maxRunningDaysPerWeek;
   const targetDate = context.authoringInput.schedule.targetDate;
+  const earlyConservativeMax = conservativeEarlyAuthoredWorkoutMax(context, week.weekNumber);
 
   if (!targetDate) {
-    return weeklyTarget;
+    return earlyConservativeMax ? upToCount(earlyConservativeMax) : exactCount(weeklyTarget);
   }
 
   const weekStart = addDaysIso(
@@ -343,7 +617,7 @@ function expectedAuthoredWorkoutCountForWeek(
   const weekEnd = addDaysIso(weekStart, 6);
 
   if (targetDate < weekStart || targetDate > weekEnd) {
-    return weeklyTarget;
+    return earlyConservativeMax ? upToCount(earlyConservativeMax) : exactCount(weeklyTarget);
   }
 
   const availableDatesThroughTarget = Array.from({ length: 7 }, (_value, offset) =>
@@ -354,7 +628,58 @@ function expectedAuthoredWorkoutCountForWeek(
     return date <= targetDate && (!context.fixedRestDays.has(weekday) || date === targetDate);
   });
 
-  return Math.max(1, Math.min(weeklyTarget, availableDatesThroughTarget.length));
+  return exactCount(Math.max(1, Math.min(weeklyTarget, availableDatesThroughTarget.length)));
+}
+
+function exactCount(value: number) {
+  return {
+    min: value,
+    max: value,
+  };
+}
+
+function upToCount(max: number) {
+  return {
+    min: 1,
+    max,
+  };
+}
+
+function conservativeEarlyAuthoredWorkoutMax(
+  context: AiFirstPlanBlueprintNormalizationContext,
+  weekNumber: number,
+) {
+  if (weekNumber > 4 || !isConservativeNoBenchmarkAuthoring(context)) {
+    return null;
+  }
+
+  const distanceMeters = context.authoringInput.planGoalIntent?.distance?.distanceMeters ?? 10_000;
+  const maxEarly =
+    distanceMeters <= 10_000 &&
+    context.authoringInput.runnerProfile.experienceLevel === "new_runner"
+      ? 3
+      : 4;
+
+  return Math.min(context.authoringInput.availability.maxRunningDaysPerWeek, maxEarly);
+}
+
+function isConservativeNoBenchmarkAuthoring(context: AiFirstPlanBlueprintNormalizationContext) {
+  const authoringInput = context.authoringInput;
+  const noBenchmark = !authoringInput.currentLevel.recent5kPaceSecondsPerKm;
+  const feasibilityStatus = authoringInput.planGoalIntent?.feasibility?.status ?? null;
+  const targetTimeIntent = Boolean(
+    authoringInput.goal.targetTime ||
+    authoringInput.planGoalIntent?.targetFinishTime ||
+    authoringInput.planGoalIntent?.targetOutcomePace,
+  );
+
+  return (
+    noBenchmark &&
+    (authoringInput.runnerProfile.experienceLevel === "new_runner" ||
+      authoringInput.runnerProfile.experienceLevel === "returning_runner" ||
+      feasibilityStatus === "aggressive_or_short_horizon" ||
+      targetTimeIntent)
+  );
 }
 
 function formatBoundedList(values: Array<string | number>) {
@@ -407,6 +732,10 @@ function validateGoalFamilyCadence(
     return;
   }
 
+  if (usesConservativeNoBenchmarkCadence(context)) {
+    return;
+  }
+
   const cadenceWeeks = new Set(
     blueprint.weeks
       .filter((week) =>
@@ -421,9 +750,10 @@ function validateGoalFamilyCadence(
   );
 
   const supportedIntensityCadence = resolveSupportedIntensityCadence(context.authoringInput);
-  const cadenceFrequency = supportedIntensityCadence.applies
-    ? supportedIntensityCadence.frequency
-    : context.goalFamilyPolicy.cadence.frequency;
+  const cadenceFrequency =
+    supportedIntensityCadence.applies && supportedIntensityCadence.frequency !== "none"
+      ? supportedIntensityCadence.frequency
+      : context.goalFamilyPolicy.cadence.frequency;
 
   if (cadenceFrequency === "none") {
     return;
@@ -437,10 +767,15 @@ function validateGoalFamilyCadence(
 
   for (let weekNumber = 1; weekNumber <= context.expectedHorizonWeeks; weekNumber += step) {
     const nextWeekNumber = step === 1 ? weekNumber : weekNumber + 1;
+    const cadenceWindowRequired =
+      shouldRequireGoalFamilyCadenceWeek(context, weekNumber, supportedIntensityCadence) ||
+      (step !== 1 &&
+        nextWeekNumber <= context.expectedHorizonWeeks &&
+        shouldRequireGoalFamilyCadenceWeek(context, nextWeekNumber, supportedIntensityCadence));
     const cadenceWindowExempt =
       cadenceExemptWeeks.has(weekNumber) && (step === 1 || cadenceExemptWeeks.has(nextWeekNumber));
 
-    if (cadenceWindowExempt) {
+    if (!cadenceWindowRequired || cadenceWindowExempt) {
       continue;
     }
 
@@ -452,6 +787,40 @@ function validateGoalFamilyCadence(
       });
     }
   }
+}
+
+function usesConservativeNoBenchmarkCadence(context: AiFirstPlanBlueprintNormalizationContext) {
+  const hasOutcomeIntent = Boolean(
+    context.authoringInput.goal.targetTime ||
+    context.authoringInput.planGoalIntent?.targetFinishTime ||
+    context.authoringInput.planGoalIntent?.targetOutcomePace,
+  );
+
+  return Boolean(
+    !context.authoringInput.currentLevel.recent5kPaceSecondsPerKm &&
+    (hasOutcomeIntent ||
+      context.authoringInput.planGoalIntent?.feasibility?.status === "aggressive_or_short_horizon"),
+  );
+}
+
+function shouldRequireGoalFamilyCadenceWeek(
+  context: AiFirstPlanBlueprintNormalizationContext,
+  weekNumber: number,
+  supportedIntensityCadence: ReturnType<typeof resolveSupportedIntensityCadence>,
+) {
+  if (
+    supportedIntensityCadence.applies &&
+    supportedIntensityCadence.frequency !== "none" &&
+    !shouldScheduleSupportedIntensityWeek(
+      context.authoringInput,
+      weekNumber,
+      supportedIntensityCadence,
+    )
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function validateGoalFamilyWorkoutIdentity(
@@ -480,9 +849,62 @@ function validateGoalFamilyWorkoutIdentity(
   }
 }
 
+function validateSelectedDistanceEndpointSignal({
+  workout,
+  date,
+  targetEndpointDate,
+  context,
+  issues,
+}: {
+  workout: AiBlueprintWorkout;
+  date: string;
+  targetEndpointDate: boolean;
+  context: AiFirstPlanBlueprintNormalizationContext;
+  issues: NormalizationIssue[];
+}) {
+  if (!isSelectedDistanceEndpointRequired(context) || !context.authoringInput.schedule.targetDate) {
+    return;
+  }
+
+  const isEndpointSignal = workout.workoutIdentity === "selected_distance_completion_or_checkpoint";
+
+  if (targetEndpointDate && !isEndpointSignal) {
+    issues.push({
+      code: "missing_selected_distance_endpoint_signal",
+      path: `${date}.workoutIdentity`,
+      message:
+        "Target-date distance goals must use selected_distance_completion_or_checkpoint on the target date; taper, long, easy, steady, or rest cannot satisfy the selected-distance endpoint.",
+    });
+    return;
+  }
+
+  if (!targetEndpointDate && isEndpointSignal) {
+    issues.push({
+      code: "selected_distance_endpoint_wrong_date",
+      path: `${date}.workoutIdentity`,
+      message: `selected_distance_completion_or_checkpoint must land exactly on target date ${context.authoringInput.schedule.targetDate}.`,
+    });
+    return;
+  }
+
+  if (
+    targetEndpointDate &&
+    isEndpointSignal &&
+    (workout.workoutFamily !== "race" || workout.calendarIconKey !== "race")
+  ) {
+    issues.push({
+      code: "selected_distance_endpoint_shape_invalid",
+      path: `${date}.workoutFamily`,
+      message:
+        "The selected-distance endpoint signal must use workoutFamily race and calendarIconKey race so backend can canonicalize it safely.",
+    });
+  }
+}
+
 function isBlueprintLongRunIntent(workout: AiBlueprintWorkout) {
   return (
     workout.workoutFamily === "long" ||
+    workout.workoutIdentity === "selected_distance_completion_or_checkpoint" ||
     workout.workoutIdentity === "hike_run_endurance" ||
     workout.workoutIdentity === "mountain_long_run_time_on_feet"
   );
@@ -513,6 +935,8 @@ export function validateNormalizedPlanDoctrine(
   context: AiFirstPlanBlueprintNormalizationContext,
   issues: NormalizationIssue[],
 ) {
+  validateSelectedDistanceEndpointDoctrine(workouts, context, issues);
+
   for (const workout of workouts) {
     if (context.fixedRestDays.has(workout.weekday) && workout.workout_family !== "rest") {
       issues.push({
@@ -526,7 +950,9 @@ export function validateNormalizedPlanDoctrine(
   validateSupportedSpecificityDoctrine(workouts, context, issues);
 
   const longRuns = workouts.filter(
-    (workout) => workout.workout_family === "long" || workout.workout_type === "long_run",
+    (workout) =>
+      !isSelectedDistanceEndpointWorkout(workout) &&
+      (workout.workout_family === "long" || workout.workout_type === "long_run"),
   );
   const longRunLoads = longRuns.map((workout) => estimateCanonicalWorkoutLoad(workout));
   let previousNonCutbackLongRunLoad = longRunLoads[0] ?? 0;
@@ -578,6 +1004,51 @@ export function validateNormalizedPlanDoctrine(
   validateRecoveryFirstAfterLongRuns(workouts, context, issues);
 }
 
+function isSelectedDistanceEndpointWorkout(workout: CanonicalWorkout) {
+  return workout.source_workout_type === SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND;
+}
+
+function isSelectedDistanceEndpointRequired(context: AiFirstPlanBlueprintNormalizationContext) {
+  return (
+    context.authoringInput.goal.goalType === "distance_build" &&
+    Boolean(context.authoringInput.planGoalIntent?.distance)
+  );
+}
+
+function validateSelectedDistanceEndpointDoctrine(
+  workouts: CanonicalWorkout[],
+  context: AiFirstPlanBlueprintNormalizationContext,
+  issues: NormalizationIssue[],
+) {
+  const distanceMeters = isSelectedDistanceEndpointRequired(context)
+    ? (context.authoringInput.planGoalIntent?.distance?.distanceMeters ?? null)
+    : null;
+  if (distanceMeters == null) {
+    return;
+  }
+
+  issues.push(
+    ...collectSelectedDistanceEndpointIssues({
+      rows: workouts.map((workout) => ({
+        id: workout.workout_id,
+        date: workout.date,
+        isRest: workout.workout_type === "rest",
+        endpointKind: workout.source_workout_type,
+        endpointIdentity: workout.workout_identity,
+        endpointDistanceMeters: selectedDistanceEndpointMainDistanceMeters({
+          endpointKind: workout.source_workout_type,
+          segments: workout.segments,
+        }),
+        isSelectedEndpointSignal:
+          workout.source_workout_type === SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND ||
+          workout.workout_identity === SELECTED_DISTANCE_ENDPOINT_IDENTITY,
+      })),
+      expectedDistanceMeters: distanceMeters,
+      targetDate: context.authoringInput.schedule.targetDate,
+    }),
+  );
+}
+
 function validateSupportedSpecificityDoctrine(
   workouts: CanonicalWorkout[],
   context: AiFirstPlanBlueprintNormalizationContext,
@@ -594,13 +1065,47 @@ function validateSupportedSpecificityDoctrine(
   for (const [weekNumber, weekWorkouts] of workoutsByWeek) {
     const cadence = resolveSupportedIntensityCadence(context.authoringInput, weekNumber);
 
-    if (!cadence.applies || cadence.frequency === "none") {
+    if (!cadence.applies) {
       continue;
     }
 
     const specificityWorkouts = weekWorkouts.filter((workout) =>
       isSupportedSpecificityIdentity(workout.workout_identity),
     );
+    const scheduledWeek =
+      cadence.applies &&
+      cadence.frequency !== "none" &&
+      shouldScheduleSupportedIntensityWeek(context.authoringInput, weekNumber, cadence);
+
+    if (!scheduledWeek) {
+      if (
+        specificityWorkouts.length > 0 &&
+        !isAllowedLowSupportTenKMicroStrideWeek(context, weekNumber, specificityWorkouts)
+      ) {
+        issues.push({
+          code: "supported_specificity_too_early",
+          path: `weeks.${weekNumber}.plannedWorkouts`,
+          message: `Week ${weekNumber} contains beginner/recreational specificity before backend support cadence allows it.`,
+        });
+      }
+      continue;
+    }
+
+    const allowedSpecificity = new Set(
+      resolveSupportedSpecificityIdentityOptions(context.authoringInput, weekNumber, cadence),
+    );
+    const disallowedSpecificity = specificityWorkouts.filter(
+      (workout) => !allowedSpecificity.has(workout.workout_identity),
+    );
+    if (disallowedSpecificity.length > 0) {
+      issues.push({
+        code: "supported_specificity_identity_not_allowed",
+        path: `weeks.${weekNumber}.plannedWorkouts`,
+        message: `Week ${weekNumber} contains specificity not allowed by backend support cadence: ${disallowedSpecificity
+          .map((workout) => workout.workout_identity)
+          .join(", ")}.`,
+      });
+    }
 
     if (specificityWorkouts.length > 1) {
       issues.push({
@@ -635,6 +1140,24 @@ function validateSupportedSpecificityDoctrine(
       });
     }
   }
+}
+
+function isAllowedLowSupportTenKMicroStrideWeek(
+  context: AiFirstPlanBlueprintNormalizationContext,
+  weekNumber: number,
+  specificityWorkouts: readonly CanonicalWorkout[],
+) {
+  const distanceMeters = context.authoringInput.planGoalIntent?.distance?.distanceMeters ?? null;
+
+  return Boolean(
+    weekNumber === 2 &&
+    distanceMeters != null &&
+    distanceMeters <= 10_000 &&
+    !context.authoringInput.currentLevel.recent5kPaceSecondsPerKm &&
+    context.authoringInput.runnerProfile.experienceLevel === "new_runner" &&
+    specificityWorkouts.length === 1 &&
+    specificityWorkouts[0]?.workout_identity === "easy_run_with_strides",
+  );
 }
 
 function isCutbackLongRun(workout: CanonicalWorkout) {
@@ -673,6 +1196,13 @@ function validateRecoveryFirstAfterLongRuns(
     const nextWorkout = runningWorkouts[index + 1] ?? null;
 
     if (!nextWorkout || isRecoveryFirstWorkout(nextWorkout)) {
+      continue;
+    }
+
+    if (
+      nextWorkout.workout_identity === "easy_run_with_strides" &&
+      diffDaysIso(nextWorkout.date, longRun.date) > 2
+    ) {
       continue;
     }
 

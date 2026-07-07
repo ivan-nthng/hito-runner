@@ -8,6 +8,7 @@ import { getRequestAuthContext } from "@/lib/backend/auth";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+  buildAiGeneratedRunningPlanPreviewUnavailable,
   buildAiGeneratedRunningPlanPreview,
   isAiGeneratedRunningPlanPreviewDraft,
   type AiGeneratedRunningPlanPreviewUnavailable,
@@ -29,6 +30,7 @@ import {
   addRunningPlanReviewProof,
   buildRunningPlanPersistenceMetadata,
   buildRunningPlanProfilePatch,
+  validateRunningPlanReviewExactness,
   validateSelfContainedRunningPlanReviewToken,
   type RunningPlanReviewedPreviewDraft,
 } from "@/lib/running-plan-engine-review";
@@ -215,7 +217,21 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
   userId: string,
   request: RunningPlanConfirmActionInput,
 ): Promise<RunningPlanConfirmActionResult> {
-  const exactness = await validateSelfContainedRunningPlanReviewToken({
+  const decoded = await validateSelfContainedRunningPlanReviewToken({
+    reviewToken: request.reviewToken,
+    reviewChecksum: request.reviewChecksum,
+  });
+
+  if (!decoded.ok) {
+    return buildConfirmFailure({
+      reason: decoded.reason,
+      message: decoded.message,
+      sourceKind: request.sourceKind,
+    });
+  }
+
+  const exactness = await validateRunningPlanReviewExactness({
+    draft: decoded.draft,
     reviewToken: request.reviewToken,
     reviewChecksum: request.reviewChecksum,
   });
@@ -229,8 +245,8 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
   }
 
   if (
-    !isAiGeneratedRunningPlanPreviewDraft(exactness.draft) ||
-    exactness.draft.sourceKind !== request.sourceKind
+    !isAiGeneratedRunningPlanPreviewDraft(decoded.draft) ||
+    decoded.draft.sourceKind !== request.sourceKind
   ) {
     return buildConfirmFailure({
       reason: "input_mismatch",
@@ -240,7 +256,7 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
-  if (!sameJson(request.previewInput, exactness.draft.previewInput)) {
+  if (!sameJson(request.previewInput, decoded.draft.previewInput)) {
     return buildConfirmFailure({
       reason: "stale_review",
       message:
@@ -253,15 +269,15 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     const applyResult = await createFirstPlanFromReviewedCanonicalPlanForUser(
       userId,
       exactness.canonicalPlan,
-      buildRunningPlanProfilePatch(exactness.draft),
+      buildRunningPlanProfilePatch(decoded.draft),
       buildRunningPlanPersistenceMetadata({
-        draft: exactness.draft,
+        draft: decoded.draft,
         canonicalPlan: exactness.canonicalPlan,
         reviewChecksum: exactness.reviewChecksum,
       }),
     );
     await markAiPlanGenerationPersisted({
-      trace: exactness.draft.aiGeneration.generationTrace,
+      trace: decoded.draft.aiGeneration.generationTrace,
     });
 
     return {
@@ -315,6 +331,26 @@ export async function buildReviewedAiGeneratedRunningPlanPreview(
   }
 
   const reviewedDraft = await addRunningPlanReviewProof(result.draft);
+  const exactness = await validateRunningPlanReviewExactness({
+    draft: reviewedDraft,
+    reviewToken: reviewedDraft.reviewToken,
+    reviewChecksum: reviewedDraft.reviewChecksum,
+  });
+
+  if (!exactness.ok) {
+    return {
+      ok: false,
+      unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
+        code: "ai_generated_plan_unavailable",
+        message: exactness.message,
+        issues: [exactness.message],
+        generationTrace: reviewedDraft.aiGeneration.generationTrace,
+        input: data,
+        normalizedInputSummary: reviewedDraft.normalizedInputSummary,
+      }),
+    };
+  }
+
   const generationTrace = await markAiPlanGenerationReviewedDraftSigned({
     trace: reviewedDraft.aiGeneration.generationTrace,
     options: options.aiPreview?.generationLedger,

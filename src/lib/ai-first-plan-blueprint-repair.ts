@@ -1,10 +1,12 @@
 import type { AiBlueprintWeek, AiBlueprintWorkout } from "@/lib/ai-first-plan-blueprint-schema";
+import { buildAiBlueprintWorkoutSections } from "@/lib/ai-first-plan-blueprint-section-templates";
 import type { AiFirstPlanBlueprintNormalizationContext } from "@/lib/ai-first-plan-blueprint-validation";
 import {
   isSupportedModerateIntensityIdentity,
   resolveSupportedSpecificityIdentityOptions,
   resolveSupportedIntensityCadence,
   shouldScheduleSupportedIntensityWeek,
+  shouldUseConservativeNoBenchmarkLongDistanceAdaptation,
   shouldUseBeginnerRunWalkAdaptation,
   shouldUseLongRunSteadyFinishAsSpecificStimulus,
   shouldUseRecoveryFirstAfterLongRun,
@@ -47,15 +49,18 @@ export function repairBeginnerRunWalkBlueprintAdaptation({
         entry.week.weekNumber,
         adaptationHorizonWeeks,
       ) ||
-      isBeginnerAdaptationSafeBlueprintWorkout(entry.workout)
+      isBeginnerAdaptationSafeBlueprintWorkout(entry.workout, entry.week.weekNumber)
     ) {
       continue;
     }
 
-    const repairedWorkout = buildBeginnerAdaptationBlueprintWorkout({
-      workout: entry.workout,
-      defaultHrAllowed: context.defaultHrAllowed,
-    });
+    const repairedWorkout = withRepairedSections(
+      buildBeginnerAdaptationBlueprintWorkout({
+        workout: entry.workout,
+        defaultHrAllowed: context.defaultHrAllowed,
+      }),
+      { context, weekNumber: entry.week.weekNumber },
+    );
 
     blueprintWorkouts.set(date, {
       ...entry,
@@ -103,12 +108,20 @@ export function repairRecoveryFirstBlueprintSequencing({
       continue;
     }
 
-    const repairedWorkout = buildRecoveryFirstBlueprintWorkout({
-      workout: nextBlueprintEntry.workout,
-      nextDate,
-      longRunDate,
-      defaultHrAllowed: context.defaultHrAllowed,
-    });
+    const gapDays = diffDaysIso(nextDate, longRunDate);
+    if (nextBlueprintEntry.workout.workoutIdentity === "easy_run_with_strides" && gapDays > 2) {
+      continue;
+    }
+
+    const repairedWorkout = withRepairedSections(
+      buildRecoveryFirstBlueprintWorkout({
+        workout: nextBlueprintEntry.workout,
+        nextDate,
+        longRunDate,
+        defaultHrAllowed: context.defaultHrAllowed,
+      }),
+      { context, weekNumber: nextBlueprintEntry.week.weekNumber },
+    );
 
     blueprintWorkouts.set(nextDate, {
       ...nextBlueprintEntry,
@@ -148,6 +161,10 @@ export function repairSupportedIntensityBlueprintCadence({
   }
 
   for (const [weekNumber, entries] of entriesByWeek) {
+    if (shouldPreserveCoachAuthoredGoalFamilyCadence(context, entries)) {
+      continue;
+    }
+
     const cadence = resolveSupportedIntensityCadence(context.authoringInput, weekNumber);
 
     if (!cadence.applies) {
@@ -175,10 +192,12 @@ export function repairSupportedIntensityBlueprintCadence({
 
         if (entry.workout.workoutIdentity !== "long_run_with_steady_finish") {
           const originalIdentity = entry.workout.workoutIdentity;
-          const repairedWorkout = buildLongRunSteadyFinishBlueprintWorkout({
-            workout: entry.workout,
-            defaultHrAllowed: context.defaultHrAllowed,
-          });
+          const repairedWorkout = withRepairedSections(
+            buildLongRunSteadyFinishBlueprintWorkout({
+              workout: entry.workout,
+              defaultHrAllowed: context.defaultHrAllowed,
+            }),
+          );
 
           blueprintWorkouts.set(longRunDate, {
             ...entry,
@@ -211,17 +230,20 @@ export function repairSupportedIntensityBlueprintCadence({
           identity !== "long_run_with_steady_finish",
       );
       const preferredAllowedIdentity = allowedIdentities[0] ?? null;
+      const shouldKeepGentleStrideTouch =
+        shouldPreserveGentleStrideTouch(context, entry.workout) && !keptModerateTouch;
       const shouldKeepModerateTouch =
+        !shouldKeepGentleStrideTouch &&
         allowedIdentities.includes(entry.workout.workoutIdentity as SupportedCadenceIdentity) &&
         !keptModerateTouch &&
         scheduledWeek;
 
-      if (shouldKeepModerateTouch) {
+      if (shouldKeepGentleStrideTouch || shouldKeepModerateTouch) {
         keptModerateTouch = true;
         continue;
       }
 
-      const repairedWorkout =
+      const repairedWorkout = withRepairedSections(
         preferredAllowedIdentity && !keptModerateTouch
           ? buildSupportedCadenceBlueprintWorkout({
               workout: entry.workout,
@@ -231,7 +253,9 @@ export function repairSupportedIntensityBlueprintCadence({
           : buildEasySupportBlueprintWorkout({
               workout: entry.workout,
               defaultHrAllowed: context.defaultHrAllowed,
-            });
+            }),
+        { context, weekNumber },
+      );
 
       if (preferredAllowedIdentity && !keptModerateTouch) {
         keptModerateTouch = true;
@@ -248,12 +272,130 @@ export function repairSupportedIntensityBlueprintCadence({
   }
 }
 
-function isBeginnerAdaptationSafeBlueprintWorkout(workout: AiBlueprintWorkout) {
+function shouldPreserveCoachAuthoredGoalFamilyCadence(
+  context: AiFirstPlanBlueprintNormalizationContext,
+  entries: Array<[string, BlueprintWorkoutEntry]>,
+) {
+  const weekNumber = entries[0]?.[1].week.weekNumber ?? null;
+  if (!weekNumber) {
+    return false;
+  }
+
+  if (shouldUseConservativeNoBenchmarkLongDistanceAdaptation(context.authoringInput, weekNumber)) {
+    return false;
+  }
+
+  const distanceMeters = context.authoringInput.planGoalIntent?.distance?.distanceMeters ?? null;
+  const lowSupportTenK =
+    distanceMeters != null &&
+    distanceMeters <= 10_000 &&
+    shouldUseBeginnerRunWalkAdaptation(context.authoringInput, 1, context.expectedHorizonWeeks);
+
+  if (lowSupportTenK) {
+    return false;
+  }
+
+  const hasUnsupportedRacePace =
+    !context.authoringInput.currentLevel.recent5kPaceSecondsPerKm &&
+    entries.some(([, entry]) => entry.workout.workoutIdentity === "race_pace_session");
+
+  if (hasUnsupportedRacePace) {
+    return false;
+  }
+
+  const cadence = resolveSupportedIntensityCadence(context.authoringInput, weekNumber);
+  if (
+    !cadence.applies ||
+    cadence.frequency === "none" ||
+    !shouldScheduleSupportedIntensityWeek(context.authoringInput, weekNumber, cadence)
+  ) {
+    return false;
+  }
+
+  const allowedSpecificity = new Set(
+    resolveSupportedSpecificityIdentityOptions(context.authoringInput, weekNumber, cadence),
+  );
+  const requestedSpecificity = entries
+    .map(([, entry]) => entry.workout.workoutIdentity)
+    .filter((identity) => isSupportedModerateIntensityIdentity(identity));
+
+  if (
+    requestedSpecificity.length > 0 &&
+    requestedSpecificity.some((identity) => !allowedSpecificity.has(identity))
+  ) {
+    return false;
+  }
+
+  const feasibilityStatus = context.authoringInput.planGoalIntent?.feasibility?.status ?? null;
+  const coachAccepted =
+    feasibilityStatus === "supported" || feasibilityStatus === "aggressive_or_short_horizon";
+  const hasTargetTime = Boolean(
+    context.authoringInput.goal.targetTime ||
+    context.authoringInput.planGoalIntent?.targetFinishTime ||
+    context.authoringInput.planGoalIntent?.targetOutcomePace,
+  );
+
+  return context.goalFamilyPolicy.key !== "beginner_consistency" && coachAccepted && hasTargetTime;
+}
+
+function shouldPreserveGentleStrideTouch(
+  context: AiFirstPlanBlueprintNormalizationContext,
+  workout: AiBlueprintWorkout,
+) {
+  return (
+    workout.workoutIdentity === "easy_run_with_strides" &&
+    context.goalFamilyPolicy.allowedIdentities.has("easy_run_with_strides") &&
+    (context.authoringInput.runnerProfile.experienceLevel === "new_runner" ||
+      context.authoringInput.availability.maxRunningDaysPerWeek <= 3 ||
+      !context.authoringInput.currentLevel.recent5kPaceSecondsPerKm)
+  );
+}
+
+function isBeginnerAdaptationSafeBlueprintWorkout(workout: AiBlueprintWorkout, weekNumber: number) {
   return (
     workout.workoutFamily === "long" ||
     workout.workoutIdentity === "easy_aerobic_run" ||
     workout.workoutIdentity === "recovery_jog" ||
-    workout.workoutIdentity === "cutback_aerobic_run"
+    workout.workoutIdentity === "cutback_aerobic_run" ||
+    (weekNumber >= 2 && workout.workoutIdentity === "easy_run_with_strides")
+  );
+}
+
+function withRepairedSections(
+  workout: AiBlueprintWorkout,
+  input?: {
+    context: AiFirstPlanBlueprintNormalizationContext;
+    weekNumber: number;
+  },
+): AiBlueprintWorkout {
+  return {
+    ...workout,
+    sections: buildAiBlueprintWorkoutSections({
+      workoutIdentity: workout.workoutIdentity,
+      workoutFamily: workout.workoutFamily,
+      plannedRpe: workout.plannedRpe,
+      distanceMeters:
+        input?.context.authoringInput.planGoalIntent?.distance?.distanceMeters ?? null,
+      weekNumber: input?.weekNumber ?? null,
+      horizonWeeks: input?.context.expectedHorizonWeeks ?? null,
+      lowSupportTenKBeginner: input
+        ? shouldUseLowSupportTenKBeginnerSections(input.context, input.weekNumber)
+        : false,
+    }),
+  };
+}
+
+function shouldUseLowSupportTenKBeginnerSections(
+  context: AiFirstPlanBlueprintNormalizationContext,
+  _weekNumber: number,
+) {
+  const distanceMeters = context.authoringInput.planGoalIntent?.distance?.distanceMeters ?? null;
+  return Boolean(
+    distanceMeters != null &&
+    distanceMeters <= 10_000 &&
+    !context.authoringInput.currentLevel.recent5kPaceSecondsPerKm &&
+    (context.authoringInput.runnerProfile.experienceLevel === "new_runner" ||
+      context.authoringInput.runnerProfile.baselineSessionsPerWeek <= 4),
   );
 }
 

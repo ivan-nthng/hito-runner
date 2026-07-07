@@ -9,6 +9,7 @@ import type {
 } from "@/lib/ai-first-plan-blueprint-schema";
 import { FUTURE_TEMPLATE_VERSION } from "@/lib/imported-plan";
 import { mainLikeSegmentTypes } from "@/lib/ai-first-plan-blueprint-taxonomy";
+import { normalizeAiAuthoredWorkoutSections } from "@/lib/ai-first-plan-blueprint-sections";
 import type { AiFirstPlanBlueprintNormalizationContext } from "@/lib/ai-first-plan-blueprint-validation";
 import { stripDisallowedDefaultEstimatedHrTargetsFromSegments } from "@/lib/default-estimated-hr-target-policy";
 import { DEFAULT_ESTIMATED_HR_SOURCE_NOTE } from "@/lib/heart-rate-zones";
@@ -22,18 +23,7 @@ import {
   type CanonicalMetricModeJson,
 } from "@/lib/rich-workout-model";
 import type { StepTarget } from "@/lib/training";
-import { shouldUseBeginnerRunWalkAdaptation } from "@/lib/structured-plan-authoring-policy";
-
-export type BuildBlueprintWorkoutSegments = (input: {
-  workout: AiBlueprintWorkout;
-  date: string;
-  weekNumber: number;
-  adaptationHorizonWeeks: number;
-  totalDurationMin: number;
-  context: AiFirstPlanBlueprintNormalizationContext;
-  deterministicWorkout: CanonicalWorkout | null;
-  repairs: string[];
-}) => CanonicalSegment[];
+import { SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND } from "@/lib/plan-creation-engine/selected-distance-endpoint";
 
 export function normalizeBlueprintWorkout({
   blueprint,
@@ -41,22 +31,16 @@ export function normalizeBlueprintWorkout({
   workout,
   date,
   context,
-  deterministicWorkout,
-  adaptationHorizonWeeks,
   repairs,
   issues,
-  buildWorkoutSegments,
 }: {
   blueprint: AiFirstPlanBlueprint;
   week: AiBlueprintWeek;
   workout: AiBlueprintWorkout;
   date: string;
   context: AiFirstPlanBlueprintNormalizationContext;
-  deterministicWorkout: CanonicalWorkout | null;
-  adaptationHorizonWeeks: number;
   repairs: string[];
   issues: NormalizationIssue[];
-  buildWorkoutSegments: BuildBlueprintWorkoutSegments;
 }): CanonicalWorkout {
   const resolved = resolveCanonicalWorkoutModel({
     workoutType: canonicalFamilyToLegacyWorkoutType(workout.workoutFamily, workout.workoutIdentity),
@@ -65,7 +49,6 @@ export function normalizeBlueprintWorkout({
     calendarIconKey: workout.calendarIconKey,
     title: workout.title,
   });
-  const totalDurationMin = estimateBlueprintWorkoutDurationMin(workout, deterministicWorkout);
   if (
     resolved.workoutFamily !== workout.workoutFamily ||
     resolved.calendarIconKey !== workout.calendarIconKey
@@ -80,23 +63,25 @@ export function normalizeBlueprintWorkout({
     workoutIdentity: resolved.workoutIdentity,
     calendarIconKey: resolved.calendarIconKey,
   } as AiBlueprintWorkout;
-  const useDeterministicAdaptationReadback =
-    deterministicWorkout &&
-    shouldUseBeginnerRunWalkAdaptation(
-      context.authoringInput,
-      week.weekNumber,
-      adaptationHorizonWeeks,
-    ) &&
-    hasRunWalkAdaptationSegments(deterministicWorkout);
-  const rawSegments = buildWorkoutSegments({
+  const isSelectedDistanceEndpoint =
+    canonicalWorkout.workoutIdentity === "selected_distance_completion_or_checkpoint" &&
+    isSelectedDistanceEndpointDate({
+      date,
+      weekNumber: week.weekNumber,
+      context,
+    }) &&
+    Boolean(context.authoringInput.planGoalIntent?.distance);
+
+  if (isSelectedDistanceEndpoint) {
+    repairs.push(
+      `${date}: canonicalized selected-distance endpoint source kind while preserving AI-authored sections.`,
+    );
+  }
+
+  const rawSegments = normalizeAiAuthoredWorkoutSections({
     workout: canonicalWorkout,
     date,
-    weekNumber: week.weekNumber,
-    adaptationHorizonWeeks,
-    totalDurationMin,
-    context,
-    deterministicWorkout,
-    repairs,
+    issues,
   });
   const segments = stripDisallowedDefaultEstimatedHrTargetsFromSegments(rawSegments, {
     sourceWorkoutType: resolved.workoutIdentity,
@@ -107,7 +92,7 @@ export function normalizeBlueprintWorkout({
   });
 
   if (
-    totalDurationMin >= 35 &&
+    estimateAiAuthoredWorkoutLoadMinutes(segments) >= 35 &&
     (segments.length < 3 ||
       !segments.some((segment) => segment.segment_type === "warmup") ||
       !segments.some((segment) => mainLikeSegmentTypes.has(segment.segment_type ?? "")) ||
@@ -130,29 +115,37 @@ export function normalizeBlueprintWorkout({
       resolved.workoutFamily,
       resolved.workoutIdentity,
     ),
-    source_workout_type: resolved.workoutIdentity,
+    source_workout_type: isSelectedDistanceEndpoint
+      ? SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND
+      : resolved.workoutIdentity,
     workout_family: resolved.workoutFamily,
     workout_identity: resolved.workoutIdentity,
     calendar_icon_key: resolved.calendarIconKey,
     goal_context: normalizeBlueprintGoalContext(context.authoringInput, blueprint),
     metric_mode: buildWorkoutMetricMode(segments),
-    title: useDeterministicAdaptationReadback ? deterministicWorkout.title : workout.title,
-    summary: useDeterministicAdaptationReadback ? deterministicWorkout.summary : workout.summary,
-    planned_rpe: useDeterministicAdaptationReadback
-      ? Math.min(workout.plannedRpe, deterministicWorkout.planned_rpe ?? 4)
-      : workout.plannedRpe,
+    title: workout.title,
+    summary: workout.summary,
+    planned_rpe: workout.plannedRpe,
     estimated_fatigue: workout.estimatedFatigue,
     recovery_priority: workout.recoveryPriority,
     segments,
   };
 }
 
-function hasRunWalkAdaptationSegments(workout: CanonicalWorkout) {
-  return workout.segments.some((segment) => {
-    return collectSegmentTargets(segment).some(
-      (target) => target.intensity === "run_walk_adaptation",
-    );
-  });
+function isSelectedDistanceEndpointDate({
+  date,
+  weekNumber,
+  context,
+}: {
+  date: string;
+  weekNumber: number;
+  context: AiFirstPlanBlueprintNormalizationContext;
+}) {
+  if (context.authoringInput.schedule.targetDate) {
+    return date === context.authoringInput.schedule.targetDate;
+  }
+
+  return weekNumber === context.expectedHorizonWeeks;
 }
 
 function collectSegmentTargets(segment: CanonicalSegment) {
@@ -383,6 +376,57 @@ function targetHasMetric(target: StepTarget | undefined, metric: "pace" | "hr") 
   return Boolean(target.hr_bpm_range || target.hr_bpm);
 }
 
+function estimateAiAuthoredWorkoutLoadMinutes(segments: CanonicalSegment[]) {
+  return segments.reduce((total, segment) => total + estimateSegmentLoadMinutes(segment), 0);
+}
+
+function estimateSegmentLoadMinutes(segment: CanonicalSegment): number {
+  const prescription = segment.prescription;
+
+  if (prescription?.mode === "time") {
+    return prescription.duration_min ?? segment.duration_min ?? 0;
+  }
+
+  if (prescription?.mode === "distance") {
+    return (prescription.distance_km ?? segment.distance_km ?? 0) * 6;
+  }
+
+  if (prescription?.mode === "repeats") {
+    const childLoad = (prescription.children ?? []).reduce(
+      (total, child) => total + estimateUnitLoadMinutes(child.prescription),
+      0,
+    );
+
+    return childLoad * (prescription.repeat_count ?? 1);
+  }
+
+  if (typeof segment.duration_min === "number") {
+    return segment.duration_min;
+  }
+
+  if (typeof segment.distance_km === "number") {
+    return segment.distance_km * 6;
+  }
+
+  return 0;
+}
+
+function estimateUnitLoadMinutes(input: {
+  mode: string;
+  duration_min?: number;
+  distance_km?: number;
+}) {
+  if (input.mode === "time") {
+    return input.duration_min ?? 0;
+  }
+
+  if (input.mode === "distance") {
+    return (input.distance_km ?? 0) * 6;
+  }
+
+  return 0;
+}
+
 function normalizeBlueprintGoalContext(
   authoringInput: StructuredAuthoringInput,
   blueprint: AiFirstPlanBlueprint | null,
@@ -402,103 +446,6 @@ function normalizeBlueprintGoalContext(
     ...(normalized?.targetDate ? { target_date: normalized.targetDate } : {}),
     ...(normalized?.targetTime ? { target_time: normalized.targetTime } : {}),
   };
-}
-
-function estimateBlueprintWorkoutDurationMin(
-  workout: AiBlueprintWorkout,
-  deterministicWorkout: CanonicalWorkout | null,
-) {
-  const deterministicDuration = deterministicWorkout
-    ? estimateCanonicalWorkoutDurationMin(deterministicWorkout)
-    : 0;
-
-  if (deterministicDuration > 0) {
-    const roundedDeterministicDuration = roundDeviceFriendlyDurationMin(deterministicDuration);
-
-    if (workout.workoutIdentity === "cutback_long_run") {
-      return roundDeviceFriendlyDurationMin(Math.max(35, roundedDeterministicDuration * 0.75));
-    }
-
-    if (workout.workoutIdentity === "taper_long_run") {
-      return roundDeviceFriendlyDurationMin(Math.max(30, roundedDeterministicDuration * 0.65));
-    }
-
-    if (workout.workoutIdentity === "ultra_time_on_feet_durability") {
-      return roundDeviceFriendlyDurationMin(Math.max(50, roundedDeterministicDuration * 0.9));
-    }
-
-    if (workout.workoutIdentity === "hike_run_endurance") {
-      return roundDeviceFriendlyDurationMin(Math.max(45, roundedDeterministicDuration * 0.9));
-    }
-
-    return roundedDeterministicDuration;
-  }
-
-  switch (workout.workoutIdentity) {
-    case "taper_long_run":
-      return 45;
-    case "cutback_long_run":
-      return 55;
-    case "long_run_with_steady_finish":
-      return 80;
-    case "ultra_time_on_feet_durability":
-      return 95;
-    case "hike_run_endurance":
-    case "mountain_long_run_time_on_feet":
-      return 85;
-    case "marathon_steady_specificity":
-    case "half_marathon_threshold_durability":
-      return 55;
-    case "10k_rhythm_intervals":
-    case "controlled_tempo_session":
-    case "progression_run":
-    case "easy_run_with_strides":
-      return 45;
-    case "recovery_jog":
-      return 30;
-  }
-
-  switch (workout.workoutFamily) {
-    case "long":
-      return 75;
-    case "tempo":
-    case "intervals":
-    case "hills":
-    case "trail":
-      return 50;
-    case "steady":
-      return 45;
-    case "recovery":
-      return 30;
-    default:
-      return 40;
-  }
-}
-
-function roundDeviceFriendlyDurationMin(value: number) {
-  return Math.max(1, Math.round(value));
-}
-
-function estimateCanonicalWorkoutDurationMin(workout: CanonicalWorkout) {
-  return workout.segments.reduce((total, segment) => {
-    if (typeof segment.duration_min === "number") {
-      return total + segment.duration_min;
-    }
-
-    if (segment.prescription?.duration_min) {
-      return total + segment.prescription.duration_min;
-    }
-
-    if (typeof segment.distance_km === "number") {
-      return total + segment.distance_km * 6;
-    }
-
-    if (segment.prescription?.distance_km) {
-      return total + segment.prescription.distance_km * 6;
-    }
-
-    return total;
-  }, 0);
 }
 
 export function slugify(value: string) {

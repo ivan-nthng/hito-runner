@@ -698,6 +698,16 @@ export function workoutDuration(workout: Pick<Workout, "steps" | "type">): numbe
   return total;
 }
 
+export function workoutStructureDuration(workout: Pick<Workout, "steps" | "type">): number {
+  let total = 0;
+
+  for (const step of workout.steps) {
+    total += stepStructureDurationMin(step, workout.type);
+  }
+
+  return total;
+}
+
 export function workoutDistanceKm(workout: Pick<Workout, "steps" | "type">): number | null {
   let km = 0;
   let anyDistance = false;
@@ -1366,6 +1376,32 @@ export function stepPlannedDurationMin(step: Step, workoutType: WorkoutType) {
   }
 
   return total;
+}
+
+export function stepStructureDurationMin(step: Step, workoutType: WorkoutType) {
+  const direct = stepPlannedDurationMin(step, workoutType);
+  if (direct > 0) {
+    return direct;
+  }
+
+  if (!step.distance_km) {
+    return 0;
+  }
+
+  const paceMap: Record<WorkoutType, number> = {
+    easy: 7.0,
+    steady_or_easy: 6.6,
+    long_run: 6.8,
+    quality: 5.8,
+    rest: 0,
+  };
+  const pace = paceMap[workoutType];
+
+  if (!pace) {
+    return 0;
+  }
+
+  return Math.round(step.distance_km * pace);
 }
 
 function repeatChildRoleLabel(role: StepRepeatChildRole) {

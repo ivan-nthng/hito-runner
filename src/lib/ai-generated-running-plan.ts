@@ -7,7 +7,6 @@ import type { AiPlanGenerationLedgerTrace } from "@/lib/ai-plan-generation-ledge
 import {
   buildAiGeneratedRunningPlanDevFixturePreviewOptions,
   isAiGeneratedRunningPlanDevFixtureEnabled,
-  isAiGeneratedRunningPlanDevFixtureModel,
 } from "@/lib/ai-generated-running-plan-dev-fixture";
 import {
   parseDurationSeconds,
@@ -21,6 +20,15 @@ import {
   type PlanGoalIntentInput,
   type NormalizedPlanGoalIntent,
 } from "@/lib/plan-creation-engine/plan-goal-intent";
+import {
+  applyGeneratedPlanCoachFeasibilityToGoalIntent,
+  evaluateGeneratedPlanCoachFeasibility,
+} from "@/lib/plan-creation-engine/generated-plan-coach-quality";
+import { resolveTenKBeginnerDosePolicyRunnerLevel } from "@/lib/plan-creation-engine/ten-k-beginner-dose-policy";
+import {
+  collectSelectedDistanceEndpointIssues,
+  resolveSelectedDistanceQualityFamily,
+} from "@/lib/plan-creation-engine/selected-distance-endpoint";
 import type {
   BuildRunningPlanPreviewInput,
   RunningPlanPreviewCalendarRow,
@@ -97,13 +105,11 @@ export interface AiGeneratedRunningPlanPreviewDraft {
     endpointDistanceMeters: number | null;
     endpointMainDistanceMeters: number | null;
     finalRowIsLastNonRest: true;
-    rejectedGenericFinalOutputs: readonly string[];
   };
   validation: {
     ok: true;
     issues: readonly string[];
     forbiddenOutputGateIdsChecked: readonly string[];
-    rejectedOldBehaviorSignalsChecked: readonly string[];
   };
   canonicalPlan: TrainingPlanV2;
   aiGeneration: AiFirstPlanDraftPreviewMetadata;
@@ -189,7 +195,7 @@ export async function buildAiGeneratedRunningPlanPreview(
   if (!authoring.ok) {
     return {
       ok: false,
-      unavailable: buildUnavailable({
+      unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
         code: authoring.reason,
         message: authoring.message,
         issues: [authoring.message],
@@ -217,7 +223,7 @@ export async function buildAiGeneratedRunningPlanPreview(
   if (!result.ok) {
     return {
       ok: false,
-      unavailable: buildUnavailable({
+      unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
         code:
           result.reason === "structured_input_invalid"
             ? "structured_input_invalid"
@@ -243,6 +249,26 @@ export async function buildAiGeneratedRunningPlanPreview(
     planGoalIntent: authoring.planGoalIntent,
   });
   const endpointProof = buildEndpointProof(calendarRows, authoring.planGoalIntent);
+  const endpointIssues = collectPreviewEndpointProofIssues({
+    rows: calendarRows,
+    intent: authoring.planGoalIntent,
+    endpointProof,
+  });
+
+  if (endpointIssues.length > 0) {
+    return {
+      ok: false,
+      unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
+        code: "ai_generated_plan_unavailable",
+        message:
+          "The AI-authored distance-goal plan did not include a valid selected-distance endpoint.",
+        issues: endpointIssues,
+        generationTrace: result.metadata.generationTrace,
+        input,
+        normalizedInputSummary: authoring.normalizedInputSummary,
+      }),
+    };
+  }
 
   return {
     ok: true,
@@ -280,17 +306,6 @@ export async function buildAiGeneratedRunningPlanPreview(
         ok: true,
         issues: [],
         forbiddenOutputGateIdsChecked: ["ai_generated_plan_validated_by_blueprint_contract"],
-        rejectedOldBehaviorSignalsChecked: [
-          "deterministic_builder_fallback",
-          "fake_pace_from_goal_intent",
-          "fake_personal_hr",
-          "legacy_pair_repeat_fields",
-          "backend_slot_scheduler",
-          "backend_horizon_extension",
-          ...(isAiGeneratedRunningPlanDevFixtureModel(result.metadata.model)
-            ? ["local_dev_fixture_not_production_ai_truth"]
-            : []),
-        ],
       },
       canonicalPlan,
       aiGeneration: result.metadata,
@@ -330,29 +345,18 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
   const startDate = normalizeStartDate(input.startDate);
   const rawGoalIntent = resolveGoalIntentInput(input);
   const horizonWeeks = resolveDefaultHorizonWeeks(rawGoalIntent, input.distanceFamily);
-  const intent = normalizePlanGoalIntent({
+  const normalizedIntent = normalizePlanGoalIntent({
     rawIntent: rawGoalIntent,
     distanceFamily: null,
     startDate,
     horizonWeeks,
   });
 
-  if (!intent.ok) {
+  if (!normalizedIntent.ok) {
     return {
       ok: false,
-      reason: intent.reason,
-      message: intent.message,
-    };
-  }
-
-  if (intent.intent.feasibility.status === "impossible_goal") {
-    return {
-      ok: false,
-      reason: "impossible_plan_goal",
-      message:
-        intent.intent.feasibility.reasons.find((reason) =>
-          /not enough time|after the plan start date/i.test(reason),
-        ) ?? "This goal does not leave enough time to prepare safely.",
+      reason: normalizedIntent.reason,
+      message: normalizedIntent.message,
     };
   }
 
@@ -363,33 +367,59 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
       ? input.preferredLongRunDay
       : (derivePreferredLongRunDayFallback(fixedRestDays) ?? availableWeekdays.at(-1) ?? "Sunday");
   const daysPerWeek = clampRunningDays(input.daysPerWeek ?? defaultDaysPerWeek(input.runnerLevel));
+  const benchmarkPaceTruth = normalizeBenchmarkPaceTruth(input.benchmark ?? null);
+  const coachFeasibility = evaluateGeneratedPlanCoachFeasibility({
+    runnerLevel: input.runnerLevel,
+    daysPerWeek,
+    benchmarkPaceTruth,
+    planGoalIntent: normalizedIntent.intent,
+  });
+  const planGoalIntent = applyGeneratedPlanCoachFeasibilityToGoalIntent(
+    normalizedIntent.intent,
+    coachFeasibility,
+  );
+  const effectiveAuthoringRunnerLevel = resolveEffectiveGeneratedPlanAuthoringRunnerLevel({
+    runnerLevel: input.runnerLevel,
+    benchmarkPaceTruth,
+    planGoalIntent,
+  });
+
+  if (coachFeasibility.previewOutcome === "impossible_goal_with_reason") {
+    return {
+      ok: false,
+      reason: "impossible_plan_goal",
+      message:
+        coachFeasibility.impossibleReason ??
+        "This goal is too compressed for Hito to create an honest training plan.",
+    };
+  }
+
   const preferredRunningDays = pickEvenly(
     moveWeekdayToEnd(availableWeekdays, preferredLongRunDay),
     Math.min(daysPerWeek, availableWeekdays.length),
   );
-  const benchmarkPaceTruth = normalizeBenchmarkPaceTruth(input.benchmark ?? null);
-  const inputDistanceBucket = resolveDistanceGoalInputBucket(input, intent.intent);
-  const goalType = resolveAuthoringGoalType(intent.intent);
-  const targetFinishTime = intent.intent.targetFinishTime?.label ?? null;
+  const inputDistanceBucket = resolveDistanceGoalInputBucket(input, planGoalIntent);
+  const goalType = resolveAuthoringGoalType(planGoalIntent);
+  const targetFinishTime = planGoalIntent.targetFinishTime?.label ?? null;
   const authoringInput = structuredPlanAuthoringInputSchema.safeParse({
     goal: {
       goalType,
-      goalLabel: buildGoalLabel(intent.intent),
+      goalLabel: buildGoalLabel(planGoalIntent),
       goalStyle: targetFinishTime ? "target_time" : "balanced",
       targetTime: targetFinishTime,
-      targetEventName: intent.intent.distance?.label
-        ? `${intent.intent.distance.label} plan`
+      targetEventName: planGoalIntent.distance?.label
+        ? `${planGoalIntent.distance.label} plan`
         : "Distance-goal plan",
     },
     schedule: {
       startDate,
-      targetDate: intent.intent.targetDate,
-      preparationHorizonWeeks: intent.intent.targetDate ? null : horizonWeeks,
+      targetDate: planGoalIntent.targetDate,
+      preparationHorizonWeeks: planGoalIntent.targetDate ? null : horizonWeeks,
     },
     runnerProfile: {
-      experienceLevel: mapRunnerLevelToAuthoring(input.runnerLevel),
+      experienceLevel: mapRunnerLevelToAuthoring(effectiveAuthoringRunnerLevel),
       baselineSessionsPerWeek: daysPerWeek,
-      baselineLongRunKm: baselineLongRunKm(input.runnerLevel, intent.intent),
+      baselineLongRunKm: baselineLongRunKm(effectiveAuthoringRunnerLevel, planGoalIntent),
       baselineLongRunDurationMin: null,
       age: Math.round(input.age),
       recentInjuryRecoveryContext: null,
@@ -421,13 +451,13 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
       terrainFocus: "standard",
       strengthOrMobilityInterest: "none",
       indoorTreadmillOk: false,
-      notes: buildAuthoringNotes(intent.intent),
+      notes: buildAuthoringNotes(planGoalIntent),
     },
     execution: {
       watchAccess: "watch_or_app",
       guidancePreference: "effort",
     },
-    planGoalIntent: intent.intent,
+    planGoalIntent,
   });
 
   if (!authoringInput.success) {
@@ -442,16 +472,23 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
 
   const parsedAuthoringInput = authoringInput.data;
   const resolvedHorizonWeeks = resolveAuthoringHorizonWeeks(parsedAuthoringInput);
+  const noBenchmarkLongDistanceTargetIntent = Boolean(
+    benchmarkPaceTruth === null &&
+    (planGoalIntent.distance?.distanceMeters ?? 0) > 10_000 &&
+    (planGoalIntent.targetFinishTime || planGoalIntent.targetOutcomePace),
+  );
   const loadContext =
-    input.runnerLevel === "beginner_new_runner" ||
-    intent.intent.feasibility.status === "aggressive_or_short_horizon"
+    effectiveAuthoringRunnerLevel === "beginner_new_runner" ||
+    planGoalIntent.feasibility.status === "aggressive_or_short_horizon" ||
+    noBenchmarkLongDistanceTargetIntent ||
+    (benchmarkPaceTruth === null && input.runnerLevel === "sometimes_runs")
       ? "conservative"
       : "standard";
 
   return {
     ok: true,
     authoringInput: parsedAuthoringInput,
-    planGoalIntent: intent.intent,
+    planGoalIntent,
     normalizedInputSummary: {
       normalizedBy: "backend_ai_generated_plan_authoring_normalizer_v1",
       sourceModelVersion: RUNNING_PLAN_SOURCE_MODEL.sourceVersion,
@@ -465,7 +502,7 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
       preferredLongRunDay,
       startDate,
       benchmarkPaceTruth,
-      planGoalIntent: intent.intent,
+      planGoalIntent,
       longRunDaySource:
         input.preferredLongRunDay && input.preferredLongRunDay === preferredLongRunDay
           ? "runner_preference"
@@ -512,15 +549,10 @@ function resolveDistanceGoalInputBucket(
   input: Pick<BuildRunningPlanPreviewInput, "distanceFamily">,
   intent?: NormalizedPlanGoalIntent,
 ): RunningPlanDistanceFamily {
-  const meters = intent?.distance?.distanceMeters ?? null;
-
-  if (meters != null) {
-    if (meters <= 10_000) return "10K";
-    if (meters <= 21_100) return "Half Marathon";
-    return "Marathon Completion";
-  }
-
-  return input.distanceFamily;
+  return resolveSelectedDistanceQualityFamily({
+    distanceMeters: intent?.distance?.distanceMeters ?? null,
+    fallbackFamily: input.distanceFamily,
+  });
 }
 
 function resolveAuthoringGoalType(
@@ -626,6 +658,22 @@ function mapRunnerLevelToAuthoring(level: RunningPlanRunnerLevel) {
   }
 }
 
+function resolveEffectiveGeneratedPlanAuthoringRunnerLevel(input: {
+  runnerLevel: RunningPlanRunnerLevel;
+  benchmarkPaceTruth: RunningPlanBenchmarkPaceTruth | null;
+  planGoalIntent: NormalizedPlanGoalIntent;
+}): RunningPlanRunnerLevel {
+  const distanceMeters = input.planGoalIntent.distance?.distanceMeters ?? null;
+  if (distanceMeters == null || distanceMeters > 10_000) {
+    return input.runnerLevel;
+  }
+
+  return resolveTenKBeginnerDosePolicyRunnerLevel({
+    runnerLevel: input.runnerLevel,
+    benchmarkPaceTruth: input.benchmarkPaceTruth,
+  });
+}
+
 function baselineLongRunKm(level: RunningPlanRunnerLevel, intent: NormalizedPlanGoalIntent) {
   const distanceKm = intent.distance?.distanceKm ?? 10;
   const supportedSpecificityFloorKm = distanceKm > 21.1 ? 11 : distanceKm > 10 ? 9 : 7;
@@ -710,19 +758,24 @@ function projectCanonicalPlanToPreviewRows({
           projectCanonicalSegmentToPreviewTemplate(workout.workout_id, segment, segmentIndex),
         ),
         endpointGateId: null,
+        endpointIdentity: workout.workout_identity ?? null,
         endpointDistanceMeters: null,
       };
     })
     .map((row, _index, rows) => {
       const finalNonRest = [...rows].reverse().find((candidate) => !candidate.isRestDay);
-      if (!finalNonRest || row.rowId !== finalNonRest.rowId) {
+      if (
+        !finalNonRest ||
+        row.rowId !== finalNonRest.rowId ||
+        row.workoutDayKind !== "final_selected_distance_day"
+      ) {
         return row;
       }
 
       return {
         ...row,
         endpointGateId: "ai_generated_goal_distance_endpoint",
-        endpointDistanceMeters: planGoalIntent.distance?.distanceMeters ?? null,
+        endpointDistanceMeters: previewRowMainDistanceMeters(row),
       };
     });
 }
@@ -801,16 +854,93 @@ function buildEndpointProof(
   intent: NormalizedPlanGoalIntent,
 ) {
   const finalNonRest = [...rows].reverse().find((row) => !row.isRestDay) ?? rows.at(-1);
-  const endpointDistanceMeters = intent.distance?.distanceMeters ?? null;
+  const endpointDistanceMeters =
+    finalNonRest?.workoutDayKind === "final_selected_distance_day"
+      ? (finalNonRest.endpointDistanceMeters ?? null)
+      : null;
+  const endpointMainDistanceMeters =
+    finalNonRest?.workoutDayKind === "final_selected_distance_day"
+      ? previewRowMainDistanceMeters(finalNonRest)
+      : null;
 
   return {
     finalRowId: finalNonRest?.rowId ?? "ai-generated-plan-endpoint-unavailable",
     finalDate: finalNonRest?.date ?? todayIso(),
     endpointDistanceMeters,
-    endpointMainDistanceMeters: endpointDistanceMeters,
+    endpointMainDistanceMeters,
     finalRowIsLastNonRest: true as const,
-    rejectedGenericFinalOutputs: ["deterministic_builder_fallback", "metadata_only_endpoint"],
   };
+}
+
+function collectPreviewEndpointProofIssues(input: {
+  rows: readonly RunningPlanPreviewCalendarRow[];
+  intent: NormalizedPlanGoalIntent;
+  endpointProof: AiGeneratedRunningPlanPreviewDraft["endpointProof"];
+}) {
+  return collectSelectedDistanceEndpointIssues({
+    rows: input.rows.map((row) => ({
+      id: row.rowId,
+      date: row.date,
+      isRest: row.isRestDay,
+      endpointKind: row.workoutDayKind,
+      endpointIdentity: row.endpointIdentity,
+      endpointDistanceMeters: previewRowMainDistanceMeters(row),
+      isSelectedEndpointSignal: row.workoutDayKind === "final_selected_distance_day",
+    })),
+    expectedDistanceMeters: input.intent.distance?.distanceMeters ?? null,
+    targetDate: input.intent.targetDate,
+    proof: input.endpointProof,
+    fallbackToFinalNonRestWhenTargetDateMissing: true,
+    requireEndpointIdentity: true,
+  }).map((issue) => `${issue.code}: ${issue.message}`);
+}
+
+function previewRowMainDistanceMeters(row: RunningPlanPreviewCalendarRow) {
+  const totalMeters = row.segments.reduce(
+    (total, segment) => total + previewPrescriptionDistanceMeters(segment.primaryPrescription),
+    0,
+  );
+
+  return totalMeters > 0 ? totalMeters : null;
+}
+
+function previewPrescriptionDistanceMeters(
+  prescription: RunningPlanPreviewCalendarRow["segments"][number]["primaryPrescription"],
+) {
+  if (prescription.mode === "distance") {
+    if (
+      !prescription.distanceMeters ||
+      prescription.distanceMeters.min !== prescription.distanceMeters.max
+    ) {
+      return 0;
+    }
+
+    return prescription.distanceMeters.min;
+  }
+
+  if (prescription.mode !== "repeat") {
+    return 0;
+  }
+
+  const childDistanceMeters = (prescription.children ?? []).reduce((total, child) => {
+    const childPrescription = child.prescription;
+
+    if (
+      childPrescription.mode !== "distance" ||
+      !childPrescription.distanceMeters ||
+      childPrescription.distanceMeters.min !== childPrescription.distanceMeters.max
+    ) {
+      return total;
+    }
+
+    return total + childPrescription.distanceMeters.min;
+  }, 0);
+
+  if (childDistanceMeters <= 0) {
+    return 0;
+  }
+
+  return childDistanceMeters * (prescription.repeatCount?.min ?? 1);
 }
 
 function normalizeWorkoutDayKind(value: string | null | undefined): RunningPlanWorkoutDayKind {
@@ -883,7 +1013,7 @@ function normalizeWeekday(value: string, date: string): WeekdayName {
   return weekdayLong(date);
 }
 
-function buildUnavailable(input: {
+export function buildAiGeneratedRunningPlanPreviewUnavailable(input: {
   code: AiGeneratedRunningPlanPreviewUnavailable["error"]["code"];
   message: string;
   issues: readonly string[];
@@ -929,7 +1059,7 @@ function classifyUnavailablePreviewOutcome(input: {
     trace?.pipeline.normalizationStatus === "failed" ||
     trace?.pipeline.normalizationStatus === "finalization_failed" ||
     trace?.pipeline.validationIssues.length ||
-    /schema|validation|target_date_overrun|running_day_count|goal_family|repeat|canonical/i.test(
+    /schema|validation|target_date_overrun|running_day_count|goal_family|runner[-_ ]facing|richness|coach|quality[-_ ]gate|prescription|dose|repeat|canonical|selected[-_]distance|endpoint/i.test(
       serialized,
     )
   ) {

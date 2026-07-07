@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
-import { IntervalsViz } from "@/components/IntervalsViz";
+import {
+  workoutStructureTimelineItems,
+  workoutStructureTimelineSummary,
+} from "@/components/workout-structure/workout-structure-timeline-items";
 import { CompletionPanel, WorkoutFeedbackPanel } from "@/components/CompletionPanel";
 import { ManualWorkoutPersistedEditDialog } from "@/components/manual-workout/ManualWorkoutPersistedEditControls";
+import {
+  WorkoutDocumentReadback,
+  type WorkoutDocumentNote,
+} from "@/components/workout-structure/WorkoutDocumentReadback";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +23,6 @@ import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   displayExecutableTargetEntries,
-  displayStepTargetReadbackEntries,
   displayTargetSupportEntries,
   displayWorkoutStructureEntries,
   formatPlannedWorkoutBlockSummary,
@@ -33,12 +39,11 @@ import {
   workoutPlannedLanguage,
   workoutTypeMeta,
   workoutDistanceKm,
-  workoutDuration,
+  workoutStructureDuration,
 } from "@/lib/training";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
 import { getWorkoutRouteData } from "@/lib/training-api";
-import type { PlannedWorkoutLanguageBlock } from "@/lib/planned-workout-language";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 
 export const Route = createFileRoute("/workout/$date")({
@@ -114,7 +119,7 @@ function WorkoutPage() {
 
   const meta = workoutTypeMeta(workout);
   const km = workoutDistanceKm(workout);
-  const duration = workoutDuration(workout);
+  const structureDuration = workoutStructureDuration(workout);
   const status = workout.status;
   const isRestDay = workout.type === "rest";
   const restAssignment = restAssignmentFor(workout);
@@ -137,8 +142,10 @@ function WorkoutPage() {
     ? []
     : [
         km != null ? { label: "Distance", value: formatDistanceKm(km), unit: "km" } : null,
-        duration > 0 ? { label: "Duration", value: formatDurationMin(duration) } : null,
-        duration > 0 ? { label: "Load", value: loadFor(workout) } : null,
+        structureDuration > 0
+          ? { label: "Duration", value: formatDurationMin(structureDuration) }
+          : null,
+        structureDuration > 0 ? { label: "Load", value: loadFor(workout) } : null,
       ].filter((metric): metric is { label: string; value: string; unit?: string } =>
         Boolean(metric),
       );
@@ -693,7 +700,8 @@ function CompletionActionPanel({
 
 function Overview({ workout }: { workout: Workout }) {
   const restAssignment = restAssignmentFor(workout);
-  const segmentReadbacks = segmentInstructionReadbacks(workout);
+  const timelineItems = workoutStructureTimelineItems(workout);
+  const documentNotes = workoutDocumentNotes(workout);
 
   if (workout.type === "rest") {
     return (
@@ -727,42 +735,12 @@ function Overview({ workout }: { workout: Workout }) {
   }
 
   return (
-    <div className="space-y-8">
-      <IntervalsViz workout={workout} />
-
-      <div>
-        <h3 className="hito-label">Segment instructions</h3>
-        {segmentReadbacks.length > 0 ? (
-          <ol className="hito-row-group mt-4">
-            {segmentReadbacks.map((segment) => (
-              <li key={segment.key} className="hito-list-row items-start gap-4">
-                <span className="hito-caption w-6 shrink-0 text-right font-mono-num">
-                  {String(segment.index).padStart(2, "0")}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="hito-list-row-title">{segment.label}</div>
-                  <div className="mt-2 space-y-2">
-                    {segment.entries.map((entry) => (
-                      <div key={`${segment.key}-${entry.label}`}>
-                        <p className="hito-section-subtitle">{entry.label}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-foreground/85">
-                          {entry.value}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="hito-support-copy mt-4 max-w-xl">
-            No extra execution notes were provided for this workout. Follow the listed structure and
-            any targets shown above.
-          </p>
-        )}
-      </div>
-    </div>
+    <WorkoutDocumentReadback
+      emptyCopy="No extra workout structure was provided for this workout."
+      items={timelineItems}
+      notes={documentNotes}
+      summary={workoutStructureTimelineSummary(timelineItems)}
+    />
   );
 }
 
@@ -872,7 +850,7 @@ function NavCard({
 }
 
 function loadFor(workout: Workout) {
-  const duration = workoutDuration(workout);
+  const duration = workoutStructureDuration(workout);
   const multiplier: Record<string, number> = {
     easy: 1.0,
     steady_or_easy: 1.1,
@@ -962,123 +940,54 @@ function workoutExecutionSummary(workout: Workout): string | null {
   }
 }
 
-type SegmentInstructionReadback = {
-  key: string;
-  index: number;
-  label: string;
-  entries: Array<{ label: string; value: string }>;
-};
-
-function segmentInstructionReadbacks(workout: Workout): SegmentInstructionReadback[] {
-  const languageBlocks = workoutPlannedLanguage(workout).runnerFacingBlocks;
-  const readbacks = workout.steps.flatMap((step, stepIndex) =>
-    segmentInstructionReadbacksForStep(
-      step,
-      workout.metricMode,
-      `${stepIndex}`,
-      stepIndex + 1,
-      languageBlocks[stepIndex],
-    ),
+function workoutDocumentNotes(workout: Workout): WorkoutDocumentNote[] {
+  const notes = workout.steps.flatMap((step, stepIndex) =>
+    workoutDocumentNotesForStep(step, `${stepIndex}`),
   );
 
-  return readbacks.map((readback, index) => ({ ...readback, index: index + 1 }));
+  return dedupeDocumentNotes(notes).slice(0, 8);
 }
 
-function segmentInstructionReadbacksForStep(
+function workoutDocumentNotesForStep(
   step: Workout["steps"][number],
-  metricMode: Workout["metricMode"],
   key: string,
-  displayIndex: number,
-  languageBlock?: PlannedWorkoutLanguageBlock,
-): SegmentInstructionReadback[] {
+): WorkoutDocumentNote[] {
   const repeatCount = repeatCountForStep(step);
   const repeatChildren = repeatChildSteps(step);
+  const ownNotes = buildWorkoutDocumentNotes(step, key);
 
   if (repeatCount && repeatChildren.length > 0) {
-    const parent = buildSegmentInstructionReadback(
-      step,
-      metricMode,
-      key,
-      displayIndex,
-      languageBlock,
+    const children = repeatChildren.flatMap((child, index) =>
+      buildWorkoutDocumentNotes(child, `${key}-child-${index + 1}`),
     );
-    const children = repeatChildren
-      .map((child, index) =>
-        buildSegmentInstructionReadback(
-          child,
-          metricMode,
-          `${key}-child-${index + 1}`,
-          displayIndex,
-          repeatChildLanguage(languageBlock, index),
-        ),
-      )
-      .filter((item): item is SegmentInstructionReadback => item != null);
 
-    return [parent, ...children].filter((item): item is SegmentInstructionReadback => item != null);
+    return [...ownNotes, ...children];
   }
 
-  const readback = buildSegmentInstructionReadback(
-    step,
-    metricMode,
-    key,
-    displayIndex,
-    languageBlock,
-  );
-
-  return readback ? [readback] : [];
+  return ownNotes;
 }
 
-function buildSegmentInstructionReadback(
+function buildWorkoutDocumentNotes(
   step: Workout["steps"][number],
-  metricMode: Workout["metricMode"],
   key: string,
-  displayIndex: number,
-  languageBlock?: PlannedWorkoutLanguageBlock | null,
-): SegmentInstructionReadback | null {
-  const entries = dedupeReadbackEntries(
-    [
-      ...displayStepTargetReadbackEntries(step, metricMode, {
-        includeStructureWithTargets: true,
-      }).map((entry) => ({
-        label: entry.label,
-        value: entry.value,
-      })),
-      readGuidanceEntry("Guidance", step.guidance),
-      ...displayTargetSupportEntries(step.target).map((entry) => ({
-        label: entry.label,
-        value: entry.value,
-      })),
-    ].filter((entry): entry is { label: string; value: string } => entry != null),
-  );
+): WorkoutDocumentNote[] {
+  const notes: Array<WorkoutDocumentNote | null> = [
+    readGuidanceEntry("Cue", step.guidance),
+    ...displayTargetSupportEntries(step.target).map((entry) => ({
+      key: `${key}-${entry.label}`,
+      label: entry.label,
+      value: entry.value,
+    })),
+  ];
 
-  if (entries.length === 0) {
-    return null;
-  }
-
-  return {
-    key,
-    index: displayIndex,
-    label:
-      languageBlock?.label ||
-      step.label?.trim() ||
-      humanizeSnakeCase(step.segment_type || step.type || "Segment"),
-    entries,
-  };
+  return notes.filter((entry): entry is WorkoutDocumentNote => entry != null);
 }
 
-function repeatChildLanguage(block: PlannedWorkoutLanguageBlock | undefined, index: number) {
-  if (!block?.children.length) {
-    return null;
-  }
-
-  return block.children[index] ?? null;
-}
-
-function dedupeReadbackEntries(entries: Array<{ label: string; value: string }>) {
+function dedupeDocumentNotes(notes: WorkoutDocumentNote[]) {
   const seen = new Set<string>();
 
-  return entries.filter((entry) => {
-    const key = `${entry.label}:${entry.value}`;
+  return notes.filter((note) => {
+    const key = `${note.label}:${note.value}`;
 
     if (seen.has(key)) {
       return false;
@@ -1092,7 +1001,7 @@ function dedupeReadbackEntries(entries: Array<{ label: string; value: string }>)
 function readGuidanceEntry(label: string, value: unknown) {
   const normalized = readGuidanceText(value);
 
-  return normalized ? { label, value: normalized } : null;
+  return normalized ? { key: `${label}-${normalized}`, label, value: normalized } : null;
 }
 
 function readGuidanceText(value: unknown): string | null {

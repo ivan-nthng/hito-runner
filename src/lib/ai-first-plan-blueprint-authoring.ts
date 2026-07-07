@@ -9,7 +9,6 @@ import {
   type NormalizationIssue,
   type StructuredAuthoringInput,
 } from "@/lib/ai-first-plan-blueprint-schema";
-import { buildWorkoutSegments } from "@/lib/ai-first-plan-blueprint-expansion";
 import {
   buildAiFirstPlanBlueprintCandidatePlan,
   buildRestWorkout,
@@ -30,7 +29,6 @@ import {
   repairRecoveryFirstBlueprintSequencing,
   repairSupportedIntensityBlueprintCadence,
 } from "@/lib/ai-first-plan-blueprint-repair";
-import { buildStructuredAuthoringPlan } from "@/lib/structured-plan-authoring";
 import { addDaysIso, weekdayLong } from "@/lib/training";
 
 export {
@@ -110,14 +108,11 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
     );
   }
 
-  const deterministicPlan = useDeterministicSupport
-    ? buildStructuredAuthoringPlan(deterministicSupportAuthoringInput ?? authoringInput)
-    : null;
-  const deterministicByDate = new Map(
-    deterministicPlan?.planned_workouts.map((workout) => [workout.date, workout]) ?? [],
-  );
-  const adaptationHorizonWeeks =
-    deterministicPlan?.preparation_horizon_weeks ?? context.expectedHorizonWeeks;
+  if (useDeterministicSupport || deterministicSupportAuthoringInput) {
+    repairs.push(
+      "Ignored deterministic support expansion because ai-first-plan-blueprint-v2 requires AI-authored workout sections.",
+    );
+  }
   const blueprintWorkouts = new Map<
     string,
     { week: AiBlueprintWeek; workout: AiBlueprintWorkout }
@@ -141,7 +136,7 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
   repairBeginnerRunWalkBlueprintAdaptation({
     blueprintWorkouts,
     context,
-    adaptationHorizonWeeks,
+    adaptationHorizonWeeks: context.expectedHorizonWeeks,
     repairs,
   });
   repairSupportedIntensityBlueprintCadence({
@@ -163,7 +158,6 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
     const weekNumber = Math.floor(offset / 7) + 1;
     const weekday = weekdayLong(date);
     const blueprintWorkout = blueprintWorkouts.get(date);
-    const deterministicWorkout = deterministicByDate.get(date) ?? null;
 
     normalizedWorkouts.push(
       blueprintWorkout
@@ -173,11 +167,8 @@ export function normalizeAiFirstPlanBlueprintToTrainingPlan({
             workout: blueprintWorkout.workout,
             date,
             context,
-            deterministicWorkout,
-            adaptationHorizonWeeks,
             repairs,
             issues,
-            buildWorkoutSegments,
           })
         : buildRestWorkout({
             date,

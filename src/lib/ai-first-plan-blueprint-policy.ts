@@ -51,6 +51,9 @@ const cutbackTaperIdentityValues = [
   "taper_long_run",
   "taper_tuneup_run",
 ] as const satisfies readonly AuthoredWorkoutIdentity[];
+const selectedDistanceEndpointIdentity = [
+  "selected_distance_completion_or_checkpoint",
+] as const satisfies readonly AuthoredWorkoutIdentity[];
 
 const identitySet = (values: readonly AuthoredWorkoutIdentity[]) =>
   new Set<AuthoredWorkoutIdentity>(values);
@@ -105,6 +108,7 @@ export const goalFamilyIdentityPolicies: Record<GoalFamilyPolicyKey, GoalFamilyI
       "5k_sharpening_repeats",
       "race_pace_session",
       "taper_tuneup_run",
+      ...selectedDistanceEndpointIdentity,
     ]),
     expectedSupportIdentities: identitySet(supportIdentityValues),
     expectedQualityIdentities: identitySet([
@@ -141,6 +145,7 @@ export const goalFamilyIdentityPolicies: Record<GoalFamilyPolicyKey, GoalFamilyI
       "10k_rhythm_intervals",
       "race_pace_session",
       "taper_tuneup_run",
+      ...selectedDistanceEndpointIdentity,
     ]),
     expectedSupportIdentities: identitySet(supportIdentityValues),
     expectedQualityIdentities: identitySet([
@@ -153,7 +158,7 @@ export const goalFamilyIdentityPolicies: Record<GoalFamilyPolicyKey, GoalFamilyI
     ]),
     longRunIdentities: identitySet(["long_aerobic_run", "cutback_long_run", "taper_long_run"]),
     cutbackTaperIdentities: identitySet(cutbackTaperIdentityValues),
-    specialtyIdentities: identitySet(["10k_rhythm_intervals"]),
+    specialtyIdentities: identitySet(["10k_rhythm_intervals", "easy_run_with_strides"]),
     excludedIdentities: identitySet([
       "5k_sharpening_repeats",
       "half_marathon_threshold_durability",
@@ -177,6 +182,7 @@ export const goalFamilyIdentityPolicies: Record<GoalFamilyPolicyKey, GoalFamilyI
       "distance_intervals",
       "race_pace_session",
       "taper_tuneup_run",
+      ...selectedDistanceEndpointIdentity,
     ]),
     expectedSupportIdentities: identitySet(supportIdentityValues),
     expectedQualityIdentities: identitySet([
@@ -219,6 +225,7 @@ export const goalFamilyIdentityPolicies: Record<GoalFamilyPolicyKey, GoalFamilyI
       "marathon_steady_specificity",
       "race_pace_session",
       "taper_tuneup_run",
+      ...selectedDistanceEndpointIdentity,
     ]),
     expectedSupportIdentities: identitySet(supportIdentityValues),
     expectedQualityIdentities: identitySet([
@@ -409,6 +416,14 @@ export function isGoalFamilyCadencePlan(
   authoringInput: StructuredAuthoringInput,
   policy: GoalFamilyIdentityPolicy,
 ) {
+  if (policy.cadence.frequency === "none") {
+    return false;
+  }
+
+  if (shouldUseCoachAcceptedGoalFamilyCadence(authoringInput, policy)) {
+    return true;
+  }
+
   const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput);
 
   if (supportedIntensityCadence.applies) {
@@ -417,10 +432,6 @@ export function isGoalFamilyCadencePlan(
     }
 
     return Boolean(resolveGoalFamilyCadenceWeekday(authoringInput, policy));
-  }
-
-  if (policy.cadence.frequency === "none") {
-    return false;
   }
 
   if (
@@ -440,6 +451,31 @@ export function isGoalFamilyCadencePlan(
   }
 
   return policy.key !== "beginner_consistency";
+}
+
+function shouldUseCoachAcceptedGoalFamilyCadence(
+  authoringInput: StructuredAuthoringInput,
+  policy: GoalFamilyIdentityPolicy,
+) {
+  const feasibilityStatus = authoringInput.planGoalIntent?.feasibility?.status ?? null;
+  const coachAccepted =
+    feasibilityStatus === "supported" || feasibilityStatus === "aggressive_or_short_horizon";
+  const hasTargetTime = Boolean(
+    authoringInput.goal.targetTime ||
+    authoringInput.planGoalIntent?.targetFinishTime ||
+    authoringInput.planGoalIntent?.targetOutcomePace,
+  );
+
+  if (
+    !coachAccepted ||
+    !hasTargetTime ||
+    authoringInput.runnerProfile.experienceLevel === "new_runner" ||
+    authoringInput.availability.maxRunningDaysPerWeek <= 3
+  ) {
+    return false;
+  }
+
+  return policy.key === "half_marathon" || policy.key === "marathon";
 }
 
 export function resolveAuthoringHorizonWeeks(authoringInput: StructuredAuthoringInput) {
@@ -476,9 +512,14 @@ function buildPromptGoalFamilyCadencePolicy(
   policy: GoalFamilyIdentityPolicy,
 ) {
   const supportedIntensityCadence = resolveSupportedIntensityCadence(authoringInput);
+  const goalFamilyCadencePlan = isGoalFamilyCadencePlan(authoringInput, policy);
 
   if (supportedIntensityCadence.applies) {
     if (supportedIntensityCadence.frequency === "none") {
+      if (goalFamilyCadencePlan) {
+        return policy.cadence;
+      }
+
       return {
         kind: "none",
         frequency: "none",
@@ -493,7 +534,7 @@ function buildPromptGoalFamilyCadencePolicy(
     };
   }
 
-  if (!isGoalFamilyCadencePlan(authoringInput, policy)) {
+  if (!goalFamilyCadencePlan) {
     return {
       kind: "none",
       frequency: "none",

@@ -1,4 +1,5 @@
 import { resolveRunningPlanCutbackWeeks } from "@/lib/plan-creation-engine/horizon-policy";
+import { diffDaysIso } from "@/lib/training";
 import type {
   RunningPlanBenchmarkPaceTruth,
   RunningPlanRange,
@@ -12,11 +13,12 @@ export const TEN_K_BEGINNER_DOSE_POLICY_VERSION = "ten_k_beginner_dose_policy_v1
 
 const FORBIDDEN_LOW_SUPPORT_KINDS = ["tempo", "intervals", "hills", "threshold"] as const;
 const ADAPTATION_WEEKS = 4;
-const WEEK_ONE_TOTAL_HARD_CAP_MINUTES = 120;
-const WEEK_ONE_LONG_RUN_HARD_CAP_MINUTES = 40;
+const WEEK_ONE_TOTAL_HARD_CAP_MINUTES = 100;
+const WEEK_ONE_LONG_RUN_HARD_CAP_MINUTES = 35;
 const EASY_RUN_HARD_CAP_MINUTES = 30;
 const RECOVERY_RUN_HARD_CAP_MINUTES = 25;
 const PEAK_LONG_RUN_HARD_CAP_MINUTES = 75;
+const EARLY_PHASE_MAX_CONSECUTIVE_RUN_DAYS = 2;
 
 export interface TenKBeginnerDosePolicyInput {
   runnerLevel: RunningPlanRunnerLevel;
@@ -43,13 +45,70 @@ export interface TenKBeginnerDosePrescriptionInput {
 
 export interface TenKBeginnerDoseValidationRow {
   rowId: string;
+  date?: string | null;
   weekNumber: number;
   isRestDay: boolean;
-  workoutDayKind: RunningPlanWorkoutDayKind | "rest";
+  workoutDayKind: RunningPlanWorkoutDayKind | "rest" | "unknown";
   endpointDistanceMeters?: number | null;
   segments: readonly {
     primaryPrescription: RunningPlanSegmentPrescription;
   }[];
+}
+
+export function normalizeTenKBeginnerDoseWorkoutDayKind(
+  value: string | null | undefined,
+): RunningPlanWorkoutDayKind | "rest" | "unknown" {
+  switch (value) {
+    case null:
+    case undefined:
+    case "":
+    case "rest":
+      return "rest";
+    case "recovery":
+    case "recovery_jog":
+      return "recovery";
+    case "easy":
+    case "easy_aerobic_run":
+    case "cutback_aerobic_run":
+      return "easy";
+    case "easy_run_with_strides":
+    case "strides":
+      return "strides";
+    case "long_run":
+    case "long_aerobic_run":
+    case "long_run_with_steady_finish":
+      return "long_run";
+    case "cutback_long_run":
+    case "taper_long_run":
+      return "cutback_long_run";
+    case "steady_aerobic_run":
+      return "steady_aerobic_run";
+    case "progression":
+    case "progression_run":
+      return "progression";
+    case "tempo":
+    case "controlled_tempo_session":
+      return "tempo";
+    case "threshold":
+    case "half_marathon_threshold_durability":
+      return "threshold";
+    case "intervals":
+    case "10k_rhythm_intervals":
+    case "5k_sharpening_repeats":
+    case "time_intervals":
+    case "distance_intervals":
+      return "intervals";
+    case "hills":
+    case "rolling_hills_session":
+    case "uphill_repeats":
+    case "controlled_downhill_durability":
+      return "hills";
+    case "final_selected_distance_day":
+    case "selected_distance_completion_or_checkpoint":
+      return "final_selected_distance_day";
+    default:
+      return "unknown";
+  }
 }
 
 export function summarizeTenKBeginnerDosePolicy(
@@ -89,6 +148,34 @@ export function resolveTenKBeginnerDosePolicyRunnerLevel(
   input: TenKBeginnerDosePolicyInput,
 ): RunningPlanRunnerLevel {
   return summarizeTenKBeginnerDosePolicy(input).effectiveRunnerLevel;
+}
+
+export function resolveTenKBeginnerWorkoutTotalMinutes(input: {
+  workoutDayKind: RunningPlanWorkoutDayKind;
+  weekNumber: number;
+  horizonWeeks: number;
+}): number | null {
+  switch (input.workoutDayKind) {
+    case "easy":
+      return input.weekNumber <= ADAPTATION_WEEKS ? 20 : input.weekNumber <= 8 ? 25 : 30;
+    case "recovery":
+      return input.weekNumber <= ADAPTATION_WEEKS ? 20 : 25;
+    case "strides":
+      return 15;
+    case "long_run":
+      return resolveLowSupportLongRunTotalMinutes(input);
+    case "cutback_long_run":
+      return resolveLowSupportCutbackLongRunTotalMinutes(input);
+    case "final_selected_distance_day":
+      return null;
+    case "steady_aerobic_run":
+    case "progression":
+    case "tempo":
+    case "threshold":
+    case "intervals":
+    case "hills":
+      return null;
+  }
 }
 
 export function resolveTenKBeginnerDosePrescription({
@@ -165,6 +252,11 @@ export function collectTenKBeginnerDosePolicyIssues({
   }
 
   for (const row of nonRestRows) {
+    if (row.workoutDayKind === "unknown") {
+      issues.push(`Low-support 10K has unknown workout kind (${row.rowId}).`);
+      continue;
+    }
+
     if (FORBIDDEN_LOW_SUPPORT_KINDS.includes(row.workoutDayKind as never)) {
       issues.push(`Low-support 10K must not include ${row.workoutDayKind} (${row.rowId}).`);
     }
@@ -201,6 +293,7 @@ export function collectTenKBeginnerDosePolicyIssues({
 
   validateLongRunProgression(longRunDurations, issues);
   validateCutbackProgression(nonRestRows, issues);
+  validateEarlyConsecutiveRunDays(nonRestRows, issues);
 
   const finalNonRestRow = nonRestRows.at(-1);
   if (
@@ -348,7 +441,7 @@ function resolveLowSupportLongRunTotalMinutes({
   );
   const buildIndex = Math.max(0, buildLongRunWeeks.length - 1);
 
-  return Math.min(75, 40 + buildIndex * 5);
+  return Math.min(75, 35 + buildIndex * 5);
 }
 
 function resolveLowSupportCutbackLongRunTotalMinutes({
@@ -363,7 +456,32 @@ function resolveLowSupportCutbackLongRunTotalMinutes({
     weekNumber: Math.max(1, weekNumber - 1),
   });
 
-  return Math.max(35, roundToFive(previousLongRunMinutes * 0.8));
+  return Math.max(30, roundToFive(previousLongRunMinutes * 0.8));
+}
+
+function validateEarlyConsecutiveRunDays(
+  rows: readonly TenKBeginnerDoseValidationRow[],
+  issues: string[],
+) {
+  const datedRows = rows
+    .filter((row) => row.date && row.weekNumber <= ADAPTATION_WEEKS)
+    .sort((left, right) => left.date!.localeCompare(right.date!));
+
+  let currentStreak = 0;
+  let previousDate: string | null = null;
+
+  for (const row of datedRows) {
+    currentStreak =
+      previousDate && diffDaysIso(row.date!, previousDate) === 1 ? currentStreak + 1 : 1;
+    previousDate = row.date!;
+
+    if (currentStreak > EARLY_PHASE_MAX_CONSECUTIVE_RUN_DAYS) {
+      issues.push(
+        `Low-support 10K adaptation must not exceed ${EARLY_PHASE_MAX_CONSECUTIVE_RUN_DAYS} consecutive running days (${row.rowId}).`,
+      );
+      return;
+    }
+  }
 }
 
 function validateLongRunProgression(

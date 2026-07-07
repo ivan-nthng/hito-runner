@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 
-import type { buildRunningPlanCanonicalPlan } from "../../src/lib/running-plan-engine-review";
+import {
+  collectSelectedDistanceEndpointIssues,
+  selectedDistanceEndpointMainDistanceMeters,
+} from "../../src/lib/plan-creation-engine";
+import type {
+  buildRunningPlanCanonicalPlan,
+  RunningPlanPreviewDraft,
+} from "../../src/lib/running-plan-engine-review";
 import type { Database } from "../../src/lib/supabase/database";
 
 type CanonicalRunningPlanRow = ReturnType<
@@ -48,6 +55,38 @@ export function validateNoPersonalHrTargets(rows: readonly unknown[]) {
   assert.doesNotMatch(
     serialized,
     /personal_hr|personalized_hr|hr_zone_truth|"hr_targets_allowed":true/i,
+  );
+}
+
+export function assertSelectedDistanceEndpointProof(input: {
+  scenarioName: string;
+  canonicalPlan: ReturnType<typeof buildRunningPlanCanonicalPlan>;
+  draft: RunningPlanPreviewDraft;
+  expectedEndpointMeters: number;
+  expectedFinalDate?: string;
+}) {
+  const endpointIssues = collectSelectedDistanceEndpointIssues({
+    rows: input.canonicalPlan.planned_workouts.map((workout) => ({
+      id: workout.workout_id,
+      date: workout.date,
+      isRest: workout.workout_type === "rest",
+      endpointKind: workout.source_workout_type,
+      endpointIdentity: workout.workout_identity,
+      endpointDistanceMeters: selectedDistanceEndpointMainDistanceMeters({
+        endpointKind: workout.source_workout_type,
+        segments: workout.segments,
+      }),
+    })),
+    expectedDistanceMeters: input.expectedEndpointMeters,
+    targetDate:
+      input.expectedFinalDate ?? input.draft.normalizedInputSummary.planGoalIntent.targetDate,
+    proof: input.draft.endpointProof,
+  });
+
+  assert.deepEqual(
+    endpointIssues,
+    [],
+    `${input.scenarioName} endpoint issues: ${JSON.stringify(endpointIssues)}`,
   );
 }
 

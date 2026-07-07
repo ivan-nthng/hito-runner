@@ -59,6 +59,7 @@ export const authoredWorkoutIdentityValues = [
   "time_intervals",
   "5k_sharpening_repeats",
   "10k_rhythm_intervals",
+  "selected_distance_completion_or_checkpoint",
   "progression_run",
   "race_pace_session",
   "taper_tuneup_run",

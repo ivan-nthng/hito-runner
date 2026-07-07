@@ -3,6 +3,7 @@ import {
   resolveAuthoringHorizonWeeks,
   resolveGoalFamilyIdentityPolicy,
 } from "@/lib/ai-first-plan-blueprint-policy";
+import { resolveSupportedIntensityCadence } from "@/lib/structured-plan-authoring-policy";
 import type {
   AiFirstPlanEnvelope,
   EnvelopeEmphasisCode,
@@ -117,11 +118,7 @@ export function buildMockAiFirstPlanEnvelope(
   const goalStyle = resolveEnvelopeGoalStyleCode(authoringInput);
   const goalPolicy = resolveGoalFamilyIdentityPolicy(authoringInput);
   const cadenceEnabled = isGoalFamilyCadencePlan(authoringInput, goalPolicy);
-  const cadenceFrequency = cadenceEnabled
-    ? goalPolicy.cadence.frequency === "weekly"
-      ? "w"
-      : "e2"
-    : "n";
+  const cadenceFrequency = resolveEnvelopeCadenceFrequency(authoringInput, cadenceEnabled);
   const isSpecialty = cadenceEnabled && goalPolicy.cadence.kind === "specialty";
 
   return {
@@ -165,6 +162,23 @@ export function buildMockAiFirstPlanEnvelope(
       "No numeric HR or pace truth is accepted from the envelope.",
     ],
   };
+}
+
+function resolveEnvelopeCadenceFrequency(
+  authoringInput: StructuredAuthoringInput,
+  cadenceEnabled: boolean,
+): EnvelopeFrequencyCode {
+  if (!cadenceEnabled) {
+    return "n";
+  }
+
+  const supportedCadence = resolveSupportedIntensityCadence(authoringInput);
+  const frequency =
+    supportedCadence.applies && supportedCadence.frequency !== "none"
+      ? supportedCadence.frequency
+      : resolveGoalFamilyIdentityPolicy(authoringInput).cadence.frequency;
+
+  return frequency === "weekly" ? "w" : "e2";
 }
 
 export function resolveEnvelopeGoalFamilyCode(

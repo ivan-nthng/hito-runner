@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EditableHeading } from "@/components/ui/editable-heading";
 import { type ReactNode, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -157,14 +158,12 @@ export function ManualWorkoutConstructorEditor({
               <WorkoutGlyph kind={iconKey} className="h-4 w-4" />
             </span>
             <div className="hito-manual-workout-title-field grid flex-1 gap-1">
-              <label className="sr-only" htmlFor="manual-workout-constructor-title">
-                Workout name
-              </label>
-              <input
-                id="manual-workout-constructor-title"
-                className="hito-field hito-field-primary hito-field-sm text-base font-semibold"
+              <EditableHeading
+                aria-label="Edit workout title"
+                className="text-base font-semibold text-foreground"
+                inputClassName="text-base font-semibold"
                 value={title}
-                onChange={(event) => onTitleChange(event.target.value)}
+                onChange={onTitleChange}
                 placeholder={selectedTemplate?.defaultTitle ?? "Name this workout"}
               />
               <p className="hito-list-row-copy">
@@ -190,7 +189,7 @@ export function ManualWorkoutConstructorEditor({
               templateOptions={templateOptions}
             />
             <span className="hito-field-helper">
-              Scratch starts empty. Choose the kind of run, then add the pieces you want reviewed.
+              Scratch starts empty. Choose the kind of run, then add the blocks you want reviewed.
             </span>
           </div>
         ) : null}
@@ -222,9 +221,9 @@ export function ManualWorkoutConstructorEditor({
       <section className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="hito-label">Workout pieces</p>
+            <p className="hito-label">Workout blocks</p>
             <p className="hito-field-helper">
-              Build the workout from ordered pieces. Hito checks the draft before it can be added.
+              Build the workout from ordered blocks. Hito checks the draft before it can be added.
             </p>
           </div>
         </div>
@@ -277,12 +276,12 @@ export function ManualWorkoutConstructorEditor({
               </span>
               <div className="min-w-0">
                 <p className="hito-list-row-title">
-                  {isRestDraft ? "No run pieces" : "Add workout piece"}
+                  {isRestDraft ? "No run blocks" : "Add workout block"}
                 </p>
                 <p className="hito-list-row-copy">
                   {isRestDraft
                     ? "Rest/no-run structure is represented without fake workout targets."
-                    : "Choose a run type and add at least one duration or distance piece before review."}
+                    : "Choose a run type and add at least one duration or distance block before review."}
                 </p>
               </div>
               {editable && !isRestDraft ? (
@@ -322,9 +321,9 @@ function ManualWorkoutDraftStructureTimeline({
   const structureParts = [
     totalSeconds > 0 ? formatDurationMin(totalSeconds / 60) : null,
     totalDistanceMeters > 0 ? formatDistanceMeters(totalDistanceMeters) : null,
-    entries.length ? `${entries.length} piece${entries.length === 1 ? "" : "s"}` : null,
+    entries.length ? `${entries.length} block${entries.length === 1 ? "" : "s"}` : null,
   ].filter(Boolean);
-  const meta = structureParts.length ? structureParts.join(" · ") : "0 min · 0 pieces";
+  const meta = structureParts.length ? structureParts.join(" · ") : "0 min · 0 blocks";
 
   return (
     <section className="hito-manual-workout-editor-surface-muted">
@@ -513,7 +512,7 @@ function ManualWorkoutEntryRow({
             block={entry.block}
             disabled={!editable}
             onChange={updateBlock}
-            roleLabel="Piece"
+            roleLabel="Block"
           />
         </div>
         <EntryRowActions
@@ -532,14 +531,14 @@ function ManualWorkoutEntryRow({
           block={entry.block}
           disabled={!editable}
           onChange={updateBlock}
-          roleLabel="Piece"
+          roleLabel="Block"
         />
         {!isNoteBlock(entry.block.blockKey) ? (
           <ManualWorkoutTargetFields
             block={entry.block}
             disabled={!editable}
             onChange={updateBlock}
-            roleLabel="Piece"
+            roleLabel="Block"
           />
         ) : null}
       </div>
@@ -804,7 +803,7 @@ function ManualBlockQuantityFields({
         </Select>
         <span className="hito-field-helper">
           {quantityMode === "none"
-            ? "Review needs duration or distance for run pieces."
+            ? "Review needs duration or distance for run blocks."
             : "Switching between duration and distance keeps only one quantity for review."}
         </span>
       </PickerField>
@@ -1103,7 +1102,7 @@ function ManualBlockTypePickerDialog({
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">Choose {label.toLowerCase()}</DialogTitle>
           <DialogDescription className="hito-body">
-            Pick the piece type. Duration, distance, and labels stay editable after selection.
+            Pick the block type. Duration, distance, and labels stay editable after selection.
           </DialogDescription>
         </DialogHeader>
 
@@ -1177,24 +1176,24 @@ function EntryRowActions({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel>Piece actions</DropdownMenuLabel>
+        <DropdownMenuLabel>Block actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={index === 0} onSelect={onMoveUp}>
           <Icon name="chevron-up" size="xs" />
-          Move piece up
+          Move block up
         </DropdownMenuItem>
         <DropdownMenuItem disabled={index >= total - 1} onSelect={onMoveDown}>
           <Icon name="chevron-down" size="xs" />
-          Move piece down
+          Move block down
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onDuplicate}>
           <Icon name="copy" size="xs" />
-          Duplicate piece
+          Duplicate block
         </DropdownMenuItem>
         <DropdownMenuItem className="text-destructive" onSelect={onDelete}>
           <Icon name="trash" size="xs" />
-          Delete piece
+          Delete block
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -1248,7 +1247,7 @@ function ManualAddStepMenu({
         onClick={() => setMobilePickerOpen(true)}
       >
         <Icon name="plus" size="xs" />
-        Add piece
+        Add block
         <Icon name="chevron-down" size="xs" />
       </button>
 
@@ -1256,7 +1255,7 @@ function ManualAddStepMenu({
         <DropdownMenuTrigger asChild>
           <button type="button" className={`${triggerClassName} hidden md:inline-flex`}>
             <Icon name="plus" size="xs" />
-            Add piece
+            Add block
             <Icon name="chevron-down" size="xs" />
           </button>
         </DropdownMenuTrigger>
@@ -1264,7 +1263,7 @@ function ManualAddStepMenu({
           align={prominent ? "end" : "center"}
           className="hito-manual-workout-menu-step"
         >
-          <DropdownMenuLabel>Workout pieces</DropdownMenuLabel>
+          <DropdownMenuLabel>Workout blocks</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem disabled={hasRepeatGroup} onSelect={onAddRepeatGroup}>
             <span className="hito-status-pill" data-tone="warning">
@@ -1324,9 +1323,9 @@ function ManualAddPiecePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Add piece</DialogTitle>
+          <DialogTitle className="hito-modal-title">Add block</DialogTitle>
           <DialogDescription className="hito-body">
-            Choose one piece for this manual workout. Hito reviews the full draft before anything is
+            Choose one block for this manual workout. Hito reviews the full draft before anything is
             saved.
           </DialogDescription>
         </DialogHeader>

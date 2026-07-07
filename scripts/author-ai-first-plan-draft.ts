@@ -9,6 +9,7 @@ import {
   AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
   type AiFirstPlanBlueprint,
 } from "../src/lib/ai-first-plan-blueprint-authoring";
+import { buildAiBlueprintWorkoutSections } from "../src/lib/ai-first-plan-blueprint-section-templates";
 import { buildMockAiFirstPlanEnvelope } from "../src/lib/ai-first-plan-envelope-policy";
 import type { TrainingPlanV2 } from "../src/lib/imported-plan";
 import { resolveCanonicalWorkoutModel } from "../src/lib/rich-workout-model";
@@ -22,7 +23,7 @@ import {
   structuredPlanAuthoringInputSchema,
 } from "../src/lib/structured-plan-authoring";
 import { resolveAiFirstPlanBlueprintHorizonStrategy } from "../src/lib/ai-first-plan-blueprint-horizon";
-import { addDaysIso, type StepPrescription } from "../src/lib/training";
+import { addDaysIso, diffDaysIso, type StepPrescription } from "../src/lib/training";
 import {
   DEFAULT_ENVELOPE_LIVE_MODEL,
   DEFAULT_REFERENCE_FILE,
@@ -90,6 +91,12 @@ type MockCadenceSpec = {
   identity: BlueprintWorkout["workoutIdentity"];
   icon: BlueprintWorkout["calendarIconKey"];
   title: string;
+};
+
+type MockTemplateSectionOptions = {
+  distanceMeters?: number | null;
+  weekNumber?: number;
+  horizonWeeks?: number | null;
 };
 
 const options = parseArgs(process.argv.slice(2));
@@ -412,7 +419,7 @@ function buildMockAiFirstPlanBlueprint(
       maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
     },
     reviewAssumptions: [
-      "Mock AI first-plan blueprint chooses compact weekly intent while backend expands final segments.",
+      "Mock AI first-plan blueprint authors explicit workout sections for backend validation.",
     ],
     metricPolicySummary:
       "Mock blueprint leaves numeric pace/HR truth to backend normalization and deterministic gates.",
@@ -642,10 +649,10 @@ function buildMockAiFirstPlanIdentityCoverageBlueprint(
       maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
     },
     reviewAssumptions: [
-      "Mock identity coverage blueprint exists only to inspect backend-expanded segment bodies.",
+      "Mock identity coverage blueprint exists only to inspect AI-authored structured sections after backend validation.",
     ],
     metricPolicySummary:
-      "AI supplies compact intent only; backend applies pace/default-HR policy during expansion.",
+      "AI supplies section structure and effort guidance; backend applies pace/default-HR safety policy during validation.",
     weeks: weeks.map((week, weekIndex) => ({
       weekNumber: weekIndex + 1,
       phase: week.phase,
@@ -654,7 +661,7 @@ function buildMockAiFirstPlanIdentityCoverageBlueprint(
       cutbackWeek: week.cutbackWeek,
       taperWeek: week.taperWeek,
       longRunIntent: "Keep Saturday durability specific but controlled.",
-      longRunProgression: "Backend validates long-run and taper sanity after expansion.",
+      longRunProgression: "Backend validates long-run and taper sanity after canonicalization.",
       plannedWorkouts: week.workouts.map((workout) => {
         const offset = weekIndex * 7 + (weekdayOffsets.get(workout.weekday) ?? 0);
 
@@ -673,7 +680,17 @@ function buildMockAiBlueprintWorkoutTemplate(
   workoutIdentity: AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number]["workoutIdentity"],
   calendarIconKey: AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number]["calendarIconKey"],
   title: string,
+  sectionOptions: MockTemplateSectionOptions = {},
 ): AiFirstPlanBlueprint["weeks"][number]["plannedWorkouts"][number] {
+  const plannedRpe =
+    workoutFamily === "recovery"
+      ? 3
+      : workoutFamily === "long" || workoutIdentity === "mountain_long_run_time_on_feet"
+        ? 5
+        : workoutFamily === "easy"
+          ? 4
+          : 6;
+
   return {
     date: null,
     weekday,
@@ -681,15 +698,8 @@ function buildMockAiBlueprintWorkoutTemplate(
     workoutIdentity,
     calendarIconKey,
     title,
-    summary: `${title} authored as compact blueprint intent for backend expansion.`,
-    plannedRpe:
-      workoutFamily === "recovery"
-        ? 3
-        : workoutFamily === "long" || workoutIdentity === "mountain_long_run_time_on_feet"
-          ? 5
-          : workoutFamily === "easy"
-            ? 4
-            : 6,
+    summary: `${title} authored with explicit blueprint sections for backend validation.`,
+    plannedRpe,
     estimatedFatigue:
       workoutFamily === "recovery"
         ? "very_low"
@@ -704,6 +714,14 @@ function buildMockAiBlueprintWorkoutTemplate(
         : "medium",
     segmentIntent: segmentIntentForFamily(workoutFamily),
     metricIntent: "mixed_if_allowed",
+    sections: buildAiBlueprintWorkoutSections({
+      workoutIdentity,
+      workoutFamily,
+      plannedRpe,
+      distanceMeters: sectionOptions.distanceMeters ?? null,
+      weekNumber: sectionOptions.weekNumber,
+      horizonWeeks: sectionOptions.horizonWeeks ?? undefined,
+    }),
   };
 }
 
@@ -735,6 +753,11 @@ function buildMockAiBlueprintWorkout(
         "easy_aerobic_run",
         "easy",
         "Easy aerobic run",
+        {
+          distanceMeters: authoringInput.planGoalIntent?.distance?.distanceMeters ?? null,
+          weekNumber: workout.week_number,
+          horizonWeeks: planHorizonWeeksForSections(authoringInput),
+        },
       ),
       date: workout.date,
       summary:
@@ -750,12 +773,20 @@ function buildMockAiBlueprintWorkout(
     workoutIdentity: resolved.workoutIdentity,
     calendarIconKey: resolved.calendarIconKey,
     title: `Mock AI blueprint ${workout.title}`,
-    summary: workout.summary ?? "Mock AI-authored blueprint workout with backend-safe expansion.",
+    summary: workout.summary ?? "Mock AI-authored structured workout with backend-safe validation.",
     plannedRpe: workout.planned_rpe ?? 4,
     estimatedFatigue: workout.estimated_fatigue ?? "low",
     recoveryPriority: workout.recovery_priority ?? "medium",
     segmentIntent: segmentIntentForFamily(resolved.workoutFamily),
     metricIntent: resolved.metricMode.paceTargetsAllowed ? "mixed_if_allowed" : "effort_only",
+    sections: buildAiBlueprintWorkoutSections({
+      workoutIdentity: resolved.workoutIdentity,
+      workoutFamily: resolved.workoutFamily,
+      plannedRpe: workout.planned_rpe ?? 4,
+      distanceMeters: authoringInput.planGoalIntent?.distance?.distanceMeters ?? null,
+      weekNumber: workout.week_number,
+      horizonWeeks: planHorizonWeeksForSections(authoringInput),
+    }),
   };
 }
 
@@ -799,6 +830,11 @@ function buildMockGoalFamilyCadenceWorkout(
       cadence.identity,
       cadence.icon,
       cadence.title,
+      {
+        distanceMeters: authoringInput.planGoalIntent?.distance?.distanceMeters ?? null,
+        weekNumber: workout.week_number,
+        horizonWeeks: planHorizonWeeksForSections(authoringInput),
+      },
     ),
     date: workout.date,
     summary: `${cadence.title} keeps the mock AI blueprint aligned with the backend goal-family cadence policy.`,
@@ -819,12 +855,28 @@ function chooseMockCadenceWeekday(authoringInput: StructuredFirstPlanAuthoringIn
   );
 }
 
+function planHorizonWeeksForSections(authoringInput: StructuredFirstPlanAuthoringInput) {
+  if (authoringInput.schedule.preparationHorizonWeeks) {
+    return authoringInput.schedule.preparationHorizonWeeks;
+  }
+
+  if (!authoringInput.schedule.targetDate) {
+    return 12;
+  }
+
+  return Math.max(
+    1,
+    Math.ceil(
+      (diffDaysIso(authoringInput.schedule.targetDate, authoringInput.schedule.startDate) + 1) / 7,
+    ),
+  );
+}
+
 function mockCadenceIdentityForGoal(
   authoringInput: StructuredFirstPlanAuthoringInput,
   weekNumber: number,
 ): MockCadenceSpec | null {
-  const finalTwoWeeks =
-    weekNumber >= Math.max(1, authoringInput.schedule.preparationHorizonWeeks - 1);
+  const finalTwoWeeks = weekNumber >= Math.max(1, planHorizonWeeksForSections(authoringInput) - 1);
 
   switch (authoringInput.goal.goalType) {
     case "5k":

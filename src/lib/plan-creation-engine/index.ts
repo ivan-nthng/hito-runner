@@ -55,6 +55,24 @@ export {
   type RunnerFacingRichnessSummary,
 } from "@/lib/plan-creation-engine/runner-facing-richness";
 export {
+  collectSelectedDistanceEndpointIssues,
+  resolveSelectedDistanceQualityFamily,
+  selectedDistanceEndpointMainDistanceMeters,
+  SELECTED_DISTANCE_ENDPOINT_IDENTITY,
+  SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND,
+  type SelectedDistanceEndpointIssue,
+  type SelectedDistanceEndpointIssueCode,
+  type SelectedDistanceEndpointProof,
+  type SelectedDistanceEndpointRow,
+} from "@/lib/plan-creation-engine/selected-distance-endpoint";
+export {
+  applyGeneratedPlanCoachFeasibilityToGoalIntent,
+  evaluateGeneratedPlanCoachFeasibility,
+  GENERATED_PLAN_COACH_CONTRACT_VERSION,
+  type EvaluateGeneratedPlanCoachFeasibilityInput,
+  type GeneratedPlanCoachFeasibilitySummary,
+} from "@/lib/plan-creation-engine/generated-plan-coach-quality";
+export {
   buildStructuredPlanGoalIntentInput,
   distanceFamilyForStructuredGoalType,
   normalizePlanGoalIntent,

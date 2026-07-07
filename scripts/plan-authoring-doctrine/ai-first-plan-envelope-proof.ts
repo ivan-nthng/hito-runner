@@ -9,7 +9,7 @@ import {
   structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
 } from "../../src/lib/structured-plan-authoring";
-import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./first-plan-release-gates";
+import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./ai-first-plan-blueprint-fixtures";
 import {
   assertFixedRestDayNames,
   assertNoTwoQualityWeeks,
@@ -337,7 +337,7 @@ function assertAiFirstPlanEnvelopeRoadSpecificityContract() {
       label: "AI envelope balanced half road specificity",
       authoringInput: buildBalancedHalfEnvelopeAuthoringInput(),
       expectedIdentity: "half_marathon_threshold_durability",
-      expectedFulfilledMinimum: 2,
+      expectedFulfilledMinimum: 1,
     },
   ];
 

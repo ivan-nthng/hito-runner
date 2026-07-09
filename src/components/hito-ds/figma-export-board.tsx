@@ -323,9 +323,7 @@ function ExportSection({
           <p className="hito-body-small mt-2">{body}</p>
         </div>
       </div>
-      <div className="min-w-0 rounded-3xl border border-hairline bg-surface/55 p-5 lg:p-6">
-        {children}
-      </div>
+      <div className="min-w-0">{children}</div>
     </section>
   );
 }

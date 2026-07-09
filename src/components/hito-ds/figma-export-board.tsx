@@ -6,9 +6,11 @@ import {
   HITO_ICON_META,
   HITO_ICON_SIZES,
   Icon,
+  type HitoIconCategory,
   type HitoIconName,
   type HitoIconSize,
 } from "@/components/ui/icon";
+import { InlineEditableText, InlineReadOnlyText } from "@/components/ui/inline-editable-text";
 import {
   WORKOUT_PRIMITIVE_PALETTE_FAMILIES,
   WORKOUT_SECTION_COLOR_ROLES,
@@ -110,6 +112,7 @@ const RADIUS_TOKENS = [
   { name: "radius-xl", token: "--radius-xl" },
   { name: "radius-2xl", token: "--radius-2xl" },
   { name: "radius-3xl", token: "--radius-3xl" },
+  { name: "radius-4xl", token: "--radius-4xl" },
 ] as const;
 
 const TYPOGRAPHY_ROLES = [
@@ -176,6 +179,7 @@ const SELECT_TRIGGER_STATES = [
 ] as const;
 
 const DROPDOWN_TRIGGER_SIZES: ButtonSize[] = ["xs", "sm", "md", "lg", "xl"];
+const INLINE_HEADER_SIZES = ["sm", "md", "lg"] as const;
 
 const BUTTON_ICON_TREATMENTS = [
   { label: "Left icon", props: { leftIcon: true } },
@@ -184,37 +188,29 @@ const BUTTON_ICON_TREATMENTS = [
   { label: "Loading", props: { loading: true, disabled: true } },
 ] as const;
 
-const ICON_EXPORT_GROUPS: Array<{
-  label: string;
-  icons: HitoIconName[];
-}> = [
-  {
-    label: "Buttons",
-    icons: ["circle", "arrow-right", "loader", "more-horizontal", "plus"],
-  },
-  {
-    label: "Dropdowns and menus",
-    icons: ["chevron-down", "chevron-right", "activity", "copy", "check", "trash", "shield-alert"],
-  },
-  {
-    label: "Status and readback",
-    icons: [
-      "warning",
-      "x-circle",
-      "check-circle",
-      "plan-note",
-      "trophy",
-      "watch",
-      "calendar-clock",
-    ],
-  },
-  {
-    label: "Utility surfaces",
-    icons: ["search", "close", "sparkles", "download", "upload", "settings"],
-  },
-];
+const ICON_EXPORT_GROUPS = HITO_ICON_META.reduce<
+  Array<{
+    category: HitoIconCategory;
+    label: string;
+    icons: HitoIconName[];
+  }>
+>((groups, icon) => {
+  const group = groups.find((candidate) => candidate.category === icon.category);
 
-const ICON_SIZE_SPECIMENS: HitoIconName[] = ["plus", "chevron-down", "loader", "warning"];
+  if (group) {
+    group.icons.push(icon.name);
+    return groups;
+  }
+
+  groups.push({
+    category: icon.category,
+    label: formatIconCategoryLabel(icon.category),
+    icons: [icon.name],
+  });
+  return groups;
+}, []);
+
+const ICON_SIZE_SPECIMENS: HitoIconName[] = ["plus", "chevron-down", "loader", "gap-horizontal"];
 
 export function HitoFigmaExportBoard() {
   return (
@@ -271,12 +267,39 @@ export function HitoFigmaExportBoard() {
         </ExportSection>
 
         <ExportSection
+          eyebrow="Inline text"
+          id="inline-editable-text"
+          title="Inline editable and read-only text states"
+          body="Captures the shared InlineEditableText / InlineReadOnlyText primitive, including the header variant and header input sizing used by true editable surfaces."
+        >
+          <InlineTextMatrix />
+        </ExportSection>
+
+        <ExportSection
           eyebrow="Dropdowns"
           id="dropdowns"
           title="Select triggers and menu item anatomy"
           body="Uses Hito select/menu surface and item classes, with every important row state visible without opening a portal during capture."
         >
           <DropdownMatrix />
+        </ExportSection>
+
+        <ExportSection
+          eyebrow="Adaptive menus"
+          id="adaptive-mobile-navigation"
+          title="Mobile escalation and full-height navigation anatomy"
+          body="Large page-switching or dense mobile menus use the Sheet/Dialog family with a Hito header, close affordance, and scrollable content instead of anchored card-like popovers."
+        >
+          <AdaptiveMenuMatrix />
+        </ExportSection>
+
+        <ExportSection
+          eyebrow="Audit controls"
+          id="ds-audit-controls"
+          title="Compact token value chips and property-control rows"
+          body="Shows the reusable control anatomy behind local DS audit prompts without exposing the inspector itself as product UI."
+        >
+          <AuditControlMatrix />
         </ExportSection>
 
         <ExportSection
@@ -580,6 +603,90 @@ function InputMatrix() {
   );
 }
 
+function InlineTextMatrix() {
+  return (
+    <div className="grid gap-6">
+      <MatrixPanel title="Header input sizes">
+        <div className="grid gap-4">
+          {INLINE_HEADER_SIZES.map((size) => (
+            <div key={`inline-header-${size}`} className="grid gap-2">
+              <span className="hito-caption">{size.toUpperCase()}</span>
+              <InlineEditableText
+                aria-label={`Edit ${size} header title`}
+                onChange={() => {}}
+                size={size}
+                value={
+                  size === "lg"
+                    ? "Tuesday interval tune-up"
+                    : size === "md"
+                      ? "Manual workout title"
+                      : "Section label"
+                }
+                variant="header"
+              />
+            </div>
+          ))}
+        </div>
+      </MatrixPanel>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MatrixPanel title="Hover">
+          <InlineEditableText
+            aria-label="Hover inline header title"
+            demoState="hover"
+            onChange={() => {}}
+            size="md"
+            value="Progression finish"
+            variant="header"
+          />
+        </MatrixPanel>
+        <MatrixPanel title="Focus-visible">
+          <InlineEditableText
+            aria-label="Focus inline header title"
+            demoState="focus"
+            onChange={() => {}}
+            size="md"
+            value="Tempo rhythm"
+            variant="header"
+          />
+        </MatrixPanel>
+        <MatrixPanel title="Edit field">
+          <input
+            aria-label="Editing inline header title"
+            className="hito-field hito-field-primary hito-field-header hito-field-header-md"
+            readOnly
+            value="Long run"
+          />
+          <span className="hito-field-helper">Enter saves; Escape cancels.</span>
+        </MatrixPanel>
+        <MatrixPanel title="Read-only truth">
+          <InlineEditableText
+            aria-label="Read-only generated title"
+            helper="Generated preview/detail rows do not expose edit affordances."
+            onChange={() => {}}
+            readOnly
+            size="md"
+            value="Generated steady finish"
+            variant="header"
+          />
+        </MatrixPanel>
+      </div>
+
+      <MatrixPanel title="Inline read-only row">
+        <InlineReadOnlyText
+          helper="Provider, generated, imported, and backend-owned truth reads normally."
+          value={
+            <div className="min-w-0">
+              <p className="hito-list-row-title">Marathon steady finish</p>
+              <p className="hito-list-row-copy">Backend-generated workout truth.</p>
+            </div>
+          }
+        />
+      </MatrixPanel>
+    </div>
+  );
+}
+
 function DropdownMatrix() {
   return (
     <div className="grid gap-6">
@@ -679,6 +786,121 @@ function DropdownMatrix() {
   );
 }
 
+function AdaptiveMenuMatrix() {
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)]">
+      <MatrixPanel title="Simple action menu escalation">
+        <div className="grid gap-4">
+          <div className="grid gap-2">
+            <p className="hito-caption">Desktop / tablet anchored</p>
+            <div className="hito-ui-menu-surface grid max-w-xs gap-1 p-1">
+              <StaticMenuItem icon="edit" label="Edit text" />
+              <StaticMenuItem icon="copy" label="Copy prompt" />
+              <StaticMenuItem icon="trash" label="Remove" destructive />
+            </div>
+          </div>
+          <div className="hito-ui-sheet-surface grid max-w-xs gap-0 overflow-hidden rounded-2xl border border-hairline bg-background/95">
+            <div className="hito-ui-sheet-header border-b border-hairline px-4 py-3 pr-12">
+              <p className="hito-ui-sheet-title text-xl">Actions</p>
+              <p className="hito-ui-sheet-description">Mobile bottom-sheet option.</p>
+            </div>
+            <div className="grid gap-1 p-2">
+              <StaticMenuItem icon="edit" label="Edit text" />
+              <StaticMenuItem icon="copy" label="Copy prompt" />
+              <StaticMenuItem icon="trash" label="Remove" destructive />
+            </div>
+          </div>
+        </div>
+      </MatrixPanel>
+
+      <MatrixPanel title="Fullscreen / full-height mobile navigation">
+        <div className="hito-ui-sheet-surface mx-auto flex h-[34rem] max-h-[34rem] w-full max-w-sm flex-col overflow-hidden rounded-none border-0 bg-background/95">
+          <div className="hito-ui-sheet-header border-b border-hairline px-5 py-4 pr-14">
+            <div className="flex min-w-0 items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="hito-ui-sheet-title">Browse DS pages</p>
+                <p className="hito-ui-sheet-description">
+                  Jump to a Hito DS reference page or section.
+                </p>
+              </div>
+              <span className="hito-ui-sheet-close shrink-0" aria-hidden="true">
+                <Icon name="close" size="sm" />
+              </span>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className="hito-row-group">
+              <div className="hito-list-row items-start">
+                <Icon name="chevron-left" size="sm" className="mt-0.5 text-muted-foreground" />
+                <span className="min-w-0">
+                  <span className="hito-list-row-title block">Back affordance</span>
+                  <span className="hito-list-row-copy block">
+                    Nested levels return inside the navigation surface.
+                  </span>
+                </span>
+              </div>
+              {["Overview", "Foundations", "Components", "Patterns"].map((label) => (
+                <div className="hito-list-row" key={label}>
+                  <span className="hito-list-row-title">{label}</span>
+                  <Icon name="chevron-right" size="xs" className="text-muted-foreground" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </MatrixPanel>
+    </div>
+  );
+}
+
+function AuditControlMatrix() {
+  return (
+    <div className="grid gap-5 xl:grid-cols-2">
+      <MatrixPanel title="Read-current-first value chip">
+        <div className="grid max-w-xl gap-3">
+          <StaticPropertyRow iconName="padding-left" label="Horizontal padding">
+            <StaticValueChip help="16px · --space-4">16</StaticValueChip>
+          </StaticPropertyRow>
+          <StaticPropertyRow iconName="gap-horizontal" label="Horizontal gap">
+            <StaticValueChip help="5.6px · custom, nearest --space-1">5.6</StaticValueChip>
+          </StaticPropertyRow>
+          <StaticPropertyRow iconName="file-text" label="Typography role">
+            <StaticValueChip help="hito-section-title · font 24px / line 27.6px">
+              Section title
+            </StaticValueChip>
+          </StaticPropertyRow>
+        </div>
+      </MatrixPanel>
+
+      <MatrixPanel title="Explicit pending change">
+        <div className="grid max-w-xl gap-3">
+          <StaticPropertyRow expanded iconName="radius-top-left" label="Radius">
+            <StaticValueChip tone="current" help="12px · --radius-lg">
+              12
+            </StaticValueChip>
+            <Icon name="arrow-right" size="xs" className="text-muted-foreground" />
+            <StaticValueChip tone="desired" help="8px · --radius-md">
+              8
+            </StaticValueChip>
+          </StaticPropertyRow>
+          <div className="ml-7 grid gap-2 rounded-md border border-hairline bg-surface/35 p-2">
+            <StaticPropertyRow compact iconName="radius-top-left" label="Top-left radius">
+              <StaticValueChip help="12px · --radius-lg">12</StaticValueChip>
+            </StaticPropertyRow>
+            <StaticPropertyRow compact iconName="radius-bottom-right" label="Bottom-right radius">
+              <StaticValueChip help="12px · --radius-lg">12</StaticValueChip>
+            </StaticPropertyRow>
+          </div>
+          <button type="button" className="hito-button hito-button-secondary hito-button-sm w-fit">
+            <Icon name="copy" size="xs" />
+            Generate Prompt
+          </button>
+        </div>
+      </MatrixPanel>
+    </div>
+  );
+}
+
 function StatusMatrix() {
   return (
     <div className="grid gap-6">
@@ -755,6 +977,72 @@ function IconInventory() {
   );
 }
 
+function StaticPropertyRow({
+  children,
+  compact,
+  expanded,
+  iconName,
+  label,
+}: {
+  children: ReactNode;
+  compact?: boolean;
+  expanded?: boolean;
+  iconName: HitoIconName;
+  label: string;
+}) {
+  return (
+    <div className={cn("grid min-w-0 gap-1 py-0.5", compact && "pl-6")}>
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
+            <Icon name={iconName} size="xs" />
+          </span>
+          <span className="hito-caption min-w-0 truncate text-foreground">{label}</span>
+          {expanded !== undefined ? (
+            <span
+              className="grid size-5 shrink-0 place-items-center rounded-sm text-muted-foreground"
+              aria-hidden="true"
+            >
+              <Icon
+                name="chevron-down"
+                size="xs"
+                className={cn("transition-transform", expanded && "rotate-180")}
+              />
+            </span>
+          ) : null}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function StaticValueChip({
+  children,
+  help,
+  tone = "neutral",
+}: {
+  children: ReactNode;
+  help: string;
+  tone?: "current" | "desired" | "neutral";
+}) {
+  return (
+    <span
+      className={cn(
+        "hito-technical-mono inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-md border px-2 text-xs",
+        tone === "current" && "border-warn/35 bg-warn/10 text-warn",
+        tone === "desired" && "border-success/35 bg-success/10 text-success",
+        tone === "neutral" && "border-hairline bg-surface/45 text-foreground",
+      )}
+      title={help}
+      aria-label={help}
+      tabIndex={0}
+    >
+      {children}
+    </span>
+  );
+}
+
 function MatrixPanel({ children, title }: { children: ReactNode; title: string }) {
   return (
     <article className="grid gap-3 rounded-2xl border border-hairline bg-background/55 p-4">
@@ -766,6 +1054,13 @@ function MatrixPanel({ children, title }: { children: ReactNode; title: string }
 
 function getIconLabel(iconName: HitoIconName) {
   return HITO_ICON_META.find((icon) => icon.name === iconName)?.label ?? iconName;
+}
+
+function formatIconCategoryLabel(category: HitoIconCategory) {
+  return category
+    .split("/")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" / ");
 }
 
 function StaticSelectTrigger({

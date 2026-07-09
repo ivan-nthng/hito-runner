@@ -99,7 +99,7 @@ export function DropdownFamilyPlayground() {
         },
         {
           label: "Mobile escalation",
-          body: "Short action menus stay anchored. Long grouped or nested mobile pickers escalate to the workflow dialog with a scroll-fill body; the anatomy is visible in Variants.",
+          body: "Desktop and tablet menus stay anchored. On mobile, simple action menus may escalate to a bottom sheet, while dense, nested, or page-switching menus use a full-height navigation surface.",
         },
       ]}
     />
@@ -434,29 +434,29 @@ function MobileDropdownEscalationSpecimen() {
       <div className="grid min-w-0 content-start gap-3">
         <div>
           <p className="hito-label">Mobile escalation rule</p>
-          <h4 className="hito-list-row-title mt-1">Long choice flows use the workflow dialog.</h4>
+          <h4 className="hito-list-row-title mt-1">Mobile menus escalate by complexity.</h4>
           <p className="hito-list-row-copy mt-2">
-            Short action menus stay anchored. Long grouped or nested mobile pickers, like manual
-            workout templates, escalate to the product workflow dialog so the list can scroll and
-            close safely.
+            Anchored cards are the desktop/tablet default. On mobile, simple action menus may use a
+            bottom sheet, while long grouped, nested, or page-switching menus use a full-height Hito
+            navigation surface.
           </p>
         </div>
         <div className="hito-row-group">
           <div className="hito-list-row items-start">
             <Icon name="more-horizontal" size="sm" className="mt-0.5 text-muted-foreground" />
             <span className="min-w-0">
-              <span className="hito-list-row-title block">Short menu</span>
+              <span className="hito-list-row-title block">Simple mobile menu</span>
               <span className="hito-list-row-copy block">
-                Keep `DropdownMenuContent` anchored to the trigger.
+                Use a bottom sheet when an anchored card would feel cramped.
               </span>
             </span>
           </div>
           <div className="hito-list-row items-start">
             <Icon name="file-text" size="sm" className="mt-0.5 text-muted-foreground" />
             <span className="min-w-0">
-              <span className="hito-list-row-title block">Long mobile picker</span>
+              <span className="hito-list-row-title block">Dense mobile picker</span>
               <span className="hito-list-row-copy block">
-                Use `hito-dialog-size-workflow` with a scroll-fill body.
+                Use a full-height workflow or navigation surface with a Hito header.
               </span>
             </span>
           </div>

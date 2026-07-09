@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import type {
-  InlineChangeTargetInput,
   InlineChangeTokenControlId,
   InlineChangeTokenControlInput,
-  InlineChangeTypographyRoleOption,
 } from "@/components/devtools/local-inline-change-target-utils";
 import { getIsTokenControlActive } from "@/components/devtools/local-ui-task-draft-view-model";
+import {
+  PendingChangeRemoveButton,
+  ValueSelect,
+  ValueTag,
+} from "@/components/devtools/LocalUiPropertyControlPrimitives";
 
 export function TokenControlRows({
   controls,
@@ -33,72 +35,6 @@ export function TokenControlRows({
           onPendingChangeRemove={onPendingChangeRemove}
         />
       ))}
-    </div>
-  );
-}
-
-export function TypographyControlRow({
-  desiredRoleId,
-  onDesiredRoleChange,
-  typography,
-}: {
-  desiredRoleId: string | null;
-  onDesiredRoleChange: (roleId: string | null) => void;
-  typography: NonNullable<InlineChangeTargetInput["typography"]>;
-}) {
-  const desiredRole = typography.options.find((option) => option.id === desiredRoleId) ?? null;
-  const isActive = Boolean(desiredRole && desiredRole.id !== typography.currentRole?.id);
-  const currentLabel = typography.currentRole?.label ?? "Observed type";
-  const currentHelp = typography.currentRole
-    ? `${typography.currentRole.className} · ${getComputedTypographyLabel(typography)}`
-    : getComputedTypographyLabel(typography);
-  const desiredHelp = desiredRole
-    ? `${desiredRole.className} · ${desiredRole.description}`
-    : currentHelp;
-
-  return (
-    <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row="typography">
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
-            <Icon name="file-text" size="xs" />
-          </span>
-          <span className="hito-caption min-w-0 truncate text-foreground">Typography role</span>
-        </div>
-        {isActive ? (
-          <>
-            <ValueTag tone="current" value={currentLabel} tooltip={currentHelp} />
-            <Icon name="arrow-right" size="xs" className="shrink-0 text-muted-foreground" />
-            <div className="group relative shrink-0">
-              <TypographyRoleSelect
-                desiredRole={desiredRole}
-                displayLabel={desiredRole?.label ?? currentLabel}
-                tooltip={desiredHelp}
-                tone="desired"
-                onDesiredRoleChange={onDesiredRoleChange}
-                options={typography.options}
-              />
-              <button
-                type="button"
-                className="absolute -right-1 -top-1 z-10 grid size-4 place-items-center rounded-sm border border-success/25 bg-background text-success opacity-70 shadow-soft outline-none transition-opacity hover:bg-success/10 hover:opacity-100 focus:bg-success/10 focus:opacity-100 focus-visible:ring-1 focus-visible:ring-success group-hover:opacity-100 group-focus-within:opacity-100"
-                aria-label="Remove typography pending change"
-                onClick={() => onDesiredRoleChange(null)}
-              >
-                <Icon name="close" size="xs" />
-              </button>
-            </div>
-          </>
-        ) : (
-          <TypographyRoleSelect
-            desiredRole={null}
-            displayLabel={currentLabel}
-            tooltip={currentHelp}
-            tone="neutral"
-            onDesiredRoleChange={onDesiredRoleChange}
-            options={typography.options}
-          />
-        )}
-      </div>
     </div>
   );
 }
@@ -261,14 +197,10 @@ function PropertyControlLine({
                 tone="desired"
                 onValueChange={onDesiredTokenChange}
               />
-              <button
-                type="button"
-                className="absolute -right-1 -top-1 z-10 grid size-4 place-items-center rounded-sm border border-success/25 bg-background text-success opacity-70 shadow-soft outline-none transition-opacity hover:bg-success/10 hover:opacity-100 focus:bg-success/10 focus:opacity-100 focus-visible:ring-1 focus-visible:ring-success group-hover:opacity-100 group-focus-within:opacity-100"
-                aria-label={`Remove ${label} pending change`}
+              <PendingChangeRemoveButton
+                ariaLabel={`Remove ${label} pending change`}
                 onClick={onPendingChangeRemove}
-              >
-                <Icon name="close" size="xs" />
-              </button>
+              />
             </div>
           </>
         ) : (
@@ -285,133 +217,6 @@ function PropertyControlLine({
       </div>
     </div>
   );
-}
-
-function ValueSelect({
-  ariaLabel,
-  control,
-  desiredOption,
-  displayValue,
-  onValueChange,
-  tone,
-  tooltip,
-}: {
-  ariaLabel: string;
-  control: InlineChangeTokenControlInput;
-  desiredOption: InlineChangeTokenControlInput["options"][number] | null;
-  displayValue: string;
-  onValueChange: (token: string) => void;
-  tone: "desired" | "neutral";
-  tooltip: string;
-}) {
-  return (
-    <Select
-      value={desiredOption?.token ?? "__keep"}
-      onValueChange={(token) => onValueChange(token === "__keep" ? "" : token)}
-    >
-      <SelectTrigger
-        aria-label={`${ariaLabel}. ${tooltip}`}
-        title={tooltip}
-        className={`hito-field-sm h-7 w-auto min-w-10 max-w-24 rounded-md px-2 py-0 text-xs shadow-none focus-visible:ring-1 [&>svg]:ml-1 [&>svg]:size-3 ${
-          tone === "desired"
-            ? "border-success/35 bg-success/10 text-success"
-            : "border-hairline bg-surface/45 text-foreground"
-        }`}
-      >
-        <span className="hito-technical-mono truncate">{displayValue}</span>
-      </SelectTrigger>
-      <SelectContent align="end" className="z-[73] w-44" data-local-ui-inspector-layer="">
-        <SelectItem value="__keep">Keep current</SelectItem>
-        {control.options.map((option) => (
-          <SelectItem key={option.token} value={option.token}>
-            {option.displayValue} · {option.token}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-function ValueTag({
-  tone = "neutral",
-  tooltip,
-  value,
-}: {
-  tone?: "current" | "neutral";
-  tooltip?: string;
-  value: string;
-}) {
-  return (
-    <span
-      className={`hito-technical-mono inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-md border px-2 text-xs ${
-        tone === "current"
-          ? "border-warn/35 bg-warn/10 text-warn"
-          : "border-hairline bg-surface/45 text-foreground"
-      }`}
-      title={tooltip}
-      aria-label={tooltip}
-      tabIndex={tooltip ? 0 : undefined}
-    >
-      {value}
-    </span>
-  );
-}
-
-function TypographyRoleSelect({
-  desiredRole,
-  displayLabel,
-  onDesiredRoleChange,
-  options,
-  tone,
-  tooltip,
-}: {
-  desiredRole: InlineChangeTypographyRoleOption | null;
-  displayLabel: string;
-  onDesiredRoleChange: (roleId: string | null) => void;
-  options: InlineChangeTypographyRoleOption[];
-  tone: "desired" | "neutral";
-  tooltip: string;
-}) {
-  return (
-    <Select
-      value={desiredRole?.id ?? "__keep"}
-      onValueChange={(roleId) => onDesiredRoleChange(roleId === "__keep" ? null : roleId)}
-    >
-      <SelectTrigger
-        aria-label={`Typography desired role. ${tooltip}`}
-        title={tooltip}
-        className={`hito-field-sm h-7 w-auto min-w-24 max-w-36 rounded-md px-2 py-0 text-xs shadow-none focus-visible:ring-1 [&>svg]:ml-1 [&>svg]:size-3 ${
-          tone === "desired"
-            ? "border-success/35 bg-success/10 text-success"
-            : "border-hairline bg-surface/45 text-foreground"
-        }`}
-      >
-        <span className="truncate">{displayLabel}</span>
-      </SelectTrigger>
-      <SelectContent align="end" className="z-[73] w-56" data-local-ui-inspector-layer="">
-        <SelectItem value="__keep">Keep current</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.id} value={option.id}>
-            {option.label} · {option.className}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-function getComputedTypographyLabel(
-  typography: NonNullable<InlineChangeTargetInput["typography"]>,
-) {
-  const label = [
-    typography.fontSize ? `font ${typography.fontSize}` : null,
-    typography.lineHeight ? `line ${typography.lineHeight}` : null,
-    typography.fontWeight ? `weight ${typography.fontWeight}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
-  return label || "computed typography";
 }
 
 type TokenControlGroup = {
@@ -434,7 +239,7 @@ function buildTokenControlGroups(controls: InlineChangeTokenControlInput[]): Tok
     const groupControls = ids
       .map((id) => byId.get(id))
       .filter(Boolean) as InlineChangeTokenControlInput[];
-    if (groupControls.length !== ids.length || !canMergeTokenControls(groupControls)) return false;
+    if (groupControls.length !== ids.length || !canMergeTokenControls(groupControls)) return;
 
     groups.push({
       controls: groupControls,
@@ -443,7 +248,6 @@ function buildTokenControlGroups(controls: InlineChangeTokenControlInput[]): Tok
       label,
     });
     ids.forEach((id) => consumed.add(id));
-    return true;
   };
 
   addGroup(["padding-left", "padding-right"], "Horizontal padding", "padding-left");
@@ -483,13 +287,9 @@ function canMergeTokenControls(controls: InlineChangeTokenControlInput[]) {
   );
 }
 
-function getCurrentValueLabel(controls: InlineChangeTokenControlInput[]) {
-  const values = getUniqueValues(controls.map((control) => control.currentValueLabel));
-  return values.length === 1 ? values[0] : "Mixed";
-}
-
 function getCurrentDisplayValueLabel(controls: InlineChangeTokenControlInput[]) {
-  const valueLabel = getCurrentValueLabel(controls);
+  const values = getUniqueValues(controls.map((control) => control.currentValueLabel));
+  const valueLabel = values.length === 1 ? values[0] : "Mixed";
   const isCustom = controls.every((control) => !control.currentToken);
 
   return isCustom && valueLabel !== "Mixed" ? `${valueLabel}px` : valueLabel;

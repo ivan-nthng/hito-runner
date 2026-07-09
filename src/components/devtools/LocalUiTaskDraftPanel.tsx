@@ -18,15 +18,15 @@ import {
   getDefaultFixScope,
   getInlineChangeAction,
   normalizeTargetKind,
+  type InlineChangeChromeRemovalSelection,
   type InlineChangeFixScope,
   type InlineChangeTargetInput,
   type InlineChangeTokenControlSelection,
   type InlineChangeTypographySelection,
 } from "@/components/devtools/local-inline-change-target-utils";
-import {
-  TokenControlRows,
-  TypographyControlRow,
-} from "@/components/devtools/LocalUiPropertyControls";
+import { ChromeControlRows } from "@/components/devtools/LocalUiChromeControls";
+import { TokenControlRows } from "@/components/devtools/LocalUiTokenControls";
+import { TypographyControlRow } from "@/components/devtools/LocalUiTypographyControls";
 import {
   buildTypographyRoleSelection,
   getBaseToken,
@@ -37,7 +37,7 @@ import {
   getIsTokenControlActive,
 } from "@/components/devtools/local-ui-task-draft-view-model";
 
-type GenerateState = "idle" | "copied" | "copy_failed";
+type GenerateState = "idle" | "copied" | "copy_failed" | "fallback_hidden";
 
 export function LocalUiTaskDraftPanel({
   actionId,
@@ -53,10 +53,10 @@ export function LocalUiTaskDraftPanel({
   const [comment, setComment] = useState("");
   const [proposedText, setProposedText] = useState(target.visibleText ?? "");
   const [generateState, setGenerateState] = useState<GenerateState>("idle");
-  const [promptGenerated, setPromptGenerated] = useState(false);
-  const [draftMessage, setDraftMessage] = useState<string | null>(null);
   const [desiredTokens, setDesiredTokens] = useState<Record<string, string>>({});
   const [desiredTypographyRole, setDesiredTypographyRole] = useState<string | null>(null);
+  const [chromeRemovalSelection, setChromeRemovalSelection] =
+    useState<InlineChangeChromeRemovalSelection | null>(null);
   const [fixScope, setFixScope] = useState<InlineChangeFixScope>(getDefaultFixScope);
   const manualPromptRef = useRef<HTMLTextAreaElement | null>(null);
   const selectedAction = useMemo(
@@ -86,8 +86,14 @@ export function LocalUiTaskDraftPanel({
     [desiredTypographyRole, target.typography],
   );
   const draftAction = useMemo(
-    () => selectedAction ?? getInferredDraftAction(tokenControlSelections, typographyRoleSelection),
-    [selectedAction, tokenControlSelections, typographyRoleSelection],
+    () =>
+      selectedAction ??
+      getInferredDraftAction(
+        tokenControlSelections,
+        typographyRoleSelection,
+        chromeRemovalSelection,
+      ),
+    [chromeRemovalSelection, selectedAction, tokenControlSelections, typographyRoleSelection],
   );
   const payload = useMemo(
     () =>
@@ -97,6 +103,7 @@ export function LocalUiTaskDraftPanel({
         fixScope,
         target: {
           ...target,
+          chromeRemovalSelection,
           proposedText: showReplacementText ? proposedText : null,
           tokenControlSelections,
           typographyRoleSelection,
@@ -104,6 +111,7 @@ export function LocalUiTaskDraftPanel({
       }),
     [
       comment,
+      chromeRemovalSelection,
       draftAction,
       fixScope,
       proposedText,
@@ -116,9 +124,12 @@ export function LocalUiTaskDraftPanel({
   const prompt = useMemo(() => buildInlineChangePrompt(payload), [payload]);
   const payloadJson = useMemo(() => JSON.stringify(payload, null, 2), [payload]);
   const targetLabel = payload.target.label ?? payload.target.selector ?? "Selected UI element";
-  const showManualPromptFallback = promptGenerated && generateState === "copy_failed";
+  const promptGenerated = generateState !== "idle";
+  const showManualPromptFallback = generateState === "copy_failed";
+  const generateButtonCopied = generateState === "copied";
   const hasActionableDraft = getHasActionableDraft({
     action: draftAction,
+    chromeRemovalSelection,
     comment,
     proposedText,
     tokenControlSelections,
@@ -126,20 +137,17 @@ export function LocalUiTaskDraftPanel({
   });
 
   useEffect(() => {
-    setDraftMessage(null);
     setComment("");
     setGenerateState("idle");
-    setPromptGenerated(false);
     setDesiredTokens({});
     setDesiredTypographyRole(null);
+    setChromeRemovalSelection(null);
     setFixScope(getDefaultFixScope());
     setProposedText(target.visibleText ?? "");
   }, [target]);
 
   useEffect(() => {
-    setDraftMessage(null);
     setGenerateState("idle");
-    setPromptGenerated(false);
   }, [selectedAction?.id]);
 
   useEffect(() => {
@@ -153,32 +161,21 @@ export function LocalUiTaskDraftPanel({
 
   const resetDraft = () => {
     onActionChange(null);
-    setDraftMessage(null);
     setComment("");
     setGenerateState("idle");
-    setPromptGenerated(false);
     setDesiredTokens({});
     setDesiredTypographyRole(null);
+    setChromeRemovalSelection(null);
     setFixScope(getDefaultFixScope());
     setProposedText(target.visibleText ?? "");
   };
 
   const clearGeneratedPrompt = () => {
-    setDraftMessage(null);
     setGenerateState("idle");
-    setPromptGenerated(false);
   };
 
   const generatePrompt = async () => {
-    if (!hasActionableDraft) {
-      setGenerateState("idle");
-      setPromptGenerated(false);
-      setDraftMessage("Add a comment or change one property before generating a prompt.");
-      return;
-    }
-
-    setDraftMessage(null);
-    setPromptGenerated(true);
+    if (!hasActionableDraft) return;
 
     try {
       const copyResult = await copyTextToClipboard(prompt);
@@ -211,6 +208,15 @@ export function LocalUiTaskDraftPanel({
       {getHasObservedProperties(target, observableTokenControls) ? (
         <div className="grid min-w-0 gap-1.5" data-local-ui-property-controls="">
           <p className="hito-caption text-foreground">Observed properties</p>
+          <ChromeControlRows
+            border={target.border}
+            cardChrome={target.cardChrome}
+            chromeRemovalSelection={chromeRemovalSelection}
+            onChromeRemovalChange={(selection) => {
+              setChromeRemovalSelection(selection);
+              clearGeneratedPrompt();
+            }}
+          />
           {observableTokenControls.length > 0 ? (
             <TokenControlRows
               controls={observableTokenControls}
@@ -337,7 +343,7 @@ export function LocalUiTaskDraftPanel({
             <button
               type="button"
               className="hito-button hito-button-ghost hito-button-sm min-h-7 px-2"
-              onClick={() => setGenerateState("idle")}
+              onClick={() => setGenerateState("fallback_hidden")}
             >
               Hide
             </button>
@@ -358,11 +364,11 @@ export function LocalUiTaskDraftPanel({
           <button
             type="button"
             className="hito-button hito-button-primary hito-button-sm min-h-8 px-2"
-            disabled={!hasActionableDraft}
+            disabled={!hasActionableDraft || generateButtonCopied}
             onClick={() => void generatePrompt()}
           >
-            <Icon name="copy" size="xs" />
-            Generate Prompt
+            <Icon name={generateButtonCopied ? "check" : "copy"} size="xs" />
+            {generateButtonCopied ? "Copied" : "Generate Prompt"}
           </button>
           <button
             type="button"
@@ -383,12 +389,7 @@ export function LocalUiTaskDraftPanel({
             />
           </TaskDisclosure>
         ) : null}
-        <TaskStatus
-          defaultLabel="Prompt hidden until Generate Prompt."
-          generateState={generateState}
-          message={draftMessage}
-          promptGenerated={promptGenerated}
-        />
+        <TaskStatus generateState={generateState} />
       </div>
     </div>
   );
@@ -406,21 +407,7 @@ function TaskDisclosure({ children, title }: { children: ReactNode; title: strin
   );
 }
 
-function TaskStatus({
-  defaultLabel,
-  generateState,
-  message,
-  promptGenerated,
-}: {
-  defaultLabel: string;
-  generateState: GenerateState;
-  message: string | null;
-  promptGenerated: boolean;
-}) {
-  if (message) {
-    return <p className="hito-caption text-warn">{message}</p>;
-  }
-
+function TaskStatus({ generateState }: { generateState: GenerateState }) {
   if (generateState === "copied") {
     return <p className="hito-caption text-success">Prompt copied.</p>;
   }
@@ -429,9 +416,9 @@ function TaskStatus({
     return <p className="hito-caption text-warn">Copy blocked. Manual prompt is visible.</p>;
   }
 
-  if (promptGenerated) {
+  if (generateState === "fallback_hidden") {
     return <p className="hito-caption text-success">Prompt generated.</p>;
   }
 
-  return <p className="hito-caption">Local prompt draft · {defaultLabel}</p>;
+  return <p className="hito-caption">Local prompt draft · Prompt hidden until Generate Prompt.</p>;
 }

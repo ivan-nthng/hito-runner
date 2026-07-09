@@ -1,6 +1,7 @@
 import {
   getInlineChangeAction,
   type InlineChangeAction,
+  type InlineChangeChromeRemovalSelection,
   type InlineChangeTargetInput,
   type InlineChangeTokenControlInput,
   type InlineChangeTokenControlSelection,
@@ -25,7 +26,11 @@ export function buildTypographyRoleSelection(
 export function getInferredDraftAction(
   tokenControlSelections: InlineChangeTokenControlSelection[],
   typographyRoleSelection: InlineChangeTypographySelection | null,
+  chromeRemovalSelection: InlineChangeChromeRemovalSelection | null,
 ) {
+  if (chromeRemovalSelection?.kind === "card_chrome")
+    return getInlineChangeAction("remove_card_chrome");
+  if (chromeRemovalSelection?.kind === "border") return getInlineChangeAction("remove_border");
   if (typographyRoleSelection) return getInlineChangeAction("align_typography");
   if (tokenControlSelections.length === 0) return getInlineChangeAction("comment");
 
@@ -52,14 +57,19 @@ export function getHasActionableDraft({
   proposedText,
   tokenControlSelections,
   typographyRoleSelection,
+  chromeRemovalSelection,
 }: {
   action: InlineChangeAction | null;
+  chromeRemovalSelection: InlineChangeChromeRemovalSelection | null;
   comment: string;
   proposedText: string;
   tokenControlSelections: InlineChangeTokenControlSelection[];
   typographyRoleSelection: InlineChangeTypographySelection | null;
 }) {
-  const hasPropertyChange = tokenControlSelections.length > 0 || Boolean(typographyRoleSelection);
+  const hasPropertyChange =
+    tokenControlSelections.length > 0 ||
+    Boolean(typographyRoleSelection) ||
+    Boolean(chromeRemovalSelection);
   if (!action) return comment.trim().length > 0 || hasPropertyChange;
 
   switch (action.id) {
@@ -68,6 +78,10 @@ export function getHasActionableDraft({
       return comment.trim().length > 0 || hasPropertyChange;
     case "edit_text":
       return proposedText.trim().length > 0;
+    case "remove_border":
+      return chromeRemovalSelection?.kind === "border";
+    case "remove_card_chrome":
+      return chromeRemovalSelection?.kind === "card_chrome";
     case "reduce_padding":
     case "reduce_gap":
     case "reduce_radius":
@@ -101,5 +115,10 @@ export function getHasObservedProperties(
   target: InlineChangeTargetInput,
   tokenControls: InlineChangeTokenControlInput[],
 ) {
-  return tokenControls.length > 0 || Boolean(target.typography);
+  return (
+    tokenControls.length > 0 ||
+    Boolean(target.typography) ||
+    Boolean(target.border) ||
+    Boolean(target.cardChrome?.isDetected)
+  );
 }

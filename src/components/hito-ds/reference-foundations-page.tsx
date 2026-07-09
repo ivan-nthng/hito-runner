@@ -311,6 +311,16 @@ const SPACING_PRIMITIVES = [
   { name: "space-10", value: "2.5rem", use: "Hero/top-level route moments only" },
 ] as const;
 
+const RADIUS_PRIMITIVES = [
+  { name: "radius-sm", token: "--radius-sm", use: "Tiny tags, compact inspector chips" },
+  { name: "radius-md", token: "--radius-md", use: "Small buttons, inputs, menu rows" },
+  { name: "radius-lg", token: "--radius-lg", use: "Default controls and menus" },
+  { name: "radius-xl", token: "--radius-xl", use: "Cards, day rows, compact panels" },
+  { name: "radius-2xl", token: "--radius-2xl", use: "Dialogs and emphasized surfaces" },
+  { name: "radius-3xl", token: "--radius-3xl", use: "Large editorial/product moments" },
+  { name: "radius-4xl", token: "--radius-4xl", use: "Reserved oversized surfaces" },
+] as const;
+
 const TYPOGRAPHY_FAMILIES = [
   {
     family: "Display",
@@ -817,6 +827,15 @@ export function HitoDsFoundationsPage() {
               <div className="mt-4 grid gap-3">
                 {SPACING_PRIMITIVES.map((space) => (
                   <SpacingPrimitiveRow key={space.name} space={space} />
+                ))}
+              </div>
+            </div>
+
+            <div className="hito-reference-note">
+              <p className="hito-label">Radius primitives</p>
+              <div className="mt-4 grid gap-3">
+                {RADIUS_PRIMITIVES.map((radius) => (
+                  <RadiusPrimitiveRow key={radius.token} radius={radius} />
                 ))}
               </div>
             </div>
@@ -1419,6 +1438,25 @@ function SpacingPrimitiveRow({ space }: { space: (typeof SPACING_PRIMITIVES)[num
           style={{ width: `calc(${space.value} * 5)` } satisfies CSSProperties}
         />
         <p className="hito-caption">{space.use}</p>
+      </div>
+    </div>
+  );
+}
+
+function RadiusPrimitiveRow({ radius }: { radius: (typeof RADIUS_PRIMITIVES)[number] }) {
+  return (
+    <div className="grid gap-2 border-t border-hairline pt-3 first:border-t-0 first:pt-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="hito-list-row-title">{radius.name}</p>
+        <code className="hito-technical-mono">{radius.token}</code>
+      </div>
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="block size-10 shrink-0 border border-hairline bg-muted/60"
+          style={{ borderRadius: `var(${radius.token})` } satisfies CSSProperties}
+        />
+        <p className="hito-caption">{radius.use}</p>
       </div>
     </div>
   );

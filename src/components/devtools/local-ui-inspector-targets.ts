@@ -1,4 +1,8 @@
 import type {
+  InlineChangeBorderEvidence,
+  InlineChangeBorderSide,
+  InlineChangeBorderSideEvidence,
+  InlineChangeCardChromeEvidence,
   InlineChangeDimensionEvidence,
   InlineChangeTargetInput,
   InlineChangeTargetKind,
@@ -121,6 +125,8 @@ export function inspectLocalUiTarget(
 ): Pick<
   InlineChangeTargetInput,
   | "classificationReason"
+  | "border"
+  | "cardChrome"
   | "dimensions"
   | "evidenceLines"
   | "targetKind"
@@ -135,13 +141,24 @@ export function inspectLocalUiTarget(
   const visibleText = getDirectTextEvidence(element);
   const dimensions = buildDimensionEvidence(element);
   const tokenControls = buildTokenEvidence(styles);
+  const border = buildBorderEvidence(styles);
   const targetKind = classifyTarget(element, styles, visibleText);
+  const cardChrome = buildCardChromeEvidence(targetKind, border, tokenControls);
   const typography = canExposeTypography(targetKind)
     ? buildTypographyEvidence(element, styles, visibleText)
     : null;
-  const evidenceLines = buildBaseEvidence(element, styles, visibleText, dimensions, typography);
+  const evidenceLines = buildBaseEvidence(
+    element,
+    styles,
+    visibleText,
+    dimensions,
+    typography,
+    border,
+  );
 
   return {
+    border,
+    cardChrome,
     classificationReason: buildClassificationReason(targetKind, tag, role, className, styles),
     dimensions,
     evidenceLines,
@@ -220,6 +237,7 @@ function buildBaseEvidence(
   visibleText: string,
   dimensions: InlineChangeDimensionEvidence[],
   typography: InlineChangeTypographyEvidence | null,
+  border: InlineChangeBorderEvidence | null,
 ) {
   const className = String(element.className ?? "");
   const role = element.getAttribute("role");
@@ -234,6 +252,7 @@ function buildBaseEvidence(
 
   if (visibleText) evidence.push(`Current text evidence: "${visibleText.slice(0, 120)}".`);
   if (hitoClasses.length > 0) evidence.push(`Hito DS class evidence: ${hitoClasses.join(", ")}.`);
+  if (border) evidence.push(`Border: ${border.summary}.`);
   if (dimensions.length > 0) {
     evidence.push(
       `Dimensions: ${dimensions
@@ -261,6 +280,97 @@ function buildBaseEvidence(
   }
 
   return evidence;
+}
+
+function buildBorderEvidence(styles: CSSStyleDeclaration): InlineChangeBorderEvidence | null {
+  const sides = (
+    [
+      ["top", styles.borderTopWidth, styles.borderTopStyle, styles.borderTopColor],
+      ["right", styles.borderRightWidth, styles.borderRightStyle, styles.borderRightColor],
+      ["bottom", styles.borderBottomWidth, styles.borderBottomStyle, styles.borderBottomColor],
+      ["left", styles.borderLeftWidth, styles.borderLeftStyle, styles.borderLeftColor],
+    ] as const
+  )
+    .map(([side, width, style, color]) => buildBorderSideEvidence(side, width, style, color))
+    .filter((side): side is InlineChangeBorderSideEvidence => Boolean(side));
+
+  if (sides.length === 0) return null;
+
+  return {
+    label: "Border",
+    sides,
+    summary: formatBorderSides(sides),
+  };
+}
+
+function buildBorderSideEvidence(
+  side: InlineChangeBorderSide,
+  width: string,
+  style: string,
+  color: string,
+): InlineChangeBorderSideEvidence | null {
+  const widthPx = parsePixelValue(width);
+  if (widthPx == null || widthPx <= 0 || style === "none" || style === "hidden") return null;
+
+  return {
+    color: normalizeBorderColor(color),
+    side,
+    style,
+    widthLabel: formatCompactPx(widthPx),
+    widthPx,
+  };
+}
+
+function buildCardChromeEvidence(
+  targetKind: InlineChangeTargetKind,
+  border: InlineChangeBorderEvidence | null,
+  tokenControls: InlineChangeTokenControlInput[],
+): InlineChangeCardChromeEvidence | null {
+  if (targetKind !== "surface") return null;
+
+  const paddingControls = tokenControls.filter((control) => control.id.startsWith("padding-"));
+  const radiusControls = tokenControls.filter((control) => control.kind === "radius");
+  const isDetected = Boolean(border || paddingControls.length > 0 || radiusControls.length > 0);
+  if (!isDetected) return null;
+
+  return {
+    border,
+    isDetected,
+    paddingControls,
+    radiusControls,
+  };
+}
+
+function formatBorderSides(sides: InlineChangeBorderSideEvidence[]) {
+  const [first] = sides;
+  const allSame =
+    first &&
+    sides.every(
+      (side) =>
+        side.widthLabel === first.widthLabel &&
+        side.style === first.style &&
+        side.color === first.color,
+    );
+
+  if (first && allSame) {
+    return `${first.widthLabel}px ${first.style}${first.color ? ` ${first.color}` : ""}`;
+  }
+
+  return sides
+    .map(
+      (side) =>
+        `${side.side} ${side.widthLabel}px ${side.style}${side.color ? ` ${side.color}` : ""}`,
+    )
+    .join("; ");
+}
+
+function normalizeBorderColor(color: string) {
+  const normalized = normalizeCssValue(color);
+  if (!normalized || normalized === "transparent" || normalized === "rgba(0, 0, 0, 0)") {
+    return null;
+  }
+
+  return normalized;
 }
 
 function buildDimensionEvidence(element: HTMLElement): InlineChangeDimensionEvidence[] {

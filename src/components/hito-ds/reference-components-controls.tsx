@@ -5,6 +5,7 @@ import {
   HitoMaskedTimeField,
 } from "@/components/ui/hito-date-time-input";
 import { Icon } from "@/components/ui/icon";
+import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { ProductLinks, ReferenceListRow } from "@/components/hito-ds/reference";
 import {
@@ -649,6 +650,33 @@ export function HitoDsComponentControls() {
                   placeholder="Describe goal, constraints, recent results, or JSON notes."
                 />
               </label>
+              <div className="grid min-w-0 gap-3 lg:col-span-2">
+                <div>
+                  <p className="hito-label">Header input variant</p>
+                  <p className="hito-caption mt-2 max-w-2xl">
+                    True editable headings use the shared inline text primitive with Hito-sized
+                    header field padding.
+                  </p>
+                </div>
+                <div className="grid min-w-0 gap-3 md:grid-cols-3">
+                  {(["sm", "md", "lg"] as const).map((headerSize) => (
+                    <InlineEditableText
+                      key={headerSize}
+                      aria-label={`Edit ${headerSize} header input specimen`}
+                      onChange={() => {}}
+                      size={headerSize}
+                      value={
+                        headerSize === "lg"
+                          ? "Workout title"
+                          : headerSize === "md"
+                            ? "Section heading"
+                            : "Block label"
+                      }
+                      variant="header"
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="border-t border-hairline pt-5">

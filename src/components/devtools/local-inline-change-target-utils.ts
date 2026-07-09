@@ -23,6 +23,8 @@ export type InlineChangeTokenControlId =
 
 export type InlineChangeTokenControlKind = "radius" | "spacing";
 
+export type InlineChangeBorderSide = "bottom" | "left" | "right" | "top";
+
 export type InlineChangeTokenControlOption = {
   displayValue: string;
   token: string;
@@ -77,6 +79,36 @@ export type InlineChangeTokenControlSelection = InlineChangeTokenControlInput & 
   desiredValuePx: number | null;
 };
 
+export type InlineChangeBorderSideEvidence = {
+  color: string | null;
+  side: InlineChangeBorderSide;
+  style: string;
+  widthLabel: string;
+  widthPx: number;
+};
+
+export type InlineChangeBorderEvidence = {
+  label: "Border";
+  sides: InlineChangeBorderSideEvidence[];
+  summary: string;
+};
+
+export type InlineChangeCardChromeEvidence = {
+  border: InlineChangeBorderEvidence | null;
+  isDetected: boolean;
+  paddingControls: InlineChangeTokenControlInput[];
+  radiusControls: InlineChangeTokenControlInput[];
+};
+
+export type InlineChangeChromeRemovalKind = "border" | "card_chrome";
+
+export type InlineChangeChromeRemovalSelection = {
+  border: InlineChangeBorderEvidence | null;
+  kind: InlineChangeChromeRemovalKind;
+  paddingControls: InlineChangeTokenControlInput[];
+  radiusControls: InlineChangeTokenControlInput[];
+};
+
 export type InlineChangeAction = {
   category: string;
   defaultOwner: string;
@@ -85,8 +117,11 @@ export type InlineChangeAction = {
 };
 
 export type InlineChangeTargetInput = {
+  border?: InlineChangeBorderEvidence | null;
+  cardChrome?: InlineChangeCardChromeEvidence | null;
   classificationReason?: string | null;
   componentId?: string | null;
+  chromeRemovalSelection?: InlineChangeChromeRemovalSelection | null;
   dimensions?: InlineChangeDimensionEvidence[] | null;
   elementClasses?: string | null;
   elementRole?: string | null;
@@ -125,6 +160,9 @@ export type InlineChangeTargetPayload = {
   source: "inline_change_target_local_v1";
   target: {
     classificationReason: string | null;
+    border: InlineChangeBorderEvidence | null;
+    cardChrome: InlineChangeCardChromeEvidence | null;
+    chromeRemoval: InlineChangeChromeRemovalSelection | null;
     componentId: string | null;
     elementClasses: string | null;
     elementRole: string | null;
@@ -177,6 +215,8 @@ export const INLINE_CHANGE_SCOPE_OPTIONS: InlineChangeScopeOption[] =
 export const INLINE_CHANGE_ACTIONS: InlineChangeAction[] = [
   ["edit_text", "Edit text", "Text / Copy", "copy"],
   ["comment", "Comment", "UI Note", "frontend"],
+  ["remove_border", "Remove border", "Surface / Chrome", "frontend"],
+  ["remove_card_chrome", "Card chrome", "Surface / Chrome", "frontend"],
   ["reduce_padding", "Reduce padding", "Spacing / Layout", "frontend"],
   ["reduce_gap", "Reduce gap", "Spacing / Layout", "frontend"],
   ["reduce_radius", "Reduce radius", "Surface / Chrome", "frontend"],
@@ -272,6 +312,9 @@ export function buildInlineChangePayload({
       suggestedOwner: target.suggestedOwner?.trim() || action.defaultOwner,
       kind: normalizeTargetKind(target.targetKind),
       classificationReason: normalizeTargetValue(target.classificationReason),
+      border: normalizeBorderEvidence(target.border),
+      cardChrome: normalizeCardChromeEvidence(target.cardChrome),
+      chromeRemoval: normalizeChromeRemovalSelection(target.chromeRemovalSelection),
       evidence: normalizeList(target.evidenceLines),
       dimensions: normalizeDimensions(target.dimensions),
       tokenControls: normalizeTokenControlSelections(target.tokenControlSelections),
@@ -310,12 +353,17 @@ export function buildInlineChangePrompt(payload: InlineChangeTargetPayload) {
     payload.target.tokenControls.length > 0
       ? payload.target.tokenControls.map(formatTokenControlPromptLine)
       : [];
+  const chromeRemovalEvidence = payload.target.chromeRemoval
+    ? [formatChromeRemovalPromptLine(payload.target.chromeRemoval)]
+    : [];
   const typographyEvidence = payload.target.typographyRoleSelection?.desiredRole
     ? [formatTypographyPromptLine(payload.target.typographyRoleSelection)]
     : [];
   const selectedChanges =
-    tokenControlEvidence.length > 0 || typographyEvidence.length > 0
-      ? [...tokenControlEvidence, ...typographyEvidence]
+    chromeRemovalEvidence.length > 0 ||
+    tokenControlEvidence.length > 0 ||
+    typographyEvidence.length > 0
+      ? [...chromeRemovalEvidence, ...tokenControlEvidence, ...typographyEvidence]
       : ["- No explicit property change selected."];
   const dsInspection =
     payload.fixScope.id === "hito_ds"
@@ -398,6 +446,80 @@ function normalizeTokenControlSelections(
     .slice(0, 10);
 }
 
+function normalizeTokenControlInputs(values: InlineChangeTokenControlInput[] | null | undefined) {
+  return (values ?? [])
+    .filter((value) => value.id && value.label && Number.isFinite(value.currentValuePx))
+    .slice(0, 10);
+}
+
+function normalizeBorderEvidence(
+  value: InlineChangeBorderEvidence | null | undefined,
+): InlineChangeBorderEvidence | null {
+  const sides = (value?.sides ?? [])
+    .filter(
+      (side) =>
+        side.side &&
+        side.style &&
+        side.widthLabel &&
+        Number.isFinite(side.widthPx) &&
+        side.widthPx > 0,
+    )
+    .slice(0, 4);
+  if (sides.length === 0) return null;
+
+  return {
+    label: "Border",
+    sides,
+    summary: normalizeTargetValue(value?.summary) ?? formatBorderSides(sides),
+  };
+}
+
+function normalizeCardChromeEvidence(
+  value: InlineChangeCardChromeEvidence | null | undefined,
+): InlineChangeCardChromeEvidence | null {
+  if (!value?.isDetected) return null;
+
+  const border = normalizeBorderEvidence(value.border);
+  const paddingControls = normalizeTokenControlInputs(value.paddingControls);
+  const radiusControls = normalizeTokenControlInputs(value.radiusControls);
+
+  if (!border && paddingControls.length === 0 && radiusControls.length === 0) return null;
+
+  return {
+    border,
+    isDetected: true,
+    paddingControls,
+    radiusControls,
+  };
+}
+
+function normalizeChromeRemovalSelection(
+  value: InlineChangeChromeRemovalSelection | null | undefined,
+): InlineChangeChromeRemovalSelection | null {
+  if (!value) return null;
+
+  const border = normalizeBorderEvidence(value.border);
+  const paddingControls = normalizeTokenControlInputs(value.paddingControls);
+  const radiusControls = normalizeTokenControlInputs(value.radiusControls);
+
+  if (value.kind === "border" && !border) return null;
+  if (
+    value.kind === "card_chrome" &&
+    !border &&
+    paddingControls.length === 0 &&
+    radiusControls.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    border,
+    kind: value.kind,
+    paddingControls,
+    radiusControls,
+  };
+}
+
 function formatTokenControlPromptLine(control: InlineChangeTokenControlSelection) {
   const currentToken = control.currentToken
     ? control.currentToken
@@ -409,6 +531,65 @@ function formatTokenControlPromptLine(control: InlineChangeTokenControlSelection
     : "not selected";
 
   return `- ${control.label}: current ${control.currentValueLabel}px (${currentToken}); desired ${desired}.`;
+}
+
+function formatChromeRemovalPromptLine(selection: InlineChangeChromeRemovalSelection) {
+  if (selection.kind === "border") {
+    const border = selection.border
+      ? formatBorderEvidence(selection.border)
+      : "the observed border";
+    return `- Remove the border currently ${border} from this selected target. Padding, radius, margin, and content stay unchanged.`;
+  }
+
+  const parts = [
+    selection.border ? `border ${formatBorderEvidence(selection.border)}` : null,
+    selection.radiusControls.length > 0
+      ? `radius ${formatObservedControlSet(selection.radiusControls)}`
+      : null,
+    selection.paddingControls.length > 0
+      ? `padding ${formatObservedControlSet(selection.paddingControls)}`
+      : null,
+  ].filter(Boolean);
+
+  return `- Remove card chrome from this selected target: remove ${parts.join(", ")} where present. Do not delete content, remove margin, or add shadow controls in this slice.`;
+}
+
+function formatBorderEvidence(border: InlineChangeBorderEvidence) {
+  return border.summary || formatBorderSides(border.sides);
+}
+
+function formatBorderSides(sides: InlineChangeBorderSideEvidence[]) {
+  const [first] = sides;
+  const allSame =
+    first &&
+    sides.every(
+      (side) =>
+        side.widthLabel === first.widthLabel &&
+        side.style === first.style &&
+        side.color === first.color,
+    );
+
+  if (first && allSame) {
+    return `${first.widthLabel}px ${first.style}${first.color ? ` ${first.color}` : ""}`;
+  }
+
+  return sides
+    .map(
+      (side) =>
+        `${side.side} ${side.widthLabel}px ${side.style}${side.color ? ` ${side.color}` : ""}`,
+    )
+    .join("; ");
+}
+
+function formatObservedControlSet(controls: InlineChangeTokenControlInput[]) {
+  const values = controls.map(
+    (control) => `${formatControlPartLabel(control.label)} ${control.currentValueLabel}px`,
+  );
+  return values.join(", ");
+}
+
+function formatControlPartLabel(label: string) {
+  return label.replace(/\s+(padding|radius)$/i, "").toLowerCase();
 }
 
 function normalizeTypographyEvidence(

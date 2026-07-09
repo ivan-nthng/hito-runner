@@ -535,14 +535,13 @@ function isPointNearChrome(element: HTMLElement, point: { x: number; y: number }
 
 function describeTargetElement(element: HTMLElement): SelectedTarget {
   const rect = element.getBoundingClientRect();
-  const visibleText = normalizeVisibleText(element.innerText || element.textContent || "");
   const targetInspection = inspectLocalUiTarget(element);
   const targetLabel =
     element.getAttribute("aria-label") ||
     element.getAttribute("data-hito-ds-pattern") ||
     element.getAttribute("data-testid") ||
     element.id ||
-    describeTag(element);
+    describeStableTag(element);
 
   return {
     componentId:
@@ -558,7 +557,7 @@ function describeTargetElement(element: HTMLElement): SelectedTarget {
     selector: buildSelector(element),
     suggestedOwner: "frontend",
     targetLabel,
-    visibleText,
+    visibleText: targetInspection.visibleText,
   };
 }
 
@@ -634,8 +633,14 @@ function parsePixelValue(value: string) {
   return match ? Number(match[1]) : null;
 }
 
-function describeTag(element: HTMLElement) {
-  return element.tagName.toLowerCase();
+function describeStableTag(element: HTMLElement) {
+  const tag = element.tagName.toLowerCase();
+  const stableClass = String(element.className)
+    .trim()
+    .split(/\s+/)
+    .find((className) => className.startsWith("hito-"));
+
+  return stableClass ? `${tag}.${stableClass}` : tag;
 }
 
 function escapeSelectorValue(value: string) {

@@ -126,17 +126,20 @@ export function inspectLocalUiTarget(
   | "targetKind"
   | "tokenControls"
   | "typography"
+  | "visibleText"
 > {
   const styles = window.getComputedStyle(element);
   const tag = element.tagName.toLowerCase();
   const role = element.getAttribute("role")?.toLowerCase() ?? null;
   const className = String(element.className ?? "");
-  const visibleText = normalizeVisibleText(element.innerText || element.textContent || "");
+  const visibleText = getDirectTextEvidence(element);
   const dimensions = buildDimensionEvidence(element);
-  const typography = buildTypographyEvidence(element, styles, visibleText);
-  const evidenceLines = buildBaseEvidence(element, styles, visibleText, dimensions, typography);
   const tokenControls = buildTokenEvidence(styles);
   const targetKind = classifyTarget(element, styles, visibleText);
+  const typography = canExposeTypography(targetKind)
+    ? buildTypographyEvidence(element, styles, visibleText)
+    : null;
+  const evidenceLines = buildBaseEvidence(element, styles, visibleText, dimensions, typography);
 
   return {
     classificationReason: buildClassificationReason(targetKind, tag, role, className, styles),
@@ -145,6 +148,7 @@ export function inspectLocalUiTarget(
     targetKind,
     tokenControls,
     typography,
+    visibleText,
   };
 }
 
@@ -173,7 +177,9 @@ function classifyTarget(
 
   if (HEADING_TAGS.has(tag) || hasHierarchyClass(className)) return "hierarchy";
 
-  if (hasText && (TEXT_TAGS.has(tag) || (childCount <= 1 && !hasLayout))) return "text";
+  if (hasText && TEXT_TAGS.has(tag)) return "text";
+
+  if (hasText && childCount <= 1 && !hasLayout) return "text";
 
   if (hasLayout) return "container";
 
@@ -296,10 +302,8 @@ function buildTypographyEvidence(
       HITO_TYPOGRAPHY_ROLE_OPTIONS.some((role) => role.className === classPart),
     );
   const hasTextSignal =
-    visibleText.length > 0 ||
-    typographyClasses.length > 0 ||
-    HEADING_TAGS.has(tag) ||
-    TEXT_TAGS.has(tag);
+    visibleText.length > 0 &&
+    (typographyClasses.length > 0 || HEADING_TAGS.has(tag) || TEXT_TAGS.has(tag));
 
   if (!hasTextSignal) return null;
 
@@ -315,6 +319,41 @@ function buildTypographyEvidence(
     options: HITO_TYPOGRAPHY_ROLE_OPTIONS,
     tag,
   };
+}
+
+function canExposeTypography(targetKind: InlineChangeTargetKind) {
+  return targetKind === "text" || targetKind === "hierarchy";
+}
+
+function getDirectTextEvidence(element: HTMLElement) {
+  const tag = element.tagName.toLowerCase();
+  const role = element.getAttribute("role")?.toLowerCase() ?? null;
+  const className = String(element.className ?? "");
+  const hasTypographyClass =
+    HITO_TYPOGRAPHY_ROLE_OPTIONS.some((option) =>
+      className.split(/\s+/).includes(option.className),
+    ) || hasHierarchyClass(className);
+  const isTextEligibleTag = TEXT_TAGS.has(tag) || HEADING_TAGS.has(tag);
+  const isDirectTextCandidate =
+    isTextEligibleTag ||
+    hasTypographyClass ||
+    CONTROL_TAGS.has(tag) ||
+    (role != null && CONTROL_ROLES.has(role)) ||
+    element.childElementCount === 0;
+
+  if (!isDirectTextCandidate) return "";
+  if (element.childElementCount > 1) return "";
+
+  const onlyChild = element.firstElementChild;
+  if (onlyChild && !isInlineTextChild(onlyChild)) return "";
+
+  return normalizeVisibleText(element.textContent || "");
+}
+
+function isInlineTextChild(element: Element) {
+  return /^(abbr|b|code|em|i|kbd|mark|small|span|strong|sub|sup|time)$/.test(
+    element.tagName.toLowerCase(),
+  );
 }
 
 function buildTokenEvidence(styles: CSSStyleDeclaration) {

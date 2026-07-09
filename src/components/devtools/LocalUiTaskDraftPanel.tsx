@@ -1,15 +1,24 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { copyTextToClipboard } from "@/components/devtools/local-ui-clipboard";
 import {
+  INLINE_CHANGE_SCOPE_OPTIONS,
   buildInlineChangePayload,
   buildInlineChangePrompt,
   buildTokenControlSelections,
   getDefaultFixScope,
   getInlineChangeAction,
   normalizeTargetKind,
+  type InlineChangeFixScope,
   type InlineChangeTargetInput,
   type InlineChangeTokenControlSelection,
   type InlineChangeTypographySelection,
@@ -48,6 +57,7 @@ export function LocalUiTaskDraftPanel({
   const [draftMessage, setDraftMessage] = useState<string | null>(null);
   const [desiredTokens, setDesiredTokens] = useState<Record<string, string>>({});
   const [desiredTypographyRole, setDesiredTypographyRole] = useState<string | null>(null);
+  const [fixScope, setFixScope] = useState<InlineChangeFixScope>(getDefaultFixScope);
   const manualPromptRef = useRef<HTMLTextAreaElement | null>(null);
   const selectedAction = useMemo(
     () => (actionId ? getInlineChangeAction(actionId) : null),
@@ -79,7 +89,6 @@ export function LocalUiTaskDraftPanel({
     () => selectedAction ?? getInferredDraftAction(tokenControlSelections, typographyRoleSelection),
     [selectedAction, tokenControlSelections, typographyRoleSelection],
   );
-  const fixScope = getDefaultFixScope();
   const payload = useMemo(
     () =>
       buildInlineChangePayload({
@@ -106,7 +115,7 @@ export function LocalUiTaskDraftPanel({
   );
   const prompt = useMemo(() => buildInlineChangePrompt(payload), [payload]);
   const payloadJson = useMemo(() => JSON.stringify(payload, null, 2), [payload]);
-  const targetLabel = payload.target.label ?? payload.target.visibleText ?? "Selected UI element";
+  const targetLabel = payload.target.label ?? payload.target.selector ?? "Selected UI element";
   const showManualPromptFallback = promptGenerated && generateState === "copy_failed";
   const hasActionableDraft = getHasActionableDraft({
     action: draftAction,
@@ -123,6 +132,7 @@ export function LocalUiTaskDraftPanel({
     setPromptGenerated(false);
     setDesiredTokens({});
     setDesiredTypographyRole(null);
+    setFixScope(getDefaultFixScope());
     setProposedText(target.visibleText ?? "");
   }, [target]);
 
@@ -149,6 +159,7 @@ export function LocalUiTaskDraftPanel({
     setPromptGenerated(false);
     setDesiredTokens({});
     setDesiredTypographyRole(null);
+    setFixScope(getDefaultFixScope());
     setProposedText(target.visibleText ?? "");
   };
 
@@ -252,6 +263,31 @@ export function LocalUiTaskDraftPanel({
           ) : null}
         </div>
       ) : null}
+
+      <label className="grid min-w-0 gap-1">
+        <span className="hito-label">Scope of fix</span>
+        <Select
+          value={fixScope}
+          onValueChange={(value) => {
+            setFixScope(value as InlineChangeFixScope);
+            clearGeneratedPrompt();
+          }}
+        >
+          <SelectTrigger
+            className="hito-field-sm h-8 min-w-0 rounded-md px-2 py-0 text-xs shadow-none focus-visible:ring-1"
+            aria-label="Scope of fix"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end" className="z-[73] w-64" data-local-ui-inspector-layer="">
+            {INLINE_CHANGE_SCOPE_OPTIONS.map((option) => (
+              <SelectItem key={option.id} value={option.id} title={option.description}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
 
       {showReplacementText ? (
         <label className="grid min-w-0 gap-1">

@@ -8,14 +8,18 @@ import type {
 export function PendingChangeRemoveButton({
   ariaLabel,
   onClick,
+  visibility = "subtle",
 }: {
   ariaLabel: string;
   onClick: () => void;
+  visibility?: "hover" | "subtle";
 }) {
   return (
     <button
       type="button"
-      className="absolute -right-1 -top-1 z-10 grid size-4 place-items-center rounded-sm border border-success/25 bg-background text-success opacity-70 shadow-soft outline-none transition-opacity hover:bg-success/10 hover:opacity-100 focus:bg-success/10 focus:opacity-100 focus-visible:ring-1 focus-visible:ring-success group-hover:opacity-100 group-focus-within:opacity-100"
+      className={`absolute -right-1 -top-1 z-10 grid size-4 place-items-center rounded-sm border border-success/25 bg-background text-success shadow-soft outline-none transition-opacity hover:bg-success/10 hover:opacity-100 focus:bg-success/10 focus:opacity-100 focus-visible:ring-1 focus-visible:ring-success group-hover:opacity-100 group-focus-within:opacity-100 ${
+        visibility === "hover" ? "opacity-0" : "opacity-70"
+      }`}
       aria-label={ariaLabel}
       onClick={onClick}
     >

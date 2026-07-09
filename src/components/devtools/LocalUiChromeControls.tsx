@@ -1,4 +1,4 @@
-import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/icon";
 import type {
   InlineChangeBorderEvidence,
   InlineChangeCardChromeEvidence,
@@ -26,13 +26,9 @@ export function ChromeControlRows({
   return (
     <div className="grid min-w-0 gap-1.5">
       {border ? (
-        <ChromeControlLine
-          actionLabel="Remove"
+        <BorderControlLine
           active={chromeRemovalSelection?.kind === "border"}
           currentLabel={getBorderValueLabel(border)}
-          desiredLabel="Removed"
-          iconName="minus"
-          label="Border"
           tooltip={border.summary}
           onActivate={() =>
             onChromeRemovalChange({
@@ -46,13 +42,8 @@ export function ChromeControlRows({
         />
       ) : null}
       {cardChrome?.isDetected ? (
-        <ChromeControlLine
-          actionLabel="Turn off"
+        <CardChromeControlLine
           active={chromeRemovalSelection?.kind === "card_chrome"}
-          currentLabel="On"
-          desiredLabel="Off"
-          iconName="settings"
-          label="Card chrome"
           tooltip={getCardChromeHelpLabel(cardChrome)}
           onActivate={() =>
             onChromeRemovalChange({
@@ -69,60 +60,86 @@ export function ChromeControlRows({
   );
 }
 
-function ChromeControlLine({
-  actionLabel,
+function BorderControlLine({
   active,
   currentLabel,
-  desiredLabel,
-  iconName,
-  label,
   onActivate,
   onRemove,
   tooltip,
 }: {
-  actionLabel: string;
   active: boolean;
   currentLabel: string;
-  desiredLabel: string;
-  iconName: HitoIconName;
-  label: string;
   onActivate: () => void;
   onRemove: () => void;
   tooltip: string;
 }) {
   return (
-    <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row={label}>
+    <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row="Border">
       <div className="flex min-w-0 items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
-            <Icon name={iconName} size="xs" />
+            <Icon name="minus" size="xs" />
           </span>
-          <span className="hito-caption min-w-0 truncate text-foreground">{label}</span>
+          <span className="hito-caption min-w-0 truncate text-foreground">Border</span>
         </div>
         {active ? (
           <>
             <ValueTag tone="current" value={currentLabel} tooltip={tooltip} />
             <Icon name="arrow-right" size="xs" className="shrink-0 text-muted-foreground" />
             <div className="group relative shrink-0">
-              <ValueTag tone="desired" value={desiredLabel} tooltip={tooltip} />
+              <ValueTag tone="desired" value="Removed" tooltip={tooltip} />
               <PendingChangeRemoveButton
-                ariaLabel={`Remove ${label} pending change`}
+                ariaLabel="Remove Border pending change"
                 onClick={onRemove}
               />
             </div>
           </>
         ) : (
-          <>
+          <div className="group relative shrink-0">
             <ValueTag value={currentLabel} tooltip={tooltip} />
-            <button
-              type="button"
-              className="hito-button hito-button-ghost hito-button-sm min-h-7 px-2"
+            <PendingChangeRemoveButton
+              ariaLabel="Remove Border"
               onClick={onActivate}
-            >
-              {actionLabel}
-            </button>
-          </>
+              visibility="hover"
+            />
+          </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function CardChromeControlLine({
+  active,
+  onActivate,
+  onRemove,
+  tooltip,
+}: {
+  active: boolean;
+  onActivate: () => void;
+  onRemove: () => void;
+  tooltip: string;
+}) {
+  return (
+    <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row="Card chrome">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
+            <Icon name="settings" size="xs" />
+          </span>
+          <span className="hito-caption min-w-0 truncate text-foreground">Card chrome</span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={!active}
+          aria-label={`Card chrome. ${active ? "Off" : "On"}. ${tooltip}`}
+          title={tooltip}
+          className="hito-choice-toggle hito-choice-toggle-xs min-w-12"
+          onClick={active ? onRemove : onActivate}
+        >
+          {active ? "Off" : "On"}
+        </button>
       </div>
     </div>
   );

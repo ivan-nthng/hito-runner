@@ -120,6 +120,7 @@ export const HITO_ICON_META = [
   { name: "radius-top-left", category: "layout/radius", label: "Radius top left" },
   { name: "radius-bottom-right", category: "layout/radius", label: "Radius bottom right" },
   { name: "radius-bottom-left", category: "layout/radius", label: "Radius bottom left" },
+  { name: "typography", category: "text/typography", label: "Typography" },
 ] as const;
 
 export type HitoIconName = (typeof HITO_ICON_META)[number]["name"];
@@ -168,6 +169,46 @@ const IconRadiusTopRight = createRadiusIcon("radius-top-right");
 const IconRadiusTopLeft = createRadiusIcon("radius-top-left");
 const IconRadiusBottomRight = createRadiusIcon("radius-bottom-right");
 const IconRadiusBottomLeft = createRadiusIcon("radius-bottom-left");
+const IconTypography = forwardRef<SVGSVGElement, HitoTablerIconProps>(function TypographyIcon(
+  { className, fill, size = 24, stroke: _stroke, title, ...props },
+  ref,
+) {
+  return (
+    <svg
+      ref={ref}
+      aria-hidden={props["aria-hidden"]}
+      aria-label={props["aria-label"]}
+      className={className}
+      fill="none"
+      focusable={props.focusable}
+      height={size}
+      role={props.role}
+      viewBox="0 0 16 16"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      {title ? <title>{title}</title> : null}
+      <g fill={fill ?? "currentColor"}>
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M0 1.56955C0 1.255 0.257618 1 0.575406 1L15.4246 1C15.7424 1 16 1.255 16 1.56955C16 1.88411 15.7424 2.13911 15.4246 2.13911L0.575406 2.13911C0.257618 2.13911 0 1.88411 0 1.56955Z"
+        />
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M0 14.4304C0 14.1159 0.257618 13.8609 0.575406 13.8609H15.4246C15.7424 13.8609 16 14.1159 16 14.4304C16 14.745 15.7424 15 15.4246 15L0.575406 15C0.257618 15 0 14.745 0 14.4304Z"
+        />
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M8.7283 2.94543C8.61837 2.67123 8.32683 2.48819 8 2.48819C7.67317 2.48819 7.38162 2.67123 7.27169 2.94543L3.40489 12.591C3.26124 12.9493 3.47086 13.3435 3.87309 13.4715C4.27532 13.5995 4.71785 13.4127 4.8615 13.0544L6.0592 10.0668H9.9408L11.1385 13.0544C11.2822 13.4127 11.7247 13.5995 12.1269 13.4715C12.5291 13.3435 12.7388 12.9493 12.5951 12.591L8.7283 2.94543ZM9.38839 8.68888H6.6116L8 5.22559L9.38839 8.68888Z"
+        />
+      </g>
+    </svg>
+  );
+}) as TablerIcon;
 
 const gapHorizontalPaths = (
   <>
@@ -385,6 +426,7 @@ const HITO_ICON_COMPONENTS: Record<HitoIconName, TablerIcon> = {
   "radius-top-left": IconRadiusTopLeft,
   "radius-bottom-right": IconRadiusBottomRight,
   "radius-bottom-left": IconRadiusBottomLeft,
+  typography: IconTypography,
 };
 
 type IconProps = Omit<SVGProps<SVGSVGElement>, "aria-label" | "role"> & {

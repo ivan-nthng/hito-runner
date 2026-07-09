@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-07-07T17:55:50.242Z
+Generated: 2026-07-09T18:24:33.997Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -200,19 +200,19 @@ Context: which Hito primitives are stable enough to reuse;
 <code>in_progress</code>
 
 #### Task
-Align active-plan workout content-editability readback before the next design batch.
+Run a domain-based deletion-first cleanup audit and select one implementation batch.
 
 <sub><code>STAGE</code></sub>
 
-<code>BACKEND implementation / active-plan content-edit capability correction.</code>
+<code>ARCHITECT audit / service-domain cleanup ranking.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Inline Editable Pattern Closeout - 2026-07-07
+Domain-Based Cleanup Anchor - 2026-07-09
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>backend</code>
+<code>architect</code>
 
 ## Safety Notes
 

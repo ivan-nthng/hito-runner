@@ -14,102 +14,101 @@ high
 
 ## Next Recommended Role
 
-backend
+architect
 
 ## Task
 
-Align active-plan workout content-editability readback before the next design batch.
+Run a domain-based deletion-first cleanup audit and select one implementation batch.
 
 ## Stage
 
-BACKEND implementation / active-plan content-edit capability correction.
+ARCHITECT audit / service-domain cleanup ranking.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: BACKEND
+ROLE: ARCHITECT
 
 Task:
-Align active-plan workout content-editability readback before the next design batch.
+Run a domain-based deletion-first cleanup audit and select one implementation batch.
 
 Stage:
-BACKEND implementation / active-plan content-edit capability correction.
+ARCHITECT audit / service-domain cleanup ranking.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md
 
 Context:
-Generated-plan backend/product readiness, source-size hygiene, generated workout-document readback
-polish, and the shared Hito inline editable text pattern are accepted. Frontend replaced the
-route-local editable-heading pilot with shared `InlineEditableText` and `InlineReadOnlyText`,
-documented the local inspector task-target behavior on `/hitoDS/patterns#inline-editable-text`, and
-kept generated workout readback itself read-only.
+Hito has one canonical service-domain ownership map in:
+/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-functional-map.md
 
-Architecture closeout found a separate blocker before the next design polish batch: workout detail
-can advertise `Edit training` from broad active-plan editability metadata even though the persisted
-edit action accepts only manual user-built active plans. Backend still blocks unsupported non-manual
-edits, so this is not fake persistence, but the read model can teach the frontend the wrong
-capability.
+Product wants one larger cleanup pass, but not another chain of isolated microfixes. The next cleanup
+must start from service domains, not recent files or raw hotspots.
 
 Root cause:
-Visible symptom: future generated/imported/refresh workout rows may expose `Edit training` before
-the backend edit action rejects them.
-Underlying cause: active-plan editability/readback treats `edit_workout` too much like Add/Clear/Move
-row-state capability instead of manual content-edit capability.
-Canonical owner: backend active-plan editability/source-capability read model first; frontend should
-only render backend-shaped capability truth.
+Visible symptom: cleanup keeps following recent hotspots or single-file pressure.
+Likely underlying cause: agents need an explicit domain-to-owner map before ranking deletion/reuse
+candidates.
+Canonical owner: ARCHITECT source-of-truth and cleanup selection first; implementation begins only
+after one owner/risk/validation batch is selected.
 
 Scope:
-1. Read `AGENTS.md`, `agents/backend.agent.md`, `skills/hito-backend-supabase-contract/SKILL.md`,
-   this source-size plan, the running-plan rebuild plan, current product/system/functional docs, and
-   the inline editable text spec:
-   /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-07-07-hito-inline-editable-text-pattern-contract.md
-2. Inspect these source seams:
-   `src/lib/active-plan-workout-editing/policy.ts`,
-   `src/lib/active-plan-workout-editing/source-capabilities.ts`,
-   `src/lib/training-api.ts`,
-   `src/lib/manual-workout-authoring/edit-workout.ts`,
-   `src/routes/workout.$date.tsx`.
-3. Align the backend editability/readback contract so `edit_workout` / content edit is allowed only
-   for backend-supported persisted manual edit contexts. Preserve Add/Clear/Move direct row-state
-   capabilities for accepted non-manual rows.
-4. Ensure row-level `sourceEditing.canEditContent` and `editContentReason` are false/explicit for
-   generated, imported, refresh, unsupported, unsafe-reconstruction, logged, evidence-backed, rest,
-   and protected rows.
-5. Ensure plan-level `workoutEditing.editWorkout` does not imply generated/imported/refresh content
-   editing if the persisted edit action will reject those sources.
-6. If the frontend must additionally consume an existing row-level capability such as
-   `sourceEditing.canEditContent` to hide `Edit training`, stop after the backend/readback fix and
-   return one exact FRONTEND follow-up prompt. Do not silently broaden this backend slice into a
-   frontend implementation.
+1. Read AGENTS.md, agents/architect.agent.md, hito-architecture-audit, hito-plan-writing-and-closeout,
+   this plan, docs/current-product.md, docs/current-functional-map.md, docs/current-system.md, and
+   docs/current-state.md.
+2. Use read-only subagents for independent domain scans:
+   - BACKEND/source ownership and duplicate/seam audit;
+   - FRONTEND/Hito DS route/component/local-devtool ownership audit;
+   - QA/DEVTOOLS validators/scripts/artifact hygiene audit;
+   - PRODUCT/docs source-of-truth drift audit.
+3. Rank service domains from the current-functional-map table by deletion/reuse/consolidation
+   opportunity, source-size impact, product risk, owner clarity, and validation story.
+4. Select exactly one cleanup implementation batch, or hold if no domain has a safe net-reduction
+   batch.
+5. The selected batch must name owner, files/roots, expected net LOC or source-truth reduction,
+   validation, and stop conditions.
+6. Do not implement cleanup code in this ARCHITECT audit.
 
 Validation:
-- Run targeted lint/type checks for touched backend files.
-- Run `npm run validate-manual-workout-authoring`.
-- Run the active-plan editability/source-capability validator if one exists; if not, add/adjust the
-  smallest existing backend proof that covers manual edit allowed and generated/imported content edit
-  blocked.
-- Run `npm run build` if runtime exports/types changed.
-- Run `git diff --check`.
-- Do not run browser QA unless backend changes expose a frontend route behavior that needs proof.
+- Use read-only source/import/docs scans.
+- Run `git status --short`.
+- Do not run browser QA.
+- Do not run `npm run metrics:lines` unless the audit explicitly needs a new ledger snapshot; if run,
+  report that it mutates the ledger.
+- If docs are edited, run scoped `git diff --check`.
 
 Stop conditions:
-- Stop if the fix would weaken Add/Clear/Move, drag/drop, protected history, logged/evidence-backed
-  row protection, or manual persisted edit review/confirm.
-- Stop if generated/imported/refresh content editing is actually intended; that requires Product and
-  Running Coach/Backend acceptance before UI exposure.
-- Stop if this requires Supabase schema/data mutation, live OpenAI/provider calls, or broad
-  active-plan lifecycle redesign.
+- Stop if a candidate requires product behavior decisions, Supabase/schema/data mutation, live
+  OpenAI/provider calls, destructive QA artifact cleanup, or broad cross-domain rewrite.
+- Stop if cleanup would weaken accepted local inspector boundaries: local-only, no live UI mutation,
+  no backend/Admin/Supabase/Work Items persistence.
+- Stop if the best available change is only cosmetic file splitting without deletion/reuse/
+  consolidation value.
 ```
+
+## Domain-Based Cleanup Anchor - 2026-07-09
+
+Current cleanup track: service-domain deletion-first cleanup.
+
+The next pass must use the service-domain ownership map in `docs/current-functional-map.md`, rank
+candidate domains with read-only subagents, and select one cleanup implementation batch at a time.
+Implementation must not begin until ARCHITECT picks a domain, owner, risk class, validation story,
+and expected net reduction or source-truth simplification.
+
+This anchor intentionally prevents microfix drift: do not select work solely because a file is recent
+or large. Prefer deletion, reuse, consolidation, or docs compression with real net reduction.
+Preserve the accepted local inspector boundary: local-only prompt generation, no live UI mutation,
+no backend/Admin/Supabase/Work Items persistence.
 
 ## Inline Editable Pattern Closeout - 2026-07-07
 
 The generated-plan workout-document readback polish and shared Hito inline editable text pattern are
 QA-accepted under the running-plan plan. The design/front-end pattern gate is complete: manual
 constructor titles use shared inline editing, generated workout readback remains read-only, and
-local inspector task targeting stays local-only with no fake Admin Capture persistence. The next
-source-proved blocker before another design polish batch is backend active-plan content-editability
-readback for `Edit training`.
+local inspector task targeting stays local-only with no fake Admin Capture persistence. The current
+cleanup entrypoint is now the domain-based cleanup anchor above; the prior backend
+content-editability concern remains a product/design blocker only if selected by the domain audit or
+by a separate product gate.
 
 ## Backend Implementation - 2026-07-02 - Generated-Plan Legacy Purge
 

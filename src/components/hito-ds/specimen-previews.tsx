@@ -707,16 +707,15 @@ export function DemoInput({
         : "close";
 
   return (
-    <div className="relative">
+    <div className="hito-field-control">
       {leftIcon ? (
-        <Icon
-          name="search"
-          size={iconSize}
-          className={cn(
-            "pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2",
-            feedbackTone,
-          )}
-        />
+        <span
+          className={cn("hito-field-icon hito-field-icon-left", feedbackTone)}
+          data-size={size}
+          aria-hidden="true"
+        >
+          <Icon name="search" size={iconSize} />
+        </span>
       ) : null}
       <input
         className={cn(
@@ -737,14 +736,13 @@ export function DemoInput({
         onChange={() => undefined}
       />
       {rightIcon ? (
-        <Icon
-          name={rightIconName}
-          size={iconSize}
-          className={cn(
-            "pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2",
-            feedbackTone,
-          )}
-        />
+        <span
+          className={cn("hito-field-icon hito-field-icon-right", feedbackTone)}
+          data-size={size}
+          aria-hidden="true"
+        >
+          <Icon name={rightIconName} size={iconSize} />
+        </span>
       ) : null}
     </div>
   );

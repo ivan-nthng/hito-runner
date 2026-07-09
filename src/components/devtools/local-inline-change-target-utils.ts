@@ -60,6 +60,13 @@ export type InlineChangeTypographySelection = {
   desiredRole: InlineChangeTypographyRoleOption | null;
 };
 
+export type InlineChangePromptActionId = "remove_component";
+
+export type InlineChangePromptActionSelection = {
+  id: InlineChangePromptActionId;
+  label: string;
+};
+
 export type InlineChangeTokenControlInput = {
   confidence: "mapped" | "uncertain";
   currentToken: string | null;
@@ -128,6 +135,7 @@ export type InlineChangeTargetInput = {
   elementTag?: string | null;
   evidenceLines?: string[] | null;
   proposedText?: string | null;
+  promptActionSelection?: InlineChangePromptActionSelection | null;
   selector?: string | null;
   suggestedOwner?: string | null;
   targetKind?: InlineChangeTargetKind | null;
@@ -172,6 +180,7 @@ export type InlineChangeTargetPayload = {
     kind: InlineChangeTargetKind;
     label: string | null;
     proposedText: string | null;
+    promptAction: InlineChangePromptActionSelection | null;
     selector: string | null;
     suggestedOwner: string;
     tokenControls: InlineChangeTokenControlSelection[];
@@ -217,6 +226,7 @@ export const INLINE_CHANGE_ACTIONS: InlineChangeAction[] = [
   ["comment", "Comment", "UI Note", "frontend"],
   ["remove_border", "Remove border", "Surface / Chrome", "frontend"],
   ["remove_card_chrome", "Card chrome", "Surface / Chrome", "frontend"],
+  ["remove_component", "Remove component", "Component / Structure", "frontend"],
   ["reduce_padding", "Reduce padding", "Spacing / Layout", "frontend"],
   ["reduce_gap", "Reduce gap", "Spacing / Layout", "frontend"],
   ["reduce_radius", "Reduce radius", "Surface / Chrome", "frontend"],
@@ -304,6 +314,7 @@ export function buildInlineChangePayload({
     target: {
       label: normalizeTargetValue(target.targetLabel),
       proposedText: normalizeTargetValue(target.proposedText),
+      promptAction: normalizePromptActionSelection(target.promptActionSelection),
       componentId: normalizeTargetValue(target.componentId),
       selector: normalizeTargetValue(target.selector),
       elementTag: normalizeTargetValue(target.elementTag),
@@ -340,7 +351,6 @@ export function buildInlineChangePayload({
 }
 
 export function buildInlineChangePrompt(payload: InlineChangeTargetPayload) {
-  const role = payload.target.suggestedOwner.toUpperCase();
   const proposedText =
     payload.action.type === "edit_text"
       ? `- Proposed text: ${payload.target.proposedText ?? "Not provided"}`
@@ -359,11 +369,20 @@ export function buildInlineChangePrompt(payload: InlineChangeTargetPayload) {
   const typographyEvidence = payload.target.typographyRoleSelection?.desiredRole
     ? [formatTypographyPromptLine(payload.target.typographyRoleSelection)]
     : [];
+  const promptActionEvidence = payload.target.promptAction
+    ? [formatPromptActionLine(payload.target.promptAction, payload.fixScope)]
+    : [];
   const selectedChanges =
     chromeRemovalEvidence.length > 0 ||
     tokenControlEvidence.length > 0 ||
-    typographyEvidence.length > 0
-      ? [...chromeRemovalEvidence, ...tokenControlEvidence, ...typographyEvidence]
+    typographyEvidence.length > 0 ||
+    promptActionEvidence.length > 0
+      ? [
+          ...chromeRemovalEvidence,
+          ...tokenControlEvidence,
+          ...typographyEvidence,
+          ...promptActionEvidence,
+        ]
       : ["- No explicit property change selected."];
   const dsInspection =
     payload.fixScope.id === "hito_ds"
@@ -371,13 +390,23 @@ export function buildInlineChangePrompt(payload: InlineChangeTargetPayload) {
       : null;
 
   return [
-    `ROLE: ${role}`,
+    "ROLE: PRODUCT",
     "",
     "Task:",
-    `${payload.action.label} for selected UI target`,
+    "Interpret and route local inspector UI request",
     "",
     "Stage:",
-    "FRONTEND/DEVTOOLS local UI generated prompt",
+    "PRODUCT routing / local inspector generated prompt",
+    "",
+    "Product routing instructions:",
+    "- Interpret the user comment and inspector evidence before assigning implementation.",
+    "- Explain the likely issue in plain language.",
+    "- Identify the correct next owner: FRONTEND, DESIGNER, QA, ARCHITECT, BACKEND, or PRODUCT.",
+    "- Preserve exact route, target, selector, component, scope, and token evidence in the routed prompt.",
+    "- Remove emotional, ambiguous, or unclear wording before writing the final next-role prompt.",
+    "- Ask clarification only if the request cannot be safely interpreted from the evidence below.",
+    "- Produce exactly one next-role prompt.",
+    "- Do not implement the UI change in this PRODUCT routing pass.",
     "",
     "Context:",
     `- Route: ${payload.route.path}`,
@@ -394,6 +423,7 @@ export function buildInlineChangePrompt(payload: InlineChangeTargetPayload) {
     `- Viewport: ${payload.viewport.width}x${payload.viewport.height}`,
     `- Category: ${payload.action.category}`,
     `- Requested action: ${payload.action.label}`,
+    `- Inspector-suggested owner: ${payload.target.suggestedOwner}`,
     `- Comment: ${payload.comment || "No comment provided."}`,
     "",
     "Observed evidence:",
@@ -424,6 +454,17 @@ function normalizeList(values: string[] | null | undefined) {
     .map((value) => value.trim())
     .filter(Boolean)
     .slice(0, 14);
+}
+
+function normalizePromptActionSelection(
+  value: InlineChangePromptActionSelection | null | undefined,
+): InlineChangePromptActionSelection | null {
+  if (value?.id !== "remove_component") return null;
+
+  return {
+    id: "remove_component",
+    label: "Remove component",
+  };
 }
 
 function normalizeDimensions(values: InlineChangeDimensionEvidence[] | null | undefined) {
@@ -644,7 +685,18 @@ function formatTypographyPromptLine(selection: InlineChangeTypographySelection) 
     ? `${selection.desiredRole.label} (${selection.desiredRole.className})`
     : "not selected";
 
-  return `- Typography role: current ${currentRole}; desired ${desiredRole}.`;
+  return `- Typography: current ${currentRole}; desired ${desiredRole}.`;
+}
+
+function formatPromptActionLine(
+  selection: InlineChangePromptActionSelection,
+  scope: InlineChangeTargetPayload["fixScope"],
+) {
+  if (selection.id === "remove_component") {
+    return `- Remove component: prompt-only request to remove the selected UI component or element from the selected scope (${scope.label}). Do not delete user data, backend data, generated/readback truth, or unrelated content.`;
+  }
+
+  return `- ${selection.label}: prompt-only selected UI action.`;
 }
 
 function formatTargetKind(kind: InlineChangeTargetKind) {

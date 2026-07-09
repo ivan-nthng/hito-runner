@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HitoLogoMark } from "@/components/ui/hito-logo";
+import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
 import { Icon } from "@/components/ui/icon";
 import {
   Sheet,
@@ -47,8 +47,8 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
       <div className="hito-workbench-shell">
         <aside className="hito-workbench-sidebar px-5 py-6">
           <div>
-            <div className="hito-panel-title">hito ds</div>
-            <p className="hito-label mt-2">Component system</p>
+            <HitoLogo className="[--hito-logo-height:1.45rem]" />
+            <p className="hito-shell-brand-kicker">Design System</p>
           </div>
 
           <HitoDsNestedNav idPrefix="desktop" activePageId={pageId} />

@@ -1,5 +1,6 @@
 @layer components {
   .hito-field {
+    display: block;
     border: 1px solid var(--color-hairline);
     border-radius: var(--radius-lg);
     background: color-mix(in oklch, var(--color-background) 62%, transparent);
@@ -473,6 +474,7 @@
 
   .hito-field-sm {
     min-height: 2rem;
+    border-radius: var(--radius-md);
     padding: 0 0.75rem;
     font-size: 0.75rem;
   }
@@ -633,10 +635,63 @@
     padding-right: 2rem;
   }
 
-  .hito-date-field-control {
+  .hito-field-control {
     position: relative;
+    align-self: center;
     width: 100%;
     min-width: 0;
+    line-height: 0;
+  }
+
+  .hito-field-icon {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    width: 1rem;
+    height: 1rem;
+    place-items: center;
+    line-height: 1;
+    transform: translateY(-50%);
+    transition: color 160ms ease;
+    pointer-events: none;
+  }
+
+  .hito-field-icon-left {
+    left: 0.875rem;
+  }
+
+  .hito-field-icon-right {
+    right: 0.875rem;
+  }
+
+  .hito-field-icon[data-size="xs"],
+  .hito-field-icon[data-size="sm"] {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  .hito-field-icon-left[data-size="xs"] {
+    left: 0.625rem;
+  }
+
+  .hito-field-icon-right[data-size="xs"] {
+    right: 0.625rem;
+  }
+
+  .hito-field-icon-left[data-size="sm"] {
+    left: 0.75rem;
+  }
+
+  .hito-field-icon-right[data-size="sm"] {
+    right: 0.75rem;
+  }
+
+  .hito-date-field-control {
+    position: relative;
+    align-self: center;
+    width: 100%;
+    min-width: 0;
+    line-height: 0;
   }
 
   .hito-date-field-control .hito-field {

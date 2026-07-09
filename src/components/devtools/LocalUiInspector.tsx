@@ -27,6 +27,7 @@ type SelectedTarget = InlineChangeTargetInput & {
 
 type FloatingPanelState = {
   actionId: string | null;
+  anchor?: "launcher";
   position: { x: number; y: number };
   target: SelectedTarget;
 };
@@ -34,6 +35,9 @@ type FloatingPanelState = {
 const PANEL_VIEWPORT_MARGIN = 10;
 const DEFAULT_PANEL_WIDTH = 352;
 const DEFAULT_PANEL_HEIGHT = 540;
+const LAUNCHER_BUTTON_SIZE = 40;
+const LAUNCHER_PANEL_GAP = 8;
+const LAUNCHER_VIEWPORT_OFFSET = 20;
 const INSPECTABLE_SELECTOR =
   "button, a, input, textarea, select, [role], [data-hito-ds-pattern], [data-testid], article, section, header, main, aside, nav, form, li, [class]";
 
@@ -127,7 +131,8 @@ export function LocalUiInspector() {
     setMenuOpen(false);
     setPanel({
       actionId: "bug",
-      position: getViewportPanelPosition(),
+      anchor: "launcher",
+      position: getLauncherPanelPosition(),
       target: {
         componentId: "LocalUiInspector.bug_prompt",
         elementClasses: null,
@@ -325,12 +330,10 @@ function InspectorPanel({
 
     const updatePosition = () => {
       const rect = element.getBoundingClientRect();
-      const nextPosition = clampPanelPosition(
-        panel.position.x,
-        panel.position.y,
-        rect.width,
-        rect.height,
-      );
+      const nextPosition =
+        panel.anchor === "launcher"
+          ? getLauncherPanelPosition(rect.width, rect.height)
+          : clampPanelPosition(panel.position.x, panel.position.y, rect.width, rect.height);
 
       setClampedPosition((current) =>
         Math.abs(current.x - nextPosition.x) < 0.5 && Math.abs(current.y - nextPosition.y) < 0.5
@@ -350,7 +353,7 @@ function InspectorPanel({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", updatePosition);
     };
-  }, [panel.position, panel.actionId]);
+  }, [panel.anchor, panel.position, panel.actionId]);
 
   return (
     <section
@@ -596,10 +599,19 @@ function getPanelPosition(rect: DOMRectReadOnly, clientX: number, clientY: numbe
   return clampPanelPosition(preferredX, preferredY);
 }
 
-function getViewportPanelPosition() {
+function getLauncherPanelPosition(
+  measuredWidth = DEFAULT_PANEL_WIDTH,
+  measuredHeight = DEFAULT_PANEL_HEIGHT,
+) {
   return clampPanelPosition(
-    window.innerWidth - DEFAULT_PANEL_WIDTH - 24,
-    window.innerHeight - DEFAULT_PANEL_HEIGHT - 24,
+    window.innerWidth - LAUNCHER_VIEWPORT_OFFSET - measuredWidth,
+    window.innerHeight -
+      LAUNCHER_VIEWPORT_OFFSET -
+      LAUNCHER_BUTTON_SIZE -
+      LAUNCHER_PANEL_GAP -
+      measuredHeight,
+    measuredWidth,
+    measuredHeight,
   );
 }
 

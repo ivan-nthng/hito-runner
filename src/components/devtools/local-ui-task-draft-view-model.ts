@@ -2,6 +2,7 @@ import {
   getInlineChangeAction,
   type InlineChangeAction,
   type InlineChangeChromeRemovalSelection,
+  type InlineChangePromptActionSelection,
   type InlineChangeTargetInput,
   type InlineChangeTokenControlInput,
   type InlineChangeTokenControlSelection,
@@ -27,7 +28,10 @@ export function getInferredDraftAction(
   tokenControlSelections: InlineChangeTokenControlSelection[],
   typographyRoleSelection: InlineChangeTypographySelection | null,
   chromeRemovalSelection: InlineChangeChromeRemovalSelection | null,
+  promptActionSelection: InlineChangePromptActionSelection | null,
 ) {
+  if (promptActionSelection?.id === "remove_component")
+    return getInlineChangeAction("remove_component");
   if (chromeRemovalSelection?.kind === "card_chrome")
     return getInlineChangeAction("remove_card_chrome");
   if (chromeRemovalSelection?.kind === "border") return getInlineChangeAction("remove_border");
@@ -58,10 +62,12 @@ export function getHasActionableDraft({
   tokenControlSelections,
   typographyRoleSelection,
   chromeRemovalSelection,
+  promptActionSelection,
 }: {
   action: InlineChangeAction | null;
   chromeRemovalSelection: InlineChangeChromeRemovalSelection | null;
   comment: string;
+  promptActionSelection: InlineChangePromptActionSelection | null;
   proposedText: string;
   tokenControlSelections: InlineChangeTokenControlSelection[];
   typographyRoleSelection: InlineChangeTypographySelection | null;
@@ -69,7 +75,8 @@ export function getHasActionableDraft({
   const hasPropertyChange =
     tokenControlSelections.length > 0 ||
     Boolean(typographyRoleSelection) ||
-    Boolean(chromeRemovalSelection);
+    Boolean(chromeRemovalSelection) ||
+    Boolean(promptActionSelection);
   if (!action) return comment.trim().length > 0 || hasPropertyChange;
 
   switch (action.id) {
@@ -82,6 +89,8 @@ export function getHasActionableDraft({
       return chromeRemovalSelection?.kind === "border";
     case "remove_card_chrome":
       return chromeRemovalSelection?.kind === "card_chrome";
+    case "remove_component":
+      return promptActionSelection?.id === "remove_component";
     case "reduce_padding":
     case "reduce_gap":
     case "reduce_radius":

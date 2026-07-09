@@ -864,7 +864,7 @@ function AuditControlMatrix() {
           <StaticPropertyRow iconName="gap-horizontal" label="Horizontal gap">
             <StaticValueChip help="5.6px · custom, nearest --space-1">5.6</StaticValueChip>
           </StaticPropertyRow>
-          <StaticPropertyRow iconName="file-text" label="Typography role">
+          <StaticPropertyRow iconName="typography" label="Typography">
             <StaticValueChip help="hito-section-title · font 24px / line 27.6px">
               Section title
             </StaticValueChip>
@@ -1045,7 +1045,7 @@ function StaticValueChip({
 
 function MatrixPanel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <article className="grid gap-3 rounded-2xl border border-hairline bg-background/55 p-4">
+    <article className="grid gap-3">
       <h4 className="hito-caption">{title}</h4>
       {children}
     </article>

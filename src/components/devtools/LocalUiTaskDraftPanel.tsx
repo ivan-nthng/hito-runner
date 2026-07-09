@@ -20,11 +20,13 @@ import {
   normalizeTargetKind,
   type InlineChangeChromeRemovalSelection,
   type InlineChangeFixScope,
+  type InlineChangePromptActionSelection,
   type InlineChangeTargetInput,
   type InlineChangeTokenControlSelection,
   type InlineChangeTypographySelection,
 } from "@/components/devtools/local-inline-change-target-utils";
 import { ChromeControlRows } from "@/components/devtools/LocalUiChromeControls";
+import { PromptActionRow } from "@/components/devtools/LocalUiPromptActionControls";
 import { TokenControlRows } from "@/components/devtools/LocalUiTokenControls";
 import { TypographyControlRow } from "@/components/devtools/LocalUiTypographyControls";
 import {
@@ -57,6 +59,8 @@ export function LocalUiTaskDraftPanel({
   const [desiredTypographyRole, setDesiredTypographyRole] = useState<string | null>(null);
   const [chromeRemovalSelection, setChromeRemovalSelection] =
     useState<InlineChangeChromeRemovalSelection | null>(null);
+  const [promptActionSelection, setPromptActionSelection] =
+    useState<InlineChangePromptActionSelection | null>(null);
   const [fixScope, setFixScope] = useState<InlineChangeFixScope>(getDefaultFixScope);
   const manualPromptRef = useRef<HTMLTextAreaElement | null>(null);
   const selectedAction = useMemo(
@@ -92,8 +96,15 @@ export function LocalUiTaskDraftPanel({
         tokenControlSelections,
         typographyRoleSelection,
         chromeRemovalSelection,
+        promptActionSelection,
       ),
-    [chromeRemovalSelection, selectedAction, tokenControlSelections, typographyRoleSelection],
+    [
+      chromeRemovalSelection,
+      promptActionSelection,
+      selectedAction,
+      tokenControlSelections,
+      typographyRoleSelection,
+    ],
   );
   const payload = useMemo(
     () =>
@@ -104,6 +115,7 @@ export function LocalUiTaskDraftPanel({
         target: {
           ...target,
           chromeRemovalSelection,
+          promptActionSelection,
           proposedText: showReplacementText ? proposedText : null,
           tokenControlSelections,
           typographyRoleSelection,
@@ -114,6 +126,7 @@ export function LocalUiTaskDraftPanel({
       chromeRemovalSelection,
       draftAction,
       fixScope,
+      promptActionSelection,
       proposedText,
       showReplacementText,
       target,
@@ -123,7 +136,8 @@ export function LocalUiTaskDraftPanel({
   );
   const prompt = useMemo(() => buildInlineChangePrompt(payload), [payload]);
   const payloadJson = useMemo(() => JSON.stringify(payload, null, 2), [payload]);
-  const targetLabel = payload.target.label ?? payload.target.selector ?? "Selected UI element";
+  const targetHeader = getTargetHeaderLabel(payload);
+  const targetMeta = getTargetMetaLabel(payload, targetKind);
   const promptGenerated = generateState !== "idle";
   const showManualPromptFallback = generateState === "copy_failed";
   const generateButtonCopied = generateState === "copied";
@@ -132,6 +146,7 @@ export function LocalUiTaskDraftPanel({
     chromeRemovalSelection,
     comment,
     proposedText,
+    promptActionSelection,
     tokenControlSelections,
     typographyRoleSelection,
   });
@@ -142,6 +157,7 @@ export function LocalUiTaskDraftPanel({
     setDesiredTokens({});
     setDesiredTypographyRole(null);
     setChromeRemovalSelection(null);
+    setPromptActionSelection(null);
     setFixScope(getDefaultFixScope());
     setProposedText(target.visibleText ?? "");
   }, [target]);
@@ -166,6 +182,7 @@ export function LocalUiTaskDraftPanel({
     setDesiredTokens({});
     setDesiredTypographyRole(null);
     setChromeRemovalSelection(null);
+    setPromptActionSelection(null);
     setFixScope(getDefaultFixScope());
     setProposedText(target.visibleText ?? "");
   };
@@ -186,18 +203,16 @@ export function LocalUiTaskDraftPanel({
   };
 
   return (
-    <div className="grid min-w-0 gap-3">
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="hito-label text-foreground">Prompt draft</p>
-          <p className="hito-caption truncate">Target: {targetLabel}</p>
-          <p className="hito-caption truncate">
-            {targetKind} · {payload.route.path}
-          </p>
+    <div className="relative grid min-w-0 gap-3 pt-0.5">
+      <div className="min-w-0 pr-8">
+        <p className="hito-label min-w-0 truncate text-foreground">{targetHeader}</p>
+        <div className="mt-0.5 grid min-w-0 gap-0.5">
+          <p className="hito-caption truncate">{targetMeta}</p>
+          <p className="hito-caption truncate">{payload.route.path}</p>
         </div>
         <button
           type="button"
-          className="hito-button hito-button-ghost hito-button-sm min-h-7 px-2"
+          className="hito-button hito-button-ghost hito-button-sm absolute -right-1 -top-1 min-h-7 px-2"
           aria-label="Close local UI prompt draft"
           onClick={onClose}
         >
@@ -270,8 +285,18 @@ export function LocalUiTaskDraftPanel({
         </div>
       ) : null}
 
+      {targetKind !== "behavior" ? (
+        <PromptActionRow
+          selection={promptActionSelection}
+          onActionChange={(selection) => {
+            setPromptActionSelection(selection);
+            clearGeneratedPrompt();
+          }}
+        />
+      ) : null}
+
       <label className="grid min-w-0 gap-1">
-        <span className="hito-label">Scope of fix</span>
+        <span className="hito-caption text-foreground">Scope of fix</span>
         <Select
           value={fixScope}
           onValueChange={(value) => {
@@ -297,7 +322,7 @@ export function LocalUiTaskDraftPanel({
 
       {showReplacementText ? (
         <label className="grid min-w-0 gap-1">
-          <span className="hito-label">Replacement text</span>
+          <span className="hito-caption text-foreground">Replacement text</span>
           <Textarea
             className="min-h-20 resize-none py-1.5"
             value={proposedText}
@@ -311,7 +336,9 @@ export function LocalUiTaskDraftPanel({
 
       {showCommentInput ? (
         <label className="grid min-w-0 gap-1">
-          <span className="hito-label">{selectedAction?.id === "bug" ? "Issue" : "Comment"}</span>
+          <span className="hito-caption text-foreground">
+            {selectedAction?.id === "bug" ? "Issue" : "Comment"}
+          </span>
           <Textarea
             className="min-h-16 resize-none py-1.5"
             placeholder={
@@ -361,15 +388,25 @@ export function LocalUiTaskDraftPanel({
 
       <div className="grid min-w-0 gap-2 border-t border-hairline pt-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-sm min-h-8 px-2"
-            disabled={!hasActionableDraft || generateButtonCopied}
-            onClick={() => void generatePrompt()}
-          >
-            <Icon name={generateButtonCopied ? "check" : "copy"} size="xs" />
-            {generateButtonCopied ? "Copied" : "Generate Prompt"}
-          </button>
+          {generateButtonCopied ? (
+            <div
+              className="inline-flex min-h-8 items-center gap-1.5 px-2 text-xs font-medium text-success"
+              aria-live="polite"
+            >
+              <Icon name="check" size="xs" />
+              Copied
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="hito-button hito-button-primary hito-button-sm min-h-8 px-2"
+              disabled={!hasActionableDraft}
+              onClick={() => void generatePrompt()}
+            >
+              <Icon name="copy" size="xs" />
+              Generate Prompt
+            </button>
+          )}
           <button
             type="button"
             className="hito-button hito-button-ghost hito-button-sm min-h-8 px-2"
@@ -420,5 +457,48 @@ function TaskStatus({ generateState }: { generateState: GenerateState }) {
     return <p className="hito-caption text-success">Prompt generated.</p>;
   }
 
-  return <p className="hito-caption">Local prompt draft · Prompt hidden until Generate Prompt.</p>;
+  return null;
+}
+
+function getTargetHeaderLabel(payload: ReturnType<typeof buildInlineChangePayload>) {
+  if (payload.target.kind === "behavior") return "Behavior page";
+
+  const stableLabel =
+    payload.target.componentId ??
+    getStableClassLabel(payload.target.elementClasses) ??
+    payload.target.selector ??
+    payload.target.label;
+  const normalizedLabel = normalizeHeaderToken(stableLabel) ?? "selected element";
+
+  return toHeaderLabel(normalizedLabel);
+}
+
+function getTargetMetaLabel(
+  payload: ReturnType<typeof buildInlineChangePayload>,
+  targetKind: string,
+) {
+  const parts = [targetKind, payload.target.elementTag].filter(Boolean);
+
+  return parts.join(" · ");
+}
+
+function getStableClassLabel(className: string | null) {
+  const hitoClass = className?.split(/\s+/).find((classPart) => classPart.startsWith("hito-"));
+  return hitoClass ?? null;
+}
+
+function normalizeHeaderToken(value: string | null) {
+  if (!value) return null;
+
+  return value
+    .replace(/^\[?data-[^\]=]+="?([^"\]]+)"?\]?$/, "$1")
+    .replace(/^#/, "")
+    .replace(/^\./, "")
+    .replace(/^hito-/, "")
+    .replace(/[-_.]+/g, " ")
+    .trim();
+}
+
+function toHeaderLabel(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

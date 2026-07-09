@@ -1,7 +1,7 @@
 # Current Functional Map
 
 Status: canonical freeze-readiness map
-Last Updated: 2026-06-27
+Last Updated: 2026-07-09
 Owner: ARCHITECT
 
 ## Purpose
@@ -49,6 +49,27 @@ Cleanup rule:
 Do not delete or demote code because it looks large. First map it to one of the flows below.
 If a file supports no current flow, no accepted validation gate, and no explicit future-only artifact,
 then it becomes a deletion/demotion candidate.
+
+## Service-Domain Ownership Map — 2026-07-09
+
+Use this table as the physical domain index before selecting cleanup batches. Product/business truth
+stays in `docs/current-product.md`; implementation ownership and deletion safety start here.
+
+| Domain | Main product meaning | High-level physical owners | Cleanup boundary |
+| --- | --- | --- | --- |
+| Auth, app shell, admin boundary | Product/admin session separation, route shell, local-only bypass | `src/start.ts`, `src/routes/__root.tsx`, `src/components/AppShell.tsx`, `src/lib/auth-actions.ts`, `src/lib/admin-auth-actions*`, `src/lib/admin-access.server.ts`, `src/lib/supabase/*`, local-auth helpers | Do not collapse runner auth, admin auth, and local bypass without preserving route/session boundaries. |
+| Runner profile, settings, onboarding | Profile basics, training preferences, first-plan setup input | `src/components/OnboardingGate.tsx`, `src/components/onboarding/*`, `src/routes/settings.tsx`, `src/lib/user-settings-actions.ts`, `src/lib/runner-training-preferences.ts`, `src/lib/structured-first-plan-onboarding.ts` | Frontend collects backend-shaped input; backend owns validation and persistence. |
+| Generated plan creation engine | Distance-goal AI/local-fixture authored preview, review, confirm, planGoalIntent, block policy | `src/lib/first-plan-actions.ts`, `src/lib/running-plan-engine-actions.ts`, `src/lib/running-plan-engine-review.ts`, `src/lib/ai-generated-running-plan.ts`, `src/lib/plan-creation-engine/*`, plan-authoring validators | Retired Plan Presets, deterministic product builders, and voice-to-plan are not current canonical owners. |
+| Active plan lifecycle, calendar, planned workouts | One calendar, Add plan, clear upcoming, schedule edit, row-state Add/Clear/Move/Edit | `src/components/Calendar.tsx`, `src/components/plan-management/*`, `src/lib/active-plan-persistence.ts`, `src/lib/active-plan-lifecycle-actions.ts`, `src/lib/active-plan-transition-actions.ts`, `src/lib/active-plan-schedule-edit-*`, `src/lib/active-plan-workout-editing/*` | Source kind is provenance; backend capability/readback owns mutation safety. |
+| Manual workout authoring | Manual Add activity, constructor/review, templates, copy/paste, persisted manual edits | `src/components/manual-workout/*`, `src/lib/manual-workout-authoring/*`, `scripts/validate-manual-workout-authoring.ts` | Do not create route-local constructor truth; reuse backend constructor/review contracts. |
+| Workout detail, readback, logging | Workout document readback, result logging, generated/manual read-only/edit boundaries | `src/routes/workout.$date.tsx`, `src/components/CompletionPanel.tsx`, `src/components/workout-completion/*`, `src/lib/workout-log-actions.ts`, `src/lib/training.ts`, `src/lib/route-data-actions.ts` | Provider evidence and plan intent stay separate; generated readback is read-only unless backend accepts editability. |
+| Import, export, provider evidence | JSON import/export, Garmin/FIT upload, actual metrics, comparisons | `src/components/UploadJsonDialog.tsx`, `src/lib/imported-plan.ts`, `src/lib/plan-replacement-actions.ts`, `src/lib/active-plan-export-actions.ts`, `src/lib/plan-export.ts`, `src/lib/workout-result-import/*` | Provider import creates actual evidence, not planned workouts; export excludes logs/evidence/comparisons. |
+| Hito DS, reference, Figma capture | Code-owned UI primitives, tokens, specimens, downstream Figma capture | `src/styles.css`, `src/styles/*`, `src/components/ui/*`, `src/components/hito-ds/*`, `src/routes/hitoDS*.tsx` | `/hitoDS` specimens are not product CRUD; Figma capture is downstream, not source-of-truth. |
+| Local devtools and inspector | Local-only DS audit and prompt generation | `src/components/devtools/*`, `src/components/ui/inline-editable-text.tsx`, `/hitoDS/patterns#inline-editable-text` | Local-only, no live UI mutation, no backend/Admin/Supabase/Work Items persistence. |
+| Admin work items, capture, analytics | Internal admin capture/backlog, repo-derived work-item mirror, analytics, test accounts | `src/routes/admin.*.tsx`, `src/components/admin/*`, `src/lib/admin-capture*`, `src/lib/admin-work-items.ts`, `src/lib/admin-analytics.ts`, `scripts/import-repo-work-items-to-admin-backlog.ts` | Repo markdown remains canonical for repo-derived rows; imported rows are read-only mirrors. |
+| Scripts, validators, QA infrastructure | Non-runtime proof, source-size ledger, local QA runtime, artifact hygiene | `scripts/*`, `scripts/**`, `docs/metrics/line-count-ledger.jsonl`, local QA server/build-output scripts, `qa-artifacts/` | Validators prove contracts; QA artifacts are protected evidence, not product runtime or cleanup targets. |
+| Docs and source-of-truth | Current product/system/functional truth, active gates, shipped history | `docs/current-*.md`, `docs/plans/active/*`, `docs/tasks/*`, `docs/history/changelog.md`, `docs/work-dashboard.md` | Current docs describe implemented truth; active plans guide next work; avoid transcript-like Markdown growth. |
+| Running coach doctrine and workout identity | Sports-quality policy, workout taxonomy, target honesty | `docs/tasks/running-coach/*`, `src/lib/rich-workout-model.ts`, `src/lib/planned-workout-language.ts`, `src/lib/planned-workout-block-contract.ts`, running-plan doctrine validators | Coach doctrine informs backend policy but does not create a second workout language. |
 
 ## Business-Flow Source-Of-Truth Audit — 2026-06-24
 

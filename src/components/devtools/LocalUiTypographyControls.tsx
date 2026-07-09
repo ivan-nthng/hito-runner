@@ -17,7 +17,7 @@ export function TypographyControlRow({
 }) {
   const desiredRole = typography.options.find((option) => option.id === desiredRoleId) ?? null;
   const isActive = Boolean(desiredRole && desiredRole.id !== typography.currentRole?.id);
-  const currentLabel = typography.currentRole?.label ?? "Observed type";
+  const currentLabel = typography.currentRole?.label ?? "Unmapped";
   const currentHelp = typography.currentRole
     ? `${typography.currentRole.className} · ${getComputedTypographyLabel(typography)}`
     : getComputedTypographyLabel(typography);
@@ -30,9 +30,9 @@ export function TypographyControlRow({
       <div className="flex min-w-0 items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
-            <Icon name="file-text" size="xs" />
+            <Icon name="typography" size="xs" />
           </span>
-          <span className="hito-caption min-w-0 truncate text-foreground">Typography role</span>
+          <span className="hito-caption min-w-0 truncate text-foreground">Typography</span>
         </div>
         {isActive ? (
           <>

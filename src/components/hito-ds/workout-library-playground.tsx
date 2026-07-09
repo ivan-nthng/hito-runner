@@ -156,7 +156,7 @@ function WorkoutLibraryPreview({
   state: WorkoutLibraryState;
 }) {
   return (
-    <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.78fr)]">
+    <div className="grid min-w-0 gap-5">
       <div className="min-w-0">
         <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
           <div className="min-w-0">
@@ -208,7 +208,7 @@ function DesktopWorkoutLibrary({
   state: WorkoutLibraryState;
 }) {
   return (
-    <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
+    <div className="hito-calendar-grid-container min-w-0">
       <div className="hito-calendar-grid-seven">
         <div className="hito-calendar-grid hito-calendar-grid-month hito-calendar-grid-month-dense">
           {WEEKDAY_HEADINGS.map((weekday) => (
@@ -228,7 +228,7 @@ function DesktopWorkoutLibrary({
         </div>
       </div>
 
-      <div className="hito-calendar-grid-list p-3">
+      <div className="hito-calendar-grid-list">
         <MobileWorkoutLibrary
           onSelect={onSelect}
           selectedIdentity={selectedIdentity}
@@ -365,10 +365,10 @@ function WorkoutDetailSpecimen({
   const hiddenSegmentCount = specimen.segments.length - visibleSegments.length;
 
   return (
-    <aside className="min-w-0 self-start rounded-xl bg-background/35 p-4">
+    <section className="min-w-0 border-t border-hairline pt-5">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-hairline pb-4">
         <div className="min-w-0">
-          <p className="hito-label">
+          <p className="hito-label break-words [overflow-wrap:anywhere]">
             Internal: {specimen.family} / {specimen.identity}
           </p>
           <h3 className="hito-section-title mt-1">{specimen.detailTitle}</h3>
@@ -462,7 +462,7 @@ function WorkoutDetailSpecimen({
         Calendar visual: {visual.result} / {visual.feedback}. No real upload, provider sync,
         comparison row, AI insight, plan creation, or workout mutation is performed.
       </p>
-    </aside>
+    </section>
   );
 }
 

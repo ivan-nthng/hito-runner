@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LocalDevtoolMenuItem } from "@/components/devtools/LocalDevtoolMenuItem";
 import { HitoLogo } from "@/components/ui/hito-logo";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -177,6 +178,10 @@ function AdminWorkspaceAccountMenu({
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator className="hito-shell-menu-separator" />
+        <LocalDevtoolMenuItem
+          itemClassName="hito-shell-menu-item"
+          separatorClassName="hito-shell-menu-separator"
+        />
         <DropdownMenuItem className="hito-shell-menu-item" asChild>
           <a href={`/api/admin/auth/logout?next=${logoutNext}`}>
             <Icon name="logout" size="sm" />

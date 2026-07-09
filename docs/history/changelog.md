@@ -21,6 +21,10 @@ The public `/changelog` Highlights view is generated from the dated entries belo
   read-only, manual editable heading is limited to true editable constructor context, and QA proved
   desktop/mobile readback, impossible-state zero persistence, completion entry, clean console, and
   disposable cleanup.
+- Hito DS Iteration: promoted inline editable text into shared Hito primitives. Manual workout titles
+  now use the shared inline editable primitive, `/hitoDS/patterns` documents editable, read-only, and
+  non-mutating local inspector task-target states, and generated workout readback remains read-only
+  without fake Admin Capture persistence.
 
 ## 2026-07-06
 

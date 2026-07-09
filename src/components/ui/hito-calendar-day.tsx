@@ -465,6 +465,7 @@ function SupportingText({
     <div
       className={cn(
         technical ? "hito-technical-mono text-muted-foreground" : "hito-list-row-copy",
+        "min-w-0 break-words [overflow-wrap:anywhere]",
         footer ? "mt-auto pt-3" : "mt-2",
       )}
     >

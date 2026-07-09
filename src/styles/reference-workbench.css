@@ -377,21 +377,13 @@
   }
 
   .hito-ds-mobile-jump-nav {
-    border-top: 1px solid var(--color-hairline);
-    padding: 0 1.25rem 1rem;
-  }
-
-  .hito-ds-mobile-jump-panel {
-    max-height: min(70vh, 28rem);
+    min-height: 0;
+    flex: 1 1 auto;
     overflow: auto;
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-xl);
-    background: color-mix(in oklch, var(--color-sidebar) 78%, var(--color-background));
-    padding: 0.55rem;
-    box-shadow: 0 18px 48px color-mix(in oklch, black 26%, transparent);
+    padding: 0.75rem;
   }
 
-  .hito-ds-mobile-jump-panel .hito-ds-sidebar-tree {
+  .hito-ds-mobile-jump-nav .hito-ds-sidebar-tree {
     margin-top: 0;
   }
 

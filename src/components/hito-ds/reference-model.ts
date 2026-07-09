@@ -52,6 +52,7 @@ export const HITO_DS_PAGES = [
     path: HITO_DS_PAGE_ROUTES.patterns,
     body: "Composed product patterns built from the component/foundation owners.",
     sections: [
+      { id: "inline-editable-text", label: "Inline editing" },
       { id: "editorial-patterns", label: "Editorial" },
       { id: "surfaces", label: "Composition" },
       { id: "states", label: "States" },

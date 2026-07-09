@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EditableHeading } from "@/components/ui/editable-heading";
+import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { type ReactNode, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -158,13 +158,13 @@ export function ManualWorkoutConstructorEditor({
               <WorkoutGlyph kind={iconKey} className="h-4 w-4" />
             </span>
             <div className="hito-manual-workout-title-field grid flex-1 gap-1">
-              <EditableHeading
+              <InlineEditableText
                 aria-label="Edit workout title"
-                className="text-base font-semibold text-foreground"
-                inputClassName="text-base font-semibold"
+                size="sm"
                 value={title}
                 onChange={onTitleChange}
                 placeholder={selectedTemplate?.defaultTitle ?? "Name this workout"}
+                variant="header"
               />
               <p className="hito-list-row-copy">
                 {dateLabel} ·{" "}

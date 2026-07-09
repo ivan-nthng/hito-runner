@@ -88,7 +88,7 @@ ARCHITECT / DESIGNER / FRONTEND / QA
 
 ## Last Updated
 
-2026-06-28
+2026-07-08
 
 ## Root Cause
 
@@ -131,6 +131,9 @@ Existing narrower docs remain valid only as subordinate inputs:
   slice is selected.
 - The dropdown/calendar normalization spec remains source context for the dropdown row family and
   calendar primitive issues, but no longer owns global `/hitoDS` IA.
+- The completed mobile dropdown fullscreen backlog remains historical implementation evidence. Its
+  older "only long/grouped/nested mobile menus must escalate" boundary is superseded for future work
+  by the adaptive global mobile menu escalation rule in this plan.
 
 ## Canonical `/hitoDS` Navigation IA
 
@@ -321,6 +324,52 @@ Forbidden settings patterns:
 - local color/spacing recipes
 - settings that imply product persistence, backend mutation, auth, provider sync, AI, or route state
 - settings panels that require the reader to infer what is being demonstrated
+
+### Global Mobile Menu Escalation Rule
+
+This plan is the canonical Hito DS source for mobile menu escalation.
+
+On mobile/narrow sizes, dropdowns, selects, context menus, nested menus, and page-switching menus
+default to adaptive escalation instead of cramped anchored popover cards inside the page. Anchored
+popover/dropdown cards remain the desktop/tablet default; they are not the mobile default.
+
+Decision tree:
+
+- small/simple action menus may open as a bottom sheet
+- large, long, nested, dense, picker-like, or page-switching menus open as a fullscreen or
+  full-height Hito navigation surface
+- if a menu is hard to scan, risks viewport clipping, or needs more than one navigation level, use
+  the fullscreen/full-height side of the rule
+
+Required mobile anatomy:
+
+- both bottom-sheet and fullscreen/full-height variants use a top Hito header with a clear title and
+  close affordance
+- nested levels use a back affordance in the same header while close remains available
+- rows use Hito menu/list-row typography, icons, metadata, selected, disabled, destructive, and
+  divider rules
+- body content scrolls inside the surface when needed without horizontal overflow
+- triggers may still use `DropdownMenu`, `Select`, or context-menu semantics, but the mobile
+  presentation escalates through the existing Sheet/Dialog overlay and header/body language
+- implementation reuses `DropdownMenu`, `Select`, `Sheet`/`Dialog`, `hito-product-dialog`,
+  `hito-product-dialog-header`, `hito-product-dialog-body-scroll-fill`, `hito-row-group`,
+  `hito-list-row`, Hito icons, and existing typography/surface classes before adding anything new
+
+Exceptions:
+
+- custom anchored mobile menu exceptions require explicit Product approval
+- do not create a parallel mobile menu framework; extend the existing Hito DS dropdown/select and
+  overlay owners instead
+- do not use mobile escalation to change product behavior, backend truth, persistence, auth,
+  provider sync, or route state
+
+Current `/hitoDS` implication:
+
+- the mobile `Browse DS pages` jump menu is a page-switching menu; under this rule, it likely
+  belongs to the fullscreen/full-height side of the decision tree
+- that classification is not evidence that small/simple mobile action menus must also become
+  fullscreen; those may use the bottom-sheet side of the rule
+- this is an implementation follow-up only; the source-of-truth decision above is active now
 
 ### 4. Contract Rows
 

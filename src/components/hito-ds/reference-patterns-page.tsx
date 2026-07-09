@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-playground";
+import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
 import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import { Icon } from "@/components/ui/icon";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
@@ -59,6 +60,7 @@ const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
 export function HitoDsPatternsPage() {
   return (
     <>
+      <HitoDsPatternInlineEditing />
       <section id="editorial-patterns" className="ds-section">
         <SectionIntro
           label="Editorial patterns"

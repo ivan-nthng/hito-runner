@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { HitoLogoMark } from "@/components/ui/hito-logo";
 import { Icon } from "@/components/ui/icon";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { HitoDsComponentsPage } from "./reference-components-page";
 import { HitoDsFoundationsPage } from "./reference-foundations-page";
 import { HitoDsNestedNav, HitoDsPagePager } from "./reference-navigation";
@@ -67,30 +75,37 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                 </div>
                 <HitoLogoMark decorative className="text-foreground [--hito-logo-height:1.65rem]" />
               </div>
-              <button
-                type="button"
-                className="hito-button hito-button-secondary hito-button-sm hito-ds-jump-trigger"
-                aria-expanded={mobileJumpOpen}
-                aria-controls="hito-ds-mobile-jump-nav"
-                onClick={() => setMobileJumpOpen((current) => !current)}
-              >
-                <span>Browse DS pages</span>
-                <span className="hito-ds-jump-trigger-context">{currentPage.label}</span>
-                <Icon name={mobileJumpOpen ? "chevron-up" : "chevron-down"} size="xs" decorative />
-              </button>
-            </div>
-            <div
-              id="hito-ds-mobile-jump-nav"
-              className="hito-ds-mobile-jump-nav"
-              hidden={!mobileJumpOpen}
-            >
-              <div className="hito-ds-mobile-jump-panel">
-                <HitoDsNestedNav
-                  idPrefix="mobile"
-                  activePageId={pageId}
-                  onNavigate={closeMobileJump}
-                />
-              </div>
+              <Sheet open={mobileJumpOpen} onOpenChange={setMobileJumpOpen}>
+                <SheetTrigger asChild>
+                  <button
+                    type="button"
+                    className="hito-button hito-button-secondary hito-button-sm hito-ds-jump-trigger"
+                    aria-controls="hito-ds-mobile-jump-nav"
+                  >
+                    <span>Browse DS pages</span>
+                    <span className="hito-ds-jump-trigger-context">{currentPage.label}</span>
+                    <Icon name="chevron-right" size="xs" decorative />
+                  </button>
+                </SheetTrigger>
+                <SheetContent
+                  side="bottom"
+                  className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none"
+                >
+                  <SheetHeader className="border-b border-hairline px-5 py-4 pr-14">
+                    <SheetTitle>Browse DS pages</SheetTitle>
+                    <SheetDescription>
+                      Jump to a Hito DS reference page or section.
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div id="hito-ds-mobile-jump-nav" className="hito-ds-mobile-jump-nav">
+                    <HitoDsNestedNav
+                      idPrefix="mobile"
+                      activePageId={pageId}
+                      onNavigate={closeMobileJump}
+                    />
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-07-07T14:45:05.280Z
+Generated: 2026-07-07T17:55:50.242Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -85,11 +85,11 @@ Current Truth
 <code>in_progress</code>
 
 #### Task
-Define the Hito inline editable text/editor pattern after workout-document readback acceptance.
+Align active-plan workout content-editability readback before the next design batch.
 
 <sub><code>STAGE</code></sub>
 
-<code>DESIGNER audit / Hito inline editable text pattern contract.</code>
+<code>BACKEND implementation / active-plan content-edit capability correction.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
@@ -97,7 +97,7 @@ Current Source Of Truth: Workout types: Rest, Recovery, Easy, Steady, Long Run, 
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>designer</code>
+<code>backend</code>
 
 ---
 
@@ -200,19 +200,19 @@ Context: which Hito primitives are stable enough to reuse;
 <code>in_progress</code>
 
 #### Task
-Define the Hito inline editable text/editor pattern after workout-document readback acceptance.
+Align active-plan workout content-editability readback before the next design batch.
 
 <sub><code>STAGE</code></sub>
 
-<code>DESIGNER audit / Hito inline editable text pattern contract.</code>
+<code>BACKEND implementation / active-plan content-edit capability correction.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Designer Gate Sync - 2026-07-07 - Workout-Document Polish Accepted
+Inline Editable Pattern Closeout - 2026-07-07
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>designer</code>
+<code>backend</code>
 
 ## Safety Notes
 

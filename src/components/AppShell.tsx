@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LocalDevtoolMenuItem } from "@/components/devtools/LocalDevtoolMenuItem";
 import {
   WEEK_STATUS_META,
   formatDate,
@@ -65,7 +66,7 @@ export function AppShell({
   const weekStatus = WEEK_STATUS_META[shellSnapshot.weekStatus];
   const modeLabel =
     shellSnapshot.mode === "authenticated"
-      ? "Saved plan"
+      ? "Beta"
       : shellSnapshot.mode === "onboarding"
         ? "Create plan"
         : "Preview";
@@ -242,6 +243,10 @@ export function AppShell({
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
+              <LocalDevtoolMenuItem
+                itemClassName="hito-shell-menu-item"
+                separatorClassName="hito-shell-menu-separator"
+              />
               <DropdownMenuItem className="hito-shell-menu-item" asChild>
                 <a href="/api/auth/logout?next=%2F">
                   <Icon name="logout" size="sm" />

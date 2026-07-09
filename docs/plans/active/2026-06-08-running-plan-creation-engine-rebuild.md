@@ -14,85 +14,92 @@ high
 
 ## Next Recommended Role
 
-designer
+backend
 
 ## Task
 
-Define the Hito inline editable text/editor pattern after workout-document readback acceptance.
+Align active-plan workout content-editability readback before the next design batch.
 
 ## Stage
 
-DESIGNER audit / Hito inline editable text pattern contract.
+BACKEND implementation / active-plan content-edit capability correction.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: DESIGNER
+ROLE: BACKEND
 
 Task:
-Define the Hito inline editable text/editor pattern after workout-document readback acceptance.
+Align active-plan workout content-editability readback before the next design batch.
 
 Stage:
-DESIGNER audit / Hito inline editable text pattern contract.
+BACKEND implementation / active-plan content-edit capability correction.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md
 
 Context:
-Generated-plan creation and the first real-user workout-document readback polish are accepted.
-Frontend implemented compact generated workout-document readback and a safe editable-heading pilot
-in editable manual context. QA passed desktop and exact 375px. Generated rows remain read-only,
-backend generated-plan truth is unchanged, and manual editable heading was validated only where
-editing is real.
+Generated-plan creation, generated workout-document readback, and the shared Hito inline editable
+text pattern are accepted at the design/frontend implementation boundary. Frontend replaced the
+route-local editable-heading pilot with shared `InlineEditableText` and `InlineReadOnlyText`,
+documented the local inspector task-target behavior on `/hitoDS/patterns#inline-editable-text`, and
+kept generated workout readback itself read-only.
 
-Product wants to avoid fixing design blindly. The next right gate is a shared Hito inline editable
-text/editor pattern contract before broader rollout.
+Architecture closeout found a separate active-plan editability leak before the next design polish
+batch: workout detail can advertise `Edit training` from broad active-plan editability metadata even
+though the persisted edit action accepts only manual user-built active plans. Backend still blocks
+unsupported non-manual edits, so this is not fake persistence, but the read model can teach the
+frontend the wrong capability.
 
 Root cause:
-Visible symptom: Hito now has a useful editable-heading pilot, but inline editing is not yet a
-documented system pattern.
-Underlying cause: editable text states, affordances, accessibility, and read-only boundaries are not
-centrally owned in Hito DS, so future surfaces could create route-local editors.
-Canonical owner: DESIGNER / Hito DS interaction pattern definition first, then FRONTEND
-implementation. This is not backend plan semantics and not generated-row editing.
+Visible symptom: future generated/imported/refresh workout rows may expose `Edit training` before
+the backend edit action rejects them.
+Underlying cause: active-plan editability/readback treats `edit_workout` too much like Add/Clear/Move
+row-state capability instead of manual content-edit capability.
+Canonical owner: backend active-plan editability/source-capability read model first; frontend should
+only render backend-shaped capability truth.
 
 Scope:
-1. Read AGENTS.md, agents/designer.agent.md, relevant design/Hito DS skills, this plan,
-   docs/tasks/frontend-specs/2026-07-07-generated-plan-real-user-experience-design-pass.md,
-   docs/current-product.md, docs/current-system.md, docs/current-functional-map.md, and accepted QA:
-   /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-07-07/generated-plan-workout-document-readback-polish-qa/
-2. Inspect the accepted editable-heading pilot and nearby source context if useful:
-   src/components/ui/editable-heading.tsx,
-   src/components/manual-workout/ManualWorkoutConstructorEditor.tsx,
-   src/components/workout-structure/WorkoutDocumentReadback.tsx,
-   src/routes/workout.$date.tsx,
-   src/routes/hitoDS.tsx,
-   src/components/hito-ds/*,
-   src/styles.css.
-3. Define the smallest shared Hito inline editable text/editor contract:
-   normal/read state, hover state, focus-visible state, edit state, disabled/read-only state,
-   validation/error state if needed, mobile/touch discoverability, keyboard behavior, labels, and
-   save/cancel expectations.
-4. Define exactly where the pattern is allowed in v1:
-   editable manual workout titles/section labels/template names or similar true-edit contexts.
-   Generated plan preview/detail rows must remain read-only unless backend capability metadata later
-   explicitly allows editing.
-5. Define how the pattern should appear on /hitoDS if Frontend promotes or keeps a shared component.
-6. Decide the first bounded FRONTEND rollout batch only if the design contract is ready. Prefer
-   documenting/promoting the existing editable-heading pilot rather than inventing a second inline
-   editor.
+1. Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this plan,
+   docs/current-product.md, docs/current-system.md, docs/current-functional-map.md, and the inline
+   editable text spec:
+   /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-07-07-hito-inline-editable-text-pattern-contract.md
+2. Inspect these source seams:
+   src/lib/active-plan-workout-editing/policy.ts,
+   src/lib/active-plan-workout-editing/source-capabilities.ts,
+   src/lib/training-api.ts,
+   src/lib/manual-workout-authoring/edit-workout.ts,
+   src/routes/workout.$date.tsx.
+3. Align the backend editability/readback contract so `edit_workout` / content edit is allowed only
+   for backend-supported persisted manual edit contexts. Preserve Add/Clear/Move direct row-state
+   capabilities for accepted non-manual rows.
+4. Ensure row-level `sourceEditing.canEditContent` and `editContentReason` are false/explicit for
+   generated, imported, refresh, unsupported, unsafe-reconstruction, logged, evidence-backed, rest,
+   and protected rows.
+5. Ensure plan-level `workoutEditing.editWorkout` does not imply generated/imported/refresh content
+   editing if the persisted edit action will reject those sources.
+6. If the frontend must additionally consume an existing row-level capability such as
+   `sourceEditing.canEditContent` to hide `Edit training`, stop after the backend/readback fix and
+   return one exact FRONTEND follow-up prompt. Do not silently broaden this backend slice into a
+   frontend implementation.
 
 Validation:
-- Design/source/artifact review only; do not edit runtime product code.
-- State which accepted QA evidence was used and what remains out of scope.
-- If a design spec/doc is updated, run scoped `git diff --check`.
+- Run targeted lint/type checks for touched backend files.
+- Run `npm run validate-manual-workout-authoring`.
+- Run the active-plan editability/source-capability validator if one exists; if not, add/adjust the
+  smallest existing backend proof that covers manual edit allowed and generated/imported content edit
+  blocked.
+- Run `npm run build` if runtime exports/types changed.
+- Run `git diff --check`.
+- Do not run browser QA unless backend changes expose a frontend route behavior that needs proof.
 
 Stop conditions:
-- Stop if the pattern would imply generated workout content editing, backend plan semantics, new
-  metric truth, provider/FIT comparison, Supabase/schema changes, live OpenAI behavior, or a broad
-  design-system redesign.
-- Stop if the first implementation batch cannot be bounded to one FRONTEND owner and one validation
-  story.
+- Stop if the fix would weaken Add/Clear/Move, drag/drop, protected history, logged/evidence-backed
+  row protection, or manual persisted edit review/confirm.
+- Stop if generated/imported/refresh content editing is actually intended; that requires Product and
+  Running Coach/Backend acceptance before UI exposure.
+- Stop if this requires Supabase schema/data mutation, live OpenAI/provider calls, or broad active-plan
+  lifecycle redesign.
 ```
 
 ## Current Source Of Truth
@@ -192,6 +199,25 @@ Accepted artifact folder:
 
 `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-07-07/generated-plan-workout-document-readback-polish-qa/`
 
+## Inline Editable Text Pattern Checkpoint
+
+FRONTEND implemented and QA accepted the Hito inline editable text pattern on 2026-07-07:
+
+- `src/components/ui/inline-editable-text.tsx` now owns `InlineEditableText` and
+  `InlineReadOnlyText`;
+- the manual workout constructor title uses the shared editable primitive instead of a local
+  editable-heading pilot;
+- `/hitoDS/patterns#inline-editable-text` documents direct edit, read-only generated truth, and a
+  non-mutating local inspector task-target example;
+- local inspector task targeting is local-only in v1 and does not create Admin Capture rows, backend
+  schema, or fake persisted tasks;
+- generated preview/detail/readback surfaces remain read-only.
+
+Architecture closeout found a separate active-plan capability leak: workout detail currently gates
+`Edit training` from broad active-plan editability metadata, while the persisted edit action supports
+manual user-built active plans only. The next gate is therefore backend editability/readback
+correction before selecting another design polish batch.
+
 ## OpenAI-Authored Dated Acceptance
 
 QA accepted the final browser/readback gate on 2026-06-30:
@@ -220,11 +246,11 @@ used as acceptance evidence.
 
 ## Current Gate
 
-Generated-plan backend/product readiness and the first generated-plan workout-document readback
-polish are accepted. The next gate is DESIGNER definition of the shared Hito inline editable
-text/editor pattern, using the accepted manual editable-heading pilot as evidence while keeping
-generated plan rows read-only unless backend capability metadata later explicitly allows editing.
-Do not reopen backend generation semantics unless the design pass finds a source-proved blocker.
+Generated-plan backend/product readiness, generated-plan workout-document readback polish, and the
+Hito DS inline editable text pattern are accepted. The current blocker before the next design polish
+batch is active-plan content-editability readback: backend must align `edit_workout` capability with
+the persisted manual edit contract so generated/imported/refresh rows do not appear editable before
+the backend rejects them. Do not reopen backend generation semantics.
 
 Provider upload/import and provider comparison from actual evidence remain explicitly unaccepted by
 the generated-plan QA gates.

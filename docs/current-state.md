@@ -272,11 +272,13 @@ Active
   current product truth. Generated-plan create-and-use browser proof is also accepted through first
   generated non-rest workout logging, child-first repeat-rich workout detail, one completed
   `workout_logs` row tied to the same planned workout id, desktop/mobile clean console, and
-  disposable cleanup to zero. The 2026-07-07 workout-document readback polish is also accepted:
-  generated preview/detail surfaces now use compact structure-strip/row readback and demote
-  proof/debug language, generated rows remain read-only, and the editable-heading pilot is limited to
-  editable manual constructor context. Garmin/FIT provider upload/comparison remains a separate later
-  QA gate.
+  disposable cleanup to zero. The 2026-07-07 workout-document readback polish and Hito inline
+  editable text pattern are also accepted: generated preview/detail surfaces now use compact
+  structure-strip/row readback and demote proof/debug language, generated rows remain read-only, the
+  manual constructor title uses shared inline editable text, `/hitoDS/patterns` documents read-only
+  and local inspector task-target examples, and change-task targeting remains non-mutating local
+  devtool behavior in v1.
+  Garmin/FIT provider upload/comparison remains a separate later QA gate.
 - The second Hito DS foundations cleanup slice is now implemented:
   workout-detail route chrome now uses existing Hito surface, row-group, hairline, tab-badge, micro-label, body-small, and technical-mono primitives instead of local radial/linear gradients, white-alpha borders, bespoke radius values, and tiny text recipes in `src/routes/workout.$date.tsx` and the Garmin upload/interval controls in `CompletionPanel`.
 - The third Hito DS foundations cleanup slice is now started with a bounded calendar surface migration:

@@ -1,5 +1,9 @@
-import { Icon } from "@/components/ui/icon";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  HitoValueTag,
+  HitoValueTagRemoveButton,
+  HitoValueTagSelectTrigger,
+} from "@/components/ui/value-tag";
 import type {
   InlineChangeTokenControlInput,
   InlineChangeTypographyRoleOption,
@@ -15,16 +19,7 @@ export function PendingChangeRemoveButton({
   visibility?: "hover" | "subtle";
 }) {
   return (
-    <button
-      type="button"
-      className={`absolute -right-1 -top-1 z-10 grid size-4 place-items-center rounded-sm border border-success/25 bg-background text-success shadow-soft outline-none transition-opacity hover:bg-success/10 hover:opacity-100 focus:bg-success/10 focus:opacity-100 focus-visible:ring-1 focus-visible:ring-success group-hover:opacity-100 group-focus-within:opacity-100 ${
-        visibility === "hover" ? "opacity-0" : "opacity-70"
-      }`}
-      aria-label={ariaLabel}
-      onClick={onClick}
-    >
-      <Icon name="close" size="xs" />
-    </button>
+    <HitoValueTagRemoveButton aria-label={ariaLabel} onClick={onClick} visibility={visibility} />
   );
 }
 
@@ -50,17 +45,14 @@ export function ValueSelect({
       value={desiredOption?.token ?? "__keep"}
       onValueChange={(token) => onValueChange(token === "__keep" ? "" : token)}
     >
-      <SelectTrigger
+      <HitoValueTagSelectTrigger
         aria-label={`${ariaLabel}. ${tooltip}`}
         title={tooltip}
-        className={`hito-field-sm h-7 w-auto min-w-10 max-w-24 rounded-md px-2 py-0 text-xs shadow-none focus-visible:ring-1 [&>svg]:ml-1 [&>svg]:size-3 ${
-          tone === "desired"
-            ? "border-success/35 bg-success/10 text-success"
-            : "border-hairline bg-surface/45 text-foreground"
-        }`}
+        className="max-w-24"
+        tone={tone}
       >
-        <span className="hito-technical-mono truncate">{displayValue}</span>
-      </SelectTrigger>
+        {displayValue}
+      </HitoValueTagSelectTrigger>
       <SelectContent align="end" className="z-[73] w-44" data-local-ui-inspector-layer="">
         <SelectItem value="__keep">Keep current</SelectItem>
         {control.options.map((option) => (
@@ -83,59 +75,54 @@ export function ValueTag({
   value: string;
 }) {
   return (
-    <span
-      className={`hito-technical-mono inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-md border px-2 text-xs ${
-        tone === "current"
-          ? "border-warn/35 bg-warn/10 text-warn"
-          : tone === "desired"
-            ? "border-success/35 bg-success/10 text-success"
-            : "border-hairline bg-surface/45 text-foreground"
-      }`}
-      title={tooltip}
-      aria-label={tooltip}
-      tabIndex={tooltip ? 0 : undefined}
-    >
+    <HitoValueTag title={tooltip} aria-label={tooltip} tone={tone}>
       {value}
-    </span>
+    </HitoValueTag>
   );
 }
 
 export function TypographyRoleSelect({
-  desiredRole,
+  currentRoleId,
   displayLabel,
   onDesiredRoleChange,
   options,
+  selectedRoleId,
   tone,
   tooltip,
 }: {
-  desiredRole: InlineChangeTypographyRoleOption | null;
+  currentRoleId: string | null;
   displayLabel: string;
   onDesiredRoleChange: (roleId: string | null) => void;
   options: InlineChangeTypographyRoleOption[];
+  selectedRoleId: string | null;
   tone: "desired" | "neutral";
   tooltip: string;
 }) {
   return (
     <Select
-      value={desiredRole?.id ?? "__keep"}
-      onValueChange={(roleId) => onDesiredRoleChange(roleId === "__keep" ? null : roleId)}
+      value={selectedRoleId ?? "__keep"}
+      onValueChange={(roleId) =>
+        onDesiredRoleChange(roleId === "__keep" || roleId === currentRoleId ? null : roleId)
+      }
     >
-      <SelectTrigger
+      <HitoValueTagSelectTrigger
         aria-label={`Typography desired role. ${tooltip}`}
         title={tooltip}
-        className={`hito-field-sm h-7 w-auto min-w-24 max-w-36 rounded-md px-2 py-0 text-xs shadow-none focus-visible:ring-1 [&>svg]:ml-1 [&>svg]:size-3 ${
-          tone === "desired"
-            ? "border-success/35 bg-success/10 text-success"
-            : "border-hairline bg-surface/45 text-foreground"
-        }`}
+        className="min-w-24 max-w-36"
+        tone={tone}
       >
-        <span className="truncate">{displayLabel}</span>
-      </SelectTrigger>
-      <SelectContent align="end" className="z-[73] w-56" data-local-ui-inspector-layer="">
+        {displayLabel}
+      </HitoValueTagSelectTrigger>
+      <SelectContent align="end" className="z-[73] w-72" data-local-ui-inspector-layer="">
         <SelectItem value="__keep">Keep current</SelectItem>
         {options.map((option) => (
           <SelectItem key={option.id} value={option.id}>
-            {option.label} · {option.className}
+            <span className="grid min-w-0 gap-0.5">
+              <span className="truncate">{option.label}</span>
+              <span className="hito-caption truncate">
+                {[option.technicalDetails, option.className].filter(Boolean).join(" · ")}
+              </span>
+            </span>
           </SelectItem>
         ))}
       </SelectContent>

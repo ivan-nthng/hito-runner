@@ -19,9 +19,28 @@ export function buildTypographyRoleSelection(
   if (!desiredRole || desiredRole.id === typography.currentRole?.id) return null;
 
   return {
+    currentDetails:
+      typography.currentRole?.technicalDetails ?? getObservedTypographyDetails(typography),
+    currentIsCustom: !typography.currentRole,
     currentRole: typography.currentRole,
     desiredRole,
   };
+}
+
+function getObservedTypographyDetails(
+  typography: NonNullable<InlineChangeTargetInput["typography"]>,
+) {
+  return (
+    [
+      typography.fontFamily,
+      typography.fontSize,
+      typography.fontWeight ? `weight ${typography.fontWeight}` : null,
+      typography.lineHeight ? `lh ${typography.lineHeight}` : null,
+      typography.letterSpacing ? `letter ${typography.letterSpacing}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null
+  );
 }
 
 export function getInferredDraftAction(

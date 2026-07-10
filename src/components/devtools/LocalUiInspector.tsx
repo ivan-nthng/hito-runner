@@ -33,6 +33,7 @@ type FloatingPanelState = {
 };
 
 const PANEL_VIEWPORT_MARGIN = 10;
+const PANEL_TARGET_GAP = 12;
 const DEFAULT_PANEL_WIDTH = 352;
 const DEFAULT_PANEL_HEIGHT = 540;
 const LAUNCHER_BUTTON_SIZE = 40;
@@ -333,7 +334,15 @@ function InspectorPanel({
       const nextPosition =
         panel.anchor === "launcher"
           ? getLauncherPanelPosition(rect.width, rect.height)
-          : clampPanelPosition(panel.position.x, panel.position.y, rect.width, rect.height);
+          : panel.target.rect
+            ? getPanelPosition(
+                panel.target.rect,
+                panel.position.x,
+                panel.position.y,
+                rect.width,
+                rect.height,
+              )
+            : clampPanelPosition(panel.position.x, panel.position.y, rect.width, rect.height);
 
       setClampedPosition((current) =>
         Math.abs(current.x - nextPosition.x) < 0.5 && Math.abs(current.y - nextPosition.y) < 0.5
@@ -353,7 +362,7 @@ function InspectorPanel({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", updatePosition);
     };
-  }, [panel.anchor, panel.position, panel.actionId]);
+  }, [panel.actionId, panel.anchor, panel.position, panel.target.rect]);
 
   return (
     <section
@@ -593,10 +602,62 @@ function buildSelector(element: HTMLElement) {
   return `${element.tagName.toLowerCase()}${classSelector}`;
 }
 
-function getPanelPosition(rect: DOMRectReadOnly, clientX: number, clientY: number) {
-  const preferredX = Math.min(clientX + 12, rect.right + 12);
-  const preferredY = Math.min(clientY + 12, rect.bottom + 12);
-  return clampPanelPosition(preferredX, preferredY);
+function getPanelPosition(
+  targetRect: DOMRectReadOnly,
+  clientX: number,
+  clientY: number,
+  measuredWidth = DEFAULT_PANEL_WIDTH,
+  measuredHeight = DEFAULT_PANEL_HEIGHT,
+) {
+  const { height: panelHeight, width: panelWidth } = getEffectivePanelSize(
+    measuredWidth,
+    measuredHeight,
+  );
+  const sideY = clampPanelPosition(0, targetRect.top - PANEL_TARGET_GAP, panelWidth, panelHeight).y;
+  const centeredX = targetRect.left + targetRect.width / 2 - panelWidth / 2;
+  const centeredClampedX = clampPanelPosition(centeredX, 0, panelWidth, panelHeight).x;
+  const isInViewport = (candidate: { x: number; y: number }) =>
+    candidate.x >= PANEL_VIEWPORT_MARGIN &&
+    candidate.y >= PANEL_VIEWPORT_MARGIN &&
+    candidate.x + panelWidth <= window.innerWidth - PANEL_VIEWPORT_MARGIN &&
+    candidate.y + panelHeight <= window.innerHeight - PANEL_VIEWPORT_MARGIN;
+  const overlapsTarget = (candidate: { x: number; y: number }) =>
+    !(
+      candidate.x + panelWidth <= targetRect.left ||
+      candidate.x >= targetRect.right ||
+      candidate.y + panelHeight <= targetRect.top ||
+      candidate.y >= targetRect.bottom
+    );
+  const candidates = [
+    { x: targetRect.right + PANEL_TARGET_GAP, y: sideY },
+    { x: targetRect.left - panelWidth - PANEL_TARGET_GAP, y: sideY },
+    {
+      x: centeredClampedX,
+      y: targetRect.bottom + PANEL_TARGET_GAP,
+    },
+    {
+      x: centeredClampedX,
+      y: targetRect.top - panelHeight - PANEL_TARGET_GAP,
+    },
+    { x: clientX + PANEL_TARGET_GAP, y: clientY + PANEL_TARGET_GAP },
+  ];
+
+  const nonOverlappingCandidate = candidates.find(
+    (candidate) => isInViewport(candidate) && !overlapsTarget(candidate),
+  );
+
+  if (nonOverlappingCandidate) return nonOverlappingCandidate;
+
+  const inViewportCandidate = candidates.find(isInViewport);
+
+  if (inViewportCandidate) return inViewportCandidate;
+
+  return clampPanelPosition(
+    clientX + PANEL_TARGET_GAP,
+    clientY + PANEL_TARGET_GAP,
+    panelWidth,
+    panelHeight,
+  );
 }
 
 function getLauncherPanelPosition(
@@ -621,8 +682,10 @@ function clampPanelPosition(
   measuredWidth = DEFAULT_PANEL_WIDTH,
   measuredHeight = DEFAULT_PANEL_HEIGHT,
 ) {
-  const panelWidth = Math.min(measuredWidth, window.innerWidth - PANEL_VIEWPORT_MARGIN * 2);
-  const panelHeight = Math.min(measuredHeight, window.innerHeight - PANEL_VIEWPORT_MARGIN * 2);
+  const { height: panelHeight, width: panelWidth } = getEffectivePanelSize(
+    measuredWidth,
+    measuredHeight,
+  );
 
   return {
     x: Math.max(
@@ -633,6 +696,13 @@ function clampPanelPosition(
       PANEL_VIEWPORT_MARGIN,
       Math.min(y, window.innerHeight - panelHeight - PANEL_VIEWPORT_MARGIN),
     ),
+  };
+}
+
+function getEffectivePanelSize(measuredWidth: number, measuredHeight: number) {
+  return {
+    height: Math.min(measuredHeight, window.innerHeight - PANEL_VIEWPORT_MARGIN * 2),
+    width: Math.min(measuredWidth, window.innerWidth - PANEL_VIEWPORT_MARGIN * 2),
   };
 }
 

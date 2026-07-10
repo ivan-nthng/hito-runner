@@ -21,6 +21,7 @@ import {
   type WorkoutPrimitivePaletteId,
   type WorkoutSectionColorRole,
 } from "@/lib/workout-color-tokens";
+import { HITO_TYPOGRAPHY_ROLES, type HitoTypographyRole } from "@/lib/hito-typography-roles";
 import { cn } from "@/lib/utils";
 
 const COLOR_TABS = ["semantic", "primitive"] as const;
@@ -375,135 +376,6 @@ type ShellContext = (typeof SHELL_CONTEXTS)[number];
 type AsyncToastDemoState = "info" | "working" | "success" | "error";
 
 const HITO_DS_TOAST_ID = "hito-ds-async-action-toast";
-const TYPOGRAPHY_ROLES = [
-  {
-    role: "Display",
-    className: "hito-display-title",
-    sample: "A running plan that stays honest.",
-    use: "Rare editorial emphasis for auth or top-tier entry moments.",
-    spec: "Fraunces · clamp(3.5rem, 7vw, 5rem) · 400 · -0.02em · lh 1",
-  },
-  {
-    role: "Page title",
-    className: "hito-page-title",
-    sample: "Profile details that follow your training.",
-    use: "Top-level route title or major state heading.",
-    spec: "Fraunces · clamp(3rem, 6vw, 4.5rem) · 400 · -0.02em · lh 1",
-  },
-  {
-    role: "Modal title",
-    className: "hito-modal-title",
-    sample: "Edit schedule",
-    use: "Primary heading inside bounded product dialogs.",
-    spec: "Fraunces · 1.75-2rem · 400 · -0.02em · lh 1.1",
-  },
-  {
-    role: "Section title",
-    className: "hito-section-title",
-    sample: "Body data",
-    use: "Section-level orientation within an open surface.",
-    spec: "Fraunces · 1.5rem · 400 · -0.02em · lh 1.15",
-  },
-  {
-    role: "Panel title",
-    className: "hito-panel-title",
-    sample: "Plan vs run",
-    use: "Compact internal panels, review modules, and feedback sections.",
-    spec: "Fraunces · 1.25-1.375rem · 400 · -0.015em · lh 1.18",
-  },
-  {
-    role: "Body",
-    className: "hito-body",
-    sample: "This compares the planned workout with the uploaded run.",
-    use: "Default readable paragraph for page, modal, and section support.",
-    spec: "Poppins · 0.875rem · 400 · lh 1.58",
-  },
-  {
-    role: "Body small",
-    className: "hito-body-small",
-    sample: "Saved workout history stays preserved.",
-    use: "Dense secondary explanations, row support, and metadata.",
-    spec: "Poppins · 0.8125rem · 400 · lh 1.5",
-  },
-  {
-    role: "Helper",
-    className: "hito-field-helper",
-    sample: "Nothing changes until you choose Apply update.",
-    use: "Field-adjacent or control-adjacent operational guidance.",
-    spec: "Poppins · 0.75rem · 400 · lh 1.45",
-  },
-  {
-    role: "Caption",
-    className: "hito-caption",
-    sample: "Extracted activity: morning-run.fit",
-    use: "Tertiary detail, legends, tiny footnotes, and timestamps.",
-    spec: "Poppins · 0.6875rem · 400 · lh 1.45",
-  },
-  {
-    role: "Label",
-    className: "hito-label",
-    sample: "Current plan",
-    use: "Micro orientation, never a substitute for a heading.",
-    spec: "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
-  },
-  {
-    role: "Form label",
-    className: "hito-form-label",
-    sample: "Start training",
-    use: "Explicit ownership label for fields and controls.",
-    spec: "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
-  },
-  {
-    role: "Micro label",
-    className: "hito-micro-label",
-    sample: "Saved mode",
-    use: "Tiny uppercase route chrome and compact status metadata, not ordinary shell labels.",
-    spec: "Poppins · 0.6875rem · 500 · 0.18em · uppercase · lh 1.2",
-  },
-  {
-    role: "Button",
-    className: "hito-button hito-button-secondary hito-button-sm",
-    sample: "Generate proposal",
-    use: "Action text tuned by shared Hito button size tiers.",
-    spec: "Poppins · tiered 0.6875-0.9375rem · 500 · lh 1",
-  },
-  {
-    role: "Nav / menu",
-    className: "hito-menu-text",
-    sample: "User settings",
-    use: "Shell navigation, dropdown rows, and utility menu text.",
-    spec: "Poppins · 0.8125-0.875rem · 500 · lh 1-1.3",
-  },
-  {
-    role: "Metric",
-    className: "hito-metric-value",
-    sample: "42.2 km",
-    use: "Measured truth: distance, duration, pace, counts, and dates.",
-    spec: "JetBrains Mono · 1rem · 500 · tabular · lh 1.1",
-  },
-  {
-    role: "Status",
-    className: "hito-status-pill",
-    sample: "Ready",
-    use: "Semantic state identifier, never a heading.",
-    spec: "Poppins · 0.625rem · 500 · normal case · rounded rectangle",
-  },
-  {
-    role: "Error / success",
-    className: "hito-field-success",
-    sample: "User settings saved.",
-    use: "Bounded action feedback near the relevant control family.",
-    spec: "Poppins · 0.875rem · 500 · lh 1.45",
-  },
-  {
-    role: "Technical mono",
-    className: "hito-technical-mono",
-    sample: '{"schema_version":"training-plan-v2"}',
-    use: "JSON, identifiers, file metadata, timestamps, and fixed-format facts.",
-    spec: "JetBrains Mono · 0.75rem · 400 · tabular · lh 1.45",
-  },
-] as const;
-
 export function HitoDsFoundationsPage() {
   const [colorTab, setColorTab] = useState<ColorTab>("semantic");
   const [iconPreviewSize, setIconPreviewSize] = useState<HitoIconSize>("md");
@@ -878,8 +750,8 @@ export function HitoDsFoundationsPage() {
           </div>
 
           <div className="hito-reference-list">
-            {TYPOGRAPHY_ROLES.map((role) => (
-              <TypographyRoleCard key={role.role} role={role} />
+            {HITO_TYPOGRAPHY_ROLES.map((role) => (
+              <TypographyRoleCard key={role.id} role={role} />
             ))}
           </div>
 
@@ -1462,11 +1334,11 @@ function RadiusPrimitiveRow({ radius }: { radius: (typeof RADIUS_PRIMITIVES)[num
   );
 }
 
-function TypographyRoleCard({ role }: { role: (typeof TYPOGRAPHY_ROLES)[number] }) {
+function TypographyRoleCard({ role }: { role: HitoTypographyRole }) {
   return (
     <article className="hito-reference-row">
       <div>
-        <p className="hito-label">{role.role}</p>
+        <p className="hito-label">{role.label}</p>
         <p className="hito-caption mt-2">{role.use}</p>
       </div>
       <div className="grid gap-3">

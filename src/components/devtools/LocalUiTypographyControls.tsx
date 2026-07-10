@@ -17,16 +17,15 @@ export function TypographyControlRow({
 }) {
   const desiredRole = typography.options.find((option) => option.id === desiredRoleId) ?? null;
   const isActive = Boolean(desiredRole && desiredRole.id !== typography.currentRole?.id);
-  const currentLabel = typography.currentRole?.label ?? "Unmapped";
+  const currentLabel = typography.currentRole?.label ?? "Custom";
   const currentHelp = typography.currentRole
-    ? `${typography.currentRole.className} · ${getComputedTypographyLabel(typography)}`
-    : getComputedTypographyLabel(typography);
-  const desiredHelp = desiredRole
-    ? `${desiredRole.className} · ${desiredRole.description}`
-    : currentHelp;
+    ? getRoleDetail(typography.currentRole)
+    : `Custom · ${getObservedTypographyLabel(typography)}`;
+  const desiredHelp = desiredRole ? getRoleDetail(desiredRole) : currentHelp;
+  const currentRoleId = typography.currentRole?.id ?? null;
 
   return (
-    <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row="typography">
+    <div className="grid min-w-0 py-0.5" data-local-ui-property-control-row="typography">
       <div className="flex min-w-0 items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
@@ -40,8 +39,9 @@ export function TypographyControlRow({
             <Icon name="arrow-right" size="xs" className="shrink-0 text-muted-foreground" />
             <div className="group relative shrink-0">
               <TypographyRoleSelect
-                desiredRole={desiredRole}
+                currentRoleId={currentRoleId}
                 displayLabel={desiredRole?.label ?? currentLabel}
+                selectedRoleId={desiredRole?.id ?? currentRoleId}
                 tooltip={desiredHelp}
                 tone="desired"
                 onDesiredRoleChange={onDesiredRoleChange}
@@ -55,8 +55,9 @@ export function TypographyControlRow({
           </>
         ) : (
           <TypographyRoleSelect
-            desiredRole={null}
+            currentRoleId={currentRoleId}
             displayLabel={currentLabel}
+            selectedRoleId={currentRoleId}
             tooltip={currentHelp}
             tone="neutral"
             onDesiredRoleChange={onDesiredRoleChange}
@@ -68,13 +69,21 @@ export function TypographyControlRow({
   );
 }
 
-function getComputedTypographyLabel(
+function getRoleDetail(
+  role: NonNullable<InlineChangeTargetInput["typography"]>["options"][number],
+) {
+  return [role.technicalDetails ?? role.description, role.className].filter(Boolean).join(" · ");
+}
+
+function getObservedTypographyLabel(
   typography: NonNullable<InlineChangeTargetInput["typography"]>,
 ) {
   const label = [
-    typography.fontSize ? `font ${typography.fontSize}` : null,
-    typography.lineHeight ? `line ${typography.lineHeight}` : null,
+    typography.fontFamily,
+    typography.fontSize,
     typography.fontWeight ? `weight ${typography.fontWeight}` : null,
+    typography.lineHeight ? `lh ${typography.lineHeight}` : null,
+    typography.letterSpacing ? `letter ${typography.letterSpacing}` : null,
   ]
     .filter(Boolean)
     .join(" · ");

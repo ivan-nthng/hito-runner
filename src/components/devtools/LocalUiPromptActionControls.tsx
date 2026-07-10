@@ -5,6 +5,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { HitoValueTag } from "@/components/ui/value-tag";
 import type { InlineChangePromptActionSelection } from "@/components/devtools/local-inline-change-target-utils";
 import { PendingChangeRemoveButton } from "@/components/devtools/LocalUiPropertyControlPrimitives";
 
@@ -31,13 +32,14 @@ export function PromptActionRow({
         </div>
         {selection ? (
           <div className="group relative shrink-0">
-            <span
-              className="inline-flex h-7 min-w-0 max-w-40 items-center gap-1.5 rounded-md border border-warn/35 bg-warn/10 px-2 text-xs font-medium text-warn"
+            <HitoValueTag
+              className="min-w-0 max-w-40"
+              iconName="trash"
+              tone="current"
               title="Prompt-only action. This does not mutate live UI."
             >
-              <Icon name="trash" size="xs" />
-              <span className="truncate">{selection.label}</span>
-            </span>
+              {selection.label}
+            </HitoValueTag>
             <PendingChangeRemoveButton
               ariaLabel={`Remove ${selection.label} pending action`}
               onClick={() => onActionChange(null)}

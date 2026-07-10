@@ -11,6 +11,7 @@ import {
   type HitoIconSize,
 } from "@/components/ui/icon";
 import { InlineEditableText, InlineReadOnlyText } from "@/components/ui/inline-editable-text";
+import { HitoValueTag } from "@/components/ui/value-tag";
 import {
   WORKOUT_PRIMITIVE_PALETTE_FAMILIES,
   WORKOUT_SECTION_COLOR_ROLES,
@@ -18,6 +19,7 @@ import {
   workoutSectionColorToken,
   workoutTypeColorToken,
 } from "@/lib/workout-color-tokens";
+import { HITO_TYPOGRAPHY_ROLES } from "@/lib/hito-typography-roles";
 import { cn } from "@/lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "outlined" | "ghost";
@@ -113,28 +115,6 @@ const RADIUS_TOKENS = [
   { name: "radius-2xl", token: "--radius-2xl" },
   { name: "radius-3xl", token: "--radius-3xl" },
   { name: "radius-4xl", token: "--radius-4xl" },
-] as const;
-
-const TYPOGRAPHY_ROLES = [
-  { role: "Display title", className: "hito-display-title", text: "10k plan preview" },
-  { role: "Section title", className: "hito-section-title", text: "Calendar states" },
-  { role: "Panel title", className: "hito-panel-title", text: "Workout detail" },
-  { role: "Modal title", className: "hito-modal-title", text: "Review move" },
-  {
-    role: "Body",
-    className: "hito-body",
-    text: "Readable runner-facing copy for product surfaces.",
-  },
-  {
-    role: "Body small",
-    className: "hito-body-small",
-    text: "Secondary explanation and support text.",
-  },
-  { role: "Label", className: "hito-label", text: "Manual plan" },
-  { role: "Form label", className: "hito-form-label", text: "Running level" },
-  { role: "Micro label", className: "hito-micro-label", text: "STATUS CHROME" },
-  { role: "Caption", className: "hito-caption", text: "Captured from live Hito DS classes." },
-  { role: "Technical mono", className: "hito-technical-mono", text: "training-plan-v2" },
 ] as const;
 
 const BUTTON_STATES: Array<{
@@ -418,16 +398,13 @@ function TypographyGrid() {
     <div className="grid gap-3">
       <h3 className="hito-label">Typography roles</h3>
       <div className="grid gap-3 rounded-2xl border border-hairline bg-background/55 p-4">
-        {TYPOGRAPHY_ROLES.map((role) => (
-          <div
-            key={role.className}
-            className="grid gap-2 border-b border-hairline pb-3 last:border-0"
-          >
+        {HITO_TYPOGRAPHY_ROLES.map((role) => (
+          <div key={role.id} className="grid gap-2 border-b border-hairline pb-3 last:border-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="hito-caption">{role.role}</span>
+              <span className="hito-caption">{role.label}</span>
               <code className="hito-technical-mono">{role.className}</code>
             </div>
-            <p className={role.className}>{role.text}</p>
+            <p className={role.className}>{role.sample}</p>
           </div>
         ))}
       </div>
@@ -1027,19 +1004,9 @@ function StaticValueChip({
   tone?: "current" | "desired" | "neutral";
 }) {
   return (
-    <span
-      className={cn(
-        "hito-technical-mono inline-flex h-7 min-w-10 shrink-0 items-center justify-center rounded-md border px-2 text-xs",
-        tone === "current" && "border-warn/35 bg-warn/10 text-warn",
-        tone === "desired" && "border-success/35 bg-success/10 text-success",
-        tone === "neutral" && "border-hairline bg-surface/45 text-foreground",
-      )}
-      title={help}
-      aria-label={help}
-      tabIndex={0}
-    >
+    <HitoValueTag title={help} aria-label={help} tone={tone}>
       {children}
-    </span>
+    </HitoValueTag>
   );
 }
 

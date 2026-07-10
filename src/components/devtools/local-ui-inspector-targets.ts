@@ -12,6 +12,7 @@ import type {
   InlineChangeTypographyEvidence,
   InlineChangeTypographyRoleOption,
 } from "@/components/devtools/local-inline-change-target-utils";
+import { HITO_INSPECTOR_TYPOGRAPHY_ROLES } from "@/lib/hito-typography-roles";
 
 const CONTROL_TAGS = new Set(["button", "a", "input", "textarea", "select"]);
 const CONTROL_ROLES = new Set([
@@ -57,68 +58,14 @@ const HITO_RADIUS_SCALE = [
   ["--radius-4xl", 16],
 ] as const;
 
-export const HITO_TYPOGRAPHY_ROLE_OPTIONS: InlineChangeTypographyRoleOption[] = [
-  {
-    className: "hito-display-title",
-    description: "Largest display heading used for hero-level product names.",
-    id: "display-title",
-    label: "Display title",
-  },
-  {
-    className: "hito-page-title",
-    description: "Primary page title role.",
-    id: "page-title",
-    label: "Page title",
-  },
-  {
-    className: "hito-section-title",
-    description: "Section-level title role.",
-    id: "section-title",
-    label: "Section title",
-  },
-  {
-    className: "hito-panel-title",
-    description: "Compact panel or card title role.",
-    id: "panel-title",
-    label: "Panel title",
-  },
-  {
-    className: "hito-list-row-title",
-    description: "Primary label inside list-row anatomy.",
-    id: "list-row-title",
-    label: "List row title",
-  },
-  {
-    className: "hito-body",
-    description: "Default body copy role.",
-    id: "body",
-    label: "Body",
-  },
-  {
-    className: "hito-body-small",
-    description: "Small supporting body copy role.",
-    id: "body-small",
-    label: "Body small",
-  },
-  {
-    className: "hito-caption",
-    description: "Quiet caption and secondary metadata role.",
-    id: "caption",
-    label: "Caption",
-  },
-  {
-    className: "hito-label",
-    description: "Compact field or metadata label role.",
-    id: "label",
-    label: "Label",
-  },
-  {
-    className: "hito-technical-mono",
-    description: "Technical monospace readback role.",
-    id: "technical-mono",
-    label: "Technical mono",
-  },
-];
+export const HITO_TYPOGRAPHY_ROLE_OPTIONS: InlineChangeTypographyRoleOption[] =
+  HITO_INSPECTOR_TYPOGRAPHY_ROLES.map((role) => ({
+    className: role.className,
+    description: role.description,
+    id: role.id,
+    label: role.label,
+    technicalDetails: role.technicalDetails,
+  }));
 
 export function inspectLocalUiTarget(
   element: HTMLElement,
@@ -262,9 +209,11 @@ function buildBaseEvidence(
   }
   if (typography) {
     const computedType = [
+      typography.fontFamily ? `family ${typography.fontFamily}` : null,
       typography.fontSize ? `font ${typography.fontSize}` : null,
       typography.lineHeight ? `line-height ${typography.lineHeight}` : null,
       typography.fontWeight ? `weight ${typography.fontWeight}` : null,
+      typography.letterSpacing ? `letter-spacing ${typography.letterSpacing}` : null,
     ]
       .filter(Boolean)
       .join("; ");
@@ -275,7 +224,7 @@ function buildBaseEvidence(
         `Hito typography role: ${typography.currentRole.label} (${typography.currentRole.className}).`,
       );
     } else if (visibleText || typography.classNames.length > 0) {
-      evidence.push("Hito typography role: no confident mapped role; computed typography only.");
+      evidence.push("Hito typography role: Custom; computed typography only.");
     }
   }
 
@@ -418,17 +367,46 @@ function buildTypographyEvidence(
   if (!hasTextSignal) return null;
 
   const currentRole =
-    HITO_TYPOGRAPHY_ROLE_OPTIONS.find((role) => typographyClasses.includes(role.className)) ?? null;
+    HITO_TYPOGRAPHY_ROLE_OPTIONS.find((role) => typographyClasses.includes(role.className)) ??
+    findComputedTypographyRole(styles);
 
   return {
     classNames: typographyClasses,
     currentRole,
+    fontFamily: normalizeCssValue(styles.fontFamily),
     fontSize: normalizeCssValue(styles.fontSize),
     fontWeight: normalizeCssValue(styles.fontWeight),
+    letterSpacing: normalizeCssValue(styles.letterSpacing),
     lineHeight: normalizeCssValue(styles.lineHeight),
     options: HITO_TYPOGRAPHY_ROLE_OPTIONS,
     tag,
   };
+}
+
+function findComputedTypographyRole(styles: CSSStyleDeclaration) {
+  const fontSizePx = parsePixelValue(styles.fontSize);
+  const lineHeightPx = parsePixelValue(styles.lineHeight);
+  if (fontSizePx == null || lineHeightPx == null) return null;
+
+  return (
+    HITO_INSPECTOR_TYPOGRAPHY_ROLES.find((role) => {
+      const match = role.match;
+      if (!match) return false;
+
+      const letterSpacingPx = parsePixelValue(styles.letterSpacing);
+      const letterSpacingMatches =
+        match.letterSpacingPx == null ||
+        (letterSpacingPx != null && isNear(letterSpacingPx, match.letterSpacingPx));
+
+      return (
+        styles.fontFamily.toLowerCase().includes(match.fontFamilyIncludes.toLowerCase()) &&
+        isNear(fontSizePx, match.fontSizePx) &&
+        styles.fontWeight === match.fontWeight &&
+        isNear(lineHeightPx, match.lineHeightPx) &&
+        letterSpacingMatches
+      );
+    }) ?? null
+  );
 }
 
 function canExposeTypography(targetKind: InlineChangeTargetKind) {
@@ -679,6 +657,10 @@ function parseCssLength(value: string) {
 
   const remMatch = value.match(/^(-?\d+(?:\.\d+)?)rem$/);
   return remMatch ? Number(remMatch[1]) * getRootFontSize() : null;
+}
+
+function isNear(actual: number, expected: number) {
+  return Math.abs(actual - expected) <= 0.25;
 }
 
 function normalizeVisibleText(text: string) {

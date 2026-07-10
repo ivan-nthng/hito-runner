@@ -43,19 +43,24 @@ export type InlineChangeTypographyRoleOption = {
   description: string;
   id: string;
   label: string;
+  technicalDetails?: string;
 };
 
 export type InlineChangeTypographyEvidence = {
   classNames: string[];
   currentRole: InlineChangeTypographyRoleOption | null;
+  fontFamily: string | null;
   fontSize: string | null;
   fontWeight: string | null;
+  letterSpacing: string | null;
   lineHeight: string | null;
   options: InlineChangeTypographyRoleOption[];
   tag: string;
 };
 
 export type InlineChangeTypographySelection = {
+  currentDetails: string | null;
+  currentIsCustom: boolean;
   currentRole: InlineChangeTypographyRoleOption | null;
   desiredRole: InlineChangeTypographyRoleOption | null;
 };
@@ -641,8 +646,10 @@ function normalizeTypographyEvidence(
   return {
     classNames: value.classNames.slice(0, 6),
     currentRole: normalizeTypographyRole(value.currentRole),
+    fontFamily: value.fontFamily,
     fontSize: value.fontSize,
     fontWeight: value.fontWeight,
+    letterSpacing: value.letterSpacing,
     lineHeight: value.lineHeight,
     options: value.options
       .map(normalizeTypographyRole)
@@ -659,6 +666,8 @@ function normalizeTypographySelection(
   if (!desiredRole) return null;
 
   return {
+    currentDetails: normalizeTargetValue(value?.currentDetails)?.slice(0, 180) ?? null,
+    currentIsCustom: Boolean(value?.currentIsCustom),
     currentRole: normalizeTypographyRole(value?.currentRole),
     desiredRole,
   };
@@ -674,18 +683,23 @@ function normalizeTypographyRole(
     description: value.description,
     id: value.id,
     label: value.label,
+    technicalDetails: value.technicalDetails,
   };
 }
 
 function formatTypographyPromptLine(selection: InlineChangeTypographySelection) {
   const currentRole = selection.currentRole
-    ? `${selection.currentRole.label} (${selection.currentRole.className})`
-    : "no mapped Hito role";
+    ? formatTypographyRoleForPrompt(selection.currentRole)
+    : `Custom${selection.currentDetails ? ` (${selection.currentDetails})` : ""}`;
   const desiredRole = selection.desiredRole
-    ? `${selection.desiredRole.label} (${selection.desiredRole.className})`
+    ? formatTypographyRoleForPrompt(selection.desiredRole)
     : "not selected";
 
   return `- Typography: current ${currentRole}; desired ${desiredRole}.`;
+}
+
+function formatTypographyRoleForPrompt(role: InlineChangeTypographyRoleOption) {
+  return `${role.label} (${[role.technicalDetails, role.className].filter(Boolean).join(" · ")})`;
 }
 
 function formatPromptActionLine(

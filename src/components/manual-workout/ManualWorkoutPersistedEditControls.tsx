@@ -1,13 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
 import {
@@ -17,6 +10,7 @@ import {
 } from "@/lib/manual-workout-authoring";
 import type {
   ManualWorkoutDraftInput,
+  ManualWorkoutPersistedEditReconstructResult,
   ManualWorkoutPersistedEditReviewResult,
   ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring";
@@ -24,15 +18,14 @@ import type { ManualWorkoutTemplateKey } from "@/lib/manual-workout-authoring/sc
 import {
   MANUAL_WORKOUT_TEMPLATES,
   cloneManualWorkoutEntries,
-  formatManualDraftStructure,
   formatReadableDate,
   getDefaultManualWorkoutTemplate,
-  targetTruthModeCopy,
-  targetTruthModeLabel,
   templateIconKind,
   templateIconTone,
 } from "@/components/manual-workout/manual-workout-authoring-utils";
 import { ManualWorkoutConstructorEditor } from "@/components/manual-workout/ManualWorkoutConstructorEditor";
+import { ManualWorkoutEditorDialogHeader } from "@/components/manual-workout/ManualWorkoutEditorDialogHeader";
+import { focusManualWorkoutDialogCloseOnOpen } from "@/components/manual-workout/manual-workout-dialog-focus";
 
 const MANUAL_PERSISTED_EDIT_TOAST_ID = "manual-workout-persisted-edit";
 
@@ -58,6 +51,7 @@ export function ManualWorkoutPersistedEditDialog({
   onOpenChange,
   open,
   plannedWorkoutId,
+  prepareSignal,
   title,
   workoutDate,
 }: {
@@ -66,6 +60,7 @@ export function ManualWorkoutPersistedEditDialog({
   onOpenChange: (open: boolean) => void;
   open: boolean;
   plannedWorkoutId: string;
+  prepareSignal?: number;
   title: string;
   workoutDate: string;
 }) {
@@ -73,16 +68,94 @@ export function ManualWorkoutPersistedEditDialog({
   const reviewEditDraftFn = useServerFn(reviewManualWorkoutPersistedEditDraft);
   const confirmEditDraftFn = useServerFn(confirmManualWorkoutPersistedEdit);
   const confirmInFlightRef = useRef(false);
+  const reconstructedDraftCacheRef = useRef<{
+    result: ManualWorkoutPersistedEditReconstructResult;
+    sourceKey: string;
+  } | null>(null);
+  const reconstructRequestRef = useRef<{
+    promise: Promise<ManualWorkoutPersistedEditReconstructResult>;
+    sourceKey: string;
+  } | null>(null);
+  const lastPrepareSignalRef = useRef<number | null>(null);
   const [draftState, setDraftState] = useState<EditableDraftState | null>(null);
+  const [loadedSourceKey, setLoadedSourceKey] = useState<string | null>(null);
   const [status, setStatus] = useState<PersistedEditStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [reviewResult, setReviewResult] = useState<ManualWorkoutPersistedEditReviewResult | null>(
     null,
   );
 
+  const sourceKey = buildPersistedEditSourceKey({ activePlanId, plannedWorkoutId, workoutDate });
+  const activeDraftState = loadedSourceKey === sourceKey ? draftState : null;
   const isBusy = status !== "idle";
   const readyReview = reviewResult?.ok ? reviewResult : null;
   const blockedMessage = reviewResult && !reviewResult.ok ? reviewResult.message : message;
+  const shouldRenderDialog = open && (Boolean(activeDraftState) || Boolean(blockedMessage));
+
+  const applyPersistedEditReconstructResult = useCallback(
+    (result: ManualWorkoutPersistedEditReconstructResult | null | undefined) => {
+      if (!result?.ok) {
+        const nextMessage =
+          result?.message ?? "This manual workout cannot be opened for editing yet.";
+        setStatus("idle");
+        setLoadedSourceKey(sourceKey);
+        setMessage(nextMessage);
+        hitoToast.error({
+          id: MANUAL_PERSISTED_EDIT_TOAST_ID,
+          title: "Edit blocked",
+          description: nextMessage,
+        });
+        return;
+      }
+
+      setDraftState({
+        baseDraftInput: result.draftInput,
+        entries: cloneManualWorkoutEntries(result.draftInput.entries),
+        notes: result.draftInput.notes ?? "",
+        targetTruthMode: result.draftInput.targetTruthMode,
+        title: result.draftInput.title,
+      });
+      setLoadedSourceKey(sourceKey);
+      setStatus("idle");
+    },
+    [sourceKey],
+  );
+
+  const loadPersistedEditDraft = useCallback(() => {
+    const cached = reconstructedDraftCacheRef.current;
+    if (cached?.sourceKey === sourceKey) {
+      return Promise.resolve(cached.result);
+    }
+
+    const existingRequest = reconstructRequestRef.current;
+    if (existingRequest?.sourceKey === sourceKey) {
+      return existingRequest.promise;
+    }
+
+    const promise = reconstructEditDraftFn({
+      data: buildPersistedEditSourcePayload({ activePlanId, plannedWorkoutId, workoutDate }),
+    }).then((result) => {
+      reconstructedDraftCacheRef.current = { result, sourceKey };
+      if (reconstructRequestRef.current?.sourceKey === sourceKey) {
+        reconstructRequestRef.current = null;
+      }
+      return result;
+    });
+
+    reconstructRequestRef.current = { promise, sourceKey };
+    return promise;
+  }, [activePlanId, plannedWorkoutId, reconstructEditDraftFn, sourceKey, workoutDate]);
+
+  useEffect(() => {
+    if (!prepareSignal || lastPrepareSignalRef.current === prepareSignal) return;
+    lastPrepareSignalRef.current = prepareSignal;
+
+    void loadPersistedEditDraft().catch(() => {
+      if (reconstructRequestRef.current?.sourceKey === sourceKey) {
+        reconstructRequestRef.current = null;
+      }
+    });
+  }, [loadPersistedEditDraft, prepareSignal, sourceKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -91,44 +164,28 @@ export function ManualWorkoutPersistedEditDialog({
     setStatus("loading");
     setMessage(null);
     setReviewResult(null);
+
     setDraftState(null);
+    setLoadedSourceKey(null);
 
     void (async () => {
       try {
-        const result = await reconstructEditDraftFn({
-          data: buildPersistedEditSourcePayload({ activePlanId, plannedWorkoutId, workoutDate }),
-        });
+        const result = await loadPersistedEditDraft();
 
         if (!active) return;
 
-        if (!result?.ok) {
-          const nextMessage =
-            result?.message ?? "This manual workout cannot be reconstructed for editing yet.";
-          setStatus("idle");
-          setMessage(nextMessage);
-          hitoToast.error({
-            id: MANUAL_PERSISTED_EDIT_TOAST_ID,
-            title: "Edit blocked",
-            description: nextMessage,
-          });
-          return;
-        }
-
-        setDraftState({
-          baseDraftInput: result.draftInput,
-          entries: cloneManualWorkoutEntries(result.draftInput.entries),
-          notes: result.draftInput.notes ?? "",
-          targetTruthMode: result.draftInput.targetTruthMode,
-          title: result.draftInput.title,
-        });
-        setStatus("idle");
+        applyPersistedEditReconstructResult(result);
       } catch (error) {
         if (!active) return;
+        if (reconstructRequestRef.current?.sourceKey === sourceKey) {
+          reconstructRequestRef.current = null;
+        }
         const nextMessage =
           error instanceof Error
             ? error.message
-            : "This manual workout could not be reconstructed for editing.";
+            : "This manual workout could not be opened for editing.";
         setStatus("idle");
+        setLoadedSourceKey(sourceKey);
         setMessage(nextMessage);
         hitoToast.error({
           id: MANUAL_PERSISTED_EDIT_TOAST_ID,
@@ -141,7 +198,7 @@ export function ManualWorkoutPersistedEditDialog({
     return () => {
       active = false;
     };
-  }, [activePlanId, open, plannedWorkoutId, reconstructEditDraftFn, workoutDate]);
+  }, [applyPersistedEditReconstructResult, loadPersistedEditDraft, open, sourceKey]);
 
   const updateDraftState = (next: Partial<Omit<EditableDraftState, "baseDraftInput">>) => {
     setDraftState((current) => (current ? { ...current, ...next } : current));
@@ -150,20 +207,20 @@ export function ManualWorkoutPersistedEditDialog({
   };
 
   const buildEditedDraftInput = () => {
-    if (!draftState) return null;
+    if (!activeDraftState) return null;
 
     return {
-      ...draftState.baseDraftInput,
-      entries: cloneManualWorkoutEntries(draftState.entries),
-      notes: draftState.notes.trim() || null,
-      targetTruthMode: draftState.targetTruthMode,
-      title: draftState.title.trim() || draftState.baseDraftInput.title,
-      workoutDate: draftState.baseDraftInput.workoutDate,
+      ...activeDraftState.baseDraftInput,
+      entries: cloneManualWorkoutEntries(activeDraftState.entries),
+      notes: activeDraftState.notes.trim() || null,
+      targetTruthMode: activeDraftState.targetTruthMode,
+      title: activeDraftState.title.trim() || activeDraftState.baseDraftInput.title,
+      workoutDate: activeDraftState.baseDraftInput.workoutDate,
     } satisfies ManualWorkoutDraftInput;
   };
 
   const submitReview = async () => {
-    if (!draftState || isBusy) return;
+    if (!activeDraftState || isBusy) return;
 
     const draftInput = buildEditedDraftInput();
     if (!draftInput) return;
@@ -280,11 +337,11 @@ export function ManualWorkoutPersistedEditDialog({
     }
   };
 
-  const template = getManualTemplateForDraft(draftState?.baseDraftInput.templateKey ?? null);
-  const allowedTargetTruthModes = draftState
+  const template = getManualTemplateForDraft(activeDraftState?.baseDraftInput.templateKey ?? null);
+  const allowedTargetTruthModes = activeDraftState
     ? Array.from(
         new Set<ManualWorkoutTargetTruthMode>([
-          draftState.targetTruthMode,
+          activeDraftState.targetTruthMode,
           ...template.allowedTargetTruthModes,
         ]),
       )
@@ -292,7 +349,7 @@ export function ManualWorkoutPersistedEditDialog({
 
   return (
     <Dialog
-      open={open}
+      open={shouldRenderDialog}
       onOpenChange={(nextOpen) => {
         if (!nextOpen && isBusy) return;
         onOpenChange(nextOpen);
@@ -300,56 +357,47 @@ export function ManualWorkoutPersistedEditDialog({
     >
       <DialogContent
         className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
+        onOpenAutoFocus={focusManualWorkoutDialogCloseOnOpen}
         overlayClassName="hito-dialog-overlay-stable"
       >
-        <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Edit training</DialogTitle>
-          <DialogDescription className="hito-body">
-            {formatReadableDate(workoutDate)}. Hito reconstructs the saved workout into the manual
-            constructor, then reviews the edit before saving.
-          </DialogDescription>
-        </DialogHeader>
+        <ManualWorkoutEditorDialogHeader
+          dateLabel={formatReadableDate(workoutDate)}
+          statusLabel={statusLabelFor(status, reviewResult)}
+          title={activeDraftState?.title ?? title}
+        />
 
         <div className="hito-product-dialog-body-scroll-fill">
-          {draftState ? (
+          {activeDraftState ? (
             <div className="grid gap-4">
               <ManualWorkoutConstructorEditor
                 allowedTargetTruthModes={allowedTargetTruthModes}
                 dateLabel={formatReadableDate(workoutDate)}
-                entries={draftState.entries}
+                entries={activeDraftState.entries}
                 iconKey={templateIconKind(template)}
                 iconTone={templateIconTone(template)}
                 isRestDraft={template.workoutType === "rest"}
-                notes={draftState.notes}
+                notes={activeDraftState.notes}
                 onEntriesChange={(entries) => updateDraftState({ entries })}
                 onNotesChange={(notes) => updateDraftState({ notes })}
                 onTargetTruthModeChange={(targetTruthMode) => updateDraftState({ targetTruthMode })}
                 onTitleChange={(nextTitle) => updateDraftState({ title: nextTitle })}
+                readbackMode={Boolean(readyReview)}
                 reviewDisabledReason={blockedMessage}
                 selectedTemplateKey={template.templateKey}
                 source="template"
-                sourceLabel="Saved workout"
-                statusLabel={statusLabelFor(status, reviewResult)}
-                targetTruthMode={draftState.targetTruthMode}
+                targetTruthMode={activeDraftState.targetTruthMode}
                 templateOptions={MANUAL_WORKOUT_TEMPLATES}
-                title={draftState.title}
+                title={activeDraftState.title}
               />
               <PersistedEditReviewReadback result={reviewResult} />
             </div>
           ) : (
             <div className="hito-list-row items-start">
-              <Icon
-                name={blockedMessage ? "shield-alert" : "loader"}
-                size="sm"
-                className="mt-0.5 text-muted-foreground"
-              />
+              <Icon name="shield-alert" size="sm" className="mt-0.5 text-muted-foreground" />
               <div className="min-w-0">
-                <p className="hito-list-row-title">
-                  {blockedMessage ? "Edit unavailable" : "Reconstructing saved workout"}
-                </p>
+                <p className="hito-list-row-title">Edit unavailable</p>
                 <p className="hito-list-row-copy">
-                  {blockedMessage ??
-                    "Hito is rebuilding the saved row into the manual constructor shape."}
+                  {blockedMessage ?? "This workout cannot be opened for editing yet."}
                 </p>
               </div>
             </div>
@@ -378,7 +426,7 @@ export function ManualWorkoutPersistedEditDialog({
             <button
               type="button"
               className="hito-button hito-button-primary hito-button-md"
-              disabled={!draftState || isBusy}
+              disabled={!activeDraftState || isBusy}
               onClick={() => void submitReview()}
             >
               {status === "reviewing" ? "Reviewing edit..." : "Review edit"}
@@ -404,6 +452,18 @@ function buildPersistedEditSourcePayload({
     plannedWorkoutId,
     workoutDate,
   };
+}
+
+function buildPersistedEditSourceKey({
+  activePlanId,
+  plannedWorkoutId,
+  workoutDate,
+}: {
+  activePlanId: string | null | undefined;
+  plannedWorkoutId: string;
+  workoutDate: string;
+}) {
+  return `${activePlanId ?? "no-active-plan"}:${plannedWorkoutId}:${workoutDate}`;
 }
 
 function getManualTemplateForDraft(templateKey: ManualWorkoutTemplateKey | null) {
@@ -444,43 +504,24 @@ function PersistedEditReviewReadback({
     );
   }
 
+  const warnings = result.draftReview.review.warnings;
+
+  if (warnings.length === 0) {
+    return (
+      <p className="hito-field-helper">
+        Hito reviewed this edit. Nothing changes until you save the edited workout.
+      </p>
+    );
+  }
+
   return (
-    <div className="hito-row-group">
-      <div className="hito-list-row items-start">
-        <div className="min-w-0">
-          <p className="hito-list-row-title">{result.draftReview.review.headline}</p>
-          <p className="hito-list-row-copy">
-            {formatManualDraftStructure(
-              result.draftReview.draft.totalDurationMin,
-              result.draftReview.draft.totalDistanceKm,
-            )}
+    <div className="hito-list-row items-start">
+      <div className="grid min-w-0 gap-2">
+        {warnings.map((warning) => (
+          <p key={warning} className="hito-field-helper">
+            Warning: {warning}
           </p>
-        </div>
-        <span className="hito-status-pill shrink-0" data-tone="success">
-          Ready
-        </span>
-      </div>
-      <div className="hito-list-row items-start">
-        <div className="grid min-w-0 gap-2">
-          {result.draftReview.review.bullets.map((bullet) => (
-            <p key={bullet} className="hito-list-row-copy">
-              {bullet}
-            </p>
-          ))}
-          <p className="hito-field-helper">
-            Save sends only the active plan id if present, planned workout id, workout date, edited
-            draft input, review token, and checksum. The backend updates the same planned workout
-            row.
-          </p>
-        </div>
-      </div>
-      <div className="hito-list-row items-start">
-        <span className="hito-status-pill shrink-0" data-tone="muted">
-          {targetTruthModeLabel(result.draftInput.targetTruthMode)}
-        </span>
-        <p className="hito-list-row-copy min-w-0">
-          {targetTruthModeCopy(result.draftInput.targetTruthMode)}
-        </p>
+        ))}
       </div>
     </div>
   );

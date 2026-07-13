@@ -251,6 +251,11 @@
     backdrop-filter: blur(18px);
   }
 
+  .hito-workbench-sidebar-footer {
+    display: grid;
+    min-width: 0;
+  }
+
   .hito-workbench-main {
     min-width: 0;
   }
@@ -412,6 +417,20 @@
       height: 100vh;
       align-self: start;
       flex-direction: column;
+    }
+
+    .hito-workbench-sidebar > .hito-ds-sidebar-tree {
+      min-height: 0;
+      flex: 1 1 auto;
+      overflow: auto;
+      padding-bottom: var(--space-4);
+    }
+
+    .hito-workbench-sidebar-footer {
+      flex: 0 0 auto;
+      margin-top: auto;
+      border-top: 1px solid var(--color-hairline);
+      padding-top: var(--space-4);
     }
 
     .hito-workbench-summary-grid {

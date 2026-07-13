@@ -9,11 +9,8 @@ import {
   formatDistanceKm,
   formatDate,
   formatDurationMin,
-  formatPrescriptionDistanceKm,
   findWorkout,
   primaryWorkoutTarget,
-  repeatChildSteps,
-  repeatCountForStep,
   type TrainingSnapshot,
   workoutTypeMeta,
   workoutDistanceKm,
@@ -39,87 +36,69 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   const paceTarget = targetEntries.find(
     (entry) => entry.key === "pace_min_per_km_range" || entry.key === "pace",
   );
+  const heroMetrics = isRestDay
+    ? []
+    : [
+        km != null ? { label: "Distance", value: formatDistanceKm(km), unit: "km" } : null,
+        duration > 0 ? { label: "Duration", value: formatDurationMin(duration) } : null,
+        primaryTarget ? { label: primaryTarget.label, value: primaryTarget.value } : null,
+        primaryStructureEntry
+          ? { label: primaryStructureEntry.label, value: primaryStructureEntry.value }
+          : null,
+        paceTarget && paceTarget.key !== primaryTarget?.key
+          ? { label: "Pace", value: paceTarget.value }
+          : null,
+      ].filter(
+        (metric): metric is { label: string; value: string; unit?: string } => metric != null,
+      );
   const workoutSupportText = isRestDay
     ? "Keep the day light unless a small recovery assignment is actually planned."
     : (workout.notes?.trim() ?? "Open the workout for segment-by-segment instructions.");
-
-  const tomorrowDate = new Date(`${snapshot.currentDate}T00:00:00`);
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrow = findWorkout(snapshot.workouts, tomorrowDate.toISOString().slice(0, 10));
+  const resultActionLabel = workout.log ? "View result" : "Mark complete";
 
   return (
-    <section className="pt-2 lg:pt-4">
-      <div className="hito-today-hero-grid gap-8 lg:gap-10">
+    <section className="pt-1 lg:pt-2">
+      <div className="hito-workout-hero-grid">
         <div>
-          <div className="flex items-center gap-3 hito-section-subtitle">
-            <span className="h-1.5 w-1.5 rounded-full bg-signal animate-pulse" />
-            <span className="text-signal">
-              Today ·{" "}
+          <div className="hito-technical-mono flex flex-wrap items-center gap-2.5">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
+            <span style={{ color: meta.color }}>{meta.label}</span>
+            <span className="opacity-50">·</span>
+            <span className="text-muted-foreground">
               {formatDate(snapshot.currentDate, {
                 weekday: "long",
-                month: "short",
+                month: "long",
                 day: "numeric",
               })}
             </span>
-            <span className="opacity-50">·</span>
-            <span style={{ color: meta.color }}>{meta.label}</span>
+            <span className="text-signal">· Today</span>
           </div>
 
-          <h2 className="font-display text-4xl lg:text-6xl mt-4 leading-[1.05] text-balance">
+          <h2 className="mt-3 max-w-2xl text-balance font-display text-4xl leading-[1.05] lg:text-5xl">
             {isRestDay ? "Rest day" : workout.title}
           </h2>
 
-          <p className="hito-support-copy mt-4 max-w-md">{workoutSupportText}</p>
+          <p className="hito-support-copy mt-4 max-w-xl">{workoutSupportText}</p>
 
-          {!isRestDay ? (
-            <>
-              <div className="hito-metric-row mt-8 max-w-3xl">
-                {km != null && <Metric label="Distance" value={formatDistanceKm(km)} unit="km" />}
-                {duration > 0 && <Metric label="Duration" value={formatDurationMin(duration)} />}
-                {primaryTarget && (
-                  <Metric label={primaryTarget.label} value={primaryTarget.value} />
-                )}
-                {primaryStructureEntry && (
-                  <Metric label={primaryStructureEntry.label} value={primaryStructureEntry.value} />
-                )}
-                {paceTarget && paceTarget.key !== primaryTarget?.key && (
-                  <Metric label="Pace" value={paceTarget.value} />
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="mt-8 max-w-md border-y border-hairline py-4">
-              <div className="flex items-center gap-4">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-background/70">
-                  <span className="h-4 w-4 rounded-full border border-hairline bg-surface/70" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-foreground/85">
-                    No workout metrics are planned today.
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">Leave room for recovery.</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             <Link
               to="/workout/$date"
               params={{ date: snapshot.currentDate }}
-              className="hito-button hito-button-primary hito-button-lg"
+              className="hito-button hito-button-primary hito-button-sm"
             >
               {isRestDay ? "Open day" : "Open workout"}
-              <Icon name="arrow-up-right" size="sm" />
+              <Icon name="arrow-up-right" size="xs" />
             </Link>
             {!isRestDay && (
               <Link
                 to="/workout/$date"
                 params={{ date: snapshot.currentDate }}
                 search={{ tab: "complete" } as never}
-                className="hito-button hito-button-secondary hito-button-lg"
+                className="hito-button hito-button-ghost hito-button-sm"
+                data-tone="success"
               >
-                Mark complete
+                <Icon name={workout.log ? "check-circle" : "check"} size="xs" />
+                {resultActionLabel}
               </Link>
             )}
           </div>
@@ -140,23 +119,32 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
           )}
         </div>
 
-        <div className="lg:pt-10">
-          {tomorrow && (
-            <section className="border-t border-hairline py-4">
-              <div>
-                <div className="hito-section-subtitle">Tomorrow</div>
-                <div className="mt-1 text-sm text-foreground/90">
-                  {tomorrow.type === "rest" ? "Rest day" : tomorrow.title}
-                </div>
-                <div className="hito-caption mt-2 font-mono-num">
-                  {summarizeUpcomingWorkout(tomorrow)}
-                </div>
+        {heroMetrics.length > 0 ? (
+          <div className="flex flex-wrap justify-start gap-5 sm:justify-end sm:gap-6">
+            {heroMetrics.map((metric) => (
+              <Metric
+                key={`${metric.label}-${metric.value}`}
+                label={metric.label}
+                value={metric.value}
+                unit={metric.unit}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="max-w-sm border-y border-hairline py-4">
+            <div className="flex items-center gap-4">
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-background/70">
+                <span className="h-4 w-4 rounded-full border border-hairline bg-surface/70" />
               </div>
-            </section>
-          )}
-        </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-foreground/85">No workout metrics are planned today.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Leave room for recovery.</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-      <div className="mt-8 border-b border-hairline" />
+      <div className="mt-6 border-b border-hairline" />
     </section>
   );
 }
@@ -199,16 +187,16 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
         : "Open another day from the calendar whenever you want to review the plan.";
 
   return (
-    <section className="pt-2 lg:pt-4">
-      <div className="hito-today-hero-grid gap-10">
+    <section className="pt-1 lg:pt-2">
+      <div className="hito-workout-hero-grid">
         <div>
-          <div className="flex items-center gap-3 hito-section-subtitle">
+          <div className="hito-technical-mono flex flex-wrap items-center gap-2.5">
             <span className="h-1.5 w-1.5 rounded-full bg-signal animate-pulse" />
             <span className="text-signal">
               Today ·{" "}
               {formatDate(snapshot.currentDate, {
                 weekday: "long",
-                month: "short",
+                month: "long",
                 day: "numeric",
               })}
             </span>
@@ -216,24 +204,24 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
             <span>No scheduled workout</span>
           </div>
 
-          <h2 className="mt-4 font-display text-4xl leading-[1.05] text-balance lg:text-6xl">
+          <h2 className="mt-3 max-w-2xl text-balance font-display text-4xl leading-[1.05] lg:text-5xl">
             {heading}
           </h2>
 
-          <p className="hito-support-copy mt-4 max-w-md">{body}</p>
+          <p className="hito-support-copy mt-4 max-w-xl">{body}</p>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             {closestWorkout && (
               <Link
                 to="/workout/$date"
                 params={{ date: closestWorkout.date }}
-                className="hito-button hito-button-primary hito-button-lg"
+                className="hito-button hito-button-primary hito-button-sm"
               >
                 Open nearest workout
-                <Icon name="arrow-up-right" size="sm" />
+                <Icon name="arrow-up-right" size="xs" />
               </Link>
             )}
-            <Link to="/progress" className="hito-button hito-button-secondary hito-button-lg">
+            <Link to="/progress" className="hito-button hito-button-secondary hito-button-sm">
               Open progress
             </Link>
           </div>
@@ -266,7 +254,7 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
           )}
         </div>
       </div>
-      <div className="mt-8 border-b border-hairline" />
+      <div className="mt-6 border-b border-hairline" />
     </section>
   );
 }
@@ -275,54 +263,12 @@ function Metric({ label, value, unit }: { label: string; value: string; unit?: s
   return (
     <div className="hito-metric">
       <div className="flex items-baseline justify-center gap-1">
-        <span className="hito-metric-value text-xl">{value}</span>
+        <span className="hito-metric-value text-2xl">{value}</span>
         {unit ? <span className="text-xs text-muted-foreground">{unit}</span> : null}
       </div>
       <div className="hito-metric-label">{label}</div>
     </div>
   );
-}
-
-function summarizeUpcomingWorkout(
-  workout: Parameters<typeof workoutDistanceKm>[0] & { title: string },
-) {
-  const km = workoutDistanceKm(workout);
-  const duration = workoutDuration(workout);
-
-  if (workout.type === "rest") {
-    return "Keep it light.";
-  }
-
-  if (km && duration > 0) {
-    return `${formatDistanceKm(km)} km · ${formatDurationMin(duration)}`;
-  }
-
-  if (km) {
-    return `${formatDistanceKm(km)} km`;
-  }
-
-  if (duration > 0) {
-    return formatDurationMin(duration);
-  }
-
-  const intervalStep = workout.steps.find(
-    (step) => repeatCountForStep(step) && repeatChildSteps(step).length > 0,
-  );
-  const repeatCount = intervalStep ? repeatCountForStep(intervalStep) : null;
-  const repeatChild = intervalStep
-    ? (repeatChildSteps(intervalStep).find((child) => child.distance_km || child.duration_min) ??
-      repeatChildSteps(intervalStep)[0])
-    : null;
-
-  if (repeatCount && repeatChild?.distance_km) {
-    return `${repeatCount} x ${formatPrescriptionDistanceKm(repeatChild.distance_km)}`;
-  }
-
-  if (repeatCount && repeatChild?.duration_min) {
-    return `${repeatCount} x ${formatDurationMin(repeatChild.duration_min, "segment")}`;
-  }
-
-  return workoutTypeMeta(workout).label;
 }
 
 function DismissibleSupportNote({

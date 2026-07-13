@@ -1,7 +1,9 @@
 export function buildNotes(options) {
   const notes = [
     options.applyQaDeleteAfterExpiryArchive
-      ? "Apply mode is scoped to archive/quarantine for manifest-safe delete-after-expiry qa-artifacts/ folders."
+      ? options.qaArchiveOwner
+        ? `Apply mode is scoped to archive/quarantine for manifest-safe delete-after-expiry qa-artifacts/ folders owned by ${options.qaArchiveOwner}.`
+        : "Apply mode is scoped to archive/quarantine for manifest-safe delete-after-expiry qa-artifacts/ folders."
       : options.applyQaImageCompression
         ? "Apply mode is scoped to manifest-safe manual-workout PNG evidence: rollback copies are written before WebP q82 replacement."
         : "Dry-run only: this command does not delete, compress, archive, or mutate files.",
@@ -40,7 +42,9 @@ export function buildNotes(options) {
 
   if (options.applyQaDeleteAfterExpiryArchive) {
     notes.push(
-      "Apply mode is scoped to archive/quarantine only for current manifest-safe delete-after-expiry qa-artifacts/ folders.",
+      options.qaArchiveOwner
+        ? `Apply mode is scoped to archive/quarantine only for current manifest-safe delete-after-expiry qa-artifacts/ folders owned by ${options.qaArchiveOwner}.`
+        : "Apply mode is scoped to archive/quarantine only for current manifest-safe delete-after-expiry qa-artifacts/ folders.",
     );
   }
 
@@ -66,6 +70,12 @@ export function validateOptionCombinations(options) {
     throw new Error("Use only one apply mode per artifact:hygiene invocation.");
   }
 
+  if (options.qaArchiveOwner && !options.applyQaDeleteAfterExpiryArchive) {
+    throw new Error(
+      "--qa-archive-owner can only be used with --apply-delete-after-expiry-archive.",
+    );
+  }
+
   if (
     options.applyQaImageCompression &&
     (options.qaCompressionEstimate ||
@@ -86,6 +96,7 @@ export function parseArgs(args) {
     manifest: false,
     qaFolderManifest: false,
     applyQaDeleteAfterExpiryArchive: false,
+    qaArchiveOwner: null,
     qaCompressionEstimate: false,
     qaCompressionApplySafetyDryRun: false,
     applyQaImageCompression: false,
@@ -124,6 +135,25 @@ export function parseArgs(args) {
     if (arg === "--apply-delete-after-expiry-archive") {
       options.qaFolderManifest = true;
       options.applyQaDeleteAfterExpiryArchive = true;
+      continue;
+    }
+
+    if (arg === "--qa-archive-owner") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error("Missing value for --qa-archive-owner.");
+      }
+      options.qaArchiveOwner = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--qa-archive-owner=")) {
+      const value = arg.slice("--qa-archive-owner=".length).trim();
+      if (!value) {
+        throw new Error("Missing value for --qa-archive-owner.");
+      }
+      options.qaArchiveOwner = value;
       continue;
     }
 
@@ -254,6 +284,7 @@ export function buildHelpText() {
   npm run artifact:hygiene -- --manifest --include-qa-artifacts
   npm run artifact:hygiene -- --qa-folder-manifest
   npm run artifact:hygiene -- --qa-folder-manifest --apply-delete-after-expiry-archive
+  npm run artifact:hygiene -- --qa-folder-manifest --apply-delete-after-expiry-archive --qa-archive-owner manual_workout_authoring
   npm run artifact:hygiene -- --qa-compression-estimate --qa-compression-class compress-after-policy --qa-compression-owner manual_workout_authoring
   npm run artifact:hygiene -- --qa-compression-apply-safety-dry-run --qa-compression-class compress-after-policy --qa-compression-owner manual_workout_authoring
   npm run artifact:hygiene -- --apply-qa-image-compression --qa-compression-class compress-after-policy --qa-compression-owner manual_workout_authoring
@@ -265,7 +296,7 @@ export function buildHelpText() {
 This is a dry-run reporter only. It inventories logs/, test-results/, and build-output residues.
 Pass --manifest to include per-file dry-run classification for top-level targets.
 Pass --qa-folder-manifest to add folder-level local qa-artifacts/ TTL/reference/sensitivity classification.
-Pass --apply-delete-after-expiry-archive with --qa-folder-manifest to move only current manifest-safe delete-after-expiry qa-artifacts/ folders into .local-artifact-archive/.
+Pass --apply-delete-after-expiry-archive with --qa-folder-manifest to move only current manifest-safe delete-after-expiry qa-artifacts/ folders into .local-artifact-archive/. Pass --qa-archive-owner to limit that archive/quarantine apply to one inferred owner.
 Pass --qa-compression-estimate with --qa-compression-class and --qa-compression-owner to estimate WebP q82 savings for manifest-selected qa-artifacts/ folders.
 Pass --qa-compression-apply-safety-dry-run to produce an image-only manifest with checksums, rollback copy plan, and restore instructions without writing evidence.
 Pass --apply-qa-image-compression to replace only manifest-safe manual-workout PNG evidence with WebP q82 siblings after writing rollback copies to .local-artifact-archive/.

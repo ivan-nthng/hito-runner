@@ -1,6 +1,7 @@
 @layer components {
   .hito-button {
     display: inline-flex;
+    cursor: pointer;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
@@ -87,6 +88,25 @@
     background: color-mix(in oklch, var(--color-signal) 82%, black);
   }
 
+  [data-hito-theme="light"] .hito-button-primary {
+    background: color-mix(in oklch, var(--color-signal) 58%, var(--color-surface) 42%);
+    color: var(--color-signal-foreground);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--color-signal) 14%, var(--color-border)),
+      0 8px 18px color-mix(in oklch, var(--color-signal) 8%, transparent);
+  }
+
+  [data-hito-theme="light"] .hito-button-primary:hover,
+  [data-hito-theme="light"] .hito-button-primary[data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-signal) 64%, var(--color-surface) 36%);
+  }
+
+  [data-hito-theme="light"] .hito-button-primary:active,
+  [data-hito-theme="light"] .hito-button-primary[data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-signal) 70%, var(--color-surface) 30%);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-signal) 20%, var(--color-border));
+  }
+
   .hito-button-primary[data-tone="success"] {
     background: var(--color-success);
     color: var(--color-success-foreground);
@@ -102,6 +122,25 @@
     background: color-mix(in oklch, var(--color-success) 82%, black);
   }
 
+  [data-hito-theme="light"] .hito-button-primary[data-tone="success"] {
+    background: color-mix(in oklch, var(--color-success) 50%, var(--color-surface) 50%);
+    color: var(--color-foreground);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--color-success) 14%, var(--color-border)),
+      0 8px 18px color-mix(in oklch, var(--color-success) 7%, transparent);
+  }
+
+  [data-hito-theme="light"] .hito-button-primary[data-tone="success"]:hover,
+  [data-hito-theme="light"] .hito-button-primary[data-tone="success"][data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-success) 56%, var(--color-surface) 44%);
+  }
+
+  [data-hito-theme="light"] .hito-button-primary[data-tone="success"]:active,
+  [data-hito-theme="light"] .hito-button-primary[data-tone="success"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-success) 62%, var(--color-surface) 38%);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-success) 20%, var(--color-border));
+  }
+
   .hito-button-primary[data-tone="error"] {
     background: var(--color-destructive);
     color: var(--color-destructive-foreground);
@@ -115,6 +154,25 @@
   .hito-button-primary[data-tone="error"]:active,
   .hito-button-primary[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 82%, black);
+  }
+
+  [data-hito-theme="light"] .hito-button-primary[data-tone="error"] {
+    background: color-mix(in oklch, var(--color-destructive) 48%, var(--color-surface) 52%);
+    color: var(--color-foreground);
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--color-destructive) 14%, var(--color-border)),
+      0 8px 18px color-mix(in oklch, var(--color-destructive) 7%, transparent);
+  }
+
+  [data-hito-theme="light"] .hito-button-primary[data-tone="error"]:hover,
+  [data-hito-theme="light"] .hito-button-primary[data-tone="error"][data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-destructive) 54%, var(--color-surface) 46%);
+  }
+
+  [data-hito-theme="light"] .hito-button-primary[data-tone="error"]:active,
+  [data-hito-theme="light"] .hito-button-primary[data-tone="error"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-destructive) 60%, var(--color-surface) 40%);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-destructive) 20%, var(--color-border));
   }
 
   .hito-button-secondary {
@@ -133,6 +191,34 @@
     background: color-mix(in oklch, var(--color-muted) 60%, transparent);
   }
 
+  [data-hito-theme="light"] .hito-button-secondary {
+    border-color: color-mix(in oklch, var(--color-border) 86%, var(--color-foreground) 8%);
+    background: color-mix(in oklch, var(--color-surface-elevated) 84%, var(--color-background) 16%);
+    color: color-mix(in oklch, var(--color-foreground) 90%, var(--color-muted-foreground) 10%);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, white 68%, transparent),
+      0 1px 2px oklch(0.52 0.025 62 / 0.06);
+  }
+
+  [data-hito-theme="light"] .hito-button-secondary:hover,
+  [data-hito-theme="light"] .hito-button-secondary[data-demo-state="hover"] {
+    border-color: color-mix(in oklch, var(--color-signal) 18%, var(--color-border));
+    background: color-mix(in oklch, var(--color-surface-elevated) 90%, var(--color-signal) 10%);
+    color: var(--color-foreground);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, white 74%, transparent),
+      0 2px 6px oklch(0.52 0.025 62 / 0.08);
+  }
+
+  [data-hito-theme="light"] .hito-button-secondary:active,
+  [data-hito-theme="light"] .hito-button-secondary[data-demo-state="active"] {
+    border-color: color-mix(in oklch, var(--color-signal) 24%, var(--color-border));
+    background: color-mix(in oklch, var(--color-signal) 12%, var(--color-surface-elevated) 88%);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, white 58%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--color-signal) 8%, transparent);
+  }
+
   .hito-button-secondary[data-tone="success"] {
     background: color-mix(in oklch, var(--color-success) 14%, transparent);
     color: color-mix(in oklch, var(--color-success) 84%, var(--color-foreground));
@@ -148,6 +234,23 @@
     background: color-mix(in oklch, var(--color-success) 26%, transparent);
   }
 
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"] {
+    border-color: color-mix(in oklch, var(--color-success) 9%, transparent);
+    background: color-mix(in oklch, var(--color-success) 5%, var(--color-surface));
+    color: color-mix(in oklch, var(--color-success) 48%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"]:hover,
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"][data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-success) 8%, var(--color-surface));
+    color: color-mix(in oklch, var(--color-success) 56%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"]:active,
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-success) 11%, var(--color-surface));
+  }
+
   .hito-button-secondary[data-tone="error"] {
     background: color-mix(in oklch, var(--color-destructive) 13%, transparent);
     color: color-mix(in oklch, var(--color-destructive) 86%, var(--color-foreground));
@@ -161,6 +264,23 @@
   .hito-button-secondary[data-tone="error"]:active,
   .hito-button-secondary[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 25%, transparent);
+  }
+
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 9%, transparent);
+    background: color-mix(in oklch, var(--color-destructive) 5%, var(--color-surface));
+    color: color-mix(in oklch, var(--color-destructive) 50%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"]:hover,
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"][data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-destructive) 8%, var(--color-surface));
+    color: color-mix(in oklch, var(--color-destructive) 58%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"]:active,
+  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-destructive) 11%, var(--color-surface));
   }
 
   .hito-button-outlined {
@@ -197,6 +317,24 @@
     background: color-mix(in oklch, var(--color-success) 15%, transparent);
   }
 
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="success"] {
+    border-color: color-mix(in oklch, var(--color-success) 22%, var(--color-border));
+    background: color-mix(in oklch, var(--color-surface) 72%, transparent);
+    color: color-mix(in oklch, var(--color-success) 52%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="success"]:hover,
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="success"][data-demo-state="hover"] {
+    border-color: color-mix(in oklch, var(--color-success) 30%, var(--color-border));
+    background: color-mix(in oklch, var(--color-success) 5%, var(--color-surface));
+    color: color-mix(in oklch, var(--color-success) 58%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="success"]:active,
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="success"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-success) 8%, var(--color-surface));
+  }
+
   .hito-button-outlined[data-tone="error"] {
     border-color: color-mix(in oklch, var(--color-destructive) 42%, transparent);
     color: var(--color-destructive);
@@ -211,6 +349,24 @@
   .hito-button-outlined[data-tone="error"]:active,
   .hito-button-outlined[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 15%, transparent);
+  }
+
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="error"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 24%, var(--color-border));
+    background: color-mix(in oklch, var(--color-surface) 72%, transparent);
+    color: color-mix(in oklch, var(--color-destructive) 54%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="error"]:hover,
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="error"][data-demo-state="hover"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 32%, var(--color-border));
+    background: color-mix(in oklch, var(--color-destructive) 5%, var(--color-surface));
+    color: color-mix(in oklch, var(--color-destructive) 60%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="error"]:active,
+  [data-hito-theme="light"] .hito-button-outlined[data-tone="error"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-destructive) 8%, var(--color-surface));
   }
 
   .hito-button-ghost {
@@ -243,6 +399,21 @@
     background: color-mix(in oklch, var(--color-success) 15%, transparent);
   }
 
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"] {
+    color: color-mix(in oklch, var(--color-success) 50%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"]:hover,
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"][data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-success) 5%, var(--color-surface));
+    color: color-mix(in oklch, var(--color-success) 58%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"]:active,
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-success) 8%, var(--color-surface));
+  }
+
   .hito-button-ghost[data-tone="error"] {
     color: var(--color-destructive);
   }
@@ -255,6 +426,21 @@
   .hito-button-ghost[data-tone="error"]:active,
   .hito-button-ghost[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 15%, transparent);
+  }
+
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"] {
+    color: color-mix(in oklch, var(--color-destructive) 52%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"]:hover,
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"][data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-destructive) 5%, var(--color-surface));
+    color: color-mix(in oklch, var(--color-destructive) 60%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"]:active,
+  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"][data-demo-state="active"] {
+    background: color-mix(in oklch, var(--color-destructive) 8%, var(--color-surface));
   }
 
   .hito-tabs,
@@ -296,6 +482,7 @@
   .hito-tab {
     position: relative;
     display: inline-flex;
+    cursor: pointer;
     min-width: 0;
     align-items: center;
     justify-content: center;
@@ -372,6 +559,41 @@
     background: color-mix(in oklch, var(--color-foreground) 12%, transparent);
   }
 
+  [data-hito-theme="light"] .hito-tabs-enclosed,
+  [data-hito-theme="light"] .hito-tab-list-open {
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--color-surface-elevated) 94%, var(--color-accent) 6%),
+        color-mix(in oklch, var(--color-surface) 90%, var(--color-accent) 10%)
+      ),
+      var(--color-surface);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, white 70%, transparent),
+      0 8px 24px oklch(0.52 0.025 62 / 0.08);
+  }
+
+  [data-hito-theme="light"] .hito-tabs-enclosed .hito-tab:hover,
+  [data-hito-theme="light"] .hito-tabs-enclosed .hito-tab[data-demo-state="hover"],
+  [data-hito-theme="light"] .hito-tab-list-open .hito-tab:hover,
+  [data-hito-theme="light"] .hito-tab-list-open .hito-tab[data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-signal) 8%, var(--color-surface) 92%);
+  }
+
+  [data-hito-theme="light"] .hito-tabs-enclosed .hito-tab[data-active="true"],
+  [data-hito-theme="light"] .hito-tabs-enclosed .hito-tab[aria-selected="true"],
+  [data-hito-theme="light"] .hito-tab-list-open .hito-tab[data-active="true"] {
+    background: var(--color-surface-elevated);
+    box-shadow:
+      0 1px 2px oklch(0.52 0.025 62 / 0.1),
+      0 0 0 1px color-mix(in oklch, var(--color-signal) 20%, var(--color-hairline));
+  }
+
+  [data-hito-theme="light"] .hito-tabs-enclosed .hito-tab[data-active="true"]:hover,
+  [data-hito-theme="light"] .hito-tabs-enclosed .hito-tab[aria-selected="true"]:hover {
+    background: var(--color-surface-elevated);
+  }
+
   .hito-tabs-enclosed .hito-tab:focus-visible,
   .hito-tabs-enclosed .hito-tab[data-demo-state="focus"],
   .hito-tab-list-open .hito-tab:focus-visible,
@@ -379,6 +601,27 @@
     box-shadow:
       0 0 0 1px color-mix(in oklch, var(--color-signal) 45%, transparent),
       0 0 0 4px color-mix(in oklch, var(--color-signal) 14%, transparent);
+  }
+
+  @media (max-width: 639px) {
+    .hito-tabs-enclosed,
+    .hito-tab-list-open {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+
+    .hito-tabs-enclosed::-webkit-scrollbar,
+    .hito-tab-list-open::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hito-tabs-enclosed .hito-tab,
+    .hito-tab-list-open .hito-tab {
+      flex: 0 0 auto;
+    }
   }
 
   .hito-tab-icon {
@@ -686,7 +929,7 @@
     font-size: 0.9375rem;
   }
 
-  .hito-choice-toggle-accent {
+  .hito-choice-toggle-card {
     min-height: 4rem;
     align-items: flex-start;
     border-radius: var(--radius-xl);
@@ -714,12 +957,28 @@
     color: color-mix(in oklch, var(--color-signal) 72%, var(--color-foreground));
   }
 
+  [data-hito-theme="light"] .hito-choice-toggle[data-selected="true"],
+  [data-hito-theme="light"] .hito-choice-toggle[aria-checked="true"],
+  [data-hito-theme="light"] .hito-choice-toggle[aria-pressed="true"] {
+    border-color: color-mix(in oklch, var(--color-signal) 38%, var(--color-border));
+    background: color-mix(in oklch, var(--color-signal) 16%, var(--color-surface-elevated) 84%);
+    color: color-mix(in oklch, var(--color-signal) 42%, var(--color-foreground) 58%);
+  }
+
   .hito-choice-toggle[data-selected="true"]:hover,
   .hito-choice-toggle[aria-checked="true"]:hover,
   .hito-choice-toggle[aria-pressed="true"]:hover,
   .hito-choice-toggle[data-demo-state="selected-hover"] {
     background: color-mix(in oklch, var(--color-signal) 21%, transparent);
     color: color-mix(in oklch, var(--color-signal) 64%, var(--color-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-choice-toggle[data-selected="true"]:hover,
+  [data-hito-theme="light"] .hito-choice-toggle[aria-checked="true"]:hover,
+  [data-hito-theme="light"] .hito-choice-toggle[aria-pressed="true"]:hover,
+  [data-hito-theme="light"] .hito-choice-toggle[data-demo-state="selected-hover"] {
+    background: color-mix(in oklch, var(--color-signal) 20%, var(--color-surface-elevated) 80%);
+    color: color-mix(in oklch, var(--color-signal) 38%, var(--color-foreground) 62%);
   }
 
   .hito-choice-toggle:focus-visible,
@@ -741,6 +1000,13 @@
   .hito-choice-toggle[aria-pressed="true"][aria-disabled="true"] {
     border-color: color-mix(in oklch, var(--color-signal) 28%, transparent);
     background: color-mix(in oklch, var(--color-signal) 10%, transparent);
+  }
+
+  [data-hito-theme="light"] .hito-choice-toggle[data-selected="true"]:disabled,
+  [data-hito-theme="light"] .hito-choice-toggle[aria-checked="true"][aria-disabled="true"],
+  [data-hito-theme="light"] .hito-choice-toggle[aria-pressed="true"][aria-disabled="true"] {
+    border-color: color-mix(in oklch, var(--color-signal) 28%, var(--color-border));
+    background: color-mix(in oklch, var(--color-signal) 10%, var(--color-surface-elevated) 90%);
   }
 
   .hito-choice-toggle[aria-invalid="true"],
@@ -779,6 +1045,12 @@
     gap: 1rem;
     padding: 1rem;
     border-top: 1px solid var(--color-hairline);
+  }
+
+  button.hito-list-row,
+  a.hito-list-row,
+  [role="button"].hito-list-row {
+    cursor: pointer;
   }
 
   .hito-list-row-signal {
@@ -916,6 +1188,13 @@
     border-color: color-mix(in oklch, var(--color-signal) 18%, transparent);
     background: color-mix(in oklch, var(--color-signal) 6%, transparent);
     color: color-mix(in oklch, var(--color-signal) 72%, var(--color-muted-foreground));
+  }
+
+  [data-hito-theme="light"] .hito-metadata-tag[data-tone="signal"],
+  [data-hito-theme="light"] .hito-metadata-tag[data-tone="rollout"] {
+    border-color: color-mix(in oklch, var(--color-signal) 26%, var(--color-border));
+    background: color-mix(in oklch, var(--color-signal) 8%, var(--color-surface) 92%);
+    color: color-mix(in oklch, var(--color-signal) 48%, var(--color-foreground) 52%);
   }
 
   .hito-metadata-tag[data-tone="muted"] {

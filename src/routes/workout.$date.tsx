@@ -7,10 +7,14 @@ import {
 } from "@/components/workout-structure/workout-structure-timeline-items";
 import { CompletionPanel, WorkoutFeedbackPanel } from "@/components/CompletionPanel";
 import { ManualWorkoutPersistedEditDialog } from "@/components/manual-workout/ManualWorkoutPersistedEditControls";
+import { ManualWorkoutDocumentPreview } from "@/components/manual-workout/ManualWorkoutDocumentPreview";
+import { manualWorkoutStepsToReadbackEntries } from "@/components/manual-workout/ManualWorkoutTrainingBlockGrammar.model";
 import {
-  WorkoutDocumentReadback,
-  type WorkoutDocumentNote,
-} from "@/components/workout-structure/WorkoutDocumentReadback";
+  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+  MANUAL_WORKOUT_TEMPLATE_KEY_VALUES,
+} from "@/lib/manual-workout-authoring/schema";
+import { WorkoutDocumentReadback } from "@/components/workout-structure/WorkoutDocumentReadback";
+import { workoutDocumentNotesForSteps } from "@/components/workout-structure/workout-document-notes";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,15 +27,12 @@ import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   displayExecutableTargetEntries,
-  displayTargetSupportEntries,
   displayWorkoutStructureEntries,
   formatPlannedWorkoutBlockSummary,
   formatDistanceKm,
   formatDate,
   formatDurationMin,
   primaryWorkoutTarget,
-  repeatChildSteps,
-  repeatCountForStep,
   WEEK_STATUS_META,
   type TrainingSnapshot,
   type Workout,
@@ -128,16 +129,11 @@ function WorkoutPage() {
   const skippedCopy = skippedExplanationFor(workout, snapshot.source);
   const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
   const primaryTarget = primaryWorkoutTarget(workout);
-  const primaryTargetMetrics = displayExecutableTargetEntries(primaryTarget, workout.metricMode);
-  const primaryStructureMetrics = isRestDay
-    ? []
-    : displayWorkoutStructureEntries(workout).slice(0, 2);
-  const targetSupportEntries = displayTargetSupportEntries(primaryTarget);
-  const executionSummary = workoutExecutionSummary(workout);
+  const primaryTargetMetrics = workoutSidebarTargetRows(workout, primaryTarget);
+  const primaryStructureMetrics = isRestDay ? [] : workoutSidebarExecutionRows(workout);
   const identityRows = workoutIdentityRows(workout);
-  const goalRows = workoutGoalRows(workout);
-  const metricRows = workoutMetricRows(workout);
-  const phase = `${workout.phase} · week ${workout.week}`;
+  const phaseLabel = humanizeSnakeCase(workout.phase);
+  const weekLabel = `Week ${workout.week}`;
   const heroMetrics = isRestDay
     ? []
     : [
@@ -154,19 +150,18 @@ function WorkoutPage() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="hito-route-gutter relative max-w-6xl py-8">
-        <div className="flex items-center gap-3 hito-section-subtitle">
-          <Link to="/" className="inline-flex items-center gap-1 hover:text-foreground">
-            <Icon name="arrow-left" size="xs" /> Calendar
-          </Link>
-          <span className="opacity-50">/</span>
-          <span>{phase}</span>
-        </div>
+      <div className="hito-route-gutter relative max-w-6xl pb-8 pt-2">
+        <WorkoutDetailTopBar
+          canEdit={canEditWorkoutFromDetail(workout, snapshot)}
+          onPlanChanged={() => router.invalidate()}
+          snapshot={snapshot}
+          workout={workout}
+        />
 
-        <section className="relative mt-5 overflow-hidden border-t border-hairline/80 px-1 pb-3 pt-6 lg:pt-7">
+        <section className="relative mt-5 overflow-hidden px-1 pb-3 pt-2 lg:pt-3">
           <div className="hito-workout-hero-grid">
             <div>
-              <div className="flex flex-wrap items-center gap-3 hito-section-subtitle">
+              <div className="hito-technical-mono flex flex-wrap items-center gap-2.5">
                 {resultMeta ? (
                   <ResultBadge meta={resultMeta} mode="identity" />
                 ) : (
@@ -181,6 +176,10 @@ function WorkoutPage() {
                     day: "numeric",
                   })}
                 </span>
+                <span className="opacity-50">·</span>
+                <span>{phaseLabel}</span>
+                <span className="opacity-50">·</span>
+                <span>{weekLabel}</span>
                 {workout.date === snapshot.currentDate && (
                   <span className="text-signal">· Today</span>
                 )}
@@ -207,14 +206,6 @@ function WorkoutPage() {
             )}
           </div>
         </section>
-
-        {lifecycle === "future_planned" && (
-          <FutureWorkoutActions
-            onPlanChanged={() => router.invalidate()}
-            snapshot={snapshot}
-            workout={workout}
-          />
-        )}
 
         {surfaceModel.tabs.length > 1 && (
           <div className="mt-10 flex gap-6 border-b border-hairline/80 pb-3">
@@ -253,7 +244,7 @@ function WorkoutPage() {
           >
             {surfaceModel.activeSurface === "overview" && (
               <>
-                <Overview workout={workout} />
+                <Overview snapshot={snapshot} workout={workout} />
                 {lifecycle === "today_planned" && (
                   <CompletionActionPanel workout={workout} variant="today" />
                 )}
@@ -294,15 +285,10 @@ function WorkoutPage() {
               )}
 
               {!isRestDay &&
-                (executionSummary ||
-                  primaryTargetMetrics.length > 0 ||
-                  primaryStructureMetrics.length > 0 ||
-                  targetSupportEntries.length > 0) && (
+                (primaryTargetMetrics.length > 0 || primaryStructureMetrics.length > 0) && (
                   <SidebarSection title="Execution" tone="signal" titleVariant="strong">
                     <div className="space-y-3">
-                      {executionSummary && <ReadbackRow label="Mode" value={executionSummary} />}
-
-                      {[...primaryTargetMetrics, ...primaryStructureMetrics].map((entry) => (
+                      {primaryStructureMetrics.map((entry) => (
                         <div
                           key={entry.key}
                           className="flex items-start justify-between gap-3 py-1 last:border-0"
@@ -314,38 +300,50 @@ function WorkoutPage() {
                         </div>
                       ))}
 
-                      {targetSupportEntries.length > 0 ? (
-                        <div className="border-t border-hairline pt-4 space-y-4">
-                          {targetSupportEntries.map((entry) => (
-                            <div key={entry.key}>
-                              <p className="hito-section-subtitle">{entry.label}</p>
-                              <p className="mt-1 text-xs leading-relaxed text-foreground/82">
-                                {entry.value}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                      <div className="border-t border-hairline pt-4">
+                        {primaryTargetMetrics.length > 0 ? (
+                          <div className="space-y-3">
+                            {primaryTargetMetrics.map((entry) => (
+                              <div
+                                key={entry.key}
+                                className="flex items-start justify-between gap-3 py-1 last:border-0"
+                              >
+                                <span className="hito-section-subtitle">{entry.label}</span>
+                                <span className="hito-readback-value hito-readback-value-compact">
+                                  {entry.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="hito-caption">
+                            No reliable pace or heart-rate target is supplied for this workout.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </SidebarSection>
                 )}
 
-              {!isRestDay && metricRows.length > 0 && (
-                <SidebarSection title="Metric mode" muted>
-                  <div className="space-y-3">
-                    {metricRows.map((row) => (
-                      <ReadbackRow key={row.label} label={row.label} value={row.value} />
-                    ))}
-                  </div>
-                </SidebarSection>
-              )}
+              {!isRestDay &&
+                primaryStructureMetrics.length === 0 &&
+                primaryTargetMetrics.length === 0 && (
+                  <SidebarSection title="Execution" tone="signal" titleVariant="strong">
+                    <p className="hito-caption">
+                      No reliable pace or heart-rate target is supplied for this workout.
+                    </p>
+                  </SidebarSection>
+                )}
 
-              {!isRestDay && goalRows.length > 0 && (
-                <SidebarSection title="Goal context" muted>
-                  <div className="space-y-3">
-                    {goalRows.map((row) => (
-                      <ReadbackRow key={row.label} label={row.label} value={row.value} />
-                    ))}
+              {status === "skipped" && (
+                <SidebarSection title="Skipped">
+                  <div className="flex items-start gap-2">
+                    <Icon name="shield-alert" size="xs" className="mt-0.5 text-destructive" />
+                    <p className="hito-body-small">
+                      {snapshot.source === "persisted"
+                        ? skippedCopy
+                        : "This sample status comes from preview logic only."}
+                    </p>
                   </div>
                 </SidebarSection>
               )}
@@ -375,32 +373,7 @@ function WorkoutPage() {
                   <span>{weekStatus.label}</span>
                   <span>{weekProgress.remaining} left</span>
                 </div>
-                <p className="hito-caption mt-3">{weekStatus.helper}</p>
               </SidebarSection>
-
-              <SidebarSection title="About this page" tone="signal">
-                <div className="flex items-start gap-2">
-                  <Icon name="calendar-clock" size="xs" className="mt-0.5 text-signal" />
-                  <p className="hito-body-small">
-                    {snapshot.source === "persisted"
-                      ? `${APP_NAME} keeps the same layout here while your plan, results, and week status come from saved data.`
-                      : `You're viewing the preview. Results and plan changes are not saved here yet.`}
-                  </p>
-                </div>
-              </SidebarSection>
-
-              {status === "skipped" && (
-                <SidebarSection title="Skipped">
-                  <div className="flex items-start gap-2">
-                    <Icon name="shield-alert" size="xs" className="mt-0.5 text-destructive" />
-                    <p className="hito-body-small">
-                      {snapshot.source === "persisted"
-                        ? skippedCopy
-                        : "This sample status comes from preview logic only."}
-                    </p>
-                  </div>
-                </SidebarSection>
-              )}
             </SidebarPanel>
           </aside>
         </div>
@@ -579,71 +552,74 @@ function workoutDetailSurfaceModelFor(
   return { activeSurface: "overview", tabs: [] };
 }
 
-function FutureWorkoutActions({
+function WorkoutDetailTopBar({
+  canEdit,
   onPlanChanged,
   snapshot,
   workout,
 }: {
+  canEdit: boolean;
   onPlanChanged: () => Promise<void>;
   snapshot: TrainingSnapshot;
   workout: Workout;
 }) {
   const [editOpen, setEditOpen] = useState(false);
-  const canEdit = canEditWorkoutFromDetail(workout, snapshot);
+  const [editPrepareSignal, setEditPrepareSignal] = useState(0);
 
-  if (!canEdit) {
-    return null;
-  }
+  const prepareEditDialog = () => {
+    if (!canEdit) return;
+    setEditPrepareSignal((current) => current + 1);
+  };
 
   return (
-    <section className="mt-6 border-y border-hairline py-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="hito-label">Future actions</p>
-          <p className="hito-body-small mt-1 text-muted-foreground">
-            Edit training uses the backend-reviewed manual constructor. Move stays on the calendar.
-          </p>
-        </div>
-        <div className="hidden items-center gap-2 sm:flex">
+    <div className="flex items-center justify-between gap-3">
+      <Link to="/" className="hito-button hito-button-ghost hito-button-sm -ml-2">
+        <Icon name="arrow-left" size="xs" />
+        Back to Calendar
+      </Link>
+
+      <DropdownMenu
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) prepareEditDialog();
+        }}
+      >
+        <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="hito-button hito-button-primary hito-button-md"
-            onClick={() => setEditOpen(true)}
+            className="hito-button hito-button-ghost hito-button-sm aspect-square p-0"
+            aria-label="Open workout actions"
+          >
+            <Icon name="more-horizontal" size="sm" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="hito-menu-width-standard">
+          <DropdownMenuLabel>Workout actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={!canEdit}
+            onFocus={prepareEditDialog}
+            onPointerEnter={prepareEditDialog}
+            onSelect={() => setEditOpen(true)}
           >
             <Icon name="edit" size="xs" />
-            Edit training
-          </button>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-md aspect-square p-0 sm:hidden"
-              aria-label="Open workout actions"
-            >
-              <Icon name="more-horizontal" size="sm" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="hito-menu-width-standard">
-            <DropdownMenuLabel>Workout actions</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setEditOpen(true)}>
-              <Icon name="edit" size="xs" />
-              Edit training
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <ManualWorkoutPersistedEditDialog
-        activePlanId={snapshot.planMeta?.id}
-        onEdited={onPlanChanged}
-        onOpenChange={setEditOpen}
-        open={editOpen}
-        plannedWorkoutId={workout.id}
-        title={workout.title}
-        workoutDate={workout.date}
-      />
-    </section>
+            Edit this training
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {canEdit ? (
+        <ManualWorkoutPersistedEditDialog
+          activePlanId={snapshot.planMeta?.id}
+          onEdited={onPlanChanged}
+          onOpenChange={setEditOpen}
+          open={editOpen}
+          plannedWorkoutId={workout.id}
+          prepareSignal={editPrepareSignal}
+          title={workout.title}
+          workoutDate={workout.date}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -651,6 +627,7 @@ function canEditWorkoutFromDetail(workout: Workout, snapshot: TrainingSnapshot) 
   return Boolean(
     snapshot.source === "persisted" &&
     snapshot.planMeta?.workoutEditing?.editWorkout.allowed &&
+    workout.sourceEditing?.canEditContent &&
     workout.sourceEditing?.eligibility === "eligible_future_unlogged" &&
     workout.type !== "rest" &&
     !workout.log,
@@ -698,10 +675,10 @@ function CompletionActionPanel({
   );
 }
 
-function Overview({ workout }: { workout: Workout }) {
+function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: Workout }) {
   const restAssignment = restAssignmentFor(workout);
   const timelineItems = workoutStructureTimelineItems(workout);
-  const documentNotes = workoutDocumentNotes(workout);
+  const documentNotes = workoutDocumentNotesForSteps(workout.steps);
 
   if (workout.type === "rest") {
     return (
@@ -734,6 +711,28 @@ function Overview({ workout }: { workout: Workout }) {
     );
   }
 
+  if (isManualWorkoutPreview(workout, snapshot)) {
+    const meta = workoutTypeMeta(workout);
+
+    return (
+      <ManualWorkoutDocumentPreview
+        dateLabel={formatDate(workout.date, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        })}
+        iconTone={meta.color}
+        notes={documentNotes}
+        readbackEntries={manualWorkoutStepsToReadbackEntries(workout.steps)}
+        timelineItems={timelineItems}
+        timelineSummary={workoutStructureTimelineSummary(timelineItems)}
+        title={workout.title}
+        typeLabel={meta.label}
+        workoutType={workout.type}
+      />
+    );
+  }
+
   return (
     <WorkoutDocumentReadback
       emptyCopy="No extra workout structure was provided for this workout."
@@ -741,6 +740,14 @@ function Overview({ workout }: { workout: Workout }) {
       notes={documentNotes}
       summary={workoutStructureTimelineSummary(timelineItems)}
     />
+  );
+}
+
+function isManualWorkoutPreview(workout: Workout, snapshot: TrainingSnapshot) {
+  return Boolean(
+    snapshot.planMeta?.sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND &&
+    workout.sourceWorkoutType &&
+    (MANUAL_WORKOUT_TEMPLATE_KEY_VALUES as readonly string[]).includes(workout.sourceWorkoutType),
   );
 }
 
@@ -863,161 +870,34 @@ function loadFor(workout: Workout) {
 
 function workoutIdentityRows(workout: Workout): Array<{ label: string; value: string }> {
   const language = workoutPlannedLanguage(workout);
+
+  return [{ label: "Type", value: language.runnerFacingWorkoutTypeLabel }];
+}
+
+function workoutSidebarExecutionRows(workout: Workout) {
+  const language = workoutPlannedLanguage(workout);
   const blockSummary = formatPlannedWorkoutBlockSummary(language.runnerFacingBlocks);
+  const structureRows = displayWorkoutStructureEntries(workout)
+    .filter((entry) => ["Duration", "Distance", "Repeats"].includes(entry.label))
+    .slice(0, 3);
 
   return [
-    { label: "Type", value: language.runnerFacingWorkoutTypeLabel },
-    blockSummary ? { label: "Blocks", value: blockSummary } : null,
-  ].filter((row): row is { label: string; value: string } => row != null);
+    ...structureRows,
+    blockSummary ? { key: "blocks", label: "Blocks", value: blockSummary } : null,
+  ].filter((row): row is { key: string; label: string; value: string } => row != null);
 }
 
-function workoutGoalRows(workout: Workout): Array<{ label: string; value: string }> {
-  const goal = workout.goalContext;
-
-  if (!goal) {
-    return [];
-  }
-
-  return [
-    goal.goalType ? { label: "Goal", value: humanizeSnakeCase(goal.goalType) } : null,
-    goal.goalStyle ? { label: "Style", value: humanizeSnakeCase(goal.goalStyle) } : null,
-    goal.terrainFocus ? { label: "Terrain", value: humanizeSnakeCase(goal.terrainFocus) } : null,
-    goal.targetDate ? { label: "Target date", value: goal.targetDate } : null,
-    goal.targetTime ? { label: "Target time", value: goal.targetTime } : null,
-  ].filter((row): row is { label: string; value: string } => row != null);
+function workoutSidebarTargetRows(
+  workout: Workout,
+  target: ReturnType<typeof primaryWorkoutTarget>,
+) {
+  return displayExecutableTargetEntries(target, workout.metricMode)
+    .filter((entry) => workout.metricMode.hrTargetsAllowed || !isHrTargetEntryKey(entry.key))
+    .slice(0, 2);
 }
 
-function workoutMetricRows(workout: Workout): Array<{ label: string; value: string }> {
-  const metricMode = workout.metricMode;
-
-  if (!metricMode) {
-    return [];
-  }
-
-  return [
-    { label: "Executable mode", value: humanizeSnakeCase(metricMode.executableMode) },
-    { label: "Guidance", value: humanizeSnakeCase(metricMode.guidance) },
-    {
-      label: "Pace targets",
-      value: metricMode.paceTargetsAllowed ? "Backend supplied" : "Not supplied",
-    },
-    {
-      label: "HR targets",
-      value: metricMode.hrTargetsAllowed
-        ? "Personal zones supplied"
-        : metricMode.hrTargetSource === "default_estimated_hr"
-          ? "Advisory only"
-          : "Not supplied",
-    },
-    metricMode.hrTargetLabel ? { label: "HR readback", value: metricMode.hrTargetLabel } : null,
-    metricMode.hrTargetSourceNote
-      ? { label: "HR note", value: metricMode.hrTargetSourceNote }
-      : null,
-    metricMode.reason ? { label: "Reason", value: metricMode.reason } : null,
-  ].filter((row): row is { label: string; value: string } => row != null);
-}
-
-function workoutExecutionSummary(workout: Workout): string | null {
-  switch (workout.metricMode.executableMode) {
-    case "pace_executable":
-      return "Pace executable";
-    case "hr_executable":
-      return "Personal HR executable";
-    case "mixed_metric_executable":
-      return "Pace + personal HR executable";
-    case "structure_only_executable":
-      return "Executable structure";
-    case "correction_required":
-      return "Correction required";
-    case "effort_only":
-      return "Readable guidance only";
-    case "none":
-      return "No execution targets";
-    case "unknown":
-      return "Unknown";
-    default:
-      return null;
-  }
-}
-
-function workoutDocumentNotes(workout: Workout): WorkoutDocumentNote[] {
-  const notes = workout.steps.flatMap((step, stepIndex) =>
-    workoutDocumentNotesForStep(step, `${stepIndex}`),
-  );
-
-  return dedupeDocumentNotes(notes).slice(0, 8);
-}
-
-function workoutDocumentNotesForStep(
-  step: Workout["steps"][number],
-  key: string,
-): WorkoutDocumentNote[] {
-  const repeatCount = repeatCountForStep(step);
-  const repeatChildren = repeatChildSteps(step);
-  const ownNotes = buildWorkoutDocumentNotes(step, key);
-
-  if (repeatCount && repeatChildren.length > 0) {
-    const children = repeatChildren.flatMap((child, index) =>
-      buildWorkoutDocumentNotes(child, `${key}-child-${index + 1}`),
-    );
-
-    return [...ownNotes, ...children];
-  }
-
-  return ownNotes;
-}
-
-function buildWorkoutDocumentNotes(
-  step: Workout["steps"][number],
-  key: string,
-): WorkoutDocumentNote[] {
-  const notes: Array<WorkoutDocumentNote | null> = [
-    readGuidanceEntry("Cue", step.guidance),
-    ...displayTargetSupportEntries(step.target).map((entry) => ({
-      key: `${key}-${entry.label}`,
-      label: entry.label,
-      value: entry.value,
-    })),
-  ];
-
-  return notes.filter((entry): entry is WorkoutDocumentNote => entry != null);
-}
-
-function dedupeDocumentNotes(notes: WorkoutDocumentNote[]) {
-  const seen = new Set<string>();
-
-  return notes.filter((note) => {
-    const key = `${note.label}:${note.value}`;
-
-    if (seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
-}
-
-function readGuidanceEntry(label: string, value: unknown) {
-  const normalized = readGuidanceText(value);
-
-  return normalized ? { key: `${label}-${normalized}`, label, value: normalized } : null;
-}
-
-function readGuidanceText(value: unknown): string | null {
-  if (typeof value === "string" || typeof value === "number") {
-    const normalized = String(value).trim();
-
-    return normalized || null;
-  }
-
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  const nested = (value as { guidance?: unknown }).guidance;
-
-  return typeof nested === "string" && nested.trim() ? nested.trim() : null;
+function isHrTargetEntryKey(key: string) {
+  return key.includes("hr") || key.includes("bpm");
 }
 
 function humanizeSnakeCase(value: string) {

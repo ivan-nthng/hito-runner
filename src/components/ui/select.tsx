@@ -14,12 +14,15 @@ const SelectValue = SelectPrimitive.Value;
 
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & {
+    size?: "default" | "sm";
+  }
+>(({ className, children, size = "default", ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "hito-ui-select-trigger flex w-full items-center justify-between whitespace-nowrap px-3 py-2 disabled:cursor-not-allowed [&>span]:line-clamp-1",
+      "hito-ui-select-trigger flex w-full cursor-pointer items-center justify-between whitespace-nowrap px-3 py-2 disabled:cursor-not-allowed [&>span]:line-clamp-1",
+      size === "sm" && "hito-ui-select-trigger-sm !px-2 !py-0",
       className,
     )}
     {...props}
@@ -39,7 +42,7 @@ const SelectScrollUpButton = React.forwardRef<
   <SelectPrimitive.ScrollUpButton
     ref={ref}
     className={cn(
-      "flex cursor-default items-center justify-center py-1 text-muted-foreground",
+      "flex cursor-pointer items-center justify-center py-1 text-muted-foreground",
       className,
     )}
     {...props}
@@ -56,7 +59,7 @@ const SelectScrollDownButton = React.forwardRef<
   <SelectPrimitive.ScrollDownButton
     ref={ref}
     className={cn(
-      "flex cursor-default items-center justify-center py-1 text-muted-foreground",
+      "flex cursor-pointer items-center justify-center py-1 text-muted-foreground",
       className,
     )}
     {...props}
@@ -117,7 +120,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "hito-ui-menu-item relative flex w-full cursor-default select-none items-center py-1.5 pl-2 pr-8 outline-none data-[disabled]:pointer-events-none",
+      "hito-ui-menu-item relative flex w-full cursor-pointer select-none items-center py-1.5 pl-2 pr-8 outline-none data-[disabled]:cursor-not-allowed",
       className,
     )}
     {...props}

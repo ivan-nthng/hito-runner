@@ -34,7 +34,7 @@ import {
   reviewManualWorkoutSavedTemplate,
   saveManualWorkoutSavedTemplate,
 } from "@/lib/manual-workout-authoring";
-import { reviewManualWorkoutDraftAction } from "@/lib/training-api";
+import { reviewManualWorkoutDraftAction } from "@/lib/manual-workout-authoring/actions";
 import type {
   ManualWorkoutDirectCopyResult,
   ManualWorkoutDraftInput,
@@ -53,6 +53,7 @@ import {
   type ManualWorkoutBlockInput,
   type ManualWorkoutConstructorEntryInput,
 } from "@/lib/manual-workout-authoring/schema";
+import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import {
   buildManualDraftInput,
@@ -62,13 +63,13 @@ import {
   VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATES,
   templateIconKind,
   templateIconTone,
-  templateOptionDisplayLabel,
 } from "@/components/manual-workout/manual-workout-authoring-utils";
 import {
   ManualWorkoutConstructorEditor,
   type ManualWorkoutConstructorSource,
 } from "@/components/manual-workout/ManualWorkoutConstructorEditor";
-import { ManualWorkoutConstructorTimelineReadback } from "@/components/manual-workout/ManualWorkoutConstructorTimelineReadback";
+import { ManualWorkoutEditorDialogHeader } from "@/components/manual-workout/ManualWorkoutEditorDialogHeader";
+import { focusManualWorkoutDialogCloseOnOpen } from "@/components/manual-workout/manual-workout-dialog-focus";
 import {
   MANUAL_COPY_PASTE_TOAST_ID,
   type ManualCopiedWorkoutSource,
@@ -87,8 +88,6 @@ import {
 
 export { ManualWorkoutSourceActionMenu } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
 export type { ManualCopiedWorkoutSource } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
-export { ManualTemplatePickerDialog } from "@/components/manual-workout/ManualWorkoutTemplatePicker";
-export type { ManualSavedTemplatesState } from "@/components/manual-workout/ManualWorkoutTemplatePicker.model";
 
 export type ManualReviewReady = Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
 export type ManualReviewRejected = Extract<ManualWorkoutDraftReviewResult, { ok: false }>;
@@ -283,6 +282,12 @@ export function ManualWorkoutAddMenu({
       targetDateProtection: "none" as const,
     },
   });
+  const syncDraftUiFromReviewedInput = (input: ManualWorkoutDraftInput) => {
+    setTitle(input.title);
+    setNotes(input.notes ?? "");
+    setTargetTruthMode(input.targetTruthMode);
+    setEntries(cloneManualWorkoutEntries(input.entries));
+  };
 
   const loadSavedTemplates = async () => {
     setSavedTemplatesState((current) => ({
@@ -353,6 +358,7 @@ export function ManualWorkoutAddMenu({
         return;
       }
 
+      syncDraftUiFromReviewedInput(input);
       setReviewedDraft({ input, review: result });
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
@@ -413,6 +419,7 @@ export function ManualWorkoutAddMenu({
       }
 
       setReviewResult(result.review);
+      syncDraftUiFromReviewedInput(result.draftInput);
       setReviewedDraft({ input: result.draftInput, review: result.review });
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
@@ -749,9 +756,12 @@ export function ManualWorkoutAddMenu({
       />
 
       <ManualWorkoutConstructorDialog
+        confirmLabel="Add workout"
+        confirmMessage={confirmMessage}
         entries={entries}
         isBusy={isBusy}
         notes={notes}
+        onConfirm={() => void confirmReviewedDraft()}
         onEntriesChange={(nextEntries) => {
           setEntries(nextEntries);
           setReviewResult(null);
@@ -762,7 +772,13 @@ export function ManualWorkoutAddMenu({
           setReviewResult(null);
           setReviewedDraft(null);
         }}
-        onOpenChange={setConstructorOpen}
+        onOpenChange={(open) => {
+          if (!open && !isBusy) {
+            setReviewedDraft(null);
+            setConfirmMessage(null);
+          }
+          setConstructorOpen(open);
+        }}
         onScratchTemplateChange={(templateKey) => {
           const template = getDefaultManualWorkoutTemplate(templateKey);
           setSelection((current) =>
@@ -788,68 +804,61 @@ export function ManualWorkoutAddMenu({
           setReviewedDraft(null);
         }}
         open={constructorOpen}
+        pendingLabel="Adding workout..."
         reviewResult={reviewResult}
+        reviewedDraft={reviewedDraft}
+        onSaveTemplate={saveReviewedTemplate}
         selection={selection}
         status={status}
         targetTruthMode={targetTruthMode}
         title={title}
       />
-
-      {reviewedDraft ? (
-        <ManualReviewSummaryDialog
-          confirmLabel="Add workout"
-          confirmMessage={confirmMessage}
-          isBusy={isBusy}
-          onConfirm={() => void confirmReviewedDraft()}
-          onOpenChange={(open) => {
-            if (!open && !isBusy) {
-              setReviewedDraft(null);
-              setConfirmMessage(null);
-            }
-          }}
-          open={Boolean(reviewedDraft)}
-          pendingLabel="Adding workout..."
-          review={reviewedDraft.review}
-          onSaveTemplate={saveReviewedTemplate}
-          status={status}
-          supportCopy="Hito reviewed this workout and it is ready to add to the selected day."
-          safetyCopy="Nothing is saved until you confirm; Hito adds the reviewed workout to the plan."
-        />
-      ) : null}
     </>
   );
 }
 
 export function ManualWorkoutConstructorDialog({
+  confirmLabel,
+  confirmMessage,
   entries,
   isBusy,
   notes,
+  onConfirm,
   onEntriesChange,
   onNotesChange,
   onOpenChange,
   onReview,
+  onSaveTemplate,
   onScratchTemplateChange,
   onTargetTruthModeChange,
   onTitleChange,
   open,
+  pendingLabel,
   reviewResult,
+  reviewedDraft,
   selection,
   status,
   targetTruthMode,
   title,
 }: {
+  confirmLabel: string;
+  confirmMessage: string | null;
   entries: ManualWorkoutConstructorEntryInput[];
   isBusy: boolean;
   notes: string;
+  onConfirm: () => void;
   onEntriesChange: (entries: ManualWorkoutConstructorEntryInput[]) => void;
   onNotesChange: (value: string) => void;
   onOpenChange: (open: boolean) => void;
   onReview: () => void;
+  onSaveTemplate?: (input: ManualSaveTemplateRequest) => Promise<void>;
   onScratchTemplateChange: (templateKey: ManualWorkoutTemplateKey) => void;
   onTargetTruthModeChange: (value: ManualWorkoutTargetTruthMode) => void;
   onTitleChange: (value: string) => void;
   open: boolean;
+  pendingLabel: string;
   reviewResult: ManualWorkoutDraftReviewResult | null;
+  reviewedDraft: ReviewedManualDraft | null;
   selection: ManualDraftSelection | null;
   status: ManualDraftStatus;
   targetTruthMode: ManualWorkoutTargetTruthMode;
@@ -867,23 +876,29 @@ export function ManualWorkoutConstructorDialog({
     : "Choose a date before review.";
   const statusLabel = constructorStatusLabel(status, reviewResult);
   const source = constructorSource(selection);
+  const readyReview = reviewedDraft?.review;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
+        onOpenAutoFocus={focusManualWorkoutDialogCloseOnOpen}
         overlayClassName="hito-dialog-overlay-stable"
       >
-        <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">
-            {selection ? selectionLabel(selection) : "Manual workout"}
-          </DialogTitle>
-          <DialogDescription className="hito-body">
-            {selection
-              ? `${formatReadableDate(selection.date)}. Edit the runner-facing draft, then ask Hito to review it.`
-              : "Choose a date and template before reviewing."}
-          </DialogDescription>
-        </DialogHeader>
+        {selection ? (
+          <ManualWorkoutEditorDialogHeader
+            dateLabel={formatReadableDate(selection.date)}
+            statusLabel={statusLabel}
+            title={title}
+          />
+        ) : (
+          <DialogHeader className="hito-product-dialog-header">
+            <DialogTitle className="hito-modal-title">Manual workout</DialogTitle>
+            <DialogDescription className="hito-body">
+              Choose a date and template before reviewing.
+            </DialogDescription>
+          </DialogHeader>
+        )}
 
         <div className="hito-product-dialog-body-scroll-fill">
           {selection ? (
@@ -908,16 +923,17 @@ export function ManualWorkoutConstructorDialog({
                   selection.kind === "saved" ? undefined : onTargetTruthModeChange
                 }
                 onTitleChange={onTitleChange}
+                readbackMode={Boolean(readyReview)}
                 reviewDisabledReason={!canReview ? reviewDisabledReason : null}
                 selectedTemplateKey={selectedTemplate?.templateKey ?? null}
                 source={source}
-                sourceLabel={constructorSourceLabel(selection)}
-                statusLabel={statusLabel}
                 targetTruthMode={targetTruthMode}
                 templateOptions={VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATES}
                 title={title}
               />
-              {reviewResult ? (
+              {readyReview ? (
+                <ManualReviewedDraftNotice confirmMessage={confirmMessage} review={readyReview} />
+              ) : reviewResult ? (
                 <div>
                   <ManualReviewResultNotice result={reviewResult} />
                 </div>
@@ -935,161 +951,66 @@ export function ManualWorkoutConstructorDialog({
           >
             Close
           </button>
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-md"
-            disabled={!canReview}
-            onClick={onReview}
-          >
-            {status === "reviewing" ? "Reviewing workout..." : "Review workout"}
-          </button>
+          {readyReview ? (
+            <>
+              {onSaveTemplate ? (
+                <ManualSaveTemplateAction
+                  defaultName={readyReview.draft.title}
+                  disabled={isBusy}
+                  onSaveTemplate={onSaveTemplate}
+                />
+              ) : null}
+              <button
+                type="button"
+                className="hito-button hito-button-primary hito-button-md"
+                disabled={isBusy}
+                onClick={onConfirm}
+              >
+                {status === "creating" ? pendingLabel : confirmLabel}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="hito-button hito-button-primary hito-button-md"
+              disabled={!canReview}
+              onClick={onReview}
+            >
+              {status === "reviewing" ? "Reviewing workout..." : "Review workout"}
+            </button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-export function ManualReviewSummary({
-  confirmLabel,
+function ManualReviewedDraftNotice({
   confirmMessage,
-  isBusy,
-  onConfirm,
-  onSaveTemplate,
-  pendingLabel,
   review,
-  safetyCopy,
-  status,
-  supportCopy,
 }: {
-  confirmLabel: string;
   confirmMessage: string | null;
-  isBusy: boolean;
-  onConfirm: () => void;
-  onSaveTemplate?: (input: ManualSaveTemplateRequest) => Promise<void>;
-  pendingLabel: string;
   review: ManualReviewReady;
-  safetyCopy: string;
-  status: ManualDraftStatus;
-  supportCopy: string;
 }) {
-  const reviewedDateLabel = formatReadableDate(review.draft.workoutDate);
+  if (review.review.warnings.length === 0 && !confirmMessage) {
+    return (
+      <p className="hito-field-helper">
+        Hito reviewed this workout. Nothing is saved until you confirm.
+      </p>
+    );
+  }
 
   return (
-    <div className="hito-row-group">
-      <div className="hito-list-row items-start">
-        <div className="min-w-0">
-          <p className="hito-list-row-title">{reviewedDateLabel}</p>
-          <p className="hito-list-row-copy">Selected calendar day for this reviewed workout.</p>
-        </div>
-        <span className="hito-status-pill shrink-0" data-tone="muted">
-          {review.draft.weekday}
-        </span>
-      </div>
-
-      <div className="hito-list-row items-start">
-        <div className="min-w-0">
-          <p className="hito-list-row-title">{review.review.headline}</p>
-          <p className="hito-list-row-copy">{supportCopy}</p>
-        </div>
-        <span className="hito-status-pill shrink-0" data-tone="success">
-          Ready
-        </span>
-      </div>
-
-      <ManualWorkoutConstructorTimelineReadback contract={review.constructorContract} />
-
-      {review.review.warnings.length > 0 || confirmMessage ? (
-        <div className="hito-list-row items-start">
-          <div className="grid min-w-0 gap-2">
-            {review.review.warnings.map((warning) => (
-              <p key={warning} className="hito-field-helper">
-                Warning: {warning}
-              </p>
-            ))}
-            {confirmMessage ? <p className="hito-field-error">{confirmMessage}</p> : null}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="hito-list-row flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-        <p className="hito-field-helper min-w-0 sm:flex-1">{safetyCopy}</p>
-        <div className="flex w-full shrink-0 flex-wrap justify-end gap-2 sm:w-auto">
-          {onSaveTemplate ? (
-            <ManualSaveTemplateAction
-              defaultName={review.draft.title}
-              disabled={isBusy}
-              onSaveTemplate={onSaveTemplate}
-            />
-          ) : null}
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-md shrink-0"
-            disabled={isBusy}
-            onClick={onConfirm}
-          >
-            {status === "creating" ? pendingLabel : confirmLabel}
-          </button>
-        </div>
+    <div className="hito-list-row items-start">
+      <div className="grid min-w-0 gap-2">
+        {review.review.warnings.map((warning) => (
+          <p key={warning} className="hito-field-helper">
+            Warning: {warning}
+          </p>
+        ))}
+        {confirmMessage ? <p className="hito-field-error">{confirmMessage}</p> : null}
       </div>
     </div>
-  );
-}
-
-function ManualReviewSummaryDialog({
-  confirmLabel,
-  confirmMessage,
-  isBusy,
-  onConfirm,
-  onOpenChange,
-  onSaveTemplate,
-  open,
-  pendingLabel,
-  review,
-  safetyCopy,
-  status,
-  supportCopy,
-}: {
-  confirmLabel: string;
-  confirmMessage: string | null;
-  isBusy: boolean;
-  onConfirm: () => void;
-  onOpenChange: (open: boolean) => void;
-  onSaveTemplate?: (input: ManualSaveTemplateRequest) => Promise<void>;
-  open: boolean;
-  pendingLabel: string;
-  review: ManualReviewReady;
-  safetyCopy: string;
-  status: ManualDraftStatus;
-  supportCopy: string;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-wide"
-        overlayClassName="hito-dialog-overlay-stable"
-      >
-        <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Review add</DialogTitle>
-          <DialogDescription className="hito-body">
-            Confirm this reviewed manual workout before it is saved into the active plan.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="hito-product-dialog-body">
-          <ManualReviewSummary
-            confirmLabel={confirmLabel}
-            confirmMessage={confirmMessage}
-            isBusy={isBusy}
-            onConfirm={onConfirm}
-            onSaveTemplate={onSaveTemplate}
-            pendingLabel={pendingLabel}
-            review={review}
-            safetyCopy={safetyCopy}
-            status={status}
-            supportCopy={supportCopy}
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -1272,16 +1193,6 @@ function ManualRejectedNotice({ result }: { result: ManualReviewRejected }) {
   );
 }
 
-function selectionLabel(selection: ManualDraftSelection) {
-  if (selection.kind === "saved") return selection.template.displayName;
-  if (selection.kind === "scratch") {
-    return selection.template
-      ? templateOptionDisplayLabel(selection.template)
-      : "Start from scratch";
-  }
-  return templateOptionDisplayLabel(selection.template);
-}
-
 function selectionTemplate(selection: ManualDraftSelection | null): ManualWorkoutTemplate | null {
   if (!selection || selection.kind === "saved") return null;
   return selection.template;
@@ -1315,12 +1226,6 @@ function constructorSource(selection: ManualDraftSelection | null): ManualWorkou
   if (selection?.kind === "saved") return "saved_template";
   if (selection?.kind === "scratch") return "scratch";
   return "template";
-}
-
-function constructorSourceLabel(selection: ManualDraftSelection) {
-  if (selection.kind === "saved") return "Saved template";
-  if (selection.kind === "scratch") return "Scratch";
-  return "Template";
 }
 
 function constructorStatusLabel(
@@ -1363,10 +1268,7 @@ function constructorReviewDisabledReason(
 
 function entryHasExecutableStructure(entry: ManualWorkoutConstructorEntryInput) {
   if (entry.kind === "repeat_group") {
-    return (
-      blockHasExecutableStructure(entry.group.workBlock) ||
-      Boolean(entry.group.recoveryBlock && blockHasExecutableStructure(entry.group.recoveryBlock))
-    );
+    return getManualWorkoutRepeatGroupChildren(entry.group).some(blockHasExecutableStructure);
   }
 
   return blockHasExecutableStructure(entry.block);

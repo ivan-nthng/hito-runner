@@ -4,6 +4,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { TrainingPreferenceFields } from "@/components/onboarding/TrainingPreferenceFields";
+import { ThemePreferenceSection } from "@/components/settings/ThemePreferenceSection";
 import {
   isRecent5kTimeInAcceptedRange,
   type WeekdayName,
@@ -45,7 +46,7 @@ type SettingsFormState = {
   recent5kTime: string;
 };
 
-type SettingsTab = "personal" | "training";
+type SettingsTab = "personal" | "training" | "appearance";
 type ProfileEditableKey = "age" | "heightCm" | "weightKg";
 
 function SettingsPage() {
@@ -144,7 +145,7 @@ function SettingsPage() {
   if (snapshot.mode === "preview") {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
-        <div className="hito-route-gutter py-20">
+        <div className="hito-route-gutter hito-route-stack py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label">Sign in first</p>
             <h1 className="hito-page-title">User settings open after sign-in.</h1>
@@ -158,6 +159,7 @@ function SettingsPage() {
               </Link>
             </div>
           </section>
+          <ThemePreferenceSection />
         </div>
       </AppShell>
     );
@@ -166,7 +168,7 @@ function SettingsPage() {
   if (!settings) {
     return (
       <AppShell snapshot={snapshot} viewer={viewer}>
-        <div className="hito-route-gutter py-20">
+        <div className="hito-route-gutter hito-route-stack py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label">Finish setup first</p>
             <h1 className="hito-page-title">User settings need a saved runner profile.</h1>
@@ -183,6 +185,7 @@ function SettingsPage() {
               </Link>
             </div>
           </section>
+          <ThemePreferenceSection />
         </div>
       </AppShell>
     );
@@ -236,6 +239,16 @@ function SettingsPage() {
             onClick={() => setActiveTab("training")}
           >
             Training preferences
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "appearance"}
+            className="hito-tab"
+            data-active={activeTab === "appearance"}
+            onClick={() => setActiveTab("appearance")}
+          >
+            Appearance
           </button>
         </div>
 
@@ -411,7 +424,7 @@ function SettingsPage() {
               </div>
             </div>
           </section>
-        ) : (
+        ) : activeTab === "training" ? (
           <section className="hito-settings-panel" role="tabpanel">
             <div>
               <div className="flex items-center gap-2">
@@ -472,6 +485,8 @@ function SettingsPage() {
               </button>
             </div>
           </section>
+        ) : (
+          <ThemePreferenceSection panelRole="tabpanel" />
         )}
       </div>
     </AppShell>

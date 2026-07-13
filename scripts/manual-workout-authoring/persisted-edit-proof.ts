@@ -1,19 +1,14 @@
 import assert from "node:assert/strict";
 import type {
-  ExistingPlanContext,
   PersistedPlanCycleRow,
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
 } from "../../src/lib/active-plan-persistence";
-import { buildImportedPlanSeed } from "../../src/lib/imported-plan";
 import {
-  buildManualWorkoutUserBuiltTrainingPlan,
   confirmManualWorkoutPersistedEditForUser,
   reconstructManualWorkoutPersistedEditDraftForUser,
-  reviewManualWorkoutDraft,
   reviewManualWorkoutPersistedEditDraftForUser,
   type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
   type ManualWorkoutPersistedEditConfirmResult,
   type ManualWorkoutPersistedEditReconstructResult,
   type ManualWorkoutPersistedEditReviewResult,
@@ -23,8 +18,19 @@ import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
 } from "../../src/lib/manual-workout-authoring/schema";
-import { buildPersistedWorkoutInsertRows } from "../../src/lib/persisted-plan-replacement";
-import type { Step } from "../../src/lib/training";
+import {
+  assertManualBlockedResult,
+  assertNoFakePaceOrHr,
+  formatJsonResult,
+  readStepsForAssertion,
+} from "./move-proof-assertions";
+import {
+  assertReady,
+  buildCanonicalPersistedPlannedWorkoutFromReview,
+  buildFakeActivePlanMutationDependencyBase,
+  buildFakePlanCycle,
+  buildFakeWorkoutLog,
+} from "./move-proof-fixtures";
 
 export async function validateManualPersistedFutureWorkoutEditContract() {
   const userId = "00000000-0000-4000-8000-000000000801";
@@ -68,7 +74,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     },
     buildFakeEditDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
   );
-  assert.equal(reconstruct.ok, true, formatPersistedEditReconstructResult(reconstruct));
+  assert.equal(reconstruct.ok, true, formatJsonResult(reconstruct));
   if (reconstruct.ok) {
     assert.equal(reconstruct.status, "draft_reconstructed");
     assert.equal(reconstruct.persisted, false);
@@ -113,7 +119,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     },
     buildFakeEditDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
   );
-  assert.equal(editReview.ok, true, formatPersistedEditReviewResult(editReview));
+  assert.equal(editReview.ok, true, formatJsonResult(editReview));
   if (editReview.ok) {
     assert.equal(editReview.status, "review_ready");
     assert.equal(editReview.persisted, false);
@@ -182,7 +188,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
       },
     }),
   );
-  assert.equal(confirm.ok, true, formatPersistedEditConfirmResult(confirm));
+  assert.equal(confirm.ok, true, formatJsonResult(confirm));
   if (confirm.ok) {
     assert.equal(confirm.status, "updated");
     assert.equal(confirm.persisted, true);
@@ -205,6 +211,11 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     );
     assert.equal(confirm.sourceMetadata.plannedWorkoutId, sourceWorkout.id);
     assert.equal(confirm.sourceMetadata.workoutDate, sourceWorkout.workout_date);
+    assert.equal(confirm.sourceMetadata.originalPlanSourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(
+      confirm.sourceMetadata.originalPlanSourceStatus,
+      MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+    );
     assert.equal(confirm.sourceMetadata.trustedClientRows, false);
     assert.equal(confirm.safety.requiresExplicitConfirm, true);
     assert.equal(confirm.safety.updatedExactlyOneRow, true);
@@ -414,35 +425,119 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     "persisted edit evidence source",
   );
 
-  const nonManualPlan = await reconstructManualWorkoutPersistedEditDraftForUser(
+  const generatedPlan = buildFakePlanCycle({
+    userId,
+    id: activePlan.id,
+    sourceKind: "ai_first_plan_blueprint_v1",
+    startDate: "2026-06-18",
+    endDate: "2026-06-24",
+  });
+  const generatedSourceWorkout = {
+    ...sourceWorkout,
+    source_workout_type: "generated_easy_run",
+    workout_identity: "easy_aerobic_run",
+  } satisfies PersistedPlannedWorkoutRow;
+  const generatedReconstruct = await reconstructManualWorkoutPersistedEditDraftForUser(
     userId,
     {
-      activePlanId: activePlan.id,
-      plannedWorkoutId: sourceWorkout.id,
-      workoutDate: sourceWorkout.workout_date,
+      activePlanId: generatedPlan.id,
+      plannedWorkoutId: generatedSourceWorkout.id,
+      workoutDate: generatedSourceWorkout.workout_date,
     },
     buildFakeEditDependencies({
-      activePlan: buildFakePlanCycle({
-        userId,
-        id: activePlan.id,
-        sourceKind: "ai_first_plan_blueprint_v1",
-        startDate: "2026-06-18",
-        endDate: "2026-06-24",
-      }),
-      workouts: [sourceWorkout, keptWorkout],
+      activePlan: generatedPlan,
+      workouts: [generatedSourceWorkout, keptWorkout],
     }),
   );
-  assertPersistedEditReconstructBlocked(
-    nonManualPlan,
-    "unsupported_active_plan_source",
-    "persisted edit generated/preset source",
+  assert.equal(generatedReconstruct.ok, true, formatJsonResult(generatedReconstruct));
+  if (generatedReconstruct.ok) {
+    assert.equal(generatedReconstruct.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(generatedReconstruct.draftInput.templateKey, "easy_aerobic_run");
+    assert.equal(generatedReconstruct.safety.reconstructedFromPersistedWorkout, true);
+    assert.equal(generatedReconstruct.safety.trustedClientRows, false);
+  }
+
+  const generatedReview = await reviewManualWorkoutPersistedEditDraftForUser(
+    userId,
+    {
+      activePlanId: generatedPlan.id,
+      plannedWorkoutId: generatedSourceWorkout.id,
+      workoutDate: generatedSourceWorkout.workout_date,
+      draftInput: editedDraftInput,
+    },
+    buildFakeEditDependencies({
+      activePlan: generatedPlan,
+      workouts: [generatedSourceWorkout, keptWorkout],
+    }),
   );
+  assert.equal(generatedReview.ok, true, formatJsonResult(generatedReview));
+  if (generatedReview.ok) {
+    assert.equal(generatedReview.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(generatedReview.review.trustedClientRows, false);
+    assert.equal(generatedReview.safety.activePlanSourceVerified, true);
+    assert.equal(generatedReview.safety.trustedClientRows, false);
+  }
+
+  const generatedPersists: Array<{
+    sourceKind: string | null;
+    sourceWorkoutId: string;
+    editedTemplateKey: string;
+  }> = [];
+  const generatedConfirm = await confirmManualWorkoutPersistedEditForUser(
+    userId,
+    {
+      activePlanId: generatedPlan.id,
+      plannedWorkoutId: generatedSourceWorkout.id,
+      workoutDate: generatedSourceWorkout.workout_date,
+      draftInput: editedDraftInput,
+      ...(generatedReview.ok
+        ? {
+            reviewToken: generatedReview.review.reviewToken,
+            reviewChecksum: generatedReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeEditDependencies({
+      activePlan: generatedPlan,
+      workouts: [generatedSourceWorkout, keptWorkout],
+      onPersist: ({ activePlan: persistedPlan, sourceWorkout: persistedSource, draftReview }) => {
+        generatedPersists.push({
+          sourceKind: persistedPlan.source_kind,
+          sourceWorkoutId: persistedSource.id,
+          editedTemplateKey: draftReview.draft.templateKey,
+        });
+      },
+    }),
+  );
+  assert.equal(generatedConfirm.ok, true, formatJsonResult(generatedConfirm));
+  if (generatedConfirm.ok) {
+    assert.equal(generatedConfirm.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(generatedConfirm.sourceStatus, null);
+    assert.equal(generatedConfirm.sourceMetadata.editSourceKind, "active_plan_user_edit_v1");
+    assert.equal(generatedConfirm.sourceMetadata.mutationKind, "user_edited_workout");
+    assert.equal(
+      generatedConfirm.sourceMetadata.originalPlanSourceKind,
+      "ai_first_plan_blueprint_v1",
+    );
+    assert.equal(generatedConfirm.sourceMetadata.originalPlanSourceStatus, null);
+    assert.equal(generatedConfirm.sourceMetadata.trustedClientRows, false);
+    assert.equal(generatedConfirm.safety.updatedExactlyOneRow, true);
+    assert.equal(generatedConfirm.safety.serverRebuiltReview, true);
+  }
+  assert.deepEqual(generatedPersists, [
+    {
+      sourceKind: "ai_first_plan_blueprint_v1",
+      sourceWorkoutId: generatedSourceWorkout.id,
+      editedTemplateKey: "steady_aerobic_run",
+    },
+  ]);
 
   const unsupportedSource = {
     ...sourceWorkout,
     id: "99999999-9999-4999-8999-000000000805",
     workout_date: "2026-06-20",
     source_workout_type: "generated_easy_run",
+    workout_identity: "legacy_generated_freeform",
   };
   const unsupported = await reconstructManualWorkoutPersistedEditDraftForUser(
     userId,
@@ -512,21 +607,6 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
   );
 }
 
-function assertReady(
-  label: string,
-  input: ManualWorkoutDraftInput,
-): Extract<ManualWorkoutDraftReviewResult, { ok: true }> {
-  const result = reviewManualWorkoutDraft(input);
-
-  assert.equal(result.ok, true, `${label} should be accepted: ${formatResult(result)}`);
-  assert.equal(result.status, "draft_ready");
-  assert.equal(result.draft.persisted, false);
-  assert.equal(result.reviewToken.startsWith("manual-workout-review-v1."), true);
-  assert.equal(result.reviewChecksum.length, 64);
-
-  return result;
-}
-
 type EditDependencies = NonNullable<
   Parameters<typeof reviewManualWorkoutPersistedEditDraftForUser>[2]
 >;
@@ -540,16 +620,7 @@ function buildFakeEditDependencies(input: {
   onPersist?: (record: Parameters<NonNullable<EditDependencies["persistWorkoutEdit"]>>[0]) => void;
 }): EditDependencies {
   return {
-    currentDate: "2026-06-10",
-    getExistingPlanContextForUser: async () =>
-      ({
-        activePlan: input.activePlan,
-        existingWorkouts: {
-          workouts: input.workouts,
-          logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
-        },
-      }) satisfies ExistingPlanContext,
-    fetchEvidenceWorkoutIds: async () => input.evidenceWorkoutIds ?? new Set(),
+    ...buildFakeActivePlanMutationDependencyBase(input),
     persistWorkoutEdit: async (record) => {
       if (input.persistError) {
         throw input.persistError;
@@ -576,114 +647,12 @@ function buildFakeEditDependencies(input: {
   };
 }
 
-function buildCanonicalPersistedPlannedWorkoutFromReview({
-  userId,
-  planCycleId,
-  id,
-  review,
-}: {
-  userId: string;
-  planCycleId: string;
-  id: string;
-  review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-}): PersistedPlannedWorkoutRow {
-  const canonicalPlan = buildManualWorkoutUserBuiltTrainingPlan(review.draft);
-  const importedSeed = buildImportedPlanSeed(canonicalPlan);
-  const [insertRow] = buildPersistedWorkoutInsertRows(planCycleId, userId, importedSeed.workouts);
-
-  assert.ok(insertRow, "canonical persisted workout fixture should produce one insert row");
-
-  return {
-    id,
-    created_at: "2026-06-10T00:00:00.000Z",
-    ...insertRow,
-  } satisfies PersistedPlannedWorkoutRow;
-}
-
-function buildFakePlanCycle({
-  userId,
-  id,
-  sourceKind,
-  startDate,
-  endDate,
-}: {
-  userId: string;
-  id: string;
-  sourceKind: string | null;
-  startDate: string;
-  endDate: string;
-}): PersistedPlanCycleRow {
-  const isManualPlan = sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-
-  return {
-    id,
-    user_id: userId,
-    status: "active",
-    title: "Manual user-built plan",
-    goal_summary: "Manual user-built plan",
-    source_template: "training-plan-v2",
-    schema_version: "training-plan-v2",
-    source_kind: sourceKind,
-    start_date: startDate,
-    end_date: endDate,
-    target_date: null,
-    goal_metadata: isManualPlan
-      ? {
-          manual_user_built_plan: {
-            source_kind: sourceKind,
-            source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-          },
-        }
-      : {},
-    plan_preferences: isManualPlan
-      ? {
-          manual_workout_authoring_reviews: [],
-        }
-      : {},
-    created_at: "2026-06-10T00:00:00.000Z",
-    updated_at: "2026-06-10T00:00:00.000Z",
-  };
-}
-
-function buildFakeWorkoutLog({
-  userId,
-  plannedWorkoutId,
-}: {
-  userId: string;
-  plannedWorkoutId: string;
-}): PersistedWorkoutLogRow {
-  return {
-    id: "77777777-7777-4777-8777-777777777777",
-    user_id: userId,
-    planned_workout_id: plannedWorkoutId,
-    outcome: "completed",
-    actual_distance_km: 5,
-    actual_duration_min: 35,
-    rpe: 3,
-    notes: null,
-    body_notes: null,
-    intervals_completed: null,
-    logged_at: "2026-06-17T12:00:00.000Z",
-    updated_at: "2026-06-17T12:00:00.000Z",
-  };
-}
-
 function assertPersistedEditReconstructBlocked(
   result: ManualWorkoutPersistedEditReconstructResult,
   reason: Extract<ManualWorkoutPersistedEditReconstructResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(
-    result.ok,
-    false,
-    `${label} should be blocked: ${formatPersistedEditReconstructResult(result)}`,
-  );
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
+  assertManualBlockedResult(result, reason, label);
 }
 
 function assertPersistedEditReviewBlocked(
@@ -691,17 +660,7 @@ function assertPersistedEditReviewBlocked(
   reason: Extract<ManualWorkoutPersistedEditReviewResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(
-    result.ok,
-    false,
-    `${label} should be blocked: ${formatPersistedEditReviewResult(result)}`,
-  );
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
+  assertManualBlockedResult(result, reason, label);
 }
 
 function assertPersistedEditConfirmBlocked(
@@ -709,58 +668,5 @@ function assertPersistedEditConfirmBlocked(
   reason: Extract<ManualWorkoutPersistedEditConfirmResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(
-    result.ok,
-    false,
-    `${label} should be blocked: ${formatPersistedEditConfirmResult(result)}`,
-  );
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
-}
-
-function assertNoFakePaceOrHr(steps: Step[], label: string) {
-  const allTargets = flattenSteps(steps).flatMap((step) => (step.target ? [step.target] : []));
-
-  for (const target of allTargets) {
-    assert.equal("pace" in target, false, `${label} should not include pace.`);
-    assert.equal(
-      "pace_min_per_km_range" in target,
-      false,
-      `${label} should not include pace range.`,
-    );
-    assert.equal("hr_bpm_range" in target, false, `${label} should not include HR range.`);
-    assert.notEqual(
-      target.hr_target_source,
-      "personal_hr_zone",
-      `${label} should not include personal HR-zone truth.`,
-    );
-  }
-}
-
-function flattenSteps(steps: Step[]): Step[] {
-  return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
-}
-
-function readStepsForAssertion(value: PersistedPlannedWorkoutRow["steps"]): Step[] {
-  return Array.isArray(value) ? (value as Step[]) : [];
-}
-
-function formatResult(result: ManualWorkoutDraftReviewResult) {
-  return JSON.stringify(result, null, 2);
-}
-
-function formatPersistedEditReconstructResult(result: ManualWorkoutPersistedEditReconstructResult) {
-  return JSON.stringify(result, null, 2);
-}
-
-function formatPersistedEditReviewResult(result: ManualWorkoutPersistedEditReviewResult) {
-  return JSON.stringify(result, null, 2);
-}
-
-function formatPersistedEditConfirmResult(result: ManualWorkoutPersistedEditConfirmResult) {
-  return JSON.stringify(result, null, 2);
+  assertManualBlockedResult(result, reason, label);
 }

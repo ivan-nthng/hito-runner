@@ -6,7 +6,6 @@ import {
   createFirstPlanFromReviewedCanonicalPlanForUser,
   getActivePlan,
 } from "@/lib/active-plan-persistence";
-import { getRequestAuthContext } from "@/lib/backend/auth";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   buildManualEmptyActivePlanCreationInput,
@@ -43,10 +42,11 @@ import {
   type ManualWorkoutTargetTruthMode,
   type ParsedManualWorkoutDraftInput,
 } from "@/lib/manual-workout-authoring/schema";
+import { resolveCurrentManualWorkoutAuthoringUser } from "@/lib/manual-workout-authoring/request-auth";
 import { normalizeManualWorkoutDraft } from "@/lib/manual-workout-authoring/normalize";
 import { validateManualWorkoutDraft } from "@/lib/manual-workout-authoring/validator";
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
-import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { safeTokenEqual } from "@/lib/review-token-signing";
 import { todayIso } from "@/lib/training";
 
 type ManualWorkoutDraftRejectionReason = Extract<
@@ -169,100 +169,64 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
   };
 }
 
+export const reviewManualWorkoutDraftAction = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => value)
+  .handler(async ({ data }): Promise<ManualWorkoutDraftReviewResult> => {
+    return reviewManualWorkoutDraft(data);
+  });
+
 export const confirmManualWorkoutDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutConfirmResult> => {
-    const auth = getRequestAuthContext();
+    const user = await resolveCurrentManualWorkoutAuthoringUser();
 
-    if (!auth.userId) {
+    if (!user.ok) {
       return buildManualWorkoutConfirmFailure({
         reason: "unauthenticated",
-        message: "Sign in before creating a manual user-built plan.",
+        message:
+          user.reason === "missing_auth"
+            ? "Sign in before creating a manual user-built plan."
+            : "This session cannot create a persisted manual plan yet.",
       });
     }
 
-    let userId: string | null = null;
-    try {
-      userId = await getPersistedUserIdForAuthContext(auth);
-    } catch {
-      return buildManualWorkoutConfirmFailure({
-        reason: "unauthenticated",
-        message: "This session cannot create a persisted manual plan yet.",
-      });
-    }
-
-    if (!userId) {
-      return buildManualWorkoutConfirmFailure({
-        reason: "unauthenticated",
-        message: "This session cannot create a persisted manual plan yet.",
-      });
-    }
-
-    return confirmManualWorkoutDraftForUser(userId, data);
+    return confirmManualWorkoutDraftForUser(user.userId, data);
   });
 
 export const createEmptyManualActivePlan = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualEmptyPlanCreateResult> => {
-    const auth = getRequestAuthContext();
+    const user = await resolveCurrentManualWorkoutAuthoringUser();
 
-    if (!auth.userId) {
+    if (!user.ok) {
       return buildManualEmptyPlanCreateFailure({
         reason: "unauthenticated",
-        message: "Sign in before creating a manual user-built plan.",
+        message:
+          user.reason === "missing_auth"
+            ? "Sign in before creating a manual user-built plan."
+            : "This session cannot create a persisted manual plan yet.",
       });
     }
 
-    let userId: string | null = null;
-    try {
-      userId = await getPersistedUserIdForAuthContext(auth);
-    } catch {
-      return buildManualEmptyPlanCreateFailure({
-        reason: "unauthenticated",
-        message: "This session cannot create a persisted manual plan yet.",
-      });
-    }
-
-    if (!userId) {
-      return buildManualEmptyPlanCreateFailure({
-        reason: "unauthenticated",
-        message: "This session cannot create a persisted manual plan yet.",
-      });
-    }
-
-    return createEmptyManualActivePlanForUser(userId, data);
+    return createEmptyManualActivePlanForUser(user.userId, data);
   });
 
 export const addManualWorkoutToActivePlan = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutAddToActivePlanResult> => {
-    const auth = getRequestAuthContext();
+    const user = await resolveCurrentManualWorkoutAuthoringUser();
 
-    if (!auth.userId) {
+    if (!user.ok) {
       return buildManualWorkoutAddToActivePlanFailure({
         reason: "unauthenticated",
-        message: "Sign in before adding workouts to a manual user-built plan.",
+        message:
+          user.reason === "missing_auth"
+            ? "Sign in before adding workouts to a manual user-built plan."
+            : "This session cannot update a persisted manual plan yet.",
       });
     }
 
-    let userId: string | null = null;
-    try {
-      userId = await getPersistedUserIdForAuthContext(auth);
-    } catch {
-      return buildManualWorkoutAddToActivePlanFailure({
-        reason: "unauthenticated",
-        message: "This session cannot update a persisted manual plan yet.",
-      });
-    }
-
-    if (!userId) {
-      return buildManualWorkoutAddToActivePlanFailure({
-        reason: "unauthenticated",
-        message: "This session cannot update a persisted manual plan yet.",
-      });
-    }
-
-    return addManualWorkoutToActivePlanForUser(userId, data);
+    return addManualWorkoutToActivePlanForUser(user.userId, data);
   });
 
 export async function confirmManualWorkoutDraftForUser(
@@ -630,19 +594,6 @@ function buildManualEmptyPlanCreateFailure(input: {
     message: input.message,
     sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   };
-}
-
-function safeTokenEqual(left: string, right: string) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
 }
 
 function buildLifecycleConflict(

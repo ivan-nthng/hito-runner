@@ -48,7 +48,7 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="hito-ui-dialog-close absolute right-4 top-4 disabled:pointer-events-none">
+      <DialogPrimitive.Close className="hito-ui-dialog-close absolute right-4 top-4 cursor-pointer disabled:cursor-not-allowed">
         <Icon name="close" size="sm" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>

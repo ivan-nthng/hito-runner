@@ -78,6 +78,9 @@ export function InlineEditableText({
   const shouldCommitOnBlur = commitOnBlur ?? !isMultiline;
   const resolvedError = localError ?? error;
   const feedback = resolvedError ?? helper;
+  const headerInputSize = isHeaderInput
+    ? Math.min(72, Math.max(8, (draft || placeholder || value || "").length + 1))
+    : undefined;
 
   useEffect(() => {
     if (!editing) {
@@ -135,7 +138,8 @@ export function InlineEditableText({
       "aria-invalid": resolvedError ? true : undefined,
       "aria-label": ariaLabel,
       className: cn(
-        "hito-field hito-field-primary min-w-0",
+        "hito-field hito-field-primary",
+        !isHeaderInput && "min-w-0",
         isMultiline
           ? "hito-textarea-md resize-none"
           : isHeaderInput
@@ -172,13 +176,19 @@ export function InlineEditableText({
     };
 
     return (
-      <div className="grid min-w-0 gap-2">
+      <div
+        className={cn(
+          "min-w-0 gap-2",
+          isHeaderInput ? "inline-grid max-w-full justify-start" : "grid",
+        )}
+      >
         {isMultiline ? (
           <textarea ref={fieldRef as RefObject<HTMLTextAreaElement>} rows={3} {...fieldProps} />
         ) : (
           <input
             ref={fieldRef as RefObject<HTMLInputElement>}
             data-size={isHeaderInput ? size : undefined}
+            size={headerInputSize}
             type="text"
             {...fieldProps}
           />
@@ -227,7 +237,12 @@ export function InlineEditableText({
   }
 
   return (
-    <div className="grid min-w-0 gap-1">
+    <div
+      className={cn(
+        "min-w-0 gap-1",
+        isHeaderInput ? "inline-grid max-w-full justify-start" : "grid",
+      )}
+    >
       <button
         ref={actionRef}
         type="button"
@@ -243,7 +258,7 @@ export function InlineEditableText({
         disabled={disabled}
         onClick={startEditing}
       >
-        <span className="min-w-0 truncate">{visibleValue}</span>
+        <span className="min-w-0 max-w-full truncate">{visibleValue}</span>
         {canEdit && showEditIcon ? (
           <span
             className={cn(

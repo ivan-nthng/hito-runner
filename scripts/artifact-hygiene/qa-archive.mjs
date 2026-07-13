@@ -5,13 +5,17 @@ import { LOCAL_ARTIFACT_ARCHIVE_ROOT, QA_FOLDER_ROOT } from "./policy.mjs";
 import { isSafeQaDeleteAfterExpiryArchiveCandidate } from "./qa-folder-manifest.mjs";
 import { formatBytes } from "./utils.mjs";
 
-export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest) {
+export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest, options = {}) {
   if (!qaFolderManifest?.entries) {
     throw new Error("QA folder manifest is required before archive apply.");
   }
 
+  const selectedOwner = options.qaArchiveOwner ?? null;
+
   const deleteAfterExpiryEntries = qaFolderManifest.entries.filter(
-    (entry) => entry.candidateRetentionClass === "delete-after-expiry",
+    (entry) =>
+      entry.candidateRetentionClass === "delete-after-expiry" &&
+      (selectedOwner === null || entry.inferredFlags?.inferredOwner === selectedOwner),
   );
   const unsafeDeleteAfterExpiryEntries = deleteAfterExpiryEntries.filter(
     (entry) => !isSafeQaDeleteAfterExpiryArchiveCandidate(entry),
@@ -24,10 +28,14 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest)
   }
 
   if (deleteAfterExpiryEntries.length === 0) {
-    throw new Error("Refusing archive apply because no delete-after-expiry folders are present.");
+    throw new Error(
+      selectedOwner
+        ? `Refusing archive apply because no delete-after-expiry folders are present for owner ${selectedOwner}.`
+        : "Refusing archive apply because no delete-after-expiry folders are present.",
+    );
   }
 
-  const archivePath = buildQaArchivePath(rootDir);
+  const archivePath = buildQaArchivePath(rootDir, selectedOwner);
   const archiveRelativePath = relative(rootDir, archivePath);
   await mkdir(archivePath, { recursive: true });
 
@@ -39,6 +47,7 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest)
     sourceRoot: QA_FOLDER_ROOT,
     archiveRoot: archiveRelativePath,
     selectedRetentionClass: "delete-after-expiry",
+    selectedInferredOwner: selectedOwner,
     selectedFolders: deleteAfterExpiryEntries.map((entry) => ({
       path: entry.path,
       files: entry.files,
@@ -65,6 +74,9 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest)
       "manuallyMarkedKeep must be false",
       "localQaArtifactsOnly must be true",
       "tracked docs evidence roots are excluded",
+      selectedOwner
+        ? `inferredOwner must be exactly ${selectedOwner}`
+        : "all inferred owners may be selected when no owner filter is supplied",
     ],
     restoreInstructions:
       "To restore, move each archived folder back from archiveRoot to its original path under qa-artifacts/. Do not partially restore without reviewing this manifest.",
@@ -96,6 +108,7 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest)
     archiveRoot: archiveRelativePath,
     manifestPath: relative(rootDir, plannedManifestPath),
     selectedRetentionClass: "delete-after-expiry",
+    selectedInferredOwner: selectedOwner,
     movedFolderCount: movedFolders.length,
     movedFileCount: movedFolders.reduce((sum, entry) => sum + entry.files, 0),
     movedBytes: movedFolders.reduce((sum, entry) => sum + entry.bytes, 0),
@@ -115,11 +128,16 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest)
   };
 }
 
-function buildQaArchivePath(rootDir) {
+function buildQaArchivePath(rootDir, selectedOwner) {
   const timestamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+  const ownerSegment = selectedOwner ? `${sanitizeArchivePathSegment(selectedOwner)}-` : "";
   return resolve(
     rootDir,
     LOCAL_ARTIFACT_ARCHIVE_ROOT,
-    `qa-artifacts-delete-after-expiry-${timestamp}`,
+    `qa-artifacts-delete-after-expiry-${ownerSegment}${timestamp}`,
   );
+}
+
+function sanitizeArchivePathSegment(value) {
+  return value.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "owner";
 }

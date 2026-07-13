@@ -4,7 +4,6 @@ import {
   ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
   ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
 } from "@/lib/active-plan-workout-editing/policy";
-import { getRequestAuthContext } from "@/lib/backend/auth";
 import {
   addReviewedManualWorkoutToActivePlanForUser,
   type ManualWorkoutActivePlanAddDependencies,
@@ -26,7 +25,7 @@ import {
   type ManualWorkoutDraftReviewResult,
 } from "@/lib/manual-workout-authoring/schema";
 import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
-import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
 
 export type { ManualWorkoutCopyPasteFailureReason } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 
@@ -188,7 +187,7 @@ export type ManualWorkoutCopyPasteDependencies = ManualWorkoutActivePlanAddDepen
 export const reviewManualWorkoutCopyPasteDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutCopyPasteReviewResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildCopyPasteBlocked({
@@ -203,7 +202,7 @@ export const reviewManualWorkoutCopyPasteDraft = createServerFn({ method: "POST"
 export const confirmManualWorkoutCopyPasteDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutCopyPasteConfirmResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildCopyPasteBlocked({
@@ -218,7 +217,7 @@ export const confirmManualWorkoutCopyPasteDraft = createServerFn({ method: "POST
 export const copyManualWorkoutWithinActivePlan = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDirectCopyResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildCopyPasteBlocked({
@@ -525,18 +524,4 @@ function buildDirectCopyMutationChecksum(input: {
 
 function inputHasClientPayload(error: z.ZodError) {
   return error.issues.some((issue) => issue.code === "unrecognized_keys");
-}
-
-async function getCurrentPersistedUserId() {
-  const auth = getRequestAuthContext();
-
-  if (!auth.userId) {
-    return null;
-  }
-
-  try {
-    return await getPersistedUserIdForAuthContext(auth);
-  } catch {
-    return null;
-  }
 }

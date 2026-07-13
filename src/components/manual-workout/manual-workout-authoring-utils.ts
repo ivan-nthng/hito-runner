@@ -14,6 +14,10 @@ import type {
   ManualWorkoutDraftInput,
   ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
+import {
+  getManualWorkoutRepeatGroupChildren,
+  isManualWorkoutRepeatRecoveryBlock,
+} from "@/lib/manual-workout-authoring/repeat-groups";
 import type { WorkoutSegmentLike } from "@/lib/rich-workout-model";
 import { workoutGlyphFromCalendarIconKey, type WorkoutGlyphKind } from "@/lib/workout-glyph";
 
@@ -64,14 +68,20 @@ export function cloneManualWorkoutEntries(
 ): ManualWorkoutConstructorEntryInput[] {
   return entries.map((entryValue) => {
     if (entryValue.kind === "repeat_group") {
+      const children = getManualWorkoutRepeatGroupChildren(entryValue.group).map(
+        cloneManualWorkoutBlock,
+      );
+      const recoveryBlock = children.find((child) =>
+        isManualWorkoutRepeatRecoveryBlock(child.blockKey),
+      );
+
       return {
         kind: "repeat_group",
         group: {
           ...entryValue.group,
-          workBlock: cloneManualWorkoutBlock(entryValue.group.workBlock),
-          ...(entryValue.group.recoveryBlock
-            ? { recoveryBlock: cloneManualWorkoutBlock(entryValue.group.recoveryBlock) }
-            : {}),
+          children,
+          workBlock: children[0] ?? cloneManualWorkoutBlock(entryValue.group.workBlock),
+          ...(recoveryBlock ? { recoveryBlock } : {}),
         },
       };
     }
@@ -115,12 +125,6 @@ export function templateRunnerFacingLabel(template: ManualWorkoutTemplate) {
   return templateRunnerFacingLanguage(template).runnerFacingWorkoutTypeLabel;
 }
 
-export function templateOptionDisplayLabel(template: ManualWorkoutTemplate) {
-  const runnerLabel = templateRunnerFacingLabel(template);
-
-  return template.label === runnerLabel ? runnerLabel : `${runnerLabel} · ${template.label}`;
-}
-
 export function manualTemplateRunnerLabelFromKey(templateKey: string) {
   const template = MANUAL_WORKOUT_TEMPLATES.find((item) => item.templateKey === templateKey);
 
@@ -151,17 +155,6 @@ export function templateWorkoutColorIndicatorStyle(template: ManualWorkoutTempla
     background: workoutTypeColorVar(type, "base"),
     borderColor: workoutTypeColorVar(type, "border"),
     boxShadow: `0 0 0 2px ${workoutTypeColorVar(type, "ring")}`,
-  };
-}
-
-export function templateWorkoutIdentity(template: ManualWorkoutTemplate) {
-  const runnerLabel = templateRunnerFacingLabel(template);
-
-  return {
-    color: workoutToneColor(template),
-    glyph: templateIconKind(template),
-    label: runnerLabel,
-    short: runnerLabel,
   };
 }
 
@@ -210,15 +203,20 @@ function manualWorkoutEntriesToLanguageSteps(
 ): WorkoutSegmentLike[] {
   return entries.map((entryValue) => {
     if (entryValue.kind === "repeat_group") {
+      const repeatChildren = getManualWorkoutRepeatGroupChildren(entryValue.group);
+      const children = repeatChildren.map(manualWorkoutBlockToLanguageStep);
+      const recoveryIndex = repeatChildren.findIndex((child) =>
+        isManualWorkoutRepeatRecoveryBlock(child.blockKey),
+      );
+
       return {
         type: "repeats",
         segment_type: "repeat_group",
         label: entryValue.group.groupLabel ?? null,
         repeat_count: entryValue.group.repeatCount,
-        work: manualWorkoutBlockToLanguageStep(entryValue.group.workBlock),
-        recovery: entryValue.group.recoveryBlock
-          ? manualWorkoutBlockToLanguageStep(entryValue.group.recoveryBlock)
-          : null,
+        children,
+        work: children[0] ?? manualWorkoutBlockToLanguageStep(entryValue.group.workBlock),
+        recovery: recoveryIndex >= 0 ? (children[recoveryIndex] ?? null) : null,
       };
     }
 

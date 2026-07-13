@@ -11,6 +11,10 @@ import {
   type ManualWorkoutTemplate,
 } from "@/lib/manual-workout-authoring/templates";
 import { validateManualWorkoutTargetInput } from "@/lib/manual-workout-authoring/target-input";
+import {
+  getManualWorkoutRepeatGroupChildren,
+  isManualWorkoutRepeatRecoveryBlock,
+} from "@/lib/manual-workout-authoring/repeat-groups";
 
 export type ManualWorkoutDraftValidationResult =
   | {
@@ -27,12 +31,6 @@ export type ManualWorkoutDraftValidationResult =
 const NOTE_ONLY_BLOCKS = new Set<ManualWorkoutBlockInput["blockKey"]>([
   "coach_cue_note_block",
   "drills_mobility_note_block",
-]);
-
-const RECOVERY_BLOCKS = new Set<ManualWorkoutBlockInput["blockKey"]>([
-  "interval_recovery_block",
-  "rest_walk_jog_recovery_block",
-  "easy_run_block",
 ]);
 
 const SUBSTANTIVE_WORK_BLOCKS = new Set<ManualWorkoutBlockInput["blockKey"]>([
@@ -215,6 +213,8 @@ function validateRepeatGroup(
   issues: ManualWorkoutDraftIssue[],
   path: Array<string | number>,
 ) {
+  const children = getManualWorkoutRepeatGroupChildren(group);
+
   if (group.nestedRepeatGroup !== undefined) {
     issues.push({
       code: "nested_repeat_not_supported",
@@ -223,33 +223,42 @@ function validateRepeatGroup(
     });
   }
 
-  validateBlock(group.workBlock, issues, [...path, "workBlock"]);
-
-  if (group.recoveryBlock) {
-    validateBlock(group.recoveryBlock, issues, [...path, "recoveryBlock"]);
+  if (children.length === 0) {
+    issues.push({
+      code: "missing_executable_structure",
+      message: `${group.safetyKind} repeat groups require at least one child block.`,
+      path: [...path, "children"],
+    });
   }
 
-  if (requiresRecovery(group.safetyKind) && !group.recoveryBlock) {
+  for (const [childIndex, child] of children.entries()) {
+    validateBlock(child, issues, [...path, "children", childIndex]);
+
+    if (NOTE_ONLY_BLOCKS.has(child.blockKey)) {
+      issues.push({
+        code: "unsafe_block_structure",
+        message: "Repeat groups can include executable child sections only, not note blocks.",
+        path: [...path, "children", childIndex, "blockKey"],
+      });
+    }
+  }
+
+  if (
+    requiresRecovery(group.safetyKind) &&
+    !children.some((child) => isManualWorkoutRepeatRecoveryBlock(child.blockKey))
+  ) {
     issues.push({
       code: "missing_recovery",
       message: `${group.safetyKind} repeat groups require an explicit recovery block.`,
-      path: [...path, "recoveryBlock"],
+      path: [...path, "children"],
     });
   }
 
-  if (group.recoveryBlock && !RECOVERY_BLOCKS.has(group.recoveryBlock.blockKey)) {
-    issues.push({
-      code: "missing_recovery",
-      message: `${group.safetyKind} repeat recovery must use a recovery block.`,
-      path: [...path, "recoveryBlock", "blockKey"],
-    });
-  }
-
-  if (!isWorkBlockCompatible(group)) {
+  if (!hasCompatibleRepeatWorkChild(group.safetyKind, children)) {
     issues.push({
       code: "unsafe_block_structure",
-      message: `${group.safetyKind} repeat group uses an incompatible work block.`,
-      path: [...path, "workBlock", "blockKey"],
+      message: `${group.safetyKind} repeat group requires a compatible work child.`,
+      path: [...path, "children"],
     });
   }
 }
@@ -313,9 +322,11 @@ function validateLongRunAnatomy(
       return total + (entryValue.block.durationSeconds ?? 0);
     }
 
-    const workSeconds = entryValue.group.workBlock.durationSeconds ?? 0;
-    const recoverySeconds = entryValue.group.recoveryBlock?.durationSeconds ?? 0;
-    return total + entryValue.group.repeatCount * (workSeconds + recoverySeconds);
+    const repeatSeconds = getManualWorkoutRepeatGroupChildren(entryValue.group).reduce(
+      (childTotal, child) => childTotal + (child.durationSeconds ?? 0),
+      0,
+    );
+    return total + entryValue.group.repeatCount * repeatSeconds;
   }, 0);
 
   if (
@@ -351,22 +362,25 @@ function requiresRecovery(safetyKind: ManualWorkoutRepeatGroupInput["safetyKind"
   );
 }
 
-function isWorkBlockCompatible(group: ManualWorkoutRepeatGroupInput) {
-  switch (group.safetyKind) {
+function hasCompatibleRepeatWorkChild(
+  safetyKind: ManualWorkoutRepeatGroupInput["safetyKind"],
+  children: ManualWorkoutBlockInput[],
+) {
+  switch (safetyKind) {
     case "intervals":
-      return group.workBlock.blockKey === "interval_work_block";
+      return children.some((child) => child.blockKey === "interval_work_block");
     case "tempo_repeats":
-      return (
-        group.workBlock.blockKey === "tempo_block" || group.workBlock.blockKey === "threshold_block"
+      return children.some(
+        (child) => child.blockKey === "tempo_block" || child.blockKey === "threshold_block",
       );
     case "hill_repeats":
-      return group.workBlock.blockKey === "hill_work_block";
+      return children.some((child) => child.blockKey === "hill_work_block");
     case "run_walk":
-      return group.workBlock.blockKey === "easy_run_block";
+      return children.some((child) => child.blockKey === "easy_run_block");
     case "strides":
-      return group.workBlock.blockKey === "strides_block";
+      return children.some((child) => child.blockKey === "strides_block");
     case "downhill_control":
-      return group.workBlock.blockKey === "downhill_control_block";
+      return children.some((child) => child.blockKey === "downhill_control_block");
     default:
       return false;
   }

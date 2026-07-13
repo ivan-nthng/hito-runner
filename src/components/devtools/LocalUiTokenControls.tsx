@@ -170,7 +170,7 @@ function PropertyControlLine({
           {onExpandedChange ? (
             <button
               type="button"
-              className="grid size-5 shrink-0 place-items-center rounded-sm text-muted-foreground outline-none transition-colors hover:bg-surface/70 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+              className="hito-button hito-button-ghost hito-button-xs size-5 min-h-5 shrink-0 rounded-sm px-0 text-muted-foreground hover:text-foreground"
               aria-label={expandLabel ?? `Show ${label} detail controls`}
               aria-expanded={expanded}
               onClick={() => onExpandedChange(!expanded)}

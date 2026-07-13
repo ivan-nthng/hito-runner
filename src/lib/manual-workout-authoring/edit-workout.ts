@@ -14,7 +14,6 @@ import {
   type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
-import { getRequestAuthContext } from "@/lib/backend/auth";
 import { buildImportedPlanSeed } from "@/lib/imported-plan";
 import {
   fetchManualWorkoutEvidenceWorkoutIds,
@@ -44,7 +43,7 @@ import {
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
-import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { todayIso } from "@/lib/training";
@@ -109,7 +108,7 @@ type ManualWorkoutPersistedEditBlockedResult = {
   persisted: false;
   reason: ManualWorkoutPersistedEditFailureReason;
   message: string;
-  sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+  sourceKind: string | null;
   workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
 };
 
@@ -118,7 +117,7 @@ export type ManualWorkoutPersistedEditReconstructResult =
       ok: true;
       status: "draft_reconstructed";
       persisted: false;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceKind: string;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
       plannedWorkoutId: string;
@@ -139,7 +138,7 @@ export type ManualWorkoutPersistedEditReviewResult =
       ok: true;
       status: "review_ready";
       persisted: false;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceKind: string;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
       plannedWorkoutId: string;
@@ -165,8 +164,8 @@ export type ManualWorkoutPersistedEditConfirmResult =
       ok: true;
       status: "updated";
       persisted: true;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
+      sourceKind: string;
+      sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
       plannedWorkoutId: string;
@@ -190,6 +189,8 @@ export type ManualWorkoutPersistedEditConfirmResult =
         templateKey: ManualWorkoutTemplateKey;
         reviewChecksum: string;
         draftReviewChecksum: string;
+        originalPlanSourceKind: string;
+        originalPlanSourceStatus: string | null;
         trustedClientRows: false;
       };
       safety: {
@@ -241,7 +242,7 @@ type PersistManualWorkoutEditInput = {
 export const reconstructManualWorkoutPersistedEditDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutPersistedEditReconstructResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildEditBlocked({
@@ -256,7 +257,7 @@ export const reconstructManualWorkoutPersistedEditDraft = createServerFn({ metho
 export const reviewManualWorkoutPersistedEditDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutPersistedEditReviewResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildEditBlocked({
@@ -271,7 +272,7 @@ export const reviewManualWorkoutPersistedEditDraft = createServerFn({ method: "P
 export const confirmManualWorkoutPersistedEdit = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutPersistedEditConfirmResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildEditBlocked({
@@ -325,7 +326,7 @@ export async function reconstructManualWorkoutPersistedEditDraftForUser(
     ok: true,
     status: "draft_reconstructed",
     persisted: false,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: target.activePlan.source_kind!,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
     activePlanId: target.activePlan.id,
     plannedWorkoutId: target.sourceWorkout.id,
@@ -398,7 +399,7 @@ export async function reviewManualWorkoutPersistedEditDraftForUser(
     ok: true,
     status: "review_ready",
     persisted: false,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: target.activePlan.source_kind!,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
     activePlanId: target.activePlan.id,
     plannedWorkoutId: target.sourceWorkout.id,
@@ -507,8 +508,8 @@ export async function confirmManualWorkoutPersistedEditForUser(
       ok: true,
       status: "updated",
       persisted: true,
-      sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-      sourceStatus: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+      sourceKind: target.activePlan.source_kind!,
+      sourceStatus: resolveActivePlanSourceStatus(target.activePlan),
       workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
       activePlanId: target.activePlan.id,
       plannedWorkoutId: target.sourceWorkout.id,
@@ -532,6 +533,8 @@ export async function confirmManualWorkoutPersistedEditForUser(
         templateKey: draftReview.draft.templateKey,
         reviewChecksum: review.reviewChecksum,
         draftReviewChecksum: draftReview.reviewChecksum,
+        originalPlanSourceKind: target.activePlan.source_kind!,
+        originalPlanSourceStatus: resolveActivePlanSourceStatus(target.activePlan),
         trustedClientRows: false,
       },
       safety: {
@@ -656,7 +659,7 @@ async function resolveManualWorkoutPersistedEditTarget(
     return {
       ok: false,
       reason: "no_active_plan",
-      message: "Create or open a manual active plan before editing workouts.",
+      message: "Create or open an active plan before editing workouts.",
     };
   }
 
@@ -664,15 +667,7 @@ async function resolveManualWorkoutPersistedEditTarget(
     return {
       ok: false,
       reason: "stale_review",
-      message: "The active manual plan changed. Refresh the workout before editing.",
-    };
-  }
-
-  if (activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
-    return {
-      ok: false,
-      reason: "unsupported_active_plan_source",
-      message: "Workout detail editing is available only for manual user-built active plans.",
+      message: "The active plan changed. Refresh the workout before editing.",
     };
   }
 
@@ -696,7 +691,7 @@ async function resolveManualWorkoutPersistedEditTarget(
     return {
       ok: false,
       reason: "source_workout_not_found",
-      message: "The planned workout was not found in the current manual plan.",
+      message: "The planned workout was not found in the current active plan.",
     };
   }
 
@@ -704,7 +699,7 @@ async function resolveManualWorkoutPersistedEditTarget(
     return {
       ok: false,
       reason: "source_workout_not_in_active_plan",
-      message: "The planned workout is not part of the current runner's active manual plan.",
+      message: "The planned workout is not part of the current runner's active plan.",
     };
   }
 
@@ -863,6 +858,10 @@ function buildManualWorkoutEditGoalMetadata(input: {
   );
   const manualPlan = asJsonRecord(root.manual_user_built_plan);
 
+  if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+    return toJson(root);
+  }
+
   return toJson({
     ...root,
     source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
@@ -911,6 +910,10 @@ function buildManualWorkoutEditPlanPreferences(input: {
     : [];
   const editMetadataRecord = buildManualWorkoutEditMetadata(input.review);
 
+  if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+    return toJson(root);
+  }
+
   return toJson({
     ...root,
     manual_workout_authoring_edit: editMetadataRecord,
@@ -958,27 +961,13 @@ function buildEditBlocked(input: {
     persisted: false,
     reason: input.reason,
     message: input.message,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: null,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
 }
 
 function inputHasClientPayload(error: z.ZodError) {
   return error.issues.some((issue) => issue.code === "unrecognized_keys");
-}
-
-async function getCurrentPersistedUserId() {
-  const auth = getRequestAuthContext();
-
-  if (!auth.userId) {
-    return null;
-  }
-
-  try {
-    return await getPersistedUserIdForAuthContext(auth);
-  } catch {
-    return null;
-  }
 }
 
 function asJsonRecord(value: unknown): Record<string, unknown> {

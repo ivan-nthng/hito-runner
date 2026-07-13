@@ -8,18 +8,33 @@ import type {
 import type { PersistedPlannedWorkoutRow } from "../../src/lib/active-plan-persistence";
 import type { Step } from "../../src/lib/training";
 
+export function assertManualBlockedResult<Result extends { ok: boolean }, Reason extends string>(
+  result: Result,
+  reason: Reason,
+  label: string,
+  format: (result: Result) => string = formatJsonResult,
+) {
+  assert.equal(result.ok, false, `${label} should be blocked: ${format(result)}`);
+
+  if (!result.ok) {
+    const blocked = result as Result & {
+      status: string;
+      persisted: boolean;
+      reason: Reason;
+    };
+
+    assert.equal(blocked.status, "blocked");
+    assert.equal(blocked.persisted, false);
+    assert.equal(blocked.reason, reason, `${label} should fail with ${reason}.`);
+  }
+}
+
 export function assertMoveReviewBlocked(
   result: ManualWorkoutMoveReviewResult,
   reason: Extract<ManualWorkoutMoveReviewResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(result.ok, false, `${label} should be blocked: ${formatMoveReviewResult(result)}`);
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
+  assertManualBlockedResult(result, reason, label, formatMoveReviewResult);
 }
 
 export function assertMoveConfirmBlocked(
@@ -27,13 +42,7 @@ export function assertMoveConfirmBlocked(
   reason: Extract<ManualWorkoutMoveConfirmResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(result.ok, false, `${label} should be blocked: ${formatMoveConfirmResult(result)}`);
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
+  assertManualBlockedResult(result, reason, label, formatMoveConfirmResult);
 }
 
 export function assertDirectMoveBlocked(
@@ -41,13 +50,7 @@ export function assertDirectMoveBlocked(
   reason: Extract<ManualWorkoutDirectMoveResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(result.ok, false, `${label} should be blocked: ${formatDirectMoveResult(result)}`);
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
+  assertManualBlockedResult(result, reason, label, formatDirectMoveResult);
 }
 
 export function assertRepeatWithRecovery(steps: Step[], label: string) {
@@ -88,19 +91,38 @@ export function readStepsForAssertion(value: PersistedPlannedWorkoutRow["steps"]
 }
 
 export function formatResult(result: ManualWorkoutDraftReviewResult) {
-  return JSON.stringify(result, null, 2);
+  return formatJsonResult(result);
 }
 
 export function formatMoveReviewResult(result: ManualWorkoutMoveReviewResult) {
-  return JSON.stringify(result, null, 2);
+  return formatJsonResult(result);
 }
 
 export function formatMoveConfirmResult(result: ManualWorkoutMoveConfirmResult) {
-  return JSON.stringify(result, null, 2);
+  return formatJsonResult(result);
 }
 
 export function formatDirectMoveResult(result: ManualWorkoutDirectMoveResult) {
+  return formatJsonResult(result);
+}
+
+export function formatJsonResult(result: unknown) {
   return JSON.stringify(result, null, 2);
+}
+
+export function assertNoFakePaceOrHrInSerialized(value: unknown, label: string) {
+  const serialized = JSON.stringify(value);
+
+  assert.doesNotMatch(
+    serialized,
+    /paceMinPerKmRange|pace_min_per_km_range|"pace"/i,
+    `${label} should not include fake pace truth.`,
+  );
+  assert.doesNotMatch(
+    serialized,
+    /personal_hr_zone|hrBpmRange|hr_bpm_range/i,
+    `${label} should not include fake personal HR truth.`,
+  );
 }
 
 function hasExecutableStructure(step: Step) {

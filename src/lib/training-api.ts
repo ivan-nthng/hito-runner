@@ -68,11 +68,7 @@ import type { Database, Json } from "@/lib/supabase/database";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { RUNNER_TRAINING_WEEKDAYS } from "@/lib/runner-training-preferences";
-import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  reviewManualWorkoutDraft as reviewManualWorkoutDraftForAction,
-  type ManualWorkoutDraftReviewResult,
-} from "@/lib/manual-workout-authoring";
+import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring";
 import { fetchManualWorkoutEvidenceWorkoutIds } from "@/lib/manual-workout-authoring/active-plan-add";
 
 export interface ViewerSummary {
@@ -174,12 +170,6 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
     return saveWorkoutLogForUser(await requirePersistedUserIdForCurrentRequest(), data);
-  });
-
-export const reviewManualWorkoutDraftAction = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutDraftReviewResult> => {
-    return reviewManualWorkoutDraftForAction(data);
   });
 
 const proposeActivePlanRefreshForCurrentRequestServer = createServerOnlyFn(

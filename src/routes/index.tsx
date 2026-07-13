@@ -59,13 +59,22 @@ function HomePendingState() {
   return (
     <AppShell>
       <div className="hito-route-gutter space-y-12 py-8 lg:py-10">
-        <section className="hito-surface p-6 lg:p-10">
-          <Skeleton className="h-4 w-40 bg-background/40" />
-          <Skeleton className="mt-5 h-16 w-full max-w-2xl bg-background/40" />
-          <Skeleton className="mt-4 h-5 w-full max-w-xl bg-background/30" />
-          <div className="hito-home-support-grid mt-8">
-            <Skeleton className="h-40 bg-background/30" />
-            <Skeleton className="h-40 bg-background/30" />
+        <section className="pt-1 lg:pt-2">
+          <div className="hito-workout-hero-grid">
+            <div>
+              <Skeleton className="h-4 w-64 bg-background/30" />
+              <Skeleton className="mt-4 h-16 w-full max-w-2xl bg-background/40" />
+              <Skeleton className="mt-4 h-5 w-full max-w-xl bg-background/30" />
+              <div className="mt-6 flex flex-wrap items-center gap-2">
+                <Skeleton className="h-8 w-28 bg-background/30" />
+                <Skeleton className="h-8 w-32 bg-background/20" />
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-start gap-5 sm:justify-end sm:gap-6">
+              <Skeleton className="h-16 w-20 bg-background/30" />
+              <Skeleton className="h-16 w-20 bg-background/30" />
+              <Skeleton className="h-16 w-20 bg-background/30" />
+            </div>
           </div>
         </section>
         <section className="space-y-5">

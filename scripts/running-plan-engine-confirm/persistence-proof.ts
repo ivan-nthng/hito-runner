@@ -11,164 +11,102 @@ import type {
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import type { Database } from "../../src/lib/supabase/database";
 import { validateNoClientRowsTrusted, validateNoFakePaceOrPersonalHr } from "./assertions";
+import {
+  cleanupDisposableSupabaseUser,
+  createDisposableSupabaseUser,
+  DISPOSABLE_REMOTE_MUTATION_ENV_VALUE,
+  DISPOSABLE_REMOTE_MUTATION_FLAG,
+  DISPOSABLE_REQUIRE_PERSISTENCE_FLAG,
+  readDisposablePersistenceCliOptions,
+  resolveDisposablePersistencePreflight,
+  type DisposablePersistencePreflight,
+  type DisposableSupabaseCleanupProof,
+  type DisposableSupabaseCleanupSpec,
+} from "../lib/disposable-persistence-proof";
 
-type DisposableCleanupProof = {
-  workoutLogsRemaining: 0;
-  planCyclesRemaining: 0;
-  plannedWorkoutsRemaining: 0;
-  runnerProfilesRemaining: 0;
-  authUserDeleted: true;
-};
-type DisposableCleanupProofCountKey = Exclude<keyof DisposableCleanupProof, "authUserDeleted">;
-type DisposableTableName = "workout_logs" | "planned_workouts" | "plan_cycles" | "runner_profiles";
-type DisposableTableRow<TableName extends DisposableTableName> =
-  Database["public"]["Tables"][TableName]["Row"];
-type DisposableCleanupSpec<TableName extends DisposableTableName = DisposableTableName> = {
-  table: TableName;
-  userColumn: Extract<keyof DisposableTableRow<TableName>, string>;
-  countColumn: Extract<keyof DisposableTableRow<TableName>, string>;
-  proofKey: DisposableCleanupProofCountKey;
-};
+type DisposableCleanupProofCountKey =
+  | "workoutLogsRemaining"
+  | "planCyclesRemaining"
+  | "plannedWorkoutsRemaining"
+  | "runnerProfilesRemaining";
+type DisposableCleanupProof = DisposableSupabaseCleanupProof<DisposableCleanupProofCountKey>;
 type BuildPreviewInputForConfirm = (
   draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
 ) => RunningPlanPreviewActionInput;
 
-const REQUIRE_PERSISTENCE_FLAG = "--require-persistence";
-const REMOTE_MUTATION_FLAG = "--allow-remote-disposable-supabase-mutation";
+const REQUIRE_PERSISTENCE_FLAG = DISPOSABLE_REQUIRE_PERSISTENCE_FLAG;
+const REMOTE_MUTATION_FLAG = DISPOSABLE_REMOTE_MUTATION_FLAG;
 const REMOTE_MUTATION_ENV = "HITO_RUNNING_PLAN_CONFIRM_ALLOW_REMOTE_MUTATION";
-const REMOTE_MUTATION_ENV_VALUE = "I_UNDERSTAND_THIS_MUTATES_REMOTE_DISPOSABLE_SUPABASE";
-const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const REMOTE_MUTATION_ENV_VALUE = DISPOSABLE_REMOTE_MUTATION_ENV_VALUE;
 const DISPOSABLE_CLEANUP_SPECS = [
   {
     table: "workout_logs",
     userColumn: "user_id",
     countColumn: "id",
     proofKey: "workoutLogsRemaining",
+    zeroMessage: "Disposable workout logs must be cleaned up.",
   },
   {
     table: "planned_workouts",
     userColumn: "user_id",
     countColumn: "id",
     proofKey: "plannedWorkoutsRemaining",
+    zeroMessage: "Disposable planned workouts must be cleaned up.",
   },
   {
     table: "plan_cycles",
     userColumn: "user_id",
     countColumn: "id",
     proofKey: "planCyclesRemaining",
+    zeroMessage: "Disposable plan cycles must be cleaned up.",
   },
   {
     table: "runner_profiles",
     userColumn: "user_id",
     countColumn: "user_id",
     proofKey: "runnerProfilesRemaining",
+    zeroMessage: "Disposable runner profile must be cleaned up.",
   },
-] as const satisfies readonly [
-  DisposableCleanupSpec<"workout_logs">,
-  DisposableCleanupSpec<"planned_workouts">,
-  DisposableCleanupSpec<"plan_cycles">,
-  DisposableCleanupSpec<"runner_profiles">,
-];
+] as const satisfies readonly DisposableSupabaseCleanupSpec<DisposableCleanupProofCountKey>[];
 
-type PersistenceTarget = {
-  url: string;
-  hostname: string;
-  projectRef: string | null;
-  isLoopback: boolean;
-};
-
-export type PersistencePreflight =
-  | {
-      mode: "no_supabase_env";
-      shouldRun: false;
-      target: null;
-      reason: string;
-      overrideHint: string;
-    }
-  | {
-      mode: "remote_supabase_blocked";
-      shouldRun: false;
-      target: PersistenceTarget;
-      reason: string;
-      overrideHint: string;
-    }
-  | {
-      mode: "local_disposable_supabase";
-      shouldRun: true;
-      target: PersistenceTarget;
-    }
-  | {
-      mode: "remote_disposable_supabase_override";
-      shouldRun: true;
-      target: PersistenceTarget;
-    };
+export type PersistencePreflight = DisposablePersistencePreflight;
 
 export function readCliOptions() {
-  const args = new Set(process.argv.slice(2));
+  const options = readDisposablePersistenceCliOptions({
+    remoteMutationEnv: REMOTE_MUTATION_ENV,
+    remoteMutationEnvValue: REMOTE_MUTATION_ENV_VALUE,
+  });
 
   return {
-    requirePersistence: args.has(REQUIRE_PERSISTENCE_FLAG),
+    requirePersistence: options.requirePersistence,
+    remoteMutationFlagPresent: options.remoteMutationFlagPresent,
+    remoteMutationEnvConfirmed: options.remoteMutationEnvConfirmed,
     allowRemoteDisposableSupabaseMutation:
-      args.has(REMOTE_MUTATION_FLAG) &&
-      process.env[REMOTE_MUTATION_ENV] === REMOTE_MUTATION_ENV_VALUE,
+      options.remoteMutationFlagPresent && options.remoteMutationEnvConfirmed,
   };
 }
 
 export function resolvePersistencePreflight(
   options: ReturnType<typeof readCliOptions>,
 ): PersistencePreflight {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
-  const serviceKey = process.env.SUPABASE_SECRET_KEY?.trim();
-
-  if (!url || !publishableKey || !serviceKey) {
-    return {
-      mode: "no_supabase_env",
-      shouldRun: false,
-      target: null,
-      reason:
-        "Supabase persistence env is incomplete; non-mutating review exactness checks ran only.",
-      overrideHint:
-        "Start local Supabase and export NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY, then rerun with --require-persistence.",
-    };
-  }
-
-  const target = parsePersistenceTarget(url);
-  if (!target) {
-    return {
-      mode: "no_supabase_env",
-      shouldRun: false,
-      target: null,
-      reason: "NEXT_PUBLIC_SUPABASE_URL is not a valid URL; persistence proof was not attempted.",
-      overrideHint:
-        "Use a valid local Supabase URL such as http://127.0.0.1:54321 and rerun with --require-persistence.",
-    };
-  }
-
-  if (target.isLoopback) {
-    return {
-      mode: "local_disposable_supabase",
-      shouldRun: true,
-      target,
-    };
-  }
-
-  if (options.allowRemoteDisposableSupabaseMutation) {
-    return {
-      mode: "remote_disposable_supabase_override",
-      shouldRun: true,
-      target,
-    };
-  }
-
-  return {
-    mode: "remote_supabase_blocked",
-    shouldRun: false,
-    target,
-    reason:
+  return resolveDisposablePersistencePreflight({
+    options,
+    includeNotRequested: true,
+    notRequestedReason:
+      "Running-plan confirm persistence proof was not requested; non-mutating review exactness checks ran only.",
+    notRequestedOverrideHint: `Pass ${REQUIRE_PERSISTENCE_FLAG} with local disposable Supabase env to run persistence proof.`,
+    envIncompleteReason:
+      "Supabase persistence env is incomplete; non-mutating review exactness checks ran only.",
+    envIncompleteOverrideHint:
+      "Start local Supabase and export NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY, then rerun with --require-persistence.",
+    invalidUrlReason:
+      "NEXT_PUBLIC_SUPABASE_URL is not a valid URL; persistence proof was not attempted.",
+    invalidUrlOverrideHint:
+      "Use a valid local Supabase URL such as http://127.0.0.1:54321 and rerun with --require-persistence.",
+    remoteBlockedReason:
       "Remote Supabase mutation is blocked by default. This harness only mutates local/disposable targets unless an explicit remote-disposable override is supplied.",
-    overrideHint: `Use a local Supabase URL, or set ${REMOTE_MUTATION_ENV}=${REMOTE_MUTATION_ENV_VALUE} and pass ${REMOTE_MUTATION_FLAG} only for an approved disposable remote validation target.`,
-  };
+    remoteOverrideHint: `Use a local Supabase URL, or set ${REMOTE_MUTATION_ENV}=${REMOTE_MUTATION_ENV_VALUE} and pass ${REMOTE_MUTATION_FLAG} only for an approved disposable remote validation target.`,
+  });
 }
 
 export function formatPersistenceBlocker(
@@ -210,7 +148,13 @@ export async function validatePersistenceContract(
 
   for (const draft of reviewedDrafts) {
     const distanceGoal = distanceGoalSummary(draft);
-    const userId = await createDisposableUser(supabase, distanceGoal.goalLabel);
+    const disposableUser = await createDisposableSupabaseUser({
+      supabase,
+      emailPrefix: "running-plan-confirm",
+      label: distanceGoal.goalLabel,
+      creationErrorMessage: "Disposable user creation failed.",
+    });
+    const userId = disposableUser.userId;
     let distanceGoalProof: Omit<(typeof persistedDistanceGoals)[number], "cleanup"> | null = null;
     let cleanupProof: DisposableCleanupProof | null = null;
 
@@ -280,45 +224,6 @@ export async function validatePersistenceContract(
   };
 }
 
-function parsePersistenceTarget(url: string): PersistenceTarget | null {
-  try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
-    const projectRef = hostname.endsWith(".supabase.co")
-      ? hostname.split(".supabase.co")[0] || null
-      : null;
-
-    return {
-      url: parsed.origin,
-      hostname,
-      projectRef,
-      isLoopback: LOOPBACK_HOSTNAMES.has(hostname),
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function createDisposableUser(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  goalLabel: string,
-) {
-  const slug = goalLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const email = `running-plan-confirm-${slug}-${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2)}@example.test`;
-  const created = await supabase.auth.admin.createUser({
-    email,
-    email_confirm: true,
-  });
-
-  if (created.error || !created.data.user) {
-    throw new Error(created.error?.message ?? "Disposable user creation failed.");
-  }
-
-  return created.data.user.id;
-}
-
 function distanceGoalSummary(draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>) {
   const distance = draft.normalizedInputSummary.planGoalIntent.distance;
 
@@ -364,86 +269,9 @@ async function cleanupDisposableUser(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
   userId: string,
 ): Promise<DisposableCleanupProof> {
-  for (const spec of DISPOSABLE_CLEANUP_SPECS) {
-    await deleteRows(supabase.from(spec.table).delete().eq(spec.userColumn, userId));
-  }
-
-  const deleted = await supabase.auth.admin.deleteUser(userId);
-  if (deleted.error) {
-    throw new Error(deleted.error.message);
-  }
-
-  const remainingCounts = new Map<DisposableCleanupProofCountKey, number>(
-    await Promise.all(
-      DISPOSABLE_CLEANUP_SPECS.map(async (spec) => [
-        spec.proofKey,
-        await countRowsForUser(supabase, spec, userId),
-      ]),
-    ),
-  );
-
-  return {
-    workoutLogsRemaining: assertZeroCleanupCount(
-      remainingCounts,
-      "workoutLogsRemaining",
-      "Disposable workout logs must be cleaned up.",
-    ),
-    planCyclesRemaining: assertZeroCleanupCount(
-      remainingCounts,
-      "planCyclesRemaining",
-      "Disposable plan cycles must be cleaned up.",
-    ),
-    plannedWorkoutsRemaining: assertZeroCleanupCount(
-      remainingCounts,
-      "plannedWorkoutsRemaining",
-      "Disposable planned workouts must be cleaned up.",
-    ),
-    runnerProfilesRemaining: assertZeroCleanupCount(
-      remainingCounts,
-      "runnerProfilesRemaining",
-      "Disposable runner profile must be cleaned up.",
-    ),
-    authUserDeleted: true,
-  };
-}
-
-async function countRowsForUser<TableName extends DisposableTableName>(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  spec: DisposableCleanupSpec<TableName>,
-  userId: string,
-) {
-  const result = await supabase
-    .from(spec.table)
-    .select(spec.countColumn, { count: "exact", head: true })
-    .eq(spec.userColumn, userId);
-
-  if (result.error) {
-    throw new Error(result.error.message);
-  }
-
-  return result.count ?? 0;
-}
-
-function assertZeroCleanupCount(
-  counts: ReadonlyMap<DisposableCleanupProofCountKey, number>,
-  proofKey: DisposableCleanupProofCountKey,
-  message: string,
-): 0 {
-  const count = counts.get(proofKey) ?? 0;
-
-  assert.equal(count, 0, message);
-
-  return 0;
-}
-
-async function deleteRows(
-  query: PromiseLike<{
-    error: { message: string } | null;
-  }>,
-) {
-  const result = await query;
-
-  if (result.error) {
-    throw new Error(result.error.message);
-  }
+  return cleanupDisposableSupabaseUser({
+    supabase,
+    userId,
+    cleanupSpecs: DISPOSABLE_CLEANUP_SPECS,
+  });
 }

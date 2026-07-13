@@ -304,10 +304,7 @@ export function LocalUiTaskDraftPanel({
             clearGeneratedPrompt();
           }}
         >
-          <SelectTrigger
-            className="hito-field-sm h-8 min-w-0 rounded-md px-2 py-0 text-xs shadow-none focus-visible:ring-1"
-            aria-label="Scope of fix"
-          >
+          <SelectTrigger size="sm" className="min-w-0" aria-label="Scope of fix">
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end" className="z-[73] w-64" data-local-ui-inspector-layer="">

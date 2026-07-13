@@ -15,6 +15,7 @@ import { MANUAL_WORKOUT_CONSTRUCTOR_CONTRACT_VERSION } from "@/lib/manual-workou
 import type { ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import { resolveManualWorkoutTargetInput } from "@/lib/manual-workout-authoring/target-input";
 import { isManualWorkoutNoteOnlyBlock } from "@/lib/manual-workout-authoring/validator";
+import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
 
 interface BuildManualWorkoutConstructorContractInput {
   parsedInput: ParsedManualWorkoutDraftInput;
@@ -97,10 +98,8 @@ function repeatGroupToConstructorEntry(
   group: Extract<ManualWorkoutConstructorEntryInput, { kind: "repeat_group" }>["group"],
   targetTruthMode: ManualWorkoutTargetTruthMode,
 ): ManualWorkoutConstructorRepeatGroup {
-  const children = [blockToConstructorSegment(group.workBlock, targetTruthMode)]
-    .concat(
-      group.recoveryBlock ? [blockToConstructorSegment(group.recoveryBlock, "structure_only")] : [],
-    )
+  const children = getManualWorkoutRepeatGroupChildren(group)
+    .map((block) => blockToConstructorSegment(block, targetTruthMode))
     .flatMap((resolved) => (resolved.kind === "segment" ? [resolved.segment] : []));
 
   return {

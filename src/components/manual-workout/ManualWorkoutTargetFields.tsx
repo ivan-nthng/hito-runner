@@ -1,4 +1,11 @@
 import type { ManualWorkoutBlockInput } from "@/lib/manual-workout-authoring/schema";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ManualWorkoutTargetInput = NonNullable<ManualWorkoutBlockInput["target"]>;
 
@@ -29,22 +36,36 @@ export function ManualWorkoutTargetFields({
   const mode = targetModeForBlock(block);
 
   return (
-    <div className="grid gap-3">
+    <div className="hito-manual-workout-target-fields">
       <div className="grid gap-2">
         <span className="hito-form-label">Target</span>
-        <TargetModeToggle
+        <Select
           disabled={disabled}
-          label={roleLabel}
-          onChange={(nextMode) => onChange(blockForTargetMode(block, nextMode))}
           value={mode}
-        />
+          onValueChange={(nextMode) =>
+            onChange(blockForTargetMode(block, nextMode as ManualWorkoutTargetMode))
+          }
+        >
+          <SelectTrigger
+            aria-label={`${roleLabel} target type`}
+            className="hito-field hito-field-secondary hito-field-sm"
+          >
+            <SelectValue placeholder="Target" />
+          </SelectTrigger>
+          <SelectContent>
+            {TARGET_MODE_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {mode === "pace_exact" ? (
         <TargetTextField
           disabled={disabled}
-          helper="Use min/km, for example 5:10/km."
-          label="Your pace target"
+          label="Value"
           onChange={(value) =>
             onChange({
               ...block,
@@ -63,8 +84,7 @@ export function ManualWorkoutTargetFields({
       {mode === "pace_range" ? (
         <TargetTextField
           disabled={disabled}
-          helper="Use a min/km range, for example 5:10-5:25/km."
-          label="Your pace target"
+          label="Value"
           onChange={(value) =>
             onChange({
               ...block,
@@ -83,9 +103,8 @@ export function ManualWorkoutTargetFields({
       {mode === "hr_cap" ? (
         <TargetTextField
           disabled={disabled}
-          helper="Use an integer bpm cap, for example 155."
           inputMode="numeric"
-          label="Your heart-rate target"
+          label="Value"
           onChange={(value) =>
             onChange({
               ...block,
@@ -104,8 +123,7 @@ export function ManualWorkoutTargetFields({
       {mode === "hr_range" ? (
         <TargetTextField
           disabled={disabled}
-          helper="Use an integer bpm range, for example 145-155 bpm."
-          label="Your heart-rate target"
+          label="Value"
           onChange={(value) =>
             onChange({
               ...block,
@@ -122,12 +140,11 @@ export function ManualWorkoutTargetFields({
       ) : null}
 
       {mode === "rpe" ? (
-        <div className="grid gap-3">
+        <div className="hito-manual-workout-target-value-grid">
           <TargetTextField
             disabled={disabled}
-            helper="Use the 0-10 perceived-effort scale."
             inputMode="decimal"
-            label="Effort (RPE 0-10)"
+            label="RPE"
             onChange={(value) =>
               onChange({
                 ...block,
@@ -142,8 +159,7 @@ export function ManualWorkoutTargetFields({
           />
           <TargetTextField
             disabled={disabled}
-            helper="Optional runner-facing label for this effort."
-            label="Effort label"
+            label="Label"
             onChange={(value) =>
               onChange({
                 ...block,
@@ -158,8 +174,7 @@ export function ManualWorkoutTargetFields({
           />
           <TargetTextField
             disabled={disabled}
-            helper="Optional runner-facing cue for this effort."
-            label="Effort cue"
+            label="Cue"
             onChange={(value) =>
               onChange({
                 ...block,
@@ -178,48 +193,8 @@ export function ManualWorkoutTargetFields({
   );
 }
 
-function TargetModeToggle({
-  disabled,
-  label,
-  onChange,
-  value,
-}: {
-  disabled: boolean;
-  label: string;
-  onChange: (value: ManualWorkoutTargetMode) => void;
-  value: ManualWorkoutTargetMode;
-}) {
-  return (
-    <div
-      className="hito-choice-toggle-group flex flex-wrap"
-      role="radiogroup"
-      aria-label={`${label} target`}
-    >
-      {TARGET_MODE_OPTIONS.map((option) => {
-        const selected = value === option.value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            className="hito-choice-toggle hito-choice-toggle-sm"
-            aria-checked={selected}
-            aria-disabled={disabled || undefined}
-            data-selected={selected}
-            disabled={disabled}
-            role="radio"
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function TargetTextField({
   disabled,
-  helper,
   inputMode,
   label,
   onChange,
@@ -227,7 +202,6 @@ function TargetTextField({
   value,
 }: {
   disabled: boolean;
-  helper: string;
   inputMode?: "decimal" | "numeric";
   label: string;
   onChange: (value: string) => void;
@@ -245,7 +219,6 @@ function TargetTextField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
       />
-      <span className="hito-field-helper">{helper}</span>
     </label>
   );
 }

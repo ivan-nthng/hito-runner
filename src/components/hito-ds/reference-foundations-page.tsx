@@ -4,6 +4,7 @@ import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconSize } from "@/components/ui/icon";
+import { HitoDsLightPaletteReference } from "@/components/hito-ds/light-palette-reference";
 import { ChoiceSelector } from "@/components/hito-ds/specimen-previews";
 import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import {
@@ -275,6 +276,7 @@ const SEMANTIC_COLOR_TOKENS: readonly SemanticColorTokenData[] = [
   { name: "signal", value: "var(--signal)", mapsTo: "amber-500", group: "accent" },
   { name: "success", value: "var(--success)", mapsTo: "green-500", group: "status" },
   { name: "warn", value: "var(--warn)", mapsTo: "orange-500", group: "status" },
+  { name: "info", value: "var(--info)", mapsTo: "blue-500", group: "status" },
   { name: "destructive", value: "var(--destructive)", mapsTo: "red-500", group: "status" },
   { name: "easy", value: "var(--easy)", mapsTo: "workout/Easy", group: "compat workout" },
   { name: "long", value: "var(--long)", mapsTo: "workout/Long Run", group: "compat workout" },
@@ -446,13 +448,15 @@ export function HitoDsFoundationsPage() {
             </LogoSpecimen>
             <LogoSpecimen
               label="Dark background"
+              labelTone="inverse"
               className="bg-[var(--stone-950)] text-[var(--sand-100)]"
             >
               <HitoLogo decorative className="[--hito-logo-height:1.7rem]" />
             </LogoSpecimen>
             <LogoSpecimen
               label="Favicon surface"
-              className="bg-[linear-gradient(135deg,#3a3732_0%,#15130f_52%,#030303_100%)] text-[var(--sand-100)]"
+              labelTone="inverse"
+              className="bg-[var(--stone-950)] [background-image:linear-gradient(135deg,#3a3732_0%,#15130f_52%,#030303_100%)] text-[var(--sand-100)]"
             >
               <HitoLogoMark decorative className="[--hito-logo-height:2.25rem]" />
             </LogoSpecimen>
@@ -648,6 +652,8 @@ export function HitoDsFoundationsPage() {
               </div>
             )}
           </div>
+
+          <HitoDsLightPaletteReference />
 
           <div className="grid min-w-0 grid-cols-1 gap-5">
             <div className="hito-reference-note">
@@ -886,16 +892,20 @@ export function HitoDsFoundationsPage() {
 
 function LogoSpecimen({
   label,
+  labelTone = "default",
   className,
   children,
 }: {
   label: string;
+  labelTone?: "default" | "inverse";
   className?: string;
   children: ReactNode;
 }) {
   return (
     <article className={cn("hito-surface-flat grid min-h-36 content-between gap-5 p-5", className)}>
-      <p className="hito-label">{label}</p>
+      <p className={cn("hito-label", labelTone === "inverse" && "text-[var(--sand-100)]")}>
+        {label}
+      </p>
       <div className="flex items-center">{children}</div>
     </article>
   );
@@ -1160,7 +1170,7 @@ function PrimitiveColorSwatchButton({
   return (
     <button
       type="button"
-      className="group grid min-h-36 content-between rounded-2xl border border-hairline p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-signal/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="group grid min-h-36 min-w-0 content-between rounded-2xl border border-hairline p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-signal/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       style={
         {
           background: color.value,
@@ -1176,15 +1186,19 @@ function PrimitiveColorSwatchButton({
           {color.contrast}
         </span>
       </span>
-      <span className="flex items-center justify-between gap-3">
-        <span className="min-w-0">
-          <span className="block truncate hito-technical-mono">{color.hex ?? copyValue}</span>
-          <span className="mt-1 block truncate text-[0.7rem] opacity-80">{color.token}</span>
+      <span className="flex min-w-0 items-center justify-between gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate hito-technical-mono" title={color.hex ?? copyValue}>
+            {color.hex ?? copyValue}
+          </span>
+          <span className="mt-1 block truncate text-[0.7rem] opacity-80" title={color.token}>
+            {color.token}
+          </span>
         </span>
         <Icon
           name="copy"
           size="xs"
-          className="opacity-0 transition group-hover:opacity-80 group-focus-visible:opacity-100"
+          className="shrink-0 opacity-0 transition group-hover:opacity-80 group-focus-visible:opacity-100"
         />
       </span>
     </button>
@@ -1206,15 +1220,19 @@ function SemanticColorCard({
   return (
     <button
       type="button"
-      className="group hito-surface-flat grid min-h-40 content-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-signal/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="group hito-surface-flat grid min-h-40 min-w-0 content-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-signal/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       onClick={() => onCopy(copyValue, token.name)}
       aria-label={`Copy ${token.name} semantic token`}
     >
-      <span className="flex items-start justify-between gap-3">
-        <span>
+      <span className="flex min-w-0 items-start justify-between gap-3">
+        <span className="min-w-0">
           <span className="hito-label">{token.group}</span>
-          <span className="mt-2 block hito-list-row-title">{token.name}</span>
-          <span className="mt-1 block hito-caption">maps to {token.mapsTo}</span>
+          <span className="mt-2 block truncate hito-list-row-title" title={token.name}>
+            {token.name}
+          </span>
+          <span className="mt-1 block truncate hito-caption" title={`maps to ${token.mapsTo}`}>
+            maps to {token.mapsTo}
+          </span>
         </span>
         <span
           aria-hidden="true"
@@ -1222,8 +1240,10 @@ function SemanticColorCard({
           style={previewStyle}
         />
       </span>
-      <span className="flex items-center justify-between gap-3">
-        <code className="hito-technical-mono min-w-0 truncate">{copyValue}</code>
+      <span className="flex min-w-0 items-center justify-between gap-3">
+        <code className="hito-technical-mono min-w-0 flex-1 truncate" title={copyValue}>
+          {copyValue}
+        </code>
         <Icon
           name="copy"
           size="xs"

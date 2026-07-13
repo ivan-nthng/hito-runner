@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { APP_NAME } from "@/lib/app-config";
 import { LocalDevtoolMount } from "@/components/devtools/LocalDevtoolMount";
 import { Toaster } from "@/components/ui/sonner";
+import { HITO_THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme-preference";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -69,8 +70,9 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-hito-theme="dark" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: HITO_THEME_BOOTSTRAP_SCRIPT }} />
         <HeadContent />
       </head>
       <body>

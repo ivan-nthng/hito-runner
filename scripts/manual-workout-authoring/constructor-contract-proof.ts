@@ -8,8 +8,9 @@ import {
   type ManualWorkoutConstructorSegment,
   type ManualWorkoutConstructorTimelineEntry,
   type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
 } from "../../src/lib/manual-workout-authoring";
+import { formatJsonResult } from "./move-proof-assertions";
+import { assertReady } from "./move-proof-fixtures";
 
 const ACCEPTED_SEGMENT_ROLES = new Set(["warm_up", "run", "work", "recover", "finish", "cooldown"]);
 
@@ -33,6 +34,7 @@ export function validateManualConstructorSegmentTargetContract() {
   assertActiveTemplatesDoNotOfferDefaultHrTruth();
   assertCleanConstructorReadbackForSupportedTemplates();
   assertRepeatContractShape();
+  assertOrderedRepeatChildrenContract();
   assertRunnerEnteredTargetReadback();
   assertManualMetricTruthRejections();
   assertRepeatSafetyRejections();
@@ -89,6 +91,72 @@ function assertRepeatContractShape() {
     "repeat label should be compact structural copy, not legacy group vocabulary",
   );
   assertNoLegacyConstructorTerms(repeat, "time_intervals repeat contract");
+}
+
+function assertOrderedRepeatChildrenContract() {
+  const review = assertReady("ordered repeat children constructor contract", {
+    templateKey: "controlled_tempo_session",
+    workoutDate: "2026-07-02",
+    entries: [
+      {
+        kind: "block",
+        block: { blockKey: "warmup_block", durationSeconds: 12 * 60 },
+      },
+      {
+        kind: "repeat_group",
+        group: {
+          repeatCount: 4,
+          safetyKind: "tempo_repeats",
+          groupLabel: "Tempo ladder",
+          children: [
+            { blockKey: "easy_run_block", durationSeconds: 3 * 60, label: "Settle" },
+            {
+              blockKey: "tempo_block",
+              durationSeconds: 2 * 60,
+              label: "Tempo press",
+              target: { rpe: 7, cue: "Controlled, not all-out." },
+            },
+            { blockKey: "interval_recovery_block", durationSeconds: 60, label: "Float" },
+          ],
+        },
+      },
+      {
+        kind: "block",
+        block: { blockKey: "cooldown_block", durationSeconds: 10 * 60 },
+      },
+    ],
+  });
+  const repeat = review.constructorContract.timeline.find(isRepeatGroup);
+
+  assert.ok(repeat, "ordered child repeat should expose one repeat container");
+  assert.deepEqual(
+    repeat.children.map((child) => child.role),
+    ["run", "work", "recover"],
+    "repeat children should preserve arbitrary ordered roles",
+  );
+  assert.deepEqual(
+    repeat.children.map((child) => child.label),
+    ["Settle", "Tempo press", "Float"],
+    "repeat children should preserve arbitrary ordered labels",
+  );
+  assert.match(
+    repeat.label,
+    /^4x \[Run 3 min \+ Work 2 min \+ Recover 1 min\]$/,
+    "repeat label should summarize all ordered children",
+  );
+
+  const repeatStep = review.draft.steps.find((step) => step.repeats);
+  assert.equal(
+    repeatStep?.prescription?.children?.length,
+    3,
+    "normalized draft should persist all ordered repeat child prescriptions",
+  );
+  assert.deepEqual(
+    repeatStep?.children?.map((child) => child.label),
+    ["Settle", "Tempo press", "Float"],
+    "normalized draft should preserve ordered child readback",
+  );
+  assertNoLegacyConstructorTerms(repeat, "ordered repeat constructor contract");
 }
 
 function assertManualMetricTruthRejections() {
@@ -287,21 +355,6 @@ function assertNoLegacyConstructorTerms(value: unknown, label: string) {
   }
 }
 
-function assertReady(
-  label: string,
-  input: ManualWorkoutDraftInput,
-): Extract<ManualWorkoutDraftReviewResult, { ok: true }> {
-  const result = reviewManualWorkoutDraft(input);
-
-  assert.equal(result.ok, true, `${label} should review cleanly`);
-
-  if (!result.ok) {
-    throw new Error(`${label} was rejected: ${formatResult(result)}`);
-  }
-
-  return result;
-}
-
 function assertRejected(label: string, input: unknown, expectedIssueCode: string) {
   const result = reviewManualWorkoutDraft(input);
 
@@ -313,7 +366,7 @@ function assertRejected(label: string, input: unknown, expectedIssueCode: string
 
   assert.ok(
     result.issues.some((issue) => issue.code === expectedIssueCode),
-    `${label} should include ${expectedIssueCode}: ${formatResult(result)}`,
+    `${label} should include ${expectedIssueCode}: ${formatJsonResult(result)}`,
   );
 }
 
@@ -330,10 +383,6 @@ function firstConstructorSegment(contract: ManualWorkoutConstructorContract) {
 
   assert.ok(segment, "constructor contract should include a segment");
   return segment;
-}
-
-function formatResult(result: ManualWorkoutDraftReviewResult) {
-  return JSON.stringify(result, null, 2);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

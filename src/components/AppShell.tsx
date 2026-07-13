@@ -24,7 +24,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { LocalDevtoolMenuItem } from "@/components/devtools/LocalDevtoolMenuItem";
+import { ThemePreferenceMenuItems } from "@/components/settings/theme-preference-controls";
 import {
   WEEK_STATUS_META,
   formatDate,
@@ -52,6 +61,7 @@ export function AppShell({
     null,
   );
   const [activePlanCreateOpen, setActivePlanCreateOpen] = useState(false);
+  const [mobilePlanActionsOpen, setMobilePlanActionsOpen] = useState(false);
   const [showShellPlanNote, setShowShellPlanNote] = useState(true);
   const [exportStatus, setExportStatus] = useState<PlanExportStatus>("idle");
   const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
@@ -82,7 +92,7 @@ export function AppShell({
   const showUploadAction = shellSnapshot.mode !== "preview";
   const showSettingsAction = shellSnapshot.mode !== "preview";
   const useFreshHomeRequest = shellSnapshot.mode !== "preview";
-  const showPlanHeaderActions = shellSnapshot.mode === "authenticated";
+  const showPlanHeaderActions = shellSnapshot.mode !== "preview";
   const planAvailable = Boolean(snapshot?.planMeta);
   const deferHeaderDialogOpen = (openDialog: () => void) => {
     clearPlanExportResetTimer(headerDialogOpenTimerRef);
@@ -100,6 +110,15 @@ export function AppShell({
   const openPlanActionDialog = (mode: PlanManagementDialogMode) => {
     setActivePlanCreateOpen(false);
     deferHeaderDialogOpen(() => setPlanActionDialogMode(mode));
+  };
+  const openCreatePlan = () => {
+    deferHeaderDialogOpen(() => setActivePlanCreateOpen(true));
+  };
+  const openImportJson = () => {
+    deferHeaderDialogOpen(() => setUploadOpen(true));
+  };
+  const closeMobilePlanActions = () => {
+    setMobilePlanActionsOpen(false);
   };
   const exportJson = () => {
     setExportStatus("exporting-json");
@@ -168,7 +187,7 @@ export function AppShell({
                   </div>
                   <p className="hito-list-row-copy">
                     {shellSnapshot.source === "persisted"
-                      ? "Your saved plan and workout results show up here. Add plan starts reviewed changes, and the actions menu keeps export and future-schedule tools nearby."
+                      ? "Your saved plan and workout results show up here. Current Plan keeps reviewed plan changes, export, and future-schedule tools together."
                       : "You can browse the preview here until you sign in and save a plan."}
                   </p>
                   <button
@@ -243,6 +262,11 @@ export function AppShell({
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
+              <ThemePreferenceMenuItems
+                itemClassName="hito-shell-theme-menu-item"
+                labelClassName="hito-shell-theme-menu-label"
+              />
+              <DropdownMenuSeparator className="hito-shell-menu-separator" />
               <LocalDevtoolMenuItem
                 itemClassName="hito-shell-menu-item"
                 separatorClassName="hito-shell-menu-separator"
@@ -294,15 +318,15 @@ export function AppShell({
                 <StatusPill label="Week" value={weekStatus.label} />
               ) : null}
               {showPlanHeaderActions ? (
-                <>
+                <div className="hidden md:block">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
                         className="hito-button hito-button-secondary hito-button-sm"
                       >
-                        <Icon name="sparkles" size="xs" />
-                        Add plan
+                        <Icon name="plan-note" size="xs" />
+                        Current Plan
                         <Icon name="chevron-down" size="xs" />
                       </button>
                     </DropdownMenuTrigger>
@@ -310,49 +334,19 @@ export function AppShell({
                       align="end"
                       className="hito-shell-menu hito-shell-menu-plan"
                     >
-                      <DropdownMenuLabel>Add plan</DropdownMenuLabel>
-                      <DropdownMenuItem
-                        className="hito-shell-menu-item"
-                        onSelect={() => {
-                          deferHeaderDialogOpen(() => setActivePlanCreateOpen(true));
-                        }}
-                      >
+                      <DropdownMenuLabel>Current Plan</DropdownMenuLabel>
+                      <DropdownMenuItem className="hito-shell-menu-item" onSelect={openCreatePlan}>
                         <Icon name="sparkles" size="sm" />
-                        Create reviewed plan
+                        Create New Plan
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="hito-shell-menu-item"
-                        onSelect={() => {
-                          deferHeaderDialogOpen(() => setUploadOpen(true));
-                        }}
-                      >
+                      <DropdownMenuItem className="hito-shell-menu-item" onSelect={openImportJson}>
                         <Icon name="import" size="sm" />
                         Import JSON
                       </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        aria-label="Plan actions"
-                        className="hito-button hito-button-secondary hito-button-sm aspect-square p-0"
-                      >
-                        <Icon name="more-horizontal" size="sm" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="hito-shell-menu hito-shell-menu-plan"
-                    >
-                      <DropdownMenuLabel>Plan utilities</DropdownMenuLabel>
                       <DropdownMenuItem
                         className="hito-shell-menu-item"
                         disabled={!planAvailable || exportStatus !== "idle"}
-                        onSelect={() => {
-                          exportJson();
-                        }}
+                        onSelect={exportJson}
                       >
                         <Icon name="download" size="sm" />
                         {exportStatus === "exporting-json" ? "Preparing JSON..." : "Export JSON"}
@@ -366,21 +360,22 @@ export function AppShell({
                         }}
                       >
                         <Icon name="calendar-clock" size="sm" />
-                        Edit schedule
+                        Edit Schedule
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="hito-shell-menu-item"
+                        data-tone="destructive"
                         disabled={!planAvailable}
                         onSelect={() => {
                           openPlanActionDialog("clear-upcoming");
                         }}
                       >
                         <Icon name="clear-calendar" size="sm" />
-                        Clear upcoming schedule
+                        Clear Upcoming Schedule
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </>
+                </div>
               ) : (
                 <Link
                   to={shellSnapshot.mode === "preview" ? "/login" : "/"}
@@ -390,7 +385,7 @@ export function AppShell({
                       ? { next: nextPath }
                       : undefined
                   }
-                  className="hito-button hito-button-secondary hito-button-sm"
+                  className="hito-button hito-button-secondary hito-button-sm hidden md:inline-flex"
                 >
                   <Icon name="activity" size="xs" />
                   {shellSnapshot.mode === "preview" ? "Sign in to save" : "Create plan"}
@@ -434,6 +429,94 @@ export function AppShell({
               </Link>
             );
           })}
+          <Sheet open={mobilePlanActionsOpen} onOpenChange={setMobilePlanActionsOpen}>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                className="hito-shell-mobile-row"
+                data-active={mobilePlanActionsOpen ? "true" : undefined}
+                aria-label="Open current plan actions"
+              >
+                <Icon name="plan-note" className="hito-shell-nav-icon" />
+                Current Plan
+              </button>
+            </SheetTrigger>
+            <SheetContent
+              side="bottom"
+              className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none"
+            >
+              <SheetHeader className="border-b border-hairline px-5 py-4 pr-14">
+                <SheetTitle>Current Plan</SheetTitle>
+                <SheetDescription>
+                  Create, import, export, or manage the saved plan schedule.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="hito-shell-plan-sheet-body">
+                {showPlanHeaderActions ? (
+                  <div className="hito-row-group">
+                    <MobilePlanActionButton
+                      icon="sparkles"
+                      label="Create New Plan"
+                      onClick={() => {
+                        closeMobilePlanActions();
+                        openCreatePlan();
+                      }}
+                    />
+                    <MobilePlanActionButton
+                      icon="import"
+                      label="Import JSON"
+                      onClick={() => {
+                        closeMobilePlanActions();
+                        openImportJson();
+                      }}
+                    />
+                    <MobilePlanActionButton
+                      disabled={!planAvailable || exportStatus !== "idle"}
+                      icon="download"
+                      label={
+                        exportStatus === "exporting-json" ? "Preparing JSON..." : "Export JSON"
+                      }
+                      onClick={() => {
+                        closeMobilePlanActions();
+                        exportJson();
+                      }}
+                    />
+                    <MobilePlanActionButton
+                      disabled={!planAvailable}
+                      icon="calendar-clock"
+                      label="Edit Schedule"
+                      onClick={() => {
+                        closeMobilePlanActions();
+                        openPlanActionDialog("edit-schedule");
+                      }}
+                    />
+                    <MobilePlanActionButton
+                      destructive
+                      disabled={!planAvailable}
+                      icon="clear-calendar"
+                      label="Clear Upcoming Schedule"
+                      onClick={() => {
+                        closeMobilePlanActions();
+                        openPlanActionDialog("clear-upcoming");
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="hito-row-group">
+                    <Link
+                      to="/login"
+                      search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
+                      className="hito-list-row"
+                      onClick={closeMobilePlanActions}
+                    >
+                      <Icon name="activity" size="sm" />
+                      <span className="hito-list-row-title">Sign in to save</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </nav>
       </main>
       <UploadJsonDialog
@@ -490,6 +573,33 @@ function StatusPill({ label, value }: { label: string; value: string }) {
         {value}
       </span>
     </div>
+  );
+}
+
+function MobilePlanActionButton({
+  destructive = false,
+  disabled = false,
+  icon,
+  label,
+  onClick,
+}: {
+  destructive?: boolean;
+  disabled?: boolean;
+  icon: HitoIconName;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="hito-list-row w-full text-left"
+      data-tone={destructive ? "destructive" : undefined}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <Icon name={icon} size="sm" />
+      <span className="hito-list-row-title">{label}</span>
+    </button>
   );
 }
 

@@ -12,6 +12,10 @@
     color: var(--color-signal);
   }
 
+  [data-hito-theme="light"] .hito-label-signal {
+    color: color-mix(in oklch, var(--color-signal) 50%, var(--color-foreground) 50%);
+  }
+
   .hito-display-title {
     font-family: var(--font-display);
     font-size: clamp(3.5rem, 7vw, 5rem);
@@ -49,15 +53,6 @@
     display: grid;
     width: 100%;
     gap: 3rem;
-  }
-
-  .hito-home-support-grid {
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  .hito-today-hero-grid {
-    display: grid;
   }
 
   .hito-route-support-grid {
@@ -128,16 +123,8 @@
       padding-inline: var(--space-10);
     }
 
-    .hito-home-support-grid {
-      grid-template-columns: minmax(0, 1fr) var(--hito-route-support-sidebar-width);
-    }
-
     .hito-auth-entry-grid {
       grid-template-columns: 0.9fr 0.85fr;
-    }
-
-    .hito-today-hero-grid {
-      grid-template-columns: 1.4fr 1fr;
     }
 
     .hito-route-support-grid {
@@ -283,6 +270,10 @@
     color: var(--color-signal);
   }
 
+  [data-hito-theme="light"] .hito-micro-label[data-tone="signal"] {
+    color: color-mix(in oklch, var(--color-signal) 50%, var(--color-foreground) 50%);
+  }
+
   .hito-technical-mono {
     font-family: var(--font-mono);
     font-size: 0.75rem;
@@ -322,6 +313,10 @@
   .hito-highlight-tag[data-tone="signal"] {
     background: color-mix(in oklch, var(--color-signal) 13%, transparent);
     color: var(--color-signal);
+  }
+
+  [data-hito-theme="light"] .hito-highlight-tag[data-tone="signal"] {
+    color: color-mix(in oklch, var(--color-signal) 50%, var(--color-foreground) 50%);
   }
 
   .hito-highlight-tag[data-tone="neutral"] {

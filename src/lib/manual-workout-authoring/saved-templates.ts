@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getRequestAuthContext } from "@/lib/backend/auth";
 import {
   reviewManualWorkoutDraft,
   validateManualWorkoutReviewExactness,
 } from "@/lib/manual-workout-authoring/actions";
+import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
 import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
@@ -17,7 +17,6 @@ import {
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
 import { validateManualWorkoutDraft } from "@/lib/manual-workout-authoring/validator";
-import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import {
   CALENDAR_ICON_KEY_VALUES,
   type CalendarIconKey,
@@ -208,7 +207,7 @@ export type ManualWorkoutSavedTemplateDependencies = {
 export const saveManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutSavedTemplateSaveResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildSavedTemplateBlocked({
@@ -222,7 +221,7 @@ export const saveManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
 
 export const listManualWorkoutSavedTemplates = createServerFn({ method: "GET" }).handler(
   async (): Promise<ManualWorkoutSavedTemplateListResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildSavedTemplateBlocked({
@@ -238,7 +237,7 @@ export const listManualWorkoutSavedTemplates = createServerFn({ method: "GET" })
 export const reviewManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutSavedTemplateReviewResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildSavedTemplateBlocked({
@@ -615,20 +614,6 @@ function normalizeSavedTemplateTargetTruthMode(value: unknown): ManualWorkoutTar
   }
 
   return "structure_only";
-}
-
-async function getCurrentPersistedUserId() {
-  const auth = getRequestAuthContext();
-
-  if (!auth.userId) {
-    return null;
-  }
-
-  try {
-    return await getPersistedUserIdForAuthContext(auth);
-  } catch {
-    return null;
-  }
 }
 
 function mapSavedTemplateInputIssue(error: z.ZodError): ManualWorkoutSavedTemplateFailureReason {

@@ -54,6 +54,8 @@
   --color-hairline: var(--hairline);
   --color-signal: var(--signal);
   --color-signal-foreground: var(--signal-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-easy: var(--easy);
   --color-long: var(--long);
   --color-quality: var(--quality);
@@ -910,6 +912,8 @@
   --ring: var(--amber-600);
   --signal: var(--amber-500);
   --signal-foreground: var(--background);
+  --info: var(--blue-500);
+  --info-foreground: var(--stone-950);
   --easy: var(--hito-workout-type-easy-base);
   --long: var(--hito-workout-type-long-run-base);
   --quality: var(--hito-workout-type-tempo-base);
@@ -965,6 +969,89 @@
   --background: var(--stone-900);
   --foreground: var(--sand-100);
   /* Current Hito is dark-first. Workout semantic slots inherit :root until a full theme split lands. */
+}
+
+[data-hito-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-hito-theme="light"] {
+  color-scheme: light;
+  --background: oklch(0.972 0.01 78);
+  --foreground: oklch(0.18 0.01 60);
+  --surface: oklch(0.988 0.006 82);
+  --surface-elevated: oklch(0.997 0.003 82);
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: oklch(0.988 0.006 82);
+  --secondary: oklch(0.94 0.012 76);
+  --secondary-foreground: oklch(0.24 0.012 64);
+  --muted: oklch(0.946 0.009 77);
+  --muted-foreground: oklch(0.4 0.014 62);
+  --accent: oklch(0.912 0.014 74);
+  --accent-foreground: var(--foreground);
+  --border: oklch(0.72 0.014 70 / 52%);
+  --hairline: oklch(0.72 0.014 70 / 32%);
+  --input: oklch(0.94 0.012 76);
+  --ring: oklch(0.62 0.14 60);
+  --signal: oklch(0.66 0.15 62);
+  --signal-foreground: oklch(0.14 0.006 58);
+  --success: oklch(0.44 0.125 150);
+  --success-foreground: oklch(0.988 0.006 82);
+  --warn: oklch(0.5 0.14 55);
+  --destructive: oklch(0.48 0.18 28);
+  --destructive-foreground: oklch(0.988 0.006 82);
+  --info: oklch(0.46 0.095 205);
+  --info-foreground: oklch(0.988 0.006 82);
+  --sidebar: oklch(0.982 0.008 80);
+  --sidebar-foreground: oklch(0.22 0.012 62);
+  --sidebar-primary: var(--signal);
+  --sidebar-primary-foreground: var(--signal-foreground);
+  --sidebar-accent: color-mix(in oklch, var(--signal) 13%, var(--surface) 87%);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(0.72 0.014 70 / 34%);
+  --sidebar-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-hairline: var(--hairline);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warn: var(--warn);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 @layer base {
@@ -1056,6 +1143,41 @@
     backdrop-filter: blur(18px);
   }
 
+  [data-hito-theme="light"] .canvas-grain,
+  [data-hito-theme="light"] .hito-canvas-atmosphere {
+    background-image:
+      radial-gradient(ellipse at top, color-mix(in oklch, var(--color-signal) 10%, transparent), transparent 58%),
+      radial-gradient(ellipse at bottom, color-mix(in oklch, var(--color-accent) 68%, transparent), transparent 56%);
+  }
+
+  [data-hito-theme="light"] .auth-hero-image {
+    filter: saturate(0.95) contrast(1.02) brightness(1.04);
+  }
+
+  [data-hito-theme="light"] .auth-hero-overlay,
+  [data-hito-theme="light"] .hito-auth-photo-overlay {
+    background:
+      radial-gradient(ellipse at 20% 35%, color-mix(in oklch, var(--color-signal) 14%, transparent), transparent 54%),
+      linear-gradient(
+        90deg,
+        color-mix(in oklch, var(--color-background) 92%, transparent) 0%,
+        color-mix(in oklch, var(--color-background) 76%, transparent) 44%,
+        color-mix(in oklch, var(--color-background) 34%, transparent) 100%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--color-surface-elevated) 38%, transparent) 0%,
+        color-mix(in oklch, var(--color-background) 16%, transparent) 48%,
+        color-mix(in oklch, var(--color-background) 62%, transparent) 100%
+      );
+  }
+
+  [data-hito-theme="light"] .auth-hero-card,
+  [data-hito-theme="light"] .hito-auth-alpha-surface {
+    background: color-mix(in oklch, var(--color-surface-elevated) 91%, transparent);
+    box-shadow: 0 24px 60px oklch(0.52 0.025 62 / 0.14);
+  }
+
   .hito-launcher-card,
   .hito-launch-surface {
     display: flex;
@@ -1140,6 +1262,18 @@
           oklch(0.09 0.005 60 / 0.9) 100%
         ),
         radial-gradient(ellipse at top, oklch(0.22 0.01 60 / 0.28), transparent 58%);
+    }
+
+    [data-hito-theme="light"] .auth-hero-overlay,
+    [data-hito-theme="light"] .hito-auth-photo-overlay {
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in oklch, var(--color-background) 93%, transparent) 0%,
+          color-mix(in oklch, var(--color-background) 82%, transparent) 48%,
+          color-mix(in oklch, var(--color-background) 94%, transparent) 100%
+        ),
+        radial-gradient(ellipse at top, color-mix(in oklch, var(--color-signal) 10%, transparent), transparent 58%);
     }
   }
 

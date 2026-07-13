@@ -30,6 +30,8 @@ API tools, load the applicable Figma plugin skills first.
 3. Reuse shared primitives for:
    - buttons
    - fields
+   - labels
+   - inputs, textareas, selects, dropdowns, menus, and segmented controls
    - tabs
    - dialog/modal structure
    - status pills
@@ -133,11 +135,38 @@ Figma bridge ownership rules:
 ## Hard Hito DS Reuse Gate
 
 - Hito DS and existing product/admin primitives are the default for every visible UI change.
-- Before adding any component, wrapper, hook, class recipe, arbitrary token, variant, or interaction pattern, search `/hitoDS`, `src/routes/hitoDS.tsx`, `src/components/ui/*`, and nearby route/component code for an existing equivalent.
+- Typography, labels, inputs, textareas, selects, dropdowns, menus, buttons, tabs, dialogs, cards,
+  rows, status pills, spacing, radius, and icon treatment must use Hito DS primitives/classes first.
+- Before adding any component, wrapper, hook, class recipe, arbitrary token, variant, or interaction
+  pattern, search `/hitoDS`, `src/routes/hitoDS.tsx`, `src/components/ui/*`,
+  `src/components/hito-ds/*`, `src/styles.css`, and nearby route/component code for an existing
+  equivalent.
 - If an existing primitive can cover the job, use it. Do not create a custom alternative.
-- If no existing primitive can cover the job, stop and propose the new primitive/pattern first. Include why existing Hito DS/admin primitives are insufficient and where the new primitive would be reused.
+- If an existing primitive looks visually stale, wrong, or incomplete, do not bypass it locally.
+  Route the fix to the canonical DS primitive/specimen owner or update that owner in the same slice
+  when the active role allows it.
+- If no existing primitive can cover the job, stop and propose the new primitive/pattern first.
+  Include why existing Hito DS/admin primitives are insufficient, where the new primitive would be
+  reused, and which old local recipes it will delete.
 - Do not implement a new UI kit, local control family, or route-specific visual language without explicit Architect/Designer approval.
 - When refactoring a surface to DS, delete the replaced local styling/components whenever safe; do not leave old UI paths behind.
+
+## Control And Typography Audit Gate
+
+- Before changing any visible form/control/readback surface, audit whether labels, helper text,
+  inputs, textareas, selects, dropdowns, menus, row actions, headings, captions, mono/technical
+  text, and body text are bound to Hito DS typography and control primitives.
+- Product surfaces must not ship custom labels, strange local inputs, custom dropdown chrome, or
+  route-local typography when a Hito DS primitive exists.
+- If a surface already contains custom controls, either migrate them to DS in the current slice or
+  report a concrete follow-up owner and stop condition. Do not normalize the surrounding layout while
+  leaving the custom control family behind without naming it.
+- `/hitoDS` itself is not immune: if a DS specimen or primitive is outdated, duplicated, or
+  inconsistent, identify the canonical primitive to keep, propose deletion/migration of the stale
+  specimen, and route to DESIGN SYSTEM or DESIGNER before Frontend creates another local variant.
+- Final reports for UI work must name the exact typography roles and control primitives reused.
+  A report that says only "used Hito DS" without naming labels/fields/selects/dropdowns/typography
+  is incomplete.
 
 ## Minimal Diff And Reuse Rule
 
@@ -181,6 +210,8 @@ When acting as Design System Engineer, treat Figma as part of the DS workflow:
 ## Do Not
 
 - add route-local color/typography/spacing recipes when Hito DS covers the need
+- add route-local labels, inputs, selects, dropdowns, menus, or text styles when Hito DS covers the
+  need
 - introduce a component family for one feature
 - redesign a surface during a behavior-preserving slice
 - make UI-only checks the authority for auth, admin, entitlement, lifecycle, or scheduling rules

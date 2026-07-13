@@ -65,6 +65,10 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - optimize for clarity and speed
 - design with existing Hito DS primitives, admin/product patterns, and documented component anatomy first
 - name the exact existing primitives/classes/patterns a frontend engineer should reuse
+- bind typography, labels, inputs, textareas, selects, dropdowns, menus, buttons, cards, rows,
+  status pills, spacing, radius, and icons to existing Hito DS primitives before proposing custom UI
+- if an existing Hito DS primitive looks stale, wrong, or incomplete, call out the primitive/specimen
+  as the design-system owner to fix instead of designing a route-local replacement
 - if a new primitive or visual pattern seems necessary, propose it explicitly with rationale before asking Frontend to build it
 - prefer simplifying existing surfaces over adding new visual systems
 - link the relevant plan/spec/task files explicitly in reports and handoffs
@@ -74,6 +78,8 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - redesign large surfaces without reason
 - change product logic through visual docs
 - invent a new UI kit, local visual language, or route-specific component family when Hito DS can cover the work
+- hand off specs with custom labels, inputs, dropdowns, menus, typography, or field chrome when an
+  existing Hito DS primitive can cover the job
 - hand off specs that require custom controls without explaining why existing Hito DS/admin primitives are insufficient
 - treat novelty as a reason to bypass DS reuse
 

@@ -20,6 +20,7 @@ import {
   type ManualWorkoutTargetTruthMode,
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
+import { isManualWorkoutRepeatRecoveryBlock } from "@/lib/manual-workout-authoring/repeat-groups";
 import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import {
   todayIso,
@@ -272,9 +273,18 @@ export function buildManualWorkoutDraftInputFromPersistedWorkout(
 function resolveSourceTemplateKey(
   workout: PersistedPlannedWorkoutRow,
 ): ManualWorkoutTemplateKey | null {
-  const sourceWorkoutType = workout.source_workout_type;
+  for (const candidate of [
+    workout.source_workout_type,
+    workout.workout_identity,
+    workout.workout_family,
+    workout.workout_type,
+  ]) {
+    if (isManualWorkoutTemplateKey(candidate)) {
+      return candidate;
+    }
+  }
 
-  return isManualWorkoutTemplateKey(sourceWorkoutType) ? sourceWorkoutType : null;
+  return null;
 }
 
 function persistedStepsToManualEntries(
@@ -316,14 +326,18 @@ function persistedStepToEntry(
   templateKey: ManualWorkoutTemplateKey,
 ): ManualWorkoutConstructorEntryInput | null {
   if (step.repeats || step.prescription?.mode === "repeats") {
-    const [workStep, recoveryStep] = repeatChildStepsForPersistedStep(step);
-    const workBlock = workStep ? persistedStepToBlock(workStep, templateKey, "work") : null;
-    const recoveryBlock = recoveryStep
-      ? persistedStepToBlock(recoveryStep, templateKey, "recovery")
-      : null;
+    const children = repeatChildStepsForPersistedStep(step)
+      .map((childStep) =>
+        persistedStepToBlock(childStep, templateKey, repeatChildReconstructionRole(childStep)),
+      )
+      .filter((block): block is ManualWorkoutBlockInput => Boolean(block));
     const repeatCount = step.repeats ?? step.prescription?.repeat_count;
+    const workBlock = children[0];
+    const recoveryBlock = children.find((block) =>
+      isManualWorkoutRepeatRecoveryBlock(block.blockKey),
+    );
 
-    if (!repeatCount || repeatCount < 2 || !workBlock || !recoveryBlock) {
+    if (!repeatCount || repeatCount < 2 || !workBlock) {
       return null;
     }
 
@@ -337,7 +351,8 @@ function persistedStepToEntry(
           normalizeManualDraftText(step.label, MANUAL_DRAFT_LABEL_MAX_LENGTH),
         ),
         workBlock,
-        recoveryBlock,
+        ...(recoveryBlock ? { recoveryBlock } : {}),
+        children,
       },
     };
   }
@@ -411,6 +426,12 @@ function repeatChildLabel(role: StepRepeatChildPrescription["role"]) {
     case "cooldown":
       return "Cooldown";
   }
+}
+
+function repeatChildReconstructionRole(step: Step): "work" | "recovery" {
+  const signal = `${step.segment_type ?? ""} ${step.type ?? ""} ${step.label ?? ""}`.toLowerCase();
+
+  return signal.includes("recover") || signal.includes("walk") ? "recovery" : "work";
 }
 
 function persistedStepToBlock(

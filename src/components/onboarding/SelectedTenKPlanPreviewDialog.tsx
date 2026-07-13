@@ -16,6 +16,7 @@ import {
   WorkoutDocumentReadback,
   type WorkoutDocumentNote,
 } from "@/components/workout-structure/WorkoutDocumentReadback";
+import { dedupeWorkoutDocumentNotes } from "@/components/workout-structure/workout-document-notes";
 import type { WorkoutStructureTimelineItem } from "@/components/workout-structure/WorkoutStructureTimeline";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import type {
@@ -701,18 +702,7 @@ function previewWorkoutDocumentNotes(row: SelectedRunningPlanCalendarRow): Worko
     ];
   });
 
-  return dedupePreviewDocumentNotes(notes).slice(0, 6);
-}
-
-function dedupePreviewDocumentNotes(notes: WorkoutDocumentNote[]) {
-  const seen = new Set<string>();
-
-  return notes.filter((note) => {
-    const key = `${note.label}:${note.value}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return dedupeWorkoutDocumentNotes(notes).slice(0, 6);
 }
 
 function previewWorkoutDocumentSummary(

@@ -133,6 +133,7 @@ async function main() {
     report.qaFolderArchiveApply = await applyQaDeleteAfterExpiryArchive(
       rootDir,
       report.qaFolderManifest,
+      options,
     );
   }
 

@@ -5,6 +5,7 @@ import type {
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
 } from "../../src/lib/active-plan-persistence";
+import type { ManualWorkoutActivePlanAddDependencies } from "../../src/lib/manual-workout-authoring/active-plan-add";
 import { buildImportedPlanSeed } from "../../src/lib/imported-plan";
 import {
   buildManualWorkoutUserBuiltTrainingPlan,
@@ -21,6 +22,29 @@ import { buildPersistedWorkoutInsertRows } from "../../src/lib/persisted-plan-re
 import { formatResult } from "./move-proof-assertions";
 
 export type MoveDependencies = NonNullable<Parameters<typeof reviewManualWorkoutMoveForUser>[2]>;
+type FakeAddPersistRecord = Parameters<
+  NonNullable<ManualWorkoutActivePlanAddDependencies["persistWorkoutAdd"]>
+>[0];
+
+export function buildFakeActivePlanMutationDependencyBase(input: {
+  activePlan: PersistedPlanCycleRow | null;
+  workouts: PersistedPlannedWorkoutRow[];
+  logsByWorkoutId?: Map<string, PersistedWorkoutLogRow>;
+  evidenceWorkoutIds?: Set<string>;
+}) {
+  return {
+    currentDate: "2026-06-10",
+    getExistingPlanContextForUser: async () =>
+      ({
+        activePlan: input.activePlan,
+        existingWorkouts: {
+          workouts: input.workouts,
+          logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
+        },
+      }) satisfies ExistingPlanContext,
+    fetchEvidenceWorkoutIds: async () => input.evidenceWorkoutIds ?? new Set(),
+  };
+}
 
 export function assertReady(
   label: string,
@@ -35,6 +59,65 @@ export function assertReady(
   assert.equal(result.reviewChecksum.length, 64);
 
   return result;
+}
+
+export function buildReviewConfirmInput(
+  draftInput: unknown,
+  review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>,
+) {
+  return {
+    draftInput,
+    reviewToken: review.reviewToken,
+    reviewChecksum: review.reviewChecksum,
+  };
+}
+
+export function buildFakeAddDependencies(input: {
+  activePlan: PersistedPlanCycleRow | null;
+  workouts: PersistedPlannedWorkoutRow[];
+  logsByWorkoutId?: Map<string, PersistedWorkoutLogRow>;
+  evidenceWorkoutIds?: Set<string>;
+  persistError?: Error;
+  currentDate?: string;
+  plannedWorkoutId?: string;
+  onPersist?: (record: {
+    workoutSeed: FakeAddPersistRecord["workoutSeed"];
+    reviewMetadata: FakeAddPersistRecord["reviewMetadata"];
+  }) => void;
+}): ManualWorkoutActivePlanAddDependencies {
+  return {
+    ...buildFakeActivePlanMutationDependencyBase(input),
+    currentDate: input.currentDate ?? "2026-06-10",
+    persistWorkoutAdd: async (record) => {
+      if (input.persistError) {
+        throw input.persistError;
+      }
+
+      input.onPersist?.({
+        workoutSeed: record.workoutSeed,
+        reviewMetadata: record.reviewMetadata,
+      });
+
+      return {
+        plannedWorkout: buildFakePlannedWorkout({
+          userId: record.userId,
+          planCycleId: record.activePlan.id,
+          id: input.plannedWorkoutId ?? "66666666-6666-4666-8666-666666666666",
+          date: record.workoutSeed.workoutDate,
+          displayOrder: record.workoutSeed.displayOrder,
+          title: record.workoutSeed.title,
+          workoutIdentity: record.workoutSeed.workoutIdentity,
+        }),
+        planCycle: {
+          ...record.activePlan,
+          end_date:
+            record.workoutSeed.workoutDate > record.activePlan.end_date
+              ? record.workoutSeed.workoutDate
+              : record.activePlan.end_date,
+        },
+      };
+    },
+  };
 }
 
 export function buildFakeMoveDependencies(input: {
@@ -275,6 +358,6 @@ export function buildFakeWorkoutLog({
   };
 }
 
-function cloneJson<T>(value: T): T {
+export function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }

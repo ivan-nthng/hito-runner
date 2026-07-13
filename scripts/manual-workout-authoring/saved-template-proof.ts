@@ -5,15 +5,20 @@ import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   listManualWorkoutSavedTemplatesForUser,
-  reviewManualWorkoutDraft,
   reviewManualWorkoutSavedTemplateForUser,
   saveManualWorkoutSavedTemplateForUser,
   type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
   type ManualWorkoutSavedTemplateRepository,
   type ManualWorkoutSavedTemplateSaveResult,
 } from "../../src/lib/manual-workout-authoring";
 import type { Step } from "../../src/lib/training";
+import {
+  assertManualBlockedResult,
+  assertNoFakePaceOrHrInSerialized,
+  assertRepeatWithRecovery,
+  formatJsonResult,
+} from "./move-proof-assertions";
+import { assertReady, buildReviewConfirmInput } from "./move-proof-fixtures";
 
 type SavedTemplateRow = Awaited<ReturnType<ManualWorkoutSavedTemplateRepository["insertTemplate"]>>;
 type SavedTemplateInsert = Parameters<ManualWorkoutSavedTemplateRepository["insertTemplate"]>[0];
@@ -38,7 +43,7 @@ export async function validateManualSavedTemplateContract() {
     {
       displayName: "  My relaxed strides  ",
       iconKey: "easy",
-      ...buildConfirmInput(input, reviewed),
+      ...buildReviewConfirmInput(input, reviewed),
     },
     { repository },
   );
@@ -127,7 +132,7 @@ export async function validateManualSavedTemplateContract() {
     {
       displayName: "My pace target",
       iconKey: "easy",
-      ...buildConfirmInput(userEnteredTargetInput, userEnteredTargetReviewed),
+      ...buildReviewConfirmInput(userEnteredTargetInput, userEnteredTargetReviewed),
     },
     { repository },
   );
@@ -170,7 +175,7 @@ export async function validateManualSavedTemplateContract() {
     {
       displayName: "   ",
       iconKey: "easy",
-      ...buildConfirmInput(input, reviewed),
+      ...buildReviewConfirmInput(input, reviewed),
     },
     { repository },
   );
@@ -181,7 +186,7 @@ export async function validateManualSavedTemplateContract() {
     {
       displayName: "Bad icon",
       iconKey: "rocket",
-      ...buildConfirmInput(input, reviewed),
+      ...buildReviewConfirmInput(input, reviewed),
     },
     { repository },
   );
@@ -258,32 +263,6 @@ export async function validateManualSavedTemplateContract() {
   }
 }
 
-function assertReady(
-  label: string,
-  input: ManualWorkoutDraftInput,
-): Extract<ManualWorkoutDraftReviewResult, { ok: true }> {
-  const result = reviewManualWorkoutDraft(input);
-
-  assert.equal(result.ok, true, `${label} should be accepted: ${formatResult(result)}`);
-  assert.equal(result.status, "draft_ready");
-  assert.equal(result.draft.persisted, false);
-  assert.equal(result.reviewToken.startsWith("manual-workout-review-v1."), true);
-  assert.equal(result.reviewChecksum.length, 64);
-
-  return result;
-}
-
-function buildConfirmInput(
-  draftInput: unknown,
-  review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>,
-) {
-  return {
-    draftInput,
-    reviewToken: review.reviewToken,
-    reviewChecksum: review.reviewChecksum,
-  };
-}
-
 function buildFakeSavedTemplateRepository(): FakeSavedTemplateRepository {
   const rows: SavedTemplateRow[] = [];
   let nextId = 1;
@@ -330,7 +309,7 @@ function buildFakeSavedTemplateRepository(): FakeSavedTemplateRepository {
 }
 
 function assertSavedTemplateSaved(result: ManualWorkoutSavedTemplateSaveResult, label: string) {
-  assert.equal(result.ok, true, `${label} should save: ${JSON.stringify(result, null, 2)}`);
+  assert.equal(result.ok, true, `${label} should save: ${formatJsonResult(result)}`);
 
   if (result.ok) {
     assert.equal(result.status, "saved");
@@ -343,42 +322,7 @@ function assertSavedTemplateBlocked(
   reason: Extract<ManualWorkoutSavedTemplateSaveResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(result.ok, false, `${label} should be blocked: ${JSON.stringify(result, null, 2)}`);
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
-}
-
-function assertRepeatWithRecovery(steps: Step[], label: string) {
-  const repeatStep = steps.find((step) => step.repeats);
-
-  assert.ok(repeatStep, `${label} should include a repeat step.`);
-  assert.ok(repeatStep.repeats && repeatStep.repeats >= 2);
-  assert.equal(Object.hasOwn(repeatStep, "work"), false, `${label} must not persist work.`);
-  assert.equal(Object.hasOwn(repeatStep, "recovery"), false, `${label} must not persist recovery.`);
-  assert.ok(repeatStep.children?.length, `${label} repeat should include ordered children.`);
-  assert.ok(
-    repeatStep.children.every((child) => hasExecutableStructure(child)),
-    `${label} repeat children should be numeric.`,
-  );
-}
-
-function assertNoFakePaceOrHrInSerialized(value: unknown, label: string) {
-  const serialized = JSON.stringify(value);
-
-  assert.doesNotMatch(
-    serialized,
-    /paceMinPerKmRange|pace_min_per_km_range|"pace"/i,
-    `${label} should not include fake pace truth.`,
-  );
-  assert.doesNotMatch(
-    serialized,
-    /personal_hr_zone|hrBpmRange|hr_bpm_range/i,
-    `${label} should not include fake personal HR truth.`,
-  );
+  assertManualBlockedResult(result, reason, label);
 }
 
 function assertUserEnteredTargetInSteps(
@@ -394,22 +338,6 @@ function assertUserEnteredTargetInSteps(
   assert.equal(target.target_source, "user_entered", `${label} should preserve source.`);
 }
 
-function hasExecutableStructure(step: Step) {
-  if (step.duration_min || step.distance_km) {
-    return true;
-  }
-
-  if (step.repeats && step.children?.length) {
-    return step.children.every((child) => hasExecutableStructure(child));
-  }
-
-  return false;
-}
-
 function flattenSteps(steps: Step[]): Step[] {
   return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
-}
-
-function formatResult(result: ManualWorkoutDraftReviewResult) {
-  return JSON.stringify(result, null, 2);
 }

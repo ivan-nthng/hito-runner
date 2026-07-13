@@ -117,8 +117,8 @@ export function ManualWorkoutMoveController({
           return;
         }
 
-        await onMoved();
         onDirectMoveSucceeded(result);
+        await onMoved();
         hitoToast.success({
           id: MANUAL_MOVE_TOAST_ID,
           title: "Workout moved",

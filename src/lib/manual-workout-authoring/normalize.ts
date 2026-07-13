@@ -30,6 +30,7 @@ import {
 } from "@/lib/manual-workout-authoring/target-input";
 import type { ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import { isManualWorkoutNoteOnlyBlock } from "@/lib/manual-workout-authoring/validator";
+import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
 
 export interface NormalizedManualWorkoutDraftResult {
   draft: ManualWorkoutCanonicalDraft;
@@ -142,45 +143,21 @@ function repeatGroupToStep(
   targetTruthMode: ManualWorkoutTargetTruthMode,
   sequence: number,
 ): Step {
-  const workUnit = blockToUnitPrescription(group.workBlock);
-  const recoveryUnit = group.recoveryBlock
-    ? blockToUnitPrescription(group.recoveryBlock)
-    : ({ mode: "none" } satisfies StepUnitPrescription);
-  const workTarget = buildTarget(
-    group.workBlock,
-    targetTruthMode,
-    defaultGuidanceForBlock(group.workBlock),
-  );
-  const recoveryTarget = group.recoveryBlock
-    ? buildTarget(
-        group.recoveryBlock,
-        "structure_only",
-        defaultGuidanceForBlock(group.recoveryBlock),
-      )
-    : undefined;
+  const children: StepRepeatChildPrescription[] = getManualWorkoutRepeatGroupChildren(group).map(
+    (block, childIndex) => {
+      const prescription = blockToUnitPrescription(block);
+      const target = buildTarget(block, targetTruthMode, defaultGuidanceForBlock(block));
 
-  const children: StepRepeatChildPrescription[] = [
-    {
-      role: repeatRoleForBlock(group.workBlock.blockKey),
-      label: group.workBlock.label ?? defaultLabelForBlock(group.workBlock.blockKey),
-      sequence: 1,
-      guidance: group.workBlock.noteText ?? defaultGuidanceForBlock(group.workBlock),
-      prescription: workUnit,
-      ...(workTarget ? { target: workTarget } : {}),
+      return {
+        role: repeatRoleForBlock(block.blockKey),
+        label: block.label ?? defaultLabelForBlock(block.blockKey),
+        sequence: childIndex + 1,
+        guidance: block.noteText ?? defaultGuidanceForBlock(block),
+        prescription,
+        ...(target ? { target } : {}),
+      };
     },
-    ...(group.recoveryBlock && recoveryUnit.mode !== "none"
-      ? [
-          {
-            role: repeatRoleForBlock(group.recoveryBlock.blockKey),
-            label: group.recoveryBlock.label ?? defaultLabelForBlock(group.recoveryBlock.blockKey),
-            sequence: 2,
-            guidance: group.recoveryBlock.noteText ?? defaultGuidanceForBlock(group.recoveryBlock),
-            prescription: recoveryUnit,
-            ...(recoveryTarget ? { target: recoveryTarget } : {}),
-          } satisfies StepRepeatChildPrescription,
-        ]
-      : []),
-  ];
+  );
 
   return {
     type: repeatStepType(group.safetyKind),
@@ -425,10 +402,9 @@ function defaultGuidanceForBlock(block: ManualWorkoutBlockInput) {
 }
 
 function defaultRepeatLabel(group: ManualWorkoutRepeatGroupInput) {
-  const work = formatBlockUnit(group.workBlock);
-  const recovery = group.recoveryBlock ? ` / ${formatBlockUnit(group.recoveryBlock)} recovery` : "";
+  const childSummary = getManualWorkoutRepeatGroupChildren(group).map(formatBlockUnit).join(" / ");
 
-  return `${group.repeatCount} x ${work}${recovery}`;
+  return childSummary ? `${group.repeatCount} x ${childSummary}` : `${group.repeatCount} x repeat`;
 }
 
 function formatBlockUnit(block: ManualWorkoutBlockInput) {

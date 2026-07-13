@@ -15,11 +15,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { LocalScreenCaptureFlow } from "@/components/devtools/LocalScreenCaptureFlow";
 import { LocalUiTaskDraftPanel } from "@/components/devtools/LocalUiTaskDraftPanel";
 import type { InlineChangeTargetInput } from "@/components/devtools/local-inline-change-target-utils";
 import { inspectLocalUiTarget } from "@/components/devtools/local-ui-inspector-targets";
 
-type InspectorMode = "idle" | "inspect";
+type InspectorMode = "idle" | "inspect" | "screen";
 
 type SelectedTarget = InlineChangeTargetInput & {
   rect: DOMRectReadOnly | null;
@@ -53,6 +54,42 @@ export function LocalUiInspector() {
   useEffect(() => {
     panelRef.current = panel;
   }, [panel]);
+
+  useEffect(() => {
+    const preventProductDismissFromDevtool = (event: Event) => {
+      const customEvent = event as CustomEvent<{ originalEvent?: Event }>;
+      const originalTarget = customEvent.detail?.originalEvent?.target;
+      const target = originalTarget instanceof Element ? originalTarget : event.target;
+
+      if (target instanceof Element && target.closest("[data-local-ui-inspector-layer]")) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener(
+      "dismissableLayer.pointerDownOutside",
+      preventProductDismissFromDevtool,
+      true,
+    );
+    window.addEventListener(
+      "dismissableLayer.focusOutside",
+      preventProductDismissFromDevtool,
+      true,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "dismissableLayer.pointerDownOutside",
+        preventProductDismissFromDevtool,
+        true,
+      );
+      window.removeEventListener(
+        "dismissableLayer.focusOutside",
+        preventProductDismissFromDevtool,
+        true,
+      );
+    };
+  }, []);
 
   const closeInspector = () => {
     setMode("idle");
@@ -153,6 +190,13 @@ export function LocalUiInspector() {
     });
   };
 
+  const startScreenCapture = () => {
+    setMenuOpen(false);
+    setPanel(null);
+    setHoverRect(null);
+    setMode("screen");
+  };
+
   const updateHoverTarget = (event: ReactPointerEvent<HTMLElement>) => {
     const point = { x: event.clientX, y: event.clientY };
     const target = resolveInspectableElementBehindLayer(event.currentTarget, point);
@@ -200,7 +244,7 @@ export function LocalUiInspector() {
     <div
       data-local-ui-inspector-layer=""
       data-local-ui-inspector-root=""
-      className="fixed bottom-5 right-5 z-[70]"
+      className="pointer-events-auto fixed bottom-5 right-5 z-[70]"
       onClick={stopDevtoolEvent}
       onPointerDown={stopDevtoolEvent}
     >
@@ -226,13 +270,16 @@ export function LocalUiInspector() {
           onClose={() => setPanel(null)}
         />
       ) : null}
+      {mode === "screen" ? <LocalScreenCaptureFlow onClose={closeInspector} /> : null}
 
-      {mode === "inspect" ? (
+      {mode === "inspect" || mode === "screen" ? (
         <button
           type="button"
-          className="hito-button hito-button-secondary hito-button-md relative z-[72] aspect-square rounded-full px-0 shadow-soft"
-          aria-label="Exit local inspect mode"
-          title="Exit local inspect mode"
+          className={`hito-button hito-button-secondary hito-button-md relative ${
+            mode === "screen" ? "z-[83]" : "z-[72]"
+          } aspect-square rounded-full px-0 shadow-soft`}
+          aria-label={mode === "screen" ? "Cancel local screen capture" : "Exit local inspect mode"}
+          title={mode === "screen" ? "Cancel local screen capture" : "Exit local inspect mode"}
           onClick={closeInspector}
         >
           <Icon name="close" size="sm" />
@@ -249,7 +296,12 @@ export function LocalUiInspector() {
               <Icon name="plus" size="sm" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={8} className="min-w-44">
+          <DropdownMenuContent
+            data-local-ui-inspector-layer=""
+            align="end"
+            sideOffset={8}
+            className="min-w-44"
+          >
             <DropdownMenuLabel>Local UI tools</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -264,6 +316,10 @@ export function LocalUiInspector() {
             <DropdownMenuItem onSelect={startQuickBug}>
               <Icon name="warning" size="sm" />
               Bug prompt
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={startScreenCapture}>
+              <Icon name="camera" size="sm" />
+              Screen
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

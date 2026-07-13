@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
 import { Icon } from "@/components/ui/icon";
+import { ThemePreferenceChoiceGroup } from "@/components/settings/theme-preference-controls";
 import {
   Sheet,
   SheetContent,
@@ -53,11 +54,11 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
 
           <HitoDsNestedNav idPrefix="desktop" activePageId={pageId} />
 
-          <div className="mt-10 border-t border-hairline pt-5">
-            <p className="hito-label hito-label-signal">Rule</p>
-            <p className="hito-list-row-copy">
-              This page follows the live product: open rhythm first, cards only when they earn it.
-            </p>
+          <div className="hito-workbench-sidebar-footer">
+            <ThemePreferenceChoiceGroup
+              buttonClassName="hito-choice-toggle-xs min-w-0 flex-1"
+              label={null}
+            />
           </div>
         </aside>
 
@@ -75,6 +76,10 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                 </div>
                 <HitoLogoMark decorative className="text-foreground [--hito-logo-height:1.65rem]" />
               </div>
+              <ThemePreferenceChoiceGroup
+                buttonClassName="hito-choice-toggle-xs min-w-0 flex-1"
+                label={null}
+              />
               <Sheet open={mobileJumpOpen} onOpenChange={setMobileJumpOpen}>
                 <SheetTrigger asChild>
                   <button

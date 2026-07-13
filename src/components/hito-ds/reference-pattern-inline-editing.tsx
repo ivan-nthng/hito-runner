@@ -67,6 +67,30 @@ export function HitoDsPatternInlineEditing() {
                 value={heading}
                 variant="header"
               />
+              <div className="mt-4 grid min-w-0 gap-2">
+                <p className="hito-caption">
+                  Header variants hug content with a minimum width. The edit affordance stays next
+                  to the label instead of pinning to the far edge of a wide field.
+                </p>
+                <div className="flex min-w-0 flex-wrap items-center gap-3">
+                  <InlineEditableText
+                    aria-label="Edit short header"
+                    demoState="hover"
+                    onChange={() => {}}
+                    size="sm"
+                    value="Beta"
+                    variant="header"
+                  />
+                  <InlineEditableText
+                    aria-label="Edit long header"
+                    demoState="hover"
+                    onChange={() => {}}
+                    size="sm"
+                    value="Marathon-specific workout title with a longer label"
+                    variant="header"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)]">

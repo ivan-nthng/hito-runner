@@ -132,9 +132,14 @@ pattern, inspect in this order:
 6. `src/styles.css` typography, spacing, color, surface, status, table, control, dialog, tab, icon,
    and layout classes
 
-Use existing Hito DS primitives/classes/components first. If a custom element remains, report what
-was inspected, why existing primitives were insufficient, whether it is a temporary bridge/proposed
-primitive/local exception, and where it will be reused or removed.
+Use existing Hito DS primitives/classes/components first. This is mandatory for typography, labels,
+inputs, textareas, selects, dropdowns, menus, buttons, tabs, dialogs, cards, rows, status pills,
+spacing, radius, and icons. If a DS primitive exists, do not ship a custom local alternative.
+
+If an existing DS primitive looks old, wrong, or incomplete, fix or route the canonical DS primitive
+instead of bypassing it on the product page. If a custom element remains, report what was inspected,
+why existing primitives were insufficient, whether it is a temporary bridge/proposed primitive/local
+exception, and where it will be reused or removed.
 
 If an existing custom element is touched, migrate it toward Hito DS when safe or explain why that is
 outside the current slice. A frontend result that cannot name the reused DS/admin/product primitive
@@ -262,7 +267,8 @@ Use the standard Implementation Report in `AGENTS.md` for changed files. Include
 - active plan/spec used, or `none`
 - root cause and canonical owner
 - files inspected and changed
-- DS preflight: nearby patterns inspected, DS primitives/classes/components reused, and custom
+- DS preflight: nearby patterns inspected; exact typography roles, labels, fields, inputs, selects,
+  dropdowns, menus, buttons, cards/rows, and DS primitives/classes/components reused; and custom
   leftovers if any
 - whether any new primitive/pattern was added, with approval/rationale if yes
 - validation run

@@ -542,7 +542,7 @@ export function SelectionControlPreview({
   disabled,
   invalid,
   focusDemo,
-  accentMode,
+  cardMode,
 }: {
   kind: SelectionControlKind;
   size: ChoiceToggleSize;
@@ -550,7 +550,7 @@ export function SelectionControlPreview({
   disabled: boolean;
   invalid: boolean;
   focusDemo: boolean;
-  accentMode: boolean;
+  cardMode: boolean;
 }) {
   const binarySize = isBinarySelectionSize(size) ? size : "md";
 
@@ -566,7 +566,7 @@ export function SelectionControlPreview({
             type="button"
             className={cn(
               "hito-choice-toggle",
-              accentMode ? "hito-choice-toggle-accent" : `hito-choice-toggle-${size}`,
+              cardMode ? "hito-choice-toggle-card" : `hito-choice-toggle-${size}`,
             )}
             data-selected={selected}
             data-demo-state={focusDemo ? "focus" : undefined}
@@ -576,16 +576,16 @@ export function SelectionControlPreview({
             disabled={disabled}
             role="radio"
           >
-            {accentMode ? (
+            {cardMode ? (
               <span>
                 <span className="block">Goal distance</span>
-                <span className="mt-1 block text-current/70">Accent display choice</span>
+                <span className="mt-1 block text-current/70">Card display choice</span>
               </span>
             ) : (
               "Preview choice"
             )}
           </button>
-          {!accentMode && (
+          {!cardMode && (
             <button
               type="button"
               className={cn("hito-choice-toggle", `hito-choice-toggle-${size}`)}
@@ -597,8 +597,8 @@ export function SelectionControlPreview({
           )}
         </div>
         <p className="hito-caption">
-          {accentMode
-            ? "Accent is reserved for large visual choice moments."
+          {cardMode
+            ? "Card is reserved for large visual choice moments."
             : `${size.toUpperCase()} toggle matches the functional button/input scale.`}
         </p>
       </div>

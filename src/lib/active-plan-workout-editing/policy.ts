@@ -84,6 +84,8 @@ const EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS = new Set([
   "active_plan_refresh_v1",
 ]);
 
+const MANUAL_CONTENT_COPY_ACTIVE_PLAN_SOURCE_KINDS = new Set(["manual_user_built_plan_v1"]);
+
 export function resolveActivePlanWorkoutEditability(
   activePlan: PersistedPlanCycleRow | null,
   operation: ActivePlanWorkoutEditOperation,
@@ -113,11 +115,16 @@ export function resolveActivePlanWorkoutEditability(
     };
   }
 
-  if (!isEditableActivePlanSourceKind(sourceKind, activePlan)) {
+  if (!isSupportedActivePlanWorkoutEditOperation(sourceKind, activePlan, operation)) {
     return {
       ok: false,
       reason: "unsupported_active_plan_source",
-      message: "This active plan source is not supported for workout editing yet.",
+      message:
+        operation === "copy_workout"
+          ? "Workout copying is available only for manual user-built active plans."
+          : operation === "edit_workout"
+            ? "Workout content editing requires a supported active plan source."
+            : "This active plan source is not supported for workout editing yet.",
     };
   }
 
@@ -148,6 +155,37 @@ export function isEditableActivePlanSourceKind(
     activePlan?.schema_version === "training-plan-v2" &&
     activePlan.source_template === "training-plan-v2"
   );
+}
+
+export function isManualContentEditableActivePlanSourceKind(sourceKind: string | null | undefined) {
+  const normalizedSourceKind = sourceKind?.trim();
+
+  return Boolean(
+    normalizedSourceKind && MANUAL_CONTENT_COPY_ACTIVE_PLAN_SOURCE_KINDS.has(normalizedSourceKind),
+  );
+}
+
+export function isActivePlanWorkoutContentEditableSourceKind(
+  sourceKind: string | null | undefined,
+  activePlan?: PersistedPlanCycleRow | null,
+) {
+  return isEditableActivePlanSourceKind(sourceKind, activePlan);
+}
+
+function isSupportedActivePlanWorkoutEditOperation(
+  sourceKind: string,
+  activePlan: PersistedPlanCycleRow,
+  operation: ActivePlanWorkoutEditOperation,
+) {
+  if (operation === "copy_workout") {
+    return isManualContentEditableActivePlanSourceKind(sourceKind);
+  }
+
+  if (operation === "edit_workout") {
+    return isActivePlanWorkoutContentEditableSourceKind(sourceKind, activePlan);
+  }
+
+  return isEditableActivePlanSourceKind(sourceKind, activePlan);
 }
 
 export function resolveActivePlanSourceStatus(activePlan: PersistedPlanCycleRow) {

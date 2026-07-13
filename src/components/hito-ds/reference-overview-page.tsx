@@ -135,7 +135,7 @@ export function HitoDsOverviewPage() {
           <ReferenceListRow
             label="Compatibility"
             title="Wrapper imports and exports remain stable."
-            body="Dialog, sheet, dropdown, select, card, progress, and related ui wrapper exports keep their existing API, keyboard, focus, portal, and controlled/uncontrolled behavior."
+            body="Dialog, sheet, dropdown menu, and select wrapper exports keep their existing API, keyboard, focus, portal, and controlled/uncontrolled behavior. Card, progress, and sidebar chrome now live in Hito CSS recipes instead of generic ui wrapper files."
           />
           <ReferenceListRow
             label="Defaults"
@@ -175,7 +175,7 @@ export function HitoDsOverviewPage() {
           <ReferenceListRow
             label="Temporary"
             title="Compatibility wrappers stay small"
-            body="Radix/shadcn wrapper exports remain stable while their default visuals continue moving under Hito DS ownership."
+            body="Only behavior-bearing wrapper exports remain. Generic wrapper residue should be deleted once product surfaces move to Hito DS classes or focused primitives."
           />
         </div>
       </section>

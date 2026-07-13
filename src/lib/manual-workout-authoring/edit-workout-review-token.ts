@@ -12,6 +12,7 @@ import type {
   ManualWorkoutDraftReviewResult,
   ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
+import { safeTokenEqual } from "@/lib/review-token-signing";
 
 export const MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION =
   "manual_workout_persisted_edit_review_v1" as const;
@@ -61,18 +62,7 @@ export function buildExpectedPersistedEditReviewToken(reviewChecksum: string) {
   return `${MANUAL_WORKOUT_EDIT_REVIEW_TOKEN_PREFIX}${reviewChecksum}`;
 }
 
-export function safeManualWorkoutEditReviewTokenEqual(left: string, right: string) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
-}
+export const safeManualWorkoutEditReviewTokenEqual = safeTokenEqual;
 
 export function buildManualWorkoutEditMetadata(review: ManualWorkoutPersistedEditReview) {
   return {

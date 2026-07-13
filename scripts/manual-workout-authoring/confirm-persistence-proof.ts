@@ -9,9 +9,14 @@ import {
   validateManualWorkoutReviewExactness,
   type ManualWorkoutConfirmResult,
   type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
 } from "../../src/lib/manual-workout-authoring";
 import type { AdditionalPlanPersistenceMetadata } from "../../src/lib/plan-authoring-snapshot";
+import {
+  assertManualBlockedResult,
+  assertNoFakePaceOrHrInSerialized,
+  formatJsonResult,
+} from "./move-proof-assertions";
+import { assertReady, buildReviewConfirmInput } from "./move-proof-fixtures";
 
 type ConfirmDependencies = NonNullable<Parameters<typeof confirmManualWorkoutDraftForUser>[2]>;
 
@@ -75,13 +80,13 @@ async function validateManualConfirmPersistenceContract() {
 
   const success = await confirmManualWorkoutDraftForUser(
     userId,
-    buildConfirmInput(input, reviewed),
+    buildReviewConfirmInput(input, reviewed),
     buildFakeConfirmDependencies({
       onPersist: (record) => persisted.push(record),
     }),
   );
 
-  assert.equal(success.ok, true, formatConfirmResult(success));
+  assert.equal(success.ok, true, formatJsonResult(success));
   if (success.ok) {
     assert.equal(success.persisted, true);
     assert.equal(success.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
@@ -107,7 +112,7 @@ async function validateManualConfirmPersistenceContract() {
     "easy_aerobic_run",
   );
   assertNumericV2Segments(persistedRecord.canonicalPlan, "persisted manual plan");
-  assertNoFakePaceOrHrInTrainingPlan(persistedRecord.canonicalPlan, "persisted manual plan");
+  assertNoFakePaceOrHrInSerialized(persistedRecord.canonicalPlan, "persisted manual plan");
   assertManualPersistenceMetadata(
     persistedRecord.metadata,
     reviewed.reviewChecksum,
@@ -116,21 +121,21 @@ async function validateManualConfirmPersistenceContract() {
 
   const changedDate = await confirmManualWorkoutDraftForUser(
     userId,
-    buildConfirmInput({ ...input, workoutDate: "2026-06-17" }, reviewed),
+    buildReviewConfirmInput({ ...input, workoutDate: "2026-06-17" }, reviewed),
     buildFakeConfirmDependencies(),
   );
   assertConfirmBlocked(changedDate, "stale_review", "changed date");
 
   const changedTemplate = await confirmManualWorkoutDraftForUser(
     userId,
-    buildConfirmInput({ ...input, templateKey: "steady_aerobic_run" }, reviewed),
+    buildReviewConfirmInput({ ...input, templateKey: "steady_aerobic_run" }, reviewed),
     buildFakeConfirmDependencies(),
   );
   assertConfirmBlocked(changedTemplate, "stale_review", "changed template");
 
   const changedEntries = await confirmManualWorkoutDraftForUser(
     userId,
-    buildConfirmInput(
+    buildReviewConfirmInput(
       {
         ...input,
         entries: [
@@ -149,7 +154,7 @@ async function validateManualConfirmPersistenceContract() {
   const invalidToken = await confirmManualWorkoutDraftForUser(
     userId,
     {
-      ...buildConfirmInput(input, reviewed),
+      ...buildReviewConfirmInput(input, reviewed),
       reviewToken: `${reviewed.reviewToken.slice(0, -1)}${
         reviewed.reviewToken.endsWith("0") ? "1" : "0"
       }`,
@@ -161,7 +166,7 @@ async function validateManualConfirmPersistenceContract() {
   const staleChecksum = await confirmManualWorkoutDraftForUser(
     userId,
     {
-      ...buildConfirmInput(input, reviewed),
+      ...buildReviewConfirmInput(input, reviewed),
       reviewChecksum: "0".repeat(64),
     },
     buildFakeConfirmDependencies(),
@@ -170,7 +175,7 @@ async function validateManualConfirmPersistenceContract() {
 
   const protectedDate = await confirmManualWorkoutDraftForUser(
     userId,
-    buildConfirmInput(
+    buildReviewConfirmInput(
       {
         ...input,
         context: {
@@ -186,7 +191,7 @@ async function validateManualConfirmPersistenceContract() {
 
   const activePlanConflict = await confirmManualWorkoutDraftForUser(
     userId,
-    buildConfirmInput(input, reviewed),
+    buildReviewConfirmInput(input, reviewed),
     buildFakeConfirmDependencies({
       activePlan: { id: "active-plan-id" },
     }),
@@ -199,7 +204,7 @@ async function validateManualConfirmPersistenceContract() {
   });
   const restOnly = await confirmManualWorkoutDraftForUser(
     userId,
-    buildConfirmInput({ templateKey: "rest_day", workoutDate: "2026-06-15" }, restReview),
+    buildReviewConfirmInput({ templateKey: "rest_day", workoutDate: "2026-06-15" }, restReview),
     buildFakeConfirmDependencies(),
   );
   assertConfirmBlocked(restOnly, "manual_workout_required", "rest-only first plan");
@@ -207,7 +212,7 @@ async function validateManualConfirmPersistenceContract() {
   const clientRowsAttempt = await confirmManualWorkoutDraftForUser(
     userId,
     {
-      ...buildConfirmInput(input, reviewed),
+      ...buildReviewConfirmInput(input, reviewed),
       canonicalPlan: persistedRecord.canonicalPlan,
     },
     buildFakeConfirmDependencies(),
@@ -216,39 +221,13 @@ async function validateManualConfirmPersistenceContract() {
 
   const persistenceFailure = await confirmManualWorkoutDraftForUser(
     userId,
-    buildConfirmInput(input, reviewed),
+    buildReviewConfirmInput(input, reviewed),
     buildFakeConfirmDependencies({ persistError: new Error("simulated insert failure") }),
   );
   assertConfirmBlocked(persistenceFailure, "persistence_failed", "persistence failure");
 
-  const exactness = validateManualWorkoutReviewExactness(buildConfirmInput(input, reviewed));
+  const exactness = validateManualWorkoutReviewExactness(buildReviewConfirmInput(input, reviewed));
   assert.equal(exactness.ok, true);
-}
-
-function assertReady(
-  label: string,
-  input: ManualWorkoutDraftInput,
-): Extract<ManualWorkoutDraftReviewResult, { ok: true }> {
-  const result = reviewManualWorkoutDraft(input);
-
-  assert.equal(result.ok, true, `${label} should be accepted: ${formatResult(result)}`);
-  assert.equal(result.status, "draft_ready");
-  assert.equal(result.draft.persisted, false);
-  assert.equal(result.reviewToken.startsWith("manual-workout-review-v1."), true);
-  assert.equal(result.reviewChecksum.length, 64);
-
-  return result;
-}
-
-function buildConfirmInput(
-  draftInput: unknown,
-  review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>,
-) {
-  return {
-    draftInput,
-    reviewToken: review.reviewToken,
-    reviewChecksum: review.reviewChecksum,
-  };
 }
 
 function buildFakeConfirmDependencies(
@@ -291,13 +270,7 @@ function assertConfirmBlocked(
   reason: Extract<ManualWorkoutConfirmResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(result.ok, false, `${label} should be blocked: ${formatConfirmResult(result)}`);
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
+  assertManualBlockedResult(result, reason, label);
 }
 
 function assertNumericV2Segments(plan: TrainingPlanV2, label: string) {
@@ -317,21 +290,6 @@ function assertNumericV2Segments(plan: TrainingPlanV2, label: string) {
       );
     }
   }
-}
-
-function assertNoFakePaceOrHrInTrainingPlan(plan: TrainingPlanV2, label: string) {
-  const serialized = JSON.stringify(plan);
-
-  assert.doesNotMatch(
-    serialized,
-    /paceMinPerKmRange|pace_min_per_km_range|"pace"/i,
-    `${label} should not include fake pace truth.`,
-  );
-  assert.doesNotMatch(
-    serialized,
-    /personal_hr_zone|hrBpmRange|hr_bpm_range/i,
-    `${label} should not include fake personal HR truth.`,
-  );
 }
 
 function assertManualPersistenceMetadata(
@@ -365,12 +323,4 @@ function assertManualPersistenceMetadata(
   assert.equal(manualMetadata?.row_count, 1);
   assert.equal(manualMetadata?.review_checksum, reviewChecksum);
   assert.equal(manualMetadata?.metric_truth_mode, "structure_only");
-}
-
-function formatResult(result: ManualWorkoutDraftReviewResult) {
-  return JSON.stringify(result, null, 2);
-}
-
-function formatConfirmResult(result: ManualWorkoutConfirmResult) {
-  return JSON.stringify(result, null, 2);
 }

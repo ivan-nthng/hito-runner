@@ -541,6 +541,11 @@ function repeatEntry(group: {
 }): ManualWorkoutConstructorEntryInput {
   return {
     kind: "repeat_group",
-    group,
+    group: {
+      ...group,
+      children: [group.workBlock, group.recoveryBlock].filter(
+        (block): block is ManualWorkoutBlockInput => Boolean(block),
+      ),
+    },
   };
 }

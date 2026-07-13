@@ -22,6 +22,7 @@ type HitoCalendarActionVisual = {
   tone?: "signal" | "muted" | "warning" | "rollout";
   button?: "secondary" | "ghost" | "icon-ghost" | "outlined";
   visual?: "pill" | "button";
+  visualButton?: "secondary" | "ghost";
   disabled?: boolean;
   ariaLabel?: string;
   focusDemo?: boolean;
@@ -619,14 +620,18 @@ function ActionVisual({
   }
 
   if (action.visual === "button") {
+    const buttonVisual = action.visualButton ?? "secondary";
+
     return (
       <span
         className={cn(
-          "hito-button hito-button-secondary hito-button-xs pointer-events-none",
+          "hito-button hito-button-xs pointer-events-none",
+          buttonVisual === "ghost" ? "hito-button-ghost" : "hito-button-secondary",
           compact && "px-2",
         )}
         aria-hidden="true"
         data-demo-state={action.focusDemo ? "focus" : undefined}
+        data-hito-calendar-action-button={buttonVisual}
         data-tone={action.tone}
       >
         {action.icon ? <Icon name={action.icon} size="xs" /> : null}

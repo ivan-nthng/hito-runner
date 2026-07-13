@@ -16,6 +16,7 @@ import {
   ADMIN_WORKSPACE_NAV_ITEMS,
   type AdminWorkspaceSectionId,
 } from "@/components/admin/admin-workspace-nav-model";
+import { ThemePreferenceMenuItems } from "@/components/settings/theme-preference-controls";
 
 export function AdminWorkspaceSidebar({
   activeSection,
@@ -177,6 +178,11 @@ function AdminWorkspaceAccountMenu({
             Back to Hito
           </Link>
         </DropdownMenuItem>
+        <DropdownMenuSeparator className="hito-shell-menu-separator" />
+        <ThemePreferenceMenuItems
+          itemClassName="hito-shell-theme-menu-item"
+          labelClassName="hito-shell-theme-menu-label"
+        />
         <DropdownMenuSeparator className="hito-shell-menu-separator" />
         <LocalDevtoolMenuItem
           itemClassName="hito-shell-menu-item"

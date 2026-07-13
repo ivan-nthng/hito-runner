@@ -14,7 +14,6 @@ import {
   type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
-import { getRequestAuthContext } from "@/lib/backend/auth";
 import {
   fetchManualWorkoutEvidenceWorkoutIds,
   type ManualWorkoutActivePlanAddDependencies,
@@ -31,7 +30,8 @@ import {
 } from "@/lib/manual-workout-authoring/schema";
 import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
 import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
-import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
+import { safeTokenEqual } from "@/lib/review-token-signing";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
@@ -242,7 +242,7 @@ type PersistManualWorkoutDeleteClearInput = {
 export const reviewManualWorkoutDeleteClear = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDeleteClearReviewResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildDeleteClearBlocked({
@@ -257,7 +257,7 @@ export const reviewManualWorkoutDeleteClear = createServerFn({ method: "POST" })
 export const confirmManualWorkoutDeleteClear = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDeleteClearConfirmResult> => {
-    const userId = await getCurrentPersistedUserId();
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
 
     if (!userId) {
       return buildDeleteClearBlocked({
@@ -859,33 +859,6 @@ function buildDeleteClearBlocked(input: {
     sourceKind: null,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
-}
-
-async function getCurrentPersistedUserId() {
-  const auth = getRequestAuthContext();
-
-  if (!auth.userId) {
-    return null;
-  }
-
-  try {
-    return await getPersistedUserIdForAuthContext(auth);
-  } catch {
-    return null;
-  }
-}
-
-function safeTokenEqual(left: string, right: string) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
 }
 
 function asJsonRecord(value: unknown): Record<string, unknown> {

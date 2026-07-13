@@ -95,16 +95,27 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
     );
   }
 
+  const copyEditability = resolveActivePlanWorkoutEditability(activePlan, "copy_workout");
+  const contentEditability = resolveActivePlanWorkoutEditability(activePlan, "edit_workout");
   const supportsManualDraftReconstruction = !persistedManualWorkoutHasUnsafeMetricTruth(workout);
-  const reconstructableManualDraft = buildManualWorkoutDraftInputFromPersistedWorkout(
-    workout,
-    workout.workout_date < currentDate ? currentDate : workout.workout_date,
-    {
-      activePlanId: activePlan.id,
-      activePlanSourceKind: activePlan.source_kind,
-    },
-  );
-  const canCopyOrEditContent = supportsManualDraftReconstruction && reconstructableManualDraft.ok;
+  const canAttemptManualContentReconstruction = copyEditability.ok || contentEditability.ok;
+  const reconstructableManualDraft = canAttemptManualContentReconstruction
+    ? buildManualWorkoutDraftInputFromPersistedWorkout(
+        workout,
+        workout.workout_date < currentDate ? currentDate : workout.workout_date,
+        {
+          activePlanId: activePlan.id,
+          activePlanSourceKind: activePlan.source_kind,
+        },
+      ).ok
+    : false;
+  const canCopy =
+    copyEditability.ok && supportsManualDraftReconstruction && reconstructableManualDraft;
+  const canEditContent =
+    contentEditability.ok &&
+    supportsManualDraftReconstruction &&
+    reconstructableManualDraft &&
+    workout.workout_date > currentDate;
 
   if (workout.workout_date >= currentDate) {
     return allowedSourceEditing({
@@ -112,35 +123,39 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
         workout.workout_date === currentDate
           ? "eligible_current_unlogged"
           : "eligible_future_unlogged",
-      canCopyOrEditContent,
+      canCopy,
+      canEditContent,
     });
   }
 
   return allowedSourceEditing({
     eligibility: "eligible_past_unlogged",
-    canCopyOrEditContent: false,
+    canCopy: false,
+    canEditContent: false,
   });
 }
 
 function allowedSourceEditing({
   eligibility,
-  canCopyOrEditContent,
+  canCopy,
+  canEditContent,
 }: {
   eligibility: Exclude<ActivePlanWorkoutSourceEditingEligibility, "blocked">;
-  canCopyOrEditContent: boolean;
+  canCopy: boolean;
+  canEditContent: boolean;
 }): ActivePlanWorkoutSourceEditingCapabilities {
   return {
     canMove: true,
     canClear: true,
-    canCopy: canCopyOrEditContent,
-    canEditContent: canCopyOrEditContent,
-    canDirectCopy: canCopyOrEditContent,
+    canCopy,
+    canEditContent,
+    canDirectCopy: canCopy,
     canDirectMove: true,
     canDragInitiate: true,
     eligibility,
     reason: null,
-    copyReason: canCopyOrEditContent ? null : "copy_requires_editor_support",
-    editContentReason: canCopyOrEditContent ? null : "edit_content_requires_editor_support",
+    copyReason: canCopy ? null : "copy_requires_editor_support",
+    editContentReason: canEditContent ? null : "edit_content_requires_editor_support",
     message: null,
   };
 }

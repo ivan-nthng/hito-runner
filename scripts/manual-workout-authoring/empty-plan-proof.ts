@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import type {
   EmptyActivePlanCreationInput,
-  ExistingPlanContext,
   PersistedPlanCycleRow,
-  PersistedPlannedWorkoutRow,
-  PersistedWorkoutLogRow,
 } from "../../src/lib/active-plan-persistence";
 import {
   MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
@@ -13,16 +10,18 @@ import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   addManualWorkoutToActivePlanForUser,
   createEmptyManualActivePlanForUser,
-  reviewManualWorkoutDraft,
   type ManualEmptyPlanCreateResult,
   type ManualEmptyPlanSetupInput,
-  type ManualWorkoutAddToActivePlanResult,
   type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
 } from "../../src/lib/manual-workout-authoring";
+import { assertManualBlockedResult, formatJsonResult } from "./move-proof-assertions";
+import {
+  assertReady,
+  buildFakeAddDependencies,
+  buildReviewConfirmInput,
+} from "./move-proof-fixtures";
 
 type EmptyPlanDependencies = NonNullable<Parameters<typeof createEmptyManualActivePlanForUser>[2]>;
-type AddDependencies = NonNullable<Parameters<typeof addManualWorkoutToActivePlanForUser>[2]>;
 
 export async function validateManualEmptyActivePlanCreationContract() {
   const userId = "00000000-0000-4000-8000-000000000401";
@@ -45,7 +44,7 @@ export async function validateManualEmptyActivePlanCreationContract() {
     }),
   );
 
-  assert.equal(success.ok, true, formatEmptyPlanResult(success));
+  assert.equal(success.ok, true, formatJsonResult(success));
   if (success.ok) {
     assert.equal(success.status, "created");
     assert.equal(success.persisted, true);
@@ -161,10 +160,12 @@ async function assertFirstAddWorksOnEmptyManualPlan(input: {
 
   const result = await addManualWorkoutToActivePlanForUser(
     input.userId,
-    buildConfirmInput(draftInput, reviewed),
+    buildReviewConfirmInput(draftInput, reviewed),
     buildFakeAddDependencies({
       activePlan: input.activePlan,
       workouts: [],
+      currentDate: "2026-06-12",
+      plannedWorkoutId: "33333333-3333-4333-8333-333333333401",
       onPersist: ({ workoutSeed, reviewMetadata }) => {
         persistedAdds.push({
           workoutDate: workoutSeed.workoutDate,
@@ -175,7 +176,7 @@ async function assertFirstAddWorksOnEmptyManualPlan(input: {
     }),
   );
 
-  assert.equal(result.ok, true, formatAddResult(result));
+  assert.equal(result.ok, true, formatJsonResult(result));
   if (result.ok) {
     assert.equal(result.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
     assert.equal(result.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
@@ -234,83 +235,6 @@ function buildFakeEmptyPlanDependencies(
   };
 }
 
-function buildFakeAddDependencies(input: {
-  activePlan: PersistedPlanCycleRow | null;
-  workouts: PersistedPlannedWorkoutRow[];
-  logsByWorkoutId?: Map<string, PersistedWorkoutLogRow>;
-  evidenceWorkoutIds?: Set<string>;
-  onPersist?: (record: {
-    workoutSeed: Parameters<NonNullable<AddDependencies["persistWorkoutAdd"]>>[0]["workoutSeed"];
-    reviewMetadata: Parameters<
-      NonNullable<AddDependencies["persistWorkoutAdd"]>
-    >[0]["reviewMetadata"];
-  }) => void;
-}): AddDependencies {
-  return {
-    currentDate: "2026-06-12",
-    getExistingPlanContextForUser: async () =>
-      ({
-        activePlan: input.activePlan,
-        existingWorkouts: {
-          workouts: input.workouts,
-          logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
-        },
-      }) satisfies ExistingPlanContext,
-    fetchEvidenceWorkoutIds: async () => input.evidenceWorkoutIds ?? new Set(),
-    persistWorkoutAdd: async (record) => {
-      input.onPersist?.({
-        workoutSeed: record.workoutSeed,
-        reviewMetadata: record.reviewMetadata,
-      });
-
-      return {
-        plannedWorkout: buildFakePlannedWorkout({
-          userId: record.userId,
-          planCycleId: record.activePlan.id,
-          id: "33333333-3333-4333-8333-333333333401",
-          date: record.workoutSeed.workoutDate,
-          displayOrder: record.workoutSeed.displayOrder,
-          title: record.workoutSeed.title,
-          workoutIdentity: record.workoutSeed.workoutIdentity,
-        }),
-        planCycle: {
-          ...record.activePlan,
-          end_date:
-            record.workoutSeed.workoutDate > record.activePlan.end_date
-              ? record.workoutSeed.workoutDate
-              : record.activePlan.end_date,
-        },
-      };
-    },
-  };
-}
-
-function assertReady(
-  label: string,
-  input: ManualWorkoutDraftInput,
-): Extract<ManualWorkoutDraftReviewResult, { ok: true }> {
-  const result = reviewManualWorkoutDraft(input);
-
-  assert.equal(result.ok, true, `${label} should be accepted: ${formatReviewResult(result)}`);
-  assert.equal(result.status, "draft_ready");
-  assert.equal(result.draft.persisted, false);
-  assert.equal(result.reviewToken.startsWith("manual-workout-review-v1."), true);
-  assert.equal(result.reviewChecksum.length, 64);
-
-  return result;
-}
-
-function buildConfirmInput(
-  draftInput: unknown,
-  review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>,
-) {
-  return {
-    draftInput,
-    reviewToken: review.reviewToken,
-    reviewChecksum: review.reviewChecksum,
-  };
-}
-
 function buildFakePlanCycle({
   userId,
   id,
@@ -361,78 +285,12 @@ function buildFakePlanCycle({
   };
 }
 
-function buildFakePlannedWorkout({
-  userId,
-  planCycleId,
-  id,
-  date,
-  displayOrder,
-  title = "Easy aerobic run",
-  notes = null,
-  weekday = "Tuesday",
-  workoutType = "easy",
-  sourceWorkoutType = "easy",
-  workoutFamily = "easy",
-  workoutIdentity = "easy_aerobic_run",
-  calendarIconKey = "easy",
-  metricMode = null,
-  steps = [],
-}: {
-  userId: string;
-  planCycleId: string;
-  id: string;
-  date: string;
-  displayOrder: number;
-  title?: string;
-  notes?: string | null;
-  weekday?: string;
-  workoutType?: PersistedPlannedWorkoutRow["workout_type"];
-  sourceWorkoutType?: string | null;
-  workoutFamily?: string | null;
-  workoutIdentity?: string | null;
-  calendarIconKey?: string | null;
-  metricMode?: PersistedPlannedWorkoutRow["metric_mode"];
-  steps?: PersistedPlannedWorkoutRow["steps"];
-}): PersistedPlannedWorkoutRow {
-  return {
-    id,
-    user_id: userId,
-    plan_cycle_id: planCycleId,
-    workout_date: date,
-    weekday,
-    week_number: 1,
-    phase: "Manual build",
-    workout_type: workoutType,
-    source_workout_id: `manual-${date}-easy_aerobic_run`,
-    source_workout_type: sourceWorkoutType,
-    workout_family: workoutFamily,
-    workout_identity: workoutIdentity,
-    calendar_icon_key: calendarIconKey,
-    goal_context: null,
-    metric_mode: metricMode,
-    title,
-    notes,
-    planned_rpe: null,
-    estimated_fatigue: null,
-    recovery_priority: null,
-    steps,
-    display_order: displayOrder,
-    created_at: "2026-06-12T00:00:00.000Z",
-  };
-}
-
 function assertEmptyPlanBlocked(
   result: ManualEmptyPlanCreateResult,
   reason: Extract<ManualEmptyPlanCreateResult, { ok: false }>["reason"],
   label: string,
 ) {
-  assert.equal(result.ok, false, `${label} should be blocked: ${formatEmptyPlanResult(result)}`);
-
-  if (!result.ok) {
-    assert.equal(result.status, "blocked");
-    assert.equal(result.persisted, false);
-    assert.equal(result.reason, reason, `${label} should fail with ${reason}.`);
-  }
+  assertManualBlockedResult(result, reason, label);
 }
 
 function readNestedString(value: unknown, path: string[]) {
@@ -457,16 +315,4 @@ function readNestedValue(value: unknown, path: string[]) {
   }
 
   return current;
-}
-
-function formatEmptyPlanResult(result: ManualEmptyPlanCreateResult) {
-  return JSON.stringify(result, null, 2);
-}
-
-function formatReviewResult(result: ManualWorkoutDraftReviewResult) {
-  return JSON.stringify(result, null, 2);
-}
-
-function formatAddResult(result: ManualWorkoutAddToActivePlanResult) {
-  return JSON.stringify(result, null, 2);
 }

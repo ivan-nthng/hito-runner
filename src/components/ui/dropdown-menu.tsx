@@ -27,7 +27,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      "hito-ui-menu-item flex cursor-default select-none items-center gap-2 px-2 py-1.5 outline-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      "hito-ui-menu-item flex cursor-pointer select-none items-center gap-2 px-2 py-1.5 outline-none data-[disabled]:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
       inset && "pl-8",
       className,
     )}
@@ -86,7 +86,7 @@ const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "hito-ui-menu-item relative flex cursor-default select-none items-center gap-2 px-2 py-1.5 outline-none transition-colors data-[disabled]:pointer-events-none [&>svg]:size-4 [&>svg]:shrink-0",
+      "hito-ui-menu-item relative flex cursor-pointer select-none items-center gap-2 px-2 py-1.5 outline-none transition-colors data-[disabled]:cursor-not-allowed [&>svg]:size-4 [&>svg]:shrink-0",
       inset && "pl-8",
       className,
     )}
@@ -102,7 +102,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
-      "hito-ui-menu-item relative flex cursor-default select-none items-center py-1.5 pl-8 pr-2 outline-none transition-colors data-[disabled]:pointer-events-none",
+      "hito-ui-menu-item relative flex cursor-pointer select-none items-center py-1.5 pl-8 pr-2 outline-none transition-colors data-[disabled]:cursor-not-allowed",
       className,
     )}
     checked={checked}
@@ -125,7 +125,7 @@ const DropdownMenuRadioItem = React.forwardRef<
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      "hito-ui-menu-item relative flex cursor-default select-none items-center py-1.5 pl-8 pr-2 outline-none transition-colors data-[disabled]:pointer-events-none",
+      "hito-ui-menu-item relative flex cursor-pointer select-none items-center py-1.5 pl-8 pr-2 outline-none transition-colors data-[disabled]:cursor-not-allowed",
       className,
     )}
     {...props}

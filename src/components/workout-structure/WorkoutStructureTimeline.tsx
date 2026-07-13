@@ -25,12 +25,14 @@ export interface WorkoutStructureTimelineItem {
 
 export function WorkoutStructureTimeline({
   ariaLabel = "Workout structure",
+  density = "default",
   emptyState,
   items,
   label = "Workout structure",
   summary,
 }: {
   ariaLabel?: string;
+  density?: "default" | "compact";
   emptyState?: {
     badge: string;
     copy: string;
@@ -47,7 +49,12 @@ export function WorkoutStructureTimeline({
     : null;
 
   return (
-    <div>
+    <div
+      className={cn(
+        "hito-workout-structure-timeline",
+        density === "compact" && "hito-workout-structure-timeline-compact",
+      )}
+    >
       <div className="flex items-center justify-between gap-3 mb-3">
         <span className="hito-label">{label}</span>
         <span className="hito-caption font-mono-num">{summary}</span>

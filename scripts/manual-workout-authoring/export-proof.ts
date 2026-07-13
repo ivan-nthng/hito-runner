@@ -3,13 +3,7 @@ import type {
   PersistedPlanCycleRow,
   PersistedPlannedWorkoutRow,
 } from "../../src/lib/active-plan-persistence";
-import { buildImportedPlanSeed, importedPlanSchema } from "../../src/lib/imported-plan";
-import {
-  buildManualWorkoutUserBuiltTrainingPlan,
-  reviewManualWorkoutDraft,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
-} from "../../src/lib/manual-workout-authoring";
+import { importedPlanSchema } from "../../src/lib/imported-plan";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
@@ -20,7 +14,12 @@ import {
   renderPlanExportJson,
   renderPlanExportMarkdown,
 } from "../../src/lib/plan-export";
-import { buildPersistedWorkoutInsertRows } from "../../src/lib/persisted-plan-replacement";
+import { assertNoFakePaceOrHrInSerialized } from "./move-proof-assertions";
+import {
+  assertReady,
+  buildCanonicalPersistedPlannedWorkoutFromReview,
+  buildFakePlanCycle,
+} from "./move-proof-fixtures";
 
 export function validateManualActivePlanExportContract() {
   const userId = "00000000-0000-4000-8000-000000000601";
@@ -188,107 +187,6 @@ export function validateManualActivePlanExportContract() {
   );
 }
 
-function assertReady(
-  label: string,
-  input: ManualWorkoutDraftInput,
-): Extract<ManualWorkoutDraftReviewResult, { ok: true }> {
-  const result = reviewManualWorkoutDraft(input);
-
-  assert.equal(result.ok, true, `${label} should be accepted: ${formatResult(result)}`);
-  assert.equal(result.status, "draft_ready");
-  assert.equal(result.draft.persisted, false);
-
-  if (!result.ok) {
-    throw new Error(`${label} unexpectedly rejected.`);
-  }
-
-  return result;
-}
-
-function buildCanonicalPersistedPlannedWorkoutFromReview({
-  userId,
-  planCycleId,
-  id,
-  review,
-}: {
-  userId: string;
-  planCycleId: string;
-  id: string;
-  review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-}): PersistedPlannedWorkoutRow {
-  const canonicalPlan = buildManualWorkoutUserBuiltTrainingPlan(review.draft);
-  const importedSeed = buildImportedPlanSeed(canonicalPlan);
-  const [insertRow] = buildPersistedWorkoutInsertRows(planCycleId, userId, importedSeed.workouts);
-
-  assert.ok(insertRow, "canonical persisted workout fixture should produce one insert row");
-
-  return {
-    id,
-    created_at: "2026-06-10T00:00:00.000Z",
-    ...insertRow,
-  } satisfies PersistedPlannedWorkoutRow;
-}
-
-function buildFakePlanCycle({
-  userId,
-  id,
-  sourceKind,
-  startDate,
-  endDate,
-}: {
-  userId: string;
-  id: string;
-  sourceKind: string | null;
-  startDate: string;
-  endDate: string;
-}): PersistedPlanCycleRow {
-  const isManualPlan = sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-
-  return {
-    id,
-    user_id: userId,
-    status: "active",
-    title: "Manual user-built plan",
-    goal_summary: "Manual user-built plan",
-    source_template: "training-plan-v2",
-    schema_version: "training-plan-v2",
-    source_kind: sourceKind,
-    start_date: startDate,
-    end_date: endDate,
-    target_date: null,
-    goal_metadata: isManualPlan
-      ? {
-          manual_user_built_plan: {
-            source_kind: sourceKind,
-            source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-          },
-        }
-      : {},
-    plan_preferences: isManualPlan
-      ? {
-          manual_workout_authoring_reviews: [],
-        }
-      : {},
-    created_at: "2026-06-10T00:00:00.000Z",
-    updated_at: "2026-06-10T00:00:00.000Z",
-  };
-}
-
-function assertNoFakePaceOrHrInSerialized(value: unknown, label: string) {
-  const serialized = JSON.stringify(value);
-
-  assert.doesNotMatch(
-    serialized,
-    /paceMinPerKmRange|pace_min_per_km_range|"pace"/i,
-    `${label} should not include fake pace truth.`,
-  );
-  assert.doesNotMatch(
-    serialized,
-    /personal_hr_zone|hrBpmRange|hr_bpm_range/i,
-    `${label} should not include fake personal HR truth.`,
-  );
-}
-
 function assertNoPrivateManualExportData(
   serialized: string,
   userId: string,
@@ -324,8 +222,4 @@ function assertNoUuid(value: string, label: string) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function formatResult(result: ManualWorkoutDraftReviewResult) {
-  return JSON.stringify(result, null, 2);
 }

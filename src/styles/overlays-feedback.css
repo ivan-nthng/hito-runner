@@ -121,7 +121,7 @@
 
   .hito-ui-menu-item[data-disabled] {
     color: color-mix(in oklch, var(--color-muted-foreground) 58%, transparent);
-    cursor: default;
+    cursor: not-allowed;
     opacity: 1;
   }
 
@@ -160,6 +160,12 @@
       box-shadow 160ms ease;
   }
 
+  .hito-ui-select-trigger-sm {
+    min-height: 2rem;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+  }
+
   .hito-ui-select-trigger:hover,
   .hito-ui-select-trigger[data-demo-state="hover"] {
     border-color: color-mix(in oklch, var(--color-foreground) 20%, transparent);
@@ -181,7 +187,7 @@
   .hito-ui-select-trigger:disabled {
     background: color-mix(in oklch, var(--color-muted) 26%, transparent);
     color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
-    cursor: default;
+    cursor: not-allowed;
     opacity: 1;
   }
 

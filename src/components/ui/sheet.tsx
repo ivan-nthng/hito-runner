@@ -61,7 +61,7 @@ const SheetContent = React.forwardRef<
   <SheetPortal>
     <SheetOverlay />
     <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-      <SheetPrimitive.Close className="hito-ui-sheet-close absolute right-4 top-4 disabled:pointer-events-none">
+      <SheetPrimitive.Close className="hito-ui-sheet-close absolute right-4 top-4 cursor-pointer disabled:cursor-not-allowed">
         <Icon name="close" size="sm" />
         <span className="sr-only">Close</span>
       </SheetPrimitive.Close>

@@ -5,18 +5,15 @@ import type {
   PersistedWorkoutLogRow,
 } from "../../src/lib/active-plan-persistence";
 import { resolveActivePlanWorkoutSourceEditingCapabilities } from "../../src/lib/active-plan-workout-editing/source-capabilities";
-import { buildImportedPlanSeed } from "../../src/lib/imported-plan";
+import { type ManualWorkoutDraftInput } from "../../src/lib/manual-workout-authoring";
+import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../../src/lib/manual-workout-authoring/schema";
 import {
-  buildManualWorkoutUserBuiltTrainingPlan,
-  reviewManualWorkoutDraft,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
-} from "../../src/lib/manual-workout-authoring";
-import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-} from "../../src/lib/manual-workout-authoring/schema";
-import { buildPersistedWorkoutInsertRows } from "../../src/lib/persisted-plan-replacement";
+  assertReady,
+  buildCanonicalPersistedPlannedWorkoutFromReview,
+  buildFakePlanCycle,
+  buildFakePlannedWorkout,
+  buildFakeWorkoutLog,
+} from "./move-proof-fixtures";
 
 export function validateManualSourceEditingCapabilityReadback() {
   const userId = "00000000-0000-4000-8000-000000000020";
@@ -148,6 +145,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     ...futureWorkout,
     id: "00000000-0000-4000-8000-000000000024",
     source_workout_type: "legacy_freeform_workout",
+    workout_identity: "legacy_freeform_workout",
+    workout_family: "unknown",
   } satisfies PersistedPlannedWorkoutRow;
   const unsupportedCapability = resolveActivePlanWorkoutSourceEditingCapabilities({
     activePlan,
@@ -300,14 +299,14 @@ export function validateManualSourceEditingCapabilityReadback() {
       canMove: true,
       canClear: true,
       canCopy: true,
-      canEditContent: true,
+      canEditContent: false,
       canDirectCopy: true,
       canDirectMove: true,
       canDragInitiate: true,
       eligibility: "eligible_current_unlogged",
       reason: null,
     },
-    "today unlogged manual source rows should expose direct copy/move/drag source capability",
+    "today unlogged manual source rows should expose copy/move/drag but not persisted content edit",
   );
 
   const presetPlan = buildFakePlanCycle({
@@ -331,12 +330,12 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     {
       canClear: true,
-      canCopy: true,
+      canCopy: false,
       canEditContent: true,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "editable active-plan sources should expose row lifecycle affordances regardless of source kind",
+    "generated active-plan sources should expose content edit when the row reconstructs safely",
   );
 
   const selectedPlan = buildFakePlanCycle({
@@ -377,179 +376,68 @@ export function validateManualSourceEditingCapabilityReadback() {
     {
       canClear: true,
       canCopy: false,
+      canEditContent: true,
+      canMove: true,
+      eligibility: "eligible_future_unlogged",
+    },
+    "selected-plan generated rows should expose content edit when rich identity reconstructs safely",
+  );
+
+  const importedPlan = buildFakePlanCycle({
+    userId,
+    id: "00000000-0000-4000-8000-000000000032",
+    sourceKind: "training_plan_v2_import",
+    startDate: "2026-06-01",
+    endDate: "2026-06-30",
+  });
+  const importedWorkout = {
+    ...selectedWorkout,
+    id: "00000000-0000-4000-8000-000000000033",
+    plan_cycle_id: importedPlan.id,
+    source_workout_type: "imported_steady_run",
+    workout_identity: "steady_aerobic_run",
+  } satisfies PersistedPlannedWorkoutRow;
+  assertSourceEditingAllowed(
+    resolveActivePlanWorkoutSourceEditingCapabilities({
+      activePlan: importedPlan,
+      workout: importedWorkout,
+      log: null,
+      evidenceWorkoutIds: new Set(),
+      currentDate,
+    }),
+    {
+      canClear: true,
+      canCopy: false,
+      canEditContent: true,
+      canMove: true,
+      eligibility: "eligible_future_unlogged",
+    },
+    "training-plan-v2 import rows should expose content edit when workout_identity reconstructs safely",
+  );
+
+  const unsupportedGeneratedWorkout = {
+    ...selectedWorkout,
+    id: "00000000-0000-4000-8000-000000000034",
+    source_workout_type: "generated_freeform_workout",
+    workout_identity: "unmapped_generated_workout",
+  } satisfies PersistedPlannedWorkoutRow;
+  assertSourceEditingAllowed(
+    resolveActivePlanWorkoutSourceEditingCapabilities({
+      activePlan: selectedPlan,
+      workout: unsupportedGeneratedWorkout,
+      log: null,
+      evidenceWorkoutIds: new Set(),
+      currentDate,
+    }),
+    {
+      canClear: true,
+      canCopy: false,
       canEditContent: false,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "selected-plan generated rows should expose move/clear while copy/content edit stay editor-gated",
+    "generated rows without reconstructable template identity should keep content edit blocked",
   );
-}
-
-function assertReady(
-  label: string,
-  input: ManualWorkoutDraftInput,
-): Extract<ManualWorkoutDraftReviewResult, { ok: true }> {
-  const result = reviewManualWorkoutDraft(input);
-
-  assert.equal(result.ok, true, `${label} should be accepted: ${formatResult(result)}`);
-  assert.equal(result.status, "draft_ready");
-  assert.equal(result.draft.persisted, false);
-  assert.equal(result.reviewToken.startsWith("manual-workout-review-v1."), true);
-  assert.equal(result.reviewChecksum.length, 64);
-
-  return result;
-}
-
-function buildCanonicalPersistedPlannedWorkoutFromReview({
-  userId,
-  planCycleId,
-  id,
-  review,
-}: {
-  userId: string;
-  planCycleId: string;
-  id: string;
-  review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-}): PersistedPlannedWorkoutRow {
-  const canonicalPlan = buildManualWorkoutUserBuiltTrainingPlan(review.draft);
-  const importedSeed = buildImportedPlanSeed(canonicalPlan);
-  const [insertRow] = buildPersistedWorkoutInsertRows(planCycleId, userId, importedSeed.workouts);
-
-  assert.ok(insertRow, "canonical persisted workout fixture should produce one insert row");
-
-  return {
-    id,
-    created_at: "2026-06-10T00:00:00.000Z",
-    ...insertRow,
-  } satisfies PersistedPlannedWorkoutRow;
-}
-
-function buildFakePlanCycle({
-  userId,
-  id,
-  sourceKind,
-  startDate,
-  endDate,
-}: {
-  userId: string;
-  id: string;
-  sourceKind: string | null;
-  startDate: string;
-  endDate: string;
-}): PersistedPlanCycleRow {
-  const isManualPlan = sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-
-  return {
-    id,
-    user_id: userId,
-    status: "active",
-    title: "Manual user-built plan",
-    goal_summary: "Manual user-built plan",
-    source_template: "training-plan-v2",
-    schema_version: "training-plan-v2",
-    source_kind: sourceKind,
-    start_date: startDate,
-    end_date: endDate,
-    target_date: null,
-    goal_metadata: isManualPlan
-      ? {
-          manual_user_built_plan: {
-            source_kind: sourceKind,
-            source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-          },
-        }
-      : {},
-    plan_preferences: isManualPlan
-      ? {
-          manual_workout_authoring_reviews: [],
-        }
-      : {},
-    created_at: "2026-06-10T00:00:00.000Z",
-    updated_at: "2026-06-10T00:00:00.000Z",
-  };
-}
-
-function buildFakePlannedWorkout({
-  userId,
-  planCycleId,
-  id,
-  date,
-  displayOrder,
-  title = "Easy aerobic run",
-  notes = null,
-  weekday = "Tuesday",
-  workoutType = "easy",
-  sourceWorkoutType = "easy",
-  workoutFamily = "easy",
-  workoutIdentity = "easy_aerobic_run",
-  calendarIconKey = "easy",
-  metricMode = null,
-  steps = [],
-}: {
-  userId: string;
-  planCycleId: string;
-  id: string;
-  date: string;
-  displayOrder: number;
-  title?: string;
-  notes?: string | null;
-  weekday?: string;
-  workoutType?: PersistedPlannedWorkoutRow["workout_type"];
-  sourceWorkoutType?: string | null;
-  workoutFamily?: string | null;
-  workoutIdentity?: string | null;
-  calendarIconKey?: string | null;
-  metricMode?: PersistedPlannedWorkoutRow["metric_mode"];
-  steps?: PersistedPlannedWorkoutRow["steps"];
-}): PersistedPlannedWorkoutRow {
-  return {
-    id,
-    user_id: userId,
-    plan_cycle_id: planCycleId,
-    workout_date: date,
-    weekday,
-    week_number: 1,
-    phase: "Manual build",
-    workout_type: workoutType,
-    source_workout_id: `manual-${date}-easy_aerobic_run`,
-    source_workout_type: sourceWorkoutType,
-    workout_family: workoutFamily,
-    workout_identity: workoutIdentity,
-    calendar_icon_key: calendarIconKey,
-    goal_context: null,
-    metric_mode: metricMode,
-    title,
-    notes,
-    planned_rpe: null,
-    estimated_fatigue: null,
-    recovery_priority: null,
-    steps,
-    display_order: displayOrder,
-    created_at: "2026-06-10T00:00:00.000Z",
-  };
-}
-
-function buildFakeWorkoutLog({
-  userId,
-  plannedWorkoutId,
-}: {
-  userId: string;
-  plannedWorkoutId: string;
-}): PersistedWorkoutLogRow {
-  return {
-    id: "77777777-7777-4777-8777-777777777777",
-    user_id: userId,
-    planned_workout_id: plannedWorkoutId,
-    outcome: "completed",
-    actual_distance_km: 5,
-    actual_duration_min: 35,
-    rpe: 3,
-    notes: null,
-    body_notes: null,
-    intervals_completed: null,
-    logged_at: "2026-06-17T12:00:00.000Z",
-    updated_at: "2026-06-17T12:00:00.000Z",
-  };
 }
 
 function assertSourceEditingBlocked(
@@ -610,8 +498,4 @@ function assertSourceEditingAllowed(
     },
     label,
   );
-}
-
-function formatResult(result: ManualWorkoutDraftReviewResult) {
-  return JSON.stringify(result, null, 2);
 }

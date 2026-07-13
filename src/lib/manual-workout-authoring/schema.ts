@@ -172,16 +172,46 @@ export const manualWorkoutBlockInputSchema = z
 
 export type ManualWorkoutBlockInput = z.infer<typeof manualWorkoutBlockInputSchema>;
 
-export const manualWorkoutRepeatGroupInputSchema = z
-  .object({
-    repeatCount: z.number().int().min(2).max(50),
-    safetyKind: z.enum(MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES),
-    groupLabel: z.string().trim().min(1).max(120).optional(),
-    workBlock: manualWorkoutBlockInputSchema,
-    recoveryBlock: manualWorkoutBlockInputSchema.optional(),
-    nestedRepeatGroup: z.unknown().optional(),
-  })
-  .strict();
+function normalizeManualWorkoutRepeatGroupInput(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  const children = Array.isArray(record.children) ? record.children : [];
+
+  if (children.length > 0 && record.workBlock === undefined) {
+    return {
+      ...record,
+      workBlock: children[0],
+      children,
+    };
+  }
+
+  if (children.length === 0 && record.workBlock !== undefined) {
+    return {
+      ...record,
+      children: [record.workBlock, record.recoveryBlock].filter(Boolean),
+    };
+  }
+
+  return value;
+}
+
+export const manualWorkoutRepeatGroupInputSchema = z.preprocess(
+  normalizeManualWorkoutRepeatGroupInput,
+  z
+    .object({
+      repeatCount: z.number().int().min(2).max(50),
+      safetyKind: z.enum(MANUAL_WORKOUT_REPEAT_SAFETY_KIND_VALUES),
+      groupLabel: z.string().trim().min(1).max(120).optional(),
+      children: z.array(manualWorkoutBlockInputSchema).min(1).max(20).optional(),
+      workBlock: manualWorkoutBlockInputSchema,
+      recoveryBlock: manualWorkoutBlockInputSchema.optional(),
+      nestedRepeatGroup: z.unknown().optional(),
+    })
+    .strict(),
+);
 
 export type ManualWorkoutRepeatGroupInput = z.infer<typeof manualWorkoutRepeatGroupInputSchema>;
 

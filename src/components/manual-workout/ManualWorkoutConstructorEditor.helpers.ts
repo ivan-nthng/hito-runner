@@ -5,15 +5,10 @@ import type {
   ManualWorkoutRepeatGroupInput,
 } from "@/lib/manual-workout-authoring/schema";
 import {
-  formatDistanceMeters,
-  formatDurationMin,
-  segmentColorMeta,
-  type StepTarget,
-} from "@/lib/training";
-import type {
-  WorkoutStructureTimelineItem,
-  WorkoutStructureTimelineReadbackEntry,
-} from "@/components/workout-structure/WorkoutStructureTimeline";
+  getManualWorkoutRepeatGroupChildren,
+  isManualWorkoutRepeatRecoveryBlock,
+} from "@/lib/manual-workout-authoring/repeat-groups";
+import { blockLabel } from "@/components/manual-workout/ManualWorkoutTrainingBlockGrammar.model";
 
 export const BLOCK_MENU_GROUPS: Array<{ label: string; items: ManualWorkoutBlockKey[] }> = [
   { label: "Preparation", items: ["warmup_block", "drills_mobility_note_block"] },
@@ -38,15 +33,40 @@ export const BLOCK_MENU_GROUPS: Array<{ label: string; items: ManualWorkoutBlock
 
 export const REPEAT_COUNT_OPTIONS = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
 
-const DURATION_SECONDS_OPTIONS = [
-  15, 20, 30, 45, 60, 75, 90, 120, 180, 240, 300, 480, 600, 720, 900, 1200, 1500, 1800, 2400, 2700,
-  3600, 4500, 5400,
-];
+export type ManualWorkoutDropPosition = "before" | "after";
 
-const DISTANCE_METERS_OPTIONS = [
-  100, 200, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000, 3000, 4000, 5000, 8000, 10000, 12000,
-  16000, 20000,
-];
+export function manualWorkoutInsertionIndex(index: number, position: ManualWorkoutDropPosition) {
+  return position === "after" ? index + 1 : index;
+}
+
+export function manualWorkoutDragTargetIndex(
+  fromIndex: number,
+  insertionIndex: number,
+  total: number,
+) {
+  const boundedInsertionIndex = Math.max(0, Math.min(insertionIndex, total));
+  return fromIndex < boundedInsertionIndex ? boundedInsertionIndex - 1 : boundedInsertionIndex;
+}
+
+export function manualWorkoutActiveInsertionIndex({
+  fromIndex,
+  overIndex,
+  position,
+  total,
+}: {
+  fromIndex: number;
+  overIndex: number | null;
+  position: ManualWorkoutDropPosition;
+  total: number;
+}) {
+  if (overIndex == null) return null;
+
+  const insertionIndex = manualWorkoutInsertionIndex(overIndex, position);
+  const boundedInsertionIndex = Math.max(0, Math.min(insertionIndex, total));
+  const targetIndex = manualWorkoutDragTargetIndex(fromIndex, boundedInsertionIndex, total);
+
+  return targetIndex === fromIndex ? null : boundedInsertionIndex;
+}
 
 export function makeBlockEntry(
   blockKey: ManualWorkoutBlockKey,
@@ -58,14 +78,15 @@ export function makeBlockEntry(
 }
 
 export function makeRepeatEntry(): ManualWorkoutConstructorEntryInput {
+  const repeatedSection = makeDefaultBlock("easy_run_block");
+
   return {
     kind: "repeat_group",
     group: {
-      repeatCount: 6,
+      repeatCount: 3,
       safetyKind: "intervals",
-      groupLabel: "6 rounds repeat set",
-      workBlock: makeDefaultBlock("interval_work_block"),
-      recoveryBlock: makeDefaultBlock("interval_recovery_block"),
+      children: [repeatedSection],
+      workBlock: repeatedSection,
     },
   };
 }
@@ -143,280 +164,75 @@ export function makeDefaultBlock(blockKey: ManualWorkoutBlockKey): ManualWorkout
   return { blockKey, durationSeconds: 10 * 60, label: blockLabel(blockKey) };
 }
 
-export function timelineItemsForEntry(
-  entry: ManualWorkoutConstructorEntryInput,
-  entryIndex: number,
-): WorkoutStructureTimelineItem[] {
-  if (entry.kind === "repeat_group") {
-    const children = repeatGroupBlocks(entry.group);
-
-    return Array.from({ length: entry.group.repeatCount }).flatMap((_, roundIndex) =>
-      children.map((block, childIndex) =>
-        timelineItemForBlock(block, {
-          detailLabel: `${roundIndex + 1}/${entry.group.repeatCount} · ${blockSummary(block)}`,
-          id: `entry-${entryIndex}-repeat-${roundIndex}-child-${childIndex}`,
-          title: `${block.label ?? blockLabel(block.blockKey)} ${roundIndex + 1}/${entry.group.repeatCount}`,
-        }),
-      ),
-    );
-  }
-
-  return [timelineItemForBlock(entry.block, { id: `entry-${entryIndex}-block` })];
-}
-
-function timelineItemForBlock(
-  block: ManualWorkoutBlockInput,
-  {
-    detailLabel,
-    id,
-    title,
-  }: {
-    detailLabel?: string;
-    id: string;
-    title?: string;
-  },
-): WorkoutStructureTimelineItem {
-  const label = block.label ?? blockLabel(block.blockKey);
-  const metric = blockSummary(block);
-  const readbackEntries = blockTargetReadbackEntries(block);
-
-  return {
-    id,
-    kindLabel: label,
-    detailLabel: detailLabel ?? metric,
-    barLabel: compactBlockStructureBarLabel(block),
-    metric,
-    title: title ?? label,
-    semanticKind: blockSemanticKind(block),
-    target: blockTargetForTimeline(block),
-    weight: blockTimelineWeight(block),
-    readbackEntries,
-    tooltipReadbackEntries: readbackEntries,
-  };
-}
-
-function repeatGroupBlocks(group: ManualWorkoutRepeatGroupInput) {
-  return [group.workBlock, group.recoveryBlock].filter((block): block is ManualWorkoutBlockInput =>
-    Boolean(block),
+export function repeatGroupWithChildren(
+  group: ManualWorkoutRepeatGroupInput,
+  children: ManualWorkoutBlockInput[],
+): ManualWorkoutRepeatGroupInput {
+  const nextChildren = children.length ? children : [group.workBlock];
+  const previousChildren = getManualWorkoutRepeatGroupChildren(group);
+  const childrenChanged =
+    repeatChildSignature(previousChildren) !== repeatChildSignature(nextChildren);
+  const recoveryBlock = nextChildren.find((child) =>
+    isManualWorkoutRepeatRecoveryBlock(child.blockKey),
   );
-}
-
-export function entryDurationSeconds(entry: ManualWorkoutConstructorEntryInput) {
-  if (entry.kind === "repeat_group") {
-    return (
-      (blockDurationSeconds(entry.group.workBlock) +
-        (entry.group.recoveryBlock ? blockDurationSeconds(entry.group.recoveryBlock) : 0)) *
-      entry.group.repeatCount
-    );
-  }
-
-  return blockDurationSeconds(entry.block);
-}
-
-function blockDurationSeconds(block: ManualWorkoutBlockInput) {
-  return block.durationSeconds ?? 0;
-}
-
-export function entryDistanceMeters(entry: ManualWorkoutConstructorEntryInput) {
-  if (entry.kind === "repeat_group") {
-    return (
-      (blockDistanceMeters(entry.group.workBlock) +
-        (entry.group.recoveryBlock ? blockDistanceMeters(entry.group.recoveryBlock) : 0)) *
-      entry.group.repeatCount
-    );
-  }
-
-  return blockDistanceMeters(entry.block);
-}
-
-function blockDistanceMeters(block: ManualWorkoutBlockInput) {
-  return block.distanceMeters ?? 0;
-}
-
-function blockTimelineWeight(block: ManualWorkoutBlockInput) {
-  if (block.durationSeconds) return block.durationSeconds;
-  if (block.distanceMeters) return Math.max(block.distanceMeters / 10, 20);
-  return 20;
-}
-
-export function repeatGroupSummary(group: ManualWorkoutRepeatGroupInput) {
-  const children = [group.workBlock, group.recoveryBlock].filter(
-    (block): block is ManualWorkoutBlockInput => Boolean(block),
-  );
-  const childSummary = children.map(repeatChildSummary).join(" + ");
-  return `${group.repeatCount} rounds · ${childSummary}`;
-}
-
-export function blockSummary(block: ManualWorkoutBlockInput) {
-  if (block.durationSeconds) return formatDurationMin(block.durationSeconds / 60, "segment");
-  if (block.distanceMeters) return formatDistanceMeters(block.distanceMeters);
-  if (block.noteText) return block.noteText;
-  return "Structure";
-}
-
-function repeatChildSummary(block: ManualWorkoutBlockInput) {
-  const label = block.label ?? blockLabel(block.blockKey);
-  const summary = blockSummary(block);
-  return summary === "Structure" ? label : `${label} ${summary}`;
-}
-
-export function blockLabel(blockKey: string) {
-  if (blockKey === "warmup_block") return "Warm-up";
-  return readableToken(blockKey.replace(/_block$/, ""));
-}
-
-export function blockShortLabel(blockKey: string) {
-  if (blockKey === "warmup_block") return "WU";
-  if (blockKey === "cooldown_block") return "CD";
-  if (blockKey === "interval_work_block") return "Work";
-  if (blockKey === "interval_recovery_block") return "Rec";
-  if (blockKey === "rest_walk_jog_recovery_block") return "Jog";
-  if (blockKey === "long_run_body_block") return "Long";
-  if (blockKey === "long_run_finish_block") return "Finish";
-  if (blockKey.includes("note") || blockKey.includes("mobility")) return "Cue";
-  return readableToken(blockKey.replace(/_block$/, "")).split(" ")[0] ?? "Step";
-}
-
-function compactBlockStructureBarLabel(block: ManualWorkoutBlockInput) {
-  if (block.durationSeconds) return compactDurationLabel(block.durationSeconds / 60);
-  if (block.distanceMeters) return `${Math.round(block.distanceMeters)}m`;
-  return blockShortLabel(block.blockKey);
-}
-
-function compactDurationLabel(durationMin: number) {
-  const totalSeconds = Math.max(1, Math.round(durationMin * 60));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  if (minutes <= 0) {
-    return `${seconds}s`;
-  }
-
-  if (seconds === 0) {
-    return `${minutes}m`;
-  }
-
-  return `${minutes}m ${seconds}s`;
-}
-
-export function readableToken(value: string) {
-  return value
-    .split("_")
-    .map((part) => part[0]?.toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-export function blockColor(block: ManualWorkoutBlockInput) {
-  return segmentColorMeta(blockSemanticKind(block), blockTargetForTimeline(block)).color;
-}
-
-export function blockKeyColor(blockKey: ManualWorkoutBlockKey) {
-  return segmentColorMeta(blockSemanticKindForKey(blockKey)).color;
-}
-
-function blockSemanticKind(block: ManualWorkoutBlockInput) {
-  return `${blockSemanticKindForKey(block.blockKey)} ${block.label ?? ""}`.trim();
-}
-
-function blockSemanticKindForKey(blockKey: ManualWorkoutBlockKey) {
-  if (blockKey.includes("warmup")) return "warm up";
-  if (blockKey.includes("cooldown")) return "cooldown";
-  if (blockKey.includes("recovery")) return "recover";
-  if (blockKey.includes("walk")) return "walk";
-  if (blockKey.includes("long")) return "run";
-  if (
-    blockKey.includes("tempo") ||
-    blockKey.includes("threshold") ||
-    blockKey.includes("interval") ||
-    blockKey.includes("hill") ||
-    blockKey.includes("strides")
-  ) {
-    return "work";
-  }
-  if (blockKey.includes("finish")) return "finish";
-  if (blockKey.includes("note") || blockKey.includes("mobility")) return "warm up";
-  return "run";
-}
-
-function blockTargetForTimeline(block: ManualWorkoutBlockInput): StepTarget | undefined {
-  const target = block.target;
-  if (!target) return undefined;
-
-  return {
-    target_source: target.targetSource,
-    intensity: target.intensity,
-    label: target.label,
-    source_note: target.sourceNote,
-    pace: target.pace,
-    pace_min_per_km_range: target.paceMinPerKmRange,
-    hr_bpm_cap:
-      typeof target.hrBpmCap === "number"
-        ? target.hrBpmCap
-        : Number.isFinite(Number(target.hrBpmCap))
-          ? Number(target.hrBpmCap)
-          : undefined,
-    hr_bpm_range: target.hrBpmRange,
-    hr_target_source: target.hrTargetSource,
-    rpe: target.rpe,
-    cue: target.cue,
-    hint: target.hint,
+  const nextGroup: ManualWorkoutRepeatGroupInput = {
+    ...group,
+    children: nextChildren,
+    workBlock: nextChildren[0] ?? group.workBlock,
   };
+
+  if (recoveryBlock) {
+    nextGroup.recoveryBlock = recoveryBlock;
+  } else {
+    delete nextGroup.recoveryBlock;
+  }
+
+  if (childrenChanged) {
+    delete nextGroup.groupLabel;
+  }
+
+  return nextGroup;
 }
 
-function blockTargetReadbackEntries(
+function repeatChildSignature(children: ManualWorkoutBlockInput[]) {
+  return children
+    .map((child) =>
+      [
+        child.blockKey,
+        child.label ?? "",
+        child.durationSeconds ?? "",
+        child.distanceMeters ?? "",
+        child.noteText ?? "",
+      ].join(":"),
+    )
+    .join("|");
+}
+
+export function insertRepeatGroupChild(
+  group: ManualWorkoutRepeatGroupInput,
+  insertIndex: number,
   block: ManualWorkoutBlockInput,
-): WorkoutStructureTimelineReadbackEntry[] {
-  const target = block.target;
-  if (!target) return [];
-
-  const entries: WorkoutStructureTimelineReadbackEntry[] = [];
-  const pace = target.pace || target.paceMinPerKmRange;
-  if (pace) {
-    entries.push({
-      key: "pace",
-      label: target.label ?? "Your pace target",
-      value: pace,
-    });
-  }
-
-  const hrValue =
-    target.hrBpmCap != null
-      ? `${target.hrBpmCap} bpm cap`
-      : target.hrBpmRange
-        ? target.hrBpmRange
-        : null;
-  if (hrValue) {
-    entries.push({
-      key: "heart_rate",
-      label: target.label ?? "Your heart-rate target",
-      value: hrValue,
-    });
-  }
-
-  const rpeValue = joinTargetReadbackParts([
-    target.rpe != null && target.rpe !== "" ? `RPE ${target.rpe}` : null,
-    target.cue,
-  ]);
-  if (rpeValue || target.intensity) {
-    entries.push({
-      key: "rpe",
-      label: target.label ?? "Effort (RPE 0-10)",
-      value: rpeValue ?? target.intensity ?? "Runner-entered",
-    });
-  }
-
-  return entries;
+) {
+  const children = getManualWorkoutRepeatGroupChildren(group);
+  const nextChildren = [...children];
+  nextChildren.splice(Math.max(0, Math.min(insertIndex, nextChildren.length)), 0, block);
+  return repeatGroupWithChildren(group, nextChildren);
 }
 
-function joinTargetReadbackParts(parts: Array<string | null | undefined>) {
-  const visibleParts = parts
-    .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part));
-  return visibleParts.length ? visibleParts.join(" · ") : null;
-}
+export function moveRepeatGroupChild(
+  group: ManualWorkoutRepeatGroupInput,
+  fromIndex: number,
+  toIndex: number,
+) {
+  const children = getManualWorkoutRepeatGroupChildren(group);
+  if (toIndex < 0 || toIndex >= children.length) return group;
 
-export function isNoteBlock(blockKey: ManualWorkoutBlockKey) {
-  return blockKey === "drills_mobility_note_block" || blockKey === "coach_cue_note_block";
+  const nextChildren = [...children];
+  const [child] = nextChildren.splice(fromIndex, 1);
+  if (!child) return group;
+
+  nextChildren.splice(toIndex, 0, child);
+  return repeatGroupWithChildren(group, nextChildren);
 }
 
 export type ManualWorkoutQuantityMode = "duration" | "distance" | "none";
@@ -424,7 +240,7 @@ export type ManualWorkoutQuantityMode = "duration" | "distance" | "none";
 export const QUANTITY_MODE_OPTIONS: Array<{ label: string; value: ManualWorkoutQuantityMode }> = [
   { label: "Duration", value: "duration" },
   { label: "Distance", value: "distance" },
-  { label: "No quantity", value: "none" },
+  { label: "No duration", value: "none" },
 ];
 
 export function quantityModeForBlock(block: ManualWorkoutBlockInput): ManualWorkoutQuantityMode {
@@ -459,72 +275,6 @@ export function blockForQuantityMode(
     durationSeconds:
       block.durationSeconds ?? makeDefaultBlock(block.blockKey).durationSeconds ?? 600,
   };
-}
-
-export function blockWithQuantityValue(
-  block: ManualWorkoutBlockInput,
-  mode: ManualWorkoutQuantityMode,
-  value: string,
-): ManualWorkoutBlockInput {
-  if (mode === "distance") {
-    return {
-      ...block,
-      distanceMeters: value === "none" ? undefined : parsePositiveInteger(value),
-      durationSeconds: undefined,
-    };
-  }
-
-  if (mode === "none") {
-    return {
-      ...block,
-      distanceMeters: undefined,
-      durationSeconds: undefined,
-    };
-  }
-
-  return {
-    ...block,
-    distanceMeters: undefined,
-    durationSeconds: value === "none" ? undefined : parsePositiveInteger(value),
-  };
-}
-
-export function durationOptionsFor(currentValue: number | undefined) {
-  return optionsWithCurrentValue(DURATION_SECONDS_OPTIONS, currentValue, "No duration", (seconds) =>
-    formatDurationMin(seconds / 60, "segment"),
-  );
-}
-
-export function distanceOptionsFor(currentValue: number | undefined) {
-  return optionsWithCurrentValue(
-    DISTANCE_METERS_OPTIONS,
-    currentValue,
-    "No distance",
-    formatDistanceMeters,
-  );
-}
-
-function optionsWithCurrentValue(
-  baseValues: number[],
-  currentValue: number | undefined,
-  emptyLabel: string,
-  formatValue: (value: number) => string,
-) {
-  const values =
-    currentValue && !baseValues.includes(currentValue)
-      ? [...baseValues, currentValue].sort((a, b) => a - b)
-      : baseValues;
-
-  return [
-    { label: emptyLabel, value: "none" },
-    ...values.map((value) => ({ label: formatValue(value), value: String(value) })),
-  ];
-}
-
-function parsePositiveInteger(value: string) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
-  return Math.max(1, Math.round(parsed));
 }
 
 export function clampInteger(value: string, min: number, max: number) {

@@ -59,7 +59,7 @@ Active
 - The first full DS coverage rollout slice is implemented:
   `/changelog` keeps its public editorial timeline design and behavior, but its date typography, title-adjacent text highlight/backdrop treatment, timeline entry cards, glow dots, and inline code chips now use canonical Hito DS classes documented in `/hitoDS#editorial-patterns`.
 - The shared interaction wrapper DS rollout slice is implemented:
-  Radix/shadcn-derived dialog, sheet, dropdown menu, select, progress, card, and sidebar wrappers now default to Hito DS chrome while preserving existing exports, semantics, keyboard behavior, and product call sites; `/hitoDS#shared-wrappers` documents the wrapper boundary.
+  Radix/shadcn-derived dialog, sheet, dropdown menu, and select wrappers now default to Hito DS chrome while preserving existing exports, semantics, keyboard behavior, and product call sites; unused generic progress/card/sidebar wrapper residue was later retired once product surfaces moved to Hito DS CSS primitives.
 - The progress visualization chrome DS rollout slice is implemented:
   `/progress` keeps the same loader data, aggregate calculations, weekly-volume geometry, and recent-consistency geometry, but its chart section dividers, compact notes, planned/actual fills, and result-status fills now use Hito DS classes documented in `/hitoDS#analytics`.
 - The internal workbench responsive shell is implemented:
@@ -215,10 +215,9 @@ Active
   input, and active-plan lifecycle result types now import from canonical owner modules or no longer
   need `training-api.ts` compatibility re-exports. Later source proof removed the remaining manual
   authoring runtime compatibility re-exports from `training-api.ts`: direct manual
-  Add/Create/Templates, Copy/Paste, Move, Delete/Clear, and persisted-edit server functions now
-  import from `src/lib/manual-workout-authoring/*`; `training-api.ts` keeps only
-  `reviewManualWorkoutDraftAction` as the TanStack server-function wrapper around the pure draft
-  review seam.
+  Add/Create/Templates, Copy/Paste, Move, Delete/Clear, persisted-edit, and Review server functions
+  now import from `src/lib/manual-workout-authoring/*`; `training-api.ts` no longer owns manual
+  authoring runtime wrappers.
 - The previous `PlanManagementDialog` decomposition work remains useful implementation history:
   export, refresh, import, lifecycle, text replacement, and summary/header UI were isolated into
   `src/components/plan-management/*`; current runner-facing IA should expose only `Add plan` plus

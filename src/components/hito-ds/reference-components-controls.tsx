@@ -84,7 +84,7 @@ export function HitoDsComponentControls() {
   const [selectionDisabled, setSelectionDisabled] = useState(false);
   const [selectionInvalid, setSelectionInvalid] = useState(false);
   const [selectionFocusDemo, setSelectionFocusDemo] = useState(false);
-  const [selectionAccentMode, setSelectionAccentMode] = useState(false);
+  const [selectionCardMode, setSelectionCardMode] = useState(false);
   const [dataTableSortable, setDataTableSortable] = useState(true);
   const [dataTableActiveSort, setDataTableActiveSort] = useState(true);
   const [dataTableSortDirection, setDataTableSortDirection] =
@@ -655,7 +655,8 @@ export function HitoDsComponentControls() {
                   <p className="hito-label">Header input variant</p>
                   <p className="hito-caption mt-2 max-w-2xl">
                     True editable headings use the shared inline text primitive with Hito-sized
-                    header field padding.
+                    header field padding, fit-content width, and an edit affordance that stays
+                    adjacent to the text.
                   </p>
                 </div>
                 <div className="grid min-w-0 gap-3 md:grid-cols-3">
@@ -1157,7 +1158,7 @@ export function HitoDsComponentControls() {
               disabled={selectionDisabled}
               invalid={selectionInvalid}
               focusDemo={selectionFocusDemo}
-              accentMode={selectionAccentMode}
+              cardMode={selectionCardMode}
             />
           </div>
         }
@@ -1227,7 +1228,12 @@ export function HitoDsComponentControls() {
               <ReferenceListRow
                 label="Toggle radio"
                 title="Selectable values"
-                body="Functional sizes match the button/input scale for normal controls. Decorative plan-builder choices use the separate accent size, not xl."
+                body="Functional sizes match the button/input scale for normal controls. Decorative plan-builder choices use the separate card variant, not xl."
+              />
+              <ReferenceListRow
+                label="Class naming"
+                title="Base, structural variant, size, runtime state."
+                body="Use hito-choice-toggle as the base, hito-choice-toggle-card only for display/card choices, and hito-choice-toggle-xs|sm|md|lg|xl for functional size. Runtime truth belongs in data-selected or ARIA state; min-w-0, flex-1, and grid utilities stay local to the layout that needs them."
               />
             </div>
 
@@ -1289,19 +1295,19 @@ export function HitoDsComponentControls() {
               </article>
 
               <article className="hito-surface-flat min-w-0 p-5">
-                <p className="hito-label">Accent / display choice</p>
+                <p className="hito-label">Card / display choice</p>
                 <p className="hito-caption mt-2">
-                  Accent is not part of the functional size ladder. Use it only when the choice is a
+                  Card is not part of the functional size ladder. Use it only when the choice is a
                   large visual planning moment.
                 </p>
                 <div
                   className="hito-choice-toggle-group mt-4"
                   role="radiogroup"
-                  aria-label="Accent toggle radio example"
+                  aria-label="Card toggle radio example"
                 >
                   <button
                     type="button"
-                    className="hito-choice-toggle hito-choice-toggle-accent"
+                    className="hito-choice-toggle hito-choice-toggle-card"
                     role="radio"
                     aria-checked="true"
                   >
@@ -1312,7 +1318,7 @@ export function HitoDsComponentControls() {
                   </button>
                   <button
                     type="button"
-                    className="hito-choice-toggle hito-choice-toggle-accent"
+                    className="hito-choice-toggle hito-choice-toggle-card"
                     role="radio"
                     aria-checked="false"
                   >
@@ -1391,9 +1397,9 @@ export function HitoDsComponentControls() {
             <div className="hito-row-group border-0">
               {selectionKind === "toggle" && (
                 <ToggleRow
-                  label="Accent display mode"
-                  active={selectionAccentMode}
-                  onToggle={() => setSelectionAccentMode((v) => !v)}
+                  label="Card display mode"
+                  active={selectionCardMode}
+                  onToggle={() => setSelectionCardMode((v) => !v)}
                 />
               )}
               <ToggleRow

@@ -45,23 +45,35 @@ export function WorkoutDocumentReadback({
         summary={summary}
       />
 
-      {notes.length > 0 ? (
-        <div className="grid gap-3">
-          <p className="hito-label">Notes or cues</p>
-          <div className="hito-row-group">
-            {notes.map((note) => (
-              <div key={note.key} className="hito-list-row items-start gap-3 py-3">
-                {note.label ? (
-                  <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
-                    {note.label}
-                  </span>
-                ) : null}
-                <p className="hito-list-row-copy min-w-0">{note.value}</p>
-              </div>
-            ))}
+      <WorkoutDocumentNotes notes={notes} />
+    </section>
+  );
+}
+
+export function WorkoutDocumentNotes({
+  labelClassName = "hito-label",
+  notes,
+}: {
+  labelClassName?: string;
+  notes: WorkoutDocumentNote[];
+}) {
+  if (notes.length === 0) return null;
+
+  return (
+    <section className="grid gap-3">
+      <p className={labelClassName}>Notes or cues</p>
+      <div className="hito-row-group">
+        {notes.map((note) => (
+          <div key={note.key} className="hito-list-row items-start gap-3 py-3">
+            {note.label ? (
+              <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
+                {note.label}
+              </span>
+            ) : null}
+            <p className="hito-list-row-copy min-w-0">{note.value}</p>
           </div>
-        </div>
-      ) : null}
+        ))}
+      </div>
     </section>
   );
 }

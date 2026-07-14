@@ -66,6 +66,17 @@ export type HighlightCategory =
   | "body_notes"
   | "changelog";
 
+const MAX_HIGHLIGHTS_PER_DAY = 4;
+
+const CATEGORY_PREFIX_HIGHLIGHTS: Record<string, HighlightCategory> = {
+  "Admin & Ops": "admin_ops",
+  "Calendar & Workout Identity": "calendar_workout_identity",
+  "Hito DS Iteration": "design_system",
+  "Plan Refresh Safety": "plan_refresh_safety",
+  "QA / Reliability": "qa_reliability",
+  "Run Creation Engine": "run_creation_engine",
+};
+
 export function parseChangelog(markdown: string): ChangelogDay[] {
   const sections: ChangelogDay[] = [];
   let current: ChangelogDay | null = null;
@@ -157,7 +168,7 @@ function getHighlightsForDay(day: ChangelogDay): ChangelogHighlight[] {
       seenCategories.add(key);
       return true;
     })
-    .slice(0, 3);
+    .slice(0, MAX_HIGHLIGHTS_PER_DAY);
 
   if (highlights.length > 0) {
     return highlights;
@@ -194,6 +205,22 @@ function getHighlightPresentation(entry: string): ChangelogHighlight | null {
 }
 
 function getHighlightBadge(entry: string): HighlightBadge | null {
+  const prefix = getCategoryPrefix(entry);
+
+  if (prefix) {
+    const prefixedBody = stripCategoryPrefix(entry);
+
+    if (/^(fixed|resolved|corrected|prevented|repaired)\b/i.test(prefixedBody)) {
+      return "Fixed";
+    }
+
+    if (/^(removed|deleted|simplified|refactored|collapsed|completed)\b/i.test(prefixedBody)) {
+      return "Cleanup";
+    }
+
+    return "Improved";
+  }
+
   if (/^(added|created|introduced|launched)\b/i.test(entry) || /\bnew\b/i.test(entry)) {
     return "New";
   }
@@ -257,6 +284,12 @@ function getDesignSystemSurfaceCount(normalizedEntry: string) {
 
 function getHighlightCategory(entry: string): HighlightCategory | null {
   const normalized = entry.toLowerCase();
+  const categoryPrefix = getCategoryPrefix(entry);
+
+  if (categoryPrefix) {
+    return CATEGORY_PREFIX_HIGHLIGHTS[categoryPrefix];
+  }
+
   const actionMatches =
     /^(added|created|implemented|introduced|shipped|launched|fixed|resolved|corrected|prevented|repaired|improved|updated|upgraded|refined|normalized|reworked|tightened|hardened|aligned|simplified|replaced|polished)\b/i.test(
       entry,
@@ -523,6 +556,23 @@ function getHighlightBody(entry: string) {
     default:
       return entry;
   }
+}
+
+function getCategoryPrefix(entry: string) {
+  const [prefix] = entry.split(":", 1);
+
+  if (!prefix) return null;
+
+  const trimmedPrefix = prefix.trim();
+  return trimmedPrefix in CATEGORY_PREFIX_HIGHLIGHTS ? trimmedPrefix : null;
+}
+
+function stripCategoryPrefix(entry: string) {
+  const prefix = getCategoryPrefix(entry);
+
+  if (!prefix) return entry;
+
+  return entry.slice(prefix.length + 1).trim();
 }
 
 function isAuthEntry(normalizedEntry: string) {

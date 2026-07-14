@@ -345,8 +345,13 @@
   }
 
   .hito-timeline-entry {
+    min-width: 0;
     border-radius: var(--radius-2xl);
     padding: 1rem;
+  }
+
+  .hito-timeline-entry p {
+    overflow-wrap: anywhere;
   }
 
   .hito-timeline-entry .hito-panel-title {
@@ -392,6 +397,9 @@
     padding: 0.125rem 0.375rem;
     font-family: var(--font-mono);
     font-size: 0.9em;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
     color: var(--color-foreground);
   }
 

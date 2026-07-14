@@ -21,6 +21,7 @@ import {
   type ChangelogYear,
 } from "@/lib/changelog-utils";
 import changelogMarkdown from "../../docs/history/changelog.md?raw";
+import technicalLogMarkdown from "../../docs/history/technical-log.md?raw";
 
 type ChangelogTab = "highlights" | "technical";
 
@@ -30,23 +31,34 @@ export const Route = createFileRoute("/changelog")({
       { title: `Hito changelog — ${APP_NAME}` },
       {
         name: "description",
-        content: "Highlights and full release notes for Hito.",
+        content: "Curated highlights and the full technical log for Hito.",
       },
     ],
   }),
   component: ChangelogPage,
 });
 
-const changelogDays = parseChangelog(changelogMarkdown);
-const changelogMonths = groupChangelogByMonth(changelogDays);
-const changelogYears = groupMonthsByYear(changelogMonths);
-const changelogHighlightMonths = getHighlightMonths(changelogDays);
+const publicChangelogDays = parseChangelog(changelogMarkdown);
+const publicChangelogMonths = groupChangelogByMonth(publicChangelogDays);
+const changelogHighlightMonths = getHighlightMonths(publicChangelogDays);
 const changelogHighlightYears = groupMonthsByYear(changelogHighlightMonths);
-const latestChangelogDate = getLatestChangelogDate(changelogDays);
+
+const technicalLogDays = parseChangelog(technicalLogMarkdown);
+const technicalLogMonths = groupChangelogByMonth(technicalLogDays);
+const technicalLogYears = groupMonthsByYear(technicalLogMonths);
 
 function ChangelogPage() {
   const [activeTab, setActiveTab] = useState<ChangelogTab>("highlights");
-  const entryCount = getChangelogEntryCount(changelogMonths);
+  const isHighlightsTab = activeTab === "highlights";
+  const entryCount = isHighlightsTab
+    ? getChangelogEntryCount(publicChangelogMonths)
+    : getChangelogEntryCount(technicalLogMonths);
+  const entryCountLabel = isHighlightsTab
+    ? formatEntryCount(entryCount)
+    : `${entryCount} accepted ${entryCount === 1 ? "slice" : "slices"}`;
+  const latestVisibleDate = getLatestChangelogDate(
+    isHighlightsTab ? publicChangelogDays : technicalLogDays,
+  );
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -61,20 +73,20 @@ function ChangelogPage() {
             </Link>
             <h1 className="hito-page-title mt-5">Hito changelog</h1>
             <p className="hito-body mt-4 max-w-2xl text-muted-foreground">
-              {activeTab === "highlights"
+              {isHighlightsTab
                 ? "Big updates, in plain language."
-                : "The complete shipped history, with the technical detail left in."}
+                : "The complete accepted-slice history, with the technical detail left in."}
             </p>
             <p className="hito-body-small mt-3 text-foreground/78">
-              {activeTab === "highlights"
-                ? `${formatEntryCount(entryCount)} so far. This view pulls out the biggest ones.`
-                : `${formatEntryCount(entryCount)} in the full technical log.`}
+              {isHighlightsTab
+                ? `${entryCountLabel} so far. This view pulls out the biggest ones.`
+                : `${entryCountLabel} in the full technical log.`}
             </p>
           </div>
           <div className="grid gap-1 text-left md:justify-items-end md:text-right">
             <p className="hito-micro-label">Last updated</p>
             <p className="hito-body-small text-muted-foreground">
-              {latestChangelogDate ? formatFullDate(latestChangelogDate) : "No updates yet"}
+              {latestVisibleDate ? formatFullDate(latestVisibleDate) : "No updates yet"}
             </p>
           </div>
         </header>
@@ -104,7 +116,7 @@ function ChangelogPage() {
           {activeTab === "highlights" ? (
             <HighlightsTimeline years={changelogHighlightYears} />
           ) : (
-            <TechnicalTimeline years={changelogYears} />
+            <TechnicalTimeline years={technicalLogYears} />
           )}
         </section>
       </div>

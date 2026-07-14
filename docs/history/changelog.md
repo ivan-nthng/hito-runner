@@ -1,6 +1,10 @@
 # Changelog
 
-Completed implementation history only.
+Curated public highlights for completed implementation history.
+
+For the complete internal accepted-slice ledger, use
+[technical log](./technical-log.md). The public changelog should stay readable: it summarizes durable
+product, DS, reliability, and operations wins instead of listing every implementation or QA slice.
 
 ## Highlight naming policy
 
@@ -12,6 +16,42 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Hito DS Iteration` for design-system refinements after the initial foundation. Do not call every DS pass "new"; version-like DS labels are docs-only and should wait for a real release bundle.
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
+
+## 2026-07-13
+
+- Calendar & Workout Identity: improved saved-calendar workout actions around direct Move and
+  future-row editing. Calendar move now projects source/target changes immediately, shows a clearer
+  `Moving` state, restores a ghost-style Undo after accepted direct move, and keeps Add/Copy/Paste
+  reachable; eligible future reconstructable workouts now open the shared edit constructor through
+  backend-shaped editability instead of a manual-source-only frontend gate.
+- Hito DS Iteration: tightened Hito DS reuse across recent product surfaces. Today/workout-detail
+  hero chrome now shares the compact workout-detail rhythm, mobile `Current Plan` actions live in
+  the bottom navigation with a full-height sheet while desktop keeps the dropdown, local inspector
+  controls use shared select/menu/button primitives, choice-toggle naming now uses the `card`
+  display variant, and `/hitoDS` gained stricter DS-first control/typography guidance.
+
+## 2026-07-12
+
+- Calendar & Workout Identity: accepted the shared workout-document editor/readback grammar across
+  manual create, persisted edit, and preview/readback. The constructor now uses one compact section
+  language for standalone sections and child-first repeat groups, supports arbitrary ordered repeat
+  children in the accepted contract, keeps generated/read-only previews on the same document grammar,
+  and preserves backend review/confirm truth instead of creating separate create/edit UI systems.
+- QA / Reliability: completed a behind-the-scenes source-size and proof-infrastructure cleanup wave
+  without changing product truth. Manual-workout proof helpers, disposable persistence proof setup,
+  calendar manual-action orchestration, workout-document notes/readback helpers, and local devtool
+  screen-prompt metadata flow were consolidated around canonical owners; validation kept manual
+  authoring, calendar, readback, build, and disposable cleanup paths green.
+
+## 2026-07-11
+
+- Hito DS Iteration: corrected the manual workout editor direction toward the compact Hito workout
+  document anatomy instead of a generic form-builder. The accepted editor uses compact section rows,
+  `Visible label`, smaller target/duration controls, centered Add Section affordances, shared
+  header input behavior, and the same readback grammar for create/edit/preview states.
+- Hito DS Iteration: shipped the product-wide light-theme correction pass. Light mode now uses warm
+  Hito semantic token mappings and DS-backed component recipes rather than a dimmed dark UI, while
+  dark mode remained preserved.
 
 ## 2026-07-07
 

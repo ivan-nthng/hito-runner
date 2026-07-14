@@ -32,6 +32,7 @@
     "author-plan-from-text": "node --env-file=.env.local --import tsx ./scripts/author-plan-from-text.ts",
     "validate-admin-capture-backlog": "node --import tsx ./scripts/validate-admin-capture-backlog.ts",
     "validate-admin-capture-backlog:live": "node --env-file=.env.local --import tsx ./scripts/validate-admin-capture-backlog.ts --live-supabase",
+    "validate-changelog-history": "node --import tsx ./scripts/validate-changelog-history-sync.ts",
     "validate-manual-workout-authoring": "node --import tsx ./scripts/validate-manual-workout-authoring.ts",
     "import-admin-backlog-work-items": "node --env-file=.env.local --import tsx ./scripts/import-repo-work-items-to-admin-backlog.ts",
     "test-user": "node --env-file=.env.local ./scripts/test-user.mjs",

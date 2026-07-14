@@ -6,9 +6,28 @@ Active
 
 ## Last Updated
 
-2026-06-28
+2026-07-13
 
 ## Where We Are Now
+
+- July source-of-truth checkpoint:
+  manual workout creation, persisted edit, and preview/readback now share one workout-document
+  grammar; child-first repeat groups are treated as containers for ordered ordinary sections; saved
+  calendar Move now has immediate optimistic readback plus clearer Undo; Today/workout-detail shell
+  chrome and mobile `Current Plan` actions have been tightened around Hito DS primitives; and local
+  inspector/screen tooling remains local-only prompt metadata tooling, not backend/Admin persistence.
+- The next strategic implementation lane is the compiler-style generated-plan engine rebuild:
+  [Hito Compiler Architecture Rebuild Plan](./tasks/backlog/2026-07-13-hito-compiler-architecture-plan.md)
+  has completed Phase 0 routing and points next to BACKEND `PlanCreation Engine Kernel Rebuild`.
+  This is not shipped engine behavior yet; it is the active gate for making generated plans compose
+  from accepted training atoms instead of relying on AI/local fixtures to own progression.
+- The changelog/hub gap exposed a process failure, so history is now split:
+  [changelog](./history/changelog.md) owns curated public highlights, while
+  [technical log](./history/technical-log.md) owns the complete internal accepted-slice ledger.
+  The technical log now also mirrors the older public changelog history back to project start so
+  previous entries remain reachable after the split. Backlog-only compiler planning remains out of
+  shipped highlights except as narrative context in the product-history digest and technical-log
+  process history.
 
 - The email-auth flow is now aligned with SSR-safe Supabase passwordless callbacks:
   link requests now ask Supabase for PKCE-oriented handling,

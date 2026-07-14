@@ -1,7 +1,7 @@
 # Product History Digest
 
 Status: active digest
-Last Updated: 2026-06-20
+Last Updated: 2026-07-13
 Owner: ARCHITECT
 
 ## Purpose And Source Boundary
@@ -12,7 +12,9 @@ archived execution prompt.
 
 This digest is not:
 
-- the shipped-history source for `/changelog`; that remains [changelog](./changelog.md)
+- the curated public shipped-history source for `/changelog`; that remains
+  [changelog](./changelog.md)
+- the internal accepted-slice ledger; that remains [technical log](./technical-log.md)
 - the implemented-behavior source; that remains [current product](../current-product.md) and
   [current system](../current-system.md)
 - an active execution plan or backlog
@@ -29,7 +31,8 @@ archived plans for detailed historical evidence.
 - [Current state](../current-state.md) owns the current project snapshot and next recommended work.
 - [Current functional map](../current-functional-map.md) owns business-flow cleanup and source
   hierarchy.
-- [Changelog](./changelog.md) owns dated shipped-history entries.
+- [Changelog](./changelog.md) owns curated public shipped-history highlights.
+- [Technical log](./technical-log.md) owns the complete internal accepted-slice ledger.
 - [Hito Docs and Artifact Compression](../plans/active/2026-06-20-hito-docs-and-artifact-compression.md)
   owns the current docs/artifact compression track.
 
@@ -166,6 +169,33 @@ Key archived evidence:
 
 - [Hito Stack Simplification Strike](../plans/archive/2026-06-07-hito-stack-simplification-strike.md)
 - [Hito DS workout-library calendar/detail playground history](../plans/archive/2026-06-09-hito-ds-workout-library-calendar-detail-playground.md)
+
+### 2026-07-07 To 2026-07-13: Shared Workout Documents, Calendar Move UX, And Compiler Gate
+
+- Manual workout creation, persisted edit, and preview/readback converged on one workout-document
+  grammar instead of separate route-local UI systems. Repeat groups are treated as containers that
+  repeat arbitrary ordered child sections, while backend review/confirm and target truth stay
+  authoritative.
+- Saved calendar actions continued moving toward one backend-shaped lifecycle. Add/Copy/Paste/Move
+  use shared calendar/manual-action orchestration, direct Move now feels immediate with a clear Undo,
+  and future reconstructable workouts can enter the shared edit constructor when backend capability
+  says they are safe to edit.
+- Hito DS cleanup became stricter: product surfaces and local devtools must reuse shared buttons,
+  selects, dropdowns, labels, typography, shell, and calendar primitives before adding local chrome.
+  The local inspector remains a local-only prompt generator, not an Admin Backlog writer or live UI
+  mutation tool.
+- Source-size governance shifted from one-off file pressure toward canonical-owner consolidation:
+  proof helpers, disposable test persistence setup, manual-workout readback helpers, calendar action
+  orchestration, and notes/cues extraction were consolidated where they replaced duplicated process.
+- Product accepted the compiler-style architecture direction for the generated-plan engine. That
+  architecture gate is not a shipped engine change yet: it defines the next backend implementation
+  target, where `PlanGoalIntent` should compile through a deterministic training-process kernel
+  before AI/local detail authoring fills dated workout documents.
+- After the July catch-up exposed that public changelog and internal implementation history had been
+  blurred, Product split the model: `docs/history/changelog.md` stays curated highlights while
+  `docs/history/technical-log.md` carries the complete accepted-slice ledger by evidence date.
+  The split was repaired losslessly by mirroring older public changelog sections into the technical
+  log as historical migrated entries, preserving project history back to the May 5 import baseline.
 
 ## Major Product Capability Tracks
 

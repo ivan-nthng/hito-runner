@@ -70,8 +70,13 @@ When a track is complete:
 - mark the plan `Complete / Closed` if no future phases remain
 - mark it `Paused after <phase>` if future phases remain but work should stop now
 - record residual QA hygiene as non-blocking if it does not justify reopening implementation
-- update `docs/history/changelog.md` for completed shipped implementation work before archiving
-- do not treat Backlog import/mirror status as a substitute for the shipped-history changelog
+- update `docs/history/technical-log.md` for every accepted implementation, QA acceptance,
+  source-cleanup, local-tooling, or durable process slice before closeout, or explicitly record why
+  the slice is not technical-log material
+- update `docs/history/changelog.md` only for curated public highlights from completed shipped
+  implementation work before archiving
+- do not treat Backlog import/mirror status as a substitute for the technical log or public
+  changelog
 - if a completed track is internal-only, ops-only, docs-only, or specimen-only, either add a clearly
   bounded changelog entry or explicitly record why it is not shipped-history material
 - archive from `docs/plans/active/` to `docs/plans/archive/` only when the plan no longer guides active/future execution
@@ -114,17 +119,25 @@ artifact, or a short final report would be the better source of truth.
 - If a docs update is larger than the durable decision it records, rewrite it smaller before
   closeout.
 
-## Changelog Gate
+## History Gate
 
-`docs/history/changelog.md` is the source of truth for `/changelog` shipped history. It is manual by
-design and is separate from repo-derived Backlog markdown.
+`docs/history/changelog.md` is the curated public source of truth for `/changelog` Highlights.
+`docs/history/technical-log.md` is the complete internal accepted-slice ledger for Technical log.
+Both are manual by design and are separate from repo-derived Backlog markdown.
 
 During closeout/archive:
 
 - inspect the completed plan/spec/backlog/QA evidence for shipped implementation changes
-- add concise dated entries for shipped product, admin, backend, frontend, QA/reliability, or DS work
+- add dated `docs/history/technical-log.md` entries for all accepted product, admin, backend,
+  frontend, QA/reliability, DS, local-tooling, source-cleanup, and durable process work
+- use actual evidence/completion dates when available instead of dumping multi-day work into one
+  catch-up date
+- add concise dated `docs/history/changelog.md` entries only for durable public highlights
+- never orphan older history when changing the log model: if a source is split or migrated, mirror
+  prior dated entries into the new owner before treating the new model as complete
 - keep future work, unimplemented plans, backlog-only intake, and reopened visual/spec work out of
-  the changelog until the implementation is complete and QA-passed
+  public changelog highlights until the implementation is complete and QA-passed; technical-log
+  entries may mention planning/spec work when it is the accepted durable outcome
 - use the existing highlight naming policy in `docs/history/changelog.md`
 - preserve accurate boundaries such as non-live, internal-only, ops-only, no production switch, or
   visual/specimen-only
@@ -137,8 +150,8 @@ For markdown-only plan changes:
 - run `git diff --check`
 - do not run build unless product code changed
 - confirm active/archive paths when moving files
-- include `docs/history/changelog.md` in the diff check when closeout adds or skips shipped-history
-  entries
+- include `docs/history/technical-log.md` in the diff check for every accepted closeout, and include
+  `docs/history/changelog.md` when public highlights are added or intentionally skipped
 
 ## Do Not
 
@@ -146,7 +159,7 @@ For markdown-only plan changes:
 - start the next phase just because the prior one finished
 - turn plans into broad speculative roadmaps
 - update permanent docs with planned behavior that is not implemented
-- let repo-derived Backlog mirroring replace the changelog update step
+- let repo-derived Backlog mirroring replace the technical-log or changelog update step
 
 ## Output
 

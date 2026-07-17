@@ -5,6 +5,7 @@ import {
   parseStructuredFirstPlanOnboardingInput,
   type StructuredFirstPlanOnboardingRequestInput,
 } from "../src/lib/structured-first-plan-onboarding";
+import { readFileSync } from "node:fs";
 import { structuredAuthoringOpenAiSchema } from "../src/lib/openai-plan-authoring";
 import { buildPlanScopedStructuredAuthoringMetadata } from "../src/lib/plan-authoring-snapshot";
 import { prepareImportedPlanApplyPolicy } from "../src/lib/plan-apply-policy";
@@ -16,15 +17,6 @@ import {
 import { allowsDefaultEstimatedHrTarget } from "../src/lib/default-estimated-hr-target-policy";
 import { assertFirstPlanReleaseGateContracts } from "./plan-authoring-doctrine/first-plan-release-gates";
 import {
-  assertAiFirstPlanBlueprintEnvelopeContracts,
-  buildAiFirstPlanAuthoringInput,
-  buildAiFirstPlanBlueprintFixture,
-  buildBalancedHalfEnvelopeAuthoringInput,
-  buildLongHorizonMarathonAiFirstPlanAuthoringInput,
-  countNonRestWorkouts,
-  readAiFirstPlanReferenceFixture,
-} from "./plan-authoring-doctrine/ai-first-plan-blueprint-envelope";
-import {
   assertActivePlanRefreshDraftReviewContracts,
   assertActivePlanRefreshRichDraftContracts,
 } from "./plan-authoring-doctrine/active-plan-refresh";
@@ -33,7 +25,6 @@ import {
   assertGoalFamilyTerrainSpecificityContracts,
   assertMountainTrailDoctrine,
   assertNoRoadRaceSharpening,
-  assertRoadPerformanceQualityCadence,
 } from "./plan-authoring-doctrine/goal-family-quality-policy";
 import { assertRichWorkoutImportExportContracts } from "./plan-authoring-doctrine/rich-workout-import-export";
 import {
@@ -41,13 +32,11 @@ import {
   assertEffortOnlyHrGuidance,
   assertNoDefaultEstimatedHrTargets,
   assertNoFakeMetricTargetRegression,
-  assertStructureOnlyExecutableContract,
   hasTargetKey,
 } from "./plan-authoring-doctrine/metric-target-readback";
 import {
   assertRichWorkoutDraftNormalizerContracts,
   buildAiLikeRichWorkoutDraft,
-  openAiFixtureResponse,
 } from "./plan-authoring-doctrine/rich-workout-draft-normalizer";
 import {
   buildStructuredAuthoringPlan,
@@ -61,13 +50,13 @@ type SegmentRecord = Record<string, unknown>;
 
 const fixedRestDays = ["Wednesday", "Sunday"] as const;
 const forbiddenStructuredReviewDisplayTitleTerms = [
-  "blueprint",
-  "opening blueprint",
-  "repaired_ai_draft",
-  "backendExtendedWeeks",
-  "requestedHorizonWeeks",
-  "aiAuthoredHorizonWeeks",
-  "ai_first_plan_blueprint_v1",
+  "internal plan draft",
+  "opening internal plan draft",
+  "internal source term",
+  "plan_first_debug_trace",
+  "requestedInternalWeeks",
+  "authoredInternalWeeks",
+  "ai_authored_plan_first_v1",
 ] as const;
 
 function buildRequest(
@@ -960,32 +949,7 @@ await assertRichWorkoutDraftNormalizerContracts({
   buildPlanWithNoAge,
   buildRequest,
 });
-assertAiFirstPlanBlueprintEnvelopeContracts({
-  assertFixedRestDays,
-  assertFixedRestDayNames,
-  assertNoDefaultEstimatedHrTargets,
-  assertRichWorkoutContract,
-  assertRoadPerformanceQualityCadence,
-  assertWeeklyLongRunDay,
-});
-await assertFirstPlanReleaseGateContracts({
-  assertFixedRestDays,
-  assertFixedRestDayNames,
-  assertNoFakeMetricTargetRegression,
-  assertNoSingleSegmentNonRestWorkouts,
-  assertRecoveryFirstAfterLongRuns,
-  assertRichWorkoutContract,
-  assertStructureOnlyExecutableContract,
-  assertWeeklyLongRunDay,
-  buildAiFirstPlanAuthoringInput,
-  buildAiFirstPlanBlueprintFixture,
-  buildBalancedHalfEnvelopeAuthoringInput,
-  buildLongHorizonMarathonAiFirstPlanAuthoringInput,
-  buildRequest,
-  countNonRestWorkouts,
-  openAiFixtureResponse,
-  readAiFirstPlanReferenceFixture,
-});
+await assertFirstPlanReleaseGateContracts();
 await assertActivePlanRefreshRichDraftContracts({
   assertFixedRestDays,
   assertMountainTrailDoctrine,
@@ -1042,7 +1006,7 @@ assertRichWorkoutContract(
   const pollutedPlanName = {
     ...plan,
     plan_name:
-      "Opening blueprint ai_first_plan_blueprint_v1 repaired_ai_draft backendExtendedWeeks requestedHorizonWeeks aiAuthoredHorizonWeeks",
+      "Opening internal plan draft ai_authored_plan_first_v1 internal source term plan_first_debug_trace requestedInternalWeeks authoredInternalWeeks",
   };
   const review = buildStructuredFirstPlanDraftReview(input, pollutedPlanName, authoringInput);
   const persistenceMetadata = buildPlanScopedStructuredAuthoringMetadata({
@@ -1199,7 +1163,7 @@ assertRichWorkoutContract(
     request,
     {
       ...plan,
-      plan_name: "AI blueprint raw marathon plan repaired_ai_draft",
+      plan_name: "AI-authored raw marathon plan internal source term",
     },
     authoringInput,
   );
@@ -1347,3 +1311,16 @@ assertActivePlanRefreshDraftReviewContracts({
 });
 
 console.log("Plan authoring doctrine fixtures passed.");
+
+function readAiFirstPlanReferenceFixture() {
+  try {
+    return JSON.parse(
+      readFileSync(
+        "/Users/ivan/Downloads/ivan_half_marathon_training_plan_v2_full_2026-05-05.json",
+        "utf8",
+      ),
+    ) as unknown;
+  } catch {
+    return null;
+  }
+}

@@ -152,6 +152,28 @@ const v2GoalSchema = z
   .object({
     goal_type: z.string().trim().min(1),
     goal_label: z.string().trim().min(1),
+    distance_km: z.number().positive().optional(),
+    distance_meters: z.number().int().positive().optional(),
+    authored_outcome_target: z
+      .object({
+        source: z.enum(["runner_entered_target", "ai_estimated_target"]),
+        label: z.string().trim().min(1).max(160),
+        finish_time_window: z.string().trim().min(1).max(160).nullable(),
+        rationale: z.string().trim().min(1).max(360),
+        confidence: z.enum(["low", "medium", "high"]),
+        assumptions: z.array(z.string().trim().min(1).max(220)).max(6),
+      })
+      .strict()
+      .optional(),
+    authored_horizon: z
+      .object({
+        source: z.enum(["runner_target_date", "ai_proposed_horizon"]),
+        weeks: z.number().int().min(1).max(52),
+        rationale: z.string().trim().min(1).max(360),
+        assumptions: z.array(z.string().trim().min(1).max(220)).max(6),
+      })
+      .strict()
+      .optional(),
     target_event: z
       .object({
         label: z.string().trim().min(1).optional(),
@@ -199,6 +221,8 @@ const v2WorkoutGoalContextSchema = z
   .object({
     goal_type: z.string().trim().min(1),
     goal_style: z.string().trim().min(1).optional().nullable(),
+    distance_km: z.number().positive().optional(),
+    distance_meters: z.number().int().positive().optional(),
     terrain_focus: z.enum(["standard", "rolling", "mountain"]).optional().nullable(),
     target_date: z
       .string()
@@ -714,6 +738,8 @@ function normalizeWorkoutGoalContext(
   return {
     goalType: value.goal_type,
     goalStyle: value.goal_style ?? null,
+    distanceKm: value.distance_km ?? null,
+    distanceMeters: value.distance_meters ?? null,
     terrainFocus: value.terrain_focus ?? null,
     targetDate: value.target_date ?? null,
     targetTime: value.target_time ?? null,
@@ -822,6 +848,8 @@ function buildGoalMetadata(plan: TrainingPlanV2): Json | null {
   const metadata = {
     ...(goalType ? { goal_type: goalType } : {}),
     ...(goalLabel ? { goal_label: goalLabel } : {}),
+    ...(plan.goal?.distance_km ? { distance_km: plan.goal.distance_km } : {}),
+    ...(plan.goal?.distance_meters ? { distance_meters: plan.goal.distance_meters } : {}),
     ...(targetDate ? { target_date: targetDate } : {}),
     ...(targetEvent
       ? {

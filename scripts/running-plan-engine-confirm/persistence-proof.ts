@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   confirmRunningPlanDraftForUser,
-  type RunningPlanPreviewActionInput,
+  type RunningPlanConfirmActionInput,
 } from "../../src/lib/running-plan-engine-actions";
 import type {
   RunningPlanPreviewDraft,
@@ -14,8 +14,6 @@ import { validateNoClientRowsTrusted, validateNoFakePaceOrPersonalHr } from "./a
 import {
   cleanupDisposableSupabaseUser,
   createDisposableSupabaseUser,
-  DISPOSABLE_REMOTE_MUTATION_ENV_VALUE,
-  DISPOSABLE_REMOTE_MUTATION_FLAG,
   DISPOSABLE_REQUIRE_PERSISTENCE_FLAG,
   readDisposablePersistenceCliOptions,
   resolveDisposablePersistencePreflight,
@@ -30,14 +28,11 @@ type DisposableCleanupProofCountKey =
   | "plannedWorkoutsRemaining"
   | "runnerProfilesRemaining";
 type DisposableCleanupProof = DisposableSupabaseCleanupProof<DisposableCleanupProofCountKey>;
-type BuildPreviewInputForConfirm = (
+type BuildConfirmInputForConfirm = (
   draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
-) => RunningPlanPreviewActionInput;
+) => RunningPlanConfirmActionInput;
 
 const REQUIRE_PERSISTENCE_FLAG = DISPOSABLE_REQUIRE_PERSISTENCE_FLAG;
-const REMOTE_MUTATION_FLAG = DISPOSABLE_REMOTE_MUTATION_FLAG;
-const REMOTE_MUTATION_ENV = "HITO_RUNNING_PLAN_CONFIRM_ALLOW_REMOTE_MUTATION";
-const REMOTE_MUTATION_ENV_VALUE = DISPOSABLE_REMOTE_MUTATION_ENV_VALUE;
 const DISPOSABLE_CLEANUP_SPECS = [
   {
     table: "workout_logs",
@@ -72,18 +67,7 @@ const DISPOSABLE_CLEANUP_SPECS = [
 export type PersistencePreflight = DisposablePersistencePreflight;
 
 export function readCliOptions() {
-  const options = readDisposablePersistenceCliOptions({
-    remoteMutationEnv: REMOTE_MUTATION_ENV,
-    remoteMutationEnvValue: REMOTE_MUTATION_ENV_VALUE,
-  });
-
-  return {
-    requirePersistence: options.requirePersistence,
-    remoteMutationFlagPresent: options.remoteMutationFlagPresent,
-    remoteMutationEnvConfirmed: options.remoteMutationEnvConfirmed,
-    allowRemoteDisposableSupabaseMutation:
-      options.remoteMutationFlagPresent && options.remoteMutationEnvConfirmed,
-  };
+  return readDisposablePersistenceCliOptions();
 }
 
 export function resolvePersistencePreflight(
@@ -103,9 +87,10 @@ export function resolvePersistencePreflight(
       "NEXT_PUBLIC_SUPABASE_URL is not a valid URL; persistence proof was not attempted.",
     invalidUrlOverrideHint:
       "Use a valid local Supabase URL such as http://127.0.0.1:54321 and rerun with --require-persistence.",
-    remoteBlockedReason:
-      "Remote Supabase mutation is blocked by default. This harness only mutates local/disposable targets unless an explicit remote-disposable override is supplied.",
-    remoteOverrideHint: `Use a local Supabase URL, or set ${REMOTE_MUTATION_ENV}=${REMOTE_MUTATION_ENV_VALUE} and pass ${REMOTE_MUTATION_FLAG} only for an approved disposable remote validation target.`,
+    nonLoopbackBlockedReason:
+      "Running-plan persistence proof only supports loopback Supabase; remote mutation is not available.",
+    nonLoopbackOverrideHint:
+      "Start local Supabase and run npm run supabase:local:configure before retrying.",
   });
 }
 
@@ -115,7 +100,7 @@ export function formatPersistenceBlocker(
   return [
     `Running-plan confirm persistence proof is blocked: ${preflight.reason}`,
     preflight.target
-      ? `Target: ${preflight.target.url} (${preflight.target.projectRef ?? preflight.target.hostname}).`
+      ? `Target: ${preflight.target.url} (${preflight.target.hostname}).`
       : "Target: none.",
     preflight.overrideHint,
   ].join(" ");
@@ -135,7 +120,7 @@ export function buildSkippedPersistenceResult(
 export async function validatePersistenceContract(
   reviewedDrafts: readonly RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>[],
   preflight: Extract<PersistencePreflight, { shouldRun: true }>,
-  buildPreviewInputForConfirm: BuildPreviewInputForConfirm,
+  buildConfirmInputForConfirm: BuildConfirmInputForConfirm,
 ) {
   const supabase = createAdminSupabaseClient();
   const persistedDistanceGoals: Array<{
@@ -159,13 +144,15 @@ export async function validatePersistenceContract(
     let cleanupProof: DisposableCleanupProof | null = null;
 
     try {
-      const result = await confirmRunningPlanDraftForUser(userId, {
-        previewInput: buildPreviewInputForConfirm(draft),
-        sourceKind: draft.sourceKind,
-        reviewToken: draft.reviewToken,
-        reviewChecksum: draft.reviewChecksum,
-      });
-      assert.equal(result.ok, true, `${distanceGoal.goalLabel} confirm should persist.`);
+      const result = await confirmRunningPlanDraftForUser(
+        userId,
+        buildConfirmInputForConfirm(draft),
+      );
+      assert.equal(
+        result.ok,
+        true,
+        `${distanceGoal.goalLabel} confirm should persist: ${JSON.stringify(result)}`,
+      );
       if (!result.ok) throw new Error(result.message);
 
       const persisted = await loadPersistedPlanForUser(supabase, userId);
@@ -188,12 +175,10 @@ export async function validatePersistenceContract(
       validateNoFakePaceOrPersonalHr(persisted.workouts);
       validateNoClientRowsTrusted(persisted.workouts);
 
-      const duplicate = await confirmRunningPlanDraftForUser(userId, {
-        previewInput: buildPreviewInputForConfirm(draft),
-        sourceKind: draft.sourceKind,
-        reviewToken: draft.reviewToken,
-        reviewChecksum: draft.reviewChecksum,
-      });
+      const duplicate = await confirmRunningPlanDraftForUser(
+        userId,
+        buildConfirmInputForConfirm(draft),
+      );
       assert.equal(duplicate.ok, false);
       if (!duplicate.ok) {
         assert.equal(duplicate.reason, "active_plan_exists");

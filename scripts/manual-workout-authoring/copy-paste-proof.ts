@@ -266,7 +266,7 @@ export async function validateManualCopyPasteContract() {
       activePlan: buildFakePlanCycle({
         userId,
         id: activePlan.id,
-        sourceKind: "ai_first_plan_blueprint_v1",
+        sourceKind: "ai_authored_plan_first_v1",
         startDate: "2026-06-18",
         endDate: "2026-06-18",
       }),
@@ -478,7 +478,7 @@ export async function validateManualCopyPasteContract() {
       activePlan: buildFakePlanCycle({
         userId,
         id: activePlan.id,
-        sourceKind: "ai_first_plan_blueprint_v1",
+        sourceKind: "ai_authored_plan_first_v1",
         startDate: "2026-06-18",
         endDate: "2026-06-18",
       }),

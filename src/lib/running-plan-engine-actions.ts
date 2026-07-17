@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
   createFirstPlanFromReviewedCanonicalPlanForUser,
@@ -63,7 +64,7 @@ export const runningPlanPreviewInputSchema = z
     heightCm: z.number().finite().positive(),
     weightKg: z.number().finite().positive(),
     runnerLevel: z.enum(RUNNING_PLAN_RUNNER_LEVEL_VALUES),
-    distanceFamily: z.enum(RUNNING_PLAN_DISTANCE_FAMILY_VALUES),
+    distanceFamily: z.enum(RUNNING_PLAN_DISTANCE_FAMILY_VALUES).optional().nullable(),
     daysPerWeek: z.number().int().min(1).max(7).optional().nullable(),
     fixedRestDays: z.array(weekdayNameSchema).optional().nullable(),
     preferredLongRunDay: weekdayNameSchema.optional().nullable(),
@@ -137,7 +138,9 @@ export type RunningPlanConfirmActionResult =
 export const previewRunningPlanDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => runningPlanPreviewInputSchema.parse(value))
   .handler(async ({ data }): Promise<RunningPlanPreviewActionResult> => {
-    return buildReviewedAiGeneratedRunningPlanPreview(data);
+    return buildReviewedAiGeneratedRunningPlanPreview(data, {
+      aiPreview: { signal: getRequest().signal },
+    });
   });
 
 export const confirmRunningPlanDraft = createServerFn({ method: "POST" })

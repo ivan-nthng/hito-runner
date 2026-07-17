@@ -8,6 +8,25 @@ This is the canonical Backend contract for requests such as:
 
 Use this document instead of ad hoc Supabase dashboard work.
 
+## Local Runtime Prerequisite
+
+Test-user mutation is local-only. Start the repository Supabase stack and write its loopback
+credentials into the ignored `.env.local` before using this lifecycle:
+
+```bash
+npx --yes supabase@2.109.1 start
+npm run supabase:local:configure
+npm run supabase:local:status
+```
+
+`test-user` refuses every non-loopback Supabase URL before opening a Supabase client. Hosted
+Supabase credentials belong only in deployment environments and are never an override for this
+workflow.
+
+Fresh local resets receive canonical table privileges from the migration history. Those grants
+remain paired with existing own-row RLS policies for `authenticated`; server-only access stays
+bounded to `service_role`, and no local setup script issues ad hoc grants.
+
 ## Purpose
 
 This repo supports one narrow test-user lifecycle path:
@@ -29,6 +48,7 @@ npm run test-user -- <command> ...
 This tool is for `tester` accounts only.
 
 It must not be used to reset or delete the protected primary account.
+Create also refuses to replace a protected local admin account.
 
 ## Required Identifiers
 
@@ -145,6 +165,8 @@ What delete removes:
 - `public.plan_cycles` through cascade
 - `public.planned_workouts` through cascade
 - `public.workout_logs` through cascade
+
+Delete fails unless the auth user and all counted canonical rows read back as zero afterward.
 - the local credentials account entry
 
 What delete preserves:

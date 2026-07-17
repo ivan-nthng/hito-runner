@@ -71,33 +71,20 @@ export const structuredPlanAuthoringInputSchema = z
       targetDate: isoDateSchema.optional().nullable(),
       preparationHorizonWeeks: z.number().int().min(1).max(40).optional().nullable(),
     }),
-    runnerProfile: z
-      .object({
-        experienceLevel: z.enum([
-          "new_runner",
-          "returning_runner",
-          "consistent_runner",
-          "experienced_runner",
-        ]),
-        baselineSessionsPerWeek: z.number().int().min(1).max(7),
-        baselineLongRunKm: z.number().positive().max(80).optional().nullable(),
-        baselineLongRunDurationMin: z.number().int().min(20).max(300).optional().nullable(),
-        age: z.number().int().min(13).max(100).optional().nullable(),
-        recentInjuryRecoveryContext: z.string().trim().max(500).optional().nullable(),
-        preferredEffortLanguage: z
-          .enum(["pace", "heart_rate", "rpe", "mixed"])
-          .optional()
-          .nullable(),
-      })
-      .superRefine((value, context) => {
-        if (!value.baselineLongRunKm && !value.baselineLongRunDurationMin) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["baselineLongRunKm"],
-            message: "Provide baselineLongRunKm or baselineLongRunDurationMin.",
-          });
-        }
-      }),
+    runnerProfile: z.object({
+      experienceLevel: z.enum([
+        "new_runner",
+        "returning_runner",
+        "consistent_runner",
+        "experienced_runner",
+      ]),
+      baselineSessionsPerWeek: z.number().int().min(1).max(7),
+      baselineLongRunKm: z.number().positive().max(80).optional().nullable(),
+      baselineLongRunDurationMin: z.number().int().min(20).max(300).optional().nullable(),
+      age: z.number().int().min(13).max(100).optional().nullable(),
+      recentInjuryRecoveryContext: z.string().trim().max(500).optional().nullable(),
+      preferredEffortLanguage: z.enum(["pace", "heart_rate", "rpe", "mixed"]).optional().nullable(),
+    }),
     currentLevel: z
       .object({
         recentResultSummary: z.string().trim().max(500).optional().nullable(),
@@ -165,7 +152,25 @@ export const structuredPlanAuthoringInputSchema = z
     planGoalIntent: normalizedPlanGoalIntentSchema.optional().nullable(),
   })
   .superRefine((value, context) => {
-    if (!value.schedule.targetDate && !value.schedule.preparationHorizonWeeks) {
+    const planFirstDistanceGoal = Boolean(value.planGoalIntent?.distance);
+
+    if (
+      !planFirstDistanceGoal &&
+      !value.runnerProfile.baselineLongRunKm &&
+      !value.runnerProfile.baselineLongRunDurationMin
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["runnerProfile", "baselineLongRunKm"],
+        message: "Provide baselineLongRunKm or baselineLongRunDurationMin.",
+      });
+    }
+
+    if (
+      !planFirstDistanceGoal &&
+      !value.schedule.targetDate &&
+      !value.schedule.preparationHorizonWeeks
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["schedule", "targetDate"],

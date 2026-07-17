@@ -11,8 +11,6 @@ import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import {
   cleanupDisposableSupabaseUser,
   createDisposableSupabaseUser,
-  DISPOSABLE_REMOTE_MUTATION_ENV_VALUE,
-  DISPOSABLE_REMOTE_MUTATION_FLAG,
   DISPOSABLE_REQUIRE_PERSISTENCE_FLAG,
   readDisposablePersistenceCliOptions,
   resolveDisposablePersistencePreflight,
@@ -39,11 +37,6 @@ type ManualDisposableCleanupProof = DisposableSupabaseCleanupProof<
 >;
 
 export const MANUAL_REQUIRE_PERSISTENCE_FLAG = DISPOSABLE_REQUIRE_PERSISTENCE_FLAG;
-export const MANUAL_REMOTE_MUTATION_FLAG = DISPOSABLE_REMOTE_MUTATION_FLAG;
-export const MANUAL_REMOTE_MUTATION_ENV = "HITO_MANUAL_WORKOUT_CONFIRM_ALLOW_REMOTE_MUTATION";
-export const MANUAL_REMOTE_MUTATION_ENV_VALUE = DISPOSABLE_REMOTE_MUTATION_ENV_VALUE;
-
-const ALLOWED_REMOTE_PROJECT_REF = "dltfjwexyctmihclcjqj";
 const MANUAL_DISPOSABLE_CLEANUP_SPECS = [
   {
     table: "workout_logs",
@@ -86,11 +79,7 @@ export type ManualPersistenceTarget = DisposableSupabaseTarget;
 export type ManualPersistencePreflight = DisposablePersistencePreflight;
 
 export function readManualPersistenceCliOptions(args = process.argv.slice(2)) {
-  return readDisposablePersistenceCliOptions({
-    args,
-    remoteMutationEnv: MANUAL_REMOTE_MUTATION_ENV,
-    remoteMutationEnvValue: MANUAL_REMOTE_MUTATION_ENV_VALUE,
-  });
+  return readDisposablePersistenceCliOptions(args);
 }
 
 export function resolveManualPersistencePreflight(
@@ -110,12 +99,10 @@ export function resolveManualPersistencePreflight(
       "NEXT_PUBLIC_SUPABASE_URL is not a valid URL; persistence proof was not attempted.",
     invalidUrlOverrideHint:
       "Use a valid local Supabase URL such as http://127.0.0.1:54321 and rerun with --require-persistence.",
-    remoteBlockedReason:
-      "Remote Supabase mutation is blocked by default for the manual workout confirm harness.",
-    remoteOverrideHint: `Use a local Supabase URL, or set ${MANUAL_REMOTE_MUTATION_ENV}=${MANUAL_REMOTE_MUTATION_ENV_VALUE} and pass ${MANUAL_REMOTE_MUTATION_FLAG} only for approved project ${ALLOWED_REMOTE_PROJECT_REF}.`,
-    allowedRemoteProjectRef: ALLOWED_REMOTE_PROJECT_REF,
-    remoteProjectNotAllowlistedReason: (target) =>
-      `Remote Supabase mutation target ${target.projectRef ?? target.hostname} is not allowlisted for this manual workout disposable proof.`,
+    nonLoopbackBlockedReason:
+      "Manual workout persistence proof only supports loopback Supabase; remote mutation is not available.",
+    nonLoopbackOverrideHint:
+      "Start local Supabase and run npm run supabase:local:configure before retrying.",
   });
 }
 
@@ -125,7 +112,7 @@ export function formatManualPersistenceBlocker(
   return [
     `Manual workout confirm persistence proof is blocked: ${preflight.reason}`,
     preflight.target
-      ? `Target: ${preflight.target.url} (${preflight.target.projectRef ?? preflight.target.hostname}).`
+      ? `Target: ${preflight.target.url} (${preflight.target.hostname}).`
       : "Target: none.",
     preflight.overrideHint,
   ].join(" ");

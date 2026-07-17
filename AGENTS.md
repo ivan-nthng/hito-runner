@@ -290,6 +290,41 @@ Goal:
 Make every implementation answer the question: "what did we reuse, and why did we need anything
 custom?"
 
+## 2.575) Additive Change Cleanup Pass (Mandatory)
+
+Adding source is not complete until the agent checks whether the addition replaced, duplicated, or
+made obsolete existing code.
+
+This applies to backend, frontend, scripts, validators, proof helpers, design-system recipes,
+devtools, route/view models, AI contracts, prompts, schemas, fixtures, and docs/source-of-truth.
+
+Before final validation, any role that adds or materially expands source must perform a cleanup pass:
+
+- search for existing functions, helpers, validators, fixtures, components, CSS recipes, scripts,
+  prompts, schemas, docs sections, or tests that now overlap with the new work
+- prefer deleting, inlining, or redirecting the old path to the canonical owner over keeping both
+- remove failed-attempt code, stale compatibility branches, redundant fixtures, unused labels,
+  duplicate diagnostics, dead exports, and obsolete proof-only scaffolding when source proof shows no
+  current consumer
+- if deletion is unsafe in the same slice, record the exact leftover owner and reason in the final
+  report or active plan; do not hide it as generic "future cleanup"
+- if the slice adds a new file, helper, validator, schema, component, or CSS recipe, the final report
+  must state what it replaces or why no existing owner could absorb the responsibility
+- if the touched source grows substantially, the agent must report the local line/source-shape impact
+  and explain why the net complexity is still lower or why cleanup is deliberately deferred
+- do not create a second implementation path just to make the new path pass; route callers to the
+  canonical seam or delete the stale seam once validation proves replacement
+
+For compiler/generated-plan work specifically, do not keep layering provider prompt rules,
+validators, fixtures, and diagnostics indefinitely without an Architect checkpoint when the live
+plan still cannot produce an accepted reviewable draft. First prove the minimum plan can work, then
+harden executable richness in bounded follow-up gates.
+
+Goal:
+
+Every addition should shrink or clarify the system around it. If it only adds weight, the work is
+not complete.
+
 ## 2.58) Bolder Root-Cause Batch Mode And Documentation Restraint (Mandatory)
 
 Agents should be careful with production truth, but not timid with local source cleanup and

@@ -8,6 +8,7 @@ export type AiPlanGenerationFinalOutcome =
   | "persisted_plan_created"
   | "unavailable"
   | "rejected"
+  | "cancelled"
   | "timeout"
   | "provider_error";
 
@@ -71,7 +72,6 @@ export interface AiPlanGenerationLedgerTrace {
   pipeline: {
     parseStatus: AiPlanGenerationParseStatus;
     normalizationStatus: AiPlanGenerationNormalizationStatus;
-    repairs: readonly string[];
     validationIssues: readonly string[];
     canonicalRowCount: number | null;
     runningWorkoutCount: number | null;
@@ -148,7 +148,6 @@ export async function createAiPlanGenerationLedgerTrace(input: {
     pipeline: {
       parseStatus: "not_started",
       normalizationStatus: "not_started",
-      repairs: [],
       validationIssues: [],
       canonicalRowCount: null,
       runningWorkoutCount: null,

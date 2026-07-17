@@ -1,13 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { createFirstPlanFromReviewedCanonicalPlanForUser } from "@/lib/active-plan-persistence";
 import type {
-  AiFirstPlanGenerationContract,
   AiFirstPlanDraftDebugMetadata,
   AiFirstPlanDraftPreviewMetadata,
   AiFirstPlanDraftUnavailableMetadata,
   GenerateAiFirstPlanDraftPreviewOptions,
 } from "@/lib/ai-first-plan-draft-service";
+import { AI_AUTHORED_PLAN_FIRST_SOURCE_KIND } from "@/lib/ai-authored-plan-first-compiler";
 import { importedPlanSchema, type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   buildStructuredFirstPlanAuthoringInput,
@@ -36,26 +37,25 @@ import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 
 const structuredFirstPlanDraftInputSchema = z.unknown();
 const structuredFirstPlanConfirmInputSchema = z.unknown();
-const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MODEL = "gpt-4.1-mini";
-const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_TIMEOUT_MS = 240_000;
-const DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MAX_OUTPUT_TOKENS = 32_000;
+const DEFAULT_STRUCTURED_FIRST_PLAN_MODEL = "gpt-4.1-mini";
+const PRODUCT_FIRST_PLAN_TIMEOUT_MS = 0;
+const DEFAULT_STRUCTURED_FIRST_PLAN_MAX_OUTPUT_TOKENS = 32_000;
 
 const structuredFirstPlanDraftGenerationDebugSchema = z
   .object({
     timeoutMs: z.number().int().nonnegative(),
     maxOutputTokens: z.number().int().positive(),
-    contractMode: z.enum(["blueprint", "envelope"]),
-    responseSchemaMode: z.enum([
-      "responses_json_schema_blueprint_strict",
-      "responses_json_schema_envelope_strict",
-    ]),
+    contractMode: z.literal("plan_first"),
+    responseSchemaMode: z.literal("responses_json_schema_plan_first_strict"),
     requestPhase: z.enum([
       "not_started",
       "request_started",
       "response_parsed",
       "normalized",
-      "fallback_after_validation",
+      "rejected_after_validation",
       "request_failed",
+      "request_cancelled",
+      "response_incomplete",
       "timeout_before_response",
     ]),
     abortFired: z.boolean(),
@@ -71,120 +71,10 @@ const structuredFirstPlanDraftGenerationDebugSchema = z
   })
   .strict();
 
-const structuredFirstPlanBlueprintTraceWeekSchema = z
-  .object({
-    weekNumber: z.number().int().min(1).max(52),
-    phase: z.string().trim().min(1).nullable().optional(),
-    theme: z.string().trim().min(1).max(180).nullable().optional(),
-    identities: z.array(z.string().trim().min(1).max(120)).max(7),
-    families: z.array(z.string().trim().min(1).max(120)).max(7),
-    icons: z.array(z.string().trim().min(1).max(120)).max(7),
-    dates: z.array(z.string().trim().min(1).max(32)).max(7).optional(),
-  })
-  .strict();
-
-const structuredFirstPlanBlueprintTraceSchema = z
-  .object({
-    sourceKind: z.string().trim().min(1).nullable(),
-    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft"]),
-    fallbackReason: z.string().trim().min(1).nullable(),
-    model: z.string().trim().min(1).nullable(),
-    timeoutMs: z.number().int().nonnegative().nullable(),
-    elapsedMs: z.number().int().nonnegative().nullable(),
-    opsMode: z.string().trim().min(1).nullable().optional(),
-    opsFixture: z.string().trim().min(1).nullable().optional(),
-    requestSummary: z
-      .object({
-        goalFamily: z.string().trim().min(1).max(80),
-        goalType: z.string().trim().min(1).max(80),
-        goalStyle: z.string().trim().min(1).max(80).nullable(),
-        goalDistance: z.string().trim().min(1).max(80),
-        targetTimePresent: z.boolean(),
-        targetDate: z.string().trim().min(1).nullable(),
-        runningDaysPerWeek: z.number().int().min(1).max(7),
-        fixedRestDays: z.array(z.string().trim().min(1).max(16)).max(7),
-        preferredLongRunDay: z.string().trim().min(1).max(16).nullable(),
-      })
-      .strict(),
-    blueprintCompleteness: z
-      .object({
-        expectedWeekCount: z.number().int().min(1).max(52),
-        actualWeekCount: z.number().int().min(0).max(52),
-        expectedRequiredSlotCount: z.number().int().min(1).max(364),
-        actualAuthoredWorkoutCount: z.number().int().min(0).max(364),
-        missingWeekNumbers: z.array(z.number().int().min(1).max(52)).max(24),
-        firstMissingRequiredDates: z.array(z.string().trim().min(1).max(32)).max(12),
-      })
-      .strict()
-      .optional(),
-    blueprintHorizonStrategy: z
-      .object({
-        requestedHorizonWeeks: z.number().int().min(1).max(52),
-        aiAuthoredHorizonWeeks: z.number().int().min(1).max(52),
-        backendExtendedWeeks: z.number().int().min(0).max(52),
-        promptRequiredSlotCount: z.number().int().min(1).max(364),
-        finalRequiredSlotCount: z.number().int().min(1).max(364),
-        promptCharEstimateBefore: z.number().int().nonnegative().nullable(),
-        promptCharEstimateAfter: z.number().int().nonnegative().nullable(),
-        finalWorkoutCount: z.number().int().nonnegative().nullable(),
-      })
-      .strict()
-      .optional(),
-    datePlacement: z
-      .object({
-        mode: z.literal("openai_authored_dated_plan"),
-        authoredDateSource: z.enum(["openai_authored_date", "local_fixture_authored_date"]),
-        validationStatus: z.enum([
-          "backend_validated_date",
-          "backend_repaired_date",
-          "backend_rejected_date",
-        ]),
-        explicitAuthoredWorkoutDateCount: z.number().int().nonnegative().nullable(),
-        missingAuthoredWorkoutDateCount: z.number().int().nonnegative().nullable(),
-        backendFilledRestDayCount: z.number().int().nonnegative().nullable(),
-        backendRepairedDateCount: z.number().int().nonnegative(),
-        backendExtendedWeeks: z.number().int().nonnegative().nullable(),
-      })
-      .strict()
-      .optional(),
-    requiredCadenceSlots: z
-      .array(
-        z
-          .object({
-            weekNumber: z.number().int().min(1).max(52),
-            date: z.string().trim().min(1).max(32),
-            weekday: z.string().trim().min(1).max(16),
-            kind: z.string().trim().min(1).max(40),
-            identityOptions: z.array(z.string().trim().min(1).max(120)).max(12),
-            purpose: z.string().trim().min(1).max(180),
-          })
-          .strict(),
-      )
-      .max(52),
-    authoredBlueprintWeeks: z.array(structuredFirstPlanBlueprintTraceWeekSchema).max(52),
-    validationIssueCodes: z.array(z.string().trim().min(1).max(120)).max(24),
-    validationIssueSummary: z.array(z.string().trim().min(1).max(220)).max(12),
-    repairs: z.array(z.string().trim().min(1).max(220)).max(12),
-    normalizedCanonicalWeeks: z.array(structuredFirstPlanBlueprintTraceWeekSchema).max(52),
-    deterministicFallbackBoundary: z
-      .object({
-        used: z.boolean(),
-        reason: z.string().trim().min(1).nullable(),
-      })
-      .strict(),
-    finalReviewedPlanIdentityCounts: z.record(z.string(), z.number().int().nonnegative()),
-    finalReviewedPlanFamilyCounts: z.record(z.string(), z.number().int().nonnegative()),
-    finalReviewedPlanIconCounts: z.record(z.string(), z.number().int().nonnegative()),
-    persistedIdentityCounts: z.record(z.string(), z.number().int().nonnegative()).nullable(),
-  })
-  .strict();
-
 const structuredFirstPlanDraftGenerationMetadataSchema = z
   .object({
-    sourceStatus: z.enum(["ai_authored", "repaired_ai_draft", "expanded_from_envelope"]),
-    sourceKind: z.string().trim().min(1),
-    fallbackReason: z.string().trim().min(1).nullable(),
-    repairs: z.array(z.string().trim().min(1)).max(12),
+    sourceStatus: z.literal("ai_authored"),
+    sourceKind: z.literal(AI_AUTHORED_PLAN_FIRST_SOURCE_KIND),
     validationIssues: z.array(z.string().trim().min(1)).max(12),
     validationIssueCount: z.number().int().min(0),
     reviewAssumptions: z.array(z.string().trim().min(1)).max(8),
@@ -193,8 +83,6 @@ const structuredFirstPlanDraftGenerationMetadataSchema = z
     responseId: z.string().trim().min(1).nullable(),
     elapsedMs: z.number().int().nonnegative().nullable(),
     debug: structuredFirstPlanDraftGenerationDebugSchema.nullable(),
-    blueprintTrace: structuredFirstPlanBlueprintTraceSchema.nullable().optional(),
-    envelopeTrace: z.unknown().nullable().optional(),
   })
   .strict();
 
@@ -221,8 +109,8 @@ export type StructuredFirstPlanDraftResult =
   | {
       ok: false;
       status: "draft_failed";
-      reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
-      code: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
+      reason: "ai_authored_plan_first_unavailable";
+      code: "ai_authored_plan_first_unavailable";
       message: string;
       generation: StructuredFirstPlanDraftFailureMetadata;
       safety: StructuredFirstPlanDraftSafety;
@@ -269,35 +157,21 @@ export type StructuredFirstPlanDraftGenerationMetadata = z.output<
 >;
 
 export interface StructuredFirstPlanDraftFailureMetadata {
-  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_envelope_v1";
-  sourceStatus: "blueprint_unavailable" | "envelope_unavailable";
-  fallbackReason: string;
+  sourceKind: typeof AI_AUTHORED_PLAN_FIRST_SOURCE_KIND;
+  sourceStatus: "plan_first_unavailable";
+  unavailableReason: string;
   validationIssues: string[];
   validationIssueCount: number;
   model: string | null;
   responseId: string | null;
   elapsedMs: number | null;
   debug: z.output<typeof structuredFirstPlanDraftGenerationDebugSchema> | null;
-  blueprintTrace: AiFirstPlanDraftUnavailableMetadata["blueprintTrace"];
-  envelopeTrace?: AiFirstPlanDraftUnavailableMetadata["envelopeTrace"];
 }
 
-type StructuredFirstPlanInternalDraftContract = Extract<
-  AiFirstPlanGenerationContract,
-  "blueprint" | "envelope"
->;
-
 export interface GenerateStructuredFirstPlanDraftOptions {
-  internalDraftContract?: StructuredFirstPlanInternalDraftContract;
   aiPreview?: Pick<
     GenerateAiFirstPlanDraftPreviewOptions,
-    | "apiKey"
-    | "model"
-    | "timeoutMs"
-    | "maxOutputTokens"
-    | "fetchImpl"
-    | "referenceExample"
-    | "today"
+    "apiKey" | "model" | "timeoutMs" | "maxOutputTokens" | "fetchImpl" | "signal" | "today"
   >;
 }
 
@@ -313,17 +187,14 @@ interface StructuredFirstPlanActionDebugContext {
 }
 
 interface StructuredFirstPlanAiPreviewDebugSummary {
-  contractMode: StructuredFirstPlanInternalDraftContract;
+  contractMode: "plan_first";
   model: string | null;
   timeoutMs: number | null;
   maxOutputTokens: number | null;
-  referenceExampleProvided: boolean;
   explicitOptionKeys: string[];
   envSource: {
     openAiFirstPlanModel: "env" | "default";
-    openAiFirstPlanTimeoutMs: "env" | "default";
     openAiFirstPlanMaxOutputTokens: "env" | "default";
-    fallbackGenericOpenAiPlanModelUsed: boolean;
     genericOpenAiPlanModelConfigured: boolean;
   };
 }
@@ -358,7 +229,9 @@ export const generateStructuredFirstPlanDraft = createServerFn({ method: "POST" 
   .handler(async ({ data }): Promise<StructuredFirstPlanDraftResult> => {
     const userId = await requirePersistedUserIdForCurrentRequest();
 
-    return generateStructuredFirstPlanDraftForUser(userId, data);
+    return generateStructuredFirstPlanDraftForUser(userId, data, {
+      aiPreview: { signal: getRequest().signal },
+    });
   });
 
 export const confirmStructuredFirstPlanDraft = createServerFn({ method: "POST" })
@@ -374,10 +247,7 @@ export async function generateStructuredFirstPlanDraftForUser(
   input: unknown,
   options: GenerateStructuredFirstPlanDraftOptions = {},
 ): Promise<StructuredFirstPlanDraftResult> {
-  const aiPreviewConfig = resolveStructuredFirstPlanAiPreviewConfig(
-    options.aiPreview,
-    options.internalDraftContract,
-  );
+  const aiPreviewConfig = resolveStructuredFirstPlanAiPreviewConfig(options.aiPreview);
   const parsed = parseStructuredFirstPlanDraftInput(input);
 
   if (!parsed.ok) {
@@ -664,11 +534,9 @@ async function generateFirstPlanStructuredDraft(
     }
 > {
   const { generateAiFirstPlanDraftPreview } = await import("@/lib/ai-first-plan-draft-service");
-  const contractMode = aiPreviewOptions?.contractMode ?? "blueprint";
   const result = await generateAiFirstPlanDraftPreview({
     input: authoringInput,
     inputKind: "structured_authoring",
-    contractMode,
     ...(aiPreviewOptions ?? {}),
   });
 
@@ -686,39 +554,24 @@ async function generateFirstPlanStructuredDraft(
   });
 
   if (!supportedSource.ok) {
-    const sourceKind =
-      contractMode === "envelope" ? "ai_first_plan_envelope_v1" : "ai_first_plan_blueprint_v1";
-    const sourceStatus =
-      contractMode === "envelope" ? "envelope_unavailable" : "blueprint_unavailable";
-    const reason =
-      contractMode === "envelope"
-        ? "ai_first_plan_envelope_unavailable"
-        : "ai_first_plan_blueprint_unavailable";
-
     return {
       ok: false,
       result: buildStructuredAiDraftUnavailableResult({
         ok: false,
-        reason,
+        reason: "ai_authored_plan_first_unavailable",
         message: "We could not create a safe AI-authored plan draft. Please retry.",
-        issues: [
-          "AI first-plan generation returned an unsupported deterministic fallback or source boundary.",
-        ],
+        issues: ["AI first-plan generation returned an unsupported source boundary."],
         authoringInput,
         metadata: {
-          sourceKind,
-          sourceStatus,
-          fallbackReason: "structured_authoring_v1_blocked",
+          sourceKind: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
+          sourceStatus: "plan_first_unavailable",
+          unavailableReason: "unsupported_source_boundary",
           model: result.metadata.model,
           responseId: result.metadata.responseId,
           elapsedMs: result.metadata.elapsedMs,
-          validationIssues: [
-            "AI first-plan generation returned an unsupported deterministic fallback or source boundary.",
-          ],
+          validationIssues: ["AI first-plan generation returned an unsupported source boundary."],
           validationIssueCount: 1,
           debug: result.metadata.debug,
-          blueprintTrace: result.metadata.blueprintTrace ?? null,
-          envelopeTrace: result.metadata.envelopeTrace ?? null,
         },
       }),
     };
@@ -733,52 +586,44 @@ async function generateFirstPlanStructuredDraft(
 
 function resolveStructuredFirstPlanAiPreviewConfig(
   overrides: GenerateStructuredFirstPlanDraftOptions["aiPreview"] = {},
-  internalDraftContract: GenerateStructuredFirstPlanDraftOptions["internalDraftContract"] = "blueprint",
 ) {
   const defaults = {
-    model: serverEnv.openAiFirstPlanModel ?? DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MODEL,
-    timeoutMs: positiveIntegerEnv(
-      serverEnv.openAiFirstPlanTimeoutMs,
-      DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_TIMEOUT_MS,
-    ),
+    model: serverEnv.openAiFirstPlanModel ?? DEFAULT_STRUCTURED_FIRST_PLAN_MODEL,
+    timeoutMs: PRODUCT_FIRST_PLAN_TIMEOUT_MS,
     maxOutputTokens: positiveIntegerEnv(
       serverEnv.openAiFirstPlanMaxOutputTokens,
-      DEFAULT_STRUCTURED_FIRST_PLAN_BLUEPRINT_MAX_OUTPUT_TOKENS,
+      DEFAULT_STRUCTURED_FIRST_PLAN_MAX_OUTPUT_TOKENS,
     ),
-    referenceExample: null,
   };
-  const options = { ...defaults, ...(overrides ?? {}), contractMode: internalDraftContract };
+  const options = { ...defaults, ...(overrides ?? {}) };
 
   return {
     options,
     summary: {
-      contractMode: internalDraftContract,
+      contractMode: "plan_first",
       model: typeof options.model === "string" ? options.model : null,
       timeoutMs: typeof options.timeoutMs === "number" ? options.timeoutMs : null,
       maxOutputTokens: typeof options.maxOutputTokens === "number" ? options.maxOutputTokens : null,
-      referenceExampleProvided: Boolean(options.referenceExample),
       explicitOptionKeys: Object.keys(overrides ?? {}).sort(),
       envSource: {
         openAiFirstPlanModel: serverEnv.openAiFirstPlanModel ? "env" : "default",
-        openAiFirstPlanTimeoutMs: serverEnv.openAiFirstPlanTimeoutMs ? "env" : "default",
         openAiFirstPlanMaxOutputTokens: serverEnv.openAiFirstPlanMaxOutputTokens
           ? "env"
           : "default",
-        fallbackGenericOpenAiPlanModelUsed: false,
         genericOpenAiPlanModelConfigured: Boolean(serverEnv.openAiPlanModel),
       },
     } satisfies StructuredFirstPlanAiPreviewDebugSummary,
   };
 }
 
-function positiveIntegerEnv(value: string | null, fallback: number) {
+function positiveIntegerEnv(value: string | null, defaultValue: number) {
   if (!value) {
-    return fallback;
+    return defaultValue;
   }
 
   const parsed = Number(value);
 
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : defaultValue;
 }
 
 function resolveSupportedStructuredFirstPlanDraftSource({
@@ -792,31 +637,20 @@ function resolveSupportedStructuredFirstPlanDraftSource({
 }):
   | {
       ok: true;
-      snapshotSource: "ai_first_plan_blueprint" | "ai_first_plan_envelope";
+      snapshotSource: "ai_authored_plan_first";
     }
   | {
       ok: false;
       message: string;
     } {
   if (
-    sourceKind === "ai_first_plan_blueprint_v1" &&
-    generationSourceKind === "ai_first_plan_blueprint_v1" &&
-    ["ai_authored", "repaired_ai_draft"].includes(sourceStatus)
+    sourceKind === AI_AUTHORED_PLAN_FIRST_SOURCE_KIND &&
+    generationSourceKind === AI_AUTHORED_PLAN_FIRST_SOURCE_KIND &&
+    sourceStatus === "ai_authored"
   ) {
     return {
       ok: true,
-      snapshotSource: "ai_first_plan_blueprint",
-    };
-  }
-
-  if (
-    sourceKind === "ai_first_plan_envelope_v1" &&
-    generationSourceKind === "ai_first_plan_envelope_v1" &&
-    sourceStatus === "expanded_from_envelope"
-  ) {
-    return {
-      ok: true,
-      snapshotSource: "ai_first_plan_envelope",
+      snapshotSource: "ai_authored_plan_first",
     };
   }
 
@@ -833,9 +667,7 @@ function buildStructuredDraftGenerationMetadata(
 ): StructuredFirstPlanDraftGenerationMetadata {
   return structuredFirstPlanDraftGenerationMetadataSchema.parse({
     sourceStatus: metadata.status,
-    sourceKind: canonicalPlan.source_kind ?? sourceKindFromGenerationSource(metadata.source),
-    fallbackReason: metadata.fallbackReason,
-    repairs: metadata.repairs.slice(0, 12),
+    sourceKind: canonicalPlan.source_kind ?? AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
     validationIssues: metadata.validationIssues.slice(0, 12),
     validationIssueCount: metadata.validationIssueCount,
     reviewAssumptions: metadata.reviewAssumptions.slice(0, 8),
@@ -844,15 +676,13 @@ function buildStructuredDraftGenerationMetadata(
     responseId: metadata.responseId,
     elapsedMs: metadata.elapsedMs,
     debug: sanitizeStructuredDraftGenerationDebug(metadata.debug),
-    blueprintTrace: metadata.blueprintTrace ?? null,
-    envelopeTrace: metadata.envelopeTrace ?? null,
   });
 }
 
 function buildStructuredAiDraftUnavailableResult(result: {
   issues: string[];
   message?: string;
-  reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable" | string;
+  reason: "ai_authored_plan_first_unavailable" | string;
   metadata?: AiFirstPlanDraftUnavailableMetadata;
 }): Extract<StructuredFirstPlanDraftResult, { ok: false }> {
   const validationIssues = (result.metadata?.validationIssues ?? result.issues)
@@ -860,22 +690,18 @@ function buildStructuredAiDraftUnavailableResult(result: {
     .filter(Boolean)
     .slice(0, 12);
 
-  const sourceKind = result.metadata?.sourceKind ?? "ai_first_plan_blueprint_v1";
-  const envelopeUnavailable = sourceKind === "ai_first_plan_envelope_v1";
-  const unavailableReason = envelopeUnavailable
-    ? "ai_first_plan_envelope_unavailable"
-    : "ai_first_plan_blueprint_unavailable";
+  const sourceKind = result.metadata?.sourceKind ?? AI_AUTHORED_PLAN_FIRST_SOURCE_KIND;
 
   return {
     ok: false,
     status: "draft_failed",
-    reason: unavailableReason,
-    code: unavailableReason,
+    reason: "ai_authored_plan_first_unavailable",
+    code: "ai_authored_plan_first_unavailable",
     message: result.message ?? "We could not create a safe AI-authored plan draft. Please retry.",
     generation: {
       sourceKind,
-      sourceStatus: envelopeUnavailable ? "envelope_unavailable" : "blueprint_unavailable",
-      fallbackReason: result.metadata?.fallbackReason ?? result.reason,
+      sourceStatus: "plan_first_unavailable",
+      unavailableReason: result.metadata?.unavailableReason ?? result.reason,
       validationIssues,
       validationIssueCount: result.metadata?.validationIssueCount ?? validationIssues.length,
       model: result.metadata?.model ?? null,
@@ -884,8 +710,6 @@ function buildStructuredAiDraftUnavailableResult(result: {
       debug: result.metadata?.debug
         ? sanitizeStructuredDraftGenerationDebug(result.metadata.debug)
         : null,
-      blueprintTrace: result.metadata?.blueprintTrace ?? null,
-      envelopeTrace: result.metadata?.envelopeTrace ?? null,
     },
     safety: buildStructuredDraftSafety(),
   };
@@ -894,31 +718,35 @@ function buildStructuredAiDraftUnavailableResult(result: {
 function classifyStructuredDraftFailureLayer(
   result: Extract<StructuredFirstPlanDraftResult, { ok: false }>,
 ) {
-  const fallbackReason = result.generation.fallbackReason;
+  const unavailableReason = result.generation.unavailableReason;
   const requestPhase = result.generation.debug?.requestPhase ?? null;
 
-  if (fallbackReason.includes("timed_out") || requestPhase === "timeout_before_response") {
+  if (unavailableReason.includes("timed_out") || requestPhase === "timeout_before_response") {
     return "openai_timeout";
   }
 
-  if (fallbackReason.includes("incomplete")) {
-    return "blueprint_incomplete";
+  if (unavailableReason.includes("cancelled") || requestPhase === "request_cancelled") {
+    return "openai_cancelled";
   }
 
-  if (fallbackReason.includes("schema") || fallbackReason.includes("non_json")) {
+  if (unavailableReason.includes("incomplete") || requestPhase === "response_incomplete") {
+    return "openai_incomplete";
+  }
+
+  if (unavailableReason.includes("schema") || unavailableReason.includes("non_json")) {
     return "openai_schema";
   }
 
-  if (fallbackReason.includes("request_failed")) {
+  if (unavailableReason.includes("request_failed")) {
     return "openai_request";
   }
 
-  if (fallbackReason.includes("not_configured")) {
+  if (unavailableReason.includes("not_configured")) {
     return "service_unavailable";
   }
 
-  if (requestPhase === "fallback_after_validation") {
-    return "blueprint_validation";
+  if (requestPhase === "rejected_after_validation") {
+    return "plan_first_validation";
   }
 
   return "action_result_mapping";
@@ -981,7 +809,6 @@ async function writeStructuredFirstPlanActionDebugArtifact(
         category: context.errorLayer,
         openAiReturnedBeforeFailure: didOpenAiReturnBeforeStructuredResult(context.result),
       },
-      blueprintTrace: extractStructuredResultBlueprintTrace(context.result),
       comparisonKeys: {
         setupSummaryHash: await digestSha256Hex(
           stableJsonStringify(
@@ -1161,14 +988,11 @@ function summarizeStructuredFirstPlanActionResult(result: StructuredFirstPlanDra
       status: result.status,
       sourceKind: result.generation.sourceKind,
       sourceStatus: result.generation.sourceStatus,
-      fallbackReason: result.generation.fallbackReason,
       validationIssueCount: result.generation.validationIssueCount,
       validationIssues: result.generation.validationIssues,
       model: result.generation.model,
       elapsedMs: result.generation.elapsedMs,
       workoutCount: result.draft.canonicalPlan.planned_workouts.length,
-      deterministicFallbackBoundary:
-        result.generation.blueprintTrace?.deterministicFallbackBoundary ?? null,
       debug: result.generation.debug,
     };
   }
@@ -1191,13 +1015,11 @@ function summarizeStructuredFirstPlanActionResult(result: StructuredFirstPlanDra
     message: result.message,
     sourceKind: result.generation.sourceKind,
     sourceStatus: result.generation.sourceStatus,
-    fallbackReason: result.generation.fallbackReason,
+    unavailableReason: result.generation.unavailableReason,
     validationIssueCount: result.generation.validationIssueCount,
     validationIssues: result.generation.validationIssues,
     model: result.generation.model,
     elapsedMs: result.generation.elapsedMs,
-    deterministicFallbackBoundary:
-      result.generation.blueprintTrace?.deterministicFallbackBoundary ?? null,
     debug: result.generation.debug,
   };
 }
@@ -1211,30 +1033,7 @@ function didOpenAiReturnBeforeStructuredResult(result: StructuredFirstPlanDraftR
         : null;
   const requestPhase = debug?.requestPhase ?? null;
 
-  return requestPhase === "fallback_after_validation" || requestPhase === "normalized";
-}
-
-function extractStructuredResultBlueprintTrace(result: StructuredFirstPlanDraftResult) {
-  if (result.ok && result.status === "draft_ready") {
-    return result.generation.blueprintTrace ?? null;
-  }
-
-  if (!result.ok) {
-    return result.generation.blueprintTrace ?? null;
-  }
-
-  return null;
-}
-
-function sourceKindFromGenerationSource(source: AiFirstPlanDraftPreviewMetadata["source"]) {
-  switch (source) {
-    case "openai_ai_first_plan_blueprint":
-      return "ai_first_plan_blueprint_v1";
-    case "openai_ai_first_plan_envelope":
-      return "ai_first_plan_envelope_v1";
-    case "openai_ai_first_plan_draft":
-      return "unsupported_ai_first_plan_draft_v1";
-  }
+  return requestPhase === "rejected_after_validation" || requestPhase === "normalized";
 }
 
 function sanitizeStructuredDraftGenerationDebug(

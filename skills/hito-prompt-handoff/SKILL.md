@@ -34,6 +34,25 @@ If it is only symptom-level, rewrite the handoff before sending it. The prompt m
 For BACKEND and FRONTEND prompts, this gate is mandatory in the `Root cause and architecture fit`
 section. For QA prompts, this gate becomes explicit source-boundary proof and stop conditions.
 
+## Solution Ownership Boundary
+
+The handoff writer assigns the problem; the receiving role designs and executes the solution.
+
+Every prompt should provide:
+
+- the observed symptom and root-cause evidence;
+- the canonical owner and existing seams to inspect;
+- the product outcome, hard constraints, non-goals, and acceptance evidence;
+- decisions already made by the user or active plan.
+
+Do not prescribe a technical design, implementation algorithm, SQL shape, schema structure, helper
+layout, command sequence, or code recipe unless it is an explicit, already-decided product contract
+or safety boundary. A plausible diagnosis or previous agent suggestion is context for the receiving
+role to evaluate, not a mandated implementation.
+
+Before finalizing a prompt, ask: `Does this tell the agent what must become true, or does it try to
+tell the agent how to code it?` Keep the former and remove the latter.
+
 ## Required Reading
 
 1. `docs/context.md`
@@ -51,8 +70,9 @@ section. For QA prompts, this gate becomes explicit source-boundary proof and st
 5. List exact files/surfaces to inspect.
 6. Add subagent guidance when the next role can safely run independent read-only audits, tests,
    source scans, or non-mutating validation without user attention.
-7. State constraints and what not to touch.
-8. Specify validation requirements.
+7. State product outcome, constraints, non-goals, and what not to touch without prescribing the
+   receiving role's technical solution.
+8. Specify validation evidence, not a code-level implementation recipe.
 9. Rely on the standard report formats in `AGENTS.md` by default. Specify custom output only when
    the task needs stricter evidence, unusual ordering, or a non-standard report shape.
 10. Do not include a long continuity footer by default. Use only the standard shell plus `Blockers`

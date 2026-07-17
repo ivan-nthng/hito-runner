@@ -76,7 +76,6 @@ export const serverEnv = {
   openAiApiKey: optionalEnv("OPENAI_API_KEY"),
   openAiPlanModel: optionalEnv("OPENAI_PLAN_MODEL"),
   openAiFirstPlanModel: optionalEnv("OPENAI_FIRST_PLAN_MODEL"),
-  openAiFirstPlanTimeoutMs: optionalEnv("OPENAI_FIRST_PLAN_TIMEOUT_MS"),
   openAiFirstPlanMaxOutputTokens: optionalEnv("OPENAI_FIRST_PLAN_MAX_OUTPUT_TOKENS"),
   localAuthBypassEnabled:
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED")?.toLowerCase() === "true" ||
@@ -110,7 +109,11 @@ export function isLoopbackRuntimeUrl(url: string | URL | null | undefined) {
 }
 
 export function isDevOnlyLocalAuthRuntime(url: string | URL | null | undefined) {
-  return hasLocalAuthBypassEnv && isLoopbackRuntimeUrl(url);
+  return (
+    hasLocalAuthBypassEnv &&
+    isLoopbackRuntimeUrl(url) &&
+    isLoopbackRuntimeUrl(publicEnv.supabaseUrl)
+  );
 }
 
 export function resolveRuntimeAppBaseUrl(options?: {

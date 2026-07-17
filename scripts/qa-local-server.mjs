@@ -122,7 +122,11 @@ async function startCommand() {
     return;
   }
 
-  if (status.serverPid && status.serverStatus === "stale" && status.compatibleServer) {
+  if (
+    status.serverPid &&
+    ["stale", "unsafe_bind"].includes(status.serverStatus) &&
+    status.compatibleServer
+  ) {
     console.log(
       `[qa-local-server] Restarting stale built QA server on ${healthUrl} (pid ${status.serverPid}).`,
     );
@@ -141,7 +145,13 @@ async function startCommand() {
     cwd: rootDir,
     detached: true,
     stdio: ["ignore", openSync(logPath, "a"), openSync(logPath, "a")],
-    env: process.env,
+    env: {
+      ...process.env,
+      HOST: host,
+      NITRO_HOST: host,
+      PORT: String(port),
+      NITRO_PORT: String(port),
+    },
   });
 
   launcher.unref();
@@ -225,9 +235,11 @@ async function resolveServerStatus() {
   const pids = listeningPids();
   const serverPid = resolveServerPid(pids, state);
   const commandLine = serverPid ? processCommand(serverPid) : null;
-  const currentRuntimeServer = serverPid ? isCompatibleServerCommand(commandLine) : false;
+  const loopbackListener = serverPid ? hasOnlyLoopbackListeners(serverPid) : false;
+  const currentRuntimeCommand = serverPid ? isCompatibleServerCommand(commandLine) : false;
   const legacyRuntimeServer = serverPid ? isLegacyWorkspaceRuntimeCommand(commandLine) : false;
-  const compatibleServer = currentRuntimeServer || legacyRuntimeServer;
+  const compatibleServer = currentRuntimeCommand || legacyRuntimeServer;
+  const currentRuntimeServer = currentRuntimeCommand && loopbackListener;
   const healthy = serverPid ? await isHealthy() : false;
   const buildIntegrity = readBuildIntegrity();
   const buildFingerprint = buildIntegrity.status === "present" ? readBuildFingerprint() : null;
@@ -240,21 +252,24 @@ async function resolveServerStatus() {
     ? "stopped"
     : !compatibleServer
       ? "unmanaged"
-      : !currentRuntimeServer
-        ? "stale"
-        : !healthy
-          ? "unhealthy"
-          : buildStatus !== "present" || !buildFingerprint
-            ? "stale"
-            : processIsOlderThanBuild
+      : !loopbackListener
+        ? "unsafe_bind"
+        : !currentRuntimeServer
+          ? "stale"
+          : !healthy
+            ? "unhealthy"
+            : buildStatus !== "present" || !buildFingerprint
               ? "stale"
-              : "current";
+              : processIsOlderThanBuild
+                ? "stale"
+                : "current";
 
   return {
     state,
     pids,
     serverPid,
     commandLine,
+    loopbackListener,
     currentRuntimeServer,
     legacyRuntimeServer,
     compatibleServer,
@@ -281,7 +296,10 @@ async function waitForHealthyServer() {
 
   while (Date.now() - startedAt < timeoutMs) {
     const pids = listeningPids();
-    const serverPid = pids.find((pid) => isCompatibleServerCommand(processCommand(pid))) ?? null;
+    const serverPid =
+      pids.find(
+        (pid) => isCompatibleServerCommand(processCommand(pid)) && hasOnlyLoopbackListeners(pid),
+      ) ?? null;
 
     if (serverPid && (await isHealthy())) {
       return serverPid;
@@ -353,6 +371,33 @@ function listeningPids() {
   } catch {
     return [];
   }
+}
+
+function hasOnlyLoopbackListeners(pid) {
+  try {
+    const output = execFileSync(
+      "lsof",
+      ["-nP", "-a", "-p", String(pid), `-iTCP:${port}`, "-sTCP:LISTEN", "-Fn"],
+      { encoding: "utf8" },
+    );
+    const addresses = output
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("n"))
+      .map((line) => line.slice(1));
+
+    return addresses.length > 0 && addresses.every(isLoopbackListenAddress);
+  } catch {
+    return false;
+  }
+}
+
+function isLoopbackListenAddress(address) {
+  return (
+    address.startsWith("127.0.0.1:") ||
+    address.startsWith("localhost:") ||
+    address.startsWith("[::1]:") ||
+    address.startsWith("::1:")
+  );
 }
 
 function processCommand(pid) {
@@ -581,6 +626,7 @@ function printStatus(status) {
     `pid: ${status.serverPid ?? "none"}`,
     `managed: ${Boolean(status.state?.serverPid && status.state.serverPid === status.serverPid)}`,
     `compatible: ${status.compatibleServer}`,
+    `loopbackBind: ${status.loopbackListener}`,
     `healthy: ${status.healthy}`,
     `build: ${status.buildStatus}`,
     `runtime: ${finalizedOutputDir}`,

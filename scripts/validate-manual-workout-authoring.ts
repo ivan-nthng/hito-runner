@@ -108,8 +108,7 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
   const lifecycleEditableSources = [
     MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
     "structured_authoring_v1",
-    "ai_first_plan_blueprint_v1",
-    "ai_first_plan_envelope_v1",
+    "ai_authored_plan_first_v1",
     "training_plan_v2_import",
     "active_plan_refresh_v1",
   ];

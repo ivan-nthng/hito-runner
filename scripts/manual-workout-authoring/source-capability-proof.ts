@@ -312,7 +312,7 @@ export function validateManualSourceEditingCapabilityReadback() {
   const presetPlan = buildFakePlanCycle({
     userId,
     id: "00000000-0000-4000-8000-000000000029",
-    sourceKind: "ai_first_plan_blueprint_v1",
+    sourceKind: "ai_authored_plan_first_v1",
     startDate: "2026-06-01",
     endDate: "2026-06-30",
   });
@@ -341,7 +341,7 @@ export function validateManualSourceEditingCapabilityReadback() {
   const selectedPlan = buildFakePlanCycle({
     userId,
     id: "00000000-0000-4000-8000-000000000030",
-    sourceKind: "ai_first_plan_blueprint_v1",
+    sourceKind: "ai_authored_plan_first_v1",
     startDate: "2026-06-01",
     endDate: "2026-06-30",
   });

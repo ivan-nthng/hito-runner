@@ -78,8 +78,7 @@ export interface ActivePlanUserEditMetadata {
 const EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS = new Set([
   "manual_user_built_plan_v1",
   "structured_authoring_v1",
-  "ai_first_plan_blueprint_v1",
-  "ai_first_plan_envelope_v1",
+  "ai_authored_plan_first_v1",
   "training_plan_v2_import",
   "active_plan_refresh_v1",
 ]);
@@ -200,8 +199,7 @@ export function resolveActivePlanSourceStatus(activePlan: PersistedPlanCycleRow)
     "manual_user_built_plan",
     "selected_plan_engine",
     "active_plan_refresh",
-    "ai_first_plan_blueprint",
-    "ai_first_plan_envelope",
+    "ai_authored_plan_first",
   ]) {
     const nestedStatus = readString(asRecord(root[key]).source_status);
 

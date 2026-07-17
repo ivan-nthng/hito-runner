@@ -6,121 +6,12 @@ export type AiFirstPlanDraftNormalizationIssue = {
   path?: string;
 };
 
-export type AiFirstPlanBlueprintDateAuthorshipMode = "openai_authored_dated_plan";
-
-export type AiFirstPlanBlueprintAuthoredDateSource =
-  | "openai_authored_date"
-  | "local_fixture_authored_date";
-
-export type AiFirstPlanBlueprintDateValidationStatus =
-  | "backend_validated_date"
-  | "backend_repaired_date"
-  | "backend_rejected_date";
-
-export interface AiFirstPlanBlueprintDatePlacementMetadata {
-  mode: AiFirstPlanBlueprintDateAuthorshipMode;
-  authoredDateSource: AiFirstPlanBlueprintAuthoredDateSource;
-  validationStatus: AiFirstPlanBlueprintDateValidationStatus;
-  explicitAuthoredWorkoutDateCount: number | null;
-  missingAuthoredWorkoutDateCount: number | null;
-  backendFilledRestDayCount: number | null;
-  backendRepairedDateCount: number;
-  backendExtendedWeeks: number | null;
-}
-
-export interface AiFirstPlanBlueprintTraceMetadata {
-  sourceKind: string | null;
-  sourceStatus: "ai_authored" | "repaired_ai_draft" | "blueprint_unavailable";
-  fallbackReason: string | null;
-  model: string | null;
-  timeoutMs: number | null;
-  elapsedMs: number | null;
-  opsMode?: string | null;
-  opsFixture?: string | null;
-  requestSummary: {
-    goalFamily: string;
-    goalType: string;
-    goalStyle: string | null;
-    goalDistance: string;
-    targetTimePresent: boolean;
-    targetDate: string | null;
-    runningDaysPerWeek: number;
-    fixedRestDays: string[];
-    preferredLongRunDay: string | null;
-  };
-  blueprintCompleteness?: {
-    expectedWeekCount: number;
-    actualWeekCount: number;
-    expectedRequiredSlotCount: number;
-    actualAuthoredWorkoutCount: number;
-    missingWeekNumbers: number[];
-    firstMissingRequiredDates: string[];
-  };
-  datePlacement: AiFirstPlanBlueprintDatePlacementMetadata;
-  blueprintHorizonStrategy?: {
-    requestedHorizonWeeks: number;
-    aiAuthoredHorizonWeeks: number;
-    backendExtendedWeeks: number;
-    promptRequiredSlotCount: number;
-    finalRequiredSlotCount: number;
-    promptCharEstimateBefore: number | null;
-    promptCharEstimateAfter: number | null;
-    finalWorkoutCount: number | null;
-  };
-  requiredCadenceSlots: Array<{
-    weekNumber: number;
-    date: string;
-    weekday: string;
-    kind: string;
-    identityOptions: string[];
-    purpose: string;
-  }>;
-  authoredBlueprintWeeks: Array<{
-    weekNumber: number;
-    phase: string | null;
-    theme: string | null;
-    identities: string[];
-    families: string[];
-    icons: string[];
-    dates: string[];
-  }>;
-  validationIssueCodes: string[];
-  validationIssueSummary: string[];
-  repairs: string[];
-  normalizedCanonicalWeeks: Array<{
-    weekNumber: number;
-    identities: string[];
-    families: string[];
-    icons: string[];
-  }>;
-  deterministicFallbackBoundary: {
-    used: boolean;
-    reason: string | null;
-  };
-  finalReviewedPlanIdentityCounts: Record<string, number>;
-  finalReviewedPlanFamilyCounts: Record<string, number>;
-  finalReviewedPlanIconCounts: Record<string, number>;
-  persistedIdentityCounts: Record<string, number> | null;
-}
-
 export interface AiFirstPlanDraftMetadata {
-  status:
-    | "ai_authored"
-    | "repaired_ai_draft"
-    | "expanded_from_envelope"
-    | "blueprint_unavailable"
-    | "envelope_unavailable";
-  source:
-    | "openai_ai_first_plan_draft"
-    | "openai_ai_first_plan_blueprint"
-    | "openai_ai_first_plan_envelope";
+  status: "ai_authored" | "plan_first_unavailable";
+  source: "openai_ai_authored_full_plan_draft";
   validationIssues: string[];
-  repairs: string[];
   reviewAssumptions: string[];
   metricPolicySummary: string;
-  blueprintTrace?: AiFirstPlanBlueprintTraceMetadata | null;
-  envelopeTrace?: unknown;
-  datePlacement?: AiFirstPlanBlueprintDatePlacementMetadata;
 }
 
 export type AiFirstPlanDraftNormalizationResult =
@@ -133,5 +24,4 @@ export type AiFirstPlanDraftNormalizationResult =
       ok: false;
       reason: string;
       issues: AiFirstPlanDraftNormalizationIssue[];
-      fallback: AiFirstPlanDraftMetadata;
     };

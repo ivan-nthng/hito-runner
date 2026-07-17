@@ -192,6 +192,16 @@ export function uniqueRunnerWeekdays(values: readonly WeekdayName[]) {
   return RUNNER_TRAINING_WEEKDAYS.filter((weekday) => values.includes(weekday));
 }
 
+export function runningWeekdaysRequireBackToBackDays(values: readonly WeekdayName[]) {
+  const weekdays = new Set(uniqueRunnerWeekdays(values));
+
+  return RUNNER_TRAINING_WEEKDAYS.some(
+    (weekday, index) =>
+      weekdays.has(weekday) &&
+      weekdays.has(RUNNER_TRAINING_WEEKDAYS[(index + 1) % RUNNER_TRAINING_WEEKDAYS.length]!),
+  );
+}
+
 export function parseRunnerWeekday(value: unknown): WeekdayName {
   if (typeof value !== "string") {
     throw new Error("Training preference weekdays must be weekday names.");

@@ -40,6 +40,13 @@ import {
   buildPersistedWorkoutFromSeed,
   type PersistedWorkoutRow,
 } from "./running-plan-engine-confirm/manual-transition-fixtures";
+import {
+  buildSkippedPersistenceResult,
+  formatPersistenceBlocker,
+  readCliOptions as readPersistenceCliOptions,
+  resolvePersistencePreflight,
+  validatePersistenceContract,
+} from "./running-plan-engine-confirm/persistence-proof";
 import { validateRunnerFacingTargetReadbackContract } from "./running-plan-engine-target-readback-contract";
 
 const baseInput = {
@@ -128,6 +135,7 @@ const scenarios = [
 }>;
 
 async function main() {
+  const persistenceOptions = readPersistenceCliOptions();
   assertRemovedDeterministicPreviewEntrypoints();
 
   const reviewedDrafts = [];
@@ -162,6 +170,19 @@ async function main() {
   const activeManualTransitionProof = await validateActiveManualPlanTransitionContract(
     reviewedDrafts[0],
   );
+  const persistencePreflight = resolvePersistencePreflight(persistenceOptions);
+
+  if (!persistencePreflight.shouldRun && persistenceOptions.requirePersistence) {
+    throw new Error(formatPersistenceBlocker(persistencePreflight));
+  }
+
+  const persistenceProof = persistencePreflight.shouldRun
+    ? await validatePersistenceContract(
+        reviewedDrafts,
+        persistencePreflight,
+        buildConfirmInputFromDraft,
+      )
+    : buildSkippedPersistenceResult(persistencePreflight);
 
   console.log("Running plan engine confirm contract checks passed.", {
     scenarios: reviewedDrafts.map((draft) => ({
@@ -172,6 +193,7 @@ async function main() {
     })),
     activeManualTransition: activeManualTransitionProof,
     deterministicPreviewBuilders: "removed",
+    persistence: persistenceProof,
   });
 }
 
@@ -266,7 +288,7 @@ async function validateFailureBoundaries(
     assert.equal(invalidTokenExactness.reason, "invalid_review");
   }
 
-  await validateFlatLongRunProgressionReviewIsRejected(longRunRichnessDraft);
+  await validateFlatLongRunProgressionReviewDoesNotInvalidatePlanFirst(longRunRichnessDraft);
   await validateMarathonRaceWeekLoadReviewIsRejected(marathonDraft);
 
   const legacySourceKindPayload = await confirmRunningPlanDraftForUser("dry-run-user", {
@@ -306,16 +328,15 @@ async function validateMarathonRaceWeekLoadReviewIsRejected(
   }
 
   const raceWeekStart = startOfWeekIso(endpoint.date);
-  const raceWeekRows = canonicalPlan.planned_workouts.filter(
-    (workout) =>
-      workout.workout_type !== "rest" &&
-      workout !== endpoint &&
-      workout.date >= raceWeekStart &&
-      workout.date < endpoint.date,
-  );
+  const raceWeekRows = canonicalPlan.planned_workouts
+    .filter(
+      (workout) =>
+        workout !== endpoint && workout.date >= raceWeekStart && workout.date < endpoint.date,
+    )
+    .slice(0, 3);
   assert.ok(
     raceWeekRows.length >= 3,
-    "Marathon race-week load exactness proof needs enough pre-endpoint rows to overload.",
+    "Marathon race-week load exactness proof needs enough pre-endpoint calendar rows to overload.",
   );
 
   const overloadedPlan = {
@@ -324,13 +345,22 @@ async function validateMarathonRaceWeekLoadReviewIsRejected(
       raceWeekRows.includes(workout)
         ? {
             ...workout,
-            segments: workout.segments.map((segment) => ({
-              ...segment,
-              prescription: {
-                mode: "time" as const,
-                duration_min: Math.round((22 / Math.max(1, workout.segments.length)) * 10) / 10,
+            workout_type: "easy" as const,
+            source_workout_type: "steady_aerobic_run",
+            title: "Injected race-week overload run",
+            summary: "Validation-only overload row for confirm hard-safety proof.",
+            segments: [
+              {
+                segment_id: `${workout.workout_id}-race-week-overload`,
+                segment_type: "main" as const,
+                label: "Race-week overload",
+                sequence: 1,
+                prescription: {
+                  mode: "time" as const,
+                  duration_min: 22,
+                },
               },
-            })),
+            ],
           }
         : workout,
     ),
@@ -356,7 +386,7 @@ async function validateMarathonRaceWeekLoadReviewIsRejected(
   }
 }
 
-async function validateFlatLongRunProgressionReviewIsRejected(
+async function validateFlatLongRunProgressionReviewDoesNotInvalidatePlanFirst(
   reviewedDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
 ) {
   const canonicalPlan = buildRunningPlanCanonicalPlan(reviewedDraft);
@@ -389,13 +419,9 @@ async function validateFlatLongRunProgressionReviewIsRejected(
 
   assert.equal(
     exactness.ok,
-    false,
-    "A signed generated-plan review with flat pre-endpoint long-run progression must not validate.",
+    true,
+    "A signed plan-first review with flat pre-endpoint long-run progression should remain review-exact; plan-first treats this as coaching caveat rather than persistence hard-stop.",
   );
-  if (!exactness.ok) {
-    assert.equal(exactness.reason, "invalid_review");
-    assert.match(exactness.message, /runner-facing richness/i);
-  }
 }
 
 function isPreEndpointBuildLongRun(

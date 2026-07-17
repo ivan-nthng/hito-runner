@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
@@ -9,6 +9,7 @@ const { applyImportedSeedAsActivePlanForOps } = await tsImport(
   "./lib/ops-plan-apply.ts",
   import.meta.url,
 );
+const { isLoopbackRuntimeUrl } = await tsImport("../src/lib/supabase/env.ts", import.meta.url);
 
 const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 
@@ -45,6 +46,10 @@ async function handleCreate() {
   const accounts = await loadLocalAccounts();
   const existingAccountByEmail = accounts.find((account) => account.email === email);
   const existingAccountByUsername = accounts.find((account) => account.username === username);
+
+  if (existingAccountByEmail?.role === "admin" || existingAccountByUsername?.role === "admin") {
+    throw new Error("Refusing to replace a protected local admin account with a tester account.");
+  }
 
   if (
     existingAccountByEmail &&
@@ -162,8 +167,7 @@ async function handleDelete() {
     throw new Error(`No local or Supabase user found for ${email}.`);
   }
 
-  const nextAccounts = accounts.filter((account) => account.email !== email);
-  await saveLocalAccounts(nextAccounts);
+  const beforeCounts = authUser ? await getUserDataCounts(authUser.id) : null;
 
   if (authUser) {
     const deletion = await supabase.auth.admin.deleteUser(authUser.id, false);
@@ -173,6 +177,20 @@ async function handleDelete() {
     }
   }
 
+  const remainingAuthUser = await findAuthUserByEmail(email);
+  const afterCounts = authUser ? await getUserDataCounts(authUser.id) : null;
+
+  if (remainingAuthUser) {
+    throw new Error(`Supabase auth user still exists after deleting ${email}.`);
+  }
+
+  if (afterCounts && Object.values(afterCounts).some((count) => count !== 0)) {
+    throw new Error(`Canonical rows still exist after deleting ${email}.`);
+  }
+
+  const nextAccounts = accounts.filter((account) => account.email !== email);
+  await saveLocalAccounts(nextAccounts);
+
   console.log(
     JSON.stringify(
       {
@@ -181,6 +199,9 @@ async function handleDelete() {
         email,
         removedAuthUser: Boolean(authUser),
         removedLocalAccount: Boolean(localAccount),
+        authUserRemaining: Boolean(remainingAuthUser),
+        beforeCounts,
+        afterCounts,
         localAccountsFile: path.relative(process.cwd(), config.accountsFilePath),
       },
       null,
@@ -195,6 +216,12 @@ function buildConfig() {
     "NEXT_PUBLIC_SUPABASE_URL",
   );
   const supabaseServerKey = requireOption(readEnv("SUPABASE_SECRET_KEY"), "SUPABASE_SECRET_KEY");
+
+  if (!isLoopbackRuntimeUrl(supabaseUrl)) {
+    throw new Error(
+      "Refusing to run test-user against non-loopback Supabase. Start local Supabase and run npm run supabase:local:configure.",
+    );
+  }
 
   return {
     supabaseUrl,
@@ -223,7 +250,11 @@ async function loadLocalAccounts() {
 
 async function saveLocalAccounts(accounts) {
   await mkdir(path.dirname(config.accountsFilePath), { recursive: true });
-  await writeFile(config.accountsFilePath, `${JSON.stringify({ accounts }, null, 2)}\n`, "utf8");
+  await writeFile(config.accountsFilePath, `${JSON.stringify({ accounts }, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  await chmod(config.accountsFilePath, 0o600);
 }
 
 function normalizeAccount(account) {

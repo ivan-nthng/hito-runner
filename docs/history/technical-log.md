@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-07-13
+Last Updated: 2026-07-14
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,17 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-07-14
+
+- PRODUCT / plan-creation guide set — created a personal Product guide folder for generated-plan
+  data inventory and required-data policy, including distance-first contract direction, mandatory
+  runner inputs, AI/backend ownership boundaries, safety/load modifier bands, and current
+  implementation mismatches around legacy `goalType` and age/height/weight handling. Evidence:
+  `docs/guides/plan-creation/plan-creation-data-inventory.md` and
+  `docs/guides/plan-creation/plan-creation-data-policy.md`. Boundary: internal Product
+  source-of-truth docs only; no runtime code, schemas, Supabase, QA artifacts, or public changelog
+  change.
 
 ## 2026-07-13
 

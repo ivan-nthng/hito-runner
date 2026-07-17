@@ -98,6 +98,8 @@ export type LegacyWorkoutType =
 export interface CanonicalGoalContext {
   goalType: string;
   goalStyle?: string | null;
+  distanceKm?: number | null;
+  distanceMeters?: number | null;
   terrainFocus?: "standard" | "rolling" | "mountain" | null;
   targetDate?: string | null;
   targetTime?: string | null;
@@ -391,6 +393,8 @@ export function normalizeCanonicalGoalContext(value: unknown): CanonicalGoalCont
   return {
     goalType,
     goalStyle: readString(record.goalStyle, record.goal_style),
+    distanceKm: readNumber(record.distanceKm, record.distance_km),
+    distanceMeters: readNumber(record.distanceMeters, record.distance_meters),
     terrainFocus: normalizeTerrainFocus(record.terrainFocus ?? record.terrain_focus),
     targetDate: readString(record.targetDate, record.target_date),
     targetTime: readString(record.targetTime, record.target_time),
@@ -841,6 +845,16 @@ function readString(...values: unknown[]) {
 
     if (trimmed) {
       return trimmed;
+    }
+  }
+
+  return null;
+}
+
+function readNumber(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
     }
   }
 

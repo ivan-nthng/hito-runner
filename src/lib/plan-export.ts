@@ -222,6 +222,8 @@ export function renderPlanExportMarkdown(payload: ActivePlanExportPayload) {
 }
 
 export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayload) {
+  const planDistanceGoal = resolvePlanDistanceGoal(payload.workouts);
+
   return {
     schema_version: "training-plan-v2",
     plan_id: payload.plan.planId,
@@ -232,8 +234,9 @@ export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayloa
     generated_for: payload.plan.createdFor,
     export_metadata: buildPlanExportMetadata(payload),
     goal: {
-      goal_type: "distance_build",
+      goal_type: "distance_goal",
       goal_label: payload.plan.goalSummary,
+      ...planDistanceGoal,
       ...(payload.plan.targetDate
         ? {
             target_event: {
@@ -261,6 +264,18 @@ export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayloa
       summary: buildWorkoutSummary(workout),
       segments: workoutToTrainingPlanV2Segments(workout),
     })),
+  };
+}
+
+function resolvePlanDistanceGoal(workouts: readonly ActivePlanExportWorkout[]) {
+  const goalContext = workouts
+    .filter((workout) => workout.workoutType !== "rest")
+    .map((workout) => workout.goalContext)
+    .find((context) => context?.distanceMeters);
+
+  return {
+    ...(goalContext?.distanceKm ? { distance_km: goalContext.distanceKm } : {}),
+    ...(goalContext?.distanceMeters ? { distance_meters: goalContext.distanceMeters } : {}),
   };
 }
 
@@ -375,6 +390,8 @@ function toExportGoalContext(goalContext: CanonicalGoalContext) {
   return {
     goal_type: goalContext.goalType,
     ...(goalContext.goalStyle ? { goal_style: goalContext.goalStyle } : {}),
+    ...(goalContext.distanceKm ? { distance_km: goalContext.distanceKm } : {}),
+    ...(goalContext.distanceMeters ? { distance_meters: goalContext.distanceMeters } : {}),
     ...(goalContext.terrainFocus ? { terrain_focus: goalContext.terrainFocus } : {}),
     ...(goalContext.targetDate ? { target_date: goalContext.targetDate } : {}),
     ...(goalContext.targetTime ? { target_time: goalContext.targetTime } : {}),

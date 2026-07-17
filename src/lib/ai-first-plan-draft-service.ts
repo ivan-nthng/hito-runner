@@ -1,25 +1,15 @@
 import type {
-  AiFirstPlanBlueprintAuthoredDateSource,
-  AiFirstPlanBlueprintDatePlacementMetadata,
-  AiFirstPlanBlueprintTraceMetadata,
   AiFirstPlanDraftMetadata,
   AiFirstPlanDraftNormalizationResult,
 } from "@/lib/ai-first-plan-draft-metadata";
 import {
-  buildAiFirstPlanBlueprintTrace,
-  buildAiFirstPlanBlueprintPrompt,
-  normalizeAiFirstPlanBlueprintToTrainingPlan,
-} from "@/lib/ai-first-plan-blueprint-authoring";
+  AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
+  compileAiAuthoredPlanFirstDraft,
+} from "@/lib/ai-authored-plan-first-compiler";
 import {
-  buildAiFirstPlanBlueprintHorizonTrace,
-  resolveAiFirstPlanBlueprintHorizonStrategy,
-  type AiFirstPlanBlueprintHorizonStrategy,
-  type AiFirstPlanBlueprintHorizonTraceMetadata,
-} from "@/lib/ai-first-plan-blueprint-horizon";
-import { resolveAuthoringHorizonWeeks } from "@/lib/ai-first-plan-blueprint-policy";
-import { buildAiFirstPlanEnvelopePrompt } from "@/lib/ai-first-plan-envelope-prompt";
-import { expandAiFirstPlanEnvelopeToTrainingPlan } from "@/lib/ai-first-plan-envelope-expand";
-import { buildAiFirstPlanEnvelopeTrace } from "@/lib/ai-first-plan-envelope-trace";
+  AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
+  buildAiAuthoredPlanFirstPrompt,
+} from "@/lib/ai-authored-plan-first-provider-contract";
 import {
   attachOutputToAiPlanGenerationLedgerTrace,
   createAiPlanGenerationLedgerTrace,
@@ -38,11 +28,12 @@ import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-author
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_PLAN_MODEL = "gpt-5";
-const DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS = 45_000;
+const DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS = 0;
 const DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS = 32_000;
-const DEFAULT_AI_FIRST_PLAN_CONTRACT = "blueprint";
+const AI_FIRST_PLAN_CONTRACT_MODE = "plan_first" as const;
+const AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE = "responses_json_schema_plan_first_strict" as const;
 
-type OpenAiResponseEnvelope = {
+type OpenAiResponseBody = {
   id?: string;
   status?: string;
   output_text?: string;
@@ -65,25 +56,21 @@ type OpenAiResponseEnvelope = {
 };
 
 export type AiFirstPlanDraftServiceInputKind = "structured_authoring" | "structured_onboarding";
-export type AiFirstPlanGenerationContract = "blueprint" | "envelope";
 
 export interface GenerateAiFirstPlanDraftPreviewOptions {
   input: unknown;
   inputKind?: AiFirstPlanDraftServiceInputKind;
-  referenceExample?: unknown;
   today?: string;
   timeoutMs?: number;
   maxOutputTokens?: number;
   apiKey?: string | null;
   model?: string | null;
-  contractMode?: AiFirstPlanGenerationContract;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
   generationLedger?: AiPlanGenerationLedgerOptions;
-  blueprintEnforcePreferredLongRunDay?: boolean;
 }
 
 export interface AiFirstPlanDraftPreviewMetadata extends AiFirstPlanDraftMetadata {
-  fallbackReason: string | null;
   model: string;
   responseId: string | null;
   elapsedMs: number;
@@ -95,17 +82,17 @@ export interface AiFirstPlanDraftPreviewMetadata extends AiFirstPlanDraftMetadat
 export interface AiFirstPlanDraftDebugMetadata {
   timeoutMs: number;
   maxOutputTokens: number;
-  contractMode: AiFirstPlanGenerationContract;
-  responseSchemaMode:
-    | "responses_json_schema_blueprint_strict"
-    | "responses_json_schema_envelope_strict";
+  contractMode: typeof AI_FIRST_PLAN_CONTRACT_MODE;
+  responseSchemaMode: typeof AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE;
   requestPhase:
     | "not_started"
     | "request_started"
     | "response_parsed"
     | "normalized"
-    | "fallback_after_validation"
+    | "rejected_after_validation"
     | "request_failed"
+    | "request_cancelled"
+    | "response_incomplete"
     | "timeout_before_response";
   abortFired: boolean;
   openAiElapsedMs: number | null;
@@ -123,9 +110,9 @@ export interface AiFirstPlanDraftDebugMetadata {
 }
 
 export interface AiFirstPlanDraftUnavailableMetadata {
-  sourceKind: "ai_first_plan_blueprint_v1" | "ai_first_plan_envelope_v1";
-  sourceStatus: "blueprint_unavailable" | "envelope_unavailable";
-  fallbackReason: string;
+  sourceKind: typeof AI_AUTHORED_PLAN_FIRST_SOURCE_KIND;
+  sourceStatus: "plan_first_unavailable";
+  unavailableReason: string;
   model: string;
   responseId: string | null;
   elapsedMs: number;
@@ -133,8 +120,6 @@ export interface AiFirstPlanDraftUnavailableMetadata {
   validationIssueCount: number;
   generationTrace: AiPlanGenerationLedgerTrace | null;
   debug: AiFirstPlanDraftDebugMetadata;
-  blueprintTrace?: AiFirstPlanBlueprintTraceMetadata | null;
-  envelopeTrace?: unknown;
 }
 
 export type AiFirstPlanDraftPreviewResult =
@@ -146,7 +131,7 @@ export type AiFirstPlanDraftPreviewResult =
     }
   | {
       ok: false;
-      reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
+      reason: "ai_authored_plan_first_unavailable";
       message: string;
       issues: string[];
       authoringInput: StructuredFirstPlanAuthoringInput;
@@ -172,16 +157,14 @@ type StructuredAuthoringInputResolution =
 export async function generateAiFirstPlanDraftPreview({
   input,
   inputKind = "structured_authoring",
-  referenceExample,
   today,
   timeoutMs = DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS,
   maxOutputTokens = DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS,
   apiKey = serverEnv.openAiApiKey,
   model = serverEnv.openAiPlanModel ?? DEFAULT_OPENAI_PLAN_MODEL,
-  contractMode = DEFAULT_AI_FIRST_PLAN_CONTRACT,
   fetchImpl = globalThis.fetch,
+  signal,
   generationLedger,
-  blueprintEnforcePreferredLongRunDay,
 }: GenerateAiFirstPlanDraftPreviewOptions): Promise<AiFirstPlanDraftPreviewResult> {
   const authoringInputResult = resolveStructuredAuthoringInput(input, inputKind);
 
@@ -191,16 +174,6 @@ export async function generateAiFirstPlanDraftPreview({
 
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
-  const blueprintHorizonStrategy =
-    contractMode === "blueprint"
-      ? resolveAiFirstPlanBlueprintHorizonStrategy({
-          authoringInput,
-          today,
-          referenceExample,
-          maxAuthoredWeeks: resolveAuthoringHorizonWeeks(authoringInput),
-        })
-      : null;
-  const openAiAuthoringInput = blueprintHorizonStrategy?.openAiAuthoringInput ?? authoringInput;
   let latestGenerationTrace: AiPlanGenerationLedgerTrace | null = null;
 
   if (!apiKey) {
@@ -215,10 +188,8 @@ export async function generateAiFirstPlanDraftPreview({
         timeoutMs,
         maxOutputTokens,
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-        contractMode,
       }),
       generationTrace: null,
-      blueprintHorizonStrategy,
     });
   }
 
@@ -226,13 +197,12 @@ export async function generateAiFirstPlanDraftPreview({
     const response = await requestOpenAiFirstPlanDraft({
       apiKey,
       model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-      authoringInput: openAiAuthoringInput,
-      referenceExample,
+      authoringInput,
       today,
       timeoutMs,
       maxOutputTokens,
-      contractMode,
       fetchImpl,
+      signal,
       generationLedger,
     });
     latestGenerationTrace = response.generationTrace;
@@ -266,20 +236,14 @@ export async function generateAiFirstPlanDraftPreview({
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
         responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
         startedAt,
-        debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
+        debug: { ...responseDebug, requestPhase: "rejected_after_validation" },
         generationTrace: latestGenerationTrace,
-        blueprintHorizonStrategy,
       });
     }
 
     const normalized = normalizeOpenAiFirstPlanContractOutput({
-      contractMode,
       parsedOutput,
       authoringInput,
-      openAiAuthoringInput,
-      blueprintHorizonStrategy,
-      responseDebug,
-      blueprintEnforcePreferredLongRunDay,
     });
 
     if (!normalized.ok) {
@@ -289,7 +253,6 @@ export async function generateAiFirstPlanDraftPreview({
         issues: normalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
         parseStatus: "parsed_json",
         normalizationStatus: "failed",
-        repairs: normalized.fallback.repairs,
         options: generationLedger,
       });
 
@@ -300,39 +263,12 @@ export async function generateAiFirstPlanDraftPreview({
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
         responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
         startedAt,
-        fallbackMetadata: normalized.fallback,
-        debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
+        debug: { ...responseDebug, requestPhase: "rejected_after_validation" },
         generationTrace: latestGenerationTrace,
-        blueprintHorizonStrategy,
       });
     }
 
     const finalized = normalized;
-
-    if (!finalized.ok) {
-      latestGenerationTrace = await recordAiPlanGenerationUnavailable({
-        trace: latestGenerationTrace,
-        reason: finalized.reason,
-        issues: finalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
-        parseStatus: "parsed_json",
-        normalizationStatus: "finalization_failed",
-        repairs: finalized.fallbackMetadata.repairs,
-        options: generationLedger,
-      });
-
-      return unavailableAiFirstPlanDraft({
-        authoringInput,
-        reason: finalized.reason,
-        issues: finalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
-        model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-        responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
-        startedAt,
-        fallbackMetadata: finalized.fallbackMetadata,
-        debug: { ...responseDebug, requestPhase: "fallback_after_validation" },
-        generationTrace: latestGenerationTrace,
-        blueprintHorizonStrategy,
-      });
-    }
 
     latestGenerationTrace = await updateAiPlanGenerationLedgerTrace(
       latestGenerationTrace,
@@ -340,7 +276,6 @@ export async function generateAiFirstPlanDraftPreview({
         pipeline: {
           parseStatus: "parsed_json",
           normalizationStatus: "normalized",
-          repairs: finalized.metadata.repairs,
           validationIssues: finalized.metadata.validationIssues,
           canonicalRowCount: finalized.canonicalPlan.planned_workouts.length,
           runningWorkoutCount: finalized.canonicalPlan.planned_workouts.filter(
@@ -359,79 +294,54 @@ export async function generateAiFirstPlanDraftPreview({
       canonicalPlan: finalized.canonicalPlan,
       metadata: {
         ...finalized.metadata,
-        fallbackReason: null,
         model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
         responseId: response.body.id ?? null,
         elapsedMs: Date.now() - startedAt,
         validationIssueCount: finalized.metadata.validationIssues.length,
         generationTrace: latestGenerationTrace,
         debug: { ...responseDebug, requestPhase: "normalized" },
-        blueprintTrace:
-          contractMode === "blueprint"
-            ? enrichAiFirstPlanBlueprintTrace({
-                trace: finalized.metadata.blueprintTrace ?? null,
-                authoringInput,
-                canonicalPlan: finalized.canonicalPlan,
-                sourceStatus: toBlueprintTraceSourceStatus(finalized.metadata.status),
-                fallbackReason: null,
-                issues: finalized.metadata.validationIssues,
-                repairs: finalized.metadata.repairs,
-                model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-                elapsedMs: Date.now() - startedAt,
-                debug: { ...responseDebug, requestPhase: "normalized" },
-                blueprintHorizonStrategy: buildAiFirstPlanBlueprintHorizonTrace({
-                  strategy: blueprintHorizonStrategy,
-                  promptCharEstimateAfter: responseDebug.promptCharEstimate,
-                  finalWorkoutCount: finalized.canonicalPlan.planned_workouts.length,
-                }),
-                authoredDateSource: resolveAuthoredDateSource(latestGenerationTrace),
-              })
-            : (finalized.metadata.blueprintTrace ?? null),
-        envelopeTrace: finalized.metadata.envelopeTrace ?? null,
-        datePlacement: withHorizonDatePlacement({
-          datePlacement: finalized.metadata.datePlacement ?? null,
-          strategy: blueprintHorizonStrategy,
-          authoredDateSource: resolveAuthoredDateSource(latestGenerationTrace),
-        }),
       },
     };
   } catch (error) {
-    const fallbackReason = classifyAiFirstPlanDraftError(error, contractMode);
+    const unavailableReason = classifyAiFirstPlanDraftError(error);
     const errorGenerationTrace = generationTraceFromError(error) ?? latestGenerationTrace;
-    const fallbackParseStatus =
+    const unavailableParseStatus =
       error instanceof AiFirstPlanDraftServiceError &&
       error.reason === "ai_first_plan_draft_empty_output"
         ? "empty_output"
         : "not_started";
-    const fallbackFinalOutcome =
-      fallbackReason.includes("timed_out") ||
-      errorGenerationTrace?.pipeline.finalOutcome === "timeout"
-        ? "timeout"
-        : errorGenerationTrace?.pipeline.finalOutcome === "provider_error"
-          ? "provider_error"
-          : "unavailable";
+    const unavailableFinalOutcome =
+      unavailableReason.includes("cancelled") ||
+      errorGenerationTrace?.pipeline.finalOutcome === "cancelled"
+        ? "cancelled"
+        : unavailableReason.includes("timed_out") ||
+            errorGenerationTrace?.pipeline.finalOutcome === "timeout"
+          ? "timeout"
+          : errorGenerationTrace?.pipeline.finalOutcome === "provider_error"
+            ? "provider_error"
+            : "unavailable";
     latestGenerationTrace = await recordAiPlanGenerationUnavailable({
       trace: errorGenerationTrace,
-      reason: fallbackReason,
-      issues: [boundedErrorMessage(error, fallbackReason)],
+      reason: unavailableReason,
+      issues: [boundedErrorMessage(error, unavailableReason)],
       parseStatus:
         errorGenerationTrace?.pipeline.parseStatus &&
         errorGenerationTrace.pipeline.parseStatus !== "not_started"
           ? errorGenerationTrace.pipeline.parseStatus
-          : fallbackParseStatus,
+          : unavailableParseStatus,
       normalizationStatus:
         errorGenerationTrace?.pipeline.normalizationStatus &&
         errorGenerationTrace.pipeline.normalizationStatus !== "not_started"
           ? errorGenerationTrace.pipeline.normalizationStatus
           : "not_started",
-      finalOutcome: fallbackFinalOutcome,
+      finalOutcome: unavailableFinalOutcome,
       options: generationLedger,
     });
 
     return unavailableAiFirstPlanDraft({
       authoringInput,
-      reason: fallbackReason,
-      issues: [boundedErrorMessage(error, fallbackReason)],
+      reason: unavailableReason,
+      issues: [boundedErrorMessage(error, unavailableReason)],
       model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
       responseId: latestGenerationTrace?.provider.responseId ?? null,
       startedAt,
@@ -442,10 +352,8 @@ export async function generateAiFirstPlanDraftPreview({
               timeoutMs,
               maxOutputTokens,
               model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-              contractMode,
             }),
       generationTrace: latestGenerationTrace,
-      blueprintHorizonStrategy,
     });
   }
 }
@@ -490,118 +398,36 @@ function resolveStructuredAuthoringInput(
 }
 
 function normalizeOpenAiFirstPlanContractOutput({
-  contractMode,
   parsedOutput,
   authoringInput,
-  openAiAuthoringInput,
-  blueprintHorizonStrategy,
-  responseDebug,
-  blueprintEnforcePreferredLongRunDay,
 }: {
-  contractMode: AiFirstPlanGenerationContract;
   parsedOutput: unknown;
   authoringInput: StructuredFirstPlanAuthoringInput;
-  openAiAuthoringInput: StructuredFirstPlanAuthoringInput;
-  blueprintHorizonStrategy: AiFirstPlanBlueprintHorizonStrategy | null;
-  responseDebug: AiFirstPlanDraftDebugMetadata;
-  blueprintEnforcePreferredLongRunDay?: boolean;
 }): AiFirstPlanDraftNormalizationResult {
-  if (contractMode === "blueprint") {
-    return normalizeAiFirstPlanBlueprintToTrainingPlan({
-      blueprint: parsedOutput,
-      authoringInput: openAiAuthoringInput,
-      deterministicSupportAuthoringInput: undefined,
-      normalizationOptions: {
-        enforcePreferredLongRunDay: blueprintEnforcePreferredLongRunDay,
-      },
-      useDeterministicSupport: false,
-    });
-  }
+  const compiled = compileAiAuthoredPlanFirstDraft({
+    draft: parsedOutput,
+    authoringInput,
+  });
 
-  if (contractMode === "envelope") {
-    const expanded = expandAiFirstPlanEnvelopeToTrainingPlan({
-      envelope: parsedOutput,
-      authoringInput,
-    });
-
-    if (!expanded.ok) {
-      return {
-        ok: false,
-        reason: expanded.reason,
-        issues: expanded.issues.map((issue) => ({
-          code: issue.code,
-          message: issue.message,
-          path: issue.path,
-        })),
-        fallback: {
-          status: "expanded_from_envelope",
-          source: "openai_ai_first_plan_envelope",
-          validationIssues: expanded.issues
-            .map((issue) => `${issue.code}: ${issue.message}`)
-            .slice(0, 12),
-          repairs: [],
-          reviewAssumptions: [],
-          metricPolicySummary:
-            "Envelope expansion failed before producing a reviewable canonical plan.",
-          envelopeTrace: buildAiFirstPlanEnvelopeTrace({
-            envelope: parsedOutput,
-            authoringInput,
-            result: expanded,
-            sizeComparison: buildAiFirstPlanEnvelopeServiceSizeComparison({
-              envelope: parsedOutput,
-              responseDebug,
-            }),
-          }),
-        },
-      };
-    }
-
+  if (!compiled.ok) {
     return {
-      ok: true,
-      canonicalPlan: expanded.canonicalPlan,
-      metadata: {
-        status: "expanded_from_envelope",
-        source: "openai_ai_first_plan_envelope",
-        validationIssues: expanded.metadata.validationIssues,
-        repairs: expanded.metadata.repairs,
-        reviewAssumptions: expanded.metadata.reviewAssumptions,
-        metricPolicySummary:
-          "Backend expanded compact envelope intent into canonical rows with existing metric gates.",
-        envelopeTrace: buildAiFirstPlanEnvelopeTrace({
-          envelope: parsedOutput,
-          authoringInput,
-          result: expanded,
-          sizeComparison: buildAiFirstPlanEnvelopeServiceSizeComparison({
-            envelope: parsedOutput,
-            responseDebug,
-          }),
-        }),
-      },
+      ok: false,
+      reason: compiled.reason,
+      issues: compiled.issues,
     };
   }
 
-  const exhaustiveContract: never = contractMode;
-  return exhaustiveContract;
-}
-
-function buildAiFirstPlanEnvelopeServiceSizeComparison({
-  envelope,
-  responseDebug,
-}: {
-  envelope: unknown;
-  responseDebug: AiFirstPlanDraftDebugMetadata;
-}) {
   return {
-    envelopePromptCharEstimate: responseDebug.promptCharEstimate,
-    envelopeSystemPromptChars: responseDebug.systemPromptChars,
-    envelopeUserPromptChars: responseDebug.userPromptChars,
-    envelopeResponseSchemaChars: responseDebug.responseSchemaChars,
-    envelopeOutputChars: JSON.stringify(envelope).length,
-    envelopeLiveOutputChars: responseDebug.outputTextChars,
-    blueprintFullOutputChars: null,
-    blueprintBoundedOutputChars: null,
-    blueprintPromptCharEstimateBefore: null,
-    blueprintPromptCharEstimateAfter: null,
+    ok: true,
+    canonicalPlan: compiled.canonicalPlan,
+    metadata: {
+      status: "ai_authored",
+      source: "openai_ai_authored_full_plan_draft",
+      validationIssues: compiled.validationIssues,
+      reviewAssumptions: compiled.reviewAssumptions,
+      metricPolicySummary:
+        "Backend parsed and atomized the AI-authored full plan draft into Hito training-plan-v2 without authoring or substituting the coach plan.",
+    },
   };
 }
 
@@ -609,34 +435,31 @@ async function requestOpenAiFirstPlanDraft({
   apiKey,
   model,
   authoringInput,
-  referenceExample,
   today,
   timeoutMs,
   maxOutputTokens,
-  contractMode,
   fetchImpl,
+  signal,
   generationLedger,
 }: {
   apiKey: string;
   model: string;
   authoringInput: StructuredFirstPlanAuthoringInput;
-  referenceExample: unknown;
   today: string | undefined;
   timeoutMs: number;
   maxOutputTokens: number;
-  contractMode: AiFirstPlanGenerationContract;
   fetchImpl: typeof fetch;
+  signal?: AbortSignal;
   generationLedger?: AiPlanGenerationLedgerOptions;
 }) {
   const prompt = buildOpenAiFirstPlanContractPrompt({
-    contractMode,
     authoringInput,
     today,
-    referenceExample,
   });
   const controller = new AbortController();
   const requestStartedAt = Date.now();
   let abortFired = false;
+  let abortReason: "cancelled" | "timeout" | null = null;
   const baseDebug = buildRequestDebug({
     model,
     timeoutMs,
@@ -647,13 +470,12 @@ async function requestOpenAiFirstPlanDraft({
     requestPhase: "request_started",
     abortFired: false,
     openAiElapsedMs: null,
-    contractMode,
   });
   let generationTrace = await createAiPlanGenerationLedgerTrace({
     providerKind: resolveAiPlanGenerationProviderKind({ apiKey, model }),
     model,
-    contractMode,
-    responseSchemaMode: responseSchemaModeForContract(contractMode),
+    contractMode: AI_FIRST_PLAN_CONTRACT_MODE,
+    responseSchemaMode: AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE,
     systemPrompt: prompt.systemPrompt,
     userPrompt: prompt.userPrompt,
     responseSchema: prompt.responseSchema,
@@ -663,8 +485,38 @@ async function requestOpenAiFirstPlanDraft({
   generationTrace =
     (await updateAiPlanGenerationLedgerTrace(generationTrace, {}, generationLedger)) ??
     generationTrace;
+  const cancelRequest = () => {
+    if (abortReason) {
+      return;
+    }
+
+    abortReason = "cancelled";
+    abortFired = true;
+    controller.abort(signal?.reason);
+  };
+
+  if (signal?.aborted) {
+    cancelRequest();
+  } else {
+    signal?.addEventListener("abort", cancelRequest, { once: true });
+  }
+
   const request = async () => {
     try {
+      if (abortReason === "cancelled") {
+        throw new AiFirstPlanDraftServiceError(
+          "ai_authored_plan_first_cancelled",
+          ["AI first-plan generation was cancelled before the provider request completed."],
+          {
+            ...baseDebug,
+            requestPhase: "request_cancelled",
+            abortFired: true,
+            openAiElapsedMs: Date.now() - requestStartedAt,
+          },
+          generationTrace,
+        );
+      }
+
       const response = await fetchImpl(OPENAI_RESPONSES_URL, {
         method: "POST",
         headers: {
@@ -698,7 +550,7 @@ async function requestOpenAiFirstPlanDraft({
           text: {
             format: {
               type: "json_schema",
-              name: responseSchemaNameForContract(contractMode),
+              name: AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
               strict: true,
               schema: prompt.responseSchema,
             },
@@ -706,7 +558,7 @@ async function requestOpenAiFirstPlanDraft({
         }),
         signal: controller.signal,
       });
-      const body = (await response.json()) as OpenAiResponseEnvelope;
+      const body = (await response.json()) as OpenAiResponseBody;
       const responseDebug: AiFirstPlanDraftDebugMetadata = {
         ...baseDebug,
         requestPhase: "response_parsed",
@@ -753,7 +605,7 @@ async function requestOpenAiFirstPlanDraft({
               pipeline: {
                 ...generationTrace.pipeline,
                 finalOutcome: "provider_error",
-                unavailableReason: `${contractPrefix(contractMode)}_request_failed`,
+                unavailableReason: "ai_authored_plan_first_request_failed",
                 validationIssues: [extractOpenAiError(body)],
               },
             },
@@ -761,9 +613,59 @@ async function requestOpenAiFirstPlanDraft({
           )) ?? generationTrace;
 
         throw new AiFirstPlanDraftServiceError(
-          `${contractPrefix(contractMode)}_request_failed`,
+          "ai_authored_plan_first_request_failed",
           [extractOpenAiError(body)],
           { ...responseDebug, requestPhase: "request_failed" },
+          generationTrace,
+        );
+      }
+
+      const providerStatus = normalizeProviderResponseStatus(body.status);
+      if (providerStatus !== "completed") {
+        const incomplete = providerStatus === "incomplete";
+        const cancelled = providerStatus === "cancelled";
+        const failed = providerStatus === "failed";
+        const reason = cancelled
+          ? "ai_authored_plan_first_cancelled"
+          : incomplete
+            ? "ai_authored_plan_first_incomplete_output"
+            : failed
+              ? "ai_authored_plan_first_request_failed"
+              : "ai_authored_plan_first_provider_not_completed";
+        const issues = [
+          incomplete
+            ? `OpenAI returned incomplete first-plan output${body.incomplete_details?.reason ? `: ${body.incomplete_details.reason}` : "."}`
+            : cancelled
+              ? "OpenAI cancelled first-plan generation before completion."
+              : failed
+                ? extractOpenAiError(body)
+                : `OpenAI first-plan generation did not complete (status: ${providerStatus ?? "missing"}).`,
+        ];
+        generationTrace =
+          (await updateAiPlanGenerationLedgerTrace(
+            generationTrace,
+            {
+              pipeline: {
+                ...generationTrace.pipeline,
+                finalOutcome: cancelled ? "cancelled" : failed ? "provider_error" : "unavailable",
+                unavailableReason: reason,
+                validationIssues: issues,
+              },
+            },
+            generationLedger,
+          )) ?? generationTrace;
+
+        throw new AiFirstPlanDraftServiceError(
+          reason,
+          issues,
+          {
+            ...responseDebug,
+            requestPhase: cancelled
+              ? "request_cancelled"
+              : incomplete
+                ? "response_incomplete"
+                : "request_failed",
+          },
           generationTrace,
         );
       }
@@ -774,12 +676,17 @@ async function requestOpenAiFirstPlanDraft({
         throw error;
       }
 
+      const cancelled = abortReason === "cancelled";
       throw new AiFirstPlanDraftServiceError(
-        classifyAiFirstPlanDraftError(error, contractMode),
+        cancelled ? "ai_authored_plan_first_cancelled" : classifyAiFirstPlanDraftError(error),
         [boundedErrorMessage(error, "AI first-plan request failed.")],
         {
           ...baseDebug,
-          requestPhase: abortFired ? "timeout_before_response" : "request_failed",
+          requestPhase: cancelled
+            ? "request_cancelled"
+            : abortReason === "timeout"
+              ? "timeout_before_response"
+              : "request_failed",
           abortFired,
           openAiElapsedMs: Date.now() - requestStartedAt,
         },
@@ -788,77 +695,50 @@ async function requestOpenAiFirstPlanDraft({
     }
   };
 
-  return withTimeout(request(), timeoutMs, () => {
-    abortFired = true;
-    controller.abort();
+  try {
+    return await withTimeout(request(), timeoutMs, () => {
+      abortReason = "timeout";
+      abortFired = true;
+      controller.abort();
 
-    return new AiFirstPlanDraftServiceError(
-      `${contractPrefix(contractMode)}_timed_out`,
-      [`AI first-plan request timed out after ${timeoutMs} ms.`],
-      {
-        ...baseDebug,
-        requestPhase: "timeout_before_response",
-        abortFired: true,
-        openAiElapsedMs: Date.now() - requestStartedAt,
-      },
-      generationTrace,
-    );
-  });
+      return new AiFirstPlanDraftServiceError(
+        "ai_authored_plan_first_timed_out",
+        [`AI first-plan request timed out after ${timeoutMs} ms.`],
+        {
+          ...baseDebug,
+          requestPhase: "timeout_before_response",
+          abortFired: true,
+          openAiElapsedMs: Date.now() - requestStartedAt,
+        },
+        generationTrace,
+      );
+    });
+  } finally {
+    signal?.removeEventListener("abort", cancelRequest);
+  }
 }
 
 function buildOpenAiFirstPlanContractPrompt({
-  contractMode,
   authoringInput,
   today,
-  referenceExample,
 }: {
-  contractMode: AiFirstPlanGenerationContract;
   authoringInput: StructuredFirstPlanAuthoringInput;
   today: string | undefined;
-  referenceExample: unknown;
 }) {
-  if (contractMode === "blueprint") {
-    return buildAiFirstPlanBlueprintPrompt({
-      authoringInput,
-      today,
-      referenceExample,
-    });
-  }
-
-  if (contractMode === "envelope") {
-    void today;
-    void referenceExample;
-
-    return buildAiFirstPlanEnvelopePrompt({
-      authoringInput,
-    });
-  }
-
-  const exhaustiveContract: never = contractMode;
-  void today;
-  void referenceExample;
-  return exhaustiveContract;
-}
-
-function responseSchemaNameForContract(contractMode: AiFirstPlanGenerationContract) {
-  switch (contractMode) {
-    case "blueprint":
-      return "ai_first_plan_blueprint";
-    case "envelope":
-      return "ai_first_plan_envelope";
-  }
+  return buildAiAuthoredPlanFirstPrompt({
+    authoringInput,
+    today,
+  });
 }
 
 function buildNotStartedDebug({
   timeoutMs,
   maxOutputTokens,
   model,
-  contractMode,
 }: {
   timeoutMs: number;
   maxOutputTokens: number;
   model: string;
-  contractMode: AiFirstPlanGenerationContract;
 }): AiFirstPlanDraftDebugMetadata {
   return buildRequestDebug({
     model,
@@ -870,7 +750,6 @@ function buildNotStartedDebug({
     requestPhase: "not_started",
     abortFired: false,
     openAiElapsedMs: null,
-    contractMode,
   });
 }
 
@@ -884,7 +763,6 @@ function buildRequestDebug({
   requestPhase,
   abortFired,
   openAiElapsedMs,
-  contractMode,
 }: {
   model: string;
   timeoutMs: number;
@@ -895,13 +773,12 @@ function buildRequestDebug({
   requestPhase: AiFirstPlanDraftDebugMetadata["requestPhase"];
   abortFired: boolean;
   openAiElapsedMs: number | null;
-  contractMode: AiFirstPlanGenerationContract;
 }): AiFirstPlanDraftDebugMetadata {
   return {
     timeoutMs,
     maxOutputTokens,
-    contractMode,
-    responseSchemaMode: responseSchemaModeForContract(contractMode),
+    contractMode: AI_FIRST_PLAN_CONTRACT_MODE,
+    responseSchemaMode: AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE,
     requestPhase,
     abortFired,
     openAiElapsedMs,
@@ -922,21 +799,14 @@ function buildRequestDebug({
   };
 }
 
-function responseSchemaModeForContract(
-  contractMode: AiFirstPlanGenerationContract,
-): AiFirstPlanDraftDebugMetadata["responseSchemaMode"] {
-  switch (contractMode) {
-    case "blueprint":
-      return "responses_json_schema_blueprint_strict";
-    case "envelope":
-      return "responses_json_schema_envelope_strict";
-  }
-}
-
 function normalizeTokenCount(value: unknown) {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, Math.round(value))
     : null;
+}
+
+function normalizeProviderResponseStatus(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim().toLowerCase() : null;
 }
 
 function supportsReasoningEffort(model: string) {
@@ -959,7 +829,6 @@ async function recordAiPlanGenerationUnavailable({
   parseStatus,
   normalizationStatus,
   finalOutcome = "unavailable",
-  repairs = [],
   options,
 }: {
   trace: AiPlanGenerationLedgerTrace | null;
@@ -968,7 +837,6 @@ async function recordAiPlanGenerationUnavailable({
   parseStatus: AiPlanGenerationLedgerTrace["pipeline"]["parseStatus"];
   normalizationStatus: AiPlanGenerationLedgerTrace["pipeline"]["normalizationStatus"];
   finalOutcome?: AiPlanGenerationLedgerTrace["pipeline"]["finalOutcome"];
-  repairs?: readonly string[];
   options?: AiPlanGenerationLedgerOptions;
 }) {
   return updateAiPlanGenerationLedgerTrace(
@@ -977,7 +845,6 @@ async function recordAiPlanGenerationUnavailable({
       pipeline: {
         parseStatus,
         normalizationStatus,
-        repairs,
         validationIssues: issues,
         canonicalRowCount: null,
         runningWorkoutCount: null,
@@ -1000,10 +867,8 @@ function unavailableAiFirstPlanDraft({
   model,
   responseId,
   startedAt,
-  fallbackMetadata,
   debug,
   generationTrace,
-  blueprintHorizonStrategy,
 }: {
   authoringInput: StructuredFirstPlanAuthoringInput;
   reason: string;
@@ -1011,15 +876,13 @@ function unavailableAiFirstPlanDraft({
   model: string;
   responseId: string | null;
   startedAt: number;
-  fallbackMetadata?: AiFirstPlanDraftMetadata;
   debug: AiFirstPlanDraftDebugMetadata;
   generationTrace?: AiPlanGenerationLedgerTrace | null;
-  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonStrategy | null;
 }): Extract<
   AiFirstPlanDraftPreviewResult,
   {
     ok: false;
-    reason: "ai_first_plan_blueprint_unavailable" | "ai_first_plan_envelope_unavailable";
+    reason: "ai_authored_plan_first_unavailable";
   }
 > {
   const validationIssues = issues
@@ -1027,39 +890,17 @@ function unavailableAiFirstPlanDraft({
     .filter(Boolean)
     .slice(0, 12);
   const elapsedMs = Date.now() - startedAt;
-  const isBlueprint = debug.contractMode === "blueprint";
-  const isEnvelope = debug.contractMode === "envelope";
-  const sourceKind = sourceKindForUnavailableContract(debug.contractMode);
-  const sourceStatus = sourceStatusForUnavailableContract(debug.contractMode);
-  const blueprintTrace = isBlueprint
-    ? buildUnavailableBlueprintTrace({
-        trace: fallbackMetadata?.blueprintTrace ?? null,
-        authoringInput,
-        sourceKind: "ai_first_plan_blueprint_v1",
-        reason,
-        issues: validationIssues,
-        repairs: fallbackMetadata?.repairs ?? [],
-        model,
-        elapsedMs,
-        debug,
-        blueprintHorizonStrategy: buildAiFirstPlanBlueprintHorizonTrace({
-          strategy: blueprintHorizonStrategy ?? null,
-          promptCharEstimateAfter: debug.promptCharEstimate,
-          finalWorkoutCount: null,
-        }),
-      })
-    : (fallbackMetadata?.blueprintTrace ?? null);
 
   return {
     ok: false,
-    reason: unavailableReasonForContract(debug.contractMode),
+    reason: "ai_authored_plan_first_unavailable",
     message: "We could not create a safe AI-authored plan draft. Please retry.",
     issues: validationIssues,
     authoringInput,
     metadata: {
-      sourceKind,
-      sourceStatus,
-      fallbackReason: reason,
+      sourceKind: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
+      sourceStatus: "plan_first_unavailable",
+      unavailableReason: reason,
       model,
       responseId,
       elapsedMs,
@@ -1067,243 +908,8 @@ function unavailableAiFirstPlanDraft({
       validationIssueCount: validationIssues.length,
       generationTrace: generationTrace ?? null,
       debug,
-      blueprintTrace,
-      envelopeTrace: isEnvelope ? (fallbackMetadata?.envelopeTrace ?? null) : undefined,
     },
   };
-}
-
-function sourceKindForUnavailableContract(contractMode: AiFirstPlanGenerationContract) {
-  switch (contractMode) {
-    case "blueprint":
-      return "ai_first_plan_blueprint_v1" as const;
-    case "envelope":
-      return "ai_first_plan_envelope_v1" as const;
-  }
-}
-
-function sourceStatusForUnavailableContract(contractMode: AiFirstPlanGenerationContract) {
-  switch (contractMode) {
-    case "blueprint":
-      return "blueprint_unavailable" as const;
-    case "envelope":
-      return "envelope_unavailable" as const;
-  }
-}
-
-function unavailableReasonForContract(contractMode: AiFirstPlanGenerationContract) {
-  switch (contractMode) {
-    case "blueprint":
-      return "ai_first_plan_blueprint_unavailable" as const;
-    case "envelope":
-      return "ai_first_plan_envelope_unavailable" as const;
-  }
-}
-
-function buildUnavailableBlueprintTrace({
-  trace,
-  authoringInput,
-  sourceKind,
-  reason,
-  issues,
-  repairs,
-  model,
-  elapsedMs,
-  debug,
-  blueprintHorizonStrategy,
-}: {
-  trace: AiFirstPlanBlueprintTraceMetadata | null;
-  authoringInput: StructuredFirstPlanAuthoringInput;
-  sourceKind: "ai_first_plan_blueprint_v1";
-  reason: string;
-  issues: string[];
-  repairs: string[];
-  model: string;
-  elapsedMs: number;
-  debug: AiFirstPlanDraftDebugMetadata;
-  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonTraceMetadata;
-}): AiFirstPlanBlueprintTraceMetadata {
-  const baseTrace =
-    trace ??
-    buildAiFirstPlanBlueprintTrace({
-      authoringInput,
-      blueprint: null,
-      normalizedWorkouts: null,
-      sourceStatus: "blueprint_unavailable",
-      sourceKind,
-      fallbackReason: reason,
-      issues: issuesToTraceIssues(issues, reason),
-      repairs,
-    });
-
-  return {
-    ...baseTrace,
-    sourceKind,
-    sourceStatus: "blueprint_unavailable",
-    fallbackReason: reason,
-    model,
-    timeoutMs: debug.timeoutMs,
-    elapsedMs,
-    deterministicFallbackBoundary: {
-      used: false,
-      reason,
-    },
-    ...(blueprintHorizonStrategy ? { blueprintHorizonStrategy } : {}),
-  };
-}
-
-function enrichAiFirstPlanBlueprintTrace({
-  trace,
-  authoringInput,
-  canonicalPlan,
-  sourceStatus,
-  fallbackReason,
-  issues,
-  repairs,
-  model,
-  elapsedMs,
-  debug,
-  blueprintHorizonStrategy,
-  authoredDateSource,
-}: {
-  trace: AiFirstPlanDraftPreviewMetadata["blueprintTrace"];
-  authoringInput: StructuredFirstPlanAuthoringInput;
-  canonicalPlan: TrainingPlanV2;
-  sourceStatus: AiFirstPlanBlueprintTraceMetadata["sourceStatus"];
-  fallbackReason: string | null;
-  issues: string[];
-  repairs: string[];
-  model: string;
-  elapsedMs: number;
-  debug: AiFirstPlanDraftDebugMetadata;
-  blueprintHorizonStrategy?: AiFirstPlanBlueprintHorizonTraceMetadata;
-  authoredDateSource?: AiFirstPlanBlueprintAuthoredDateSource;
-}) {
-  const baseTrace =
-    trace ??
-    buildAiFirstPlanBlueprintTrace({
-      authoringInput,
-      blueprint: null,
-      normalizedWorkouts: canonicalPlan.planned_workouts,
-      sourceStatus,
-      sourceKind: canonicalPlan.source_kind ?? null,
-      fallbackReason,
-      issues: issuesToTraceIssues(issues, fallbackReason ?? "unknown"),
-      repairs,
-      authoredDateSource,
-    });
-
-  return {
-    ...baseTrace,
-    sourceKind: canonicalPlan.source_kind ?? baseTrace.sourceKind,
-    sourceStatus,
-    fallbackReason,
-    model,
-    timeoutMs: debug.timeoutMs,
-    elapsedMs,
-    deterministicFallbackBoundary: {
-      used: false,
-      reason: fallbackReason,
-    },
-    datePlacement:
-      withHorizonDatePlacement({
-        datePlacement: baseTrace.datePlacement,
-        strategy: blueprintHorizonStrategy,
-        authoredDateSource,
-      }) ?? baseTrace.datePlacement,
-    normalizedCanonicalWeeks: groupCanonicalIdentityTraceByWeek(canonicalPlan.planned_workouts),
-    finalReviewedPlanIdentityCounts: countCanonicalWorkoutField(
-      canonicalPlan.planned_workouts,
-      "workout_identity",
-    ),
-    finalReviewedPlanFamilyCounts: countCanonicalWorkoutField(
-      canonicalPlan.planned_workouts,
-      "workout_family",
-    ),
-    finalReviewedPlanIconCounts: countCanonicalWorkoutField(
-      canonicalPlan.planned_workouts,
-      "calendar_icon_key",
-    ),
-    ...(blueprintHorizonStrategy ? { blueprintHorizonStrategy } : {}),
-  };
-}
-
-function toBlueprintTraceSourceStatus(
-  status: AiFirstPlanDraftPreviewMetadata["status"],
-): AiFirstPlanBlueprintTraceMetadata["sourceStatus"] {
-  switch (status) {
-    case "ai_authored":
-    case "repaired_ai_draft":
-      return status;
-    case "expanded_from_envelope":
-    case "blueprint_unavailable":
-    case "envelope_unavailable":
-      return "blueprint_unavailable";
-  }
-}
-
-function withHorizonDatePlacement({
-  datePlacement,
-  strategy,
-  authoredDateSource,
-}: {
-  datePlacement: AiFirstPlanBlueprintDatePlacementMetadata | null;
-  strategy?: AiFirstPlanBlueprintHorizonStrategy | AiFirstPlanBlueprintHorizonTraceMetadata | null;
-  authoredDateSource?: AiFirstPlanBlueprintAuthoredDateSource;
-}): AiFirstPlanBlueprintDatePlacementMetadata | undefined {
-  if (!datePlacement) {
-    return undefined;
-  }
-
-  return {
-    ...datePlacement,
-    ...(authoredDateSource ? { authoredDateSource } : {}),
-    backendExtendedWeeks: strategy?.backendExtendedWeeks ?? datePlacement.backendExtendedWeeks,
-  };
-}
-
-function resolveAuthoredDateSource(
-  trace: AiPlanGenerationLedgerTrace | null,
-): AiFirstPlanBlueprintAuthoredDateSource {
-  return trace?.provider.kind === "local_dev_fixture"
-    ? "local_fixture_authored_date"
-    : "openai_authored_date";
-}
-
-function groupCanonicalIdentityTraceByWeek(workouts: TrainingPlanV2["planned_workouts"]) {
-  const byWeek = new Map<number, TrainingPlanV2["planned_workouts"]>();
-
-  for (const workout of workouts) {
-    byWeek.set(workout.week_number, [...(byWeek.get(workout.week_number) ?? []), workout]);
-  }
-
-  return [...byWeek.entries()]
-    .sort(([left], [right]) => left - right)
-    .slice(0, 52)
-    .map(([weekNumber, weekWorkouts]) => ({
-      weekNumber,
-      identities: weekWorkouts.map((workout) => workout.workout_identity ?? "unknown").slice(0, 7),
-      families: weekWorkouts.map((workout) => workout.workout_family ?? "unknown").slice(0, 7),
-      icons: weekWorkouts.map((workout) => workout.calendar_icon_key ?? "unknown").slice(0, 7),
-    }));
-}
-
-function countCanonicalWorkoutField(
-  workouts: TrainingPlanV2["planned_workouts"],
-  field: "workout_identity" | "workout_family" | "calendar_icon_key",
-) {
-  return workouts.reduce<Record<string, number>>((counts, workout) => {
-    const value = workout[field] ?? "unknown";
-    counts[value] = (counts[value] ?? 0) + 1;
-    return counts;
-  }, {});
-}
-
-function issuesToTraceIssues(issues: string[], fallbackCode: string) {
-  return issues.map((issue) => ({
-    code: issue.includes(":") ? (issue.split(":")[0]?.trim() ?? "unknown") : fallbackCode,
-    message: issue,
-  }));
 }
 
 async function withTimeout<T>(
@@ -1334,7 +940,7 @@ async function withTimeout<T>(
 }
 
 function extractStructuredOutputText(
-  response: OpenAiResponseEnvelope,
+  response: OpenAiResponseBody,
   debug: AiFirstPlanDraftDebugMetadata,
 ) {
   if (typeof response.output_text === "string" && response.output_text.trim()) {
@@ -1356,7 +962,7 @@ function extractStructuredOutputText(
   );
 }
 
-function extractOpenAiError(response: OpenAiResponseEnvelope) {
+function extractOpenAiError(response: OpenAiResponseBody) {
   if (typeof response.error?.message === "string" && response.error.message.trim()) {
     return response.error.message.trim();
   }
@@ -1372,40 +978,28 @@ function safeParseJson(raw: string) {
   }
 }
 
-function classifyAiFirstPlanDraftError(
-  error: unknown,
-  contractMode: AiFirstPlanGenerationContract = DEFAULT_AI_FIRST_PLAN_CONTRACT,
-) {
+function classifyAiFirstPlanDraftError(error: unknown) {
   if (error instanceof AiFirstPlanDraftServiceError) {
     return error.reason;
   }
 
   if (error instanceof Error && error.name === "AbortError") {
-    return `${contractPrefix(contractMode)}_timed_out`;
+    return "ai_authored_plan_first_cancelled";
   }
 
-  return `${contractPrefix(contractMode)}_unavailable`;
+  return "ai_authored_plan_first_unavailable";
 }
 
-function contractPrefix(contractMode: AiFirstPlanGenerationContract) {
-  switch (contractMode) {
-    case "blueprint":
-      return "ai_first_plan_blueprint";
-    case "envelope":
-      return "ai_first_plan_envelope";
-  }
-}
-
-function boundedErrorMessage(error: unknown, fallback: string) {
+function boundedErrorMessage(error: unknown, defaultMessage: string) {
   if (error instanceof AiFirstPlanDraftServiceError) {
-    return error.issues.join(" | ").slice(0, 300) || fallback;
+    return error.issues.join(" | ").slice(0, 300) || defaultMessage;
   }
 
   if (error instanceof Error) {
-    return error.message.trim().slice(0, 300) || fallback;
+    return error.message.trim().slice(0, 300) || defaultMessage;
   }
 
-  return fallback;
+  return defaultMessage;
 }
 
 class AiFirstPlanDraftServiceError extends Error {

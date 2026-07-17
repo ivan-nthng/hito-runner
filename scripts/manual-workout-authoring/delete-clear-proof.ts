@@ -292,7 +292,7 @@ export async function validateManualDeleteClearContract() {
   const presetPlan = buildFakePlanCycle({
     userId,
     id: activePlan.id,
-    sourceKind: "ai_first_plan_blueprint_v1",
+    sourceKind: "ai_authored_plan_first_v1",
     startDate: "2026-06-18",
     endDate: "2026-06-21",
   });
@@ -306,7 +306,7 @@ export async function validateManualDeleteClearContract() {
   );
   assert.equal(presetReview.ok, true, formatJsonResult(presetReview));
   if (presetReview.ok) {
-    assert.equal(presetReview.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(presetReview.sourceKind, "ai_authored_plan_first_v1");
     assert.equal(presetReview.restore.available, true);
     assert.deepEqual(presetReview.restore.alternateLabels, ["Put back", "Redo"]);
   }
@@ -327,7 +327,7 @@ export async function validateManualDeleteClearContract() {
   );
   assert.equal(presetConfirm.ok, true, formatJsonResult(presetConfirm));
   if (presetConfirm.ok) {
-    assert.equal(presetConfirm.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(presetConfirm.sourceKind, "ai_authored_plan_first_v1");
     assert.equal(presetConfirm.sourceStatus, null);
     assert.equal(presetConfirm.safety.deletedExactlyOneRow, true);
   }
@@ -335,7 +335,7 @@ export async function validateManualDeleteClearContract() {
   const selectedPlan = buildFakePlanCycle({
     userId,
     id: activePlan.id,
-    sourceKind: "ai_first_plan_blueprint_v1",
+    sourceKind: "ai_authored_plan_first_v1",
     startDate: "2026-06-18",
     endDate: "2026-06-21",
   });
@@ -377,7 +377,7 @@ export async function validateManualDeleteClearContract() {
   );
   assert.equal(selectedReview.ok, true, formatJsonResult(selectedReview));
   if (selectedReview.ok) {
-    assert.equal(selectedReview.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(selectedReview.sourceKind, "ai_authored_plan_first_v1");
     assert.equal(selectedReview.templateKey, "selected_plan_easy_run");
     assert.equal(selectedReview.restore.available, false);
     assert.equal(selectedReview.restore.reason, "restore_requires_editor_support");
@@ -409,7 +409,7 @@ export async function validateManualDeleteClearContract() {
   );
   assert.equal(selectedConfirm.ok, true, formatJsonResult(selectedConfirm));
   if (selectedConfirm.ok) {
-    assert.equal(selectedConfirm.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(selectedConfirm.sourceKind, "ai_authored_plan_first_v1");
     assert.equal(selectedConfirm.safety.deletedExactlyOneRow, true);
     assert.equal(selectedConfirm.restore.available, false);
   }

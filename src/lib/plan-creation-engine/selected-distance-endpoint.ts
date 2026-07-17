@@ -120,7 +120,7 @@ function distanceKmForPrescription(
 
 export function resolveSelectedDistanceQualityFamily(input: {
   distanceMeters: number | null | undefined;
-  fallbackFamily: RunningPlanDistanceFamily;
+  fallbackFamily?: RunningPlanDistanceFamily | null;
 }): RunningPlanDistanceFamily {
   const meters = input.distanceMeters ?? null;
 
@@ -130,7 +130,7 @@ export function resolveSelectedDistanceQualityFamily(input: {
     return "Marathon Completion";
   }
 
-  return input.fallbackFamily;
+  return input.fallbackFamily ?? "10K";
 }
 
 export function collectSelectedDistanceEndpointIssues(input: {
@@ -138,7 +138,7 @@ export function collectSelectedDistanceEndpointIssues(input: {
   expectedDistanceMeters: number | null | undefined;
   targetDate?: string | null;
   proof?: SelectedDistanceEndpointProof | null;
-  fallbackToFinalNonRestWhenTargetDateMissing?: boolean;
+  useFinalNonRestWhenTargetDateMissing?: boolean;
   requireEndpointIdentity?: boolean;
 }) {
   const issues: SelectedDistanceEndpointIssue[] = [];
@@ -155,7 +155,7 @@ export function collectSelectedDistanceEndpointIssues(input: {
     input.rows.some((row) => Object.prototype.hasOwnProperty.call(row, "endpointIdentity"));
   const endpointRow =
     (targetDate ? nonRestRows.find((row) => row.date === targetDate) : finalNonRest) ??
-    (input.fallbackToFinalNonRestWhenTargetDateMissing ? finalNonRest : undefined);
+    (input.useFinalNonRestWhenTargetDateMissing ? finalNonRest : undefined);
 
   if (!endpointRow) {
     return [buildIssue("selected_distance_endpoint_missing", "planned_workouts")];

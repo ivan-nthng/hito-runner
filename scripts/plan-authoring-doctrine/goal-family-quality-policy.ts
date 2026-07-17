@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { normalizeAiFirstPlanBlueprintToTrainingPlan } from "../../src/lib/ai-first-plan-blueprint-authoring";
 import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
 import {
   buildStructuredFirstPlanDraftReview,
@@ -7,11 +6,10 @@ import {
 } from "../../src/lib/structured-first-plan-onboarding";
 import {
   buildStructuredAuthoringPlan,
-  structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
 } from "../../src/lib/structured-plan-authoring";
+import { structuredPlanAuthoringInputSchema } from "../../src/lib/structured-plan-authoring-schema";
 import type { WeekdayName } from "../../src/lib/weekday-rest-invariants";
-import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./ai-first-plan-blueprint-fixtures";
 
 const fixedRestDays = ["Wednesday", "Sunday"] as const;
 
@@ -669,79 +667,6 @@ function assertBeginnerRecreationalSupportedIntensityCadence({
     false,
     "beginner marathon target-time without benchmark must not unlock pace targets",
   );
-
-  const blueprintAuthoringInput = structuredPlanAuthoringInputSchema.parse({
-    ...unsupportedTargetTimeMarathonResult.authoringInput,
-    schedule: {
-      ...unsupportedTargetTimeMarathonResult.authoringInput.schedule,
-      targetDate: null,
-      preparationHorizonWeeks: 8,
-    },
-  });
-  const overAuthoredBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
-    blueprintAuthoringInput,
-    { horizonWeeks: 8 },
-  );
-
-  for (const week of overAuthoredBlueprint.weeks.filter((candidate) => candidate.weekNumber <= 4)) {
-    while (week.plannedWorkouts.length > 4) {
-      const removableIndex = week.plannedWorkouts.findIndex(
-        (workout) =>
-          workout.workoutFamily !== "long" &&
-          workout.workoutIdentity !== "selected_distance_completion_or_checkpoint" &&
-          workout.weekday !== "Tuesday",
-      );
-
-      assert.notEqual(removableIndex, -1, "early fixture week must have a removable support row");
-      week.plannedWorkouts.splice(removableIndex, 1);
-    }
-  }
-
-  for (const week of overAuthoredBlueprint.weeks) {
-    let changedOneWorkout = false;
-
-    for (const workout of week.plannedWorkouts) {
-      if (
-        changedOneWorkout ||
-        workout.workoutFamily === "long" ||
-        workout.workoutIdentity === "selected_distance_completion_or_checkpoint" ||
-        workout.weekday !== "Tuesday"
-      ) {
-        continue;
-      }
-
-      workout.workoutFamily = "race";
-      workout.workoutIdentity = "race_pace_session";
-      workout.calendarIconKey = "race";
-      workout.title = "Unsupported race-rhythm block";
-      workout.summary = "Doctrine fixture intentionally overstates beginner race specificity.";
-      workout.plannedRpe = 8;
-      workout.estimatedFatigue = "high";
-      workout.recoveryPriority = "high";
-      workout.segmentIntent = "race_tuneup";
-      workout.metricIntent = "pace_if_allowed";
-      changedOneWorkout = true;
-    }
-  }
-
-  const rejectedBlueprint = normalizeAiFirstPlanBlueprintToTrainingPlan({
-    blueprint: overAuthoredBlueprint,
-    authoringInput: blueprintAuthoringInput,
-  });
-
-  assert.equal(
-    rejectedBlueprint.ok,
-    false,
-    "beginner over-authored W1-W4 specificity should reject before review signing.",
-  );
-
-  if (!rejectedBlueprint.ok) {
-    assert.match(
-      JSON.stringify(rejectedBlueprint.issues),
-      /conservative_no_benchmark_early_specificity/,
-      "beginner over-authored blueprint rejection should name the adaptation-phase policy.",
-    );
-  }
 }
 
 function assertSupportedHalfMarathonMarathonSpecificity({

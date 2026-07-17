@@ -5,1330 +5,190 @@ import {
   type StructuredFirstPlanOnboardingRequestInput,
 } from "../../src/lib/structured-first-plan-onboarding";
 import { buildReviewedFirstPlanImportedSeed } from "../../src/lib/active-plan-persistence";
-import { buildPersistedWorkoutInsertRows } from "../../src/lib/persisted-plan-replacement";
 import { generateAiFirstPlanDraftPreview } from "../../src/lib/ai-first-plan-draft-service";
+import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
+} from "../../src/lib/ai-generated-running-plan-dev-fixture";
+import { AI_AUTHORED_PLAN_FIRST_SOURCE_KIND } from "../../src/lib/ai-authored-plan-first-compiler";
 import { generateStructuredFirstPlanDraftForUser } from "../../src/lib/first-plan-actions";
-import {
-  AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
-  type AiFirstPlanBlueprint,
-} from "../../src/lib/ai-first-plan-blueprint-authoring";
-import { resolveAiFirstPlanBlueprintHorizonStrategy } from "../../src/lib/ai-first-plan-blueprint-horizon";
-import { buildMockAiFirstPlanEnvelope } from "../../src/lib/ai-first-plan-envelope-policy";
-import {
-  buildStructuredAuthoringPlan,
-  structuredPlanAuthoringInputSchema,
-  type StructuredPlanAuthoringInput,
-} from "../../src/lib/structured-plan-authoring";
-import { addDaysIso, diffDaysIso } from "../../src/lib/training";
 import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
-import type { WeekdayName } from "../../src/lib/weekday-rest-invariants";
-import { buildMinimalAiFirstPlanBlueprintForAuthoringInput } from "./ai-first-plan-blueprint-fixtures";
 
-export type DoctrineRequestBuilder = (
-  goalDistance: StructuredFirstPlanOnboardingRequestInput["goal"]["goalDistance"],
-  overrides?: Partial<StructuredFirstPlanOnboardingRequestInput>,
-) => StructuredFirstPlanOnboardingRequestInput;
+export async function assertFirstPlanReleaseGateContracts() {
+  const request = buildPlanFirstReleaseGateRequest();
+  const parsedInput = parseStructuredFirstPlanOnboardingInput(request);
+  const authoringInput = buildStructuredFirstPlanAuthoringInput(parsedInput);
+  const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+    authoringInput,
+    today: authoringInput.schedule.startDate,
+  });
 
-export interface FirstPlanReleaseGateDependencies {
-  assertFixedRestDays: (plan: TrainingPlanV2) => void;
-  assertFixedRestDayNames: (plan: TrainingPlanV2, restDays: WeekdayName[], label: string) => void;
-  assertNoFakeMetricTargetRegression: (plan: TrainingPlanV2, label: string) => void;
-  assertNoSingleSegmentNonRestWorkouts: (plan: TrainingPlanV2, label: string) => void;
-  assertRecoveryFirstAfterLongRuns: (plan: TrainingPlanV2, label: string) => void;
-  assertRichWorkoutContract: (plan: TrainingPlanV2, label: string) => void;
-  assertStructureOnlyExecutableContract: (plan: TrainingPlanV2, label: string) => void;
-  assertWeeklyLongRunDay: (
-    plan: TrainingPlanV2,
-    expectedWeekday: WeekdayName,
-    label: string,
-  ) => void;
-  buildAiFirstPlanAuthoringInput: (
-    overrides?: Partial<StructuredPlanAuthoringInput>,
-  ) => StructuredPlanAuthoringInput;
-  buildAiFirstPlanBlueprintFixture: () => AiFirstPlanBlueprint;
-  buildBalancedHalfEnvelopeAuthoringInput: () => StructuredPlanAuthoringInput;
-  buildLongHorizonMarathonAiFirstPlanAuthoringInput: () => StructuredPlanAuthoringInput;
-  buildRequest: DoctrineRequestBuilder;
-  countNonRestWorkouts: (plan: TrainingPlanV2) => number;
-  openAiFixtureResponse: (responseId: string, payload: unknown) => Response;
-  readAiFirstPlanReferenceFixture: () => unknown;
-}
-
-export async function assertFirstPlanReleaseGateContracts(deps: FirstPlanReleaseGateDependencies) {
-  await assertAiFirstPlanDraftServiceContract(deps);
-  await assertStructuredFirstPlanDraftBlueprintReviewContract(deps);
-  assertReviewedFirstPlanPersistenceExactness();
-}
-
-async function assertAiFirstPlanDraftServiceContract(deps: FirstPlanReleaseGateDependencies) {
-  const {
-    buildAiFirstPlanAuthoringInput,
-    buildAiFirstPlanBlueprintFixture,
-    buildBalancedHalfEnvelopeAuthoringInput,
-    buildLongHorizonMarathonAiFirstPlanAuthoringInput,
-    countNonRestWorkouts,
-    openAiFixtureResponse,
-    readAiFirstPlanReferenceFixture,
-  } = deps;
-  const authoringInput = buildAiFirstPlanAuthoringInput();
-  const referenceFixture = readAiFirstPlanReferenceFixture();
-  const blueprint = buildAiFirstPlanBlueprintFixture();
-  const validResult = await generateAiFirstPlanDraftPreview({
+  const serviceResult = await generateAiFirstPlanDraftPreview({
     input: authoringInput,
     inputKind: "structured_authoring",
-    referenceExample: referenceFixture,
-    today: "2026-05-26",
-    apiKey: "test-openai-key",
-    model: "test-ai-first-plan-model",
+    today: authoringInput.schedule.startDate,
+    apiKey: "plan-first-release-gate",
+    model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+    fetchImpl: fixtureFetch,
     timeoutMs: 1_000,
-    fetchImpl: (async () =>
-      openAiFixtureResponse("ai-first-plan-blueprint-valid", blueprint)) as typeof fetch,
-  });
-
-  assert.equal(validResult.ok, true, "AI first-plan service should return a bounded result");
-
-  if (validResult.ok) {
-    assert.equal(
-      validResult.metadata.status,
-      "ai_authored",
-      "valid AI first-plan service draft should preserve ai_authored status",
-    );
-    assert.equal(
-      validResult.metadata.responseId,
-      "ai-first-plan-blueprint-valid",
-      "AI first-plan service should expose bounded response id metadata",
-    );
-    assert.equal(
-      validResult.metadata.source,
-      "openai_ai_first_plan_blueprint",
-      "AI first-plan service should default to the compact blueprint contract",
-    );
-    assert.equal(
-      validResult.canonicalPlan.schema_version,
-      "training-plan-v2",
-      "AI first-plan service should return normalized training-plan-v2",
-    );
-  }
-
-  const longHorizonAuthoringInput = buildLongHorizonMarathonAiFirstPlanAuthoringInput();
-  const longHorizonStrategy = resolveAiFirstPlanBlueprintHorizonStrategy({
-    authoringInput: longHorizonAuthoringInput,
-    today: "2026-05-29",
-    referenceExample: null,
-  });
-  const boundedLongHorizonBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
-    longHorizonStrategy.openAiAuthoringInput,
-    { horizonWeeks: longHorizonStrategy.aiAuthoredHorizonWeeks },
-  );
-  const longHorizonResult = await generateAiFirstPlanDraftPreview({
-    input: longHorizonAuthoringInput,
-    inputKind: "structured_authoring",
-    referenceExample: null,
-    today: "2026-05-29",
-    apiKey: "test-openai-key",
-    model: "test-ai-first-plan-model",
-    timeoutMs: 1_000,
-    fetchImpl: (async () =>
-      openAiFixtureResponse(
-        "ai-first-plan-blueprint-long-horizon-valid",
-        boundedLongHorizonBlueprint,
-      )) as typeof fetch,
+    maxOutputTokens: 12_000,
   });
 
   assert.equal(
-    longHorizonStrategy.requestedHorizonWeeks,
-    29,
-    "long target-date fixture should preserve the full 29-week requested horizon",
-  );
-  assert.equal(
-    longHorizonStrategy.aiAuthoredHorizonWeeks,
-    29,
-    "long target-date fixture should ask OpenAI for the full dated horizon",
-  );
-  assert.equal(
-    longHorizonResult.ok,
+    serviceResult.ok,
     true,
-    "full long-horizon blueprint should normalize into a complete reviewable plan",
+    serviceResult.ok
+      ? "Plan-first draft service should produce canonical plan output."
+      : serviceResult.message,
+  );
+  if (!serviceResult.ok) throw new Error(serviceResult.message);
+
+  assertPlanFirstCanonicalResult(serviceResult.canonicalPlan, "plan-first draft service");
+  assert.equal(serviceResult.metadata.status, "ai_authored");
+  assert.equal(serviceResult.metadata.source, "openai_ai_authored_full_plan_draft");
+  assert.equal(serviceResult.metadata.debug.contractMode, "plan_first");
+  assert.equal(
+    serviceResult.metadata.debug.responseSchemaMode,
+    "responses_json_schema_plan_first_strict",
+  );
+  assert.doesNotMatch(
+    JSON.stringify(serviceResult),
+    /repeat_unit|recovery_unit/,
+    "Plan-first service output must not expose deleted generated-plan legacy vocabulary.",
   );
 
-  if (longHorizonResult.ok) {
-    assert.equal(
-      longHorizonResult.metadata.status,
-      "repaired_ai_draft",
-      "long-horizon blueprint should expose metric-policy repairs without backend scheduling",
-    );
-    assert.equal(
-      longHorizonResult.canonicalPlan.source_kind,
-      "ai_first_plan_blueprint_v1",
-      "long-horizon plan must keep blueprint source kind",
-    );
-    assert.equal(
-      longHorizonResult.canonicalPlan.preparation_horizon_weeks,
-      29,
-      "OpenAI-authored long-horizon plan should cover the requested target-date horizon",
-    );
-    assert.equal(
-      longHorizonResult.canonicalPlan.planned_workouts.length,
-      29 * 7,
-      "OpenAI-authored long-horizon plan should include every reviewed calendar row",
-    );
-    assert.equal(
-      countNonRestWorkouts(longHorizonResult.canonicalPlan),
-      countBlueprintAuthoredWorkouts(boundedLongHorizonBlueprint),
-      "OpenAI-authored long-horizon plan should preserve every dated authored running day",
-    );
-    assert.equal(
-      longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks,
-      0,
-      "long-horizon trace should not expose backend-authored calendar weeks",
-    );
-    assert.ok(
-      (longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy
-        ?.promptCharEstimateAfter ?? 0) >=
-        (longHorizonResult.metadata.blueprintTrace?.blueprintHorizonStrategy
-          ?.promptCharEstimateBefore ?? 0),
-      "long-horizon trace should preserve full-horizon prompt sizing",
-    );
-  }
-
-  const envelopeAuthoringInput = buildBalancedHalfEnvelopeAuthoringInput();
-  const envelope = buildMockAiFirstPlanEnvelope(envelopeAuthoringInput);
-  const envelopeResult = await generateAiFirstPlanDraftPreview({
-    input: envelopeAuthoringInput,
-    inputKind: "structured_authoring",
-    apiKey: "test-openai-key",
-    model: "test-ai-first-plan-model",
-    contractMode: "envelope",
-    timeoutMs: 1_000,
-    fetchImpl: (async () =>
-      openAiFixtureResponse("ai-first-plan-envelope-valid", envelope)) as typeof fetch,
-  });
+  const structuredDraft = await generateStructuredFirstPlanDraftForUser(
+    "doctrine-plan-first-user",
+    request,
+    {
+      aiPreview: {
+        today: authoringInput.schedule.startDate,
+        apiKey: "structured-plan-first-release-gate",
+        model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+        fetchImpl: fixtureFetch,
+        timeoutMs: 1_000,
+        maxOutputTokens: 12_000,
+      },
+    },
+  );
 
   assert.equal(
-    envelopeResult.ok,
+    structuredDraft.ok,
     true,
-    "internal envelope service option should return a reviewable canonical result",
+    structuredDraft.ok
+      ? "Structured first-plan draft should return review-ready plan-first output."
+      : structuredDraft.message,
+  );
+  assert.equal(structuredDraft.status, "draft_ready");
+  if (!structuredDraft.ok || structuredDraft.status !== "draft_ready") {
+    throw new Error("Structured first-plan draft did not return review-ready output.");
+  }
+
+  assert.equal(structuredDraft.sourceKind, AI_AUTHORED_PLAN_FIRST_SOURCE_KIND);
+  assert.equal(structuredDraft.generation.sourceStatus, "ai_authored");
+  assertPlanFirstCanonicalResult(
+    structuredDraft.draft.canonicalPlan,
+    "structured first-plan draft",
+  );
+  assert.equal(structuredDraft.safety.doesNotMutatePlan, true);
+  assert.equal(structuredDraft.safety.requiresExplicitApply, true);
+  assert.equal(structuredDraft.draft.draftToken.includes(":"), true);
+  assert.doesNotMatch(
+    JSON.stringify(structuredDraft),
+    /repeat_unit|recovery_unit/,
+    "Structured first-plan review payload must be plan-first only.",
   );
 
-  if (envelopeResult.ok) {
-    assert.equal(
-      envelopeResult.canonicalPlan.source_kind,
-      "ai_first_plan_envelope_v1",
-      "internal envelope service option should preserve envelope source kind",
-    );
-    assert.equal(
-      envelopeResult.metadata.status,
-      "expanded_from_envelope",
-      "internal envelope service option should expose expanded envelope status",
-    );
-    assert.equal(
-      envelopeResult.metadata.source,
-      "openai_ai_first_plan_envelope",
-      "internal envelope service option should expose envelope source metadata",
-    );
-    assert.equal(
-      envelopeResult.metadata.fallbackReason,
-      null,
-      "internal envelope service option should not use fallback on valid envelope output",
-    );
-    assert.equal(
-      envelopeResult.metadata.validationIssueCount,
-      0,
-      "internal envelope service option should pass canonical validation",
-    );
-    assert.ok(
-      envelopeResult.metadata.envelopeTrace,
-      "internal envelope service option should expose bounded envelope trace metadata",
-    );
-  }
+  const importedSeed = buildReviewedFirstPlanImportedSeed(structuredDraft.draft.canonicalPlan);
+  assert.equal(
+    importedSeed.workouts.length,
+    structuredDraft.draft.canonicalPlan.planned_workouts.length,
+  );
 
   const invalidResult = await generateAiFirstPlanDraftPreview({
     input: authoringInput,
     inputKind: "structured_authoring",
-    apiKey: "test-openai-key",
-    model: "test-ai-first-plan-model",
-    timeoutMs: 1_000,
-    fetchImpl: (async () =>
-      openAiFixtureResponse("ai-first-plan-invalid", {
-        schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
-        planName: "Invalid",
+    apiKey: "invalid-plan-first-release-gate",
+    model: "invalid-plan-first-release-gate",
+    today: authoringInput.schedule.startDate,
+    fetchImpl: async () =>
+      openAiPlanFirstResponse("invalid-plan-first-release-gate", {
+        metadata: {
+          goal: "Invalid plan-first draft",
+          target_date: null,
+          target_time: null,
+          athlete: null,
+          rest_days: [],
+          long_run_day: null,
+          note: null,
+          warnings: [],
+          assumptions: [],
+        },
         weeks: [],
-      })) as typeof fetch,
+      }),
+    timeoutMs: 1_000,
   });
 
-  assert.equal(
-    invalidResult.ok,
-    false,
-    "invalid AI first-plan service draft should return bounded blueprint-unavailable failure",
-  );
-
-  if (!invalidResult.ok && invalidResult.reason === "ai_first_plan_blueprint_unavailable") {
-    assert.equal(
-      invalidResult.metadata.sourceStatus,
-      "blueprint_unavailable",
-      "invalid AI first-plan service draft should not become deterministic fallback",
-    );
-    assert.equal(
-      invalidResult.metadata.fallbackReason,
-      "ai_first_plan_blueprint_schema_invalid",
-      "invalid AI first-plan service draft should expose validation fallback reason",
-    );
-    assert.ok(
-      invalidResult.metadata.validationIssueCount > 0,
-      "invalid AI first-plan service draft should expose bounded validation issue count",
-    );
+  assert.equal(invalidResult.ok, false);
+  if (invalidResult.ok) {
+    throw new Error("Invalid plan-first release-gate payload unexpectedly compiled.");
   }
-
-  const timeoutResult = await generateAiFirstPlanDraftPreview({
-    input: authoringInput,
-    inputKind: "structured_authoring",
-    apiKey: "test-openai-key",
-    model: "test-ai-first-plan-model",
-    timeoutMs: 5,
-    fetchImpl: (async () => new Promise<Response>(() => undefined)) as typeof fetch,
-  });
-
-  assert.equal(
-    timeoutResult.ok,
-    false,
-    "timed-out AI first-plan service should return bounded blueprint-unavailable failure",
-  );
-
-  if (!timeoutResult.ok && timeoutResult.reason === "ai_first_plan_blueprint_unavailable") {
-    assert.equal(
-      timeoutResult.metadata.sourceStatus,
-      "blueprint_unavailable",
-      "timed-out AI first-plan service should not become deterministic fallback",
-    );
-    assert.equal(
-      timeoutResult.metadata.fallbackReason,
-      "ai_first_plan_blueprint_timed_out",
-      "timed-out AI first-plan service should expose timeout fallback reason",
-    );
-  }
+  assert.equal(invalidResult.reason, "ai_authored_plan_first_unavailable");
+  assert.equal(JSON.stringify(invalidResult).includes("draftToken"), false);
 }
 
-async function assertStructuredFirstPlanDraftBlueprintReviewContract(
-  deps: FirstPlanReleaseGateDependencies,
-) {
-  const {
-    assertFixedRestDays,
-    assertFixedRestDayNames,
-    assertNoFakeMetricTargetRegression,
-    assertNoSingleSegmentNonRestWorkouts,
-    assertRecoveryFirstAfterLongRuns,
-    assertRichWorkoutContract,
-    assertStructureOnlyExecutableContract,
-    assertWeeklyLongRunDay,
-    buildLongHorizonMarathonAiFirstPlanAuthoringInput,
-    buildRequest,
-    countNonRestWorkouts,
-    openAiFixtureResponse,
-  } = deps;
-  const availability = {
-    runningDaysPerWeek: 2,
-    fixedRestDays: ["Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-    preferredLongRunDay: "Tuesday",
-  } satisfies StructuredFirstPlanOnboardingRequestInput["availability"];
-  const initialInput = parseStructuredFirstPlanOnboardingInput(
-    buildRequest("half_marathon", {
-      availability,
-      goal: {
-        goalDistance: "half_marathon",
-        goalStyle: "target_time",
-        terrainFocus: "standard",
-        targetTime: "2:00:00",
-        targetDate: "2026-07-12",
-      },
-    }),
-  );
-  const initialAuthoringInput = buildStructuredFirstPlanAuthoringInput(initialInput);
-  const targetDate = addDaysIso(initialAuthoringInput.schedule.startDate, 13);
-  const input = parseStructuredFirstPlanOnboardingInput(
-    buildRequest("half_marathon", {
-      availability,
-      goal: {
-        goalDistance: "half_marathon",
-        goalStyle: "target_time",
-        terrainFocus: "standard",
-        targetTime: "2:00:00",
-        targetDate,
-      },
-    }),
-  );
-  const authoringInput = buildStructuredFirstPlanAuthoringInput(input);
-  const blueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(authoringInput);
-  const aiResult = await generateStructuredFirstPlanDraftForUser("doctrine-fixture-user", input, {
-    aiPreview: {
-      apiKey: "test-openai-key",
-      model: "test-ai-first-plan-model",
-      timeoutMs: 1_000,
-      fetchImpl: (async () =>
-        openAiFixtureResponse("structured-first-plan-blueprint-valid", blueprint)) as typeof fetch,
-    },
-  });
-
-  assert.equal(
-    aiResult.ok,
-    true,
-    `structured first-plan draft should return a bounded result: ${JSON.stringify(aiResult)}`,
-  );
-  assert.equal(aiResult.status, "draft_ready", "structured first-plan draft should be ready");
-
-  if (aiResult.ok && aiResult.status === "draft_ready") {
-    assert.equal(
-      aiResult.sourceKind,
-      "ai_first_plan_blueprint_v1",
-      "structured first-plan draft should expose AI blueprint source kind",
-    );
-    assert.equal(
-      aiResult.generation.sourceStatus,
-      "ai_authored",
-      "structured first-plan draft should expose AI-authored source status",
-    );
-    assert.equal(
-      aiResult.draft.canonicalPlan.source_kind,
-      "ai_first_plan_blueprint_v1",
-      "structured first-plan draft should review canonical AI blueprint plan truth",
-    );
-    assert.ok(
-      aiResult.draft.draftToken.includes(":"),
-      "structured first-plan draft should include a signed reviewed-plan token",
-    );
-    assertRichWorkoutContract(aiResult.draft.canonicalPlan, "structured first-plan AI draft");
-    assertFixedRestDays(aiResult.draft.canonicalPlan);
-    assertStructureOnlyExecutableContract(
-      aiResult.draft.canonicalPlan,
-      "structured first-plan AI draft executable contract",
-    );
-  }
-
-  const staleExecutionInput = {
-    ...input,
-    execution: { watchAccess: "unknown", guidancePreference: "effort" },
-  } satisfies StructuredFirstPlanOnboardingRequestInput;
-  const normalizedExecutionAuthoringInput =
-    buildStructuredFirstPlanAuthoringInput(staleExecutionInput);
-  const normalizedExecutionBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
-    normalizedExecutionAuthoringInput,
-  );
-  const normalizedExecutionResult = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-fixture-user",
-    staleExecutionInput,
-    {
-      aiPreview: {
-        apiKey: "test-openai-key",
-        model: "test-ai-first-plan-model",
-        timeoutMs: 1_000,
-        fetchImpl: (async () =>
-          openAiFixtureResponse(
-            "structured-first-plan-blueprint-watch-normalized",
-            normalizedExecutionBlueprint,
-          )) as typeof fetch,
-      },
-    },
-  );
-
-  assert.equal(
-    normalizedExecutionResult.ok,
-    true,
-    "stale missing execution surface input should return a bounded draft result",
-  );
-  assert.equal(
-    normalizedExecutionResult.status,
-    "draft_ready",
-    "stale missing execution surface input should normalize into supported blueprint generation",
-  );
-
-  if (normalizedExecutionResult.ok && normalizedExecutionResult.status === "draft_ready") {
-    assert.equal(
-      normalizedExecutionResult.draft.authoringInput.execution.watchAccess,
-      "watch_or_app",
-      "supported new-plan generation should normalize execution surface server-side",
-    );
-    assertStructureOnlyExecutableContract(
-      normalizedExecutionResult.draft.canonicalPlan,
-      "structured first-plan stale execution input normalized executable contract",
-    );
-  }
-
-  const envelopeInput = parseStructuredFirstPlanOnboardingInput(
-    buildRequest("half_marathon", {
-      profile: { age: 38, weightKg: 72, heightCm: 178 },
-      benchmark: { kind: "recent_5k_time", recent5kTime: "24:30" },
-      availability: {
-        runningDaysPerWeek: 5,
-        fixedRestDays: ["Wednesday", "Sunday"],
-        preferredLongRunDay: "Saturday",
-      },
-      goal: {
-        goalDistance: "half_marathon",
-        goalStyle: "balanced",
-        terrainFocus: "standard",
-        targetTime: null,
-        targetDate: "2026-07-12",
-      },
-      schedule: {
-        startDate: "2026-06-01",
-        targetDate: "2026-07-12",
-      },
-      strength: { preference: "mobility" },
-      execution: { watchAccess: "watch_or_app", guidancePreference: "effort" },
-      comment: null,
-    }),
-  );
-  const envelopeAuthoringInput = buildStructuredFirstPlanAuthoringInput(envelopeInput);
-  const envelope = buildMockAiFirstPlanEnvelope(envelopeAuthoringInput);
-  const envelopeDraft = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-fixture-user",
-    envelopeInput,
-    {
-      internalDraftContract: "envelope",
-      aiPreview: {
-        apiKey: "test-openai-key",
-        model: "test-ai-first-plan-model",
-        timeoutMs: 1_000,
-        fetchImpl: (async () =>
-          openAiFixtureResponse("structured-first-plan-envelope-valid", envelope)) as typeof fetch,
-      },
-    },
-  );
-
-  assert.equal(
-    envelopeDraft.ok,
-    true,
-    "explicit internal envelope structured first-plan option should return a draft",
-  );
-
-  if (envelopeDraft.ok && envelopeDraft.status === "draft_ready") {
-    assert.equal(
-      envelopeDraft.sourceKind,
-      "ai_first_plan_envelope_v1",
-      "explicit internal envelope draft should expose envelope source kind",
-    );
-    assert.equal(
-      envelopeDraft.generation.sourceStatus,
-      "expanded_from_envelope",
-      "explicit internal envelope draft should expose expanded envelope status",
-    );
-    assert.equal(
-      envelopeDraft.draft.canonicalPlan.source_kind,
-      "ai_first_plan_envelope_v1",
-      "explicit internal envelope draft should review canonical envelope plan truth",
-    );
-    assert.equal(
-      envelopeDraft.safety.doesNotMutatePlan,
-      true,
-      "explicit internal envelope draft generation must remain non-mutating",
-    );
-    assert.ok(
-      envelopeDraft.draft.draftToken.includes(":"),
-      "explicit internal envelope draft should include a signed reviewed-plan token",
-    );
-    assertRichWorkoutContract(
-      envelopeDraft.draft.canonicalPlan,
-      "explicit internal envelope structured draft",
-    );
-    assertFixedRestDayNames(
-      envelopeDraft.draft.canonicalPlan,
-      ["Wednesday", "Sunday"],
-      "explicit internal envelope structured draft",
-    );
-    assertWeeklyLongRunDay(
-      envelopeDraft.draft.canonicalPlan,
-      "Saturday",
-      "explicit internal envelope structured draft",
-    );
-    assertNoFakeMetricTargetRegression(
-      envelopeDraft.draft.canonicalPlan,
-      "explicit internal envelope structured draft",
-    );
-    assert.ok(
-      envelopeDraft.generation.envelopeTrace,
-      "explicit internal envelope draft should carry bounded envelope trace metadata",
-    );
-  }
-
-  const invalidEnvelopeDraft = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-fixture-user",
-    envelopeInput,
-    {
-      internalDraftContract: "envelope",
-      aiPreview: {
-        apiKey: "test-openai-key",
-        model: "test-ai-first-plan-model",
-        timeoutMs: 1_000,
-        fetchImpl: (async () =>
-          openAiFixtureResponse("structured-first-plan-envelope-invalid", {
-            ...envelope,
-            phases: [],
-          })) as typeof fetch,
-      },
-    },
-  );
-
-  assert.equal(
-    invalidEnvelopeDraft.ok,
-    false,
-    "invalid internal envelope structured first-plan option should fail bounded",
-  );
-
-  if (!invalidEnvelopeDraft.ok && invalidEnvelopeDraft.status === "draft_failed") {
-    assert.equal(
-      invalidEnvelopeDraft.reason,
-      "ai_first_plan_envelope_unavailable",
-      "invalid internal envelope draft should expose envelope unavailable reason",
-    );
-    assert.equal(
-      invalidEnvelopeDraft.generation.sourceKind,
-      "ai_first_plan_envelope_v1",
-      "invalid internal envelope draft should keep envelope source boundary",
-    );
-    assert.equal(
-      invalidEnvelopeDraft.generation.sourceStatus,
-      "envelope_unavailable",
-      "invalid internal envelope draft should expose unavailable envelope status",
-    );
-    assert.ok(
-      !("draft" in invalidEnvelopeDraft),
-      "invalid internal envelope draft must not include a reviewed-plan token",
-    );
-  }
-
-  const timedOutEnvelopeDraft = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-fixture-user",
-    envelopeInput,
-    {
-      internalDraftContract: "envelope",
-      aiPreview: {
-        apiKey: "test-openai-key",
-        model: "test-ai-first-plan-model",
-        timeoutMs: 5,
-        fetchImpl: (async () => new Promise<Response>(() => undefined)) as typeof fetch,
-      },
-    },
-  );
-
-  assert.equal(
-    timedOutEnvelopeDraft.ok,
-    false,
-    "timed-out internal envelope structured first-plan option should fail bounded",
-  );
-
-  if (!timedOutEnvelopeDraft.ok && timedOutEnvelopeDraft.status === "draft_failed") {
-    assert.equal(
-      timedOutEnvelopeDraft.generation.fallbackReason,
-      "ai_first_plan_envelope_timed_out",
-      "timed-out internal envelope draft should expose bounded timeout reason",
-    );
-    assert.ok(
-      !("draft" in timedOutEnvelopeDraft),
-      "timed-out internal envelope draft must not include a reviewed-plan token",
-    );
-  }
-
-  const invalidResult = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-fixture-user",
-    input,
-    {
-      aiPreview: {
-        apiKey: "test-openai-key",
-        model: "test-ai-first-plan-model",
-        timeoutMs: 1_000,
-        fetchImpl: (async () =>
-          openAiFixtureResponse("structured-first-plan-blueprint-invalid", {
-            schemaVersion: AI_FIRST_PLAN_BLUEPRINT_SCHEMA_VERSION,
-            planName: "Invalid",
-            weeks: [],
-          })) as typeof fetch,
-      },
-    },
-  );
-
-  assert.equal(
-    invalidResult.ok,
-    false,
-    "invalid blueprint structured first-plan draft should return bounded failure",
-  );
-  assert.equal(
-    invalidResult.status,
-    "draft_failed",
-    "invalid blueprint must not produce a reviewable deterministic draft",
-  );
-
-  if (!invalidResult.ok && invalidResult.status === "draft_failed") {
-    assert.equal(
-      invalidResult.generation.sourceStatus,
-      "blueprint_unavailable",
-      "invalid blueprint structured draft should expose unavailable status",
-    );
-    assert.equal(
-      invalidResult.generation.fallbackReason,
-      "ai_first_plan_blueprint_schema_invalid",
-      "invalid blueprint structured draft should expose bounded fallback reason",
-    );
-    assert.equal(
-      invalidResult.generation.sourceKind,
-      "ai_first_plan_blueprint_v1",
-      "invalid blueprint structured draft should keep the blueprint source boundary",
-    );
-  }
-
-  const partialInput = parseStructuredFirstPlanOnboardingInput(
-    buildRequest("marathon", {
-      profile: { age: 36, weightKg: 72, heightCm: 178 },
-      benchmark: { fitnessLevel: "new_to_running" },
-      availability: {
-        runningDaysPerWeek: 5,
-        fixedRestDays: ["Wednesday", "Saturday"],
-        preferredLongRunDay: "Sunday",
-      },
-      goal: {
-        goalDistance: "marathon",
-        goalStyle: "target_time",
-        terrainFocus: "rolling",
-        targetTime: "3:50:00",
-        targetDate: "2026-12-11",
-      },
-      schedule: {
-        startDate: "2026-05-29",
-        targetDate: "2026-12-11",
-      },
-      strength: { preference: "mobility" },
-      execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
-      comment: null,
-    }),
-  );
-  const partialAuthoringInput = buildStructuredFirstPlanAuthoringInput(partialInput);
-  const partialHorizonWeeks = Math.ceil(
-    (diffDaysIso(
-      partialAuthoringInput.schedule.targetDate!,
-      partialAuthoringInput.schedule.startDate,
-    ) +
-      1) /
-      7,
-  );
-  const boundedHorizonStrategy = resolveAiFirstPlanBlueprintHorizonStrategy({
-    authoringInput: partialAuthoringInput,
-    today: "2026-05-29",
-    referenceExample: null,
-  });
-  const boundedHorizonBlueprint = buildMinimalAiFirstPlanBlueprintForAuthoringInput(
-    boundedHorizonStrategy.openAiAuthoringInput,
-    { horizonWeeks: boundedHorizonStrategy.aiAuthoredHorizonWeeks },
-  );
-  const forcedPostLongRunSteady =
-    forceFirstPostLongRunBlueprintWorkoutToSteady(boundedHorizonBlueprint);
-  const boundedHorizonResult = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-fixture-user",
-    partialInput,
-    {
-      aiPreview: {
-        apiKey: "test-openai-key",
-        model: "test-ai-first-plan-model",
-        timeoutMs: 1_000,
-        fetchImpl: (async () =>
-          openAiFixtureResponse(
-            "structured-first-plan-blueprint-long-horizon-valid",
-            boundedHorizonBlueprint,
-          )) as typeof fetch,
-      },
-    },
-  );
-
-  assert.equal(
-    partialHorizonWeeks,
-    29,
-    "long target-date structured first-plan scenario should reproduce the 29-week marathon horizon",
-  );
-  assert.equal(
-    boundedHorizonStrategy.aiAuthoredHorizonWeeks,
-    29,
-    "long target-date structured first-plan scenario should request the full OpenAI-authored horizon",
-  );
-  assert.equal(
-    boundedHorizonResult.ok,
-    true,
-    boundedHorizonResult.ok
-      ? "long target-date structured first-plan draft should review a complete OpenAI-authored dated plan"
-      : `long target-date structured first-plan draft should review a complete OpenAI-authored dated plan: ${JSON.stringify(
-          boundedHorizonResult,
-        )}`,
-  );
-
-  if (boundedHorizonResult.ok && boundedHorizonResult.status === "draft_ready") {
-    assert.equal(
-      boundedHorizonResult.review.displayTitle,
-      "Marathon 3:50:00 target plan through 2026-12-11",
-      "long target-date structured review display title should describe the full plan through target date",
-    );
-    assert.equal(
-      /16-week/i.test(boundedHorizonResult.review.displayTitle),
-      false,
-      "long target-date structured review display title must not imply only the AI-authored opening window",
-    );
-    assert.equal(
-      /blueprint|opening blueprint|repaired_ai_draft|backendExtendedWeeks|requestedHorizonWeeks|aiAuthoredHorizonWeeks|ai_first_plan_blueprint_v1/i.test(
-        boundedHorizonResult.review.displayTitle,
-      ),
-      false,
-      "long target-date structured review display title must not expose internal source/debug terms",
-    );
-    assert.equal(
-      boundedHorizonResult.draft.canonicalPlan.source_kind,
-      "ai_first_plan_blueprint_v1",
-      "long target-date structured first-plan review should remain blueprint-backed",
-    );
-    assert.equal(
-      boundedHorizonResult.generation.sourceStatus,
-      "repaired_ai_draft",
-      "long target-date metric-policy repair should be visible in review metadata",
-    );
-    assert.equal(
-      boundedHorizonResult.generation.blueprintTrace?.blueprintHorizonStrategy
-        ?.requestedHorizonWeeks,
-      29,
-      "structured review trace should preserve requested horizon weeks",
-    );
-    assert.equal(
-      boundedHorizonResult.generation.blueprintTrace?.blueprintHorizonStrategy
-        ?.backendExtendedWeeks,
-      0,
-      "structured review trace should not expose backend-authored calendar weeks",
-    );
-    assert.equal(
-      boundedHorizonResult.draft.canonicalPlan.planned_workouts.length,
-      29 * 7,
-      "long target-date structured review should include full calendar rows",
-    );
-    assert.equal(
-      countNonRestWorkouts(boundedHorizonResult.draft.canonicalPlan),
-      countBlueprintAuthoredWorkouts(boundedHorizonBlueprint),
-      "long target-date structured review should include every authored running day",
-    );
-    assertFixedRestDayNames(
-      boundedHorizonResult.draft.canonicalPlan,
-      ["Wednesday", "Saturday"],
-      "long target-date low-support marathon review",
-    );
-    assertWeeklyLongRunDayWithTargetEndpoint(
-      boundedHorizonResult.draft.canonicalPlan,
-      "Sunday",
-      partialAuthoringInput.schedule.targetDate!,
-      "long target-date low-support marathon review",
-    );
-    assertRecoveryFirstAfterLongRuns(
-      boundedHorizonResult.draft.canonicalPlan,
-      "long target-date low-support marathon review",
-    );
-    assertRichWorkoutContract(
-      boundedHorizonResult.draft.canonicalPlan,
-      "long target-date low-support marathon review",
-    );
-    assertNoSingleSegmentNonRestWorkouts(
-      boundedHorizonResult.draft.canonicalPlan,
-      "long target-date low-support marathon review",
-    );
-    assertNoFakeMetricTargetRegression(
-      boundedHorizonResult.draft.canonicalPlan,
-      "long target-date low-support marathon review",
-    );
-    assert.equal(
-      boundedHorizonResult.generation.blueprintTrace?.requiredCadenceSlots.length,
-      0,
-      "low-support marathon target-date review should keep cadence kind none",
-    );
-    assert.ok(
-      forcedPostLongRunSteady,
-      "doctrine fixture should force a post-long-run steady blueprint workout before repair",
-    );
-    assert.ok(
-      boundedHorizonResult.generation.repairs.some((repair) =>
-        repair.includes(`recovery-first sequencing changed steady_aerobic_run`),
-      ),
-      "post-long-run steady blueprint workout should be repaired before review",
-    );
-    assert.equal(
-      boundedHorizonResult.generation.blueprintTrace?.deterministicFallbackBoundary.used,
-      false,
-      "long target-date structured review must not use deterministic fallback",
-    );
-  }
-
-  const nonSundayLongRunAuthoringInput = structuredPlanAuthoringInputSchema.parse({
-    ...partialAuthoringInput,
-    schedule: {
-      ...partialAuthoringInput.schedule,
-      startDate: "2026-06-01",
-      targetDate: null,
-      preparationHorizonWeeks: 4,
-    },
-    availability: {
-      ...partialAuthoringInput.availability,
-      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Sunday"],
-      unavailableDays: ["Wednesday", "Saturday"],
-      preferredLongRunDay: "Tuesday",
-    },
-  });
-  const nonSundayLongRunPlan = buildStructuredAuthoringPlan(nonSundayLongRunAuthoringInput);
-
-  assertWeeklyLongRunDay(
-    nonSundayLongRunPlan,
-    "Tuesday",
-    "non-Sunday low-support marathon recovery sequencing fixture",
-  );
-  assertFixedRestDayNames(
-    nonSundayLongRunPlan,
-    ["Wednesday", "Saturday"],
-    "non-Sunday low-support marathon recovery sequencing fixture",
-  );
-  assertRecoveryFirstAfterLongRuns(
-    nonSundayLongRunPlan,
-    "non-Sunday low-support marathon recovery sequencing fixture",
-  );
-
-  const partialBlueprint = {
-    ...buildMinimalAiFirstPlanBlueprintForAuthoringInput(partialAuthoringInput, {
-      horizonWeeks: partialHorizonWeeks,
-    }),
-  };
-  partialBlueprint.weeks = partialBlueprint.weeks.slice(0, 5);
-  const partialResult = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-fixture-user",
-    partialInput,
-    {
-      aiPreview: {
-        apiKey: "test-openai-key",
-        model: "test-ai-first-plan-model",
-        timeoutMs: 1_000,
-        fetchImpl: (async () =>
-          openAiFixtureResponse(
-            "structured-first-plan-blueprint-partial",
-            partialBlueprint,
-          )) as typeof fetch,
-      },
-    },
-  );
-
-  assert.equal(
-    partialHorizonWeeks,
-    29,
-    "partial blueprint doctrine scenario should reproduce the 29-week marathon horizon",
-  );
-  assert.equal(
-    partialResult.ok,
-    false,
-    "partial blueprint structured first-plan draft should return bounded failure",
-  );
-
-  if (!partialResult.ok && partialResult.status === "draft_failed") {
-    assert.equal(
-      partialResult.generation.fallbackReason,
-      "ai_first_plan_blueprint_incomplete",
-      "partial blueprint structured draft should expose incomplete fallback reason",
-    );
-    assert.ok(
-      partialResult.generation.validationIssues.some((issue) =>
-        issue.includes("incomplete_blueprint_weeks"),
-      ),
-      "partial blueprint structured draft should report missing week validation issue",
-    );
-    assert.equal(
-      partialResult.generation.blueprintTrace?.blueprintCompleteness?.expectedWeekCount,
-      29,
-      "partial blueprint structured draft trace should include the full AI-authored expected week count",
-    );
-    assert.equal(
-      partialResult.generation.blueprintTrace?.blueprintCompleteness?.actualWeekCount,
-      5,
-      "partial blueprint structured draft trace should include actual authored week count",
-    );
-    assert.equal(
-      partialResult.generation.blueprintTrace?.blueprintHorizonStrategy?.requestedHorizonWeeks,
-      29,
-      "partial blueprint structured draft trace should still expose the full requested horizon",
-    );
-    assert.equal(
-      partialResult.generation.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks,
-      0,
-      "partial blueprint structured draft trace should not expose backend extension",
-    );
-    assert.equal(
-      partialResult.generation.blueprintTrace?.deterministicFallbackBoundary.used,
-      false,
-      "partial blueprint structured draft must not use deterministic fallback",
-    );
-    assert.ok(
-      !("draft" in partialResult),
-      "partial blueprint structured draft must not include a reviewed-plan token",
-    );
-  }
-
-  const timeoutResult = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-fixture-user",
-    input,
-    {
-      aiPreview: {
-        apiKey: "test-openai-key",
-        model: "test-ai-first-plan-model",
-        timeoutMs: 5,
-        fetchImpl: (async () => new Promise<Response>(() => undefined)) as typeof fetch,
-      },
-    },
-  );
-
-  assert.equal(
-    timeoutResult.ok,
-    false,
-    "timed-out blueprint structured first-plan draft should return bounded failure",
-  );
-
-  if (!timeoutResult.ok && timeoutResult.status === "draft_failed") {
-    assert.equal(
-      timeoutResult.generation.sourceStatus,
-      "blueprint_unavailable",
-      "timed-out blueprint structured draft should expose unavailable status",
-    );
-    assert.equal(
-      timeoutResult.generation.fallbackReason,
-      "ai_first_plan_blueprint_timed_out",
-      "timed-out blueprint structured draft should expose bounded timeout reason",
-    );
-    assert.ok(
-      !("draft" in timeoutResult),
-      "timed-out blueprint structured draft must not include a reviewed-plan token",
-    );
-  }
-}
-
-function assertReviewedFirstPlanPersistenceExactness() {
-  const reviewedPlan = buildReviewedFirstPlanExactnessFixture();
-  const seed = buildReviewedFirstPlanImportedSeed(reviewedPlan);
-  const rows = buildPersistedWorkoutInsertRows("reviewed-plan", "reviewed-user", seed.workouts);
-
-  assert.equal(
-    seed.workouts.length,
-    reviewedPlan.planned_workouts.length,
-    "reviewed first-plan persistence seed should keep every reviewed calendar row",
-  );
-  assert.equal(
-    seed.endDate,
-    "2026-06-01",
-    "reviewed first-plan persistence seed should keep trailing reviewed calendar days",
-  );
-  assert.equal(
-    rows.length,
-    reviewedPlan.planned_workouts.length,
-    "reviewed first-plan persisted rows should match reviewed row count exactly",
-  );
-  assert.equal(
-    rows.at(-1)?.workout_date,
-    "2026-06-01",
-    "reviewed first-plan persisted rows should keep reviewed final date",
-  );
-
-  const reviewedRestRow = rows.find((row) => row.workout_date === "2026-05-31");
-  assert.ok(reviewedRestRow, "reviewed rest day should be persisted");
-  assert.equal(
-    reviewedRestRow?.title,
-    "Rest and recovery",
-    "reviewed rest day title should not be rewritten into synthetic fixed-rest copy",
-  );
-  assert.equal(
-    reviewedRestRow?.notes,
-    "No run today; protect recovery.",
-    "reviewed rest day notes should come from the reviewed canonical row",
-  );
-  assert.deepEqual(
-    reviewedRestRow?.steps,
-    [],
-    "reviewed rest day should keep the canonical empty persisted steps shape",
-  );
-  assert.notEqual(
-    reviewedRestRow?.notes,
-    "Fixed weekday rest day.",
-    "reviewed first-plan confirm must not insert synthetic fixed-rest notes",
-  );
-
-  const invalidReviewedPlan: TrainingPlanV2 = {
-    ...reviewedPlan,
-    planned_workouts: reviewedPlan.planned_workouts.map((workout) =>
-      workout.date === "2026-05-31"
-        ? {
-            ...workout,
-            workout_type: "easy",
-            source_workout_type: "easy_aerobic_run",
-            workout_family: "easy",
-            workout_identity: "easy_aerobic_run",
-            calendar_icon_key: "easy",
-            title: "Invalid fixed-rest run",
-            summary: "This tampered draft tries to place running on a fixed rest day.",
-            segments: [
-              {
-                segment_id: "invalid-main",
-                segment_type: "main",
-                label: "Easy run",
-                sequence: 1,
-                guidance: "This should be rejected before persistence.",
-                prescription: { mode: "time", duration_min: 30 },
-              },
-            ],
-          }
-        : workout,
-    ),
-  };
-
-  assert.throws(
-    () => buildReviewedFirstPlanImportedSeed(invalidReviewedPlan),
-    /Fixed rest-day constraints would be violated/,
-    "reviewed first-plan persistence should validate fixed rest days without rewriting",
-  );
-}
-
-function buildReviewedFirstPlanExactnessFixture(): TrainingPlanV2 {
-  const metricMode = {
-    guidance: "effort" as const,
-    pace_targets_allowed: false,
-    hr_targets_allowed: false,
-    hr_target_source: "effort_only" as const,
-    reason: "Fixture stays effort-only.",
-  };
-  const goalContext = {
-    goal_type: "half_marathon",
-    goal_style: "target_time",
-    terrain_focus: "standard" as const,
-    target_date: "2026-06-01",
-    target_time: "2:00:00",
-  };
-
+function buildPlanFirstReleaseGateRequest(): StructuredFirstPlanOnboardingRequestInput {
   return {
-    schema_version: "training-plan-v2",
-    plan_name: "Reviewed AI blueprint exactness fixture",
-    source_kind: "ai_first_plan_blueprint_v1",
-    generated_for: "Doctrine fixture",
+    profile: { age: 34, weightKg: 72, heightCm: 178 },
+    benchmark: { kind: "recent_5k_time", recent5kTime: "24:00" },
+    availability: {
+      runningDaysPerWeek: 5,
+      fixedRestDays: ["Wednesday", "Sunday"],
+      preferredLongRunDay: "Saturday",
+    },
     goal: {
-      goal_type: "half_marathon",
-      goal_label: "Half marathon target-time plan",
-      target_event: { date: "2026-06-01" },
+      goalDistance: "half_marathon",
+      goalStyle: "target_time",
+      terrainFocus: "standard",
+      targetTime: "2:00:00",
+      targetDate: "2026-09-26",
     },
-    runner_profile: {
-      experience_level: "returning_runner",
-      baseline_sessions_per_week: 2,
-      baseline_long_run_duration_min: 45,
-      age: 34,
-      primary_goal: "Half marathon",
-    },
-    start_date: "2026-05-30",
-    preparation_horizon_weeks: 1,
-    target_date: "2026-06-01",
-    plan_preferences: {
-      preferred_run_days: ["Saturday"],
-      blocked_days: ["Sunday"],
-      max_running_days_per_week: 1,
-      preferred_long_run_day: "Saturday",
-    },
-    training_constraints: {
-      running_days_per_week: 1,
-      full_rest_days: ["Sunday"],
-      long_run_day: "Saturday",
-    },
-    planned_workouts: [
-      {
-        workout_id: "reviewed-easy-2026-05-30",
-        date: "2026-05-30",
-        weekday: "Saturday",
-        week_number: 1,
-        phase: "Base",
-        workout_type: "easy",
-        source_workout_type: "easy_aerobic_run",
-        workout_family: "easy",
-        workout_identity: "easy_aerobic_run",
-        calendar_icon_key: "easy",
-        goal_context: goalContext,
-        metric_mode: metricMode,
-        title: "Easy aerobic run",
-        summary: "A reviewed easy run with visible structure.",
-        planned_rpe: 4,
-        estimated_fatigue: "low",
-        recovery_priority: "medium",
-        segments: [
-          {
-            segment_id: "easy-warmup",
-            segment_type: "warmup",
-            label: "Ease in",
-            sequence: 1,
-            guidance: "Start relaxed and conversational.",
-            prescription: { mode: "time", duration_min: 8 },
-          },
-          {
-            segment_id: "easy-main",
-            segment_type: "main",
-            label: "Easy aerobic",
-            sequence: 2,
-            guidance: "Stay smooth and effort-led.",
-            prescription: { mode: "time", duration_min: 24 },
-          },
-          {
-            segment_id: "easy-finish",
-            segment_type: "cooldown",
-            label: "Easy finish",
-            sequence: 3,
-            guidance: "Finish lighter than you started.",
-            prescription: { mode: "time", duration_min: 8 },
-          },
-        ],
-      },
-      {
-        workout_id: "reviewed-rest-2026-05-31",
-        date: "2026-05-31",
-        weekday: "Sunday",
-        week_number: 1,
-        phase: "Base",
-        workout_type: "rest",
-        source_workout_type: "rest_and_recovery",
-        workout_family: "rest",
-        workout_identity: "rest_and_recovery",
-        calendar_icon_key: "rest",
-        goal_context: goalContext,
-        metric_mode: metricMode,
-        title: "Rest and recovery",
-        summary: "Reviewed rest day should persist exactly.",
-        estimated_fatigue: "low",
-        recovery_priority: "high",
-        segments: [
-          {
-            segment_id: "reviewed-rest",
-            segment_type: "rest",
-            label: "Rest and recovery",
-            sequence: 1,
-            guidance: "No run today; protect recovery.",
-            prescription: { mode: "none" },
-          },
-        ],
-      },
-      {
-        workout_id: "reviewed-trailing-rest-2026-06-01",
-        date: "2026-06-01",
-        weekday: "Monday",
-        week_number: 1,
-        phase: "Base",
-        workout_type: "rest",
-        source_workout_type: "rest_and_recovery",
-        workout_family: "rest",
-        workout_identity: "rest_and_recovery",
-        calendar_icon_key: "rest",
-        goal_context: goalContext,
-        metric_mode: metricMode,
-        title: "Trailing reviewed rest",
-        summary: "Reviewed trailing calendar day should not be dropped.",
-        estimated_fatigue: "low",
-        recovery_priority: "medium",
-        segments: [
-          {
-            segment_id: "reviewed-trailing-rest",
-            segment_type: "rest",
-            label: "Rest",
-            sequence: 1,
-            guidance: "Keep the reviewed trailing day in saved mode.",
-            prescription: { mode: "none" },
-          },
-        ],
-      },
-    ],
+    strength: { preference: "mobility" },
+    execution: { watchAccess: "watch_or_app", guidancePreference: "mixed" },
+    comment: null,
   };
 }
 
-function forceFirstPostLongRunBlueprintWorkoutToSteady(blueprint: AiFirstPlanBlueprint) {
-  const entries = blueprint.weeks
-    .flatMap((week) => week.plannedWorkouts.map((workout) => ({ week, workout })))
-    .filter((entry) => entry.workout.date)
-    .sort((left, right) => left.workout.date!.localeCompare(right.workout.date!));
-
-  for (let index = 0; index < entries.length; index += 1) {
-    const longRunEntry = entries[index]!;
-
-    if (longRunEntry.workout.workoutFamily !== "long") {
-      continue;
-    }
-
-    if (longRunEntry.week.weekNumber <= 4) {
-      continue;
-    }
-
-    const nextEntry = entries[index + 1] ?? null;
-
-    if (!nextEntry) {
-      return null;
-    }
-
-    nextEntry.workout.workoutFamily = "steady";
-    nextEntry.workout.workoutIdentity = "steady_aerobic_run";
-    nextEntry.workout.calendarIconKey = "steady";
-    nextEntry.workout.title = "Steady aerobic run";
-    nextEntry.workout.summary =
-      "Deliberately inserted doctrine fixture violation after a long run.";
-    nextEntry.workout.plannedRpe = 5;
-    nextEntry.workout.estimatedFatigue = "medium";
-    nextEntry.workout.recoveryPriority = "medium";
-    nextEntry.workout.segmentIntent = "steady_aerobic";
-    nextEntry.workout.metricIntent = "mixed_if_allowed";
-
-    return {
-      longRunDate: longRunEntry.workout.date!,
-      repairedDate: nextEntry.workout.date!,
-    };
-  }
-
-  return null;
+function assertPlanFirstCanonicalResult(plan: TrainingPlanV2, label: string) {
+  assert.equal(plan.schema_version, "training-plan-v2");
+  assert.equal(plan.source_kind, AI_AUTHORED_PLAN_FIRST_SOURCE_KIND);
+  assert.equal(plan.source_status, "ai_authored");
+  assert.equal(plan.goal.goal_type, "distance_goal");
+  assert.equal(plan.goal.distance_meters, 21_100);
+  assert.ok(plan.planned_workouts.length > 0, `${label} must include calendar rows.`);
+  assert.ok(
+    plan.planned_workouts.some((workout) =>
+      workout.segments.some((segment) => segment.prescription.mode === "repeats"),
+    ),
+    `${label} must preserve AI-authored repeat structure.`,
+  );
 }
 
-function countBlueprintAuthoredWorkouts(blueprint: AiFirstPlanBlueprint) {
-  return blueprint.weeks.reduce((total, week) => total + week.plannedWorkouts.length, 0);
-}
-
-function assertWeeklyLongRunDayWithTargetEndpoint(
-  plan: TrainingPlanV2,
-  expectedWeekday: WeekdayName,
-  targetDate: string,
-  label: string,
-) {
-  const targetWeekNumber =
-    plan.planned_workouts.find((workout) => workout.date === targetDate)?.week_number ?? null;
-  const weekNumbers = [...new Set(plan.planned_workouts.map((workout) => workout.week_number))];
-
-  for (const weekNumber of weekNumbers) {
-    const longRuns = plan.planned_workouts.filter(
-      (workout) =>
-        workout.week_number === weekNumber &&
-        (workout.workout_family === "long" || workout.workout_type === "long_run"),
-    );
-    const endpointRows =
-      weekNumber === targetWeekNumber
-        ? plan.planned_workouts.filter(
-            (workout) =>
-              workout.week_number === weekNumber &&
-              workout.date === targetDate &&
-              workout.source_workout_type === "final_selected_distance_day",
-          )
-        : [];
-    const longRunEquivalents = longRuns.length > 0 ? longRuns : endpointRows;
-
-    assert.equal(
-      longRunEquivalents.length,
-      1,
-      `${label}: week ${weekNumber} should have one long run or selected-distance endpoint`,
-    );
-
-    const longRun = longRunEquivalents[0]!;
-
-    if (weekNumber === targetWeekNumber && longRun.date === targetDate) {
-      continue;
-    }
-
-    assert.equal(
-      longRun.weekday,
-      expectedWeekday,
-      `${label}: week ${weekNumber} long run should land on ${expectedWeekday}`,
-    );
-  }
+function openAiPlanFirstResponse(responseId: string, draft: unknown) {
+  return new Response(
+    JSON.stringify({
+      id: responseId,
+      status: "completed",
+      output_text: JSON.stringify(draft),
+      usage: {
+        input_tokens: 100,
+        output_tokens: 100,
+        total_tokens: 200,
+      },
+    }),
+    {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    },
+  );
 }

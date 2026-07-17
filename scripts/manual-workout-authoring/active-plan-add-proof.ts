@@ -195,7 +195,7 @@ export async function validateManualActivePlanAddWorkoutContract() {
   const presetPlan = buildFakePlanCycle({
     userId,
     id: "33333333-3333-4333-8333-333333333333",
-    sourceKind: "ai_first_plan_blueprint_v1",
+    sourceKind: "ai_authored_plan_first_v1",
     startDate: "2026-06-16",
     endDate: "2026-06-16",
   });
@@ -206,9 +206,9 @@ export async function validateManualActivePlanAddWorkoutContract() {
   );
   assert.equal(presetAdd.ok, true, formatJsonResult(presetAdd));
   if (presetAdd.ok) {
-    assert.equal(presetAdd.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(presetAdd.sourceKind, "ai_authored_plan_first_v1");
     assert.equal(presetAdd.sourceMetadata.editSourceKind, ACTIVE_PLAN_USER_EDIT_SOURCE_KIND);
-    assert.equal(presetAdd.sourceMetadata.originalPlanSourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(presetAdd.sourceMetadata.originalPlanSourceKind, "ai_authored_plan_first_v1");
     assert.equal(
       presetAdd.sourceMetadata.mutationKind,
       ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,

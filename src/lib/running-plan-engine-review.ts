@@ -4,26 +4,12 @@ import {
   type AiGeneratedRunningPlanPreviewDraft,
 } from "@/lib/ai-generated-running-plan";
 import {
-  collectTenKBeginnerDosePolicyIssues,
-  normalizeTenKBeginnerDoseWorkoutDayKind,
-  resolveTenKBeginnerDosePolicyRunnerLevel,
-} from "@/lib/plan-creation-engine/ten-k-beginner-dose-policy";
-import {
-  RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION,
-  isRunningPlanCompositionDevelopmentTouch,
-  resolveRunningPlanCompositionWeek,
   collectRunnerFacingCanonicalRichnessIssues,
-  collectRunningPlanCanonicalPrescriptionGrammarIssues,
   collectSelectedDistanceEndpointIssues,
-  resolveSelectedDistanceQualityFamily,
-  summarizeRunnerFacingCanonicalRichness,
-  summarizeRunningPlanCanonicalPrescriptionGrammar,
+  isHardRunnerFacingRichnessIssue,
   selectedDistanceEndpointMainDistanceMeters,
   type RunningPlanPreviewCalendarRow,
-  type RunningPlanRepeatChildUnitPrescription,
-  type RunningPlanSegmentPrescription,
 } from "@/lib/plan-creation-engine";
-import type { RunningPlanDistanceFamily } from "@/lib/plan-creation-engine/source-types";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import { trainingPlanV2Schema } from "@/lib/imported-plan";
 import {
@@ -139,46 +125,21 @@ export async function validateRunningPlanReviewExactness(input: {
   }
 
   const richnessIssues = collectRunnerFacingCanonicalRichnessIssues({
-    family: resolveDistanceGoalQualityFamily(input.draft),
-    runnerLevel: resolveRunnerLevelForCanonicalQualityGates(input.draft),
-    loadContext: input.draft.normalizedInputSummary.loadContext,
+    distanceMeters:
+      input.draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ??
+      input.draft.endpointProof.endpointDistanceMeters ??
+      null,
     rows: canonicalPlan.planned_workouts,
   });
 
-  if (richnessIssues.length > 0) {
+  const hardRichnessIssues = richnessIssues.filter(isHardRunnerFacingRichnessIssue);
+
+  if (hardRichnessIssues.length > 0) {
     return {
       ok: false,
       reason: "invalid_review",
-      message: `This selected-plan review no longer satisfies Hito's runner-facing richness gates: ${richnessIssues[0]} Refresh the preview before creating a plan.`,
+      message: `This selected-plan review no longer satisfies Hito's runner-facing richness gates: ${hardRichnessIssues[0]} Refresh the preview before creating a plan.`,
     };
-  }
-
-  const prescriptionGrammarIssues = collectRunningPlanCanonicalPrescriptionGrammarIssues(
-    canonicalPlan.planned_workouts,
-  );
-  if (prescriptionGrammarIssues.length > 0) {
-    return {
-      ok: false,
-      reason: "invalid_review",
-      message:
-        "This selected-plan review no longer satisfies Hito's executable workout prescription grammar. Refresh the preview before creating a plan.",
-    };
-  }
-
-  if (resolveDistanceGoalQualityFamily(input.draft) === "10K") {
-    const beginnerDoseIssues = collectTenKBeginnerDosePolicyIssues({
-      runnerLevel: input.draft.normalizedInputSummary.runnerLevel,
-      benchmarkPaceTruth: input.draft.normalizedInputSummary.benchmarkPaceTruth,
-      rows: canonicalPlan.planned_workouts.map(canonicalWorkoutToTenKDoseValidationRow),
-    });
-    if (beginnerDoseIssues.length > 0) {
-      return {
-        ok: false,
-        reason: "invalid_review",
-        message:
-          "This selected-plan review no longer satisfies Hito's beginner 10K dose policy. Refresh the preview before creating a plan.",
-      };
-    }
   }
 
   const reviewPayload = buildRunningPlanReviewPayload(input.draft, canonicalPlan);
@@ -246,16 +207,6 @@ export function buildRunningPlanPersistenceMetadata(input: {
 }): AdditionalPlanPersistenceMetadata {
   const { draft, canonicalPlan, reviewChecksum } = input;
   const nonRestRows = draft.calendarRows.filter((row) => !row.isRestDay);
-  const compositionGrammar = summarizeRunningPlanCompositionGrammar(draft);
-  const runnerFacingRichness = summarizeRunnerFacingCanonicalRichness({
-    family: resolveDistanceGoalQualityFamily(draft),
-    runnerLevel: resolveRunnerLevelForCanonicalQualityGates(draft),
-    loadContext: draft.normalizedInputSummary.loadContext,
-    rows: canonicalPlan.planned_workouts,
-  });
-  const prescriptionGrammar = summarizeRunningPlanCanonicalPrescriptionGrammar(
-    canonicalPlan.planned_workouts,
-  );
   const metricPolicy = summarizeMetricPolicy(draft.calendarRows);
   const planGoalIntent = draft.normalizedInputSummary.planGoalIntent;
 
@@ -270,6 +221,7 @@ export function buildRunningPlanPersistenceMetadata(input: {
         preview_source_status: draft.sourceStatus,
         goal_model: "distance_goal",
         distance_goal: buildDistanceGoalMetadata(planGoalIntent),
+        ai_authored_goal_assumptions: buildAiAuthoredGoalAssumptionMetadata(canonicalPlan),
         runner_level: draft.normalizedInputSummary.runnerLevel,
         load_context: draft.normalizedInputSummary.loadContext,
         start_date: canonicalPlan.start_date,
@@ -279,8 +231,6 @@ export function buildRunningPlanPersistenceMetadata(input: {
         endpoint_proof: draft.endpointProof,
         plan_goal_intent: planGoalIntent,
         ai_generation: summarizeAiGenerationForPersistence(draft),
-        runner_facing_richness: runnerFacingRichness,
-        prescription_grammar: prescriptionGrammar,
         metric_policy: metricPolicy,
       },
     }),
@@ -288,12 +238,19 @@ export function buildRunningPlanPersistenceMetadata(input: {
       running_plan_engine_review: {
         review_contract_version: RUNNING_PLAN_REVIEW_CONTRACT_VERSION,
         review_checksum: reviewChecksum,
-        normalized_input: draft.normalizedInputSummary,
+        normalized_input: buildDistanceFirstNormalizedInputMetadata(draft),
+        ai_authored_goal_assumptions: buildAiAuthoredGoalAssumptionMetadata(canonicalPlan),
         plan_goal_intent: planGoalIntent,
         validation: draft.validation,
-        composition_grammar: compositionGrammar,
       },
     }),
+  };
+}
+
+function buildAiAuthoredGoalAssumptionMetadata(canonicalPlan: TrainingPlanV2) {
+  return {
+    authored_outcome_target: canonicalPlan.goal?.authored_outcome_target ?? null,
+    authored_horizon: canonicalPlan.goal?.authored_horizon ?? null,
   };
 }
 
@@ -303,7 +260,6 @@ function buildDistanceGoalMetadata(
   const distance = planGoalIntent.distance;
 
   return {
-    goal_type: "distance_build",
     ...(distance
       ? {
           kind: distance.kind,
@@ -318,6 +274,29 @@ function buildDistanceGoalMetadata(
     target_finish_time: planGoalIntent.targetFinishTime?.label ?? null,
     target_outcome_pace: planGoalIntent.targetOutcomePace?.label ?? null,
     outcome_pace_source: planGoalIntent.targetOutcomePace?.source ?? null,
+  };
+}
+
+function buildDistanceFirstNormalizedInputMetadata(draft: RunningPlanPreviewDraft) {
+  const normalizedInput = draft.normalizedInputSummary;
+  const intent = normalizedInput.planGoalIntent;
+
+  return {
+    normalizedBy: normalizedInput.normalizedBy,
+    age: normalizedInput.age,
+    heightCm: normalizedInput.heightCm,
+    weightKg: normalizedInput.weightKg,
+    runnerLevel: normalizedInput.runnerLevel,
+    daysPerWeek: normalizedInput.daysPerWeek,
+    fixedRestDays: normalizedInput.fixedRestDays,
+    preferredLongRunDay: normalizedInput.preferredLongRunDay,
+    longRunDaySource: normalizedInput.longRunDaySource,
+    trainingWeekdays: normalizedInput.trainingWeekdays,
+    startDate: normalizedInput.startDate,
+    benchmarkPaceTruth: normalizedInput.benchmarkPaceTruth,
+    loadContext: normalizedInput.loadContext,
+    distanceGoal: buildDistanceGoalMetadata(intent),
+    planGoalIntent: intent,
   };
 }
 
@@ -522,52 +501,6 @@ function stripRunningPlanReviewProof(draft: RunningPlanPreviewDraft): RunningPla
   };
 }
 
-function summarizeRunningPlanCompositionGrammar(draft: RunningPlanPreviewDraft) {
-  const rows = draft.calendarRows;
-  const horizonWeeks = maxWeekNumber(rows);
-  const weekProofs = Array.from({ length: horizonWeeks }, (_, index) => {
-    const weekNumber = index + 1;
-    const composition = resolveRunningPlanCompositionWeek({
-      family: resolveDistanceGoalQualityFamily(draft),
-      runnerLevel: draft.normalizedInputSummary.runnerLevel,
-      loadContext: draft.normalizedInputSummary.loadContext,
-      weekNumber,
-      horizonWeeks,
-    });
-    const weekRows = rows.filter((row) => row.weekNumber === weekNumber);
-    const actualDevelopmentTouches = weekRows
-      .filter(
-        (row) => !row.isRestDay && isRunningPlanCompositionDevelopmentTouch(row.workoutDayKind),
-      )
-      .map((row) => row.workoutDayKind);
-
-    return {
-      weekNumber,
-      archetype: composition.archetype,
-      plannedDevelopmentTouch: composition.developmentTouch,
-      actualDevelopmentTouches,
-      longRunRole: composition.longRunRole,
-      familySignals: composition.familySignals,
-    };
-  });
-
-  return {
-    version: RUNNING_PLAN_COMPOSITION_GRAMMAR_VERSION,
-    weekArchetypeSequence: weekProofs.map((week) => `${week.weekNumber}:${week.archetype}`),
-    plannedDevelopmentSequence: weekProofs
-      .filter((week) => week.plannedDevelopmentTouch)
-      .map((week) => `${week.weekNumber}:${week.plannedDevelopmentTouch}`),
-    actualDevelopmentSequence: weekProofs.flatMap((week) =>
-      week.actualDevelopmentTouches.map((touch) => `${week.weekNumber}:${touch}`),
-    ),
-    developmentTouchCountsByWeek: Object.fromEntries(
-      weekProofs.map((week) => [week.weekNumber, week.actualDevelopmentTouches.length]),
-    ),
-    familySignals: uniqueStrings(weekProofs.flatMap((week) => week.familySignals)),
-    longRunRoleSequence: weekProofs.map((week) => `${week.weekNumber}:${week.longRunRole}`),
-  };
-}
-
 function summarizeMetricPolicy(rows: readonly RunningPlanPreviewCalendarRow[]) {
   return {
     executableMode: "structure_only_executable",
@@ -579,122 +512,6 @@ function summarizeMetricPolicy(rows: readonly RunningPlanPreviewCalendarRow[]) {
     fakePaceOrPersonalHrOutput: /pace_min|pace_target|personal_hr|race_pace/i.test(
       JSON.stringify(rows),
     ),
-  };
-}
-
-function resolveRunnerLevelForCanonicalQualityGates(draft: RunningPlanPreviewDraft) {
-  if (resolveDistanceGoalQualityFamily(draft) !== "10K") {
-    return draft.normalizedInputSummary.runnerLevel;
-  }
-
-  return resolveTenKBeginnerDosePolicyRunnerLevel({
-    runnerLevel: draft.normalizedInputSummary.runnerLevel,
-    benchmarkPaceTruth: draft.normalizedInputSummary.benchmarkPaceTruth,
-  });
-}
-
-function resolveDistanceGoalQualityFamily(
-  draft: RunningPlanPreviewDraft,
-): RunningPlanDistanceFamily {
-  const meters =
-    draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ??
-    draft.endpointProof.endpointDistanceMeters ??
-    null;
-
-  return resolveSelectedDistanceQualityFamily({
-    distanceMeters: meters,
-    fallbackFamily: draft.normalizedInputSummary.distanceFamily,
-  });
-}
-
-export function canonicalWorkoutToTenKDoseValidationRow(
-  row: TrainingPlanV2["planned_workouts"][number],
-) {
-  return {
-    rowId: row.workout_id,
-    date: row.date,
-    weekNumber: row.week_number,
-    isRestDay: row.workout_type === "rest",
-    workoutDayKind: normalizeTenKBeginnerDoseWorkoutDayKind(
-      row.source_workout_type ?? row.workout_identity ?? row.workout_type,
-    ),
-    endpointDistanceMeters: selectedDistanceEndpointMainDistanceMeters({
-      endpointKind: row.source_workout_type,
-      segments: row.segments,
-    }),
-    segments: row.segments.map((segment) => ({
-      primaryPrescription: canonicalPrescriptionToDosePrescription(segment.prescription),
-    })),
-  };
-}
-
-function canonicalPrescriptionToDosePrescription(
-  prescription: TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"],
-): RunningPlanSegmentPrescription {
-  if (!prescription || prescription.mode === "none") {
-    return {
-      mode: "time",
-      durationSeconds: { min: 0, max: 0 },
-      intensityLabel: "none",
-    };
-  }
-
-  if (prescription.mode === "distance") {
-    const distanceMeters = Math.round((prescription.distance_km ?? 0) * 1000);
-    return {
-      mode: "distance",
-      distanceMeters: { min: distanceMeters, max: distanceMeters },
-      intensityLabel: "canonical_distance",
-    };
-  }
-
-  if (prescription.mode === "repeats") {
-    const repeatCount = prescription.repeat_count ?? 0;
-    return {
-      mode: "repeat",
-      repeatCount: { min: repeatCount, max: repeatCount },
-      children: (prescription.children ?? []).map((child, index) => ({
-        role: child.role,
-        ...(child.label ? { label: child.label } : {}),
-        ...(child.guidance ? { guidance: child.guidance } : {}),
-        prescription: canonicalRepeatChildUnitToDoseUnit(child.prescription),
-        intensityLabel: `canonical_repeat_${child.role}_${index + 1}`,
-      })),
-    };
-  }
-
-  const durationSeconds = Math.round((prescription.duration_min ?? 0) * 60);
-  return {
-    mode: "time",
-    durationSeconds: { min: durationSeconds, max: durationSeconds },
-    intensityLabel: "canonical_time",
-  };
-}
-
-function canonicalRepeatChildUnitToDoseUnit(
-  unit:
-    | NonNullable<
-        Extract<
-          NonNullable<
-            TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"]
-          >,
-          { mode: "repeats" }
-        >["children"]
-      >[number]["prescription"]
-    | undefined,
-): RunningPlanRepeatChildUnitPrescription {
-  if (unit?.mode === "distance") {
-    const distanceMeters = Math.round((unit.distance_km ?? 0) * 1000);
-    return {
-      mode: "distance",
-      distanceMeters: { min: distanceMeters, max: distanceMeters },
-    };
-  }
-
-  const durationSeconds = Math.round((unit?.duration_min ?? 0) * 60);
-  return {
-    mode: "time",
-    durationSeconds: { min: durationSeconds, max: durationSeconds },
   };
 }
 
@@ -723,14 +540,6 @@ function collectDistanceGoalEndpointExactnessIssues(
     targetDate: draft.normalizedInputSummary.planGoalIntent.targetDate,
     proof: draft.endpointProof,
   }).map((issue) => issue.code);
-}
-
-function maxWeekNumber(rows: readonly RunningPlanPreviewCalendarRow[]) {
-  return Math.max(...rows.map((row) => row.weekNumber));
-}
-
-function uniqueStrings(values: readonly string[]) {
-  return Array.from(new Set(values));
 }
 
 async function signRunningPlanReviewPayload(payload: unknown) {

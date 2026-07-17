@@ -163,13 +163,13 @@ export function validateManualActivePlanExportContract() {
     ...buildFakePlanCycle({
       userId,
       id: "99999999-9999-4999-8999-000000000606",
-      sourceKind: "ai_first_plan_blueprint_v1",
+      sourceKind: "ai_authored_plan_first_v1",
       startDate: "2026-06-18",
       endDate: "2026-06-22",
     }),
     goal_metadata: {
       selected_plan_engine: {
-        source_kind: "ai_first_plan_blueprint_v1",
+        source_kind: "ai_authored_plan_first_v1",
         source_status: "preview_ready",
       },
     },

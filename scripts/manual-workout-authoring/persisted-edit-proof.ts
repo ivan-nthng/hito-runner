@@ -428,7 +428,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
   const generatedPlan = buildFakePlanCycle({
     userId,
     id: activePlan.id,
-    sourceKind: "ai_first_plan_blueprint_v1",
+    sourceKind: "ai_authored_plan_first_v1",
     startDate: "2026-06-18",
     endDate: "2026-06-24",
   });
@@ -451,7 +451,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
   );
   assert.equal(generatedReconstruct.ok, true, formatJsonResult(generatedReconstruct));
   if (generatedReconstruct.ok) {
-    assert.equal(generatedReconstruct.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(generatedReconstruct.sourceKind, "ai_authored_plan_first_v1");
     assert.equal(generatedReconstruct.draftInput.templateKey, "easy_aerobic_run");
     assert.equal(generatedReconstruct.safety.reconstructedFromPersistedWorkout, true);
     assert.equal(generatedReconstruct.safety.trustedClientRows, false);
@@ -472,7 +472,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
   );
   assert.equal(generatedReview.ok, true, formatJsonResult(generatedReview));
   if (generatedReview.ok) {
-    assert.equal(generatedReview.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(generatedReview.sourceKind, "ai_authored_plan_first_v1");
     assert.equal(generatedReview.review.trustedClientRows, false);
     assert.equal(generatedReview.safety.activePlanSourceVerified, true);
     assert.equal(generatedReview.safety.trustedClientRows, false);
@@ -511,13 +511,13 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
   );
   assert.equal(generatedConfirm.ok, true, formatJsonResult(generatedConfirm));
   if (generatedConfirm.ok) {
-    assert.equal(generatedConfirm.sourceKind, "ai_first_plan_blueprint_v1");
+    assert.equal(generatedConfirm.sourceKind, "ai_authored_plan_first_v1");
     assert.equal(generatedConfirm.sourceStatus, null);
     assert.equal(generatedConfirm.sourceMetadata.editSourceKind, "active_plan_user_edit_v1");
     assert.equal(generatedConfirm.sourceMetadata.mutationKind, "user_edited_workout");
     assert.equal(
       generatedConfirm.sourceMetadata.originalPlanSourceKind,
-      "ai_first_plan_blueprint_v1",
+      "ai_authored_plan_first_v1",
     );
     assert.equal(generatedConfirm.sourceMetadata.originalPlanSourceStatus, null);
     assert.equal(generatedConfirm.sourceMetadata.trustedClientRows, false);
@@ -526,7 +526,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
   }
   assert.deepEqual(generatedPersists, [
     {
-      sourceKind: "ai_first_plan_blueprint_v1",
+      sourceKind: "ai_authored_plan_first_v1",
       sourceWorkoutId: generatedSourceWorkout.id,
       editedTemplateKey: "steady_aerobic_run",
     },

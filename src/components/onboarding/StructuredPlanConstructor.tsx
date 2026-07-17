@@ -585,7 +585,6 @@ function StructuredDraftReadyReviewModal({
 }) {
   const review = result.review;
   const summary = result.draft.summary;
-  const longHorizonReviewCopy = getLongHorizonReviewCopy(result);
   const durationLabel = summary.targetDate ? "Plan range" : "Plan length";
 
   return (
@@ -613,7 +612,10 @@ function StructuredDraftReadyReviewModal({
             <div className="hito-list-row items-start">
               <div className="min-w-0">
                 <p className="hito-list-row-title">Plan ready</p>
-                <p className="hito-list-row-copy">{longHorizonReviewCopy}</p>
+                <p className="hito-list-row-copy">
+                  AI authored the complete draft. Hito compiled and reviewed it. Confirm to create
+                  the reviewed plan.
+                </p>
               </div>
               <span className="hito-status-pill" data-tone="success">
                 Review
@@ -776,17 +778,6 @@ function StructuredReviewLine({ label, value }: { label: string; value: string }
       <p className="hito-body-small text-muted-foreground">{value}</p>
     </div>
   );
-}
-
-function getLongHorizonReviewCopy(result: StructuredDraftReady) {
-  const backendExtendedWeeks =
-    result.generation.blueprintTrace?.blueprintHorizonStrategy?.backendExtendedWeeks ?? 0;
-
-  if (backendExtendedWeeks > 0 && result.draft.summary.targetDate) {
-    return "This is your full plan through your goal date. Hito shapes the opening block with AI, then builds the remaining weeks with safe progression before you confirm.";
-  }
-
-  return "Hito reviewed your answers and prepared your full plan. The active plan is created only after the next explicit confirmation.";
 }
 
 const PRESET_RUNNING_DAY_OPTIONS: { value: string; label: string; copy: string }[] = [

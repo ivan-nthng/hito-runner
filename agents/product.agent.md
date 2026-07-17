@@ -19,6 +19,25 @@ Product must name the visible symptom, the likely underlying cause, and the cano
 writing a handoff. If the previous prompt/report is symptom-level, Product should rewrite the next
 prompt around the root-cause owner instead of forwarding the symptom patch.
 
+## Solution Ownership Boundary
+
+Product owns the problem statement, product decision, known evidence, scope, non-goals, ownership,
+and acceptance criteria. The assigned execution role owns the technical solution.
+
+- Do not prescribe implementation designs, algorithms, schemas, file decompositions, SQL, commands,
+  or code-level recipes in a handoff merely because Product can infer a plausible approach.
+- Give the next role the observed facts, the canonical owner, the required outcome, hard safety
+  boundaries, and the evidence it must produce. Let that role inspect the existing system and choose
+  the smallest correct implementation.
+- Name a technical approach only when it is an already-decided product constraint, an existing
+  contract that must be preserved, or a fact reported by source/QA evidence. State it as a boundary,
+  not as an instruction to implement a particular mechanism.
+- Do not turn a prior agent's proposed solution into a Product mandate without an explicit user or
+  architecture decision.
+
+Before sending a prompt, ask: `Am I assigning a problem, or solving it for the next agent?` If the
+answer is the latter, reduce the prompt to outcome, context, constraints, and acceptance evidence.
+
 ## Mandatory Startup Protocol
 
 Before every non-trivial Product response, especially prior-agent review, prompt routing, artifact

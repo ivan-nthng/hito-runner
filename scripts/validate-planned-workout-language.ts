@@ -506,7 +506,7 @@ function buildArbitraryRepeatChildrenTrainingPlan(basePlan: TrainingPlanV2): Tra
   return importedPlanSchema.parse({
     ...basePlan,
     plan_name: "Generated/AI arbitrary repeat children contract",
-    source_kind: "ai_first_plan_blueprint_v1",
+    source_kind: "ai_authored_plan_first_v1",
     planned_workouts: [
       buildRepeatChildrenWorkout(baseWorkout, {
         workoutId: "repeat_children_run_walk",
@@ -691,8 +691,8 @@ function assertArbitraryRepeatChildrenRoundtrip(plan: TrainingPlanV2) {
     ...buildFakePlanCycle(userId),
     id: "99999999-9999-4999-8999-000000000710",
     title: "Generated repeat children export proof",
-    source_kind: "ai_first_plan_blueprint_v1",
-    source_template: "ai_first_plan_blueprint_v1",
+    source_kind: "ai_authored_plan_first_v1",
+    source_template: "ai_authored_plan_first_v1",
   };
   const rows: PersistedPlannedWorkoutRow[] = buildPersistedWorkoutInsertRows(
     planCycle.id,
@@ -1060,7 +1060,7 @@ function validateSourceKindIsProvenanceOnly() {
   const alternate = buildPlannedWorkoutLanguage({
     workoutType: "quality",
     sourceWorkoutType: base.provenance.sourceWorkoutType,
-    sourceKind: "ai_first_plan_blueprint_v1",
+    sourceKind: "ai_authored_plan_first_v1",
     workoutFamily: base.canonical.workoutFamily,
     workoutIdentity: base.canonical.workoutIdentity,
     calendarIconKey: base.canonical.calendarIconKey,
@@ -1077,7 +1077,7 @@ function validateSourceKindIsProvenanceOnly() {
   });
 
   assert.equal(alternate.runnerFacingWorkoutType, "hills");
-  assert.equal(alternate.provenance.sourceKind, "ai_first_plan_blueprint_v1");
+  assert.equal(alternate.provenance.sourceKind, "ai_authored_plan_first_v1");
 }
 
 function validateInternalIdentityLabelsStayBackendOnly() {

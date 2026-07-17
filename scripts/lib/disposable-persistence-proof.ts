@@ -3,9 +3,6 @@ import assert from "node:assert/strict";
 import type { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 
 export const DISPOSABLE_REQUIRE_PERSISTENCE_FLAG = "--require-persistence";
-export const DISPOSABLE_REMOTE_MUTATION_FLAG = "--allow-remote-disposable-supabase-mutation";
-export const DISPOSABLE_REMOTE_MUTATION_ENV_VALUE =
-  "I_UNDERSTAND_THIS_MUTATES_REMOTE_DISPOSABLE_SUPABASE";
 
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 type SupabaseAdminLike = ReturnType<typeof createAdminSupabaseClient>;
@@ -13,14 +10,11 @@ type SupabaseAdminLike = ReturnType<typeof createAdminSupabaseClient>;
 export type DisposableSupabaseTarget = {
   url: string;
   hostname: string;
-  projectRef: string | null;
   isLoopback: boolean;
 };
 
 export type DisposablePersistenceCliOptions = {
   requirePersistence: boolean;
-  remoteMutationFlagPresent: boolean;
-  remoteMutationEnvConfirmed: boolean;
 };
 
 export type DisposablePersistencePreflight =
@@ -39,7 +33,7 @@ export type DisposablePersistencePreflight =
       overrideHint: string;
     }
   | {
-      mode: "remote_supabase_blocked";
+      mode: "non_loopback_supabase_blocked";
       shouldRun: false;
       target: DisposableSupabaseTarget;
       reason: string;
@@ -47,11 +41,6 @@ export type DisposablePersistencePreflight =
     }
   | {
       mode: "local_disposable_supabase";
-      shouldRun: true;
-      target: DisposableSupabaseTarget;
-    }
-  | {
-      mode: "remote_disposable_supabase_override";
       shouldRun: true;
       target: DisposableSupabaseTarget;
     };
@@ -71,19 +60,13 @@ export type DisposableSupabaseCleanupProof<
     ? { authUserRemaining: false }
     : Record<never, never>);
 
-export function readDisposablePersistenceCliOptions(input: {
-  args?: readonly string[];
-  remoteMutationEnv: string;
-  remoteMutationEnvValue?: string;
-}): DisposablePersistenceCliOptions {
-  const flags = new Set(input.args ?? process.argv.slice(2));
+export function readDisposablePersistenceCliOptions(
+  args: readonly string[] = process.argv.slice(2),
+): DisposablePersistenceCliOptions {
+  const flags = new Set(args);
 
   return {
     requirePersistence: flags.has(DISPOSABLE_REQUIRE_PERSISTENCE_FLAG),
-    remoteMutationFlagPresent: flags.has(DISPOSABLE_REMOTE_MUTATION_FLAG),
-    remoteMutationEnvConfirmed:
-      process.env[input.remoteMutationEnv] ===
-      (input.remoteMutationEnvValue ?? DISPOSABLE_REMOTE_MUTATION_ENV_VALUE),
   };
 }
 
@@ -96,10 +79,8 @@ export function resolveDisposablePersistencePreflight(input: {
   envIncompleteOverrideHint: string;
   invalidUrlReason: string;
   invalidUrlOverrideHint: string;
-  remoteBlockedReason: string;
-  remoteOverrideHint: string;
-  allowedRemoteProjectRef?: string;
-  remoteProjectNotAllowlistedReason?: (target: DisposableSupabaseTarget) => string;
+  nonLoopbackBlockedReason: string;
+  nonLoopbackOverrideHint: string;
 }): DisposablePersistencePreflight {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const target = url ? parseDisposableSupabaseTarget(url) : null;
@@ -147,28 +128,12 @@ export function resolveDisposablePersistencePreflight(input: {
     };
   }
 
-  const remoteOverrideRequested =
-    input.options.remoteMutationFlagPresent && input.options.remoteMutationEnvConfirmed;
-  const remoteProjectAllowed =
-    !input.allowedRemoteProjectRef || target.projectRef === input.allowedRemoteProjectRef;
-
-  if (remoteOverrideRequested && remoteProjectAllowed) {
-    return {
-      mode: "remote_disposable_supabase_override",
-      shouldRun: true,
-      target,
-    };
-  }
-
   return {
-    mode: "remote_supabase_blocked",
+    mode: "non_loopback_supabase_blocked",
     shouldRun: false,
     target,
-    reason:
-      remoteOverrideRequested && !remoteProjectAllowed && input.remoteProjectNotAllowlistedReason
-        ? input.remoteProjectNotAllowlistedReason(target)
-        : input.remoteBlockedReason,
-    overrideHint: input.remoteOverrideHint,
+    reason: input.nonLoopbackBlockedReason,
+    overrideHint: input.nonLoopbackOverrideHint,
   };
 }
 
@@ -176,14 +141,10 @@ export function parseDisposableSupabaseTarget(url: string): DisposableSupabaseTa
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
-    const projectRef = hostname.endsWith(".supabase.co")
-      ? hostname.split(".supabase.co")[0] || null
-      : null;
 
     return {
       url: parsed.origin,
       hostname,
-      projectRef,
       isLoopback: LOOPBACK_HOSTNAMES.has(hostname),
     };
   } catch {
